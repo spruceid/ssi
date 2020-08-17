@@ -16,12 +16,7 @@ idchar = _{ ASCII_ALPHANUMERIC | "." | "-" | "_" }
 // NOTE: path-abempty and fragment are from RFC3986 (URI: Generic Syntax) so we
 // have included the relevant constructions below. 
 //
-// did-url            = did path-abempty [ "?" did-query ]
-//                      [ "#" fragment ]
-// did-query          = param *( "&" param )
-// param              = param-name "=" param-value
-// param-name         = 1*pchar
-// param-value        = *pchar
+// did-url = did path-abempty [ "?" query ] [ "#" fragment ]
 
 did_url = { did }
 
