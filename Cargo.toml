@@ -1,5 +1,5 @@
 [package]
-name = "didkit"
+name = "ssi"
 version = "0.1.0"
 authors = ["wyc <wyc@fastmail.fm>"]
 edition = "2018"
@@ -10,3 +10,5 @@ edition = "2018"
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+pest = "2.1"
+pest_derive = "2.1"
