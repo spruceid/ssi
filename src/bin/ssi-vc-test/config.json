@@ -1,0 +1,15 @@
+{
+  "generator": "../ssi/target/debug/ssi-vc-test generate",
+  "presentationGenerator": "../ssi/target/debug/ssi-vc-test generate-presentation",
+  "generatorOptions": "",
+  "sectionsNotSupported": [
+    "schema",
+    "refresh",
+    "evidence",
+    "status",
+    "tou",
+    "ldp",
+    "jwt",
+    "zkp"
+  ]
+}
