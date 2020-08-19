@@ -158,6 +158,10 @@ impl Document {
             proof: None,
         }
     }
+
+    pub fn from_json(json: &str) -> Result<Document, serde_json::Error> {
+        serde_json::from_str(json)
+    }
 }
 
 #[cfg(test)]
@@ -200,6 +204,18 @@ mod tests {
             .build()
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+    }
+
+    #[test]
+    fn document_from_json() {
+        let doc_str = "{\
+            \"@context\": \"https://www.w3.org/2019/did/v1\",\
+            \"id\": \"did:test:deadbeefcafe\"\
+        }";
+        let id = "did:test:deadbeefcafe";
+        let doc = Document::from_json(doc_str).unwrap();
+        println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+        assert_eq!(doc.id, id);
     }
 
     #[test]
