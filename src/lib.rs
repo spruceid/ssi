@@ -3,6 +3,8 @@ mod vc;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
+#[macro_use]
+extern crate derive_builder;
 
 use pest::error::Error;
 use pest::Parser;
