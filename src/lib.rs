@@ -4,8 +4,8 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
-use pest::Parser;
 use pest::error::Error;
+use pest::Parser;
 
 #[derive(Parser)]
 #[grammar = "did.pest"]
@@ -20,7 +20,7 @@ mod tests {
         let input = "did:deadbeef:cafe/sub/path/?p1=v1&p2=v2#frag1";
         let rv = DidParser::parse(Rule::did_url, input);
         match rv {
-            Ok(pairs) => { 
+            Ok(pairs) => {
                 //println!("{:#?}", pairs);
                 assert_eq!(input, pairs.as_str()); // ensure complete parsing
                 let mut pairs_iter = pairs;
@@ -43,7 +43,7 @@ mod tests {
                 let fragment_pair = did_url_pairs_iter.next().unwrap();
                 assert_eq!(Rule::fragment, fragment_pair.as_rule());
                 assert_eq!("frag1", fragment_pair.as_str());
-            },
+            }
             Err(e) => panic!("error: {}", e),
         }
     }
