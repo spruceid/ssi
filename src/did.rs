@@ -1,9 +1,9 @@
 use std::collections::HashMap as Map;
 
-use serde::{Serialize, Deserialize};
-use serde_json::{Value, json};
-use serde_json;
 use chrono::prelude::*;
+use serde::{Deserialize, Serialize};
+use serde_json;
+use serde_json::{json, Value};
 
 // ***********************************************
 // * Data Structures for Decentralized Identifiers
@@ -105,10 +105,9 @@ pub struct Proof {
     #[serde(rename = "type")]
     type_: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]          
+    #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
-
 
 impl Document {
     pub fn new(id: &str) -> Document {
@@ -138,12 +137,13 @@ mod tests {
         assert_eq!(doc.id, id);
     }
 
-
     #[test]
     fn public_key() {
         let id = "did:test:deadbeefcafe";
         let mut doc = Document::new(id);
-        doc.public_key = Some(PublicKey::One(PublicKeyEntry::DIDURL(String::from("did:pubkey:okay"))));
+        doc.public_key = Some(PublicKey::One(PublicKeyEntry::DIDURL(String::from(
+            "did:pubkey:okay",
+        ))));
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
         let pko = PublicKeyObject {
             id: String::from("did:example:123456789abcdefghi#keys-1"),
