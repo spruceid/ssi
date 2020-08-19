@@ -1,5 +1,5 @@
-mod did;
-mod vc;
+pub mod did;
+pub mod vc;
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
