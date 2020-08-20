@@ -60,7 +60,7 @@ pub enum ContextsUnchecked {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Context {
-    URI(String),
+    URI(URI),
     Object(Map<String, Value>),
 }
 
@@ -83,16 +83,8 @@ pub struct Subject {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-#[serde(try_from = "IssuerUnchecked")]
 pub enum Issuer {
-    URI(String),
-    Object(ObjectWithId),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum IssuerUnchecked {
-    URI(String),
+    URI(URI),
     Object(ObjectWithId),
 }
 
@@ -152,6 +144,13 @@ pub struct Status {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(try_from = "String")]
+#[serde(untagged)]
+pub enum URI {
+    String(String),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Presentation {
     #[serde(rename = "@context")]
@@ -175,54 +174,42 @@ impl TryFrom<ContextsUnchecked> for Contexts {
         match context {
             // @TODO: make more DRY
             ContextsUnchecked::One(context) => match context {
-                Context::URI(uri) => {
-                    if uri != DEFAULT_CONTEXT.to_string() {
+                Context::URI(URI::String(uri)) => {
+                    if uri != DEFAULT_CONTEXT {
                         Err("Invalid context")
                     } else {
-                        Ok(Contexts::One(Context::URI(uri)))
+                        Ok(Contexts::One(Context::URI(URI::String(uri))))
                     }
                 }
-                Context::Object(_) => Err("Base context must be URI"),
+                _ => Err("Base context must be URI"),
             },
             ContextsUnchecked::Many(contexts) => {
                 if contexts.len() == 0 {
-                    Err("Missing context")
-                } else {
-                    let first_context = &contexts[0];
-                    match first_context {
-                        Context::URI(uri) => {
-                            if uri != DEFAULT_CONTEXT {
-                                return Err("Invalid context");
-                            }
-                            // @TODO: check strings are URIs and objects are valid
-                            // context definitions
-                            Ok(Contexts::Many(contexts))
+                    return Err("Missing context");
+                }
+                let first_context = &contexts[0];
+                match first_context {
+                    Context::URI(URI::String(uri)) => {
+                        if uri != DEFAULT_CONTEXT {
+                            return Err("Invalid context");
                         }
-                        Context::Object(_) => Err("Base context must be URI"),
+                        Ok(Contexts::Many(contexts))
                     }
+                    _ => Err("Base context must be URI"),
                 }
             }
         }
     }
 }
 
-impl TryFrom<IssuerUnchecked> for Issuer {
+impl TryFrom<String> for URI {
     type Error = &'static str;
-    fn try_from(issuer: IssuerUnchecked) -> Result<Self, Self::Error> {
-        // must be either URI or object containing id property
-        match issuer {
-            IssuerUnchecked::URI(uri) => {
-                // @TODO: more complete checking
-                if uri.contains(":") {
-                    Ok(Issuer::URI(uri))
-                } else {
-                    Err("Issuer string is not a URI")
-                }
-            }
-            IssuerUnchecked::Object(object) => {
-                // id property is already required by the ObjectWithId struct
-                Ok(Issuer::Object(object))
-            }
+    fn try_from(uri: String) -> Result<Self, Self::Error> {
+        // @TODO: more complete checking
+        if uri.contains(":") {
+            Ok(URI::String(uri))
+        } else {
+            Err("String is not a URI")
         }
     }
 }
