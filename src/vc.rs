@@ -233,16 +233,16 @@ mod tests {
 
     #[test]
     fn credential_from_json() {
-        let doc_str = "{\
-            \"@context\": \"https://www.w3.org/2018/credentials/v1\",\
-            \"id\": \"http://example.org/credentials/3731\",\
-            \"type\": [\"VerifiableCredential\"],\
-            \"issuer\": \"did:example:30e07a529f32d234f6181736bd3\",\
-            \"issuanceDate\": \"2020-08-19T21:41:50Z\",\
-            \"credentialSubject\": {\
-                \"id\": \"did:example:d23dd687a7dc6787646f2eb98d0\"\
-            }\
-        }";
+        let doc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
         let id = "http://example.org/credentials/3731";
         let doc: Credential = serde_json::from_str(doc_str).unwrap();
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
@@ -251,19 +251,19 @@ mod tests {
 
     #[test]
     fn credential_multiple_contexts() {
-        let doc_str = "{\
-            \"@context\": [\
-              \"https://www.w3.org/2018/credentials/v1\",\
-              \"https://www.w3.org/2018/credentials/examples/v1\"\
-            ],\
-            \"id\": \"http://example.org/credentials/3731\",\
-            \"type\": [\"VerifiableCredential\"],\
-            \"issuer\": \"did:example:30e07a529f32d234f6181736bd3\",\
-            \"issuanceDate\": \"2020-08-19T21:41:50Z\",\
-            \"credentialSubject\": {\
-                \"id\": \"did:example:d23dd687a7dc6787646f2eb98d0\"\
-            }\
-        }";
+        let doc_str = r###"{
+            "@context": [
+              "https://www.w3.org/2018/credentials/v1",
+              "https://www.w3.org/2018/credentials/examples/v1"
+            ],
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
         let doc: Credential = serde_json::from_str(doc_str).unwrap();
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
         if let Contexts::Many(contexts) = doc.context {
@@ -276,16 +276,16 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid context")]
     fn credential_invalid_context() {
-        let doc_str = "{\
-            \"@context\": \"https://example.org/invalid-context\",
-            \"id\": \"http://example.org/credentials/3731\",\
-            \"type\": [\"VerifiableCredential\"],\
-            \"issuer\": \"did:example:30e07a529f32d234f6181736bd3\",\
-            \"issuanceDate\": \"2020-08-19T21:41:50Z\",\
-            \"credentialSubject\": {\
-                \"id\": \"did:example:d23dd687a7dc6787646f2eb98d0\"\
-            }\
-        }";
+        let doc_str = r###"{
+            "@context": "https://example.org/invalid-context",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
         let doc: Credential = serde_json::from_str(doc_str).unwrap();
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
     }
