@@ -39,7 +39,11 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub terms_of_use: Option<Vec<TermsOfUse>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub evidence: Option<Vec<Evidence>>,
+    pub evidence: Option<Evidences>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub credential_schema: Option<Schemas>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_service: Option<RefreshServices>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -125,12 +129,19 @@ pub struct TermsOfUse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Evidences {
+    One(Evidence),
+    Many(Vec<Evidence>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Evidence {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: Vec<String>,
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
@@ -151,12 +162,47 @@ pub enum URI {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Schemas {
+    One(Schema),
+    Many(Vec<Schemas>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Schema {
+    pub id: URI,
+    #[serde(rename = "type")]
+    pub type_: String,
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RefreshServices {
+    One(RefreshService),
+    Many(Vec<RefreshService>),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RefreshService {
+    pub id: URI,
+    #[serde(rename = "type")]
+    pub type_: String,
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Presentation {
     #[serde(rename = "@context")]
     pub context: Vec<String>,
     #[serde(rename = "type")]
     pub type_: Vec<String>,
+    // @TODO: credential must have credential_schema
     pub verifiable_credential: Vec<Credential>,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
