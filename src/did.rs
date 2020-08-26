@@ -3,7 +3,7 @@ use std::collections::HashMap as Map;
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json;
-use serde_json::{json, Value};
+use serde_json::Value;
 
 // ***********************************************
 // * Data Structures for Decentralized Identifiers

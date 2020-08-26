@@ -1,21 +1,25 @@
+pub mod der;
 pub mod did;
+pub mod error;
+pub mod jwk;
 pub mod vc;
+
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 #[macro_use]
 extern crate derive_builder;
 
-use pest::error::Error;
-use pest::Parser;
-
 #[derive(Parser)]
 #[grammar = "did.pest"]
-struct DidParser;
+pub struct DidParser;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // use pest::error::Error;
+    use pest::Parser;
 
     #[test]
     fn parse_did_components() {
