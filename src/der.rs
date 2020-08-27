@@ -5,6 +5,9 @@
 // ISO/IEC 8825-1:2015 (E)
 // https://tools.ietf.org/html/rfc8017#page-55
 
+const TAG_INTEGER: u8 = 0x02;
+const TAG_SEQUENCE: u8 = 0x10;
+
 pub trait ASN1: Clone {
     fn as_bytes(self) -> Vec<u8>;
 }
@@ -46,6 +49,7 @@ fn trim_bytes(bytes: &[u8]) -> Vec<u8> {
 fn encode(tag: u8, constructed: bool, contents: Vec<u8>) -> Vec<u8> {
     // prepare an ASN1 tag-length-value
     let id = tag
+        // set bit for constructed (vs primitive)
         | match constructed {
             true => 0x20,
             false => 0,
@@ -69,7 +73,7 @@ impl ASN1 for RSAPrivateKey {
         let multiprime = self.other_prime_infos.is_some();
         let version = Integer(vec![if multiprime { 1 } else { 0 }]);
         encode(
-            0x10,
+            TAG_SEQUENCE,
             true,
             [
                 version.as_bytes().to_vec(),
@@ -90,7 +94,7 @@ impl ASN1 for RSAPrivateKey {
 
 impl ASN1 for Integer {
     fn as_bytes(self) -> Vec<u8> {
-        encode(0x02, false, self.0)
+        encode(TAG_INTEGER, false, self.0)
     }
 }
 
@@ -106,7 +110,7 @@ impl<T: ASN1> ASN1 for Option<T> {
 impl ASN1 for OtherPrimeInfos {
     fn as_bytes(self) -> Vec<u8> {
         encode(
-            0x10,
+            TAG_SEQUENCE,
             true,
             self.0
                 .into_iter()
@@ -119,7 +123,7 @@ impl ASN1 for OtherPrimeInfos {
 impl ASN1 for OtherPrimeInfo {
     fn as_bytes(self) -> Vec<u8> {
         encode(
-            0x10,
+            TAG_SEQUENCE,
             true,
             [
                 self.prime.as_bytes().to_vec(),
@@ -138,6 +142,9 @@ mod tests {
     #[test]
     fn encode_integer() {
         let integer = Integer(vec![5]);
+        // 0x02: Integer type
+        // 0x01: Content length of one byte
+        // 0x05: The integer 5
         let expected = vec![0x02, 0x01, 0x05];
         assert_eq!(integer.as_bytes(), expected);
     }
