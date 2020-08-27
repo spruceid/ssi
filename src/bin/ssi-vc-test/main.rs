@@ -1,6 +1,7 @@
 use ssi::jwk::JWTKeys;
-use ssi::vc::Contexts;
+use ssi::vc::Context;
 use ssi::vc::Credential;
+use ssi::vc::OneOrMany;
 use ssi::vc::Presentation;
 
 fn usage() {
@@ -33,12 +34,14 @@ fn generate(data: String) -> String {
     }
 
     // work around https://github.com/w3c/vc-test-suite/issues/96
-    if doc.type_.len() > 1 {
-        if let Contexts::Many(ref context) = doc.context {
-            if context.len() == 1 {
-                panic!("If there are multiple types, there should be multiple contexts.");
-            }
-        }
+    let contexts: &OneOrMany<Context> = &doc.context.clone().into();
+    if doc.type_.len() > 1 && contexts.len() <= 1 {
+        panic!("If there are multiple types, there should be multiple contexts.");
+    }
+
+    // work around https://github.com/w3c/vc-test-suite/issues/97
+    if contexts.len() > 1 && doc.type_.len() <= 1 {
+        panic!("If there are multiple contexts, there should be multiple types.");
     }
 
     serde_json::to_string_pretty(&doc).unwrap()

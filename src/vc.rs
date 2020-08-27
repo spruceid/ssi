@@ -304,6 +304,15 @@ impl TryFrom<OneOrMany<Context>> for Contexts {
     }
 }
 
+impl From<Contexts> for OneOrMany<Context> {
+    fn from(contexts: Contexts) -> OneOrMany<Context> {
+        match contexts {
+            Contexts::One(context) => OneOrMany::One(context),
+            Contexts::Many(contexts) => OneOrMany::Many(contexts),
+        }
+    }
+}
+
 impl TryFrom<String> for URI {
     type Error = Error;
     fn try_from(uri: String) -> Result<Self, Self::Error> {
