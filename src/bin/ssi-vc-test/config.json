@@ -2,9 +2,7 @@
   "generator": "../ssi/target/debug/ssi-vc-test generate",
   "presentationGenerator": "../ssi/target/debug/ssi-vc-test generate-presentation",
   "generatorOptions": "",
-  "sectionsNotSupported": [
-    "zkp"
-  ],
+  "sectionsNotSupported": [],
   "jwt": {
     "rs256PrivateKeyJwk": {
       "kty": "RSA",

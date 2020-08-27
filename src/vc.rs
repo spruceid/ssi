@@ -17,9 +17,13 @@ use serde_json::Value;
 // @TODO items:
 // - implement HS256 and ES256 (RFC 7518) for JWT
 // - ensure Credential in Presentation has credential_schema
+// - ensure Credential has credential_schema if using ZKP
+// - ensure vc/vp proof and vc issuance_date are set
 // - more complete URI checking
 // - decode Presentation from JWT
 // - ensure refreshService id and credentialStatus id are URLs
+// - implement IntoIterator for OneOrMany, instead of using own
+//   functions for any, len, contains, etc.
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
 
@@ -181,8 +185,8 @@ pub struct Presentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<URI>,
     #[serde(rename = "type")]
-    pub type_: Vec<String>,
-    pub verifiable_credential: Vec<CredentialOrJWT>,
+    pub type_: OneOrMany<String>,
+    pub verifiable_credential: OneOrMany<CredentialOrJWT>,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
@@ -228,6 +232,16 @@ pub struct JWTClaims {
 }
 
 impl<T> OneOrMany<T> {
+    pub fn any<F>(&self, f: F) -> bool
+    where
+        F: Fn(&T) -> bool,
+    {
+        match self {
+            Self::One(value) => f(value),
+            Self::Many(values) => values.iter().any(f),
+        }
+    }
+
     pub fn len(&self) -> usize {
         match self {
             Self::One(_) => 1,

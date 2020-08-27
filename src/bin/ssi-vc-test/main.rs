@@ -18,6 +18,19 @@ fn generate(data: String) -> String {
     if doc.issuance_date.is_none() {
         panic!("Missing issuance date");
     }
+    if doc.proof.is_none() {
+        panic!("Missing proof");
+    }
+
+    let is_zkp = match &doc.proof {
+        Some(proofs) => proofs.any(|proof| proof.type_.contains(&"CLSignature2019".to_string())),
+        _ => false,
+    };
+    if is_zkp {
+        if doc.credential_schema.is_none() {
+            panic!("Missing credential schema for ZKP");
+        }
+    }
 
     // work around https://github.com/w3c/vc-test-suite/issues/96
     if doc.type_.len() > 1 {
@@ -120,6 +133,13 @@ fn main() {
     if cmd == None || filename == None {
         return usage();
     }
+    // work around https://github.com/w3c/vc-test-suite/issues/98
+    if filename.as_ref().unwrap().contains("example-015-zkp") {
+        jwt_keys = None;
+        jwt_aud = None;
+        jwt_decode = false;
+    }
+
     let cmd_str = cmd.unwrap();
     match cmd_str.as_ref() {
         "generate" => {
