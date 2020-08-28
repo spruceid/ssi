@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Test
+      run: cargo test --verbose
+
+    - name: Test vc-test-suite
+      run: |
+        cd ..
+        git clone https://github.com/w3c/vc-test-suite --depth 1
+        cd vc-test-suite
+        npm i
+        cp ../ssi/src/bin/ssi-vc-test/config.json .
+        npm test
