@@ -13,11 +13,17 @@ pub enum Error {
     MissingKey,
     MissingCredential,
     MissingKeyParameters,
+    MissingProof,
+    MissingIssuanceDate,
+    MissingTypeVerifiableCredential,
+    MissingTypeVerifiablePresentation,
+    MissingIssuer,
     Key,
     TimeError,
     URI,
     InvalidContext,
     MissingContext,
+    MissingCredentialSchema,
     JWT(JWTError),
     Base64(Base64Error),
     JSON(JSONError),
@@ -33,6 +39,15 @@ impl fmt::Display for Error {
             Error::InvalidIssuer => write!(f, "Invalid issuer for JWT"),
             Error::MissingKey => write!(f, "JWT key not found"),
             Error::MissingKeyParameters => write!(f, "JWT key parameters not found"),
+            Error::MissingProof => write!(f, "Missing proof property"),
+            Error::MissingIssuanceDate => write!(f, "Missing issuance date"),
+            Error::MissingTypeVerifiableCredential => {
+                write!(f, "Missing type VerifiableCredential")
+            }
+            Error::MissingTypeVerifiablePresentation => {
+                write!(f, "Missing type VerifiablePresentation")
+            }
+            Error::MissingIssuer => write!(f, "Missing issuer property"),
             Error::MissingCredential => write!(f, "Verifiable credential not found in JWT"),
             Error::Key => write!(f, "problem with JWT key"),
             Error::AlgorithmNotImplemented => write!(f, "JWA algorithm not implemented"),
@@ -40,6 +55,7 @@ impl fmt::Display for Error {
             Error::TimeError => write!(f, "Unable to convert date/time"),
             Error::InvalidContext => write!(f, "Invalid context"),
             Error::MissingContext => write!(f, "Missing context"),
+            Error::MissingCredentialSchema => write!(f, "Missing credential schema for ZKP"),
             Error::URI => write!(f, "Invalid URI"),
             Error::Base64(e) => e.fmt(f),
             Error::JWT(e) => e.fmt(f),

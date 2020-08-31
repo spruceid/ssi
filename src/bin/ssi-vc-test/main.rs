@@ -9,29 +9,7 @@ fn usage() {
 }
 
 fn generate(data: String) -> String {
-    let doc: Credential = serde_json::from_str(&data).unwrap();
-    if !doc.type_.contains(&"VerifiableCredential".to_string()) {
-        panic!("Missing type VerifiableCredential");
-    }
-    if doc.issuer.is_none() {
-        panic!("Missing issuer");
-    }
-    if doc.issuance_date.is_none() {
-        panic!("Missing issuance date");
-    }
-    if doc.proof.is_none() {
-        panic!("Missing proof");
-    }
-
-    let is_zkp = match &doc.proof {
-        Some(proofs) => proofs.any(|proof| proof.type_.contains(&"CLSignature2019".to_string())),
-        _ => false,
-    };
-    if is_zkp {
-        if doc.credential_schema.is_none() {
-            panic!("Missing credential schema for ZKP");
-        }
-    }
+    let doc = Credential::from_json(&data).unwrap();
 
     // work around https://github.com/w3c/vc-test-suite/issues/96
     let contexts: &OneOrMany<Context> = &doc.context.clone().into();
@@ -48,7 +26,7 @@ fn generate(data: String) -> String {
 }
 
 fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -> String {
-    let vc: Credential = serde_json::from_str(data).unwrap();
+    let vc = Credential::from_json_unsigned(data).unwrap();
     if sign {
         vc.encode_sign_jwt(keys, aud).unwrap()
     } else {
@@ -62,21 +40,12 @@ fn decode_jwt_unsigned(data: &String) -> String {
 }
 
 fn generate_presentation(data: &String) -> String {
-    let doc: Presentation = serde_json::from_str(data).unwrap();
-    if !doc.type_.contains(&"VerifiablePresentation".to_string()) {
-        panic!("Missing type VerifiablePresentation");
-    }
-
-    // note: for JWT, proof may be outside the VC object
-    if !doc.proof.is_some() {
-        panic!("Missing proof");
-    }
-
-    serde_json::to_string_pretty(&doc).unwrap()
+    let vp = Presentation::from_json(data).unwrap();
+    serde_json::to_string_pretty(&vp).unwrap()
 }
 
 fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) -> String {
-    let vp: Presentation = serde_json::from_str(data).unwrap();
+    let vp = Presentation::from_json_unsigned(data).unwrap();
     vp.encode_sign_jwt(keys, aud).unwrap()
 }
 

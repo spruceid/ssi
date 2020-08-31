@@ -16,14 +16,12 @@ use serde_json::Value;
 // ********************************************
 // @TODO items:
 // - implement HS256 and ES256 (RFC 7518) for JWT
-// - ensure Credential in Presentation has credential_schema
-// - ensure Credential has credential_schema if using ZKP
-// - ensure vc/vp proof and vc issuance_date are set
 // - more complete URI checking
 // - decode Presentation from JWT
 // - ensure refreshService id and credentialStatus id are URLs
 // - implement IntoIterator for OneOrMany, instead of using own
 //   functions for any, len, contains, etc.
+// - Decode JWT VC embedded in VP
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
 
@@ -355,6 +353,18 @@ fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
 }
 
 impl Credential {
+    pub fn from_json(s: &str) -> Result<Self, Error> {
+        let vp: Self = serde_json::from_str(s)?;
+        vp.validate()?;
+        Ok(vp)
+    }
+
+    pub fn from_json_unsigned(s: &str) -> Result<Self, Error> {
+        let vp: Self = serde_json::from_str(s)?;
+        vp.validate_unsigned()?;
+        Ok(vp)
+    }
+
     pub fn from_jwt_keys(jwt: &String, keys: &JWTKeys) -> Result<Self, Error> {
         if let Some(rs256_key) = &keys.rs256_private_key {
             let validation = Validation::new(Algorithm::RS256);
@@ -392,7 +402,9 @@ impl Credential {
 
     pub fn from_jwt_unsigned(jwt: &String) -> Result<Self, Error> {
         let token_data = jsonwebtoken::dangerous_insecure_decode::<JWTClaims>(jwt)?;
-        Self::from_token_data(token_data)
+        let vc = Self::from_token_data(token_data)?;
+        vc.validate_unsigned()?;
+        Ok(vc)
     }
 
     pub fn from_token_data(token_data: jsonwebtoken::TokenData<JWTClaims>) -> Result<Self, Error> {
@@ -471,9 +483,59 @@ impl Credential {
         let claims = self.to_jwt_claims(aud)?;
         jwt_encode(&claims, &keys)
     }
+
+    pub fn validate_unsigned(&self) -> Result<(), Error> {
+        if !self.type_.contains(&"VerifiableCredential".to_string()) {
+            return Err(Error::MissingTypeVerifiableCredential);
+        }
+        if self.issuer.is_none() {
+            return Err(Error::MissingIssuer);
+        }
+        if self.issuance_date.is_none() {
+            return Err(Error::MissingIssuanceDate);
+        }
+
+        if self.is_zkp() {
+            if self.credential_schema.is_none() {
+                return Err(Error::MissingCredentialSchema);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn is_zkp(&self) -> bool {
+        match &self.proof {
+            Some(proofs) => {
+                proofs.any(|proof| proof.type_.contains(&"CLSignature2019".to_string()))
+            }
+            _ => false,
+        }
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        self.validate_unsigned()?;
+        if self.proof.is_none() {
+            return Err(Error::MissingProof);
+        }
+
+        Ok(())
+    }
 }
 
 impl Presentation {
+    pub fn from_json(s: &str) -> Result<Self, Error> {
+        let vp: Self = serde_json::from_str(s)?;
+        vp.validate()?;
+        Ok(vp)
+    }
+
+    pub fn from_json_unsigned(s: &str) -> Result<Self, Error> {
+        let vp: Self = serde_json::from_str(s)?;
+        vp.validate_unsigned()?;
+        Ok(vp)
+    }
+
     pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &String) -> Result<String, Error> {
         let claims = JWTClaims {
             expiration_time: None,
@@ -486,6 +548,44 @@ impl Presentation {
             verifiable_presentation: Some(self.clone()),
         };
         jwt_encode(&claims, &keys)
+    }
+
+    pub fn validate_unsigned(&self) -> Result<(), Error> {
+        if !self.type_.contains(&"VerifiablePresentation".to_string()) {
+            return Err(Error::MissingTypeVerifiablePresentation);
+        }
+
+        // https://w3c.github.io/vc-data-model/#zero-knowledge-proofs
+        // With ZKP, VC in VP must have credentialSchema
+        let missing_zkp_credential_schema = self.verifiable_credential.any(|vc| match vc {
+            CredentialOrJWT::Credential(vc) => {
+                if vc.is_zkp() {
+                    vc.credential_schema.is_none()
+                } else {
+                    false
+                }
+            }
+            CredentialOrJWT::JWT(_) => {
+                // TODO: check JWT-decoded VC
+                // https://w3c.github.io/vc-data-model/#example-31-jwt-payload-of-a-jwt-based-verifiable-presentation-non-normative
+                false
+            }
+        });
+        if missing_zkp_credential_schema {
+            return Err(Error::MissingCredentialSchema);
+        }
+
+        Ok(())
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        self.validate_unsigned()?;
+
+        if self.proof.is_none() {
+            return Err(Error::MissingProof);
+        }
+
+        Ok(())
     }
 }
 
