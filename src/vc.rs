@@ -19,8 +19,6 @@ use serde_json::Value;
 // - more complete URI checking
 // - decode Presentation from JWT
 // - ensure refreshService id and credentialStatus id are URLs
-// - implement IntoIterator for OneOrMany, instead of using own
-//   functions for any, len, contains, etc.
 // - Decode JWT VC embedded in VP
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
@@ -230,16 +228,6 @@ pub struct JWTClaims {
 }
 
 impl<T> OneOrMany<T> {
-    pub fn any<F>(&self, f: F) -> bool
-    where
-        F: Fn(&T) -> bool,
-    {
-        match self {
-            Self::One(value) => f(value),
-            Self::Many(values) => values.iter().any(f),
-        }
-    }
-
     pub fn len(&self) -> usize {
         match self {
             Self::One(_) => 1,
@@ -280,6 +268,32 @@ impl<T> OneOrMany<T> {
                     None
                 }
             }
+        }
+    }
+}
+
+// consuming iterator
+impl<T> IntoIterator for OneOrMany<T> {
+    type Item = T;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            Self::One(value) => vec![value].into_iter(),
+            Self::Many(values) => values.into_iter(),
+        }
+    }
+}
+
+// non-consuming iterator
+impl<'a, T> IntoIterator for &'a OneOrMany<T> {
+    type Item = &'a T;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            OneOrMany::One(value) => vec![value].into_iter(),
+            OneOrMany::Many(values) => values.into_iter().collect::<Vec<Self::Item>>().into_iter(),
         }
     }
 }
@@ -506,9 +520,9 @@ impl Credential {
 
     pub fn is_zkp(&self) -> bool {
         match &self.proof {
-            Some(proofs) => {
-                proofs.any(|proof| proof.type_.contains(&"CLSignature2019".to_string()))
-            }
+            Some(proofs) => proofs
+                .into_iter()
+                .any(|proof| proof.type_.contains(&"CLSignature2019".to_string())),
             _ => false,
         }
     }
