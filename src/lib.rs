@@ -2,6 +2,7 @@ pub mod der;
 pub mod did;
 pub mod error;
 pub mod jwk;
+pub mod rdf;
 pub mod vc;
 
 extern crate pest;

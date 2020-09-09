@@ -1,11 +1,16 @@
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;
+use std::convert::TryInto;
 
 use crate::error::Error;
-use crate::jwk::{JWTKeys, Params};
+use crate::jwk::{Header, JWTKeys, JWK};
+use crate::rdf::{
+    BlankNodeLabel, DataSet, IRIRef, Literal, Object, Predicate, Statement, StringLiteral, Subject,
+};
 
 use chrono::prelude::*;
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, Validation};
+use ring::digest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -20,6 +25,11 @@ use serde_json::Value;
 // - decode Presentation from JWT
 // - ensure refreshService id and credentialStatus id are URLs
 // - Decode JWT VC embedded in VP
+// - Abstract out LD-Proof generate/add/verify to be shared between VC and VP
+// - Look up keys for verify from a set or store, or using verificationMethod
+// - Fetch contexts, to support arbitrary VC and LD-Proof properties
+// - Support normalization of arbitrary JSON-LD
+// - Support more LD-proof types
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
 
@@ -35,7 +45,7 @@ pub struct Credential {
     pub id: Option<URI>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
-    pub credential_subject: OneOrMany<Subject>,
+    pub credential_subject: OneOrMany<CredentialSubject>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub issuer: Option<Issuer>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -83,9 +93,12 @@ pub enum Context {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Subject {
+pub struct CredentialSubject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<URI>,
+    // name is here for example/testing purposes:
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<HTML>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -113,8 +126,39 @@ pub struct Proof {
     #[serde(rename = "type")]
     pub type_: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_purpose: Option<ProofPurpose>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // Note: ld-proofs specifies verificationMethod as a "set of parameters",
+    // but all examples use a single string.
+    pub verification_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<DateTime<Utc>>, // ISO 8601
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires: Option<DateTime<Utc>>, // ISO 8601
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jws: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(try_from = "String")]
+// #[serde(untagged)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofPurpose {
+    AssertionMethod,
+    Authentication,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -150,6 +194,12 @@ pub struct Status {
 #[serde(try_from = "String")]
 #[serde(untagged)]
 pub enum URI {
+    String(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(untagged)]
+pub enum HTML {
     String(String),
 }
 
@@ -343,26 +393,38 @@ impl From<URI> for String {
     }
 }
 
+impl From<HTML> for Literal {
+    fn from(html: HTML) -> Self {
+        let HTML::String(string) = html;
+        Literal::Typed {
+            string: StringLiteral(string),
+            type_: IRIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML".to_string()),
+        }
+    }
+}
+
+impl From<URI> for IRIRef {
+    fn from(uri: URI) -> Self {
+        let URI::String(string) = uri;
+        IRIRef(string)
+    }
+}
+
 fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
 
 fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
-    let mut header = Header::default();
-    let key: EncodingKey;
-    if let Some(rs256_key) = &keys.rs256_private_key {
-        header.alg = Algorithm::RS256;
-        if let Some(ref key_id) = rs256_key.key_id {
-            header.kid = Some(key_id.to_owned());
-        }
-        let der = rs256_key.to_der()?;
-        key = EncodingKey::from_rsa_der(&der);
+    let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
+        rs256_key
     } else if keys.es256k_private_key.is_some() {
         return Err(Error::AlgorithmNotImplemented);
     } else {
         return Err(Error::MissingKey);
-    }
+    };
+    let header = jwk.to_jwt_header()?;
+    let key = jwk.to_jwt_encoding_key()?;
     Ok(jsonwebtoken::encode(&header, claims, &key)?)
 }
 
@@ -380,29 +442,16 @@ impl Credential {
     }
 
     pub fn from_jwt_keys(jwt: &String, keys: &JWTKeys) -> Result<Self, Error> {
-        if let Some(rs256_key) = &keys.rs256_private_key {
-            let validation = Validation::new(Algorithm::RS256);
-            let rsa_params = match &rs256_key.params {
-                Params::RSA(params) => params,
-                _ => return Err(Error::MissingKeyParameters),
-            };
-            let modulus = match &rsa_params.modulus {
-                Some(n) => n.0.clone(),
-                None => return Err(Error::MissingKeyParameters),
-            };
-            let exponent = match &rsa_params.exponent {
-                Some(n) => n.0.clone(),
-                None => return Err(Error::MissingKeyParameters),
-            };
-            let modulus_b64 = base64::encode_config(modulus, base64::URL_SAFE_NO_PAD);
-            let exponent_b64 = base64::encode_config(exponent, base64::URL_SAFE_NO_PAD);
-            let key = DecodingKey::from_rsa_components(&modulus_b64, &exponent_b64);
-            Credential::from_jwt(jwt, &key, &validation)
+        let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
+            rs256_key
         } else if keys.es256k_private_key.is_some() {
-            Err(Error::AlgorithmNotImplemented)
+            return Err(Error::AlgorithmNotImplemented);
         } else {
-            Err(Error::MissingKey)
-        }
+            return Err(Error::MissingKey);
+        };
+        let key = jwk.to_decoding_key()?;
+        let validation = jwk.to_validation()?;
+        Credential::from_jwt(jwt, &key, &validation)
     }
 
     pub fn from_jwt(
@@ -551,8 +600,439 @@ impl Credential {
         if self.proof.is_none() {
             return Err(Error::MissingProof);
         }
-
         Ok(())
+    }
+
+    pub fn verify_proofs(
+        &self,
+        key: &JWK,
+        domain: Option<&str>,
+        proof_purpose: Option<ProofPurpose>,
+    ) -> Result<(), Error> {
+        match &self.proof {
+            None => return Err(Error::MissingProof),
+            Some(OneOrMany::One(proof)) => {
+                self.verify_proof(proof, key, domain, proof_purpose.clone())?;
+            }
+            Some(OneOrMany::Many(proofs)) => {
+                for proof in proofs {
+                    self.verify_proof(proof, key, domain, proof_purpose.clone())?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub fn to_signing_input(&self, header_b64: &str, proof: &Proof) -> Result<Vec<u8>, Error> {
+        let sigopts_normalized = proof.to_urdna2015_for_signing()?;
+        let doc_normalized = self.to_urdna2015_for_signing()?;
+        let sigopts_digest = digest::digest(&digest::SHA256, sigopts_normalized.as_bytes());
+        let doc_digest = digest::digest(&digest::SHA256, doc_normalized.as_bytes());
+        let data = [
+            sigopts_digest.as_ref().to_vec(),
+            doc_digest.as_ref().to_vec(),
+        ]
+        .concat();
+        let message = [header_b64.as_bytes(), b".", data.as_slice()].concat();
+        Ok(message)
+    }
+
+    // https://w3c-ccg.github.io/ld-proofs/
+    // https://w3c-ccg.github.io/lds-rsa2018/
+    pub fn generate_proof(
+        &self,
+        jwk: &JWK,
+        domain: Option<String>,
+        purpose: ProofPurpose,
+        expires: Option<DateTime<Utc>>,
+        nonce: Option<String>,
+    ) -> Result<Proof, Error> {
+        let header = jwk.to_jwt_header_unencoded()?;
+        let json_header = base64_encode_json(&header)?;
+        let key = jwk.to_jwt_encoding_key()?;
+        let mut proof = Proof {
+            type_: "RsaSignature2018".to_string(),
+            proof_purpose: Some(purpose),
+            proof_value: None,
+            verification_method: None,
+            creator: None,
+            created: Some(Utc::now()),
+            domain: domain,
+            expires: expires,
+            challenge: None,
+            nonce: nonce,
+            property_set: None,
+            jws: None,
+        };
+        let message = self.to_signing_input(&json_header, &proof)?;
+        // https://github.com/Keats/jsonwebtoken/pull/150
+        let message_str = unsafe { String::from_utf8_unchecked(message) };
+        let sig = jsonwebtoken::crypto::sign(&message_str, &key, header.algorithm)?;
+        proof.jws = Some([&json_header, "", &sig].join("."));
+        Ok(proof)
+    }
+
+    pub fn verify_proof(
+        &self,
+        proof: &Proof,
+        jwk: &JWK,
+        domain: Option<&str>,
+        proof_purpose: Option<ProofPurpose>,
+    ) -> Result<(), Error> {
+        if let Some(expires) = proof.expires {
+            if expires < Utc::now() {
+                return Err(Error::ExpiredProof);
+            }
+        }
+
+        if let Some(created) = proof.created {
+            if created > Utc::now() {
+                return Err(Error::FutureProof);
+            }
+        }
+
+        if let Some(expected_domain) = domain {
+            match proof.domain {
+                None => return Err(Error::InvalidProofDomain),
+                Some(ref domain) => {
+                    if domain != expected_domain {
+                        return Err(Error::InvalidProofDomain);
+                    }
+                }
+            }
+        }
+
+        if let Some(expected_purpose) = proof_purpose {
+            if proof.proof_purpose != Some(expected_purpose) {
+                return Err(Error::InvalidProofPurpose);
+            }
+        }
+
+        match proof.type_.as_str() {
+            "RsaSignature2018" => match &proof.jws {
+                None => return Err(Error::MissingProofSignature),
+                Some(jws) => {
+                    // let header = jsonwebtoken::decode_header(jws.as_str())?;
+                    let mut parts = jws.splitn(3, '.');
+                    if let (Some(header_b64), Some(""), Some(signature_b64)) =
+                        (parts.next(), parts.next(), parts.next())
+                    {
+                        let header = Header::from_b64(header_b64)?;
+                        if header.base64urlencode_payload != Some(false) {
+                            return Err(Error::ExpectedUnencodedHeader);
+                        }
+                        let message = self.to_signing_input(&header_b64, proof)?;
+                        // https://github.com/Keats/jsonwebtoken/pull/150
+                        let message_str = unsafe { String::from_utf8_unchecked(message) };
+                        let key = jwk.to_decoding_key()?;
+                        let verified = jsonwebtoken::crypto::verify(
+                            signature_b64,
+                            &message_str,
+                            &key,
+                            header.algorithm,
+                        )?;
+                        if verified {
+                            return Ok(());
+                        } else {
+                            return Err(Error::InvalidSignature);
+                        }
+                    } else {
+                        return Err(Error::InvalidSignature);
+                    }
+                }
+            },
+            _ => {
+                return Err(Error::ProofTypeNotImplemented);
+            }
+        }
+    }
+
+    pub fn add_proof(&mut self, proof: Proof) {
+        self.proof = match self.proof.take() {
+            None => Some(OneOrMany::One(proof)),
+            Some(OneOrMany::One(existing_proof)) => {
+                Some(OneOrMany::Many(vec![existing_proof, proof]))
+            }
+            Some(OneOrMany::Many(mut proofs)) => {
+                proofs.push(proof);
+                Some(OneOrMany::Many(proofs))
+            }
+        }
+    }
+
+    pub fn to_urdna2015_for_signing(&self) -> Result<String, Error> {
+        let mut copy = self.clone();
+        copy.proof = None;
+        let dataset: DataSet = copy.try_into()?;
+        dataset.to_nquads()
+    }
+}
+
+impl TryFrom<CredentialSubject> for DataSet {
+    type Error = Error;
+    fn try_from(credential_subject: CredentialSubject) -> Result<Self, Self::Error> {
+        let mut statements: Vec<Statement> = Vec::new();
+
+        if has_more_props(credential_subject.property_set) {
+            return Err(Error::UnsupportedProperty);
+        }
+
+        let subject = match credential_subject.id {
+            Some(id) => Subject::IRIRef(IRIRef::from(id)),
+            None => Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string())),
+        };
+
+        if let Some(name) = credential_subject.name {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef("http://schema.org/name".to_string())),
+                object: Object::Literal(Literal::from(name)),
+                graph_label: None,
+            });
+        }
+
+        Ok(DataSet {
+            statements: statements,
+        })
+    }
+}
+
+fn has_more_props(property_set: Option<Map<String, Value>>) -> bool {
+    match property_set {
+        None => false,
+        Some(ref props) => !props.is_empty(),
+    }
+}
+
+impl<T> TryFrom<OneOrMany<T>> for DataSet
+where
+    DataSet: TryFrom<T>,
+    <DataSet as TryFrom<T>>::Error: Into<Error>,
+{
+    type Error = Error;
+    fn try_from(item: OneOrMany<T>) -> Result<Self, Self::Error> {
+        match item {
+            OneOrMany::One(value) => value.try_into().map_err(Into::into),
+            OneOrMany::Many(values) => {
+                let mut dataset = DataSet {
+                    statements: Vec::new(),
+                };
+                for value in values {
+                    let mut this_dataset: DataSet = value.try_into().map_err(Into::into)?;
+                    dataset.statements.append(&mut this_dataset.statements);
+                }
+                Ok(dataset)
+            }
+        }
+    }
+}
+
+impl TryFrom<Credential> for DataSet {
+    type Error = Error;
+    fn try_from(vc: Credential) -> Result<Self, Self::Error> {
+        let mut statements: Vec<Statement> = Vec::new();
+        let mut used_blank_node = false;
+
+        let subject = match vc.id {
+            Some(id) => Subject::IRIRef(IRIRef::from(id)),
+            None => {
+                used_blank_node = true;
+                Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
+            }
+        };
+
+        for vc_subject in vc.credential_subject {
+            let vc_subject_id = match vc_subject.id.clone() {
+                Some(id) => Object::IRIRef(IRIRef::from(id)),
+                None => {
+                    if used_blank_node {
+                        return Err(Error::UnsupportedMultipleBlankNodes);
+                    }
+                    used_blank_node = true;
+                    Object::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
+                }
+            };
+            let mut vc_subject_dataset: DataSet = vc_subject.try_into()?;
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#credentialSubject".to_string(),
+                )),
+                object: vc_subject_id,
+                graph_label: None,
+            });
+            statements.append(&mut vc_subject_dataset.statements);
+        }
+
+        for type_ in vc.type_ {
+            if type_ != "VerifiableCredential" {
+                return Err(Error::UnsupportedType);
+            }
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#".to_string() + &type_,
+                )),
+                graph_label: None,
+            });
+        }
+
+        if let Some(issuance_date) = vc.issuance_date {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#issuanceDate".to_string(),
+                )),
+                object: Object::Literal(Literal::from(issuance_date)),
+                graph_label: None,
+            });
+        }
+
+        if let Some(issuer) = vc.issuer {
+            let issuer_id = match issuer {
+                Issuer::URI(uri) => uri,
+                Issuer::Object(object_with_id) => {
+                    if has_more_props(object_with_id.property_set) {
+                        return Err(Error::UnsupportedProperty);
+                    }
+                    object_with_id.id
+                }
+            };
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#issuer".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef::from(issuer_id)),
+                graph_label: None,
+            });
+        }
+
+        Ok(DataSet {
+            statements: statements,
+        })
+    }
+}
+
+impl TryFrom<Proof> for DataSet {
+    type Error = Error;
+    fn try_from(proof: Proof) -> Result<Self, Self::Error> {
+        let mut statements: Vec<Statement> = Vec::new();
+
+        let subject = Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()));
+        // TODO: use references instead of clones
+
+        if let Some(created) = proof.created {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "http://purl.org/dc/terms/created".to_string(),
+                )),
+                object: Object::Literal(Literal::from(created)),
+                graph_label: None,
+            });
+        }
+
+        if let Some(creator) = proof.creator {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "http://purl.org/dc/terms/creator".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef(creator)),
+                graph_label: None,
+            });
+        }
+
+        statements.push(Statement {
+            subject: subject.clone(),
+            predicate: Predicate::IRIRef(IRIRef(
+                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+            )),
+            object: Object::IRIRef(IRIRef(
+                "https://w3id.org/security#".to_string() + &proof.type_,
+            )),
+            graph_label: None,
+        });
+
+        if let Some(challenge) = proof.challenge {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://w3id.org/security#challenge".to_string(),
+                )),
+                object: Object::Literal(Literal::String {
+                    string: StringLiteral(challenge),
+                }),
+                graph_label: None,
+            });
+        }
+
+        if let Some(domain) = proof.domain {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://w3id.org/security#domain".to_string(),
+                )),
+                object: Object::Literal(Literal::String {
+                    string: StringLiteral(domain),
+                }),
+                graph_label: None,
+            });
+        }
+
+        if let Some(expires) = proof.expires {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://w3id.org/security#expires".to_string(),
+                )),
+                object: Object::Literal(Literal::from(expires)),
+                graph_label: None,
+            });
+        }
+
+        if let Some(nonce) = proof.nonce {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef("https://w3id.org/security#nonce".to_string())),
+                object: Object::Literal(Literal::String {
+                    string: StringLiteral(nonce),
+                }),
+                graph_label: None,
+            });
+        }
+
+        if let Some(purpose) = proof.proof_purpose {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://w3id.org/security#proofPurpose".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef(
+                    "https://w3id.org/security#".to_string() + &String::from(purpose),
+                )),
+                graph_label: None,
+            });
+        }
+
+        if let Some(verification_method) = proof.verification_method {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://w3id.org/security#verificationMethod".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef(verification_method)),
+                graph_label: None,
+            });
+        }
+
+        Ok(DataSet {
+            statements: statements,
+        })
     }
 }
 
@@ -610,6 +1090,35 @@ impl Presentation {
         }
 
         Ok(())
+    }
+}
+
+impl Proof {
+    pub fn to_urdna2015_for_signing(&self) -> Result<String, Error> {
+        let mut copy = self.clone();
+        copy.jws = None;
+        let dataset: DataSet = copy.try_into()?;
+        dataset.to_nquads()
+    }
+}
+
+impl TryFrom<String> for ProofPurpose {
+    type Error = Error;
+    fn try_from(purpose: String) -> Result<Self, Self::Error> {
+        match purpose.as_str() {
+            "authentication" => Ok(Self::Authentication),
+            "assertionMethod" => Ok(Self::AssertionMethod),
+            _ => Err(Error::UnsupportedProofPurpose),
+        }
+    }
+}
+
+impl From<ProofPurpose> for String {
+    fn from(purpose: ProofPurpose) -> String {
+        match purpose {
+            ProofPurpose::Authentication => "authentication".to_string(),
+            ProofPurpose::AssertionMethod => "assertionMethod".to_string(),
+        }
     }
 }
 
@@ -739,5 +1248,93 @@ mod tests {
 
         let vc1 = Credential::from_jwt_keys(&signed_jwt, &conf.keys).unwrap();
         assert_eq!(vc.id, vc1.id);
+    }
+
+    #[test]
+    fn credential_prove_verify() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
+        const JWK_JSON: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.json");
+        let key: JWK = serde_json::from_slice(JWK_JSON).unwrap();
+
+        let proof = vc
+            .generate_proof(&key, None, ProofPurpose::AssertionMethod, None, None)
+            .unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        vc.verify_proofs(&key, None, Some(ProofPurpose::AssertionMethod))
+            .unwrap();
+
+        // mess with the proof to make verify fail
+        match vc.proof {
+            None => unreachable!(),
+            Some(OneOrMany::Many(_)) => unreachable!(),
+            Some(OneOrMany::One(ref mut proof)) => match proof.jws {
+                None => unreachable!(),
+                Some(ref mut jws) => {
+                    jws.insert(0, 'x');
+                }
+            },
+        }
+        println!("{}", serde_json::to_string_pretty(&vc).unwrap());
+        assert!(vc
+            .verify_proofs(&key, None, Some(ProofPurpose::AssertionMethod))
+            .is_err());
+    }
+
+    #[test]
+    fn proof_json_to_urdna2015() {
+        let proof_str = r###"{
+            "type": "RsaSignature2018",
+            "created": "2020-09-03T15:15:39Z",
+            "creator": "https://example.org/foo/1",
+            "proofPurpose": "assertionMethod"
+        }"###;
+        let urdna2015_expected = r###"_:c14n0 <http://purl.org/dc/terms/created> "2020-09-03T15:15:39Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+_:c14n0 <http://purl.org/dc/terms/creator> <https://example.org/foo/1> .
+_:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://w3id.org/security#RsaSignature2018> .
+_:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#assertionMethod> .
+"###;
+        let proof: Proof = serde_json::from_str(proof_str).unwrap();
+        let proof_urdna2015 = proof.to_urdna2015_for_signing().unwrap();
+        assert_eq!(proof_urdna2015, urdna2015_expected);
+    }
+
+    #[test]
+    fn credential_json_to_urdna2015() {
+        let credential_str = r#"{
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                "https://www.w3.org/2018/credentials/examples/v1"
+            ],
+            "id": "http://example.com/credentials/4643",
+            "type": ["VerifiableCredential"],
+            "issuer": "https://example.com/issuers/14",
+            "issuanceDate": "2018-02-24T05:28:04Z",
+            "credentialSubject": {
+                "id": "did:example:abcdef1234567",
+                "name": "Jane Doe"
+            }
+        }"#;
+        let urdna2015_expected = r#"<did:example:abcdef1234567> <http://schema.org/name> "Jane Doe"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML> .
+<http://example.com/credentials/4643> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .
+<http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#credentialSubject> <did:example:abcdef1234567> .
+<http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuanceDate> "2018-02-24T05:28:04Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
+"#;
+        let vc: Credential = serde_json::from_str(credential_str).unwrap();
+        let credential_urdna2015 = vc.to_urdna2015_for_signing().unwrap();
+        assert_eq!(credential_urdna2015, urdna2015_expected);
     }
 }
