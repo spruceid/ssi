@@ -421,6 +421,13 @@ impl Credential {
         Ok(vc)
     }
 
+    pub(crate) fn from_jwt_unsigned_embedded(jwt: &String) -> Result<Self, Error> {
+        let token_data = jsonwebtoken::dangerous_insecure_decode::<JWTClaims>(jwt)?;
+        let vc = Self::from_token_data(token_data)?;
+        vc.validate_unsigned_embedded()?;
+        Ok(vc)
+    }
+
     pub fn from_token_data(token_data: jsonwebtoken::TokenData<JWTClaims>) -> Result<Self, Error> {
         let mut vc = match token_data.claims.verifiable_credential {
             Some(vc) => vc,
@@ -518,6 +525,18 @@ impl Credential {
         Ok(())
     }
 
+    pub(crate) fn validate_unsigned_embedded(&self) -> Result<(), Error> {
+        self.validate_unsigned()?;
+
+        // https://w3c.github.io/vc-data-model/#zero-knowledge-proofs
+        // With ZKP, VC in VP must have credentialSchema
+        if self.is_zkp() && self.credential_schema.is_none() {
+            return Err(Error::MissingCredentialSchema);
+        }
+
+        Ok(())
+    }
+
     pub fn is_zkp(&self) -> bool {
         match &self.proof {
             Some(proofs) => proofs
@@ -569,26 +588,17 @@ impl Presentation {
             return Err(Error::MissingTypeVerifiablePresentation);
         }
 
-        // https://w3c.github.io/vc-data-model/#zero-knowledge-proofs
-        // With ZKP, VC in VP must have credentialSchema
-        let missing_zkp_credential_schema = self.verifiable_credential.any(|vc| match vc {
-            CredentialOrJWT::Credential(vc) => {
-                if vc.is_zkp() {
-                    vc.credential_schema.is_none()
-                } else {
-                    false
+        for ref vc in &self.verifiable_credential {
+            match vc {
+                CredentialOrJWT::Credential(vc) => {
+                    vc.validate_unsigned_embedded()?;
                 }
-            }
-            CredentialOrJWT::JWT(_) => {
-                // TODO: check JWT-decoded VC
-                // https://w3c.github.io/vc-data-model/#example-31-jwt-payload-of-a-jwt-based-verifiable-presentation-non-normative
-                false
-            }
-        });
-        if missing_zkp_credential_schema {
-            return Err(Error::MissingCredentialSchema);
+                CredentialOrJWT::JWT(jwt) => {
+                    // https://w3c.github.io/vc-data-model/#example-31-jwt-payload-of-a-jwt-based-verifiable-presentation-non-normative
+                    Credential::from_jwt_unsigned_embedded(&jwt)?;
+                }
+            };
         }
-
         Ok(())
     }
 
