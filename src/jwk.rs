@@ -304,11 +304,11 @@ impl RSAParams {
         let key = RSAPrivateKey {
             modulus: match &self.modulus {
                 Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
-                None => Integer(vec![]),
+                None => return Err(Error::MissingModulus),
             },
             public_exponent: match &self.exponent {
                 Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
-                None => Integer(vec![]),
+                None => return Err(Error::MissingExponent),
             },
             private_exponent: match &self.private_exponent {
                 Some(integer) => Integer(integer.0.clone()),
