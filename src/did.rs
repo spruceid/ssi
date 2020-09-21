@@ -1,4 +1,8 @@
 use std::collections::HashMap as Map;
+use std::convert::TryFrom;
+
+use crate::error::Error;
+use crate::one_or_many::OneOrMany;
 
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -13,7 +17,10 @@ use serde_json::Value;
 // ***********************************************
 // @TODO `id` must be URI
 
-pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2019/did/v1";
+pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+
+// v0.11 context used by universal resolver
+pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 
 // @TODO parsed data structs for DID and DIDURL
 type DID = String;
@@ -28,22 +35,32 @@ type DIDURL = String;
 )]
 pub struct Document {
     #[serde(rename = "@context")]
-    context: String,
-    id: DID,
+    pub context: Contexts,
+    pub id: DID,
     #[serde(skip_serializing_if = "Option::is_none")]
-    created: Option<DateTime<Utc>>,
+    pub created: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    updated: Option<DateTime<Utc>>,
+    pub updated: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    authentication: Option<Vec<VerificationMethod>>,
+    pub authentication: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    service: Option<Vec<Service>>,
+    pub service: Option<Vec<Service>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    public_key: Option<PublicKey>,
+    pub public_key: Option<PublicKey>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    controller: Option<Controller>,
+    pub controller: Option<Controller>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    proof: Option<Proof>,
+    pub proof: Option<Proof>,
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+#[serde(try_from = "OneOrMany<String>")]
+pub enum Contexts {
+    One(String),
+    Many(Vec<String>),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -65,15 +82,15 @@ pub enum PublicKeyEntry {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicKeyObject {
-    id: String,
+    pub id: String,
     #[serde(rename = "type")]
-    type_: String,
+    pub type_: String,
     // Note: different than when the DID Document is the subject:
     //    The value of the controller property, which identifies the
     //    controller of the corresponding private key, MUST be a valid DID.
-    controller: DID,
+    pub controller: DID,
     #[serde(flatten)]
-    property_set: Option<Map<String, Value>>,
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -95,20 +112,20 @@ pub enum Controller {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
-    id: String,
+    pub id: String,
     #[serde(rename = "type")]
-    type_: String,
-    service_endpoint: String,
+    pub type_: String,
+    pub service_endpoint: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
-    property_set: Option<Map<String, Value>>,
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Proof {
     #[serde(rename = "type")]
-    type_: String,
+    pub type_: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -117,7 +134,7 @@ pub struct Proof {
 impl Default for Document {
     fn default() -> Self {
         Document {
-            context: DEFAULT_CONTEXT.to_string(),
+            context: Contexts::One(DEFAULT_CONTEXT.to_string()),
             id: "".to_string(),
             created: None,
             updated: None,
@@ -126,19 +143,58 @@ impl Default for Document {
             public_key: None,
             controller: None,
             proof: None,
+            property_set: None,
+        }
+    }
+}
+
+impl TryFrom<OneOrMany<String>> for Contexts {
+    type Error = Error;
+    fn try_from(context: OneOrMany<String>) -> Result<Self, Self::Error> {
+        let first_uri = match context.first() {
+            None => return Err(Error::MissingContext),
+            Some(uri) => uri,
+        };
+        if first_uri != DEFAULT_CONTEXT && first_uri != V0_11_CONTEXT {
+            return Err(Error::InvalidContext);
+        }
+        Ok(match context {
+            OneOrMany::One(context) => Contexts::One(context),
+            OneOrMany::Many(contexts) => Contexts::Many(contexts),
+        })
+    }
+}
+
+impl From<Contexts> for OneOrMany<String> {
+    fn from(contexts: Contexts) -> OneOrMany<String> {
+        match contexts {
+            Contexts::One(context) => OneOrMany::One(context),
+            Contexts::Many(contexts) => OneOrMany::Many(contexts),
         }
     }
 }
 
 impl DocumentBuilder {
-    fn validate(&self) -> Result<(), String> {
+    fn validate(&self) -> Result<(), Error> {
         // validate is called before defaults are assigned.
         // None means default will be used.
         if self.id == None || self.id == Some("".to_string()) {
-            return Err("Missing document id".to_string());
+            return Err(Error::MissingDocumentId);
         }
-        if self.context != None && self.context != Some(DEFAULT_CONTEXT.to_string()) {
-            return Err("Invalid context".to_string());
+        if let Some(first_context) = match &self.context {
+            None => None,
+            Some(Contexts::One(context)) => Some(context),
+            Some(Contexts::Many(contexts)) => {
+                if contexts.len() > 0 {
+                    Some(&contexts[0])
+                } else {
+                    None
+                }
+            }
+        } {
+            if first_context != &DEFAULT_CONTEXT && first_context != &V0_11_CONTEXT {
+                return Err(Error::InvalidContext);
+            }
         }
         Ok(())
     }
@@ -147,7 +203,7 @@ impl DocumentBuilder {
 impl Document {
     pub fn new(id: &str) -> Document {
         Document {
-            context: DEFAULT_CONTEXT.to_string(),
+            context: Contexts::One(DEFAULT_CONTEXT.to_string()),
             id: String::from(id),
             created: None,
             updated: None,
@@ -156,11 +212,16 @@ impl Document {
             public_key: None,
             controller: None,
             proof: None,
+            property_set: None,
         }
     }
 
     pub fn from_json(json: &str) -> Result<Document, serde_json::Error> {
         serde_json::from_str(json)
+    }
+
+    pub fn from_json_bytes(json: &[u8]) -> Result<Document, serde_json::Error> {
+        serde_json::from_slice(json)
     }
 }
 
@@ -188,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Missing document id")]
+    #[should_panic(expected = "Missing document ID")]
     fn build_document_no_id() {
         let doc = DocumentBuilder::default().build().unwrap();
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
@@ -199,7 +260,7 @@ mod tests {
     fn build_document_invalid_context() {
         let id = "did:test:deadbeefcafe";
         let doc = DocumentBuilder::default()
-            .context("example:bad")
+            .context(Contexts::One("example:bad".to_string()))
             .id(id)
             .build()
             .unwrap();
@@ -209,7 +270,7 @@ mod tests {
     #[test]
     fn document_from_json() {
         let doc_str = "{\
-            \"@context\": \"https://www.w3.org/2019/did/v1\",\
+            \"@context\": \"https://www.w3.org/ns/did/v1\",\
             \"id\": \"did:test:deadbeefcafe\"\
         }";
         let id = "did:test:deadbeefcafe";

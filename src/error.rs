@@ -28,6 +28,7 @@ pub enum Error {
     URI,
     InvalidContext,
     MissingContext,
+    MissingDocumentId,
     MissingProofSignature,
     ExpiredProof,
     FutureProof,
@@ -76,6 +77,7 @@ impl fmt::Display for Error {
             Error::TimeError => write!(f, "Unable to convert date/time"),
             Error::InvalidContext => write!(f, "Invalid context"),
             Error::MissingContext => write!(f, "Missing context"),
+            Error::MissingDocumentId => write!(f, "Missing document ID"),
             Error::MissingProofSignature => write!(f, "Missing JWS in proof"),
             Error::ExpiredProof => write!(f, "Expired proof"),
             Error::FutureProof => write!(f, "Proof creation time is in the future"),
@@ -112,5 +114,11 @@ impl From<Base64Error> for Error {
 impl From<JSONError> for Error {
     fn from(err: JSONError) -> Error {
         Error::JSON(err)
+    }
+}
+
+impl From<Error> for String {
+    fn from(err: Error) -> String {
+        format!("{}", err)
     }
 }
