@@ -1,7 +1,7 @@
 use ssi::jwk::JWTKeys;
+use ssi::one_or_many::OneOrMany;
 use ssi::vc::Context;
 use ssi::vc::Credential;
-use ssi::vc::OneOrMany;
 use ssi::vc::Presentation;
 
 fn usage() {

@@ -4,6 +4,7 @@ use std::convert::TryInto;
 
 use crate::error::Error;
 use crate::jwk::{Header, JWTKeys, JWK};
+use crate::one_or_many::OneOrMany;
 use crate::rdf::{
     BlankNodeLabel, DataSet, IRIRef, Literal, Object, Predicate, Statement, StringLiteral, Subject,
 };
@@ -67,13 +68,6 @@ pub struct Credential {
     pub credential_schema: Option<OneOrMany<Schema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_service: Option<OneOrMany<RefreshService>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum OneOrMany<T> {
-    One(T),
-    Many(Vec<T>),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -275,77 +269,6 @@ pub struct JWTClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "vp")]
     pub verifiable_presentation: Option<Presentation>,
-}
-
-impl<T> OneOrMany<T> {
-    pub fn len(&self) -> usize {
-        match self {
-            Self::One(_) => 1,
-            Self::Many(values) => values.len(),
-        }
-    }
-
-    pub fn contains(&self, x: &T) -> bool
-    where
-        T: PartialEq<T>,
-    {
-        match self {
-            Self::One(value) => x == value,
-            Self::Many(values) => values.contains(x),
-        }
-    }
-
-    pub fn first(&self) -> Option<&T> {
-        match self {
-            Self::One(value) => Some(&value),
-            Self::Many(values) => {
-                if values.len() > 0 {
-                    Some(&values[0])
-                } else {
-                    None
-                }
-            }
-        }
-    }
-
-    pub fn to_single(&self) -> Option<&T> {
-        match self {
-            Self::One(value) => Some(&value),
-            Self::Many(values) => {
-                if values.len() == 1 {
-                    Some(&values[0])
-                } else {
-                    None
-                }
-            }
-        }
-    }
-}
-
-// consuming iterator
-impl<T> IntoIterator for OneOrMany<T> {
-    type Item = T;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            Self::One(value) => vec![value].into_iter(),
-            Self::Many(values) => values.into_iter(),
-        }
-    }
-}
-
-// non-consuming iterator
-impl<'a, T> IntoIterator for &'a OneOrMany<T> {
-    type Item = &'a T;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        match self {
-            OneOrMany::One(value) => vec![value].into_iter(),
-            OneOrMany::Many(values) => values.into_iter().collect::<Vec<Self::Item>>().into_iter(),
-        }
-    }
 }
 
 impl TryFrom<OneOrMany<Context>> for Contexts {
