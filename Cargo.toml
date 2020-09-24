@@ -20,4 +20,5 @@ ring = "0.16"
 [workspace]
 members = [
   "did-resolve",
+  "vc-test",
 ]

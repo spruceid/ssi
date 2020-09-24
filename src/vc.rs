@@ -1135,7 +1135,7 @@ mod tests {
             }
         }"###;
 
-        const CONFIG: &'static [u8] = include_bytes!("bin/ssi-vc-test/config.json");
+        const CONFIG: &'static [u8] = include_bytes!("../vc-test/config.json");
         let conf: Config = serde_json::from_slice(CONFIG).unwrap();
 
         let vc: Credential = serde_json::from_str(vc_str).unwrap();
@@ -1146,7 +1146,7 @@ mod tests {
 
     #[test]
     fn decode_verify_jwt() {
-        const CONFIG: &'static [u8] = include_bytes!("bin/ssi-vc-test/config.json");
+        const CONFIG: &'static [u8] = include_bytes!("../vc-test/config.json");
         let conf: Config = serde_json::from_slice(CONFIG).unwrap();
 
         let vc_str = r###"{

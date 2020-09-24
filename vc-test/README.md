@@ -4,7 +4,7 @@ Test driver for the SSI VC implementation in [vc-test-suite][]
 
 ## Usage
 
-- `cargo build` this repo
+- `cargo build` this package
 - `git clone` and `npm install` [vc-test-suite][]
 - Copy `config.json` from this `ssi-vc-test` directory into `vc-test-suite`
 - `npm run test` in `vc-test-suite`
