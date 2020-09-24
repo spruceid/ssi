@@ -5,7 +5,7 @@ authors = ["Charles E. Lehner <charles.lehner@spruceid.com>"]
 edition = "2018"
 
 [dependencies]
-ssi = "0.1"
+ssi = { path = "../" }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "0.2", features = ["macros", "stream"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -17,6 +17,3 @@ http = "0.2"
 async-trait = "0.1"
 percent-encoding = "2.1"
 serde_urlencoded = "0.7"
-
-[patch.crates-io]
-ssi = { path = "../" }

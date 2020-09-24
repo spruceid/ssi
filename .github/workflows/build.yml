@@ -17,11 +17,11 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Build ssi
-      run: cargo build --verbose
+    - name: Build
+      run: cargo build --verbose --workspace
 
-    - name: Test ssi
-      run: cargo test --verbose
+    - name: Test
+      run: cargo test --verbose --workspace
 
     - name: Test vc-test-suite
       run: |
@@ -31,13 +31,3 @@ jobs:
         npm i
         cp ../ssi/src/bin/ssi-vc-test/config.json .
         npm test
-
-    - name: Build did-resolve
-      run: |
-        cd did-resolve
-        cargo build --verbose
-
-    - name: Test did-resolve
-      run: |
-        cd did-resolve
-        cargo test --verbose
