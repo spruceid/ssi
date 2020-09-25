@@ -364,7 +364,7 @@ impl Credential {
         Ok(vp)
     }
 
-    pub fn from_jwt_keys(jwt: &String, keys: &JWTKeys) -> Result<Self, Error> {
+    pub fn from_jwt_keys(jwt: &str, keys: &JWTKeys) -> Result<Self, Error> {
         let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
             rs256_key
         } else if keys.es256k_private_key.is_some() {
@@ -377,16 +377,12 @@ impl Credential {
         Credential::from_jwt(jwt, &key, &validation)
     }
 
-    pub fn from_jwt(
-        jwt: &String,
-        key: &DecodingKey,
-        validation: &Validation,
-    ) -> Result<Self, Error> {
+    pub fn from_jwt(jwt: &str, key: &DecodingKey, validation: &Validation) -> Result<Self, Error> {
         let token_data = jsonwebtoken::decode::<JWTClaims>(jwt, &key, validation)?;
         Self::from_token_data(token_data)
     }
 
-    pub fn from_jwt_unsigned(jwt: &String) -> Result<Self, Error> {
+    pub fn from_jwt_unsigned(jwt: &str) -> Result<Self, Error> {
         let token_data = jsonwebtoken::dangerous_insecure_decode::<JWTClaims>(jwt)?;
         let vc = Self::from_token_data(token_data)?;
         vc.validate_unsigned()?;
@@ -432,7 +428,7 @@ impl Credential {
         Ok(vc)
     }
 
-    fn to_jwt_claims(&self, aud: &String) -> Result<JWTClaims, Error> {
+    fn to_jwt_claims(&self, aud: &str) -> Result<JWTClaims, Error> {
         let subject = match self.credential_subject.to_single() {
             Some(subject) => subject,
             None => return Err(Error::InvalidSubject),
@@ -456,13 +452,13 @@ impl Credential {
             not_before: vc.issuance_date.map(|date| date.timestamp()),
             jwt_id: vc.id.take().map(|id| id.into()),
             subject: Some(subject_id),
-            audience: Some(aud.clone()),
+            audience: Some(aud.to_string()),
             verifiable_credential: Some(vc),
             verifiable_presentation: None,
         })
     }
 
-    pub fn encode_jwt_unsigned(&self, aud: &String) -> Result<String, Error> {
+    pub fn encode_jwt_unsigned(&self, aud: &str) -> Result<String, Error> {
         let claims = self.to_jwt_claims(aud)?;
         Ok([
             base64_encode_json(&Header::default())?.as_ref(),
@@ -472,7 +468,7 @@ impl Credential {
         .join("."))
     }
 
-    pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &String) -> Result<String, Error> {
+    pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {
         let claims = self.to_jwt_claims(aud)?;
         jwt_encode(&claims, &keys)
     }
@@ -972,14 +968,14 @@ impl Presentation {
         Ok(vp)
     }
 
-    pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &String) -> Result<String, Error> {
+    pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {
         let claims = JWTClaims {
             expiration_time: None,
             not_before: None,
             subject: None,
             issuer: self.holder.clone().map(|id| id.into()),
             jwt_id: self.id.clone().map(|id| id.into()),
-            audience: Some(aud.clone()),
+            audience: Some(aud.to_string()),
             verifiable_credential: None,
             verifiable_presentation: Some(self.clone()),
         };
