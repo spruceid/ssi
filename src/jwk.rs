@@ -139,6 +139,7 @@ pub struct Header {
     #[serde(rename = "x5u")]
     pub x509_url: Option<String>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "x5c")]
     pub x509_certificate_chain: Option<Vec<String>>,
 
@@ -154,6 +155,7 @@ pub struct Header {
     #[serde(rename = "typ")]
     pub type_: Option<String>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "cty")]
     pub content_type: Option<String>,
 
