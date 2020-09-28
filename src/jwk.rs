@@ -31,7 +31,7 @@ pub struct JWK {
     #[serde(rename = "key_ops")]
     pub key_operations: Option<Vec<String>>,
     #[serde(rename = "alg")]
-    pub algorithm: Option<String>,
+    pub algorithm: Option<Algorithm>,
     #[serde(rename = "kid")]
     pub key_id: Option<String>,
     #[serde(rename = "x5u")]
@@ -202,12 +202,9 @@ impl JWK {
 
     pub fn to_algorithm(&self) -> Result<Algorithm, Error> {
         if let Some(ref algorithm) = self.algorithm {
-            match algorithm.as_ref() {
-                "RS256" => Ok(Algorithm::RS256),
-                _ => return Err(Error::AlgorithmNotImplemented),
-            }
+            Ok(*algorithm)
         } else {
-            return Err(Error::MissingAlgorithm);
+            Err(Error::MissingAlgorithm)
         }
     }
 
