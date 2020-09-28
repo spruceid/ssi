@@ -5,12 +5,12 @@
 // ISO/IEC 8825-1:2015 (E)
 // https://tools.ietf.org/html/rfc8017#page-55
 
+use std::convert::From;
+
 const TAG_INTEGER: u8 = 0x02;
 const TAG_SEQUENCE: u8 = 0x10;
 
-pub trait ASN1: Clone {
-    fn as_bytes(self) -> Vec<u8>;
-}
+pub type DER = Vec<u8>;
 
 #[derive(Debug, Clone)]
 pub struct RSAPrivateKey {
@@ -68,67 +68,58 @@ fn encode(tag: u8, constructed: bool, contents: Vec<u8>) -> Vec<u8> {
     [vec![id, 0x80 | len_len_bytes[0]], len_bytes, contents].concat()
 }
 
-impl ASN1 for RSAPrivateKey {
-    fn as_bytes(self) -> Vec<u8> {
-        let multiprime = self.other_prime_infos.is_some();
+impl From<RSAPrivateKey> for DER {
+    fn from(key: RSAPrivateKey) -> Self {
+        let multiprime = key.other_prime_infos.is_some();
         let version = Integer(vec![if multiprime { 1 } else { 0 }]);
         encode(
             TAG_SEQUENCE,
             true,
             [
-                version.as_bytes().to_vec(),
-                self.modulus.as_bytes().to_vec(),
-                self.public_exponent.as_bytes().to_vec(),
-                self.private_exponent.as_bytes().to_vec(),
-                self.prime1.as_bytes().to_vec(),
-                self.prime2.as_bytes().to_vec(),
-                self.exponent1.as_bytes().to_vec(),
-                self.exponent2.as_bytes().to_vec(),
-                self.coefficient.as_bytes().to_vec(),
-                self.other_prime_infos.as_bytes().to_vec(),
+                DER::from(version),
+                DER::from(key.modulus),
+                DER::from(key.public_exponent),
+                DER::from(key.private_exponent),
+                DER::from(key.prime1),
+                DER::from(key.prime2),
+                DER::from(key.exponent1),
+                DER::from(key.exponent2),
+                DER::from(key.coefficient),
+                match key.other_prime_infos {
+                    Some(infos) => DER::from(infos),
+                    None => Vec::new(),
+                },
             ]
             .concat(),
         )
     }
 }
 
-impl ASN1 for Integer {
-    fn as_bytes(self) -> Vec<u8> {
-        encode(TAG_INTEGER, false, self.0)
+impl From<Integer> for DER {
+    fn from(key: Integer) -> Self {
+        encode(TAG_INTEGER, false, key.0)
     }
 }
 
-impl<T: ASN1> ASN1 for Option<T> {
-    fn as_bytes(self) -> Vec<u8> {
-        match self {
-            Some(t) => t.as_bytes(),
-            None => vec![],
-        }
-    }
-}
-
-impl ASN1 for OtherPrimeInfos {
-    fn as_bytes(self) -> Vec<u8> {
+impl From<OtherPrimeInfos> for DER {
+    fn from(infos: OtherPrimeInfos) -> Self {
         encode(
             TAG_SEQUENCE,
             true,
-            self.0
-                .into_iter()
-                .flat_map(|info| info.as_bytes())
-                .collect(),
+            infos.0.into_iter().flat_map(DER::from).collect(),
         )
     }
 }
 
-impl ASN1 for OtherPrimeInfo {
-    fn as_bytes(self) -> Vec<u8> {
+impl From<OtherPrimeInfo> for DER {
+    fn from(info: OtherPrimeInfo) -> Self {
         encode(
             TAG_SEQUENCE,
             true,
             [
-                self.prime.as_bytes().to_vec(),
-                self.exponent.as_bytes().to_vec(),
-                self.coefficient.as_bytes().to_vec(),
+                DER::from(info.prime),
+                DER::from(info.exponent),
+                DER::from(info.coefficient),
             ]
             .concat(),
         )
@@ -146,6 +137,6 @@ mod tests {
         // 0x01: Content length of one byte
         // 0x05: The integer 5
         let expected = vec![0x02, 0x01, 0x05];
-        assert_eq!(integer.as_bytes(), expected);
+        assert_eq!(DER::from(integer), expected);
     }
 }

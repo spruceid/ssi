@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::result::Result;
 
-use crate::der::{Integer, RSAPrivateKey, ASN1};
+use crate::der::{Integer, RSAPrivateKey, DER};
 use crate::error::Error;
 
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header as HeaderLite, Validation};
@@ -173,19 +173,10 @@ pub struct Header {
 }
 
 impl JWK {
-    pub fn to_der(&self) -> Result<Vec<u8>, Error> {
-        match &self.params {
-            // EC(params) => params.to_der(),
-            Params::RSA(params) => params.to_der(),
-            // Symmetric(params) => params.to_der(),
-            _ => Err(Error::KeyTypeNotImplemented),
-        }
-    }
-
     pub fn to_jwt_encoding_key(&self) -> Result<EncodingKey, Error> {
         match &self.params {
             Params::RSA(rsa_params) => {
-                let der = rsa_params.to_der()?;
+                let der = DER::try_from(rsa_params)?;
                 Ok(EncodingKey::from_rsa_der(&der))
             }
             _ => return Err(Error::KeyTypeNotImplemented),
@@ -246,6 +237,18 @@ impl JWK {
     }
 }
 
+impl TryFrom<&JWK> for DER {
+    type Error = Error;
+    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
+        match &jwk.params {
+            // EC(params) => DER::try_from(params),
+            Params::RSA(params) => DER::try_from(params),
+            // Symmetric(params) => DER::try_from(params),
+            _ => Err(Error::KeyTypeNotImplemented),
+        }
+    }
+}
+
 impl Header {
     pub fn from_b64(b64: &str) -> Result<Self, Error> {
         let json = base64::decode_config(b64, base64::URL_SAFE)?;
@@ -301,44 +304,45 @@ impl Default for Header {
     }
 }
 
-impl RSAParams {
-    pub fn to_der(&self) -> Result<Vec<u8>, Error> {
+impl TryFrom<&RSAParams> for DER {
+    type Error = Error;
+    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
         let key = RSAPrivateKey {
-            modulus: match &self.modulus {
+            modulus: match &params.modulus {
                 Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
                 None => return Err(Error::MissingModulus),
             },
-            public_exponent: match &self.exponent {
+            public_exponent: match &params.exponent {
                 Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
                 None => return Err(Error::MissingExponent),
             },
-            private_exponent: match &self.private_exponent {
+            private_exponent: match &params.private_exponent {
                 Some(integer) => Integer(integer.0.clone()),
                 None => Integer(vec![]),
             },
-            prime1: match &self.first_prime_factor {
+            prime1: match &params.first_prime_factor {
                 Some(integer) => Integer(integer.0.clone()),
                 None => Integer(vec![]),
             },
-            prime2: match &self.second_prime_factor {
+            prime2: match &params.second_prime_factor {
                 Some(integer) => Integer(integer.0.clone()),
                 None => Integer(vec![]),
             },
-            exponent1: match &self.first_prime_factor_crt_exponent {
+            exponent1: match &params.first_prime_factor_crt_exponent {
                 Some(integer) => Integer(integer.0.clone()),
                 None => Integer(vec![]),
             },
-            exponent2: match &self.second_prime_factor_crt_exponent {
+            exponent2: match &params.second_prime_factor_crt_exponent {
                 Some(integer) => Integer(integer.0.clone()),
                 None => Integer(vec![]),
             },
-            coefficient: match &self.first_crt_coefficient {
+            coefficient: match &params.first_crt_coefficient {
                 Some(integer) => Integer(integer.0.clone()),
                 None => Integer(vec![0]),
             },
             other_prime_infos: None,
         };
-        Ok(key.as_bytes())
+        Ok(key.into())
     }
 }
 
@@ -368,7 +372,7 @@ mod tests {
         const DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
 
         let key: JWK = serde_json::from_slice(JSON).unwrap();
-        let der = key.to_der().unwrap();
+        let der = DER::try_from(&key).unwrap();
         assert_eq!(der, DER);
     }
 }
