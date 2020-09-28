@@ -9,7 +9,7 @@ use crate::rdf::{
 };
 
 use chrono::prelude::*;
-use jsonwebtoken::{DecodingKey, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
 use ring::digest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -424,7 +424,7 @@ fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
         return Err(Error::MissingKey);
     };
     let header = jwk.to_jwt_header()?;
-    let key = jwk.to_jwt_encoding_key()?;
+    let key = EncodingKey::try_from(jwk)?;
     Ok(jsonwebtoken::encode(&header, claims, &key)?)
 }
 
@@ -449,8 +449,8 @@ impl Credential {
         } else {
             return Err(Error::MissingKey);
         };
-        let key = jwk.to_decoding_key()?;
-        let validation = jwk.to_validation()?;
+        let key = DecodingKey::try_from(jwk)?;
+        let validation = Validation::try_from(jwk)?;
         Credential::from_jwt(jwt, &key, &validation)
     }
 
@@ -649,7 +649,7 @@ impl Credential {
     ) -> Result<Proof, Error> {
         let header = jwk.to_jwt_header_unencoded()?;
         let json_header = base64_encode_json(&header)?;
-        let key = jwk.to_jwt_encoding_key()?;
+        let key = EncodingKey::try_from(jwk)?;
         let mut proof = Proof {
             type_: "RsaSignature2018".to_string(),
             proof_purpose: Some(purpose),
@@ -724,7 +724,7 @@ impl Credential {
                         let message = self.to_signing_input(&header_b64, proof)?;
                         // https://github.com/Keats/jsonwebtoken/pull/150
                         let message_str = unsafe { String::from_utf8_unchecked(message) };
-                        let key = jwk.to_decoding_key()?;
+                        let key = DecodingKey::try_from(jwk)?;
                         let verified = jsonwebtoken::crypto::verify(
                             signature_b64,
                             &message_str,

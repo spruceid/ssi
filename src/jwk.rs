@@ -173,49 +173,9 @@ pub struct Header {
 }
 
 impl JWK {
-    pub fn to_jwt_encoding_key(&self) -> Result<EncodingKey, Error> {
-        match &self.params {
-            Params::RSA(rsa_params) => {
-                let der = DER::try_from(rsa_params)?;
-                Ok(EncodingKey::from_rsa_der(&der))
-            }
-            _ => return Err(Error::KeyTypeNotImplemented),
-        }
-    }
-
-    pub fn to_decoding_key(&self) -> Result<DecodingKey, Error> {
-        match &self.params {
-            Params::RSA(rsa_params) => {
-                let modulus = match &rsa_params.modulus {
-                    Some(n) => n,
-                    None => return Err(Error::MissingKeyParameters),
-                };
-                let exponent = match &rsa_params.exponent {
-                    Some(n) => n,
-                    None => return Err(Error::MissingKeyParameters),
-                };
-                Ok(DecodingKey::from_rsa_components(modulus, exponent))
-            }
-            _ => Err(Error::KeyTypeNotImplemented),
-        }
-    }
-
-    pub fn to_algorithm(&self) -> Result<Algorithm, Error> {
-        if let Some(ref algorithm) = self.algorithm {
-            Ok(*algorithm)
-        } else {
-            Err(Error::MissingAlgorithm)
-        }
-    }
-
-    pub fn to_validation(&self) -> Result<Validation, Error> {
-        let algorithm = self.to_algorithm()?;
-        Ok(Validation::new(algorithm))
-    }
-
     pub fn to_jwt_header(&self) -> Result<HeaderLite, Error> {
         let mut header = HeaderLite::default();
-        header.alg = self.to_algorithm()?;
+        header.alg = Algorithm::try_from(self)?;
         if let Some(ref key_id) = self.key_id {
             header.kid = Some(key_id.clone());
         }
@@ -224,7 +184,7 @@ impl JWK {
 
     pub fn to_jwt_header_unencoded(&self) -> Result<Header, Error> {
         let mut header = Header::default();
-        header.algorithm = self.to_algorithm()?;
+        header.algorithm = Algorithm::try_from(self)?;
         if let Some(ref key_id) = self.key_id {
             header.key_id = Some(key_id.clone());
         }
@@ -243,6 +203,58 @@ impl TryFrom<&JWK> for DER {
             // Symmetric(params) => DER::try_from(params),
             _ => Err(Error::KeyTypeNotImplemented),
         }
+    }
+}
+
+impl TryFrom<&JWK> for EncodingKey {
+    type Error = Error;
+    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
+        match &jwk.params {
+            Params::RSA(rsa_params) => {
+                let der = DER::try_from(rsa_params)?;
+                Ok(EncodingKey::from_rsa_der(&der))
+            }
+            _ => return Err(Error::KeyTypeNotImplemented),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a JWK> for DecodingKey<'a> {
+    type Error = Error;
+    fn try_from(jwk: &'a JWK) -> Result<Self, Self::Error> {
+        match &jwk.params {
+            Params::RSA(rsa_params) => {
+                let modulus = match &rsa_params.modulus {
+                    Some(n) => n,
+                    None => return Err(Error::MissingKeyParameters),
+                };
+                let exponent = match &rsa_params.exponent {
+                    Some(n) => n,
+                    None => return Err(Error::MissingKeyParameters),
+                };
+                Ok(DecodingKey::from_rsa_components(modulus, exponent))
+            }
+            _ => Err(Error::KeyTypeNotImplemented),
+        }
+    }
+}
+
+impl TryFrom<&JWK> for Algorithm {
+    type Error = Error;
+    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
+        if let Some(algorithm) = jwk.algorithm {
+            Ok(algorithm)
+        } else {
+            Err(Error::MissingAlgorithm)
+        }
+    }
+}
+
+impl TryFrom<&JWK> for Validation {
+    type Error = Error;
+    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
+        let algorithm = Algorithm::try_from(jwk)?;
+        Ok(Validation::new(algorithm))
     }
 }
 
