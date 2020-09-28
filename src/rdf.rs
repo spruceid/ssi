@@ -135,19 +135,11 @@ impl From<&IRIRef> for String {
         out.push('<');
         for c in string.chars() {
             match c {
-                '\t' => out.push_str("\\t"),
-                '\x08' => out.push_str("\\b"),
-                '\x0c' => out.push_str("\\f"),
-                '\n' => out.push_str("\\n"),
-                '\r' => out.push_str("\\r"),
-                '"' => out.push_str("\\\""),
-                '\'' => out.push_str("\\'"),
-                '\\' => out.push_str("\\\\"),
-                '\x00'..='\x20' | '<' | '>' | '{' | '}' | '|' | '^' | '`' => {
+                '\x00'..='\x20' | '<' | '>' | '"' | '{' | '}' | '|' | '^' | '`' | '\\' => {
                     let bytes: u32 = c.into();
                     out.push_str(&format!("\\u{:#04x}", bytes))
                 }
-                '\0'..='\u{10ffff}' => out.push(c),
+                _ => out.push(c),
             }
         }
         out.push('>');
@@ -167,7 +159,7 @@ impl From<&StringLiteral> for String {
                 '\r' => out.push_str("\\r"),
                 '"' => out.push_str("\\\""),
                 '\\' => out.push_str("\\\\"),
-                '\0'..='\u{10ffff}' => out.push(c),
+                _ => out.push(c),
             }
         }
         out.push('"');
