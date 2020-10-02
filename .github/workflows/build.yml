@@ -24,7 +24,7 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', '**.rs') }}
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', 'Makefile', '**.rs') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
 
@@ -42,3 +42,14 @@ jobs:
         npm i
         cp ../ssi/vc-test/config.json .
         npm test
+
+    - name: Install JDK
+      uses: actions/setup-java@v1
+      with:
+        java-version: 1.8
+
+    - name: Test C FFI
+      run: make target/test/c.stamp
+
+    - name: Test JNI
+      run: make target/test/java.stamp

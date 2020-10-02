@@ -16,9 +16,14 @@ derive_builder = "0.9"
 base64 = "0.12"
 jsonwebtoken = "7"
 ring = "0.16"
+jni = "0.17"
 
 [workspace]
 members = [
   "did-resolve",
   "vc-test",
+  "cbindings",
 ]
+
+[lib]
+crate-type = ["lib", "cdylib"]
