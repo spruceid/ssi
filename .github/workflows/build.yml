@@ -51,6 +51,14 @@ jobs:
       with:
         java-version: 1.8
 
+    - name: Install Flutter
+      uses: subosito/flutter-action@v1
+
+    - name: Opt out of Dart/Flutter analytics
+      run: |
+        dart --disable-analytics
+        flutter --suppress-analytics config --no-analytics
+
     - name: Install Android SDK
       uses: android-actions/setup-android@v2
 
@@ -70,6 +78,9 @@ jobs:
 
     - name: Test JNI
       run: make target/test/java.stamp
+
+    - name: Test Dart/Flutter plugin
+      run: make target/test/flutter.stamp
 
     - name: Build Android Archive
       run: make target/test/aar.stamp

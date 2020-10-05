@@ -3,7 +3,8 @@
 .PHONY: test
 test: target/test/c.stamp \
 	target/test/java.stamp \
-	target/test/aar.stamp
+	target/test/aar.stamp \
+	target/test/flutter.stamp
 
 ## Setup
 
@@ -84,6 +85,13 @@ target/%/release/libssi.so: $(RUST_SRC)
 	PATH=$(TOOLCHAIN)/bin:$(PATH) \
 	cargo build --lib --release --target $*
 	$(TOOLCHAIN)/bin/llvm-strip $@
+
+## Flutter
+
+target/test/flutter.stamp: flutter/lib/ssi.dart target/release/libssi.so | target/test
+	cd flutter && LD_LIBRARY_PATH=$(PWD)/flutter \
+		flutter --suppress-analytics test
+	touch $@
 
 ## Cleanup
 
