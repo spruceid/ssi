@@ -4,3 +4,4 @@ The SSI library is written in Rust, but has bindings for other languages and env
 
 - [C](c/)
 - [Java](java/)
+- [Android](android/)

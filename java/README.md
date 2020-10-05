@@ -14,5 +14,9 @@ To build the shared library:
 make target/release/libssi.so
 ```
 
+## Android
+
+For Android, you can use the separate [Android library (AAR file)](../android/) which includes the Java class files and compiled shared libraries.
+
 [JAR]: https://en.wikipedia.org/wiki/JAR_(file_format)
 [JNI]: https://en.wikipedia.org/wiki/Java_Native_Interface

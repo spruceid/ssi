@@ -43,13 +43,33 @@ jobs:
         cp ../ssi/vc-test/config.json .
         npm test
 
+    - name: Install Rust Android targets
+      run: make install-rustup-android
+
     - name: Install JDK
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
+
+    - name: Install Android SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Cache Android NDK
+      id: ndk-cache
+      uses: actions/cache@v2
+      with:
+        path: ${{ env.ANDROID_SDK_ROOT }}/ndk-bundle
+        key: ${{ runner.os }}-ndk-bundle
+
+    - name: Install Android NDK
+      if: steps.ndk-cache.outputs.cache-hit != 'true'
+      run: $ANDROID_SDK_ROOT/tools/bin/sdkmanager ndk-bundle
 
     - name: Test C FFI
       run: make target/test/c.stamp
 
     - name: Test JNI
       run: make target/test/java.stamp
+
+    - name: Build Android Archive
+      run: make target/test/aar.stamp
