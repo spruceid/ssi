@@ -26,6 +26,12 @@ pub struct RSAPrivateKey {
 }
 
 #[derive(Debug, Clone)]
+pub struct RSAPublicKey {
+    pub modulus: Integer,
+    pub public_exponent: Integer,
+}
+
+#[derive(Debug, Clone)]
 pub struct OtherPrimeInfos(pub Vec<OtherPrimeInfo>);
 
 #[derive(Debug, Clone)]
@@ -91,6 +97,16 @@ impl From<RSAPrivateKey> for DER {
                 },
             ]
             .concat(),
+        )
+    }
+}
+
+impl From<RSAPublicKey> for DER {
+    fn from(key: RSAPublicKey) -> Self {
+        encode(
+            TAG_SEQUENCE,
+            true,
+            [DER::from(key.modulus), DER::from(key.public_exponent)].concat(),
         )
     }
 }

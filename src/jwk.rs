@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::result::Result;
 
-use crate::der::{Integer, RSAPrivateKey, DER};
+use crate::der::{Integer, RSAPrivateKey, RSAPublicKey, DER};
 use crate::error::Error;
 
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header as HeaderLite, Validation};
@@ -316,42 +316,49 @@ impl Default for Header {
 impl TryFrom<&RSAParams> for DER {
     type Error = Error;
     fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
-        let key = RSAPrivateKey {
-            modulus: match &params.modulus {
-                Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
-                None => return Err(Error::MissingModulus),
-            },
-            public_exponent: match &params.exponent {
-                Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
-                None => return Err(Error::MissingExponent),
-            },
-            private_exponent: match &params.private_exponent {
-                Some(integer) => Integer(integer.0.clone()),
-                None => Integer(vec![]),
-            },
-            prime1: match &params.first_prime_factor {
-                Some(integer) => Integer(integer.0.clone()),
-                None => Integer(vec![]),
-            },
-            prime2: match &params.second_prime_factor {
-                Some(integer) => Integer(integer.0.clone()),
-                None => Integer(vec![]),
-            },
-            exponent1: match &params.first_prime_factor_crt_exponent {
-                Some(integer) => Integer(integer.0.clone()),
-                None => Integer(vec![]),
-            },
-            exponent2: match &params.second_prime_factor_crt_exponent {
-                Some(integer) => Integer(integer.0.clone()),
-                None => Integer(vec![]),
-            },
-            coefficient: match &params.first_crt_coefficient {
-                Some(integer) => Integer(integer.0.clone()),
-                None => Integer(vec![0]),
-            },
-            other_prime_infos: None,
+        let modulus = match &params.modulus {
+            Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
+            None => return Err(Error::MissingModulus),
         };
-        Ok(key.into())
+        let public_exponent = match &params.exponent {
+            Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
+            None => return Err(Error::MissingExponent),
+        };
+        if let Some(ref private_exponent) = params.private_exponent {
+            let key = RSAPrivateKey {
+                modulus,
+                public_exponent,
+                private_exponent: Integer(private_exponent.0.clone()),
+                prime1: match &params.first_prime_factor {
+                    Some(integer) => Integer(integer.0.clone()),
+                    None => Integer(vec![]),
+                },
+                prime2: match &params.second_prime_factor {
+                    Some(integer) => Integer(integer.0.clone()),
+                    None => Integer(vec![]),
+                },
+                exponent1: match &params.first_prime_factor_crt_exponent {
+                    Some(integer) => Integer(integer.0.clone()),
+                    None => Integer(vec![]),
+                },
+                exponent2: match &params.second_prime_factor_crt_exponent {
+                    Some(integer) => Integer(integer.0.clone()),
+                    None => Integer(vec![]),
+                },
+                coefficient: match &params.first_crt_coefficient {
+                    Some(integer) => Integer(integer.0.clone()),
+                    None => Integer(vec![0]),
+                },
+                other_prime_infos: None,
+            };
+            Ok(key.into())
+        } else {
+            let key = RSAPublicKey {
+                modulus,
+                public_exponent,
+            };
+            Ok(key.into())
+        }
     }
 }
 
