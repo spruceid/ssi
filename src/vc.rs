@@ -153,6 +153,10 @@ pub struct Proof {
 pub enum ProofPurpose {
     AssertionMethod,
     Authentication,
+    KeyAgreement,
+    ContractAgreement,
+    CapabilityInvocation,
+    CapabilityDelegation,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1027,6 +1031,10 @@ impl TryFrom<String> for ProofPurpose {
         match purpose.as_str() {
             "authentication" => Ok(Self::Authentication),
             "assertionMethod" => Ok(Self::AssertionMethod),
+            "keyAgreement" => Ok(Self::KeyAgreement),
+            "contractAgreement" => Ok(Self::ContractAgreement),
+            "capabilityInvocation" => Ok(Self::CapabilityInvocation),
+            "capabilityDelegation" => Ok(Self::CapabilityDelegation),
             _ => Err(Error::UnsupportedProofPurpose),
         }
     }
@@ -1037,6 +1045,10 @@ impl From<ProofPurpose> for String {
         match purpose {
             ProofPurpose::Authentication => "authentication".to_string(),
             ProofPurpose::AssertionMethod => "assertionMethod".to_string(),
+            ProofPurpose::KeyAgreement => "keyAgreement".to_string(),
+            ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
+            ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
+            ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
         }
     }
 }
