@@ -181,17 +181,6 @@ impl JWK {
         }
         Ok(header)
     }
-
-    pub fn to_jwt_header_unencoded(&self) -> Result<Header, Error> {
-        let mut header = Header::default();
-        header.algorithm = Algorithm::try_from(self)?;
-        if let Some(ref key_id) = self.key_id {
-            header.key_id = Some(key_id.clone());
-        }
-        header.base64urlencode_payload = Some(false);
-        header.critical = Some(vec!["b64".to_string()]);
-        Ok(header)
-    }
 }
 
 impl TryFrom<&JWK> for DER {

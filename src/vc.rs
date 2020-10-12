@@ -4,6 +4,7 @@ use std::convert::TryInto;
 
 use crate::error::Error;
 use crate::jwk::{Header, JWTKeys, JWK};
+use crate::ldp::{LinkedDataDocument, LinkedDataProofs};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::{
     BlankNodeLabel, DataSet, IRIRef, Literal, Object, Predicate, Statement, StringLiteral, Subject,
@@ -11,7 +12,6 @@ use crate::rdf::{
 
 use chrono::prelude::*;
 use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
-use ring::digest;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -26,7 +26,6 @@ use serde_json::Value;
 // - decode Presentation from JWT
 // - ensure refreshService id and credentialStatus id are URLs
 // - Decode JWT VC embedded in VP
-// - Abstract out LD-Proof generate/add/verify to be shared between VC and VP
 // - Look up keys for verify from a set or store, or using verificationMethod
 // - Fetch contexts, to support arbitrary VC and LD-Proof properties
 // - Support normalization of arbitrary JSON-LD
@@ -275,6 +274,99 @@ pub struct JWTClaims {
     pub verifiable_presentation: Option<Presentation>,
 }
 
+// https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Options for specifying how the LinkedDataProof is created.
+/// Reference: vc-http-api
+pub struct LinkedDataProofOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The URI of the verificationMethod used for the proof. If omitted a default
+    /// assertionMethod will be used.
+    pub verification_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The purpose of the proof. If omitted "assertionMethod" will be used.
+    pub proof_purpose: Option<ProofPurpose>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The date of the proof. If omitted system time will be used.
+    pub created: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The challenge of the proof.
+    pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The domain of the proof.
+    pub domain: Option<String>,
+}
+
+// https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Object summarizing a verification
+/// Reference: vc-http-api
+pub struct VerificationResult {
+    /// The checks performed
+    pub checks: Vec<String>,
+    /// Warnings
+    pub warnings: Vec<String>,
+    /// Errors
+    pub errors: Vec<String>,
+}
+
+impl Default for ProofPurpose {
+    fn default() -> Self {
+        Self::AssertionMethod
+    }
+}
+
+impl Default for LinkedDataProofOptions {
+    fn default() -> Self {
+        Self {
+            verification_method: None,
+            proof_purpose: Some(ProofPurpose::default()),
+            created: Some(Utc::now()),
+            challenge: None,
+            domain: None,
+        }
+    }
+}
+
+impl VerificationResult {
+    fn new() -> Self {
+        Self {
+            checks: vec![],
+            warnings: vec![],
+            errors: vec![],
+        }
+    }
+
+    fn error(err: &str) -> Self {
+        Self {
+            checks: vec![],
+            warnings: vec![],
+            errors: vec![err.to_string()],
+        }
+    }
+
+    fn append(&mut self, other: &mut Self) {
+        self.checks.append(&mut other.checks);
+        self.warnings.append(&mut other.warnings);
+        self.errors.append(&mut other.errors);
+    }
+}
+
+impl From<Result<(), Error>> for VerificationResult {
+    fn from(res: Result<(), Error>) -> Self {
+        Self {
+            checks: vec![],
+            warnings: vec![],
+            errors: match res {
+                Ok(_) => vec![],
+                Err(error) => vec![error.to_string()],
+            },
+        }
+    }
+}
+
 impl TryFrom<OneOrMany<Context>> for Contexts {
     type Error = Error;
     fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
@@ -337,7 +429,7 @@ impl From<URI> for IRIRef {
     }
 }
 
-fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
+pub fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
@@ -526,148 +618,44 @@ impl Credential {
         Ok(())
     }
 
-    pub fn verify_proofs(
-        &self,
-        key: &JWK,
-        domain: Option<&str>,
-        proof_purpose: Option<ProofPurpose>,
-    ) -> Result<(), Error> {
-        match &self.proof {
-            None => return Err(Error::MissingProof),
-            Some(OneOrMany::One(proof)) => {
-                self.verify_proof(proof, key, domain, proof_purpose.clone())?;
-            }
-            Some(OneOrMany::Many(proofs)) => {
-                for proof in proofs {
-                    self.verify_proof(proof, key, domain, proof_purpose.clone())?;
-                }
-            }
-        }
-        Ok(())
+    fn filter_proofs(&self, options: Option<LinkedDataProofOptions>) -> Vec<&Proof> {
+        let options = options.unwrap_or_default();
+        self.proof
+            .iter()
+            .flatten()
+            .filter(|proof| proof.matches(&options))
+            .collect()
     }
 
-    pub fn to_signing_input(&self, header_b64: &str, proof: &Proof) -> Result<Vec<u8>, Error> {
-        let sigopts_normalized = proof.to_urdna2015_for_signing()?;
-        let doc_normalized = self.to_urdna2015_for_signing()?;
-        let sigopts_digest = digest::digest(&digest::SHA256, sigopts_normalized.as_bytes());
-        let doc_digest = digest::digest(&digest::SHA256, doc_normalized.as_bytes());
-        let data = [
-            sigopts_digest.as_ref().to_vec(),
-            doc_digest.as_ref().to_vec(),
-        ]
-        .concat();
-        let message = [header_b64.as_bytes(), b".", data.as_slice()].concat();
-        Ok(message)
+    pub fn verify(&self, options: Option<LinkedDataProofOptions>) -> VerificationResult {
+        let proofs = self.filter_proofs(options);
+        if proofs.is_empty() {
+            return VerificationResult::error("No applicable proof");
+            // TODO: say why, e.g. expired
+        }
+        let mut results = VerificationResult::new();
+        // Try verifying each proof until one succeeds
+        for proof in proofs {
+            let mut result = proof.verify(self);
+            if result.errors.is_empty() {
+                result.checks.push("Verified credential proof".to_string());
+                return result;
+            };
+            results.append(&mut result);
+        }
+        results
     }
 
     // https://w3c-ccg.github.io/ld-proofs/
     // https://w3c-ccg.github.io/lds-rsa2018/
+    // https://w3c-ccg.github.io/vc-http-api/#/Issuer/issueCredential
     pub fn generate_proof(
         &self,
         jwk: &JWK,
-        domain: Option<String>,
-        purpose: ProofPurpose,
-        expires: Option<DateTime<Utc>>,
-        nonce: Option<String>,
+        options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        let header = jwk.to_jwt_header_unencoded()?;
-        let json_header = base64_encode_json(&header)?;
         let key = EncodingKey::try_from(jwk)?;
-        let mut proof = Proof {
-            type_: "RsaSignature2018".to_string(),
-            proof_purpose: Some(purpose),
-            proof_value: None,
-            verification_method: None,
-            creator: None,
-            created: Some(Utc::now()),
-            domain: domain,
-            expires: expires,
-            challenge: None,
-            nonce: nonce,
-            property_set: None,
-            jws: None,
-        };
-        let message = self.to_signing_input(&json_header, &proof)?;
-        // https://github.com/Keats/jsonwebtoken/pull/150
-        let message_str = unsafe { String::from_utf8_unchecked(message) };
-        let sig = jsonwebtoken::crypto::sign(&message_str, &key, header.algorithm)?;
-        proof.jws = Some([&json_header, "", &sig].join("."));
-        Ok(proof)
-    }
-
-    pub fn verify_proof(
-        &self,
-        proof: &Proof,
-        jwk: &JWK,
-        domain: Option<&str>,
-        proof_purpose: Option<ProofPurpose>,
-    ) -> Result<(), Error> {
-        if let Some(expires) = proof.expires {
-            if expires < Utc::now() {
-                return Err(Error::ExpiredProof);
-            }
-        }
-
-        if let Some(created) = proof.created {
-            if created > Utc::now() {
-                return Err(Error::FutureProof);
-            }
-        }
-
-        if let Some(expected_domain) = domain {
-            match proof.domain {
-                None => return Err(Error::InvalidProofDomain),
-                Some(ref domain) => {
-                    if domain != expected_domain {
-                        return Err(Error::InvalidProofDomain);
-                    }
-                }
-            }
-        }
-
-        if let Some(expected_purpose) = proof_purpose {
-            if proof.proof_purpose != Some(expected_purpose) {
-                return Err(Error::InvalidProofPurpose);
-            }
-        }
-
-        match proof.type_.as_str() {
-            "RsaSignature2018" => match &proof.jws {
-                None => return Err(Error::MissingProofSignature),
-                Some(jws) => {
-                    // let header = jsonwebtoken::decode_header(jws.as_str())?;
-                    let mut parts = jws.splitn(3, '.');
-                    if let (Some(header_b64), Some(""), Some(signature_b64)) =
-                        (parts.next(), parts.next(), parts.next())
-                    {
-                        let header = Header::from_b64(header_b64)?;
-                        if header.base64urlencode_payload != Some(false) {
-                            return Err(Error::ExpectedUnencodedHeader);
-                        }
-                        let message = self.to_signing_input(&header_b64, proof)?;
-                        // https://github.com/Keats/jsonwebtoken/pull/150
-                        let message_str = unsafe { String::from_utf8_unchecked(message) };
-                        let key = DecodingKey::try_from(jwk)?;
-                        let verified = jsonwebtoken::crypto::verify(
-                            signature_b64,
-                            &message_str,
-                            &key,
-                            header.algorithm,
-                        )?;
-                        if verified {
-                            return Ok(());
-                        } else {
-                            return Err(Error::InvalidSignature);
-                        }
-                    } else {
-                        return Err(Error::InvalidSignature);
-                    }
-                }
-            },
-            _ => {
-                return Err(Error::ProofTypeNotImplemented);
-            }
-        }
+        LinkedDataProofs::sign(self, options, &key)
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -682,12 +670,13 @@ impl Credential {
             }
         }
     }
+}
 
-    pub fn to_urdna2015_for_signing(&self) -> Result<String, Error> {
+impl LinkedDataDocument for Credential {
+    fn to_dataset_for_signing(&self) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
-        let dataset: DataSet = copy.try_into()?;
-        dataset.to_nquads()
+        DataSet::try_from(copy)
     }
 }
 
@@ -769,7 +758,7 @@ impl TryFrom<Credential> for DataSet {
                 Some(id) => Object::IRIRef(IRIRef::from(id)),
                 None => {
                     if used_blank_node {
-                        return Err(Error::UnsupportedMultipleBlankNodes);
+                        return Err(Error::TooManyBlankNodes);
                     }
                     used_blank_node = true;
                     Object::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
@@ -1014,14 +1003,164 @@ impl Presentation {
 
         Ok(())
     }
+
+    pub fn generate_proof(
+        &self,
+        jwk: &JWK,
+        options: &LinkedDataProofOptions,
+    ) -> Result<Proof, Error> {
+        let key = EncodingKey::try_from(jwk)?;
+        LinkedDataProofs::sign(self, options, &key)
+    }
+
+    pub fn add_proof(&mut self, proof: Proof) {
+        self.proof = match self.proof.take() {
+            None => Some(OneOrMany::One(proof)),
+            Some(OneOrMany::One(existing_proof)) => {
+                Some(OneOrMany::Many(vec![existing_proof, proof]))
+            }
+            Some(OneOrMany::Many(mut proofs)) => {
+                proofs.push(proof);
+                Some(OneOrMany::Many(proofs))
+            }
+        }
+    }
+
+    fn filter_proofs(&self, options: Option<LinkedDataProofOptions>) -> Vec<&Proof> {
+        let options = options.unwrap_or_default();
+        self.proof
+            .iter()
+            .flatten()
+            .filter(|proof| proof.matches(&options))
+            .collect()
+    }
+
+    pub fn verify(&self, options: Option<LinkedDataProofOptions>) -> VerificationResult {
+        let proofs = self.filter_proofs(options);
+        if proofs.is_empty() {
+            return VerificationResult::error("No applicable proof");
+            // TODO: say why, e.g. expired
+        }
+        let mut results = VerificationResult::new();
+        // Try verifying each proof until one succeeds
+        for proof in proofs {
+            let mut result = proof.verify(self);
+            if result.errors.is_empty() {
+                result
+                    .checks
+                    .push("Verified presentation proof".to_string());
+                return result;
+            };
+            results.append(&mut result);
+        }
+        results
+    }
+}
+
+impl LinkedDataDocument for Presentation {
+    fn to_dataset_for_signing(&self) -> Result<DataSet, Error> {
+        let mut copy = self.clone();
+        copy.proof = None;
+        DataSet::try_from(copy)
+    }
+}
+
+impl TryFrom<Presentation> for DataSet {
+    type Error = Error;
+    fn try_from(vp: Presentation) -> Result<Self, Self::Error> {
+        let mut statements: Vec<Statement> = Vec::new();
+
+        let subject = match vp.id {
+            Some(id) => Subject::IRIRef(IRIRef::from(id)),
+            None => return Err(Error::TooManyBlankNodes),
+        };
+
+        for type_ in vp.type_ {
+            if type_ != "VerifiablePresentation" {
+                return Err(Error::UnsupportedType);
+            }
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#".to_string() + &type_,
+                )),
+                graph_label: None,
+            });
+        }
+
+        if let Some(holder) = vp.holder {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#holder".to_string(),
+                )),
+                object: Object::IRIRef(IRIRef::from(holder)),
+                graph_label: None,
+            });
+        }
+
+        for vc_or_jwt in vp.verifiable_credential {
+            let vc = match vc_or_jwt {
+                CredentialOrJWT::Credential(vc) => vc,
+                CredentialOrJWT::JWT(_) => {
+                    return Err(Error::JWTCredentialInPresentation);
+                }
+            };
+            let mut vc_dataset = DataSet::try_from(vc)?;
+            statements.append(&mut vc_dataset.statements);
+        }
+
+        Ok(DataSet {
+            statements: statements,
+        })
+    }
+}
+
+macro_rules! assert_local {
+    ($cond:expr) => {
+        if !$cond {
+            return false;
+        }
+    };
 }
 
 impl Proof {
-    pub fn to_urdna2015_for_signing(&self) -> Result<String, Error> {
+    pub fn matches(&self, options: &LinkedDataProofOptions) -> bool {
+        if let Some(expires) = self.expires {
+            assert_local!(Utc::now() < expires);
+        }
+        if let Some(ref verification_method) = options.verification_method {
+            assert_local!(self.verification_method.as_ref() == Some(verification_method));
+        }
+        if let Some(created) = self.created {
+            assert_local!(options.created.unwrap_or(Utc::now()) >= created);
+        } else {
+            return false;
+        }
+        if let Some(ref challenge) = options.challenge {
+            assert_local!(self.challenge.as_ref() == Some(challenge));
+        }
+        if let Some(ref domain) = options.domain {
+            assert_local!(self.domain.as_ref() == Some(domain));
+        }
+        let proof_purpose = options.proof_purpose.clone().unwrap_or_default();
+        assert_local!(self.proof_purpose == Some(proof_purpose));
+        true
+    }
+
+    pub fn verify(&self, document: &dyn LinkedDataDocument) -> VerificationResult {
+        LinkedDataProofs::verify(self, document).into()
+    }
+}
+
+impl LinkedDataDocument for Proof {
+    fn to_dataset_for_signing(&self) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.jws = None;
-        let dataset: DataSet = copy.try_into()?;
-        dataset.to_nquads()
+        DataSet::try_from(copy)
     }
 }
 
@@ -1064,6 +1203,8 @@ mod tests {
         #[serde(flatten)]
         pub property_set: Option<Map<String, Value>>,
     }
+
+    const JWK_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
 
     #[test]
     fn credential_from_json() {
@@ -1195,17 +1336,18 @@ mod tests {
         }"###;
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
 
-        const JWK_JSON: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.json");
-        let key: JWK = serde_json::from_slice(JWK_JSON).unwrap();
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
-        let proof = vc
-            .generate_proof(&key, None, ProofPurpose::AssertionMethod, None, None)
-            .unwrap();
+        let mut issue_options = LinkedDataProofOptions::default();
+        let issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
+        issue_options.verification_method = Some(issuer_key);
+        let proof = vc.generate_proof(&key, &issue_options).unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        vc.verify_proofs(&key, None, Some(ProofPurpose::AssertionMethod))
-            .unwrap();
+        let verification_result = vc.verify(None);
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
 
         // mess with the proof to make verify fail
         match vc.proof {
@@ -1219,9 +1361,9 @@ mod tests {
             },
         }
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
-        assert!(vc
-            .verify_proofs(&key, None, Some(ProofPurpose::AssertionMethod))
-            .is_err());
+        let verification_result = vc.verify(None);
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.len() >= 1);
     }
 
     #[test]
@@ -1238,7 +1380,8 @@ _:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://w3id.org/secu
 _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#assertionMethod> .
 "###;
         let proof: Proof = serde_json::from_str(proof_str).unwrap();
-        let proof_urdna2015 = proof.to_urdna2015_for_signing().unwrap();
+        let proof_dataset = proof.to_dataset_for_signing().unwrap();
+        let proof_urdna2015 = proof_dataset.to_nquads().unwrap();
         assert_eq!(proof_urdna2015, urdna2015_expected);
     }
 
@@ -1265,7 +1408,72 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
 "#;
         let vc: Credential = serde_json::from_str(credential_str).unwrap();
-        let credential_urdna2015 = vc.to_urdna2015_for_signing().unwrap();
+        let credential_dataset = vc.to_dataset_for_signing().unwrap();
+        let credential_urdna2015 = credential_dataset.to_nquads().unwrap();
         assert_eq!(credential_urdna2015, urdna2015_expected);
+    }
+
+    #[test]
+    fn presentation_from_credential_issue_verify() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        // Issue credential
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+        let mut vc_issue_options = LinkedDataProofOptions::default();
+        let vp_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
+        vc_issue_options.verification_method = Some(vp_issuer_key);
+        let vc_proof = vc.generate_proof(&key, &vc_issue_options).unwrap();
+        vc.add_proof(vc_proof);
+        println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
+        vc.validate().unwrap();
+        let vc_verification_result = vc.verify(None);
+        println!("{:#?}", vc_verification_result);
+        assert!(vc_verification_result.errors.is_empty());
+
+        // Issue Presentation with Credential
+        let mut vp = Presentation {
+            context: vec![DEFAULT_CONTEXT.to_string()],
+            id: Some(URI::String(
+                "http://example.org/presentations/3731".to_string(),
+            )),
+            type_: OneOrMany::One("VerifiablePresentation".to_string()),
+            verifiable_credential: OneOrMany::One(CredentialOrJWT::Credential(vc)),
+            proof: None,
+            holder: None,
+        };
+        let mut vp_issue_options = LinkedDataProofOptions::default();
+        let vp_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
+        vp_issue_options.verification_method = Some(vp_issuer_key);
+        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        let vp_proof = vp.generate_proof(&key, &vp_issue_options).unwrap();
+        vp.add_proof(vp_proof);
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        vp.validate().unwrap();
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()));
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.is_empty());
+
+        // mess with the VP proof to make verify fail
+        match vp.proof {
+            Some(OneOrMany::One(ref mut proof)) => match proof.jws {
+                Some(ref mut jws) => {
+                    jws.insert(0, 'x');
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+        let vp_verification_result = vp.verify(Some(vp_issue_options));
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.len() >= 1);
     }
 }
