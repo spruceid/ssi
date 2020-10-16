@@ -15,7 +15,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - name: Checkout SSI Library
+      uses: actions/checkout@v2
 
     - name: Cache Cargo registry and build artifacts
       uses: actions/cache@v2
@@ -34,11 +35,15 @@ jobs:
     - name: Test
       run: cargo test --verbose --workspace
 
+    - name: Checkout vc-test-suite
+      uses: actions/checkout@v2
+      with:
+        repository: w3c/vc-test-suite
+        path: vc-test-suite
+
     - name: Test vc-test-suite
       run: |
-        cd ..
-        git clone https://github.com/w3c/vc-test-suite --depth 1
         cd vc-test-suite
         npm i
-        cp ../ssi/vc-test/config.json .
+        cp ../vc-test/config.json .
         npm test
