@@ -14,11 +14,12 @@ pest = "2.1"
 pest_derive = "2.1"
 derive_builder = "0.9"
 base64 = "0.12"
-jsonwebtoken = "7"
+jsonwebtoken = { path = "jsonwebtoken" }
 ring = "0.16"
 
 [workspace]
 members = [
   "did-resolve",
   "vc-test",
+  "jsonwebtoken",
 ]
