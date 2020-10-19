@@ -1,6 +1,7 @@
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 use std::convert::TryInto;
+use std::str::FromStr;
 
 use crate::error::Error;
 use crate::jwk::{JWTKeys, JWK};
@@ -1164,10 +1165,10 @@ impl LinkedDataDocument for Proof {
     }
 }
 
-impl TryFrom<String> for ProofPurpose {
-    type Error = Error;
-    fn try_from(purpose: String) -> Result<Self, Self::Error> {
-        match purpose.as_str() {
+impl FromStr for ProofPurpose {
+    type Err = Error;
+    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
+        match purpose {
             "authentication" => Ok(Self::Authentication),
             "assertionMethod" => Ok(Self::AssertionMethod),
             "keyAgreement" => Ok(Self::KeyAgreement),
@@ -1176,6 +1177,13 @@ impl TryFrom<String> for ProofPurpose {
             "capabilityDelegation" => Ok(Self::CapabilityDelegation),
             _ => Err(Error::UnsupportedProofPurpose),
         }
+    }
+}
+
+impl TryFrom<String> for ProofPurpose {
+    type Error = Error;
+    fn try_from(purpose: String) -> Result<Self, Self::Error> {
+        Self::from_str(&purpose)
     }
 }
 

@@ -26,21 +26,29 @@ pub struct JWTKeys {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct JWK {
-    #[serde(rename = "crv")]
+    #[serde(rename = "use")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_use: Option<String>,
     #[serde(rename = "key_ops")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub key_operations: Option<Vec<String>>,
     #[serde(rename = "alg")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<Algorithm>,
     #[serde(rename = "kid")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub key_id: Option<String>,
     #[serde(rename = "x5u")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub x509_url: Option<String>,
     #[serde(rename = "x5c")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub x509_certificate_chain: Option<Vec<String>>,
     #[serde(rename = "x5t")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub x509_thumbprint_sha1: Option<Base64urlUInt>,
     #[serde(rename = "x5t#S256")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub x509_thumbprint_sha256: Option<Base64urlUInt>,
     #[serde(flatten)]
     pub params: Params,
@@ -58,7 +66,6 @@ pub enum Params {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct ECParams {
     // Parameters for Elliptic Curve Public Keys
-    #[serde(rename = "crv")]
     pub curve: Option<String>,
     #[serde(rename = "x")]
     pub x_coordinate: Option<Base64urlUInt>,
@@ -117,7 +124,9 @@ pub struct Prime {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(try_from = "String")]
+#[serde(into = "Base64urlUIntString")]
 pub struct Base64urlUInt(pub Vec<u8>);
+type Base64urlUIntString = String;
 
 impl JWK {
     pub fn to_jwt_header(&self) -> Result<Header, Error> {
@@ -256,6 +265,12 @@ impl TryFrom<String> for Base64urlUInt {
 impl From<&Base64urlUInt> for String {
     fn from(data: &Base64urlUInt) -> String {
         base64::encode_config(&data.0, base64::URL_SAFE_NO_PAD)
+    }
+}
+
+impl From<Base64urlUInt> for Base64urlUIntString {
+    fn from(data: Base64urlUInt) -> Base64urlUIntString {
+        String::from(&data)
     }
 }
 
