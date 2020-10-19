@@ -1,7 +1,11 @@
+use ring::signature::{Ed25519KeyPair, KeyPair};
 use std::convert::TryFrom;
 use std::result::Result;
 
-use crate::der::{Integer, RSAPrivateKey, RSAPublicKey, DER};
+use crate::der::{
+    BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
+    RSAPublicKey, DER,
+};
 use crate::error::Error;
 
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
@@ -13,6 +17,7 @@ use serde::{Deserialize, Serialize};
 // RFC 7518 - JSON Web Algorithms (JWA)
 // RFC 7519 - JSON Web Token (JWT)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
+// RFC 8037 - CFRG ECDH and Signatures in JOSE
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JWTKeys {
@@ -60,7 +65,7 @@ pub enum Params {
     EC(ECParams),
     RSA(RSAParams),
     Symmetric(SymmetricParams),
-    // @TODO: OKP (RFC 8037)
+    OKP(OctetParams),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -113,6 +118,20 @@ pub struct SymmetricParams {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename = "OKP")]
+pub struct OctetParams {
+    // Parameters for Octet Key Pair Public Keys
+    #[serde(rename = "crv")]
+    pub curve: String,
+    #[serde(rename = "x")]
+    pub public_key: Base64urlUInt,
+
+    // Parameters for Octet Key Pair Private Keys
+    #[serde(rename = "d")]
+    pub private_key: Option<Base64urlUInt>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Prime {
     #[serde(rename = "r")]
     pub prime_factor: String, // Base64urlUInt
@@ -137,6 +156,32 @@ impl JWK {
         }
         Ok(header)
     }
+
+    pub fn generate_ed25519() -> Result<JWK, Error> {
+        let rng = ring::rand::SystemRandom::new();
+        let doc = Ed25519KeyPair::generate_pkcs8(&rng)?;
+        let key_pkcs8 = doc.as_ref();
+        let keypair = Ed25519KeyPair::from_pkcs8(key_pkcs8)?;
+        let public_key = keypair.public_key().as_ref();
+        // reference: ring/src/ec/curve25519/ed25519/signing.rs
+        let private_key = &key_pkcs8[0x10..0x30];
+        return Ok(JWK {
+            params: Params::OKP(OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: Base64urlUInt(public_key.to_vec()),
+                private_key: Some(Base64urlUInt(private_key.to_vec())),
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        });
+    }
+}
 }
 
 impl TryFrom<&JWK> for DER {
@@ -159,6 +204,10 @@ impl TryFrom<&JWK> for EncodingKey {
                 let der = DER::try_from(rsa_params)?;
                 Ok(EncodingKey::from_rsa_der(&der))
             }
+            Params::OKP(okp_params) => {
+                let der = DER::try_from(okp_params)?;
+                Ok(EncodingKey::from_ed_der(&der))
+            }
             _ => return Err(Error::KeyTypeNotImplemented),
         }
     }
@@ -178,6 +227,12 @@ impl<'a> TryFrom<&'a JWK> for DecodingKey<'a> {
                     None => return Err(Error::MissingKeyParameters),
                 };
                 Ok(DecodingKey::from_rsa_components(modulus, exponent))
+            }
+            Params::OKP(okp) => {
+                if okp.curve != "Ed25519".to_string() {
+                    return Err(Error::KeyTypeNotImplemented);
+                }
+                Ok(DecodingKey::from_ed_der(&okp.public_key.0))
             }
             _ => Err(Error::KeyTypeNotImplemented),
         }
@@ -252,6 +307,29 @@ impl TryFrom<&RSAParams> for DER {
     }
 }
 
+impl TryFrom<&OctetParams> for DER {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != "Ed25519".to_string() {
+            return Err(Error::KeyTypeNotImplemented);
+        }
+        let public_key = BitString(params.public_key.0.clone());
+        if let Some(private_key) = match &params.private_key {
+            Some(private_key) => Some(OctetString(private_key.0.clone())),
+            None => None,
+        } {
+            let key = Ed25519PrivateKey {
+                public_key,
+                private_key,
+            };
+            Ok(key.into())
+        } else {
+            let key = Ed25519PublicKey { public_key };
+            Ok(key.into())
+        }
+    }
+}
+
 impl TryFrom<String> for Base64urlUInt {
     type Error = Error;
     fn try_from(data: String) -> Result<Self, Self::Error> {
@@ -278,13 +356,36 @@ impl From<Base64urlUInt> for Base64urlUIntString {
 mod tests {
     use super::*;
 
+    const RSA_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
+    const RSA_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
+
     #[test]
     fn jwk_to_der_rsa() {
-        const JSON: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.json");
-        const DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
-
-        let key: JWK = serde_json::from_slice(JSON).unwrap();
+        let key: JWK = serde_json::from_str(RSA_JSON).unwrap();
         let der = DER::try_from(&key).unwrap();
-        assert_eq!(der, DER);
+        assert_eq!(der, RSA_DER);
+    }
+
+    #[test]
+    fn ed25519_from_str() {
+        let json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"tfh77YHchREL9WbreVu87Q5P_puHaXGMtLEcmiQSSco\",\"d\":\"KZFPt0DnxRNBdRBQxMJGBUzEt1CgdVqRm-qs474IIlw\"}";
+        let _jwk: JWK = serde_json::from_str(&json).unwrap();
+    }
+
+    #[test]
+    fn generate_ed25519_sign_verify() {
+        let key = JWK::generate_ed25519().unwrap();
+        let encoding_key = EncodingKey::try_from(&key).unwrap();
+        let decoding_key = DecodingKey::try_from(&key).unwrap();
+        let message = "asdf".as_bytes();
+        let signature =
+            jsonwebtoken::crypto::sign_bytes(&message, &encoding_key, Algorithm::EdDSA).unwrap();
+        assert!(jsonwebtoken::crypto::verify_bytes(
+            &signature,
+            &message,
+            &decoding_key,
+            Algorithm::EdDSA
+        )
+        .unwrap());
     }
 }

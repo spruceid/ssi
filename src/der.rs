@@ -4,10 +4,13 @@
 // https://serde.rs/impl-serializer.html
 // ISO/IEC 8825-1:2015 (E)
 // https://tools.ietf.org/html/rfc8017#page-55
+// https://tools.ietf.org/html/rfc8410
 
 use std::convert::From;
 
 const TAG_INTEGER: u8 = 0x02;
+const TAG_OCTETSTRING: u8 = 0x04;
+const TAG_BITSTRING: u8 = 0x03;
 const TAG_SEQUENCE: u8 = 0x10;
 
 pub type DER = Vec<u8>;
@@ -32,6 +35,17 @@ pub struct RSAPublicKey {
 }
 
 #[derive(Debug, Clone)]
+pub struct Ed25519PublicKey {
+    pub public_key: BitString,
+}
+
+#[derive(Debug, Clone)]
+pub struct Ed25519PrivateKey {
+    pub public_key: BitString,
+    pub private_key: OctetString,
+}
+
+#[derive(Debug, Clone)]
 pub struct OtherPrimeInfos(pub Vec<OtherPrimeInfo>);
 
 #[derive(Debug, Clone)]
@@ -43,6 +57,13 @@ pub struct OtherPrimeInfo {
 
 #[derive(Debug, Clone)]
 pub struct Integer(pub Vec<u8>);
+
+#[derive(Debug, Clone)]
+pub struct OctetString(pub Vec<u8>);
+
+#[derive(Debug, Clone)]
+// TODO: support bitstrings not bytes-aligned
+pub struct BitString(pub Vec<u8>);
 
 fn trim_bytes(bytes: &[u8]) -> Vec<u8> {
     // Remove leading zeros from an array.
@@ -111,9 +132,55 @@ impl From<RSAPublicKey> for DER {
     }
 }
 
+impl Ed25519PrivateKey {
+    fn oid() -> Vec<u8> {
+        // id-Ed25519 1.3.101.112
+        return vec![0x30, 0x05, 0x06, 0x03, 0x2B, 0x65, 0x70];
+    }
+}
+
+impl From<Ed25519PrivateKey> for DER {
+    fn from(key: Ed25519PrivateKey) -> Self {
+        let version = Integer(vec![0]);
+        // TODO: include public key
+        encode(
+            TAG_SEQUENCE,
+            true,
+            [
+                DER::from(version),
+                Ed25519PrivateKey::oid(),
+                DER::from(key.private_key),
+            ]
+            .concat(),
+        )
+    }
+}
+
+impl From<Ed25519PublicKey> for DER {
+    fn from(key: Ed25519PublicKey) -> Self {
+        DER::from(key.public_key)
+    }
+}
+
 impl From<Integer> for DER {
     fn from(key: Integer) -> Self {
         encode(TAG_INTEGER, false, key.0)
+    }
+}
+
+impl From<OctetString> for DER {
+    fn from(octets: OctetString) -> Self {
+        encode(
+            TAG_OCTETSTRING,
+            false,
+            encode(TAG_OCTETSTRING, false, octets.0),
+        )
+    }
+}
+
+impl From<BitString> for DER {
+    fn from(data: BitString) -> Self {
+        encode(TAG_BITSTRING, false, [vec![0], data.0].concat())
     }
 }
 
@@ -154,5 +221,20 @@ mod tests {
         // 0x05: The integer 5
         let expected = vec![0x02, 0x01, 0x05];
         assert_eq!(DER::from(integer), expected);
+    }
+
+    #[test]
+    fn encode_ed25519_private_key() {
+        let key = Ed25519PrivateKey {
+            public_key: BitString(vec![]),
+            private_key: OctetString(vec![
+                0xD4, 0xEE, 0x72, 0xDB, 0xF9, 0x13, 0x58, 0x4A, 0xD5, 0xB6, 0xD8, 0xF1, 0xF7, 0x69,
+                0xF8, 0xAD, 0x3A, 0xFE, 0x7C, 0x28, 0xCB, 0xF1, 0xD4, 0xFB, 0xE0, 0x97, 0xA8, 0x8F,
+                0x44, 0x75, 0x58, 0x42,
+            ]),
+        };
+        let expected_b64 = "MC4CAQAwBQYDK2VwBCIEINTuctv5E1hK1bbY8fdp+K06/nwoy/HU++CXqI9EdVhC";
+        let expected_key = base64::decode(expected_b64).unwrap();
+        assert_eq!(DER::from(key), expected_key);
     }
 }

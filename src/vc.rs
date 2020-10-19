@@ -655,8 +655,7 @@ impl Credential {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        let key = EncodingKey::try_from(jwk)?;
-        LinkedDataProofs::sign(self, options, &key)
+        LinkedDataProofs::sign(self, options, jwk)
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1010,8 +1009,7 @@ impl Presentation {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        let key = EncodingKey::try_from(jwk)?;
-        LinkedDataProofs::sign(self, options, &key)
+        LinkedDataProofs::sign(self, options, jwk)
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
