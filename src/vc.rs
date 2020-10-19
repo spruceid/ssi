@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 use crate::error::Error;
-use crate::jwk::{Header, JWTKeys, JWK};
+use crate::jwk::{JWTKeys, JWK};
 use crate::ldp::{LinkedDataDocument, LinkedDataProofs};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::{
@@ -11,7 +11,7 @@ use crate::rdf::{
 };
 
 use chrono::prelude::*;
-use jsonwebtoken::{DecodingKey, EncodingKey, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

@@ -8,6 +8,7 @@ use std::fmt;
 pub enum Error {
     InvalidSubject,
     InvalidCriticalHeader,
+    UnknownCriticalHeader,
     InvalidIssuer,
     AlgorithmNotImplemented,
     ProofTypeNotImplemented,
@@ -58,6 +59,7 @@ impl fmt::Display for Error {
         match self {
             Error::InvalidSubject => write!(f, "Invalid subject for JWT"),
             Error::InvalidCriticalHeader => write!(f, "Invalid crit property in JWT header"),
+            Error::UnknownCriticalHeader => write!(f, "Unknown critical header name in JWT header"),
             Error::InvalidIssuer => write!(f, "Invalid issuer for JWT"),
             Error::MissingKey => write!(f, "JWT key not found"),
             Error::MissingModulus => write!(f, "Missing modulus in RSA key"),

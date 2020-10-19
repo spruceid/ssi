@@ -4,7 +4,7 @@ use std::result::Result;
 use crate::der::{Integer, RSAPrivateKey, RSAPublicKey, DER};
 use crate::error::Error;
 
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header as HeaderLite, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
 // RFC 7515 - JSON Web Signature (JWS)
@@ -119,62 +119,9 @@ pub struct Prime {
 #[serde(try_from = "String")]
 pub struct Base64urlUInt(pub Vec<u8>);
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub struct Header {
-    #[serde(rename = "alg")]
-    pub algorithm: Algorithm,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "jku")]
-    pub jwk_set_url: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub jwk: Option<JWK>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "kid")]
-    pub key_id: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "x5u")]
-    pub x509_url: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "x5c")]
-    pub x509_certificate_chain: Option<Vec<String>>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "x5t")]
-    pub x509_thumbprint_sha1: Option<Base64urlUInt>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "x5t#S256")]
-    pub x509_thumbprint_sha256: Option<Base64urlUInt>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "typ")]
-    pub type_: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "cty")]
-    pub content_type: Option<String>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "crit")]
-    pub critical: Option<Vec<String>>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "b64")]
-    pub base64urlencode_payload: Option<bool>,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]
-    pub additional_params: Option<std::collections::HashMap<String, serde_json::Value>>,
-}
-
 impl JWK {
-    pub fn to_jwt_header(&self) -> Result<HeaderLite, Error> {
-        let mut header = HeaderLite::default();
+    pub fn to_jwt_header(&self) -> Result<Header, Error> {
+        let mut header = Header::default();
         header.alg = Algorithm::try_from(self)?;
         if let Some(ref key_id) = self.key_id {
             header.kid = Some(key_id.clone());
@@ -244,61 +191,6 @@ impl TryFrom<&JWK> for Validation {
     fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
         let algorithm = Algorithm::try_from(jwk)?;
         Ok(Validation::new(algorithm))
-    }
-}
-
-impl Header {
-    pub fn from_b64(b64: &str) -> Result<Self, Error> {
-        let json = base64::decode_config(b64, base64::URL_SAFE)?;
-        let header: Self = serde_json::from_slice(&json)?;
-
-        if let Some(crit) = &header.critical {
-            if crit.is_empty() {
-                return Err(Error::InvalidCriticalHeader);
-            }
-            for name in crit {
-                match name.as_str() {
-                    "alg" | "jku" | "jwk" | "kid" | "x5u" | "x5c" | "x5t" | "x5t#S256" | "typ"
-                    | "cty" | "crit" => return Err(Error::InvalidCriticalHeader),
-                    "b64" => {
-                        if !header.base64urlencode_payload.is_some() {
-                            return Err(Error::InvalidCriticalHeader);
-                        }
-                    }
-                    _ => {
-                        let has_param = match &header.additional_params {
-                            Some(params) => params.contains_key(name),
-                            None => false,
-                        };
-                        if !has_param {
-                            return Err(Error::InvalidCriticalHeader);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(header)
-    }
-}
-
-impl Default for Header {
-    fn default() -> Self {
-        Header {
-            algorithm: Algorithm::default(),
-            jwk_set_url: None,
-            jwk: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-            type_: Some("JWT".to_string()),
-            content_type: None,
-            critical: None,
-            base64urlencode_payload: None,
-            additional_params: None,
-        }
     }
 }
 

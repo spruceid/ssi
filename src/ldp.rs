@@ -1,11 +1,12 @@
 use std::convert::TryFrom;
 
 use chrono::prelude::*;
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey};
+use jsonwebtoken::{decode_header, Algorithm, DecodingKey, EncodingKey, Header};
 use ring::digest;
+use serde_json::value::Value;
 
 use crate::error::Error;
-use crate::jwk::{Header, JWK};
+use crate::jwk::JWK;
 use crate::rdf::DataSet;
 use crate::vc::{base64_encode_json, LinkedDataProofOptions, Proof};
 
@@ -78,10 +79,12 @@ impl ProofSuite for RsaSignature2018 {
         key: &EncodingKey,
     ) -> Result<Proof, Error> {
         let mut header = Header::default();
-        header.algorithm = Algorithm::RS256;
-        header.base64urlencode_payload = Some(false);
-        header.critical = Some(vec!["b64".to_string()]);
-        // header.key_id = Some(key_id.clone());
+        header.alg = Algorithm::RS256;
+        let mut params = std::collections::HashMap::new();
+        params.insert("b64".to_string(), false.into());
+        header.params = Some(params);
+        header.crit = Some(vec!["b64".to_string()]);
+        // header.kid = Some(key_id.clone());
         let mut proof = Proof {
             type_: "RsaSignature2018".to_string(),
             proof_purpose: options.proof_purpose.clone(),
@@ -98,9 +101,7 @@ impl ProofSuite for RsaSignature2018 {
         };
         let header_b64 = base64_encode_json(&header)?;
         let message = to_signing_input(document, &header_b64, &proof)?;
-        // https://github.com/Keats/jsonwebtoken/pull/150
-        let message_str = unsafe { String::from_utf8_unchecked(message) };
-        let sig = jsonwebtoken::crypto::sign(&message_str, &key, header.algorithm)?;
+        let sig = jsonwebtoken::crypto::sign_bytes(&message, &key, header.alg)?;
         proof.jws = Some([&header_b64, "", &sig].join("."));
         Ok(proof)
     }
@@ -123,16 +124,31 @@ impl ProofSuite for RsaSignature2018 {
             (Some(header_b64), Some(""), Some(signature_b64)) => (header_b64, signature_b64),
             _ => return Err(Error::InvalidSignature),
         };
-        let header = Header::from_b64(header_b64)?;
-        if header.base64urlencode_payload != Some(false) {
+        let header = decode_header(jws)?;
+        let b64: Option<bool> = match header.params {
+            Some(params) => match params.get("b64") {
+                Some(Value::Bool(boolean)) => Some(*boolean),
+                Some(_) => None,
+                None => None,
+            },
+            None => None,
+        };
+        if b64 != Some(false) {
             return Err(Error::ExpectedUnencodedHeader);
+        }
+        for name in header.crit.iter().flatten() {
+            match name.as_str() {
+                "b64" => {}
+                _ => {
+                    return Err(Error::UnknownCriticalHeader);
+                }
+            }
         }
 
         let message = to_signing_input(document, &header_b64, proof)?;
         // https://github.com/Keats/jsonwebtoken/pull/150
-        let message_str = unsafe { String::from_utf8_unchecked(message) };
         let verified =
-            jsonwebtoken::crypto::verify(signature_b64, &message_str, &key, header.algorithm)?;
+            jsonwebtoken::crypto::verify_bytes(signature_b64, &message, &key, header.alg)?;
         if !verified {
             return Err(Error::InvalidSignature);
         }
