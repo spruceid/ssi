@@ -87,6 +87,9 @@ fn resolve_key(verification_method: &str) -> Result<JWK, Error> {
         let jwk: JWK = serde_json::from_str(&verification_method[16..])?;
         return Ok(jwk);
     }
+    if &verification_method[..8] == "did:key:" {
+        return JWK::from_did_key(verification_method);
+    }
     Err(Error::ResourceNotFound)
 }
 

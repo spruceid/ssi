@@ -1373,6 +1373,35 @@ mod tests {
     }
 
     #[test]
+    fn credential_prove_verify_did_key() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
+        // let key = JWK::generate_ed25519().unwrap();
+        let key_json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww\",\"d\":\"39Ev8-k-jkKunJyFWog3k0OwgPjnKv_qwLhfqXdAXTY\"}";
+        let key: JWK = serde_json::from_str(&key_json).unwrap();
+        let did = key.to_did().unwrap();
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some(did);
+        let proof = vc.generate_proof(&key, &issue_options).unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None);
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+    }
+
+    #[test]
     fn proof_json_to_urdna2015() {
         let proof_str = r###"{
             "type": "RsaSignature2018",

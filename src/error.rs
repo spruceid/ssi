@@ -1,6 +1,8 @@
-// use std::error::Error as StdError;
 use base64::DecodeError as Base64Error;
 use jsonwebtoken::errors::Error as JWTError;
+use multibase::Error as MultibaseError;
+use ring::error::KeyRejected as KeyRejectedError;
+use ring::error::Unspecified as RingUnspecified;
 use serde_json::Error as JSONError;
 use std::fmt;
 
@@ -39,6 +41,7 @@ pub enum Error {
     InvalidSignature,
     MissingCredentialSchema,
     UnsupportedProperty,
+    UnsupportedKeyType,
     UnsupportedType,
     UnsupportedProofPurpose,
     TooManyBlankNodes,
@@ -46,8 +49,12 @@ pub enum Error {
     ExpectedUnencodedHeader,
     ResourceNotFound,
     InvalidProofTypeType,
+    InvalidKeyLength,
+    RingError,
+    KeyRejected(KeyRejectedError),
     JWT(JWTError),
     Base64(Base64Error),
+    Multibase(MultibaseError),
     JSON(JSONError),
 
     #[doc(hidden)]
@@ -93,6 +100,7 @@ impl fmt::Display for Error {
             Error::InvalidProofDomain => write!(f, "Invalid proof domain"),
             Error::MissingCredentialSchema => write!(f, "Missing credential schema for ZKP"),
             Error::UnsupportedProperty => write!(f, "Unsupported property for LDP"),
+            Error::UnsupportedKeyType => write!(f, "Unsupported key type for did:key"),
             Error::TooManyBlankNodes => write!(f, "Multiple blank nodes not supported. Either credential or credential subject must have id property. Presentation must have id property."),
             Error::UnsupportedType => write!(f, "Unsupported type for LDP"),
             Error::UnsupportedProofPurpose => write!(f, "Unsupported proof purpose"),
@@ -100,8 +108,12 @@ impl fmt::Display for Error {
             Error::ExpectedUnencodedHeader => write!(f, "Expected unencoded JWT header"),
             Error::ResourceNotFound => write!(f, "Resource not found"),
             Error::InvalidProofTypeType => write!(f, "Invalid ProofType type"),
+            Error::InvalidKeyLength => write!(f, "Invalid key length"),
             Error::URI => write!(f, "Invalid URI"),
+            Error::RingError => write!(f, "Crypto error"),
+            Error::KeyRejected(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
+            Error::Multibase(e) => e.fmt(f),
             Error::JWT(e) => e.fmt(f),
             Error::JSON(e) => e.fmt(f),
             _ => unreachable!(),
@@ -121,9 +133,27 @@ impl From<Base64Error> for Error {
     }
 }
 
+impl From<MultibaseError> for Error {
+    fn from(err: MultibaseError) -> Error {
+        Error::Multibase(err)
+    }
+}
+
 impl From<JSONError> for Error {
     fn from(err: JSONError) -> Error {
         Error::JSON(err)
+    }
+}
+
+impl From<KeyRejectedError> for Error {
+    fn from(err: KeyRejectedError) -> Error {
+        Error::KeyRejected(err)
+    }
+}
+
+impl From<RingUnspecified> for Error {
+    fn from(_: RingUnspecified) -> Error {
+        Error::RingError
     }
 }
 
