@@ -90,9 +90,11 @@ pub enum Context {
 pub struct CredentialSubject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<URI>,
-    // name is here for example/testing purposes:
+    // name and identifier for example/testing purposes:
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<HTML>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -699,6 +701,17 @@ impl TryFrom<CredentialSubject> for DataSet {
                 subject: subject.clone(),
                 predicate: Predicate::IRIRef(IRIRef("http://schema.org/name".to_string())),
                 object: Object::Literal(Literal::from(name)),
+                graph_label: None,
+            });
+        }
+
+        if let Some(identifier) = credential_subject.identifier {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef("http://schema.org/identifier".to_string())),
+                object: Object::Literal(Literal::String {
+                    string: StringLiteral(identifier),
+                }),
                 graph_label: None,
             });
         }
@@ -1433,10 +1446,12 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             "issuanceDate": "2018-02-24T05:28:04Z",
             "credentialSubject": {
                 "id": "did:example:abcdef1234567",
-                "name": "Jane Doe"
+                "name": "Jane Doe",
+                "identifier": "EXAMPLE_ID"
             }
         }"#;
-        let urdna2015_expected = r#"<did:example:abcdef1234567> <http://schema.org/name> "Jane Doe"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML> .
+        let urdna2015_expected = r#"<did:example:abcdef1234567> <http://schema.org/identifier> "EXAMPLE_ID" .
+<did:example:abcdef1234567> <http://schema.org/name> "Jane Doe"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML> .
 <http://example.com/credentials/4643> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#credentialSubject> <did:example:abcdef1234567> .
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuanceDate> "2018-02-24T05:28:04Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
