@@ -622,7 +622,19 @@ impl Credential {
     }
 
     fn filter_proofs(&self, options: Option<LinkedDataProofOptions>) -> Vec<&Proof> {
-        let options = options.unwrap_or_default();
+        let mut options = options.unwrap_or_default().clone();
+        // Use issuer as default verificationMethod
+        if options.verification_method.is_none() {
+            if let Some(ref issuer) = self.issuer {
+                let issuer_uri = match issuer.clone() {
+                    Issuer::URI(uri) => uri,
+                    Issuer::Object(object_with_id) => object_with_id.id,
+                };
+                options.verification_method = Some(match issuer_uri {
+                    URI::String(uri) => uri,
+                });
+            }
+        }
         self.proof
             .iter()
             .flatten()
@@ -1039,7 +1051,13 @@ impl Presentation {
     }
 
     fn filter_proofs(&self, options: Option<LinkedDataProofOptions>) -> Vec<&Proof> {
-        let options = options.unwrap_or_default();
+        let mut options = options.unwrap_or_default();
+        // Use holder as default verificationMethod
+        if options.verification_method.is_none() {
+            if let Some(URI::String(ref holder)) = self.holder {
+                options.verification_method = Some(holder.clone());
+            }
+        }
         self.proof
             .iter()
             .flatten()
@@ -1347,7 +1365,7 @@ mod tests {
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
             "type": ["VerifiableCredential"],
-            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuer": "did:example:placeholder",
             "issuanceDate": "2020-08-19T21:41:50Z",
             "credentialSubject": {
                 "id": "did:example:d23dd687a7dc6787646f2eb98d0"
@@ -1359,6 +1377,7 @@ mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         let issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
+        vc.issuer = Some(Issuer::URI(URI::String(issuer_key.clone())));
         issue_options.verification_method = Some(issuer_key);
         let proof = vc.generate_proof(&key, &issue_options).unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -1404,6 +1423,7 @@ mod tests {
         let key: JWK = serde_json::from_str(&key_json).unwrap();
         let did = key.to_did().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
+        vc.issuer = Some(Issuer::URI(URI::String(did.clone())));
         issue_options.verification_method = Some(did);
         let proof = vc.generate_proof(&key, &issue_options).unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -1412,6 +1432,10 @@ mod tests {
         let verification_result = vc.verify(None);
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
+
+        // test that issuer is verified
+        vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
+        assert!(vc.verify(None).errors.len() > 0);
     }
 
     #[test]
@@ -1469,7 +1493,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
             "type": ["VerifiableCredential"],
-            "issuer": "did:example:30e07a529f32d234f6181736bd3",
+            "issuer": "did:example:placeholder",
             "issuanceDate": "2020-08-19T21:41:50Z",
             "credentialSubject": {
                 "id": "did:example:d23dd687a7dc6787646f2eb98d0"
@@ -1479,8 +1503,9 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
         let mut vc_issue_options = LinkedDataProofOptions::default();
-        let vp_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
-        vc_issue_options.verification_method = Some(vp_issuer_key);
+        let vc_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
+        vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
+        vc_issue_options.verification_method = Some(vc_issuer_key);
         let vc_proof = vc.generate_proof(&key, &vc_issue_options).unwrap();
         vc.add_proof(vc_proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
@@ -1502,6 +1527,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         let vp_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
+        vp.holder = Some(URI::String(vp_issuer_key.to_string()));
         vp_issue_options.verification_method = Some(vp_issuer_key);
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).unwrap();
@@ -1513,7 +1539,8 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert!(vp_verification_result.errors.is_empty());
 
         // mess with the VP proof to make verify fail
-        match vp.proof {
+        let mut vp1 = vp.clone();
+        match vp1.proof {
             Some(OneOrMany::One(ref mut proof)) => match proof.jws {
                 Some(ref mut jws) => {
                     jws.insert(0, 'x');
@@ -1522,8 +1549,13 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp.verify(Some(vp_issue_options));
+        let vp_verification_result = vp1.verify(Some(vp_issue_options));
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
+
+        // test that holder is verified
+        let mut vp2 = vp.clone();
+        vp2.holder = Some(URI::String("did:example:bad".to_string()));
+        assert!(vp2.verify(None).errors.len() > 0);
     }
 }
