@@ -39,6 +39,7 @@ pub const ALT_DEFAULT_CONTEXT: &str = "https://w3.org/2018/credentials/v1";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct Credential {
     #[serde(rename = "@context")]
     pub context: Contexts,
@@ -163,6 +164,7 @@ pub enum ProofPurpose {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct TermsOfUse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
@@ -184,6 +186,7 @@ pub struct Evidence {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct Status {
     pub id: URI,
     #[serde(rename = "type")]
@@ -225,6 +228,7 @@ pub struct RefreshService {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct Presentation {
     #[serde(rename = "@context")]
     pub context: Vec<String>,
@@ -859,6 +863,15 @@ impl TryFrom<Credential> for DataSet {
             });
         }
 
+        if vc.credential_status.is_some()
+            || vc.terms_of_use.is_some()
+            || vc.evidence.is_some()
+            || vc.credential_schema.is_some()
+            || vc.refresh_service.is_some()
+        {
+            return Err(Error::UnsupportedProperty);
+        }
+
         Ok(DataSet {
             statements: statements,
         })
@@ -869,6 +882,10 @@ impl TryFrom<Proof> for DataSet {
     type Error = Error;
     fn try_from(proof: Proof) -> Result<Self, Self::Error> {
         let mut statements: Vec<Statement> = Vec::new();
+
+        if has_more_props(proof.property_set) {
+            return Err(Error::UnsupportedProperty);
+        }
 
         let subject = Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()));
         // TODO: use references instead of clones
