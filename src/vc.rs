@@ -164,13 +164,13 @@ pub enum ProofPurpose {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
 pub struct TermsOfUse {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-
+    pub id: Option<URI>,
     #[serde(rename = "type")]
     pub type_: String,
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -738,6 +738,37 @@ impl TryFrom<CredentialSubject> for DataSet {
     }
 }
 
+impl TryFrom<TermsOfUse> for DataSet {
+    type Error = Error;
+    fn try_from(tos: TermsOfUse) -> Result<Self, Self::Error> {
+        let mut statements: Vec<Statement> = Vec::new();
+
+        if has_more_props(tos.property_set) {
+            return Err(Error::UnsupportedProperty);
+        }
+
+        let subject = match tos.id {
+            Some(id) => Subject::IRIRef(IRIRef::from(id)),
+            None => Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string())),
+        };
+
+        statements.push(Statement {
+            subject: subject.clone(),
+            predicate: Predicate::IRIRef(IRIRef(
+                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+            )),
+            object: Object::IRIRef(IRIRef(
+                "https://example.org/examples#".to_string() + &tos.type_,
+            )),
+            graph_label: None,
+        });
+
+        Ok(DataSet {
+            statements: statements,
+        })
+    }
+}
+
 fn has_more_props(property_set: Option<Map<String, Value>>) -> bool {
     match property_set {
         None => false,
@@ -863,8 +894,32 @@ impl TryFrom<Credential> for DataSet {
             });
         }
 
+        if let Some(tos_vec) = vc.terms_of_use {
+            for tos in tos_vec {
+                let tos_id = match tos.id.clone() {
+                    Some(id) => Object::IRIRef(IRIRef::from(id)),
+                    None => {
+                        if used_blank_node {
+                            return Err(Error::TooManyBlankNodes);
+                        }
+                        used_blank_node = true;
+                        Object::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
+                    }
+                };
+                let mut tos_dataset: DataSet = tos.try_into()?;
+                statements.push(Statement {
+                    subject: subject.clone(),
+                    predicate: Predicate::IRIRef(IRIRef(
+                        "https://www.w3.org/2018/credentials#termsOfUse".to_string(),
+                    )),
+                    object: tos_id,
+                    graph_label: None,
+                });
+                statements.append(&mut tos_dataset.statements);
+            }
+        }
+
         if vc.credential_status.is_some()
-            || vc.terms_of_use.is_some()
             || vc.evidence.is_some()
             || vc.credential_schema.is_some()
             || vc.refresh_service.is_some()
