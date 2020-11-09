@@ -828,6 +828,17 @@ impl TryFrom<Credential> for DataSet {
             });
         }
 
+        if let Some(expiration_date) = vc.expiration_date {
+            statements.push(Statement {
+                subject: subject.clone(),
+                predicate: Predicate::IRIRef(IRIRef(
+                    "https://www.w3.org/2018/credentials#expirationDate".to_string(),
+                )),
+                object: Object::Literal(Literal::from(expiration_date)),
+                graph_label: None,
+            });
+        }
+
         if let Some(issuer) = vc.issuer {
             let issuer_id = match issuer {
                 Issuer::URI(uri) => uri,
