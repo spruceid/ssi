@@ -15,7 +15,7 @@ pest_derive = "2.1"
 derive_builder = "0.9"
 base64 = "0.12"
 jsonwebtoken = { path = "jsonwebtoken" }
-ring = "0.16"
+ring = "0.16, < 0.16.16"
 multibase = "0.8"
 
 [workspace]
