@@ -61,7 +61,7 @@ impl LinkedDataProofs {
                 x509_thumbprint_sha256: _,
             } => match &curve[..] {
                 "Ed25519" => {
-                    return Ed25519VerificationKey2018::sign(document, options, &key);
+                    return Ed25519Signature2018::sign(document, options, &key);
                 }
                 _ => {}
             },
@@ -74,7 +74,8 @@ impl LinkedDataProofs {
     pub fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error> {
         match proof.type_.as_str() {
             "RsaSignature2018" => RsaSignature2018::verify(proof, document),
-            "Ed25519VerificationKey2018" => Ed25519VerificationKey2018::verify(proof, document),
+            "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document),
+            "Ed25519VerificationKey2018" => Ed25519Signature2018::verify(proof, document), // invalid/deprecated
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -208,8 +209,8 @@ impl ProofSuite for RsaSignature2018 {
     }
 }
 
-pub struct Ed25519VerificationKey2018 {}
-impl ProofSuite for Ed25519VerificationKey2018 {
+pub struct Ed25519Signature2018 {}
+impl ProofSuite for Ed25519Signature2018 {
     fn sign(
         document: &dyn LinkedDataDocument,
         options: &LinkedDataProofOptions,
@@ -219,7 +220,7 @@ impl ProofSuite for Ed25519VerificationKey2018 {
             document,
             options,
             key,
-            "Ed25519VerificationKey2018",
+            "Ed25519Signature2018",
             Algorithm::EdDSA,
         )
     }
