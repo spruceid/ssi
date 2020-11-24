@@ -284,6 +284,7 @@ pub struct JWTClaims {
 // https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 /// Options for specifying how the LinkedDataProof is created.
 /// Reference: vc-http-api
 pub struct LinkedDataProofOptions {
@@ -303,6 +304,16 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The domain of the proof.
     pub domain: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Checks to perform
+    pub checks: Option<Vec<Check>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(try_from = "String")]
+#[serde(rename_all = "camelCase")]
+pub enum Check {
+    Proof,
 }
 
 // https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
@@ -312,7 +323,7 @@ pub struct LinkedDataProofOptions {
 /// Reference: vc-http-api
 pub struct VerificationResult {
     /// The checks performed
-    pub checks: Vec<String>,
+    pub checks: Vec<Check>,
     /// Warnings
     pub warnings: Vec<String>,
     /// Errors
@@ -333,6 +344,7 @@ impl Default for LinkedDataProofOptions {
             created: Some(Utc::now()),
             challenge: None,
             domain: None,
+            checks: Some(vec![Check::Proof]),
         }
     }
 }
@@ -657,7 +669,7 @@ impl Credential {
         for proof in proofs {
             let mut result = proof.verify(self);
             if result.errors.is_empty() {
-                result.checks.push("Verified credential proof".to_string());
+                result.checks.push(Check::Proof);
                 return result;
             };
             results.append(&mut result);
@@ -1159,9 +1171,7 @@ impl Presentation {
         for proof in proofs {
             let mut result = proof.verify(self);
             if result.errors.is_empty() {
-                result
-                    .checks
-                    .push("Verified presentation proof".to_string());
+                result.checks.push(Check::Proof);
                 return result;
             };
             results.append(&mut result);
@@ -1259,8 +1269,9 @@ impl Proof {
         if let Some(ref domain) = options.domain {
             assert_local!(self.domain.as_ref() == Some(domain));
         }
-        let proof_purpose = options.proof_purpose.clone().unwrap_or_default();
-        assert_local!(self.proof_purpose == Some(proof_purpose));
+        if let Some(ref proof_purpose) = options.proof_purpose {
+            assert_local!(self.proof_purpose.as_ref() == Some(proof_purpose));
+        }
         true
     }
 
@@ -1308,6 +1319,31 @@ impl From<ProofPurpose> for String {
             ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
             ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
             ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
+        }
+    }
+}
+
+impl FromStr for Check {
+    type Err = Error;
+    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
+        match purpose {
+            "proof" => Ok(Self::Proof),
+            _ => Err(Error::UnsupportedCheck),
+        }
+    }
+}
+
+impl TryFrom<String> for Check {
+    type Error = Error;
+    fn try_from(purpose: String) -> Result<Self, Self::Error> {
+        Self::from_str(&purpose)
+    }
+}
+
+impl From<Check> for String {
+    fn from(purpose: Check) -> String {
+        match purpose {
+            Check::Proof => "proof".to_string(),
         }
     }
 }
