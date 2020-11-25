@@ -160,12 +160,21 @@ impl JWK {
     }
 
     // TODO: Use TryFrom
-    pub fn from_did_key(did: &str) -> Result<JWK, Error> {
+    pub fn from_did_key(mut did: &str) -> Result<JWK, Error> {
         if did.len() < 8 {
             return Err(Error::InvalidKeyLength);
         }
         if &did[..8] != "did:key:" {
             return Err(Error::Key);
+        }
+        // Match "did:key:<data>#<data>"
+        if let Some(i) = did.find('#') {
+            let begin = &did[8..i];
+            let end = &did[(i + 1)..];
+            if begin != end {
+                return Err(Error::InconsistentDIDKey);
+            }
+            did = &did[0..i];
         }
         let (_base, data) = multibase::decode(&did[8..])?;
         if data.len() < 2 {
@@ -196,6 +205,14 @@ impl JWK {
 
     pub fn to_did(&self) -> Result<String, Error> {
         self.params.to_did()
+    }
+
+    pub fn to_verification_method(&self) -> Result<String, Error> {
+        let did = self.to_did()?;
+        if !did.starts_with("did:key") {
+            return Err(Error::UnsupportedKeyType);
+        }
+        Ok(did.clone() + "#" + &did[8..])
     }
 
     pub fn generate_ed25519() -> Result<JWK, Error> {
@@ -432,7 +449,7 @@ mod tests {
 
     #[test]
     fn from_did_key() {
-        JWK::from_did_key("did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH").unwrap();
+        JWK::from_did_key("did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH").unwrap();
     }
 
     #[test]

@@ -646,9 +646,10 @@ impl Credential {
                     Issuer::URI(uri) => uri,
                     Issuer::Object(object_with_id) => object_with_id.id,
                 };
-                options.verification_method = Some(match issuer_uri {
+                let issuer_did = match issuer_uri {
                     URI::String(uri) => uri,
-                });
+                };
+                options.verification_method = did_to_verification_method(&issuer_did);
             }
         }
         self.proof
@@ -1150,7 +1151,7 @@ impl Presentation {
         // Use holder as default verificationMethod
         if options.verification_method.is_none() {
             if let Some(URI::String(ref holder)) = self.holder {
-                options.verification_method = Some(holder.clone());
+                options.verification_method = did_to_verification_method(holder);
             }
         }
         self.proof
@@ -1178,6 +1179,13 @@ impl Presentation {
         }
         results
     }
+}
+
+fn did_to_verification_method(did: &str) -> Option<String> {
+    if &did[..8] != "did:key:" {
+        return None;
+    }
+    Some(did.to_string() + "#" + &did[8..])
 }
 
 impl LinkedDataDocument for Presentation {
@@ -1541,9 +1549,10 @@ mod tests {
         let key_json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww\",\"d\":\"39Ev8-k-jkKunJyFWog3k0OwgPjnKv_qwLhfqXdAXTY\"}";
         let key: JWK = serde_json::from_str(&key_json).unwrap();
         let did = key.to_did().unwrap();
+        let verification_method = key.to_verification_method().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         vc.issuer = Some(Issuer::URI(URI::String(did.clone())));
-        issue_options.verification_method = Some(did);
+        issue_options.verification_method = Some(verification_method);
         let proof = vc.generate_proof(&key, &issue_options).unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
