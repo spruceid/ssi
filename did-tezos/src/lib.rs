@@ -1,5 +1,5 @@
 use ssi::did::{
-    Contexts, Document, PublicKey, PublicKeyEntry, PublicKeyObject, VerificationMethod,
+    Contexts, Document, PublicKey, PublicKeyEntry, PublicKeyObject, Service, VerificationMethod,
     DEFAULT_CONTEXT,
 };
 use ssi_did_resolve::{DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata};
@@ -43,7 +43,9 @@ impl DIDResolver for TezosDIDResolver {
                 );
             }
         };
-        let doc = self.derive(did);
+        let mut doc = self.derive(did);
+        self.on_chain(&mut doc);
+        // self.offChain(doc);
 
         let res_meta = ResolutionMetadata {
             error: None,
@@ -228,6 +230,19 @@ impl TezosDIDResolver {
             proof: None,
             property_set: None,
         }
+    }
+
+    fn on_chain(&self, doc: &mut Document) -> Result<()> {
+        doc.service = Some(vec![
+            Service {
+                id: format!("{}#discovery", doc.id.to_string()),
+                type_: "".to_string(),
+                service_endpoint: format!("tezos-storage://{}/listing", "".to_string()),
+                property_set: None,
+            };
+            1
+        ]);
+        Ok(())
     }
 }
 

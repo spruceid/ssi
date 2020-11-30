@@ -1,0 +1,15 @@
+{
+  "name": "taquito",
+  "version": "1.0.0",
+  "description": "",
+  "main": "originate.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@taquito/signer": "^7.0.1-beta.0",
+    "@taquito/taquito": "^7.0.1-beta.0"
+  }
+}
