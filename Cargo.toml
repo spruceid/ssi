@@ -15,8 +15,11 @@ pest_derive = "2.1"
 derive_builder = "0.9"
 base64 = "0.12"
 jsonwebtoken = { path = "jsonwebtoken" }
-ring = "0.16"
 multibase = "0.8"
+
+[dependencies.ring]
+version = "0.16"
+features = ["wasm32_c"]
 
 [workspace]
 members = [
