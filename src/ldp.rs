@@ -142,7 +142,6 @@ fn sign(
         creator: None,
         created: Some(options.created.unwrap_or(now_ms())),
         domain: options.domain.clone(),
-        expires: None,
         challenge: options.challenge.clone(),
         nonce: None,
         property_set: None,

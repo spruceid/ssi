@@ -139,8 +139,6 @@ pub struct Proof {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub domain: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<DateTime<Utc>>, // ISO 8601
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<String>,
@@ -1017,17 +1015,6 @@ impl TryFrom<Proof> for DataSet {
             });
         }
 
-        if let Some(expires) = proof.expires {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://w3id.org/security#expires".to_string(),
-                )),
-                object: Object::Literal(Literal::from(expires)),
-                graph_label: None,
-            });
-        }
-
         if let Some(nonce) = proof.nonce {
             statements.push(Statement {
                 subject: subject.clone(),
@@ -1260,9 +1247,6 @@ macro_rules! assert_local {
 
 impl Proof {
     pub fn matches(&self, options: &LinkedDataProofOptions) -> bool {
-        if let Some(expires) = self.expires {
-            assert_local!(Utc::now() < expires);
-        }
         if let Some(ref verification_method) = options.verification_method {
             assert_local!(self.verification_method.as_ref() == Some(verification_method));
         }
