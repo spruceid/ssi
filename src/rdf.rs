@@ -209,7 +209,7 @@ impl DataSet {
 impl From<DateTime<Utc>> for Literal {
     fn from(date_time: DateTime<Utc>) -> Self {
         Literal::Typed {
-            string: StringLiteral(format!("{}", date_time.format("%Y-%m-%dT%H:%M:%SZ"))),
+            string: StringLiteral(date_time.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true)),
             type_: IRIRef("http://www.w3.org/2001/XMLSchema#dateTime".to_string()),
         }
     }
