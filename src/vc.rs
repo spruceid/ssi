@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 use crate::error::Error;
 use crate::jwk::{JWTKeys, JWK};
-use crate::ldp::{LinkedDataDocument, LinkedDataProofs};
+use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::{
     BlankNodeLabel, DataSet, IRIRef, Literal, Object, Predicate, Statement, StringLiteral, Subject,
@@ -341,7 +341,7 @@ impl Default for LinkedDataProofOptions {
         Self {
             verification_method: None,
             proof_purpose: Some(ProofPurpose::default()),
-            created: Some(Utc::now()),
+            created: Some(now_ms()),
             challenge: None,
             domain: None,
             checks: Some(vec![Check::Proof]),
@@ -1267,7 +1267,7 @@ impl Proof {
             assert_local!(self.verification_method.as_ref() == Some(verification_method));
         }
         if let Some(created) = self.created {
-            assert_local!(options.created.unwrap_or(Utc::now()) >= created);
+            assert_local!(options.created.unwrap_or(now_ms()) >= created);
         } else {
             return false;
         }

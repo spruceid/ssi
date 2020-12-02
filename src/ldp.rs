@@ -10,6 +10,14 @@ use crate::jwk::{OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::rdf::DataSet;
 use crate::vc::{base64_encode_json, LinkedDataProofOptions, Proof};
 
+// Get current time to millisecond precision if possible
+pub fn now_ms() -> DateTime<Utc> {
+    let datetime = Utc::now();
+    let ms = datetime.timestamp_subsec_millis();
+    let ns = ms * 1_000_000;
+    datetime.with_nanosecond(ns).unwrap_or(datetime)
+}
+
 pub trait LinkedDataDocument {
     fn to_dataset_for_signing(&self) -> Result<DataSet, Error>;
 }
@@ -132,7 +140,7 @@ fn sign(
         proof_value: None,
         verification_method: options.verification_method.clone(),
         creator: None,
-        created: Some(options.created.unwrap_or(Utc::now())),
+        created: Some(options.created.unwrap_or(now_ms())),
         domain: options.domain.clone(),
         expires: None,
         challenge: options.challenge.clone(),
