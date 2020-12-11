@@ -1,12 +1,14 @@
 pub mod der;
 pub mod did;
 pub mod error;
+pub mod jsonld;
 pub mod jwk;
 pub mod jws;
 pub mod jwt;
 pub mod ldp;
 pub mod one_or_many;
 pub mod rdf;
+pub mod urdna2015;
 pub mod vc;
 
 extern crate pest;
@@ -14,6 +16,10 @@ extern crate pest;
 extern crate pest_derive;
 #[macro_use]
 extern crate derive_builder;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate json;
 
 #[derive(Parser)]
 #[grammar = "did.pest"]

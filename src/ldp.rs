@@ -5,6 +5,7 @@ use ring::digest;
 use crate::error::Error;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::rdf::DataSet;
+use crate::urdna2015;
 use crate::vc::{LinkedDataProofOptions, Proof};
 
 // Get current time to millisecond precision if possible
@@ -17,7 +18,11 @@ pub fn now_ms() -> DateTime<Utc> {
 
 #[async_trait]
 pub trait LinkedDataDocument {
-    async fn to_dataset_for_signing(&self) -> Result<DataSet, Error>;
+    fn get_contexts(&self) -> Result<Option<String>, Error>;
+    async fn to_dataset_for_signing(
+        &self,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
+    ) -> Result<DataSet, Error>;
 }
 
 #[async_trait]
@@ -108,8 +113,12 @@ async fn to_jws_payload(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
-    let doc_normalized = document.to_dataset_for_signing().await?.to_nquads()?;
-    let sigopts_normalized = proof.to_dataset_for_signing().await?.to_nquads()?;
+    let doc_dataset = document.to_dataset_for_signing(None).await?;
+    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
+    let doc_normalized = doc_dataset_normalized.to_nquads()?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
+    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
+    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let sigopts_digest = digest::digest(&digest::SHA256, sigopts_normalized.as_bytes());
     let doc_digest = digest::digest(&digest::SHA256, doc_normalized.as_bytes());
     let data = [

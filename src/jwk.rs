@@ -268,7 +268,7 @@ impl Params {
     pub fn to_did(&self) -> Result<String, Error> {
         match self {
             Self::OKP(okp) => okp.to_did(),
-            _ => return Err(Error::UnsupportedKeyType),
+            _ => Err(Error::UnsupportedKeyType),
         }
     }
 }

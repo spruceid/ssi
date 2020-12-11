@@ -1,0 +1,6 @@
+[submodule "json-ld-api"]
+	path = json-ld-api
+	url = https://github.com/w3c/json-ld-api
+[submodule "json-ld-normalization"]
+	path = json-ld-normalization
+	url = https://github.com/json-ld/normalization/

@@ -1,10 +1,16 @@
 use base64::DecodeError as Base64Error;
+use iref::Error as IRIError;
+use json::Error as JSONError;
+use json_ld::Error as JSONLDError;
+use json_ld::ErrorCode as JSONLDErrorCode;
 use multibase::Error as MultibaseError;
 use ring::error::KeyRejected as KeyRejectedError;
 use ring::error::Unspecified as RingUnspecified;
-use serde_json::Error as JSONError;
+use serde_json::Error as SerdeJSONError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
+use std::char::CharTryFromError;
 use std::fmt;
+use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 
 #[derive(Debug)]
@@ -13,9 +19,18 @@ pub enum Error {
     InvalidCriticalHeader,
     UnknownCriticalHeader,
     InvalidIssuer,
+    NotImplemented,
     AlgorithmNotImplemented,
     ProofTypeNotImplemented,
     MissingAlgorithm,
+    MissingIdentifier,
+    MissingChosenIssuer,
+    ExpectedTerm,
+    ExpectedNQuad,
+    ExpectedLiteral,
+    ExpectedBlankNodeLabel,
+    ExpectedIRIRef,
+    ExpectedLang,
     AlgorithmMismatch,
     UnsupportedAlgorithm,
     KeyTypeNotImplemented,
@@ -52,6 +67,7 @@ pub enum Error {
     UnsupportedType,
     UnsupportedProofPurpose,
     UnsupportedCheck,
+    UnsupportedBlankPredicate,
     TooManyBlankNodes,
     JWTCredentialInPresentation,
     ExpectedUnencodedHeader,
@@ -60,12 +76,45 @@ pub enum Error {
     InvalidKeyLength,
     InconsistentDIDKey,
     RingError,
+    ExpectedObject,
+    ExpectedArray,
+    ExpectedString,
+    ExpectedList,
+    ExpectedArrayList,
+    ExpectedValue,
+    MissingGraph,
+    MissingActiveProperty,
+    MissingActivePropertyEntry,
+    // https://w3c.github.io/json-ld-api/#dom-jsonlderrorcode-conflicting-indexes
+    ConflictingIndexes,
+    ValueObjectLanguageType,
+    UnexpectedKeyword,
+    UnexpectedIRI,
+    ExpectedValueTypeJson,
+    UnrecognizedDirection,
+    ExpectedStringIndex,
+    UnexpectedNestedArray,
+    UnexpectedValue,
+    UnexpectedList,
+    UnexpectedSet,
+    ExpectedLangStringType,
+    IRIRefNotWellFormed,
+    SerializeDouble,
+    ExpectedFailure,
+    ExpectedOutput(String, String),
+    UnknownProcessingMode(String),
+    UnknownRdfDirection(String),
     KeyRejected(KeyRejectedError),
     FromUtf8(FromUtf8Error),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
     JSON(JSONError),
+    SerdeJSON(SerdeJSONError),
+    JSONLD(JSONLDErrorCode),
+    IRI(IRIError),
+    ParseInt(ParseIntError),
+    CharTryFrom(CharTryFromError),
 
     #[doc(hidden)]
     __Nonexhaustive,
@@ -96,9 +145,18 @@ impl fmt::Display for Error {
             Error::MissingVerificationMethod => write!(f, "Missing proof verificationMethod"),
             Error::MissingCredential => write!(f, "Verifiable credential not found in JWT"),
             Error::Key => write!(f, "problem with JWT key"),
+            Error::NotImplemented => write!(f, "Not implemented"),
             Error::AlgorithmNotImplemented => write!(f, "JWA algorithm not implemented"),
             Error::ProofTypeNotImplemented => write!(f, "Linked Data Proof type not implemented"),
             Error::MissingAlgorithm => write!(f, "Missing algorithm in JWT"),
+            Error::MissingIdentifier => write!(f, "Missing identifier"),
+            Error::MissingChosenIssuer => write!(f, "Missing chosen issuer"),
+            Error::ExpectedTerm => write!(f, "Expected RDF term"),
+            Error::ExpectedNQuad => write!(f, "Expected RDF N-Quad"),
+            Error::ExpectedLiteral => write!(f, "Expected RDF Literal"),
+            Error::ExpectedBlankNodeLabel => write!(f, "Expected RDF blank node label"),
+            Error::ExpectedIRIRef => write!(f, "Expected RDF IRI reference"),
+            Error::ExpectedLang => write!(f, "Expected RDF language tag"),
             Error::AlgorithmMismatch => write!(f, "Algorithm in JWS header does not match JWK"),
             Error::UnsupportedAlgorithm => write!(f, "Unsupported algorithm"),
             Error::KeyTypeNotImplemented => write!(f, "Key type not implemented"),
@@ -121,6 +179,7 @@ impl fmt::Display for Error {
             Error::UnsupportedType => write!(f, "Unsupported type for LDP"),
             Error::UnsupportedProofPurpose => write!(f, "Unsupported proof purpose"),
             Error::UnsupportedCheck => write!(f, "Unsupported check"),
+            Error::UnsupportedBlankPredicate => write!(f, "Blank node identifier in predicate is unsupported"),
             Error::JWTCredentialInPresentation => write!(f, "Unsupported JWT VC in VP"),
             Error::ExpectedUnencodedHeader => write!(f, "Expected unencoded JWT header"),
             Error::ResourceNotFound => write!(f, "Resource not found"),
@@ -129,11 +188,43 @@ impl fmt::Display for Error {
             Error::InconsistentDIDKey => write!(f, "Inconsistent DID Key"),
             Error::URI => write!(f, "Invalid URI"),
             Error::RingError => write!(f, "Crypto error"),
+            Error::ExpectedObject => write!(f, "Expected object"),
+            Error::ExpectedArray => write!(f, "Expected array"),
+            Error::ExpectedString => write!(f, "Expected string"),
+            Error::ExpectedList => write!(f, "Expected object with @list key"),
+            Error::ExpectedArrayList => write!(f, "Expected array in @list"),
+            Error::ExpectedValue => write!(f, "Expected object with @value key"),
+            Error::MissingGraph => write!(f, "Missing graph"),
+            Error::MissingActiveProperty => write!(f, "Missing active property"),
+            Error::MissingActivePropertyEntry => write!(f, "Missing active property entry"),
+            Error::ConflictingIndexes => write!(f, "Multiple conflicting indexes have been found for the same node."),
+            Error::ValueObjectLanguageType => write!(f, "Value object with @type must not contain @language or @direction"),
+            Error::UnexpectedKeyword => write!(f, "Unexpected keyword in object"),
+            Error::UnexpectedIRI => write!(f, "Unexpected IRI in object"),
+            Error::ExpectedValueTypeJson => write!(f, "Value object expected @json @type for array or object value"),
+            Error::UnrecognizedDirection => write!(f, "Unrecognized @direction value"),
+            Error::ExpectedStringIndex => write!(f, "Expected string value for @index key of value object"),
+            Error::UnexpectedNestedArray => write!(f, "Unexpected nested array"),
+            Error::UnexpectedValue => write!(f, "Unexpected @value key"),
+            Error::UnexpectedList => write!(f, "Unexpected @list key"),
+            Error::UnexpectedSet => write!(f, "Unexpected @set key"),
+            Error::ExpectedLangStringType => write!(f, "Expected rdf:langString type with language-tagged string literal"),
+            Error::IRIRefNotWellFormed => write!(f, "IRI reference not well-formed"),
+            Error::SerializeDouble => write!(f, "Unable to serialize double"),
+            Error::ExpectedFailure => write!(f, "Expected failure"),
+            Error::ExpectedOutput(expected, found) => write!(f, "Expected output '{}', but found '{}'", expected, found),
+            Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
+            Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
             Error::KeyRejected(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
             Error::JSON(e) => e.fmt(f),
+            Error::SerdeJSON(e) => e.fmt(f),
+            Error::JSONLD(e) => e.fmt(f),
+            Error::IRI(e) => e.fmt(f),
+            Error::ParseInt(e) => e.fmt(f),
+            Error::CharTryFrom(e) => e.fmt(f),
             _ => unreachable!(),
         }
     }
@@ -163,6 +254,24 @@ impl From<JSONError> for Error {
     }
 }
 
+impl From<SerdeJSONError> for Error {
+    fn from(err: SerdeJSONError) -> Error {
+        Error::SerdeJSON(err)
+    }
+}
+
+impl From<JSONLDError> for Error {
+    fn from(err: JSONLDError) -> Error {
+        Error::JSONLD(err.code())
+    }
+}
+
+impl From<IRIError> for Error {
+    fn from(err: IRIError) -> Error {
+        Error::IRI(err)
+    }
+}
+
 impl From<KeyRejectedError> for Error {
     fn from(err: KeyRejectedError) -> Error {
         Error::KeyRejected(err)
@@ -184,5 +293,17 @@ impl From<Error> for String {
 impl From<FromUtf8Error> for Error {
     fn from(err: FromUtf8Error) -> Error {
         Error::FromUtf8(err)
+    }
+}
+
+impl From<ParseIntError> for Error {
+    fn from(err: ParseIntError) -> Error {
+        Error::ParseInt(err)
+    }
+}
+
+impl From<CharTryFromError> for Error {
+    fn from(err: CharTryFromError) -> Error {
+        Error::CharTryFrom(err)
     }
 }

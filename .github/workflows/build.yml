@@ -15,6 +15,8 @@ jobs:
     steps:
     - name: Checkout SSI Library
       uses: actions/checkout@v2
+      with:
+        submodules: true
 
     - name: Cache Cargo registry and build artifacts
       uses: actions/cache@v2
@@ -26,6 +28,13 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml', '**.rs') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
+
+    - name: Install Rust nightly
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        profile: minimal
+        default: true
 
     - name: Build
       run: cargo build --verbose --workspace

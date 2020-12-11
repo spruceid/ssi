@@ -1,15 +1,13 @@
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;
-use std::convert::TryInto;
 use std::str::FromStr;
 
 use crate::error::Error;
+use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
 use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs};
 use crate::one_or_many::OneOrMany;
-use crate::rdf::{
-    BlankNodeLabel, DataSet, IRIRef, Literal, Object, Predicate, Statement, StringLiteral, Subject,
-};
+use crate::rdf::DataSet;
 
 use async_trait::async_trait;
 use chrono::prelude::*;
@@ -39,7 +37,6 @@ pub const ALT_DEFAULT_CONTEXT: &str = "https://w3.org/2018/credentials/v1";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
 pub struct Credential {
     #[serde(rename = "@context")]
     pub context: Contexts,
@@ -69,6 +66,9 @@ pub struct Credential {
     pub credential_schema: Option<OneOrMany<Schema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_service: Option<OneOrMany<RefreshService>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -91,11 +91,6 @@ pub enum Context {
 pub struct CredentialSubject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<URI>,
-    // name and identifier for example/testing purposes:
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<HTML>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub identifier: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -184,23 +179,19 @@ pub struct Evidence {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
 pub struct Status {
     pub id: URI,
     #[serde(rename = "type")]
     pub type_: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(try_from = "String")]
 #[serde(untagged)]
 pub enum URI {
-    String(String),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(untagged)]
-pub enum HTML {
     String(String),
 }
 
@@ -226,7 +217,6 @@ pub struct RefreshService {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
 pub struct Presentation {
     #[serde(rename = "@context")]
     pub context: Vec<String>,
@@ -242,6 +232,9 @@ pub struct Presentation {
     pub proof: Option<OneOrMany<Proof>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub holder: Option<URI>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -426,23 +419,6 @@ impl From<URI> for String {
     fn from(uri: URI) -> String {
         let URI::String(string) = uri;
         string
-    }
-}
-
-impl From<HTML> for Literal {
-    fn from(html: HTML) -> Self {
-        let HTML::String(string) = html;
-        Literal::Typed {
-            string: StringLiteral(string),
-            type_: IRIRef("http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML".to_string()),
-        }
-    }
-}
-
-impl From<URI> for IRIRef {
-    fn from(uri: URI) -> Self {
-        let URI::String(string) = uri;
-        IRIRef(string)
     }
 }
 
@@ -695,357 +671,23 @@ impl Credential {
 
 #[async_trait]
 impl LinkedDataDocument for Credential {
-    async fn to_dataset_for_signing(&self) -> Result<DataSet, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, Error> {
+        Ok(Some(serde_json::to_string(&self.context)?))
+    }
+
+    async fn to_dataset_for_signing(
+        &self,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
+    ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
-        DataSet::try_from(copy)
-    }
-}
-
-impl TryFrom<CredentialSubject> for DataSet {
-    type Error = Error;
-    fn try_from(credential_subject: CredentialSubject) -> Result<Self, Self::Error> {
-        let mut statements: Vec<Statement> = Vec::new();
-
-        if has_more_props(credential_subject.property_set) {
-            return Err(Error::UnsupportedProperty);
-        }
-
-        let subject = match credential_subject.id {
-            Some(id) => Subject::IRIRef(IRIRef::from(id)),
-            None => Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string())),
+        let json = serde_json::to_string(&copy)?;
+        let more_contexts = match parent {
+            Some(parent) => parent.get_contexts()?,
+            None => None,
         };
-
-        if let Some(name) = credential_subject.name {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef("http://schema.org/name".to_string())),
-                object: Object::Literal(Literal::from(name)),
-                graph_label: None,
-            });
-        }
-
-        if let Some(identifier) = credential_subject.identifier {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef("http://schema.org/identifier".to_string())),
-                object: Object::Literal(Literal::String {
-                    string: StringLiteral(identifier),
-                }),
-                graph_label: None,
-            });
-        }
-
-        Ok(DataSet {
-            statements: statements,
-        })
-    }
-}
-
-impl TryFrom<TermsOfUse> for DataSet {
-    type Error = Error;
-    fn try_from(tos: TermsOfUse) -> Result<Self, Self::Error> {
-        let mut statements: Vec<Statement> = Vec::new();
-
-        if has_more_props(tos.property_set) {
-            return Err(Error::UnsupportedProperty);
-        }
-
-        let subject = match tos.id {
-            Some(id) => Subject::IRIRef(IRIRef::from(id)),
-            None => Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string())),
-        };
-
-        statements.push(Statement {
-            subject: subject.clone(),
-            predicate: Predicate::IRIRef(IRIRef(
-                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-            )),
-            object: Object::IRIRef(IRIRef(
-                "https://example.org/examples#".to_string() + &tos.type_,
-            )),
-            graph_label: None,
-        });
-
-        Ok(DataSet {
-            statements: statements,
-        })
-    }
-}
-
-fn has_more_props(property_set: Option<Map<String, Value>>) -> bool {
-    match property_set {
-        None => false,
-        Some(ref props) => !props.is_empty(),
-    }
-}
-
-impl<T> TryFrom<OneOrMany<T>> for DataSet
-where
-    DataSet: TryFrom<T>,
-    <DataSet as TryFrom<T>>::Error: Into<Error>,
-{
-    type Error = Error;
-    fn try_from(item: OneOrMany<T>) -> Result<Self, Self::Error> {
-        match item {
-            OneOrMany::One(value) => value.try_into().map_err(Into::into),
-            OneOrMany::Many(values) => {
-                let mut dataset = DataSet {
-                    statements: Vec::new(),
-                };
-                for value in values {
-                    let mut this_dataset: DataSet = value.try_into().map_err(Into::into)?;
-                    dataset.statements.append(&mut this_dataset.statements);
-                }
-                Ok(dataset)
-            }
-        }
-    }
-}
-
-impl TryFrom<Credential> for DataSet {
-    type Error = Error;
-    fn try_from(vc: Credential) -> Result<Self, Self::Error> {
-        let mut statements: Vec<Statement> = Vec::new();
-        let mut used_blank_node = false;
-
-        let subject = match vc.id {
-            Some(id) => Subject::IRIRef(IRIRef::from(id)),
-            None => {
-                used_blank_node = true;
-                Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
-            }
-        };
-
-        for vc_subject in vc.credential_subject {
-            let vc_subject_id = match vc_subject.id.clone() {
-                Some(id) => Object::IRIRef(IRIRef::from(id)),
-                None => {
-                    if used_blank_node {
-                        return Err(Error::TooManyBlankNodes);
-                    }
-                    used_blank_node = true;
-                    Object::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
-                }
-            };
-            let mut vc_subject_dataset: DataSet = vc_subject.try_into()?;
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#credentialSubject".to_string(),
-                )),
-                object: vc_subject_id,
-                graph_label: None,
-            });
-            statements.append(&mut vc_subject_dataset.statements);
-        }
-
-        for type_ in vc.type_ {
-            if type_ != "VerifiableCredential" {
-                return Err(Error::UnsupportedType);
-            }
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#".to_string() + &type_,
-                )),
-                graph_label: None,
-            });
-        }
-
-        if let Some(issuance_date) = vc.issuance_date {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#issuanceDate".to_string(),
-                )),
-                object: Object::Literal(Literal::from(issuance_date)),
-                graph_label: None,
-            });
-        }
-
-        if let Some(expiration_date) = vc.expiration_date {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#expirationDate".to_string(),
-                )),
-                object: Object::Literal(Literal::from(expiration_date)),
-                graph_label: None,
-            });
-        }
-
-        if let Some(issuer) = vc.issuer {
-            let issuer_id = match issuer {
-                Issuer::URI(uri) => uri,
-                Issuer::Object(object_with_id) => {
-                    if has_more_props(object_with_id.property_set) {
-                        return Err(Error::UnsupportedProperty);
-                    }
-                    object_with_id.id
-                }
-            };
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#issuer".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef::from(issuer_id)),
-                graph_label: None,
-            });
-        }
-
-        if let Some(tos_vec) = vc.terms_of_use {
-            for tos in tos_vec {
-                let tos_id = match tos.id.clone() {
-                    Some(id) => Object::IRIRef(IRIRef::from(id)),
-                    None => {
-                        if used_blank_node {
-                            return Err(Error::TooManyBlankNodes);
-                        }
-                        used_blank_node = true;
-                        Object::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()))
-                    }
-                };
-                let mut tos_dataset: DataSet = tos.try_into()?;
-                statements.push(Statement {
-                    subject: subject.clone(),
-                    predicate: Predicate::IRIRef(IRIRef(
-                        "https://www.w3.org/2018/credentials#termsOfUse".to_string(),
-                    )),
-                    object: tos_id,
-                    graph_label: None,
-                });
-                statements.append(&mut tos_dataset.statements);
-            }
-        }
-
-        if vc.credential_status.is_some()
-            || vc.evidence.is_some()
-            || vc.credential_schema.is_some()
-            || vc.refresh_service.is_some()
-        {
-            return Err(Error::UnsupportedProperty);
-        }
-
-        Ok(DataSet {
-            statements: statements,
-        })
-    }
-}
-
-impl TryFrom<Proof> for DataSet {
-    type Error = Error;
-    fn try_from(proof: Proof) -> Result<Self, Self::Error> {
-        let mut statements: Vec<Statement> = Vec::new();
-
-        if has_more_props(proof.property_set) {
-            return Err(Error::UnsupportedProperty);
-        }
-
-        let subject = Subject::BlankNodeLabel(BlankNodeLabel("_:c14n0".to_string()));
-        // TODO: use references instead of clones
-
-        if let Some(created) = proof.created {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "http://purl.org/dc/terms/created".to_string(),
-                )),
-                object: Object::Literal(Literal::from(created)),
-                graph_label: None,
-            });
-        }
-
-        if let Some(creator) = proof.creator {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "http://purl.org/dc/terms/creator".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef(creator)),
-                graph_label: None,
-            });
-        }
-
-        statements.push(Statement {
-            subject: subject.clone(),
-            predicate: Predicate::IRIRef(IRIRef(
-                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-            )),
-            object: Object::IRIRef(IRIRef(
-                "https://w3id.org/security#".to_string() + &proof.type_,
-            )),
-            graph_label: None,
-        });
-
-        if let Some(challenge) = proof.challenge {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://w3id.org/security#challenge".to_string(),
-                )),
-                object: Object::Literal(Literal::String {
-                    string: StringLiteral(challenge),
-                }),
-                graph_label: None,
-            });
-        }
-
-        if let Some(domain) = proof.domain {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://w3id.org/security#domain".to_string(),
-                )),
-                object: Object::Literal(Literal::String {
-                    string: StringLiteral(domain),
-                }),
-                graph_label: None,
-            });
-        }
-
-        if let Some(nonce) = proof.nonce {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef("https://w3id.org/security#nonce".to_string())),
-                object: Object::Literal(Literal::String {
-                    string: StringLiteral(nonce),
-                }),
-                graph_label: None,
-            });
-        }
-
-        if let Some(purpose) = proof.proof_purpose {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://w3id.org/security#proofPurpose".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef(
-                    "https://w3id.org/security#".to_string() + &String::from(purpose),
-                )),
-                graph_label: None,
-            });
-        }
-
-        if let Some(verification_method) = proof.verification_method {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://w3id.org/security#verificationMethod".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef(verification_method)),
-                graph_label: None,
-            });
-        }
-
-        Ok(DataSet {
-            statements: statements,
-        })
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
 }
 
@@ -1170,64 +812,23 @@ fn did_to_verification_method(did: &str) -> Option<String> {
 
 #[async_trait]
 impl LinkedDataDocument for Presentation {
-    async fn to_dataset_for_signing(&self) -> Result<DataSet, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, Error> {
+        Ok(Some(serde_json::to_string(&self.context)?))
+    }
+
+    async fn to_dataset_for_signing(
+        &self,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
+    ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
-        DataSet::try_from(copy)
-    }
-}
-
-impl TryFrom<Presentation> for DataSet {
-    type Error = Error;
-    fn try_from(vp: Presentation) -> Result<Self, Self::Error> {
-        let mut statements: Vec<Statement> = Vec::new();
-
-        let subject = match vp.id {
-            Some(id) => Subject::IRIRef(IRIRef::from(id)),
-            None => return Err(Error::TooManyBlankNodes),
+        let json = serde_json::to_string(&copy)?;
+        let more_contexts = match parent {
+            Some(parent) => parent.get_contexts()?,
+            None => None,
         };
-
-        for type_ in vp.type_ {
-            if type_ != "VerifiablePresentation" {
-                return Err(Error::UnsupportedType);
-            }
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#".to_string() + &type_,
-                )),
-                graph_label: None,
-            });
-        }
-
-        if let Some(holder) = vp.holder {
-            statements.push(Statement {
-                subject: subject.clone(),
-                predicate: Predicate::IRIRef(IRIRef(
-                    "https://www.w3.org/2018/credentials#holder".to_string(),
-                )),
-                object: Object::IRIRef(IRIRef::from(holder)),
-                graph_label: None,
-            });
-        }
-
-        for vc_or_jwt in vp.verifiable_credential {
-            let vc = match vc_or_jwt {
-                CredentialOrJWT::Credential(vc) => vc,
-                CredentialOrJWT::JWT(_) => {
-                    return Err(Error::JWTCredentialInPresentation);
-                }
-            };
-            let mut vc_dataset = DataSet::try_from(vc)?;
-            statements.append(&mut vc_dataset.statements);
-        }
-
-        Ok(DataSet {
-            statements: statements,
-        })
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
 }
 
@@ -1268,10 +869,23 @@ impl Proof {
 
 #[async_trait]
 impl LinkedDataDocument for Proof {
-    async fn to_dataset_for_signing(&self) -> Result<DataSet, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, Error> {
+        Ok(None)
+    }
+
+    async fn to_dataset_for_signing(
+        &self,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
+    ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.jws = None;
-        DataSet::try_from(copy)
+        let json = serde_json::to_string(&copy)?;
+        let more_contexts = match parent {
+            Some(parent) => parent.get_contexts()?,
+            None => None,
+        };
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
 }
 
@@ -1338,6 +952,7 @@ impl From<Check> for String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::urdna2015;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct Config {
@@ -1524,8 +1139,7 @@ mod tests {
         }"###;
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
 
-        // let key = JWK::generate_ed25519().unwrap();
-        let key_json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww\",\"d\":\"39Ev8-k-jkKunJyFWog3k0OwgPjnKv_qwLhfqXdAXTY\"}";
+        let key_json = include_str!("../tests/ed25519-2020-10-18.json");
         let key: JWK = serde_json::from_str(&key_json).unwrap();
         let did = key.to_did().unwrap();
         let verification_method = key.to_verification_method().unwrap();
@@ -1547,6 +1161,7 @@ mod tests {
 
     #[async_std::test]
     async fn proof_json_to_urdna2015() {
+        use serde_json::json;
         let proof_str = r###"{
             "type": "RsaSignature2018",
             "created": "2020-09-03T15:15:39Z",
@@ -1559,8 +1174,26 @@ _:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://w3id.org/secu
 _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#assertionMethod> .
 "###;
         let proof: Proof = serde_json::from_str(proof_str).unwrap();
-        let proof_dataset = proof.to_dataset_for_signing().await.unwrap();
-        let proof_urdna2015 = proof_dataset.to_nquads().unwrap();
+        struct ProofContexts(Value);
+        #[async_trait]
+        impl LinkedDataDocument for ProofContexts {
+            fn get_contexts(&self) -> Result<Option<String>, Error> {
+                Ok(Some(serde_json::to_string(&self.0)?))
+            }
+
+            async fn to_dataset_for_signing(
+                &self,
+                _parent: Option<&(dyn LinkedDataDocument + Sync)>,
+            ) -> Result<DataSet, Error> {
+                Err(Error::NotImplemented)
+            }
+        }
+        let parent = ProofContexts(json!(["https://w3id.org/security/v1", DEFAULT_CONTEXT]));
+        let proof_dataset = proof.to_dataset_for_signing(Some(&parent)).await.unwrap();
+        let proof_dataset_normalized = urdna2015::normalize(&proof_dataset).unwrap();
+        let proof_urdna2015 = proof_dataset_normalized.to_nquads().unwrap();
+        eprintln!("proof:\n{}", proof_urdna2015);
+        eprintln!("expected:\n{}", urdna2015_expected);
         assert_eq!(proof_urdna2015, urdna2015_expected);
     }
 
@@ -1577,21 +1210,57 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             "issuanceDate": "2018-02-24T05:28:04Z",
             "credentialSubject": {
                 "id": "did:example:abcdef1234567",
-                "name": "Jane Doe",
-                "identifier": "EXAMPLE_ID"
+                "name": "Jane Doe"
             }
         }"#;
-        let urdna2015_expected = r#"<did:example:abcdef1234567> <http://schema.org/identifier> "EXAMPLE_ID" .
-<did:example:abcdef1234567> <http://schema.org/name> "Jane Doe"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML> .
+        let urdna2015_expected = r#"<did:example:abcdef1234567> <http://schema.org/name> "Jane Doe"^^<http://www.w3.org/1999/02/22-rdf-syntax-ns#HTML> .
 <http://example.com/credentials/4643> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#credentialSubject> <did:example:abcdef1234567> .
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuanceDate> "2018-02-24T05:28:04Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
 "#;
         let vc: Credential = serde_json::from_str(credential_str).unwrap();
-        let credential_dataset = vc.to_dataset_for_signing().await.unwrap();
-        let credential_urdna2015 = credential_dataset.to_nquads().unwrap();
+        let credential_dataset = vc.to_dataset_for_signing(None).await.unwrap();
+        let credential_dataset_normalized = urdna2015::normalize(&credential_dataset).unwrap();
+        let credential_urdna2015 = credential_dataset_normalized.to_nquads().unwrap();
+        eprintln!("credential:\n{}", credential_urdna2015);
+        eprintln!("expected:\n{}", urdna2015_expected);
         assert_eq!(credential_urdna2015, urdna2015_expected);
+    }
+
+    #[async_std::test]
+    async fn credential_verify() {
+        let vc_str = include_str!("../examples/vc.jsonld");
+        let vc = Credential::from_json(vc_str).unwrap();
+        let result = vc.verify(None).await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[async_std::test]
+    async fn cannot_add_properties_after_signing() {
+        use serde_json::json;
+        let vc_str = include_str!("../examples/vc.jsonld");
+        let mut vc: Value = serde_json::from_str(vc_str).unwrap();
+        vc["newProp"] = json!("foo");
+        let vc: Credential = serde_json::from_value(vc).unwrap();
+        let result = vc.verify(None).await;
+        println!("{:#?}", result);
+        assert!(!result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[async_std::test]
+    async fn presentation_verify() {
+        let vp_str = include_str!("../examples/vp.jsonld");
+        let vp = Presentation::from_json(vp_str).unwrap();
+        let mut verify_options = LinkedDataProofOptions::default();
+        verify_options.proof_purpose = Some(ProofPurpose::Authentication);
+        let result = vp.verify(Some(verify_options)).await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
     }
 
     #[async_std::test]
@@ -1631,6 +1300,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             verifiable_credential: OneOrMany::One(CredentialOrJWT::Credential(vc)),
             proof: None,
             holder: None,
+            property_set: None,
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         let vp_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
