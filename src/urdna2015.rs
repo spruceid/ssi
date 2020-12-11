@@ -411,3 +411,51 @@ pub fn hash_related_blank_node(
     let hash_hex = digest_to_lowerhex(&digest);
     Ok(hash_hex)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    /// https://json-ld.github.io/normalization/tests/
+    fn normalization_test_suite() {
+        use std::fs::{self};
+        use std::path::PathBuf;
+        use std::str::FromStr;
+        let case = std::env::args().skip(2).next();
+        // Example usage to run a single test case:
+        //   cargo test normalization_test_suite -- test022
+        let mut passed = 0;
+        let mut total = 0;
+        for entry in fs::read_dir("json-ld-normalization/tests").unwrap() {
+            let entry = entry.unwrap();
+            let filename = entry.file_name().into_string().unwrap();
+            if !filename.starts_with("test") || !filename.ends_with("-urdna2015.nq") {
+                continue;
+            }
+            let num = &filename[0..7].to_string();
+            if let Some(ref case) = case {
+                if case != num {
+                    continue;
+                }
+            }
+            total += 1;
+            let mut path = entry.path();
+            let expected_str = fs::read_to_string(&path).unwrap();
+            let in_file_name = num.to_string() + "-in.nq";
+            path.set_file_name(PathBuf::from(in_file_name));
+            let in_str = fs::read_to_string(&path).unwrap();
+            let dataset = DataSet::from_str(&in_str).unwrap();
+            let dataset_normalized = normalize(&dataset).unwrap();
+            let normalized = dataset_normalized.to_nquads().unwrap();
+            if &normalized == &expected_str {
+                passed += 1;
+            } else {
+                let changes = difference::Changeset::new(&normalized, &expected_str, "\n");
+                eprintln!("test {}: failed. diff:\n{}", num, changes);
+            }
+        }
+        assert!(total > 0);
+        assert_eq!(passed, total);
+    }
+}

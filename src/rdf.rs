@@ -481,6 +481,190 @@ impl From<DateTime<Utc>> for Literal {
 mod tests {
     use super::*;
 
+    fn parse_uchar(chars: &mut Peekable<Chars>, len: usize) -> Result<char, Error> {
+        let escaped: String = chars.take(len).collect();
+        let c_u32 = u32::from_str_radix(&escaped, 16)?;
+        let c = char::try_from(c_u32)?;
+        Ok(c)
+    }
+
+    fn parse_iri_ref(chars: &mut Peekable<Chars>) -> Result<IRIRef, Error> {
+        let mut out = String::new();
+        if chars.next() != Some('<') {
+            return Err(Error::ExpectedIRIRef);
+        }
+        while let Some(c) = chars.next() {
+            match c {
+                '>' => return Ok(IRIRef(out)),
+                '\\' => {
+                    let c = match chars.next() {
+                        Some('u') => parse_uchar(chars, 4)?,
+                        Some('U') => parse_uchar(chars, 8)?,
+                        _ => return Err(Error::ExpectedIRIRef),
+                    };
+                    out.push(c);
+                }
+                _ => out.push(c),
+            }
+        }
+        Err(Error::ExpectedIRIRef)
+    }
+
+    fn parse_string_literal_quote(chars: &mut Peekable<Chars>) -> Result<StringLiteral, Error> {
+        let mut string = String::new();
+        if chars.next() != Some('"') {
+            return Err(Error::ExpectedLiteral);
+        }
+        while let Some(c) = chars.next() {
+            match c {
+                '"' => return Ok(StringLiteral(string)),
+                '\\' => {
+                    let c = match chars.next() {
+                        Some('u') => parse_uchar(chars, 4)?,
+                        Some('U') => parse_uchar(chars, 8)?,
+                        Some('t') => '\t',
+                        Some('b') => '\x08',
+                        Some('n') => '\n',
+                        Some('r') => '\r',
+                        Some('f') => '\x0c',
+                        Some('"') => '"',
+                        Some('\'') => '\'',
+                        Some('\\') => '\\',
+                        _ => return Err(Error::ExpectedLiteral),
+                    };
+                    string.push(c);
+                }
+                _ => string.push(c),
+            }
+        }
+        Err(Error::ExpectedLiteral)
+    }
+
+    fn parse_literal(chars: &mut Peekable<Chars>) -> Result<Literal, Error> {
+        let string = parse_string_literal_quote(chars)?;
+        match chars.peek() {
+            Some(' ') | Some('\t') | None => Ok(Literal::String { string }),
+            Some('^') => {
+                chars.next();
+                if chars.next() != Some('^') {
+                    return Err(Error::ExpectedLiteral);
+                }
+                let type_ = parse_iri_ref(chars)?;
+                Ok(Literal::Typed { string, type_ })
+            }
+            Some('@') => {
+                chars.next();
+                let lang = parse_lang(chars)?;
+                Ok(Literal::LangTagged { string, lang })
+            }
+            _ => Err(Error::ExpectedLiteral),
+        }
+    }
+
+    fn parse_blank_node_label(chars: &mut Peekable<Chars>) -> Result<BlankNodeLabel, Error> {
+        if chars.next() != Some('_') {
+            return Err(Error::ExpectedBlankNodeLabel);
+        }
+        if chars.next() != Some(':') {
+            return Err(Error::ExpectedBlankNodeLabel);
+        }
+        let mut out = String::new();
+        out.push_str("_:");
+        while let Some(c) = chars.next() {
+            match c {
+                ' ' => break,
+                '\t' => break,
+                // TODO: handle PN_CHARS*
+                // https://www.w3.org/TR/n-quads/#grammar-production-BLANK_NODE_LABEL
+                _ => out.push(c),
+            }
+        }
+        Ok(BlankNodeLabel(out.to_string()))
+    }
+
+    fn parse_subject(chars: &mut Peekable<Chars>) -> Result<Subject, Error> {
+        match chars.peek() {
+            Some('<') => Ok(Subject::IRIRef(parse_iri_ref(chars)?)),
+            Some('_') => Ok(Subject::BlankNodeLabel(parse_blank_node_label(chars)?)),
+            _ => Err(Error::ExpectedTerm),
+        }
+    }
+
+    fn parse_predicate(chars: &mut Peekable<Chars>) -> Result<Predicate, Error> {
+        Ok(Predicate::IRIRef(parse_iri_ref(chars)?))
+    }
+
+    fn parse_object(chars: &mut Peekable<Chars>) -> Result<Object, Error> {
+        match chars.peek() {
+            Some('"') => Ok(Object::Literal(parse_literal(chars)?)),
+            Some('<') => Ok(Object::IRIRef(parse_iri_ref(chars)?)),
+            Some('_') => Ok(Object::BlankNodeLabel(parse_blank_node_label(chars)?)),
+            _ => Err(Error::ExpectedTerm),
+        }
+    }
+
+    fn parse_graph_label(chars: &mut Peekable<Chars>) -> Result<Option<GraphLabel>, Error> {
+        match chars.peek() {
+            Some('<') => Ok(Some(GraphLabel::IRIRef(parse_iri_ref(chars)?))),
+            Some('_') => Ok(Some(GraphLabel::BlankNodeLabel(parse_blank_node_label(
+                chars,
+            )?))),
+            Some(_) => Err(Error::ExpectedTerm),
+            None => Ok(None),
+        }
+    }
+
+    fn ignore_whitespace(chars: &mut Peekable<Chars>) {
+        while let Some(c) = chars.peek() {
+            match c {
+                ' ' | '\t' => {
+                    chars.next();
+                }
+                _ => break,
+            }
+        }
+    }
+
+    impl FromStr for Statement {
+        type Err = Error;
+        fn from_str(line: &str) -> Result<Self, Self::Err> {
+            let mut chars = line.chars().peekable();
+            if chars.next_back() != Some('.') {
+                return Err(Error::ExpectedNQuad);
+            }
+            match chars.next_back() {
+                Some(' ') | Some('\t') => {}
+                _ => return Err(Error::ExpectedNQuad),
+            }
+            let subject = parse_subject(&mut chars)?;
+            ignore_whitespace(&mut chars);
+            let predicate = parse_predicate(&mut chars)?;
+            ignore_whitespace(&mut chars);
+            let object = parse_object(&mut chars)?;
+            ignore_whitespace(&mut chars);
+            let graph_label = parse_graph_label(&mut chars)?;
+            Ok(Self {
+                subject,
+                predicate,
+                object,
+                graph_label,
+            })
+        }
+    }
+
+    // Parse N-Quads for testing in urdna2015
+    impl FromStr for DataSet {
+        type Err = Error;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let mut dataset = DataSet::default();
+            for line in s.lines() {
+                let statement = Statement::from_str(line)?;
+                dataset.add_statement(statement);
+            }
+            Ok(dataset)
+        }
+    }
+
     #[test]
     fn escape() {
         let string_literal = StringLiteral("\t\x08\n\r\x0c\"\'\\\u{221e}".to_string());

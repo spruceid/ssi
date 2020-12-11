@@ -36,3 +36,4 @@ members = [
 
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4", "serde"] }
+difference = "2.0"
