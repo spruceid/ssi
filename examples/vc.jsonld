@@ -1,0 +1,18 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1"
+  ],
+  "type": "VerifiableCredential",
+  "credentialSubject": {
+    "id": "urn:uuid:58485ecc-1f84-4d5e-a122-340fbd124148"
+  },
+  "issuer": "did:key:z6MkgKnUaGk7CNTuUjAoeLV9MWE6Y7QvFpdAhrmE8X9vJjYf",
+  "issuanceDate": "2020-12-11T21:05:24.506Z",
+  "proof": {
+    "type": "Ed25519Signature2018",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "did:key:z6MkgKnUaGk7CNTuUjAoeLV9MWE6Y7QvFpdAhrmE8X9vJjYf#z6MkgKnUaGk7CNTuUjAoeLV9MWE6Y7QvFpdAhrmE8X9vJjYf",
+    "created": "2020-12-11T21:05:24.507Z",
+    "jws": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..ypUd5O9jAEmzErLuk-TxpVE9sZMUqyheO8fPfZCZ8r4OzlxKircw0wOJJWTGtScOAPsOAmKk1461DBE0s8DiAA"
+  }
+}

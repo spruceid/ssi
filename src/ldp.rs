@@ -8,6 +8,7 @@ use serde_json::value::Value;
 use crate::error::Error;
 use crate::jwk::{OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::rdf::DataSet;
+use crate::urdna2015;
 use crate::vc::{base64_encode_json, LinkedDataProofOptions, Proof};
 
 // Get current time to millisecond precision if possible
@@ -19,7 +20,11 @@ pub fn now_ms() -> DateTime<Utc> {
 }
 
 pub trait LinkedDataDocument {
-    fn to_dataset_for_signing(&self) -> Result<DataSet, Error>;
+    fn get_contexts(&self) -> Result<Option<String>, Error>;
+    fn to_dataset_for_signing(
+        &self,
+        parent: Option<&dyn LinkedDataDocument>,
+    ) -> Result<DataSet, Error>;
 }
 
 pub trait ProofSuite {
@@ -107,8 +112,12 @@ fn to_signing_input(
     header_b64: &str,
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
-    let doc_normalized = document.to_dataset_for_signing()?.to_nquads()?;
-    let sigopts_normalized = proof.to_dataset_for_signing()?.to_nquads()?;
+    let doc_dataset = document.to_dataset_for_signing(None)?;
+    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
+    let doc_normalized = doc_dataset_normalized.to_nquads()?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document))?;
+    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
+    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let sigopts_digest = digest::digest(&digest::SHA256, sigopts_normalized.as_bytes());
     let doc_digest = digest::digest(&digest::SHA256, doc_normalized.as_bytes());
     let data = [
@@ -117,6 +126,7 @@ fn to_signing_input(
     ]
     .concat();
     let message = [header_b64.as_bytes(), b".", data.as_slice()].concat();
+    // eprintln!("doc: {}\nsigopts: {}\n", doc_normalized, sigopts_normalized);
     Ok(message)
 }
 
@@ -150,7 +160,8 @@ fn sign(
     let header_b64 = base64_encode_json(&header)?;
     let message = to_signing_input(document, &header_b64, &proof)?;
     let sig = jsonwebtoken::crypto::sign_bytes(&message, &key, header.alg)?;
-    proof.jws = Some([&header_b64, "", &sig].join("."));
+    let jws = [&header_b64, "", &sig].join(".");
+    proof.jws = Some(jws);
     Ok(proof)
 }
 
@@ -159,7 +170,6 @@ fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error>
         None => return Err(Error::MissingProofSignature),
         Some(jws) => jws,
     };
-
     let ref verification_method = match &proof.verification_method {
         Some(verification_method) => verification_method,
         None => return Err(Error::MissingVerificationMethod),

@@ -439,6 +439,7 @@ mod tests {
 
     const RSA_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
     const RSA_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
+    const ED25519_JSON: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
 
     #[test]
     fn jwk_to_der_rsa() {
@@ -454,8 +455,7 @@ mod tests {
 
     #[test]
     fn ed25519_from_str() {
-        let json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"tfh77YHchREL9WbreVu87Q5P_puHaXGMtLEcmiQSSco\",\"d\":\"KZFPt0DnxRNBdRBQxMJGBUzEt1CgdVqRm-qs474IIlw\"}";
-        let _jwk: JWK = serde_json::from_str(&json).unwrap();
+        let _jwk: JWK = serde_json::from_str(ED25519_JSON).unwrap();
     }
 
     #[test]
