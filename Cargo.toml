@@ -21,6 +21,7 @@ multibase = "0.8"
 [workspace]
 members = [
   "did-resolve",
+  "did-tezos",
   "vc-test",
   "jsonwebtoken",
 ]

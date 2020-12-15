@@ -32,32 +32,32 @@ pub enum Metadata {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolutionInputMetadata {
-    accept: Option<String>,
+    pub accept: Option<String>,
     #[serde(flatten)]
-    property_set: Option<HashMap<String, Metadata>>,
+    pub property_set: Option<HashMap<String, Metadata>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolutionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
+    pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "content-type")]
-    content_type: Option<String>,
+    pub content_type: Option<String>,
     #[serde(flatten)]
-    property_set: Option<HashMap<String, Metadata>>,
+    pub property_set: Option<HashMap<String, Metadata>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
-    created: Option<DateTime<Utc>>,
+    pub created: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    updated: Option<DateTime<Utc>>,
+    pub updated: Option<DateTime<Utc>>,
     #[serde(flatten)]
-    property_set: Option<HashMap<String, Metadata>>,
+    pub property_set: Option<HashMap<String, Metadata>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
