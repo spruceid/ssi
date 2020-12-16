@@ -26,7 +26,7 @@ pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 type DID = String;
 type DIDURL = String;
 
-#[derive(Debug, Serialize, Deserialize, Builder, Clone)]
+#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[builder(
     setter(into, strip_option),
@@ -55,7 +55,7 @@ pub struct Document {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 #[serde(try_from = "OneOrMany<String>")]
 pub enum Contexts {
@@ -63,7 +63,7 @@ pub enum Contexts {
     Many(Vec<String>),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum PublicKey {
@@ -71,7 +71,7 @@ pub enum PublicKey {
     Many(Vec<PublicKeyEntry>),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum PublicKeyEntry {
@@ -79,7 +79,7 @@ pub enum PublicKeyEntry {
     PublicKeyObject(PublicKeyObject),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicKeyObject {
     pub id: String,
@@ -93,7 +93,7 @@ pub struct PublicKeyObject {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum VerificationMethod {
@@ -101,7 +101,7 @@ pub enum VerificationMethod {
     PublicKey(PublicKey),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum Controller {
@@ -109,7 +109,7 @@ pub enum Controller {
     Many(Vec<DID>),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
     pub id: String,
@@ -121,7 +121,7 @@ pub struct Service {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Proof {
     #[serde(rename = "type")]
