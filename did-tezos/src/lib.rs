@@ -99,7 +99,7 @@ impl fmt::Display for TezosDIDAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             TezosDIDAddress::TZ1(b) => write!(f, "tz1{}", std::str::from_utf8(b).unwrap()),
-            TezosDIDAddress::TZ2(b) => write!(f, "tx2{}", std::str::from_utf8(b).unwrap()),
+            TezosDIDAddress::TZ2(b) => write!(f, "tz2{}", std::str::from_utf8(b).unwrap()),
             TezosDIDAddress::TZ3(b) => write!(f, "tz3{}", std::str::from_utf8(b).unwrap()),
             TezosDIDAddress::KT1(b) => write!(f, "KT1{}", std::str::from_utf8(b).unwrap()),
         }
