@@ -245,7 +245,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_direvation() {
+    async fn test_derivation() {
         let resolver = TezosDIDResolver {};
         let resolved_doc = resolver
             .resolve(
