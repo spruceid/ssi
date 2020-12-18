@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use crate::error::Error;
-use crate::jsonld::json_to_dataset;
+use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
 use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs};
 use crate::one_or_many::OneOrMany;
@@ -693,7 +693,8 @@ impl LinkedDataDocument for Credential {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, None, more_contexts.as_ref())
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader)
     }
 }
 
@@ -832,7 +833,8 @@ impl LinkedDataDocument for Presentation {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, None, more_contexts.as_ref())
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader)
     }
 }
 
@@ -887,7 +889,8 @@ impl LinkedDataDocument for Proof {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, None, more_contexts.as_ref())
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader)
     }
 }
 

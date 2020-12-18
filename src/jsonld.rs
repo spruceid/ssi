@@ -12,7 +12,7 @@ use async_std::task;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
-use json_ld::{util::AsJson, Document, JsonContext, Loader, RemoteDocument};
+use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
 
 #[derive(Debug, Clone)]
 pub enum RdfDirection {
@@ -20,16 +20,37 @@ pub enum RdfDirection {
     CompoundLiteral,
 }
 
-#[derive(Debug, Clone, Default)]
+/// https://w3c.github.io/json-ld-api/#the-jsonldoptions-type
+#[derive(Debug, Clone)]
 pub struct JsonLdOptions {
+    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-base
+    pub base: Option<String>,
+    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-expandcontext
+    pub expand_context: Option<String>,
+    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-ordered
+    pub ordered: bool,
+    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-processingmode
+    pub processing_mode: ProcessingMode,
+    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-producegeneralizedrdf
     pub produce_generalized_rdf: Option<bool>,
+    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-rdfdirection
     pub rdf_direction: Option<RdfDirection>,
 }
 
 pub const DEFAULT_JSON_LD_OPTIONS: JsonLdOptions = JsonLdOptions {
+    base: None,
+    expand_context: None,
+    ordered: false,
+    processing_mode: ProcessingMode::JsonLd1_1,
     produce_generalized_rdf: None,
     rdf_direction: None,
 };
+
+impl Default for JsonLdOptions {
+    fn default() -> Self {
+        DEFAULT_JSON_LD_OPTIONS.clone()
+    }
+}
 
 pub const CREDENTIALS_V1_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
 pub const CREDENTIALS_EXAMPLES_V1_CONTEXT: &str = "https://www.w3.org/2018/credentials/examples/v1";
@@ -110,6 +131,26 @@ impl Loader for StaticLoader {
             }
         }
         .boxed()
+    }
+}
+
+impl FromStr for RdfDirection {
+    type Err = Error;
+    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
+        match purpose {
+            "i18n-datatype" => Ok(Self::I18nDatatype),
+            "compound-literal" => Ok(Self::CompoundLiteral),
+            _ => Err(Error::UnknownRdfDirection(purpose.to_owned())),
+        }
+    }
+}
+
+impl From<&JsonLdOptions> for json_ld::expansion::Options {
+    fn from(options: &JsonLdOptions) -> Self {
+        let mut expansion_options = Self::default();
+        expansion_options.ordered = options.ordered;
+        expansion_options.processing_mode = options.processing_mode;
+        expansion_options
     }
 }
 
@@ -604,7 +645,7 @@ pub fn is_iri(string: &str) -> bool {
     IriBuf::new(string).is_ok()
 }
 
-// https://w3c.github.io/json-ld-api/#deserialize-json-ld-to-rdf-algorithm
+/// https://w3c.github.io/json-ld-api/#deserialize-json-ld-to-rdf-algorithm
 pub fn json_ld_to_rdf(
     node_map: &NodeMap,
     dataset: &mut DataSet,
@@ -1313,22 +1354,37 @@ pub fn list_to_rdf(
     return Ok(first);
 }
 
-pub fn json_to_dataset(
+/// https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf
+pub fn json_to_dataset<T>(
     json: &str,
-    iri: Option<&str>,
     more_contexts_json: Option<&String>,
-) -> Result<DataSet, Error> {
-    let base = match iri {
-        Some(iri) => Some(iref::Iri::new(iri)?),
+    lax: bool,
+    options: Option<&JsonLdOptions>,
+    loader: &mut T,
+) -> Result<DataSet, Error>
+where
+    T: Loader<Document = JsonValue> + std::marker::Send + Sync,
+{
+    let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
+    let base = match options.base {
+        Some(ref iri) => Some(iref::Iri::new(iri)?),
         None => None,
     };
-    let context: JsonContext = JsonContext::new(base);
+    let mut context: JsonContext = JsonContext::new(base);
+    if let Some(ref url) = options.expand_context {
+        use json_ld::context::Loader;
+        use json_ld::context::Local;
+        let iri = IriBuf::new(url).unwrap();
+        let local_context = task::block_on(loader.load_context(iri.as_iri()))?.into_context();
+        context = task::block_on(local_context.process(&context, loader, base)).unwrap();
+    }
     let mut doc = json::parse(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
         let more_contexts = json::parse(&more_contexts_json)?;
         // Merge additional contexts into document. This is needed for serializing proofs, since
         // they typically inherit the context of the parent credential/presentation rather than
         // including their own.
+        // TODO: handle this with the expandContext option instead
         let doc_object = match doc {
             JsonValue::Object(ref mut object) => object,
             _ => return Err(Error::ExpectedObject),
@@ -1344,10 +1400,10 @@ pub fn json_to_dataset(
         }
         doc_object.insert("@context", JsonValue::Array(contexts_merged));
     }
-    let mut loader = StaticLoader;
-    let mut options = json_ld::expansion::Options::default();
-    options.strict = true;
-    let expanding = doc.expand_with(base, &context, &mut loader, options);
+    let mut expansion_options = json_ld::expansion::Options::from(options);
+    expansion_options.strict = !lax;
+    expansion_options.ordered = false;
+    let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = task::block_on(expanding)?;
     let mut node_map = Map::new();
     node_map.insert("@default".to_string(), Map::new());
@@ -1365,6 +1421,178 @@ pub fn json_to_dataset(
         )?;
     }
     let mut dataset = DataSet::default();
-    json_ld_to_rdf(&node_map, &mut dataset, None, &mut blank_node_id_generator)?;
+    json_ld_to_rdf(
+        &node_map,
+        &mut dataset,
+        Some(options),
+        &mut blank_node_id_generator,
+    )?;
     Ok(dataset)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use json_ld::FsLoader;
+
+    fn test_to_rdf(obj: &json::object::Object) -> Result<(), Error> {
+        use crate::urdna2015;
+        use std::fs;
+        use std::path::PathBuf;
+        let base1 = "https://w3c.github.io/json-ld-api/tests/".to_string();
+        let base = "json-ld-api/tests/";
+        let input = obj.get("input").unwrap().as_str().unwrap();
+        let input = base.to_string() + input;
+        let mut base_iri = "https://w3c.github.io/".to_string() + &input;
+        let input_path = PathBuf::from(input);
+        let in_str = fs::read_to_string(&input_path).unwrap();
+        let mut loader = FsLoader::new();
+        loader.mount(
+            Iri::new("https://w3c.github.io/json-ld-api").unwrap(),
+            "json-ld-api",
+        );
+        let mut ld_options = DEFAULT_JSON_LD_OPTIONS.clone();
+        if let Some(JsonValue::Object(options)) = obj.get("option") {
+            if let Some(mode) = options.get("processingMode") {
+                let mode_str = match mode.as_str() {
+                    Some(mode_str) => mode_str,
+                    None => return Err(Error::ExpectedString),
+                };
+                ld_options.processing_mode = ProcessingMode::try_from(mode_str)
+                    .map_err(|_| Error::UnknownProcessingMode(mode_str.to_owned()))?;
+            }
+            if let Some(mode) = options.get("rdfDirection") {
+                ld_options.rdf_direction = Some(RdfDirection::from_str(mode.as_str().unwrap())?);
+            }
+            if let Some(base) = options.get("base") {
+                base_iri = base.as_str().unwrap().to_owned();
+            }
+            if let Some(ctx) = options.get("expandContext") {
+                use iref::IriRef;
+                let ctx = ctx.as_str().unwrap();
+                let iri_ref = IriRef::new(ctx).unwrap();
+                let base1 = Iri::new(&base1).unwrap();
+                ld_options.expand_context = Some(iri_ref.resolved(base1).to_string());
+            }
+        }
+        ld_options.base = Some(base_iri);
+        // Normalize input and input for comparison
+        let result = json_to_dataset(&in_str, None, true, Some(&ld_options), &mut loader)
+            .and_then(|dataset| urdna2015::normalize(&dataset))
+            .and_then(|dataset| dataset.to_nquads());
+        if let Some(output) = obj.get("expect") {
+            let output = output.as_str().unwrap();
+            let output_path = PathBuf::from(base.to_string() + output);
+            let output_string = fs::read_to_string(&output_path).unwrap();
+            let output_dataset = DataSet::from_str(&output_string)?;
+            let output_dataset_normalized = urdna2015::normalize(&output_dataset)?;
+            let output_string_normalized = output_dataset_normalized.to_nquads()?;
+            let nquads = result?;
+            if &nquads != &output_string_normalized {
+                return Err(Error::ExpectedOutput(output_string_normalized, nquads));
+            }
+        } else if obj.get("expectErrorCode").is_some() {
+            if result.is_ok() {
+                return Err(Error::ExpectedFailure);
+            }
+        } else {
+            result?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    /// https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html
+    fn to_rdf_test_suite() {
+        let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
+        let manifest = json::parse(manifest_str).unwrap();
+        let manifest_obj = match manifest {
+            JsonValue::Object(obj) => Ok(obj),
+            _ => Err(Error::ExpectedObject),
+        }
+        .unwrap();
+        let case = std::env::args().skip(2).next();
+        let sequence = manifest_obj.get("sequence").unwrap();
+        let mut passed = 0;
+        let mut total = 0;
+        for test in sequence.members() {
+            let obj = match test {
+                JsonValue::Object(obj) => obj,
+                _ => panic!("expected object"),
+            };
+            let id = obj.get("@id").unwrap().as_str().unwrap();
+            if let Some(ref case) = case {
+                if case != id {
+                    continue;
+                }
+            }
+            let skip = match id {
+                "#tli12" => {
+                    // "Tests list elements expanded to IRIs with a bad @base.",
+                    // But the JSON-LD Context Processing Algorithm says to error and aborts processing if @base is invalid. See step 5.7.5:
+                    // https://w3c.github.io/json-ld-api/#algorithm
+                    // Implemented in json-ld crate:
+                    // https://github.com/timothee-haudebourg/json-ld/blob/3d084e5d616eb350918948b3c551f5177b973e9b/src/context/processing.rs#L339
+                    true
+                }
+                "#te111" | "#te112" => {
+                    // Why is "#fragment-works": "#fragment-works" not allowed
+                    // but "?query=works": "?query=works" is?
+                    true
+                }
+                "#te122" => {
+                    // "Processors SHOULD generate a warning and MUST ignore IRIs having the form of a keyword."
+                    // This test applies to expansion
+                    true
+                }
+                "#tc037" | "#tc038" => {
+                    // "Nesting terms may have property-scoped contexts defined."
+                    // Applies to expansion
+                    true
+                }
+                "#t0122" | "#t0123" | "#t0124" | "#t0125" => {
+                    // "IRI resolution according to RFC3986."
+                    // Applies to expansion and IRI resolution
+                    true
+                }
+                _ => false,
+            };
+            if skip {
+                eprintln!("test {}: skipping", id);
+                continue;
+            }
+            if let Some(requires) = obj.get("requires") {
+                if requires.as_str() == Some("GeneralizedRdf") {
+                    eprintln!("test {}: skipping: requires Generalized RDF", id);
+                    continue;
+                }
+            }
+            if let Some(JsonValue::Object(options)) = obj.get("option") {
+                if options.get("normative") == Some(&JsonValue::Boolean(false)) {
+                    eprintln!("test {}: skipping: non-normative", id);
+                    continue;
+                }
+                if let Some(spec_version) = options.get("specVersion") {
+                    let spec_version = spec_version.as_str().unwrap();
+                    if spec_version != "json-ld-1.1" {
+                        eprintln!("test {}: skipping: spec version '{}'", id, spec_version);
+                        continue;
+                    }
+                }
+            }
+            total += 1;
+            if let Err(err) = test_to_rdf(&obj) {
+                if let Error::ExpectedOutput(expected, found) = err {
+                    let changes = difference::Changeset::new(&found, &expected, "\n");
+                    eprintln!("test {}: failed. diff:\n{}", id, changes);
+                } else {
+                    eprintln!("test {}: failed: {:?}", id, err);
+                }
+            } else {
+                passed += 1;
+            }
+        }
+        assert!(total > 0);
+        assert_eq!(passed, total);
+    }
 }
