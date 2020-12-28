@@ -215,6 +215,15 @@ impl From<&JsonLdOptions> for json_ld::expansion::Options {
     }
 }
 
+impl From<&JsonLdOptions> for json_ld::context::ProcessingOptions {
+    fn from(options: &JsonLdOptions) -> Self {
+        Self {
+            processing_mode: options.processing_mode,
+            ..Self::default()
+        }
+    }
+}
+
 pub enum JsonValuesIter<'a> {
     Multiple(std::slice::Iter<'a, JsonValue>),
     Single(Option<&'a JsonValue>),
@@ -1419,7 +1428,13 @@ where
         use json_ld::context::Local;
         let iri = IriBuf::new(url).unwrap();
         let local_context = task::block_on(loader.load_context(iri.as_iri()))?.into_context();
-        context = task::block_on(local_context.process(&context, loader, base)).unwrap();
+        context = task::block_on(local_context.process_with(
+            &context,
+            json_ld::context::ProcessingStack::new(),
+            loader,
+            base,
+            options.into(),
+        ))?;
     }
     let mut doc = json::parse(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
