@@ -18,7 +18,7 @@ base64 = "0.12"
 jsonwebtoken = { path = "jsonwebtoken" }
 ring = "0.16"
 multibase = "0.8"
-json-ld = { git = "https://github.com/clehner/json-ld", rev = "448791ead1d4c1a78e4434e91d6f7e77b455b4f1" }
+json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "448791ead1d4c1a78e4434e91d6f7e77b455b4f1" }
 async-std = { version = "1.5", features = ["attributes"] }
 json = "0.12"
 futures = "0.3"
