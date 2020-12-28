@@ -76,11 +76,13 @@ impl LinkedDataProofs {
                 "Ed25519" => {
                     return Ed25519Signature2018::sign(document, options, &key);
                 }
-                _ => {}
+                _ => {
+                    return Err(Error::ProofTypeNotImplemented);
+                }
             },
             _ => {}
         };
-        return Err(Error::ProofTypeNotImplemented);
+        Err(Error::ProofTypeNotImplemented)
     }
 
     // https://w3c-ccg.github.io/ld-proofs/#proof-verification-algorithm
@@ -137,12 +139,14 @@ fn sign(
     type_: &str,
     algorithm: Algorithm,
 ) -> Result<Proof, Error> {
-    let mut header = Header::default();
-    header.alg = algorithm;
     let mut params = std::collections::HashMap::new();
     params.insert("b64".to_string(), false.into());
-    header.params = Some(params);
-    header.crit = Some(vec!["b64".to_string()]);
+    let header = Header {
+        alg: algorithm,
+        params: Some(params),
+        crit: Some(vec!["b64".to_string()]),
+        ..Default::default()
+    };
     // header.kid = Some(key_id.clone());
     let mut proof = Proof {
         type_: type_.to_string(),
@@ -150,7 +154,7 @@ fn sign(
         proof_value: None,
         verification_method: options.verification_method.clone(),
         creator: None,
-        created: Some(options.created.unwrap_or(now_ms())),
+        created: Some(options.created.unwrap_or_else(now_ms)),
         domain: options.domain.clone(),
         challenge: options.challenge.clone(),
         nonce: None,
@@ -170,7 +174,7 @@ fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error>
         None => return Err(Error::MissingProofSignature),
         Some(jws) => jws,
     };
-    let ref verification_method = match &proof.verification_method {
+    let verification_method = match &proof.verification_method {
         Some(verification_method) => verification_method,
         None => return Err(Error::MissingVerificationMethod),
     };

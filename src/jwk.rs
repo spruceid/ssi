@@ -151,11 +151,11 @@ const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 
 impl JWK {
     pub fn to_jwt_header(&self) -> Result<Header, Error> {
-        let mut header = Header::default();
-        header.alg = Algorithm::try_from(self)?;
-        if let Some(ref key_id) = self.key_id {
-            header.kid = Some(key_id.clone());
-        }
+        let header = Header {
+            alg: Algorithm::try_from(self)?,
+            kid: self.key_id.clone(),
+            ..Default::default()
+        };
         Ok(header)
     }
 
@@ -200,7 +200,7 @@ impl JWK {
                 x509_thumbprint_sha256: None,
             });
         }
-        return Err(Error::KeyTypeNotImplemented);
+        Err(Error::KeyTypeNotImplemented)
     }
 
     pub fn to_did(&self) -> Result<String, Error> {
@@ -223,7 +223,7 @@ impl JWK {
         let public_key = keypair.public_key().as_ref();
         // reference: ring/src/ec/curve25519/ed25519/signing.rs
         let private_key = &key_pkcs8[0x10..0x30];
-        return Ok(JWK {
+        Ok(JWK {
             params: Params::OKP(OctetParams {
                 curve: "Ed25519".to_string(),
                 public_key: Base64urlUInt(public_key.to_vec()),
@@ -237,7 +237,7 @@ impl JWK {
             x509_certificate_chain: None,
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
-        });
+        })
     }
 }
 
@@ -245,7 +245,7 @@ impl Params {
     pub fn to_did(&self) -> Result<String, Error> {
         match self {
             Self::OKP(okp) => okp.to_did(),
-            _ => return Err(Error::UnsupportedKeyType),
+            _ => Err(Error::UnsupportedKeyType),
         }
     }
 }
@@ -258,9 +258,7 @@ impl OctetParams {
                     multibase::Base::Base58Btc,
                     [DID_KEY_ED25519_PREFIX.to_vec(), self.public_key.0.clone()].concat(),
                 )),
-            _ => {
-                return Err(Error::UnsupportedKeyType);
-            }
+            _ => Err(Error::UnsupportedKeyType),
         }
     }
 }
@@ -289,7 +287,7 @@ impl TryFrom<&JWK> for EncodingKey {
                 let der = DER::try_from(okp_params)?;
                 Ok(EncodingKey::from_ed_der(&der))
             }
-            _ => return Err(Error::KeyTypeNotImplemented),
+            _ => Err(Error::KeyTypeNotImplemented),
         }
     }
 }
@@ -310,7 +308,7 @@ impl<'a> TryFrom<&'a JWK> for DecodingKey<'a> {
                 Ok(DecodingKey::from_rsa_components(modulus, exponent))
             }
             Params::OKP(okp) => {
-                if okp.curve != "Ed25519".to_string() {
+                if okp.curve != *"Ed25519" {
                     return Err(Error::KeyTypeNotImplemented);
                 }
                 Ok(DecodingKey::from_ed_der(&okp.public_key.0))
@@ -391,7 +389,7 @@ impl TryFrom<&RSAParams> for DER {
 impl TryFrom<&OctetParams> for DER {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
-        if params.curve != "Ed25519".to_string() {
+        if params.curve != *"Ed25519" {
             return Err(Error::KeyTypeNotImplemented);
         }
         let public_key = BitString(params.public_key.0.clone());

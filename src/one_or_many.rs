@@ -25,6 +25,13 @@ impl<T> OneOrMany<T> {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Self::One(_) => false,
+            Self::Many(values) => values.is_empty(),
+        }
+    }
+
     pub fn contains(&self, x: &T) -> bool
     where
         T: PartialEq<T>,
@@ -39,7 +46,7 @@ impl<T> OneOrMany<T> {
         match self {
             Self::One(value) => Some(&value),
             Self::Many(values) => {
-                if values.len() > 0 {
+                if !values.is_empty() {
                     Some(&values[0])
                 } else {
                     None
@@ -83,7 +90,7 @@ impl<'a, T> IntoIterator for &'a OneOrMany<T> {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             OneOrMany::One(value) => vec![value].into_iter(),
-            OneOrMany::Many(values) => values.into_iter().collect::<Vec<Self::Item>>().into_iter(),
+            OneOrMany::Many(values) => values.iter().collect::<Vec<Self::Item>>().into_iter(),
         }
     }
 }

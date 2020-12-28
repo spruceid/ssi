@@ -23,7 +23,7 @@ impl DIDResolver for TezosDIDResolver {
     async fn resolve(
         &self,
         did: &str,
-        input_metadata: &ResolutionInputMetadata,
+        _input_metadata: &ResolutionInputMetadata,
     ) -> (
         ResolutionMetadata,
         Option<Document>,

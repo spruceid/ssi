@@ -67,7 +67,7 @@ pub struct BitString(pub Vec<u8>);
 
 fn trim_bytes(bytes: &[u8]) -> Vec<u8> {
     // Remove leading zeros from an array.
-    match bytes.into_iter().position(|&x| x != 0) {
+    match bytes.iter().position(|&x| x != 0) {
         Some(n) => bytes[n..].to_vec(),
         None => vec![0],
     }

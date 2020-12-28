@@ -79,13 +79,32 @@ pub const AT_VERSION: &str = "@version";
 pub const AT_VOCAB: &str = "@vocab";
 
 pub fn is_keyword(string: &str) -> bool {
-    match string {
-        AT_BASE | AT_CONTAINER | AT_CONTEXT | AT_DIRECTION | AT_GRAPH | AT_ID | AT_IMPORT
-        | AT_INCLUDED | AT_INDEX | AT_JSON | AT_LANGUAGE | AT_LIST | AT_NEST | AT_NONE
-        | AT_PREFIX | AT_PROPAGATE | AT_PROTECTED | AT_REVERSE | AT_SET | AT_TYPE | AT_VALUE
-        | AT_VERSION | AT_VOCAB => true,
-        _ => false,
-    }
+    matches!(
+        string,
+        AT_BASE
+            | AT_CONTAINER
+            | AT_CONTEXT
+            | AT_DIRECTION
+            | AT_GRAPH
+            | AT_ID
+            | AT_IMPORT
+            | AT_INCLUDED
+            | AT_INDEX
+            | AT_JSON
+            | AT_LANGUAGE
+            | AT_LIST
+            | AT_NEST
+            | AT_NONE
+            | AT_PREFIX
+            | AT_PROPAGATE
+            | AT_PROTECTED
+            | AT_REVERSE
+            | AT_SET
+            | AT_TYPE
+            | AT_VALUE
+            | AT_VERSION
+            | AT_VOCAB
+    )
 }
 
 pub fn is_iri(string: &str) -> bool {
@@ -187,10 +206,11 @@ impl FromStr for RdfDirection {
 
 impl From<&JsonLdOptions> for json_ld::expansion::Options {
     fn from(options: &JsonLdOptions) -> Self {
-        let mut expansion_options = Self::default();
-        expansion_options.ordered = options.ordered;
-        expansion_options.processing_mode = options.processing_mode;
-        expansion_options
+        Self {
+            ordered: options.ordered,
+            processing_mode: options.processing_mode,
+            ..Self::default()
+        }
     }
 }
 
@@ -268,7 +288,7 @@ impl BlankNodeIdentifierGenerator {
 }
 
 /// https://w3c.github.io/json-ld-api/#node-map-generation
-pub fn generate_node_map<'a>(
+pub fn generate_node_map(
     element: &mut JsonValue,
     node_map: &mut NodeMap,
     active_graph: Option<&str>,
@@ -513,7 +533,7 @@ pub fn generate_node_map<'a>(
                             _ => return Err(Error::ExpectedArray),
                         };
                         if !array.contains(&reference) {
-                            array.push(reference.clone());
+                            array.push(reference);
                         }
                     } else {
                         // 6.6.2.1
@@ -714,6 +734,7 @@ pub fn json_ld_to_rdf(
             // 1.3.2
             for (property, values) in property_values {
                 // 1.3.2.1
+                #[allow(clippy::if_same_then_else)]
                 if property == AT_TYPE
                 // TODO: find out why type is not getting turned into @type here
                 || property == "type"
@@ -1012,7 +1033,7 @@ pub fn object_to_rdf(
         ItemObject::Node(node) => {
             // 1
             let id = match match node.id {
-                Some(id) => IRIOrBlankNodeIdentifier::try_from(id.to_string()).ok(),
+                Some(id) => IRIOrBlankNodeIdentifier::try_from(id).ok(),
                 None => None,
             } {
                 Some(id) => id,
@@ -1045,7 +1066,7 @@ pub fn object_to_rdf(
             None => return Ok(None),
         };
         // TODO: use IRI here rather than IRIRef
-        if datatype != AT_JSON && !IRIRef::try_from(datatype.to_string()).is_ok() {
+        if datatype != AT_JSON && IRIRef::try_from(datatype.to_string()).is_err() {
             return Ok(None);
         }
         Some(datatype)
@@ -1104,7 +1125,7 @@ pub fn object_to_rdf(
         } else {
             // 11
             let num = format!("{:.0}", num_f64);
-            value = JsonValue::String(num.to_string());
+            value = JsonValue::String(num);
             if datatype == None {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#integer");
             }
@@ -1132,7 +1153,7 @@ pub fn object_to_rdf(
     if let (Some(direction), Some(rdf_direction)) = (item.direction, options.rdf_direction.as_ref())
     {
         // 13.1
-        let language = language.unwrap_or("".to_string());
+        let language = language.unwrap_or_else(|| "".to_string());
         let direction = match direction.as_str() {
             Some(direction) => direction,
             None => return Err(Error::ExpectedString),
@@ -1141,7 +1162,7 @@ pub fn object_to_rdf(
             // 13.2
             RdfDirection::I18nDatatype => {
                 let datatype_string =
-                    "https://www.w3.org/ns/i18n#".to_string() + &language + "_" + &direction;
+                    "https://www.w3.org/ns/i18n#".to_string() + &language + "_" + direction;
                 literal = Literal::Typed {
                     string: StringLiteral(value_string),
                     type_: IRIRef(datatype_string),
@@ -1168,14 +1189,14 @@ pub fn object_to_rdf(
                     object: Object::try_from(value.to_string())?,
                 });
                 // 13.3.3
-                if language.len() > 0 {
+                if !language.is_empty() {
                     list_triples.push(Triple {
                         subject: Subject::BlankNodeLabel(BlankNodeLabel(literal_string.clone())),
                         predicate: Predicate::IRIRef(IRIRef(
                             "http://www.w3.org/1999/02/22-rdf-syntax-ns#language".to_string(),
                         )),
                         // TODO: is language a literal?
-                        object: Object::try_from(language.to_string())?,
+                        object: Object::try_from(language)?,
                     });
                 }
                 // 13.3.4
@@ -1325,11 +1346,7 @@ pub fn list_to_rdf(
     // 3
     let mut bnodes_iter = bnodes.iter().peekable();
     let mut list_iter = list.iter();
-    loop {
-        let (subject, item) = match (bnodes_iter.next(), list_iter.next()) {
-            (Some(subject), Some(item)) => (subject, item),
-            _ => break,
-        };
+    while let (Some(subject), Some(item)) = (bnodes_iter.next(), list_iter.next()) {
         let subject = Subject::try_from(subject.to_string())?;
         // 3.1
         let mut embedded_triples = vec![];
@@ -1376,7 +1393,7 @@ pub fn list_to_rdf(
             "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil".to_string(),
         )),
     };
-    return Ok(first);
+    Ok(first)
 }
 
 /// https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf

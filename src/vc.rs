@@ -407,7 +407,7 @@ impl From<Contexts> for OneOrMany<Context> {
 impl TryFrom<String> for URI {
     type Error = Error;
     fn try_from(uri: String) -> Result<Self, Self::Error> {
-        if uri.contains(":") {
+        if uri.contains(':') {
             Ok(URI::String(uri))
         } else {
             Err(Error::URI)
@@ -478,7 +478,7 @@ impl Credential {
         Ok(vc)
     }
 
-    pub(crate) fn from_jwt_unsigned_embedded(jwt: &String) -> Result<Self, Error> {
+    pub(crate) fn from_jwt_unsigned_embedded(jwt: &str) -> Result<Self, Error> {
         let token_data = jsonwebtoken::dangerous_insecure_decode::<JWTClaims>(jwt)?;
         let vc = Self::from_token_data(token_data)?;
         vc.validate_unsigned_embedded()?;
@@ -573,10 +573,8 @@ impl Credential {
             return Err(Error::MissingIssuanceDate);
         }
 
-        if self.is_zkp() {
-            if self.credential_schema.is_none() {
-                return Err(Error::MissingCredentialSchema);
-            }
+        if self.is_zkp() && self.credential_schema.is_none() {
+            return Err(Error::MissingCredentialSchema);
         }
 
         Ok(())
@@ -612,7 +610,7 @@ impl Credential {
     }
 
     fn filter_proofs(&self, options: Option<LinkedDataProofOptions>) -> Vec<&Proof> {
-        let mut options = options.unwrap_or_default().clone();
+        let mut options = options.unwrap_or_default();
         // Use issuer as default verificationMethod
         if options.verification_method.is_none() {
             if let Some(ref issuer) = self.issuer {
@@ -620,9 +618,7 @@ impl Credential {
                     Issuer::URI(uri) => uri,
                     Issuer::Object(object_with_id) => object_with_id.id,
                 };
-                let issuer_did = match issuer_uri {
-                    URI::String(uri) => uri,
-                };
+                let URI::String(issuer_did) = issuer_uri;
                 options.verification_method = did_to_verification_method(&issuer_did);
             }
         }
@@ -852,7 +848,7 @@ impl Proof {
             assert_local!(self.verification_method.as_ref() == Some(verification_method));
         }
         if let Some(created) = self.created {
-            assert_local!(options.created.unwrap_or(now_ms()) >= created);
+            assert_local!(options.created.unwrap_or_else(now_ms) >= created);
         } else {
             return false;
         }
