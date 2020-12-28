@@ -52,6 +52,46 @@ impl Default for JsonLdOptions {
     }
 }
 
+/// https://www.w3.org/TR/json-ld11/#keywords
+pub const AT_BASE: &str = "@base";
+pub const AT_CONTAINER: &str = "@container";
+pub const AT_CONTEXT: &str = "@context";
+pub const AT_DEFAULT: &str = "@default";
+pub const AT_DIRECTION: &str = "@direction";
+pub const AT_GRAPH: &str = "@graph";
+pub const AT_ID: &str = "@id";
+pub const AT_IMPORT: &str = "@import";
+pub const AT_INCLUDED: &str = "@included";
+pub const AT_INDEX: &str = "@index";
+pub const AT_JSON: &str = "@json";
+pub const AT_LANGUAGE: &str = "@language";
+pub const AT_LIST: &str = "@list";
+pub const AT_NEST: &str = "@nest";
+pub const AT_NONE: &str = "@none";
+pub const AT_PREFIX: &str = "@prefix";
+pub const AT_PROPAGATE: &str = "@propagate";
+pub const AT_PROTECTED: &str = "@protected";
+pub const AT_REVERSE: &str = "@reverse";
+pub const AT_SET: &str = "@set";
+pub const AT_TYPE: &str = "@type";
+pub const AT_VALUE: &str = "@value";
+pub const AT_VERSION: &str = "@version";
+pub const AT_VOCAB: &str = "@vocab";
+
+pub fn is_keyword(string: &str) -> bool {
+    match string {
+        AT_BASE | AT_CONTAINER | AT_CONTEXT | AT_DIRECTION | AT_GRAPH | AT_ID | AT_IMPORT
+        | AT_INCLUDED | AT_INDEX | AT_JSON | AT_LANGUAGE | AT_LIST | AT_NEST | AT_NONE
+        | AT_PREFIX | AT_PROPAGATE | AT_PROTECTED | AT_REVERSE | AT_SET | AT_TYPE | AT_VALUE
+        | AT_VERSION | AT_VOCAB => true,
+        _ => false,
+    }
+}
+
+pub fn is_iri(string: &str) -> bool {
+    IriBuf::new(string).is_ok()
+}
+
 pub const CREDENTIALS_V1_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
 pub const CREDENTIALS_EXAMPLES_V1_CONTEXT: &str = "https://www.w3.org/2018/credentials/examples/v1";
 pub const ODRL_CONTEXT: &str = "https://www.w3.org/ns/odrl.jsonld";
@@ -259,7 +299,7 @@ pub fn generate_node_map<'a>(
         JsonValue::Object(object) => object,
         _ => return Err(Error::ExpectedObject),
     };
-    let active_graph = active_graph.unwrap_or("@default");
+    let active_graph = active_graph.unwrap_or(AT_DEFAULT);
     // 2
     let graph = node_map
         .entry(active_graph.to_string())
@@ -274,7 +314,7 @@ pub fn generate_node_map<'a>(
         None => None,
     };
     // 3
-    if let Some(types) = match element_obj.remove("@type") {
+    if let Some(types) = match element_obj.remove(AT_TYPE) {
         Some(JsonValue::Array(items)) => Some(JsonValue::Array(
             items
                 .into_iter()
@@ -298,17 +338,17 @@ pub fn generate_node_map<'a>(
         }
         None => None,
     } {
-        element_obj.insert("@type", types);
+        element_obj.insert(AT_TYPE, types);
     }
     // 4
-    if element_obj.get("@value").is_some() {
+    if element_obj.get(AT_VALUE).is_some() {
         if let Some(ref mut list) = match list {
             JsonValue::Object(list) => Some(list),
             JsonValue::Null => None,
             _ => return Err(Error::ExpectedObject),
         } {
             // 4.2
-            let array = match list.get_mut("@list") {
+            let array = match list.get_mut(AT_LIST) {
                 Some(JsonValue::Array(vec)) => vec,
                 _ => return Err(Error::ExpectedArrayList),
             };
@@ -340,10 +380,10 @@ pub fn generate_node_map<'a>(
             }
         }
     // 5
-    } else if let Some(element_list) = element_obj.get_mut("@list") {
+    } else if let Some(element_list) = element_obj.get_mut(AT_LIST) {
         // 5.1
         let mut result: JsonValue = JsonValue::new_object();
-        result.insert("@list", JsonValue::new_array())?;
+        result.insert(AT_LIST, JsonValue::new_array())?;
         // 5.2
         generate_node_map(
             element_list,
@@ -388,7 +428,7 @@ pub fn generate_node_map<'a>(
                 JsonValue::Object(list) => list,
                 _ => return Err(Error::ExpectedObject),
             };
-            let list_entry_of_list = match list.get_mut("@list") {
+            let list_entry_of_list = match list.get_mut(AT_LIST) {
                 Some(JsonValue::Array(list)) => list,
                 _ => return Err(Error::ExpectedArrayList),
             };
@@ -397,7 +437,7 @@ pub fn generate_node_map<'a>(
     // 6
     } else {
         // 6.1
-        let id = match element_obj.remove("@id") {
+        let id = match element_obj.remove(AT_ID) {
             Some(id) => {
                 if is_blank_node_identifier(&id) {
                     blank_node_id_generator.generate(&id)?
@@ -414,9 +454,9 @@ pub fn generate_node_map<'a>(
         };
         // 6.3
         if !graph.contains_key(id_string) {
-            let entry = object! {
-                "@id": id.clone()
-            };
+            let mut object = json::object::Object::new();
+            object.insert(AT_ID, id.clone());
+            let entry = JsonValue::Object(object);
             graph.insert(id_string.to_string(), entry);
         };
         // 6.4
@@ -450,9 +490,9 @@ pub fn generate_node_map<'a>(
             // 6.6
             if let Some(active_property) = active_property {
                 // 6.6.1
-                let reference = object! {
-                    "@id": id.clone()
-                };
+                let mut reference_object = json::object::Object::new();
+                reference_object.insert(AT_ID, id.clone());
+                let reference = JsonValue::Object(reference_object);
                 if list.is_null() {
                     // 6.6.2
                     let subject_node = match active_subject {
@@ -486,7 +526,7 @@ pub fn generate_node_map<'a>(
                         JsonValue::Object(list) => list,
                         _ => return Err(Error::ExpectedObject),
                     };
-                    let list_entry_of_list = match list.get_mut("@list") {
+                    let list_entry_of_list = match list.get_mut(AT_LIST) {
                         Some(JsonValue::Array(list)) => list,
                         _ => return Err(Error::ExpectedArrayList),
                     };
@@ -500,12 +540,12 @@ pub fn generate_node_map<'a>(
             Some(JsonValue::Object(node)) => node,
             _ => return Err(Error::ExpectedObject),
         };
-        if let Some(element_type) = element_obj.remove("@type") {
+        if let Some(element_type) = element_obj.remove(AT_TYPE) {
             let element_type_array = match element_type {
                 JsonValue::Array(array) => array,
                 _ => return Err(Error::ExpectedArray),
             };
-            if let Some(node_type) = node.get_mut("@type") {
+            if let Some(node_type) = node.get_mut(AT_TYPE) {
                 let node_type_array = match node_type {
                     JsonValue::Array(array) => array,
                     _ => return Err(Error::ExpectedArray),
@@ -520,8 +560,8 @@ pub fn generate_node_map<'a>(
             }
         }
         // 6.8
-        if let Some(element_index) = element_obj.remove("@index") {
-            if let Some(node_index) = node.get("@index") {
+        if let Some(element_index) = element_obj.remove(AT_INDEX) {
+            if let Some(node_index) = node.get(AT_INDEX) {
                 if node_index != &element_index {
                     return Err(Error::ConflictingIndexes);
                 }
@@ -530,11 +570,11 @@ pub fn generate_node_map<'a>(
             }
         }
         // 6.9, 6.9.2, 6.9.4
-        if let Some(reverse_map) = element_obj.remove("@reverse") {
+        if let Some(reverse_map) = element_obj.remove(AT_REVERSE) {
             // 6.9.1
-            let referenced_node = object! {
-                "@id": id.clone()
-            };
+            let mut object = json::object::Object::new();
+            object.insert(AT_ID, id.clone());
+            let referenced_node = JsonValue::Object(object);
             // 6.9.3
             let mut reverse_map_object = match reverse_map {
                 JsonValue::Object(object) => object,
@@ -561,7 +601,7 @@ pub fn generate_node_map<'a>(
             }
         }
         // 6.10
-        if let Some(mut graph) = element_obj.remove("@graph") {
+        if let Some(mut graph) = element_obj.remove(AT_GRAPH) {
             let id_string = match id.as_str() {
                 Some(id) => id,
                 None => return Err(Error::ExpectedString),
@@ -577,7 +617,7 @@ pub fn generate_node_map<'a>(
             )?;
         }
         // 6.11
-        if let Some(mut included) = element_obj.remove("@included") {
+        if let Some(mut included) = element_obj.remove(AT_INCLUDED) {
             generate_node_map(
                 &mut included,
                 node_map,
@@ -630,21 +670,6 @@ pub fn generate_node_map<'a>(
     Ok(())
 }
 
-/// https://www.w3.org/TR/json-ld11/#keywords
-pub fn is_keyword(string: &str) -> bool {
-    match string {
-        "@base" | "@container" | "@context" | "@direction" | "@graph" | "@id" | "@import"
-        | "@included" | "@index" | "@json" | "@language" | "@list" | "@nest" | "@none"
-        | "@prefix" | "@propagate" | "@protected" | "@reverse" | "@set" | "@type" | "@value"
-        | "@version" | "@vocab" => true,
-        _ => false,
-    }
-}
-
-pub fn is_iri(string: &str) -> bool {
-    IriBuf::new(string).is_ok()
-}
-
 /// https://w3c.github.io/json-ld-api/#deserialize-json-ld-to-rdf-algorithm
 pub fn json_ld_to_rdf(
     node_map: &NodeMap,
@@ -659,7 +684,7 @@ pub fn json_ld_to_rdf(
     for (graph_name, graph) in graphs {
         // 1.1
         // 1.2
-        let triples = if graph_name == "@default" {
+        let triples = if graph_name == AT_DEFAULT {
             &mut dataset.default_graph
         } else {
             let graph_name = match GraphLabel::try_from(graph_name.to_string()) {
@@ -689,7 +714,7 @@ pub fn json_ld_to_rdf(
             // 1.3.2
             for (property, values) in property_values {
                 // 1.3.2.1
-                if property == "@type"
+                if property == AT_TYPE
                 // TODO: find out why type is not getting turned into @type here
                 || property == "type"
                 {
@@ -794,11 +819,11 @@ impl TryFrom<&JsonValue> for ValueObject {
             _ => return Err(Error::ExpectedObject),
         }
         .clone();
-        let value = match object.remove("@value") {
+        let value = match object.remove(AT_VALUE) {
             Some(value) => value,
             None => return Err(Error::ExpectedValue),
         };
-        let type_ = object.remove("@type");
+        let type_ = object.remove(AT_TYPE);
         let type_str = match type_ {
             Some(ref type_) => match type_.as_str() {
                 Some(type_str) => Some(type_str),
@@ -809,11 +834,11 @@ impl TryFrom<&JsonValue> for ValueObject {
         // TODO:
         // - The value associated with the @type key MUST be a term, an IRI, a compact IRI, a string which can be turned into an IRI using the vocabulary mapping, @json, or null.
         // - The value associated with the @language key MUST have the lexical form described in [BCP47], or be null.
-        if (value.is_array() || value.is_object()) && type_str != Some("@json") {
+        if (value.is_array() || value.is_object()) && type_str != Some(AT_JSON) {
             return Err(Error::ExpectedValueTypeJson);
         }
-        let language = object.remove("@language");
-        let direction = object.remove("@direction");
+        let language = object.remove(AT_LANGUAGE);
+        let direction = object.remove(AT_DIRECTION);
         if let Some(ref direction) = direction {
             if !direction.is_null() {
                 match direction.as_str() {
@@ -822,13 +847,13 @@ impl TryFrom<&JsonValue> for ValueObject {
                 }
             }
         }
-        let index = object.remove("@index");
+        let index = object.remove(AT_INDEX);
         if let Some(ref index) = index {
             if !index.is_string() {
                 return Err(Error::ExpectedStringIndex);
             }
         }
-        let context = object.remove("@context");
+        let context = object.remove(AT_CONTEXT);
         if type_.is_some() && (language.is_some() || direction.is_some()) {
             return Err(Error::ValueObjectLanguageType);
         }
@@ -860,13 +885,13 @@ impl TryFrom<&JsonValue> for NodeObject {
             JsonValue::Object(object) => object,
             _ => return Err(Error::ExpectedObject),
         };
-        if object.get("@value").is_some() {
+        if object.get(AT_VALUE).is_some() {
             return Err(Error::UnexpectedValue);
         }
-        if object.get("@list").is_some() {
+        if object.get(AT_LIST).is_some() {
             return Err(Error::UnexpectedList);
         }
-        if object.get("@set").is_some() {
+        if object.get(AT_SET).is_some() {
             return Err(Error::UnexpectedSet);
         }
         let mut object = object.clone();
@@ -875,10 +900,10 @@ impl TryFrom<&JsonValue> for NodeObject {
         // - it is not a graph object.
         // - All keys which are not IRIs, compact IRIs, terms valid in the active context, or one of the following keywords (or alias of such a keyword) MUST be ignored when processed: @context, @id, @included, @graph, @nest, @type, @reverse, or @index
         // - Keys in a node object that are not keywords MAY expand to an IRI using the active context. The values associated with keys that expand to an IRI MUST be one of the following: string, number, true, false, null, node object, graph object, value object, list object, set object, an array of zero or more of any of the possibilities above, a language map, an index map, an included block an id map, or a type map
-        if let Some(_context) = object.get("@context") {
+        if let Some(_context) = object.get(AT_CONTEXT) {
             // TODO
         }
-        let id = match object.remove("@id") {
+        let id = match object.remove(AT_ID) {
             None => None,
             Some(value) => {
                 let id_str = match value.as_str() {
@@ -889,24 +914,24 @@ impl TryFrom<&JsonValue> for NodeObject {
                 Some(id_str.to_owned())
             }
         };
-        if let Some(_graph) = object.get("graph") {
+        if let Some(_graph) = object.get(AT_GRAPH) {
             // TODO
         }
-        if let Some(_type_) = object.get("@type") {
+        if let Some(_type_) = object.get(AT_TYPE) {
             // TODO
         }
-        if let Some(_reverse) = object.get("@type") {
+        if let Some(_reverse) = object.get(AT_REVERSE) {
             // TODO
         }
-        if let Some(_included) = object.get("@type") {
+        if let Some(_included) = object.get(AT_INCLUDED) {
             // TODO
         }
-        if let Some(index) = object.get("@index") {
+        if let Some(index) = object.get(AT_INDEX) {
             if !index.is_string() {
                 return Err(Error::ExpectedString);
             }
         }
-        if let Some(_nest) = object.get("@nest") {
+        if let Some(_nest) = object.get(AT_NEST) {
             // TODO
         }
 
@@ -926,11 +951,11 @@ impl TryFrom<&JsonValue> for ListObject {
             _ => return Err(Error::ExpectedObject),
         }
         .clone();
-        let list = match object.remove("@list") {
+        let list = match object.remove(AT_LIST) {
             Some(value) => value,
             None => return Err(Error::ExpectedList),
         };
-        let index = object.remove("@index");
+        let index = object.remove(AT_INDEX);
         for (key, _) in object.iter() {
             if is_keyword(key) {
                 return Err(Error::UnexpectedKeyword);
@@ -965,9 +990,9 @@ impl TryFrom<&JsonValue> for ListObject {
 impl TryFrom<&JsonValue> for ItemObject {
     type Error = Error;
     fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
-        Ok(if value.has_key("@list") {
+        Ok(if value.has_key(AT_LIST) {
             Self::List(ListObject::try_from(value)?)
-        } else if value.has_key("@value") {
+        } else if value.has_key(AT_VALUE) {
             Self::Value(ValueObject::try_from(value)?)
         } else {
             Self::Node(NodeObject::try_from(value)?)
@@ -1020,7 +1045,7 @@ pub fn object_to_rdf(
             None => return Ok(None),
         };
         // TODO: use IRI here rather than IRIRef
-        if datatype != "@json" && !IRIRef::try_from(datatype.to_string()).is_ok() {
+        if datatype != AT_JSON && !IRIRef::try_from(datatype.to_string()).is_ok() {
             return Ok(None);
         }
         Some(datatype)
@@ -1036,7 +1061,7 @@ pub fn object_to_rdf(
         }
     }
     // 8
-    if datatype == Some("@json") {
+    if datatype == Some(AT_JSON) {
         value = JsonValue::String(canonicalize_json(&value));
         datatype = Some("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON");
     }
@@ -1390,7 +1415,7 @@ where
             _ => return Err(Error::ExpectedObject),
         };
         let mut contexts_merged = Vec::new();
-        if let Some(doc_contexts) = doc_object.remove("@context") {
+        if let Some(doc_contexts) = doc_object.remove(AT_CONTEXT) {
             for item in JsonValuesIter::from(&doc_contexts) {
                 contexts_merged.push(item.clone());
             }
@@ -1398,7 +1423,7 @@ where
         for item in JsonValuesIter::from(&more_contexts) {
             contexts_merged.push(item.clone());
         }
-        doc_object.insert("@context", JsonValue::Array(contexts_merged));
+        doc_object.insert(AT_CONTEXT, JsonValue::Array(contexts_merged));
     }
     let mut expansion_options = json_ld::expansion::Options::from(options);
     expansion_options.strict = !lax;
@@ -1406,7 +1431,7 @@ where
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = task::block_on(expanding)?;
     let mut node_map = Map::new();
-    node_map.insert("@default".to_string(), Map::new());
+    node_map.insert(AT_DEFAULT.to_string(), Map::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();
     for object in expanded_doc {
         let mut object_json = object.as_json();
@@ -1520,7 +1545,7 @@ mod tests {
                 JsonValue::Object(obj) => obj,
                 _ => panic!("expected object"),
             };
-            let id = obj.get("@id").unwrap().as_str().unwrap();
+            let id = obj.get(AT_ID).unwrap().as_str().unwrap();
             if let Some(ref case) = case {
                 if case != id {
                     continue;
