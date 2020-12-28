@@ -299,7 +299,7 @@ impl BlankNodeIdentifierGenerator {
 
 /// https://w3c.github.io/json-ld-api/#node-map-generation
 pub fn generate_node_map(
-    element: &mut JsonValue,
+    element: JsonValue,
     node_map: &mut NodeMap,
     active_graph: Option<&str>,
     active_subject: Option<&JsonValue>,
@@ -309,13 +309,13 @@ pub fn generate_node_map(
 ) -> Result<(), Error> {
     let mut null: JsonValue = JsonValue::Null;
     let list = list.unwrap_or(&mut null);
-    let element_obj = match element {
+    let mut element_obj = match element {
         JsonValue::Array(array) => {
             // 1
-            for mut item in array {
+            for item in array.into_iter() {
                 // 1.1
                 generate_node_map(
-                    &mut item,
+                    item,
                     node_map,
                     active_graph,
                     active_subject,
@@ -372,6 +372,8 @@ pub fn generate_node_map(
     }
     // 4
     if element_obj.get(AT_VALUE).is_some() {
+        // Reconstruct element since it was partially moved.
+        let element = JsonValue::Object(element_obj);
         if let Some(ref mut list) = match list {
             JsonValue::Object(list) => Some(list),
             JsonValue::Null => None,
@@ -382,7 +384,7 @@ pub fn generate_node_map(
                 Some(JsonValue::Array(vec)) => vec,
                 _ => return Err(Error::ExpectedArrayList),
             };
-            array.push(element.clone());
+            array.push(element);
         } else {
             // 4.1
             let subject_node = match subject_node {
@@ -399,18 +401,17 @@ pub fn generate_node_map(
                     JsonValue::Array(array) => array,
                     _ => return Err(Error::ExpectedArray),
                 };
-                if !array.contains(element) {
-                    // TODO: is it okay to use clone here?
-                    array.push(element.clone());
+                if !array.contains(&element) {
+                    array.push(element);
                 }
             } else {
                 // 4.1.1
-                let entry = array![element.clone()];
+                let entry = array![element];
                 subject_node.insert(active_property, entry);
             }
         }
     // 5
-    } else if let Some(element_list) = element_obj.get_mut(AT_LIST) {
+    } else if let Some(element_list) = element_obj.remove(AT_LIST) {
         // 5.1
         let mut result: JsonValue = JsonValue::new_object();
         result.insert(AT_LIST, JsonValue::new_array())?;
@@ -582,7 +583,7 @@ pub fn generate_node_map(
                 };
                 for type_ in element_type_array.into_iter() {
                     if !node_type_array.contains(&type_) {
-                        node_type_array.push(type_.clone());
+                        node_type_array.push(type_);
                     }
                 }
             } else {
@@ -606,24 +607,26 @@ pub fn generate_node_map(
             object.insert(AT_ID, id.clone());
             let referenced_node = JsonValue::Object(object);
             // 6.9.3
-            let mut reverse_map_object = match reverse_map {
+            let reverse_map_object = match reverse_map {
                 JsonValue::Object(object) => object,
                 _ => return Err(Error::ExpectedObject),
             };
-            for (property, value) in reverse_map_object.iter_mut() {
-                let mut values = match value {
-                    JsonValue::Array(array) => array.iter_mut().collect(),
-                    value => vec![value],
+            // Clone since Object does not have a consuming iterator.
+            // https://github.com/maciejhirsz/json-rust/pull/190
+            for (property, value) in reverse_map_object.iter() {
+                let values = match value {
+                    JsonValue::Array(array) => array.to_vec(),
+                    value => vec![value.clone()],
                 };
                 // 6.9.3.1
-                for mut value in values.iter_mut() {
+                for value in values.into_iter() {
                     // 6.9.3.1.1
                     generate_node_map(
-                        &mut value,
+                        value,
                         node_map,
                         Some(active_graph),
                         Some(&referenced_node),
-                        Some(property),
+                        Some(&property),
                         None,
                         blank_node_id_generator,
                     )?;
@@ -631,13 +634,13 @@ pub fn generate_node_map(
             }
         }
         // 6.10
-        if let Some(mut graph) = element_obj.remove(AT_GRAPH) {
+        if let Some(graph) = element_obj.remove(AT_GRAPH) {
             let id_string = match id.as_str() {
                 Some(id) => id,
                 None => return Err(Error::ExpectedString),
             };
             generate_node_map(
-                &mut graph,
+                graph,
                 node_map,
                 Some(id_string),
                 None,
@@ -647,9 +650,9 @@ pub fn generate_node_map(
             )?;
         }
         // 6.11
-        if let Some(mut included) = element_obj.remove(AT_INCLUDED) {
+        if let Some(included) = element_obj.remove(AT_INCLUDED) {
             generate_node_map(
-                &mut included,
+                included,
                 node_map,
                 Some(active_graph),
                 None,
@@ -659,10 +662,12 @@ pub fn generate_node_map(
             )?;
         }
         // 6.12
-        let mut element_property_values: Vec<(&str, &mut JsonValue)> =
-            element_obj.iter_mut().collect();
+        let mut element_property_values: Vec<(String, JsonValue)> = element_obj
+            .iter()
+            .map(|(prop, value)| (prop.to_owned(), value.to_owned()))
+            .collect();
         element_property_values.sort_by(|(property1, _), (property2, _)| property1.cmp(property2));
-        for (property_str, mut value) in element_property_values {
+        for (property_str, value) in element_property_values {
             // 6.12.1
             let mut property = JsonValue::String(property_str.to_string());
             if is_blank_node_identifier(&property) {
@@ -687,7 +692,7 @@ pub fn generate_node_map(
             }
             // 6.12.3
             generate_node_map(
-                &mut value,
+                value,
                 node_map,
                 Some(active_graph),
                 Some(&id),
@@ -1467,9 +1472,9 @@ where
     node_map.insert(AT_DEFAULT.to_string(), Map::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();
     for object in expanded_doc {
-        let mut object_json = object.as_json();
+        let object_json = object.as_json();
         generate_node_map(
-            &mut object_json,
+            object_json,
             &mut node_map,
             None,
             None,
