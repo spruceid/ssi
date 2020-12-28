@@ -21,6 +21,7 @@ pub enum RdfDirection {
 }
 
 /// https://w3c.github.io/json-ld-api/#the-jsonldoptions-type
+// Options implemented as needed
 #[derive(Debug, Clone)]
 pub struct JsonLdOptions {
     /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-base
