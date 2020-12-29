@@ -339,6 +339,7 @@ pub fn generate_node_map(
             Some(subject) => graph.get_mut(subject),
             // On reverse, active subject is a map.
             None => None,
+            // https://github.com/w3c/json-ld-api/issues/519
             // None => return Err(Error::ExpectedString),
         },
         None => None,
