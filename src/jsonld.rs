@@ -1282,7 +1282,7 @@ pub fn canonicalize_json(value: &JsonValue) -> String {
         }
         JsonValue::Object(object) => {
             let mut entries = object.iter().collect::<Vec<(&str, &JsonValue)>>();
-            entries.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+            entries.sort_by_cached_key(|(key, _)| key.encode_utf16().collect::<Vec<u16>>());
             let mut string = "{".to_string();
             let mut first = true;
             for (key, value) in entries {
