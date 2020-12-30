@@ -9,6 +9,7 @@ use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 
+use async_trait::async_trait;
 use chrono::prelude::*;
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
@@ -629,7 +630,7 @@ impl Credential {
             .collect()
     }
 
-    pub fn verify(&self, options: Option<LinkedDataProofOptions>) -> VerificationResult {
+    pub async fn verify(&self, options: Option<LinkedDataProofOptions>) -> VerificationResult {
         let proofs = self.filter_proofs(options);
         if proofs.is_empty() {
             return VerificationResult::error("No applicable proof");
@@ -638,7 +639,7 @@ impl Credential {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self);
+            let mut result = proof.verify(self).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -651,12 +652,12 @@ impl Credential {
     // https://w3c-ccg.github.io/ld-proofs/
     // https://w3c-ccg.github.io/lds-rsa2018/
     // https://w3c-ccg.github.io/vc-http-api/#/Issuer/issueCredential
-    pub fn generate_proof(
+    pub async fn generate_proof(
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk)
+        LinkedDataProofs::sign(self, options, jwk).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -673,14 +674,15 @@ impl Credential {
     }
 }
 
+#[async_trait]
 impl LinkedDataDocument for Credential {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
-    fn to_dataset_for_signing(
+    async fn to_dataset_for_signing(
         &self,
-        parent: Option<&dyn LinkedDataDocument>,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
@@ -690,7 +692,7 @@ impl LinkedDataDocument for Credential {
             None => None,
         };
         let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader)
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
 }
 
@@ -750,12 +752,12 @@ impl Presentation {
         Ok(())
     }
 
-    pub fn generate_proof(
+    pub async fn generate_proof(
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk)
+        LinkedDataProofs::sign(self, options, jwk).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -786,7 +788,7 @@ impl Presentation {
             .collect()
     }
 
-    pub fn verify(&self, options: Option<LinkedDataProofOptions>) -> VerificationResult {
+    pub async fn verify(&self, options: Option<LinkedDataProofOptions>) -> VerificationResult {
         let proofs = self.filter_proofs(options);
         if proofs.is_empty() {
             return VerificationResult::error("No applicable proof");
@@ -795,7 +797,7 @@ impl Presentation {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self);
+            let mut result = proof.verify(self).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -813,14 +815,15 @@ fn did_to_verification_method(did: &str) -> Option<String> {
     Some(did.to_string() + "#" + &did[8..])
 }
 
+#[async_trait]
 impl LinkedDataDocument for Presentation {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
-    fn to_dataset_for_signing(
+    async fn to_dataset_for_signing(
         &self,
-        parent: Option<&dyn LinkedDataDocument>,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
@@ -830,7 +833,7 @@ impl LinkedDataDocument for Presentation {
             None => None,
         };
         let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader)
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
 }
 
@@ -864,19 +867,20 @@ impl Proof {
         true
     }
 
-    pub fn verify(&self, document: &dyn LinkedDataDocument) -> VerificationResult {
-        LinkedDataProofs::verify(self, document).into()
+    pub async fn verify(&self, document: &(dyn LinkedDataDocument + Sync)) -> VerificationResult {
+        LinkedDataProofs::verify(self, document).await.into()
     }
 }
 
+#[async_trait]
 impl LinkedDataDocument for Proof {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(None)
     }
 
-    fn to_dataset_for_signing(
+    async fn to_dataset_for_signing(
         &self,
-        parent: Option<&dyn LinkedDataDocument>,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.jws = None;
@@ -886,7 +890,7 @@ impl LinkedDataDocument for Proof {
             None => None,
         };
         let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader)
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
 }
 
@@ -1081,8 +1085,8 @@ mod tests {
         assert_eq!(vc.id, vc1.id);
     }
 
-    #[test]
-    fn credential_prove_verify() {
+    #[async_std::test]
+    async fn credential_prove_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
@@ -1101,11 +1105,11 @@ mod tests {
         let issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
         vc.issuer = Some(Issuer::URI(URI::String(issuer_key.clone())));
         issue_options.verification_method = Some(issuer_key);
-        let proof = vc.generate_proof(&key, &issue_options).unwrap();
+        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None);
+        let verification_result = vc.verify(None).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
@@ -1121,13 +1125,13 @@ mod tests {
             },
         }
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
-        let verification_result = vc.verify(None);
+        let verification_result = vc.verify(None).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() >= 1);
     }
 
-    #[test]
-    fn credential_prove_verify_did_key() {
+    #[async_std::test]
+    async fn credential_prove_verify_did_key() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
@@ -1147,21 +1151,21 @@ mod tests {
         let mut issue_options = LinkedDataProofOptions::default();
         vc.issuer = Some(Issuer::URI(URI::String(did.clone())));
         issue_options.verification_method = Some(verification_method);
-        let proof = vc.generate_proof(&key, &issue_options).unwrap();
+        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None);
+        let verification_result = vc.verify(None).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None).errors.len() > 0);
+        assert!(vc.verify(None).await.errors.len() > 0);
     }
 
-    #[test]
-    fn proof_json_to_urdna2015() {
+    #[async_std::test]
+    async fn proof_json_to_urdna2015() {
         use serde_json::json;
         let proof_str = r###"{
             "type": "RsaSignature2018",
@@ -1176,20 +1180,21 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 "###;
         let proof: Proof = serde_json::from_str(proof_str).unwrap();
         struct ProofContexts(Value);
+        #[async_trait]
         impl LinkedDataDocument for ProofContexts {
             fn get_contexts(&self) -> Result<Option<String>, Error> {
                 Ok(Some(serde_json::to_string(&self.0)?))
             }
 
-            fn to_dataset_for_signing(
+            async fn to_dataset_for_signing(
                 &self,
-                _parent: Option<&dyn LinkedDataDocument>,
+                _parent: Option<&(dyn LinkedDataDocument + Sync)>,
             ) -> Result<DataSet, Error> {
                 Err(Error::NotImplemented)
             }
         };
         let parent = ProofContexts(json!(["https://w3id.org/security/v1", DEFAULT_CONTEXT]));
-        let proof_dataset = proof.to_dataset_for_signing(Some(&parent)).unwrap();
+        let proof_dataset = proof.to_dataset_for_signing(Some(&parent)).await.unwrap();
         let proof_dataset_normalized = urdna2015::normalize(&proof_dataset).unwrap();
         let proof_urdna2015 = proof_dataset_normalized.to_nquads().unwrap();
         eprintln!("proof:\n{}", proof_urdna2015);
@@ -1197,8 +1202,8 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert_eq!(proof_urdna2015, urdna2015_expected);
     }
 
-    #[test]
-    fn credential_json_to_urdna2015() {
+    #[async_std::test]
+    async fn credential_json_to_urdna2015() {
         let credential_str = r#"{
             "@context": [
                 "https://www.w3.org/2018/credentials/v1",
@@ -1220,7 +1225,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
 "#;
         let vc: Credential = serde_json::from_str(credential_str).unwrap();
-        let credential_dataset = vc.to_dataset_for_signing(None).unwrap();
+        let credential_dataset = vc.to_dataset_for_signing(None).await.unwrap();
         let credential_dataset_normalized = urdna2015::normalize(&credential_dataset).unwrap();
         let credential_urdna2015 = credential_dataset_normalized.to_nquads().unwrap();
         eprintln!("credential:\n{}", credential_urdna2015);
@@ -1228,43 +1233,43 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert_eq!(credential_urdna2015, urdna2015_expected);
     }
 
-    #[test]
-    fn credential_verify() {
+    #[async_std::test]
+    async fn credential_verify() {
         let vc_str = include_str!("../examples/vc.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();
-        let result = vc.verify(None);
+        let result = vc.verify(None).await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
     }
 
-    #[test]
-    fn cannot_add_properties_after_signing() {
+    #[async_std::test]
+    async fn cannot_add_properties_after_signing() {
         use serde_json::json;
         let vc_str = include_str!("../examples/vc.jsonld");
         let mut vc: Value = serde_json::from_str(vc_str).unwrap();
         vc["newProp"] = json!("foo");
         let vc: Credential = serde_json::from_value(vc).unwrap();
-        let result = vc.verify(None);
+        let result = vc.verify(None).await;
         println!("{:#?}", result);
         assert!(!result.errors.is_empty());
         assert!(result.warnings.is_empty());
     }
 
-    #[test]
-    fn presentation_verify() {
+    #[async_std::test]
+    async fn presentation_verify() {
         let vp_str = include_str!("../examples/vp.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
         let mut verify_options = LinkedDataProofOptions::default();
         verify_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let result = vp.verify(Some(verify_options));
+        let result = vp.verify(Some(verify_options)).await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
     }
 
-    #[test]
-    fn presentation_from_credential_issue_verify() {
+    #[async_std::test]
+    async fn presentation_from_credential_issue_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
@@ -1282,11 +1287,11 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let vc_issuer_key = "did:example:jwk:".to_string() + JWK_JSON;
         vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
         vc_issue_options.verification_method = Some(vc_issuer_key);
-        let vc_proof = vc.generate_proof(&key, &vc_issue_options).unwrap();
+        let vc_proof = vc.generate_proof(&key, &vc_issue_options).await.unwrap();
         vc.add_proof(vc_proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         vc.validate().unwrap();
-        let vc_verification_result = vc.verify(None);
+        let vc_verification_result = vc.verify(None).await;
         println!("{:#?}", vc_verification_result);
         assert!(vc_verification_result.errors.is_empty());
 
@@ -1307,11 +1312,11 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         vp.holder = Some(URI::String(vp_issuer_key.to_string()));
         vp_issue_options.verification_method = Some(vp_issuer_key);
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).unwrap();
+        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()));
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone())).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -1326,13 +1331,13 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options));
+        let vp_verification_result = vp1.verify(Some(vp_issue_options)).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None).errors.len() > 0);
+        assert!(vp2.verify(None).await.errors.len() > 0);
     }
 }

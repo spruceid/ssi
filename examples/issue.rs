@@ -1,7 +1,8 @@
 // To generate text fixture:
 // cargo run --example issue > examples/vc.jsonld
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let vc = serde_json::json!({
@@ -17,9 +18,9 @@ fn main() {
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = key.to_verification_method().unwrap();
     proof_options.verification_method = Some(verification_method);
-    let proof = vc.generate_proof(&key, &proof_options).unwrap();
+    let proof = vc.generate_proof(&key, &proof_options).await.unwrap();
     vc.add_proof(proof);
-    let result = vc.verify(None);
+    let result = vc.verify(None).await;
     if result.errors.len() > 0 {
         panic!("verify failed: {:#?}", result);
     }

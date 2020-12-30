@@ -8,7 +8,6 @@ use crate::rdf::{
     Object, Predicate, StringLiteral, Subject, Triple, LANG_STRING_IRI_STR,
 };
 
-use async_std::task;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
@@ -1413,7 +1412,7 @@ pub fn list_to_rdf(
 }
 
 /// https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf
-pub fn json_to_dataset<T>(
+pub async fn json_to_dataset<T>(
     json: &str,
     more_contexts_json: Option<&String>,
     lax: bool,
@@ -1433,14 +1432,16 @@ where
         use json_ld::context::Loader;
         use json_ld::context::Local;
         let iri = IriBuf::new(url).unwrap();
-        let local_context = task::block_on(loader.load_context(iri.as_iri()))?.into_context();
-        context = task::block_on(local_context.process_with(
-            &context,
-            json_ld::context::ProcessingStack::new(),
-            loader,
-            base,
-            options.into(),
-        ))?;
+        let local_context = loader.load_context(iri.as_iri()).await?.into_context();
+        context = local_context
+            .process_with(
+                &context,
+                json_ld::context::ProcessingStack::new(),
+                loader,
+                base,
+                options.into(),
+            )
+            .await?;
     }
     let mut doc = json::parse(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
@@ -1468,7 +1469,7 @@ where
     expansion_options.strict = !lax;
     expansion_options.ordered = false;
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
-    let expanded_doc = task::block_on(expanding)?;
+    let expanded_doc = expanding.await?;
     let mut node_map = Map::new();
     node_map.insert(AT_DEFAULT.to_string(), Map::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();
@@ -1499,7 +1500,7 @@ mod tests {
     use super::*;
     use json_ld::FsLoader;
 
-    fn test_to_rdf(obj: &json::object::Object) -> Result<(), Error> {
+    async fn test_to_rdf(obj: &json::object::Object) -> Result<(), Error> {
         use crate::urdna2015;
         use std::fs;
         use std::path::PathBuf;
@@ -1542,6 +1543,7 @@ mod tests {
         ld_options.base = Some(base_iri);
         // Normalize input and input for comparison
         let result = json_to_dataset(&in_str, None, true, Some(&ld_options), &mut loader)
+            .await
             .and_then(|dataset| urdna2015::normalize(&dataset))
             .and_then(|dataset| dataset.to_nquads());
         if let Some(output) = obj.get("expect") {
@@ -1565,9 +1567,9 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    #[async_std::test]
     /// https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html
-    fn to_rdf_test_suite() {
+    async fn to_rdf_test_suite() {
         let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
         let manifest = json::parse(manifest_str).unwrap();
         let manifest_obj = match manifest {
@@ -1645,7 +1647,7 @@ mod tests {
                 }
             }
             total += 1;
-            if let Err(err) = test_to_rdf(&obj) {
+            if let Err(err) = test_to_rdf(&obj).await {
                 if let Error::ExpectedOutput(expected, found) = err {
                     let changes = difference::Changeset::new(&found, &expected, "\n");
                     eprintln!("test {}: failed. diff:\n{}", id, changes);

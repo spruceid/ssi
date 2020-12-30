@@ -1,7 +1,8 @@
 // To generate text fixture:
 // cargo run --example present < examples/vc.jsonld > examples/vp.jsonld
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let reader = std::io::BufReader::new(std::io::stdin());
@@ -18,9 +19,9 @@ fn main() {
     proof_options.verification_method = Some(verification_method);
     proof_options.proof_purpose = Some(ssi::vc::ProofPurpose::Authentication);
     proof_options.challenge = Some("example".to_string());
-    let proof = vp.generate_proof(&key, &proof_options).unwrap();
+    let proof = vp.generate_proof(&key, &proof_options).await.unwrap();
     vp.add_proof(proof);
-    let result = vp.verify(Some(proof_options));
+    let result = vp.verify(Some(proof_options)).await;
     if result.errors.len() > 0 {
         panic!("verify failed: {:#?}", result);
     }
