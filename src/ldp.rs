@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use async_trait::async_trait;
 use chrono::prelude::*;
 use jsonwebtoken::{decode_header, Algorithm, DecodingKey, EncodingKey, Header};
 use ring::digest;
@@ -18,24 +19,27 @@ pub fn now_ms() -> DateTime<Utc> {
     datetime.with_nanosecond(ns).unwrap_or(datetime)
 }
 
+#[async_trait]
 pub trait LinkedDataDocument {
-    fn to_dataset_for_signing(&self) -> Result<DataSet, Error>;
+    async fn to_dataset_for_signing(&self) -> Result<DataSet, Error>;
 }
 
+#[async_trait]
 pub trait ProofSuite {
-    fn sign(
-        document: &dyn LinkedDataDocument,
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &EncodingKey,
     ) -> Result<Proof, Error>;
-    fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error>;
+    async fn verify(proof: &Proof, document: &(dyn LinkedDataDocument + Sync))
+        -> Result<(), Error>;
 }
 
-pub struct LinkedDataProofs {}
+pub struct LinkedDataProofs;
 impl LinkedDataProofs {
     // https://w3c-ccg.github.io/ld-proofs/#proof-algorithm
-    pub fn sign(
-        document: &dyn LinkedDataDocument,
+    pub async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         jwk: &JWK,
     ) -> Result<Proof, Error> {
@@ -51,7 +55,7 @@ impl LinkedDataProofs {
                 x509_certificate_chain: _,
                 x509_thumbprint_sha1: _,
                 x509_thumbprint_sha256: _,
-            } => return RsaSignature2018::sign(document, options, &key),
+            } => return RsaSignature2018::sign(document, options, &key).await,
             JWK {
                 params:
                     JWKParams::OKP(JWKOctetParams {
@@ -69,7 +73,7 @@ impl LinkedDataProofs {
                 x509_thumbprint_sha256: _,
             } => match &curve[..] {
                 "Ed25519" => {
-                    return Ed25519Signature2018::sign(document, options, &key);
+                    return Ed25519Signature2018::sign(document, options, &key).await;
                 }
                 _ => {}
             },
@@ -79,11 +83,14 @@ impl LinkedDataProofs {
     }
 
     // https://w3c-ccg.github.io/ld-proofs/#proof-verification-algorithm
-    pub fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error> {
+    pub async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+    ) -> Result<(), Error> {
         match proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018::verify(proof, document),
-            "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document),
-            "Ed25519VerificationKey2018" => Ed25519Signature2018::verify(proof, document), // invalid/deprecated
+            "RsaSignature2018" => RsaSignature2018::verify(proof, document).await,
+            "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document).await,
+            "Ed25519VerificationKey2018" => Ed25519Signature2018::verify(proof, document).await, // invalid/deprecated
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -102,13 +109,13 @@ fn resolve_key(verification_method: &str) -> Result<JWK, Error> {
     Err(Error::ResourceNotFound)
 }
 
-fn to_signing_input(
-    document: &dyn LinkedDataDocument,
+async fn to_signing_input(
+    document: &(dyn LinkedDataDocument + Sync),
     header_b64: &str,
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
-    let doc_normalized = document.to_dataset_for_signing()?.to_nquads()?;
-    let sigopts_normalized = proof.to_dataset_for_signing()?.to_nquads()?;
+    let doc_normalized = document.to_dataset_for_signing().await?.to_nquads()?;
+    let sigopts_normalized = proof.to_dataset_for_signing().await?.to_nquads()?;
     let sigopts_digest = digest::digest(&digest::SHA256, sigopts_normalized.as_bytes());
     let doc_digest = digest::digest(&digest::SHA256, doc_normalized.as_bytes());
     let data = [
@@ -120,8 +127,8 @@ fn to_signing_input(
     Ok(message)
 }
 
-fn sign(
-    document: &dyn LinkedDataDocument,
+async fn sign(
+    document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
     key: &EncodingKey,
     type_: &str,
@@ -148,13 +155,13 @@ fn sign(
         jws: None,
     };
     let header_b64 = base64_encode_json(&header)?;
-    let message = to_signing_input(document, &header_b64, &proof)?;
+    let message = to_signing_input(document, &header_b64, &proof).await?;
     let sig = jsonwebtoken::crypto::sign_bytes(&message, &key, header.alg)?;
     proof.jws = Some([&header_b64, "", &sig].join("."));
     Ok(proof)
 }
 
-fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error> {
+async fn verify(proof: &Proof, document: &(dyn LinkedDataDocument + Sync)) -> Result<(), Error> {
     let jws = match &proof.jws {
         None => return Err(Error::MissingProofSignature),
         Some(jws) => jws,
@@ -193,7 +200,7 @@ fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error>
         }
     }
 
-    let message = to_signing_input(document, &header_b64, proof)?;
+    let message = to_signing_input(document, &header_b64, proof).await?;
     let verified = jsonwebtoken::crypto::verify_bytes(signature_b64, &message, &key, header.alg)?;
     if !verified {
         return Err(Error::InvalidSignature);
@@ -201,25 +208,30 @@ fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error>
     Ok(())
 }
 
-pub struct RsaSignature2018 {}
+pub struct RsaSignature2018;
+#[async_trait]
 impl ProofSuite for RsaSignature2018 {
-    fn sign(
-        document: &dyn LinkedDataDocument,
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &EncodingKey,
     ) -> Result<Proof, Error> {
-        sign(document, options, key, "RsaSignature2018", Algorithm::RS256)
+        sign(document, options, key, "RsaSignature2018", Algorithm::RS256).await
     }
 
-    fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error> {
-        verify(proof, document)
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+    ) -> Result<(), Error> {
+        verify(proof, document).await
     }
 }
 
-pub struct Ed25519Signature2018 {}
+pub struct Ed25519Signature2018;
+#[async_trait]
 impl ProofSuite for Ed25519Signature2018 {
-    fn sign(
-        document: &dyn LinkedDataDocument,
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &EncodingKey,
     ) -> Result<Proof, Error> {
@@ -230,9 +242,13 @@ impl ProofSuite for Ed25519Signature2018 {
             "Ed25519Signature2018",
             Algorithm::EdDSA,
         )
+        .await
     }
 
-    fn verify(proof: &Proof, document: &dyn LinkedDataDocument) -> Result<(), Error> {
-        verify(proof, document)
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+    ) -> Result<(), Error> {
+        verify(proof, document).await
     }
 }

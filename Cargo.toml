@@ -19,6 +19,8 @@ ring = "0.16"
 multibase = "0.8"
 simple_asn1 = "0.5"
 num-bigint = "0.3"
+async-std = { version = "1.5", features = ["attributes"] }
+async-trait = "0.1"
 
 [workspace]
 members = [
