@@ -224,6 +224,13 @@ impl JWK {
         Ok(did.clone() + "#" + &did[8..])
     }
 
+    pub fn to_did_tezos(&self) -> Result<String, Error> {
+        match self.params.get_tezos_address() {
+            Ok(address) => Ok(format!("did:tz:{}", address)),
+            Err(err) => Err(err),
+        }
+    }
+
     pub fn generate_ed25519() -> Result<JWK, Error> {
         use ring::signature::KeyPair;
         let rng = ring::rand::SystemRandom::new();
@@ -264,11 +271,26 @@ impl JWK {
     }
 }
 
+const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
+const TZ2_HASH: [u8; 3] = [0x06, 0xa1, 0xa1];
+const TZ3_HASH: [u8; 3] = [0x06, 0xa1, 0xa4];
+
+const TZ1_EDPK: [u8; 4] = [0x65, 0x64, 0x70, 0x6b];
+const TZ2_SPPK: [u8; 4] = [0x73, 0x70, 0x70, 0x6b];
+const TZ3_P2PK: [u8; 4] = [0x70, 0x32, 0x70, 0x6b];
+
 impl Params {
     pub fn to_did(&self) -> Result<String, Error> {
         match self {
             Self::OKP(okp) => okp.to_did(),
             _ => Err(Error::UnsupportedKeyType),
+        }
+    }
+
+    pub fn get_tezos_address(&self) -> Result<String, Error> {
+        match self {
+            Self::OKP(okp) => okp.get_tezos_address(),
+            _ => return Err(Error::UnsupportedKeyType),
         }
     }
 }
@@ -282,6 +304,62 @@ impl OctetParams {
                     [DID_KEY_ED25519_PREFIX.to_vec(), self.public_key.0.clone()].concat(),
                 )),
             _ => Err(Error::UnsupportedKeyType),
+        }
+    }
+
+    fn get_b58_public_key(&self) -> Result<Vec<u8>, Error> {
+        let encoded = bs58::encode(&self.public_key.0).into_vec();
+        let mut data = Vec::with_capacity(4 + encoded.len());
+
+        match &self.curve[..] {
+            "Ed25519" => {
+                data.extend_from_slice(&TZ1_EDPK);
+            }
+            "secp256k1" => {
+                data.extend_from_slice(&TZ2_SPPK);
+            }
+            "P-256" => {
+                data.extend_from_slice(&TZ3_P2PK);
+            }
+            _ => {
+                return Err(Error::UnsupportedKeyType);
+            }
+        };
+
+        data.extend(encoded);
+        Ok(data)
+    }
+
+    fn get_encoding_bytes(&self) -> Result<&[u8], Error> {
+        match &self.curve[..] {
+            "Ed25519" => Ok(&TZ1_HASH),
+            "secp256k1" => Ok(&TZ2_HASH),
+            "P-256" => Ok(&TZ3_HASH),
+            _ => Err(Error::UnsupportedKeyType),
+        }
+    }
+
+    pub fn get_tezos_address(&self) -> Result<String, Error> {
+        match &self.curve[..] {
+            "Ed25519" | "secp256k1" | "P-256" => {
+                let pk = self.get_b58_public_key().unwrap();
+
+                let mut hasher = blake2b_simd::Params::new();
+                hasher.hash_length(20);
+
+                let blake2b = hasher.hash(&pk[..]);
+                let blake2b = blake2b.as_bytes();
+
+                let encoding = self.get_encoding_bytes().unwrap();
+                let mut to_encode = Vec::with_capacity(23);
+                to_encode.extend_from_slice(encoding);
+                to_encode.extend_from_slice(&blake2b[..]);
+
+                let address = bs58::encode(&to_encode).with_check().into_string();
+
+                Ok(address)
+            }
+            _ => return Err(Error::UnsupportedKeyType),
         }
     }
 }
@@ -493,6 +571,17 @@ mod tests {
     #[test]
     fn ed25519_from_str() {
         let _jwk: JWK = serde_json::from_str(ED25519_JSON).unwrap();
+    }
+
+    const TZ1: &'static str = "did:tz:tz1VFda3KmzRecjsYptDq5bJh1M1NyAqgBJf";
+
+    #[test]
+    fn jwk_to_did_tezos() {
+        // TODO: add tz2 and tz3 test cases
+        let json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
+        let jwk: JWK = serde_json::from_str(&json).unwrap();
+        let tz1 = jwk.to_did_tezos().unwrap();
+        assert_eq!(tz1, TZ1);
     }
 
     #[test]

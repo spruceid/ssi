@@ -27,6 +27,11 @@ futures = "0.3"
 iref = "1.1"
 lazy_static = "1.4"
 permute = "0.1"
+blake2b_simd = "0.5"
+
+[dependencies.bs58]
+version = "0.4"
+features = ["check"]
 
 [workspace]
 members = [
