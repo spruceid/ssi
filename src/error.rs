@@ -1,13 +1,20 @@
 use base64::DecodeError as Base64Error;
+#[cfg(feature = "ed25519-compact")]
+use ed25519_compact::Error as Ed25519CompatError;
 use iref::Error as IRIError;
 use json::Error as JSONError;
 use json_ld::Error as JSONLDError;
 use json_ld::ErrorCode as JSONLDErrorCode;
 use multibase::Error as MultibaseError;
+#[cfg(feature = "ring")]
 use ring::error::KeyRejected as KeyRejectedError;
+#[cfg(feature = "ring")]
 use ring::error::Unspecified as RingUnspecified;
+#[cfg(feature = "rsa")]
+use rsa::errors::Error as RsaError;
 use serde_json::Error as SerdeJSONError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
+use std::array::TryFromSliceError;
 use std::char::CharTryFromError;
 use std::fmt;
 use std::num::ParseIntError;
@@ -105,8 +112,13 @@ pub enum Error {
     ExpectedOutput(String, String),
     UnknownProcessingMode(String),
     UnknownRdfDirection(String),
+    #[cfg(feature = "ring")]
     KeyRejected(KeyRejectedError),
     FromUtf8(FromUtf8Error),
+    #[cfg(feature = "rsa")]
+    Rsa(RsaError),
+    #[cfg(feature = "ed25519-compact")]
+    Ed25519Compat(Ed25519CompatError),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
@@ -116,6 +128,7 @@ pub enum Error {
     IRI(IRIError),
     ParseInt(ParseIntError),
     CharTryFrom(CharTryFromError),
+    TryFromSlice(TryFromSliceError),
 }
 
 impl fmt::Display for Error {
@@ -213,8 +226,14 @@ impl fmt::Display for Error {
             Error::ExpectedOutput(expected, found) => write!(f, "Expected output '{}', but found '{}'", expected, found),
             Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
-            Error::KeyRejected(e) => e.fmt(f),
             Error::FromUtf8(e) => e.fmt(f),
+            Error::TryFromSlice(e) => e.fmt(f),
+            #[cfg(feature = "ring")]
+            Error::KeyRejected(e) => e.fmt(f),
+            #[cfg(feature = "rsa")]
+            Error::Rsa(e) => e.fmt(f),
+            #[cfg(feature = "ed25519-compact")]
+            Error::Ed25519Compat(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -270,12 +289,14 @@ impl From<IRIError> for Error {
     }
 }
 
+#[cfg(feature = "ring")]
 impl From<KeyRejectedError> for Error {
     fn from(err: KeyRejectedError) -> Error {
         Error::KeyRejected(err)
     }
 }
 
+#[cfg(feature = "ring")]
 impl From<RingUnspecified> for Error {
     fn from(_: RingUnspecified) -> Error {
         Error::RingError
@@ -303,5 +324,25 @@ impl From<ParseIntError> for Error {
 impl From<CharTryFromError> for Error {
     fn from(err: CharTryFromError) -> Error {
         Error::CharTryFrom(err)
+    }
+}
+
+#[cfg(feature = "rsa")]
+impl From<RsaError> for Error {
+    fn from(err: RsaError) -> Error {
+        Error::Rsa(err)
+    }
+}
+
+#[cfg(feature = "ed25519-compact")]
+impl From<Ed25519CompatError> for Error {
+    fn from(err: Ed25519CompatError) -> Error {
+        Error::Ed25519Compat(err)
+    }
+}
+
+impl From<TryFromSliceError> for Error {
+    fn from(err: TryFromSliceError) -> Error {
+        Error::TryFromSlice(err)
     }
 }

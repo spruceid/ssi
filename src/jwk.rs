@@ -224,6 +224,7 @@ impl JWK {
         Ok(did.clone() + "#" + &did[8..])
     }
 
+    #[cfg(feature = "ring")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         use ring::signature::KeyPair;
         let rng = ring::rand::SystemRandom::new();
@@ -238,6 +239,29 @@ impl JWK {
                 curve: "Ed25519".to_string(),
                 public_key: Base64urlUInt(public_key.to_vec()),
                 private_key: Some(Base64urlUInt(private_key.to_vec())),
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        })
+    }
+
+    #[cfg(feature = "ed25519-compact")]
+    pub fn generate_ed25519() -> Result<JWK, Error> {
+        let seed = ed25519_compact::Seed::generate();
+        let keypair = ed25519_compact::KeyPair::from_seed(seed);
+        let sk_bytes = *keypair.sk;
+        let pk_bytes = *keypair.pk;
+        Ok(JWK {
+            params: Params::OKP(OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: Base64urlUInt(pk_bytes.to_vec()),
+                private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
             }),
             public_key_use: None,
             key_operations: None,
@@ -391,6 +415,51 @@ impl FromStr for Algorithm {
     }
 }
 
+#[cfg(feature = "rsa")]
+impl From<&Base64urlUInt> for rsa::BigUint {
+    fn from(uint: &Base64urlUInt) -> Self {
+        Self::from_bytes_be(&uint.0)
+    }
+}
+
+#[cfg(feature = "rsa")]
+impl TryFrom<&RSAParams> for rsa::RSAPublicKey {
+    type Error = Error;
+    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
+        let n = params.modulus.as_ref().ok_or(Error::MissingModulus)?;
+        let e = params.exponent.as_ref().ok_or(Error::MissingExponent)?;
+        Ok(Self::new(n.into(), e.into())?)
+    }
+}
+
+#[cfg(feature = "rsa")]
+impl TryFrom<&RSAParams> for rsa::RSAPrivateKey {
+    type Error = Error;
+    #[allow(clippy::many_single_char_names)]
+    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
+        let n = params.modulus.as_ref().ok_or(Error::MissingModulus)?;
+        let e = params.exponent.as_ref().ok_or(Error::MissingExponent)?;
+        let d = params
+            .private_exponent
+            .as_ref()
+            .ok_or(Error::MissingExponent)?;
+        let p = params
+            .first_prime_factor
+            .as_ref()
+            .ok_or(Error::MissingPrime)?;
+        let q = params
+            .second_prime_factor
+            .as_ref()
+            .ok_or(Error::MissingPrime)?;
+        let mut primes = vec![p.into(), q.into()];
+        for prime in params.other_primes_info.iter().flatten() {
+            primes.push((&prime.prime_factor).into());
+        }
+        Ok(Self::from_components(n.into(), e.into(), d.into(), primes))
+    }
+}
+
+#[cfg(feature = "ring")]
 impl<'a> TryFrom<&'a RSAParams> for ring::signature::RsaPublicKeyComponents<&'a [u8]> {
     type Error = Error;
     fn try_from(params: &'a RSAParams) -> Result<Self, Self::Error> {
@@ -408,6 +477,7 @@ impl<'a> TryFrom<&'a RSAParams> for ring::signature::RsaPublicKeyComponents<&'a 
     }
 }
 
+#[cfg(feature = "ring")]
 impl TryFrom<&RSAParams> for ring::signature::RsaKeyPair {
     type Error = Error;
     fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
@@ -417,6 +487,34 @@ impl TryFrom<&RSAParams> for ring::signature::RsaKeyPair {
     }
 }
 
+#[cfg(feature = "ed25519-compact")]
+impl TryFrom<&OctetParams> for ed25519_compact::PublicKey {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        Ok(Self::from_slice(&params.public_key.0)?)
+    }
+}
+
+#[cfg(feature = "ed25519-compact")]
+impl TryFrom<&OctetParams> for ed25519_compact::SecretKey {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        let private_key = params
+            .private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let bytes = [private_key.0.clone(), params.public_key.0.clone()].concat();
+        Ok(Self::from_slice(&bytes)?)
+    }
+}
+
+#[cfg(feature = "ring")]
 impl TryFrom<&OctetParams> for &ring::signature::EdDSAParameters {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
@@ -427,6 +525,7 @@ impl TryFrom<&OctetParams> for &ring::signature::EdDSAParameters {
     }
 }
 
+#[cfg(feature = "ring")]
 impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {

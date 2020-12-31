@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["wyc <wyc@fastmail.fm>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["ring"]
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -15,7 +16,9 @@ pest = "2.1"
 pest_derive = "2.1"
 derive_builder = "0.9"
 base64 = "0.12"
-ring = "0.16"
+ring = { version = "0.16", optional = true }
+rsa = { version = "0.3", optional = true }
+ed25519-compact = { version = "0.1", optional = true }
 multibase = "0.8"
 simple_asn1 = "0.5"
 num-bigint = "0.3"
@@ -27,6 +30,7 @@ futures = "0.3"
 iref = "1.1"
 lazy_static = "1.4"
 permute = "0.1"
+sha2 = { version = "0.9", optional = true }
 
 [workspace]
 members = [

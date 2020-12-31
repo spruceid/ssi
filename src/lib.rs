@@ -1,6 +1,7 @@
 pub mod der;
 pub mod did;
 pub mod error;
+pub mod hash;
 pub mod jsonld;
 pub mod jwk;
 pub mod jws;

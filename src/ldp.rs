@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use chrono::prelude::*;
-use ring::digest;
 
 use crate::error::Error;
+use crate::hash::sha256;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::rdf::DataSet;
 use crate::urdna2015;
@@ -121,8 +121,8 @@ async fn to_jws_payload(
     let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
-    let sigopts_digest = digest::digest(&digest::SHA256, sigopts_normalized.as_bytes());
-    let doc_digest = digest::digest(&digest::SHA256, doc_normalized.as_bytes());
+    let sigopts_digest = sha256(sigopts_normalized.as_bytes())?;
+    let doc_digest = sha256(doc_normalized.as_bytes())?;
     let data = [
         sigopts_digest.as_ref().to_vec(),
         doc_digest.as_ref().to_vec(),

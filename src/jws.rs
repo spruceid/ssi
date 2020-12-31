@@ -67,6 +67,7 @@ fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
 
 pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String, Error> {
     let signature = match &key.params {
+        #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
             let padding_alg = match algorithm {
@@ -78,6 +79,22 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
             key_pair.sign(padding_alg, &rng, data, &mut sig)?;
             sig
         }
+        #[cfg(feature = "rsa")]
+        JWKParams::RSA(rsa_params) => {
+            let private_key = rsa::RSAPrivateKey::try_from(rsa_params)?;
+            let padding;
+            let hashed;
+            match algorithm {
+                Algorithm::RS256 => {
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                _ => return Err(Error::AlgorithmNotImplemented),
+            }
+            private_key.sign(padding, &hashed)?
+        }
+        #[cfg(feature = "ring")]
         JWKParams::OKP(okp) => {
             if algorithm != Algorithm::EdDSA {
                 return Err(Error::UnsupportedAlgorithm);
@@ -89,6 +106,19 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
             key_pair.sign(data).as_ref().to_vec()
         }
         // TODO: SymmetricParams
+        #[cfg(feature = "ed25519-compact")]
+        JWKParams::OKP(okp) => {
+            if algorithm != Algorithm::EdDSA {
+                return Err(Error::UnsupportedAlgorithm);
+            }
+            if okp.curve != *"Ed25519" {
+                return Err(Error::CurveNotImplemented(okp.curve.to_string()));
+            }
+            let secret_key = ed25519_compact::SecretKey::try_from(okp)?;
+            secret_key
+                .sign(data, Some(ed25519_compact::Noise::default()))
+                .to_vec()
+        }
         _ => return Err(Error::KeyTypeNotImplemented),
     };
     let sig_b64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
@@ -107,6 +137,7 @@ pub fn verify_bytes(
         }
     }
     match &key.params {
+        #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
             use ring::signature::RsaPublicKeyComponents;
             let public_key = RsaPublicKeyComponents::try_from(rsa_params)?;
@@ -116,7 +147,24 @@ pub fn verify_bytes(
             };
             public_key.verify(parameters, data, signature)?
         }
+        #[cfg(feature = "rsa")]
+        JWKParams::RSA(rsa_params) => {
+            use rsa::PublicKey;
+            let public_key = rsa::RSAPublicKey::try_from(rsa_params)?;
+            let padding;
+            let hashed;
+            match algorithm {
+                Algorithm::RS256 => {
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                _ => return Err(Error::AlgorithmNotImplemented),
+            }
+            public_key.verify(padding, &hashed, signature)?;
+        }
         // TODO: SymmetricParams
+        #[cfg(feature = "ring")]
         JWKParams::OKP(okp) => {
             use ring::signature::UnparsedPublicKey;
             if okp.curve != *"Ed25519" {
@@ -125,6 +173,15 @@ pub fn verify_bytes(
             let verification_algorithm = &ring::signature::ED25519;
             let public_key = UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
             public_key.verify(data, signature)?;
+        }
+        #[cfg(feature = "ed25519-compact")]
+        JWKParams::OKP(okp) => {
+            if okp.curve != *"Ed25519" {
+                return Err(Error::CurveNotImplemented(okp.curve.to_string()));
+            }
+            let public_key = ed25519_compact::PublicKey::try_from(okp)?;
+            let signature = ed25519_compact::Signature::from_slice(signature)?;
+            public_key.verify(data, &signature)?;
         }
         _ => return Err(Error::KeyTypeNotImplemented),
     }
