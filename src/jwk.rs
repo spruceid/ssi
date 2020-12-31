@@ -1,10 +1,12 @@
+use num_bigint::{BigInt, Sign};
 use ring::signature::{Ed25519KeyPair, KeyPair};
+use simple_asn1::{der_encode, ASN1Block, ASN1Class, ToASN1};
 use std::convert::TryFrom;
 use std::result::Result;
 
 use crate::der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
-    RSAPublicKey, DER,
+    RSAPublicKey,
 };
 use crate::error::Error;
 
@@ -265,13 +267,13 @@ impl OctetParams {
     }
 }
 
-impl TryFrom<&JWK> for DER {
+impl ToASN1 for JWK {
     type Error = Error;
-    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
-        match &jwk.params {
-            // EC(params) => DER::try_from(params),
-            Params::RSA(params) => DER::try_from(params),
-            // Symmetric(params) => DER::try_from(params),
+    fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
+        match &self.params {
+            // EC(params) => params.to_asn1_class(class),
+            Params::RSA(params) => params.to_asn1_class(class),
+            // Symmetric(params) => params.to_asn1_class(class),
             _ => Err(Error::KeyTypeNotImplemented),
         }
     }
@@ -282,11 +284,11 @@ impl TryFrom<&JWK> for EncodingKey {
     fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
         match &jwk.params {
             Params::RSA(rsa_params) => {
-                let der = DER::try_from(rsa_params)?;
+                let der = der_encode(rsa_params)?;
                 Ok(EncodingKey::from_rsa_der(&der))
             }
             Params::OKP(okp_params) => {
-                let der = DER::try_from(okp_params)?;
+                let der = der_encode(okp_params)?;
                 Ok(EncodingKey::from_ed_der(&der))
             }
             _ => return Err(Error::KeyTypeNotImplemented),
@@ -339,63 +341,69 @@ impl TryFrom<&JWK> for Validation {
     }
 }
 
-impl TryFrom<&RSAParams> for DER {
+impl ToASN1 for RSAParams {
     type Error = Error;
-    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
-        let modulus = match &params.modulus {
-            Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
+    fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
+        let modulus = match &self.modulus {
+            Some(integer) => Integer(BigInt::from_bytes_be(
+                Sign::Plus,
+                &Base64urlUInt::try_from(integer.clone())?.0,
+            )),
             None => return Err(Error::MissingModulus),
         };
-        let public_exponent = match &params.exponent {
-            Some(integer) => Integer(Base64urlUInt::try_from(integer.clone())?.0),
+        let public_exponent = match &self.exponent {
+            Some(integer) => Integer(BigInt::from_bytes_be(
+                Sign::Plus,
+                &Base64urlUInt::try_from(integer.clone())?.0,
+            )),
             None => return Err(Error::MissingExponent),
         };
-        if let Some(ref private_exponent) = params.private_exponent {
+        if let Some(ref private_exponent) = self.private_exponent {
             let key = RSAPrivateKey {
                 modulus,
                 public_exponent,
-                private_exponent: Integer(private_exponent.0.clone()),
-                prime1: match &params.first_prime_factor {
-                    Some(integer) => Integer(integer.0.clone()),
-                    None => Integer(vec![]),
+                private_exponent: Integer(BigInt::from_bytes_be(Sign::Plus, &private_exponent.0)),
+                prime1: match &self.first_prime_factor {
+                    Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
+                    None => Integer(BigInt::new(Sign::NoSign, vec![])),
                 },
-                prime2: match &params.second_prime_factor {
-                    Some(integer) => Integer(integer.0.clone()),
-                    None => Integer(vec![]),
+                prime2: match &self.second_prime_factor {
+                    Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
+                    None => Integer(BigInt::new(Sign::NoSign, vec![])),
                 },
-                exponent1: match &params.first_prime_factor_crt_exponent {
-                    Some(integer) => Integer(integer.0.clone()),
-                    None => Integer(vec![]),
+                exponent1: match &self.first_prime_factor_crt_exponent {
+                    Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
+                    None => Integer(BigInt::new(Sign::NoSign, vec![])),
                 },
-                exponent2: match &params.second_prime_factor_crt_exponent {
-                    Some(integer) => Integer(integer.0.clone()),
-                    None => Integer(vec![]),
+                exponent2: match &self.second_prime_factor_crt_exponent {
+                    Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
+                    None => Integer(BigInt::new(Sign::NoSign, vec![])),
                 },
-                coefficient: match &params.first_crt_coefficient {
-                    Some(integer) => Integer(integer.0.clone()),
-                    None => Integer(vec![0]),
+                coefficient: match &self.first_crt_coefficient {
+                    Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
+                    None => Integer(BigInt::new(Sign::NoSign, vec![0])),
                 },
                 other_prime_infos: None,
             };
-            Ok(key.into())
+            key.to_asn1_class(class)
         } else {
             let key = RSAPublicKey {
                 modulus,
                 public_exponent,
             };
-            Ok(key.into())
+            key.to_asn1_class(class)
         }
     }
 }
 
-impl TryFrom<&OctetParams> for DER {
+impl ToASN1 for OctetParams {
     type Error = Error;
-    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
-        if params.curve != "Ed25519".to_string() {
+    fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
+        if self.curve != "Ed25519".to_string() {
             return Err(Error::KeyTypeNotImplemented);
         }
-        let public_key = BitString(params.public_key.0.clone());
-        if let Some(private_key) = match &params.private_key {
+        let public_key = BitString(self.public_key.0.clone());
+        if let Some(private_key) = match &self.private_key {
             Some(private_key) => Some(OctetString(private_key.0.clone())),
             None => None,
         } {
@@ -403,10 +411,10 @@ impl TryFrom<&OctetParams> for DER {
                 public_key,
                 private_key,
             };
-            Ok(key.into())
+            key.to_asn1_class(class)
         } else {
             let key = Ed25519PublicKey { public_key };
-            Ok(key.into())
+            key.to_asn1_class(class)
         }
     }
 }
@@ -443,7 +451,7 @@ mod tests {
     #[test]
     fn jwk_to_der_rsa() {
         let key: JWK = serde_json::from_str(RSA_JSON).unwrap();
-        let der = DER::try_from(&key).unwrap();
+        let der = der_encode(&key).unwrap();
         assert_eq!(der, RSA_DER);
     }
 

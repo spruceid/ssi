@@ -4,6 +4,7 @@ use multibase::Error as MultibaseError;
 use ring::error::KeyRejected as KeyRejectedError;
 use ring::error::Unspecified as RingUnspecified;
 use serde_json::Error as JSONError;
+use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
 use std::fmt;
 
 #[derive(Debug)]
@@ -55,6 +56,7 @@ pub enum Error {
     RingError,
     KeyRejected(KeyRejectedError),
     JWT(JWTError),
+    ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
     JSON(JSONError),
@@ -119,6 +121,7 @@ impl fmt::Display for Error {
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::JWT(e) => e.fmt(f),
+            Error::ASN1Encode(e) => e.fmt(f),
             Error::JSON(e) => e.fmt(f),
             _ => unreachable!(),
         }
@@ -140,6 +143,12 @@ impl From<Base64Error> for Error {
 impl From<MultibaseError> for Error {
     fn from(err: MultibaseError) -> Error {
         Error::Multibase(err)
+    }
+}
+
+impl From<ASN1EncodeError> for Error {
+    fn from(err: ASN1EncodeError) -> Error {
+        Error::ASN1Encode(err)
     }
 }
 

@@ -17,6 +17,8 @@ base64 = "0.12"
 jsonwebtoken = { path = "jsonwebtoken" }
 ring = "0.16"
 multibase = "0.8"
+simple_asn1 = "0.5"
+num-bigint = "0.3"
 
 [workspace]
 members = [
