@@ -14,7 +14,6 @@ pest = "2.1"
 pest_derive = "2.1"
 derive_builder = "0.9"
 base64 = "0.12"
-jsonwebtoken = { path = "jsonwebtoken" }
 ring = "0.16"
 multibase = "0.8"
 simple_asn1 = "0.5"
@@ -27,5 +26,4 @@ members = [
   "did-resolve",
   "did-tezos",
   "vc-test",
-  "jsonwebtoken",
 ]

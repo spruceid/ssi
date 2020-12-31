@@ -1,5 +1,4 @@
 use base64::DecodeError as Base64Error;
-use jsonwebtoken::errors::Error as JWTError;
 use multibase::Error as MultibaseError;
 use ring::error::KeyRejected as KeyRejectedError;
 use ring::error::Unspecified as RingUnspecified;
@@ -63,7 +62,6 @@ pub enum Error {
     RingError,
     KeyRejected(KeyRejectedError),
     FromUtf8(FromUtf8Error),
-    JWT(JWTError),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
@@ -134,17 +132,10 @@ impl fmt::Display for Error {
             Error::KeyRejected(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
-            Error::JWT(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
             Error::JSON(e) => e.fmt(f),
             _ => unreachable!(),
         }
-    }
-}
-
-impl From<JWTError> for Error {
-    fn from(err: JWTError) -> Error {
-        Error::JWT(err)
     }
 }
 
