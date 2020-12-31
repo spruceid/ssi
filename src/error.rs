@@ -6,6 +6,7 @@ use ring::error::Unspecified as RingUnspecified;
 use serde_json::Error as JSONError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
 use std::fmt;
+use std::string::FromUtf8Error;
 
 #[derive(Debug)]
 pub enum Error {
@@ -16,10 +17,15 @@ pub enum Error {
     AlgorithmNotImplemented,
     ProofTypeNotImplemented,
     MissingAlgorithm,
+    AlgorithmMismatch,
+    UnsupportedAlgorithm,
     KeyTypeNotImplemented,
+    CurveNotImplemented(String),
     MissingKey,
+    MissingPrivateKey,
     MissingModulus,
     MissingExponent,
+    MissingPrime,
     MissingCredential,
     MissingKeyParameters,
     MissingProof,
@@ -40,6 +46,7 @@ pub enum Error {
     InvalidProofPurpose,
     InvalidProofDomain,
     InvalidSignature,
+    InvalidJWS,
     MissingCredentialSchema,
     UnsupportedProperty,
     UnsupportedKeyType,
@@ -55,6 +62,7 @@ pub enum Error {
     InconsistentDIDKey,
     RingError,
     KeyRejected(KeyRejectedError),
+    FromUtf8(FromUtf8Error),
     JWT(JWTError),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
@@ -73,8 +81,10 @@ impl fmt::Display for Error {
             Error::UnknownCriticalHeader => write!(f, "Unknown critical header name in JWT header"),
             Error::InvalidIssuer => write!(f, "Invalid issuer for JWT"),
             Error::MissingKey => write!(f, "JWT key not found"),
+            Error::MissingPrivateKey => write!(f, "Missing private key parametern JWK"),
             Error::MissingModulus => write!(f, "Missing modulus in RSA key"),
             Error::MissingExponent => write!(f, "Missing modulus in RSA key"),
+            Error::MissingPrime => write!(f, "Missing prime factor in RSA key"),
             Error::MissingKeyParameters => write!(f, "JWT key parameters not found"),
             Error::MissingProof => write!(f, "Missing proof property"),
             Error::MissingIssuanceDate => write!(f, "Missing issuance date"),
@@ -91,7 +101,10 @@ impl fmt::Display for Error {
             Error::AlgorithmNotImplemented => write!(f, "JWA algorithm not implemented"),
             Error::ProofTypeNotImplemented => write!(f, "Linked Data Proof type not implemented"),
             Error::MissingAlgorithm => write!(f, "Missing algorithm in JWT"),
-            Error::KeyTypeNotImplemented => write!(f, "key type not implemented"),
+            Error::AlgorithmMismatch => write!(f, "Algorithm in JWS header does not match JWK"),
+            Error::UnsupportedAlgorithm => write!(f, "Unsupported algorithm"),
+            Error::KeyTypeNotImplemented => write!(f, "Key type not implemented"),
+            Error::CurveNotImplemented(curve) => write!(f, "Curve not implemented: '{:?}'", curve),
             Error::TimeError => write!(f, "Unable to convert date/time"),
             Error::InvalidContext => write!(f, "Invalid context"),
             Error::MissingContext => write!(f, "Missing context"),
@@ -99,7 +112,8 @@ impl fmt::Display for Error {
             Error::MissingProofSignature => write!(f, "Missing JWS in proof"),
             Error::ExpiredProof => write!(f, "Expired proof"),
             Error::FutureProof => write!(f, "Proof creation time is in the future"),
-            Error::InvalidSignature => write!(f, "Invalid JWS"),
+            Error::InvalidSignature => write!(f, "Invalid Signature"),
+            Error::InvalidJWS => write!(f, "Invalid JWS"),
             Error::InvalidProofPurpose => write!(f, "Invalid proof purpose"),
             Error::InvalidProofDomain => write!(f, "Invalid proof domain"),
             Error::MissingCredentialSchema => write!(f, "Missing credential schema for ZKP"),
@@ -173,5 +187,11 @@ impl From<RingUnspecified> for Error {
 impl From<Error> for String {
     fn from(err: Error) -> String {
         format!("{}", err)
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(err: FromUtf8Error) -> Error {
+        Error::FromUtf8(err)
     }
 }

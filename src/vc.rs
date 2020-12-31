@@ -13,7 +13,6 @@ use crate::rdf::{
 
 use async_trait::async_trait;
 use chrono::prelude::*;
-use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -460,9 +459,8 @@ fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
     } else {
         return Err(Error::MissingKey);
     };
-    let header = jwk.to_jwt_header()?;
-    let key = EncodingKey::try_from(jwk)?;
-    Ok(jsonwebtoken::encode(&header, claims, &key)?)
+    let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+    Ok(crate::jwt::encode_sign(algorithm, claims, &jwk)?)
 }
 
 impl Credential {
@@ -486,56 +484,54 @@ impl Credential {
         } else {
             return Err(Error::MissingKey);
         };
-        let key = DecodingKey::try_from(jwk)?;
-        let validation = Validation::try_from(jwk)?;
-        Credential::from_jwt(jwt, &key, &validation)
+        Credential::from_jwt(jwt, &jwk)
     }
 
-    pub fn from_jwt(jwt: &str, key: &DecodingKey, validation: &Validation) -> Result<Self, Error> {
-        let token_data = jsonwebtoken::decode::<JWTClaims>(jwt, &key, validation)?;
-        Self::from_token_data(token_data)
+    pub fn from_jwt(jwt: &str, key: &JWK) -> Result<Self, Error> {
+        let token_data: JWTClaims = crate::jwt::decode_verify(jwt, &key)?;
+        Self::from_jwt_claims(token_data)
     }
 
     pub fn from_jwt_unsigned(jwt: &str) -> Result<Self, Error> {
-        let token_data = jsonwebtoken::dangerous_insecure_decode::<JWTClaims>(jwt)?;
-        let vc = Self::from_token_data(token_data)?;
+        let token_data: JWTClaims = crate::jwt::decode_unverified(jwt)?;
+        let vc = Self::from_jwt_claims(token_data)?;
         vc.validate_unsigned()?;
         Ok(vc)
     }
 
-    pub(crate) fn from_jwt_unsigned_embedded(jwt: &String) -> Result<Self, Error> {
-        let token_data = jsonwebtoken::dangerous_insecure_decode::<JWTClaims>(jwt)?;
-        let vc = Self::from_token_data(token_data)?;
+    pub(crate) fn from_jwt_unsigned_embedded(jwt: &str) -> Result<Self, Error> {
+        let token_data: JWTClaims = crate::jwt::decode_unverified(jwt)?;
+        let vc = Self::from_jwt_claims(token_data)?;
         vc.validate_unsigned_embedded()?;
         Ok(vc)
     }
 
-    pub fn from_token_data(token_data: jsonwebtoken::TokenData<JWTClaims>) -> Result<Self, Error> {
-        let mut vc = match token_data.claims.verifiable_credential {
+    pub fn from_jwt_claims(claims: JWTClaims) -> Result<Self, Error> {
+        let mut vc = match claims.verifiable_credential {
             Some(vc) => vc,
             None => return Err(Error::MissingCredential),
         };
-        if let Some(exp) = token_data.claims.expiration_time {
+        if let Some(exp) = claims.expiration_time {
             vc.expiration_date = Utc.timestamp_opt(exp, 0).latest();
         }
-        if let Some(iss) = token_data.claims.issuer {
+        if let Some(iss) = claims.issuer {
             vc.issuer = Some(Issuer::URI(URI::String(iss)));
         }
-        if let Some(nbf) = token_data.claims.not_before {
+        if let Some(nbf) = claims.not_before {
             if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
                 vc.issuance_date = Some(time);
             } else {
                 return Err(Error::TimeError);
             }
         }
-        if let Some(sub) = token_data.claims.subject {
+        if let Some(sub) = claims.subject {
             if let OneOrMany::One(ref mut subject) = vc.credential_subject {
                 subject.id = Some(URI::String(sub));
             } else {
                 return Err(Error::InvalidSubject);
             }
         }
-        if let Some(id) = token_data.claims.jwt_id {
+        if let Some(id) = claims.jwt_id {
             let uri = URI::try_from(id)?;
             vc.id = Some(uri);
         }
@@ -574,12 +570,7 @@ impl Credential {
 
     pub fn encode_jwt_unsigned(&self, aud: &str) -> Result<String, Error> {
         let claims = self.to_jwt_claims(aud)?;
-        Ok([
-            base64_encode_json(&Header::default())?.as_ref(),
-            base64_encode_json(&claims)?.as_ref(),
-            "",
-        ]
-        .join("."))
+        Ok(crate::jwt::encode_unsigned(&claims)?)
     }
 
     pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {

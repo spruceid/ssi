@@ -1,15 +1,11 @@
-use std::convert::TryFrom;
-
 use async_trait::async_trait;
 use chrono::prelude::*;
-use jsonwebtoken::{decode_header, Algorithm, DecodingKey, EncodingKey, Header};
 use ring::digest;
-use serde_json::value::Value;
 
 use crate::error::Error;
-use crate::jwk::{OctetParams as JWKOctetParams, Params as JWKParams, JWK};
+use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::rdf::DataSet;
-use crate::vc::{base64_encode_json, LinkedDataProofOptions, Proof};
+use crate::vc::{LinkedDataProofOptions, Proof};
 
 // Get current time to millisecond precision if possible
 pub fn now_ms() -> DateTime<Utc> {
@@ -29,7 +25,7 @@ pub trait ProofSuite {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        key: &EncodingKey,
+        key: &JWK,
     ) -> Result<Proof, Error>;
     async fn verify(proof: &Proof, document: &(dyn LinkedDataDocument + Sync))
         -> Result<(), Error>;
@@ -41,10 +37,9 @@ impl LinkedDataProofs {
     pub async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        jwk: &JWK,
+        key: &JWK,
     ) -> Result<Proof, Error> {
-        let key = EncodingKey::try_from(jwk)?;
-        match jwk {
+        match key {
             JWK {
                 params: JWKParams::RSA(_),
                 public_key_use: _,
@@ -109,9 +104,8 @@ fn resolve_key(verification_method: &str) -> Result<JWK, Error> {
     Err(Error::ResourceNotFound)
 }
 
-async fn to_signing_input(
+async fn to_jws_payload(
     document: &(dyn LinkedDataDocument + Sync),
-    header_b64: &str,
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
     let doc_normalized = document.to_dataset_for_signing().await?.to_nquads()?;
@@ -123,24 +117,21 @@ async fn to_signing_input(
         doc_digest.as_ref().to_vec(),
     ]
     .concat();
-    let message = [header_b64.as_bytes(), b".", data.as_slice()].concat();
-    Ok(message)
+    Ok(data)
 }
 
 async fn sign(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
-    key: &EncodingKey,
+    key: &JWK,
     type_: &str,
     algorithm: Algorithm,
 ) -> Result<Proof, Error> {
-    let mut header = Header::default();
-    header.alg = algorithm;
-    let mut params = std::collections::HashMap::new();
-    params.insert("b64".to_string(), false.into());
-    header.params = Some(params);
-    header.crit = Some(vec!["b64".to_string()]);
-    // header.kid = Some(key_id.clone());
+    if let Some(key_algorithm) = key.algorithm {
+        if key_algorithm != algorithm {
+            return Err(Error::AlgorithmMismatch);
+        }
+    }
     let mut proof = Proof {
         type_: type_.to_string(),
         proof_purpose: options.proof_purpose.clone(),
@@ -154,57 +145,21 @@ async fn sign(
         property_set: None,
         jws: None,
     };
-    let header_b64 = base64_encode_json(&header)?;
-    let message = to_signing_input(document, &header_b64, &proof).await?;
-    let sig = jsonwebtoken::crypto::sign_bytes(&message, &key, header.alg)?;
-    proof.jws = Some([&header_b64, "", &sig].join("."));
+    let message = to_jws_payload(document, &proof).await?;
+    let jws = crate::jws::detached_sign_unencoded_payload(algorithm, &message, &key)?;
+    proof.jws = Some(jws);
     Ok(proof)
 }
 
 async fn verify(proof: &Proof, document: &(dyn LinkedDataDocument + Sync)) -> Result<(), Error> {
-    let jws = match &proof.jws {
-        None => return Err(Error::MissingProofSignature),
-        Some(jws) => jws,
-    };
-
-    let ref verification_method = match &proof.verification_method {
-        Some(verification_method) => verification_method,
-        None => return Err(Error::MissingVerificationMethod),
-    };
-    let jwk = resolve_key(verification_method)?;
-    let key = DecodingKey::try_from(&jwk)?;
-
-    let mut parts = jws.splitn(3, '.');
-    let (header_b64, signature_b64) = match (parts.next(), parts.next(), parts.next()) {
-        (Some(header_b64), Some(""), Some(signature_b64)) => (header_b64, signature_b64),
-        _ => return Err(Error::InvalidSignature),
-    };
-    let header = decode_header(jws)?;
-    let b64: Option<bool> = match header.params {
-        Some(params) => match params.get("b64") {
-            Some(Value::Bool(boolean)) => Some(*boolean),
-            Some(_) => None,
-            None => None,
-        },
-        None => None,
-    };
-    if b64 != Some(false) {
-        return Err(Error::ExpectedUnencodedHeader);
-    }
-    for name in header.crit.iter().flatten() {
-        match name.as_str() {
-            "b64" => {}
-            _ => {
-                return Err(Error::UnknownCriticalHeader);
-            }
-        }
-    }
-
-    let message = to_signing_input(document, &header_b64, proof).await?;
-    let verified = jsonwebtoken::crypto::verify_bytes(signature_b64, &message, &key, header.alg)?;
-    if !verified {
-        return Err(Error::InvalidSignature);
-    }
+    let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+    let verification_method = proof
+        .verification_method
+        .as_ref()
+        .ok_or(Error::MissingVerificationMethod)?;
+    let key = resolve_key(&verification_method)?;
+    let message = to_jws_payload(document, proof).await?;
+    crate::jws::detached_verify(&jws, &message, &key)?;
     Ok(())
 }
 
@@ -214,7 +169,7 @@ impl ProofSuite for RsaSignature2018 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        key: &EncodingKey,
+        key: &JWK,
     ) -> Result<Proof, Error> {
         sign(document, options, key, "RsaSignature2018", Algorithm::RS256).await
     }
@@ -233,7 +188,7 @@ impl ProofSuite for Ed25519Signature2018 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        key: &EncodingKey,
+        key: &JWK,
     ) -> Result<Proof, Error> {
         sign(
             document,

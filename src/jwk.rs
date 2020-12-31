@@ -1,8 +1,8 @@
 use num_bigint::{BigInt, Sign};
-use ring::signature::{Ed25519KeyPair, KeyPair};
-use simple_asn1::{der_encode, ASN1Block, ASN1Class, ToASN1};
+use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use std::convert::TryFrom;
 use std::result::Result;
+use std::str::FromStr;
 
 use crate::der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
@@ -10,15 +10,11 @@ use crate::der::{
 };
 use crate::error::Error;
 
-use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
 
-// RFC 7515 - JSON Web Signature (JWS)
 // RFC 7516 - JSON Web Encryption (JWE)
 // RFC 7517 - JSON Web Key (JWK)
 // RFC 7518 - JSON Web Algorithms (JWA)
-// RFC 7519 - JSON Web Token (JWT)
-// RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
 // RFC 8037 - CFRG ECDH and Signatures in JOSE
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -88,11 +84,9 @@ pub struct ECParams {
 pub struct RSAParams {
     // Parameters for RSA Public Keys
     #[serde(rename = "n")]
-    // modulus and exponent are Base64urlUInt, but also needed as strings
-    // for DecodingKey::from_rsa_components
-    pub modulus: Option<String>,
+    pub modulus: Option<Base64urlUInt>,
     #[serde(rename = "e")]
-    pub exponent: Option<String>,
+    pub exponent: Option<Base64urlUInt>,
 
     // Parameters for RSA Private Keys
     #[serde(rename = "d")]
@@ -136,11 +130,11 @@ pub struct OctetParams {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Prime {
     #[serde(rename = "r")]
-    pub prime_factor: String, // Base64urlUInt
+    pub prime_factor: Base64urlUInt,
     #[serde(rename = "d")]
-    pub factor_crt_exponent: String, // Base64urlUInt
+    pub factor_crt_exponent: Base64urlUInt,
     #[serde(rename = "t")]
-    pub factor_crt_coefficient: String, // Base64urlUInt
+    pub factor_crt_coefficient: Base64urlUInt,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -149,18 +143,31 @@ pub struct Prime {
 pub struct Base64urlUInt(pub Vec<u8>);
 type Base64urlUIntString = String;
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+pub enum Algorithm {
+    HS256,
+    HS384,
+    HS512,
+    RS256,
+    RS384,
+    RS512,
+    PS256,
+    PS384,
+    PS512,
+    EdDSA,
+    ES256K,
+    None,
+}
+
+impl Default for Algorithm {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 
 impl JWK {
-    pub fn to_jwt_header(&self) -> Result<Header, Error> {
-        let mut header = Header::default();
-        header.alg = Algorithm::try_from(self)?;
-        if let Some(ref key_id) = self.key_id {
-            header.kid = Some(key_id.clone());
-        }
-        Ok(header)
-    }
-
     // TODO: Use TryFrom
     pub fn from_did_key(mut did: &str) -> Result<JWK, Error> {
         if did.len() < 8 {
@@ -218,14 +225,15 @@ impl JWK {
     }
 
     pub fn generate_ed25519() -> Result<JWK, Error> {
+        use ring::signature::KeyPair;
         let rng = ring::rand::SystemRandom::new();
-        let doc = Ed25519KeyPair::generate_pkcs8(&rng)?;
+        let doc = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?;
         let key_pkcs8 = doc.as_ref();
-        let keypair = Ed25519KeyPair::from_pkcs8(key_pkcs8)?;
+        let keypair = ring::signature::Ed25519KeyPair::from_pkcs8(key_pkcs8)?;
         let public_key = keypair.public_key().as_ref();
         // reference: ring/src/ec/curve25519/ed25519/signing.rs
         let private_key = &key_pkcs8[0x10..0x30];
-        return Ok(JWK {
+        Ok(JWK {
             params: Params::OKP(OctetParams {
                 curve: "Ed25519".to_string(),
                 public_key: Base64urlUInt(public_key.to_vec()),
@@ -239,7 +247,20 @@ impl JWK {
             x509_certificate_chain: None,
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
-        });
+        })
+    }
+
+    pub fn get_algorithm(&self) -> Option<Algorithm> {
+        if let Some(algorithm) = self.algorithm {
+            return Some(algorithm);
+        }
+        match &self.params {
+            Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
+                return Some(Algorithm::EdDSA);
+            }
+            _ => {}
+        };
+        None
     }
 }
 
@@ -274,70 +295,9 @@ impl ToASN1 for JWK {
             // EC(params) => params.to_asn1_class(class),
             Params::RSA(params) => params.to_asn1_class(class),
             // Symmetric(params) => params.to_asn1_class(class),
+            Params::OKP(params) => params.to_asn1_class(class),
             _ => Err(Error::KeyTypeNotImplemented),
         }
-    }
-}
-
-impl TryFrom<&JWK> for EncodingKey {
-    type Error = Error;
-    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
-        match &jwk.params {
-            Params::RSA(rsa_params) => {
-                let der = der_encode(rsa_params)?;
-                Ok(EncodingKey::from_rsa_der(&der))
-            }
-            Params::OKP(okp_params) => {
-                let der = der_encode(okp_params)?;
-                Ok(EncodingKey::from_ed_der(&der))
-            }
-            _ => return Err(Error::KeyTypeNotImplemented),
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a JWK> for DecodingKey<'a> {
-    type Error = Error;
-    fn try_from(jwk: &'a JWK) -> Result<Self, Self::Error> {
-        match &jwk.params {
-            Params::RSA(rsa_params) => {
-                let modulus = match &rsa_params.modulus {
-                    Some(n) => n,
-                    None => return Err(Error::MissingKeyParameters),
-                };
-                let exponent = match &rsa_params.exponent {
-                    Some(n) => n,
-                    None => return Err(Error::MissingKeyParameters),
-                };
-                Ok(DecodingKey::from_rsa_components(modulus, exponent))
-            }
-            Params::OKP(okp) => {
-                if okp.curve != "Ed25519".to_string() {
-                    return Err(Error::KeyTypeNotImplemented);
-                }
-                Ok(DecodingKey::from_ed_der(&okp.public_key.0))
-            }
-            _ => Err(Error::KeyTypeNotImplemented),
-        }
-    }
-}
-
-impl TryFrom<&JWK> for Algorithm {
-    type Error = Error;
-    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
-        if let Some(algorithm) = jwk.algorithm {
-            Ok(algorithm)
-        } else {
-            Err(Error::MissingAlgorithm)
-        }
-    }
-}
-
-impl TryFrom<&JWK> for Validation {
-    type Error = Error;
-    fn try_from(jwk: &JWK) -> Result<Self, Self::Error> {
-        let algorithm = Algorithm::try_from(jwk)?;
-        Ok(Validation::new(algorithm))
     }
 }
 
@@ -345,17 +305,11 @@ impl ToASN1 for RSAParams {
     type Error = Error;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         let modulus = match &self.modulus {
-            Some(integer) => Integer(BigInt::from_bytes_be(
-                Sign::Plus,
-                &Base64urlUInt::try_from(integer.clone())?.0,
-            )),
+            Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
             None => return Err(Error::MissingModulus),
         };
         let public_exponent = match &self.exponent {
-            Some(integer) => Integer(BigInt::from_bytes_be(
-                Sign::Plus,
-                &Base64urlUInt::try_from(integer.clone())?.0,
-            )),
+            Some(integer) => Integer(BigInt::from_bytes_be(Sign::Plus, &integer.0)),
             None => return Err(Error::MissingExponent),
         };
         if let Some(ref private_exponent) = self.private_exponent {
@@ -399,8 +353,8 @@ impl ToASN1 for RSAParams {
 impl ToASN1 for OctetParams {
     type Error = Error;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
-        if self.curve != "Ed25519".to_string() {
-            return Err(Error::KeyTypeNotImplemented);
+        if self.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(self.curve.to_string()));
         }
         let public_key = BitString(self.public_key.0.clone());
         if let Some(private_key) = match &self.private_key {
@@ -416,6 +370,78 @@ impl ToASN1 for OctetParams {
             let key = Ed25519PublicKey { public_key };
             key.to_asn1_class(class)
         }
+    }
+}
+
+impl FromStr for Algorithm {
+    type Err = Error;
+    fn from_str(algorithm: &str) -> Result<Self, Self::Err> {
+        match algorithm {
+            "HS256" => Ok(Self::HS256),
+            "HS384" => Ok(Self::HS384),
+            "HS512" => Ok(Self::HS512),
+            "RS256" => Ok(Self::RS256),
+            "RS384" => Ok(Self::RS384),
+            "RS512" => Ok(Self::RS512),
+            "PS256" => Ok(Self::PS256),
+            "PS384" => Ok(Self::PS384),
+            "PS512" => Ok(Self::PS512),
+            "EdDSA" => Ok(Self::EdDSA),
+            "ES256K" => Ok(Self::ES256K),
+            _ => Err(Error::UnsupportedAlgorithm),
+        }
+    }
+}
+
+impl<'a> TryFrom<&'a RSAParams> for ring::signature::RsaPublicKeyComponents<&'a [u8]> {
+    type Error = Error;
+    fn try_from(params: &'a RSAParams) -> Result<Self, Self::Error> {
+        fn trim_bytes(bytes: &[u8]) -> &[u8] {
+            const ZERO: [u8; 1] = [0];
+            // Remove leading zeros
+            match bytes.iter().position(|&x| x != 0) {
+                Some(n) => &bytes[n..],
+                None => &ZERO,
+            }
+        }
+        let n = trim_bytes(&params.modulus.as_ref().ok_or(Error::MissingModulus)?.0);
+        let e = trim_bytes(&params.exponent.as_ref().ok_or(Error::MissingExponent)?.0);
+        Ok(Self { n, e })
+    }
+}
+
+impl TryFrom<&RSAParams> for ring::signature::RsaKeyPair {
+    type Error = Error;
+    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
+        let der = simple_asn1::der_encode(params)?;
+        let keypair = Self::from_der(&der)?;
+        Ok(keypair)
+    }
+}
+
+impl TryFrom<&OctetParams> for &ring::signature::EdDSAParameters {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        Ok(&ring::signature::ED25519)
+    }
+}
+
+impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        params
+            .private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let der = simple_asn1::der_encode(params)?;
+        let keypair = Self::from_pkcs8_maybe_unchecked(&der)?;
+        Ok(keypair)
     }
 }
 
@@ -447,11 +473,12 @@ mod tests {
 
     const RSA_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
     const RSA_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
+    const ED25519_JSON: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
 
     #[test]
     fn jwk_to_der_rsa() {
         let key: JWK = serde_json::from_str(RSA_JSON).unwrap();
-        let der = der_encode(&key).unwrap();
+        let der = simple_asn1::der_encode(&key).unwrap();
         assert_eq!(der, RSA_DER);
     }
 
@@ -461,25 +488,17 @@ mod tests {
     }
 
     #[test]
-    fn ed25519_from_str() {
-        let json = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"tfh77YHchREL9WbreVu87Q5P_puHaXGMtLEcmiQSSco\",\"d\":\"KZFPt0DnxRNBdRBQxMJGBUzEt1CgdVqRm-qs474IIlw\"}";
-        let _jwk: JWK = serde_json::from_str(&json).unwrap();
+    fn rsa_from_str() {
+        let _key: JWK = serde_json::from_str(RSA_JSON).unwrap();
     }
 
     #[test]
-    fn generate_ed25519_sign_verify() {
-        let key = JWK::generate_ed25519().unwrap();
-        let encoding_key = EncodingKey::try_from(&key).unwrap();
-        let decoding_key = DecodingKey::try_from(&key).unwrap();
-        let message = "asdf".as_bytes();
-        let signature =
-            jsonwebtoken::crypto::sign_bytes(&message, &encoding_key, Algorithm::EdDSA).unwrap();
-        assert!(jsonwebtoken::crypto::verify_bytes(
-            &signature,
-            &message,
-            &decoding_key,
-            Algorithm::EdDSA
-        )
-        .unwrap());
+    fn ed25519_from_str() {
+        let _jwk: JWK = serde_json::from_str(ED25519_JSON).unwrap();
+    }
+
+    #[test]
+    fn generate_ed25519() {
+        let _key = JWK::generate_ed25519().unwrap();
     }
 }

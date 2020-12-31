@@ -2,6 +2,8 @@ pub mod der;
 pub mod did;
 pub mod error;
 pub mod jwk;
+pub mod jws;
+pub mod jwt;
 pub mod ldp;
 pub mod one_or_many;
 pub mod rdf;
