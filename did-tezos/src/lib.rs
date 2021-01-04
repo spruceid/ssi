@@ -155,7 +155,7 @@ impl TezosDIDAddress {
     fn get_type(&self) -> String {
         match self {
             TezosDIDAddress::TZ1(_) => {
-                "Ed25519PublicKeyBLAKE2BDigestSize20Base58Encoded2020".to_string()
+                "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2020".to_string()
             }
             TezosDIDAddress::TZ2(_) => "".to_string(),
             TezosDIDAddress::TZ3(_) => "".to_string(),
@@ -280,7 +280,7 @@ mod tests {
               "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
               "authentication": [{
                 "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
-                "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58Encoded2020",
+                "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2020",
                 "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
                 "blockchainAccountId": "tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8@tezos:mainnet"
               }]
