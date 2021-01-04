@@ -3,6 +3,7 @@ type rotation_event = {
     public_key           : key,
     current_value_digest : bytes,
     next_value_digest    : bytes,
+    current_chain        : bytes,
     rotation_count       : nat
 };
 // type signature = bytes;
@@ -23,6 +24,7 @@ type storage = {
 let rotate_authentication = ((vm, rot, sgn, strg): (verification_method, rotation_event, signature, storage)): storage => {
     let sgn_target = Bytes.concat(rot.current_value_digest, Bytes.concat(rot.next_value_digest, Bytes.pack(strg.rotation_count)));
     assert(Crypto.check(strg.active_key, sgn, sgn_target));
+    assert(rot.current_chain == Bytes.pack(Tezos.chain_id));
     assert(rot.rotation_count == strg.rotation_count + 1n);
 
     {
@@ -40,6 +42,7 @@ let get_authentication = (strg: storage): storage => { ...strg, result: Some (By
 let rotate_service = ((srv, rot, sgn, strg): (service, rotation_event, signature, storage)): storage => {
     let sgn_target = Bytes.concat(rot.current_value_digest, Bytes.concat(rot.next_value_digest, Bytes.pack(strg.rotation_count)));
     assert(Crypto.check(strg.active_key, sgn, sgn_target));
+    assert(rot.current_chain == Bytes.pack(Tezos.chain_id));
     assert(rot.rotation_count == strg.rotation_count + 1n);
     assert(srv.type_ == strg.service.type_);
     assert(srv.service_endpoint == strg.service.service_endpoint);
