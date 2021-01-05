@@ -75,11 +75,13 @@ impl LinkedDataProofs {
                 "Ed25519" => {
                     return Ed25519Signature2018::sign(document, options, &key).await;
                 }
-                _ => {}
+                _ => {
+                    return Err(Error::ProofTypeNotImplemented);
+                }
             },
             _ => {}
         };
-        return Err(Error::ProofTypeNotImplemented);
+        Err(Error::ProofTypeNotImplemented)
     }
 
     // https://w3c-ccg.github.io/ld-proofs/#proof-verification-algorithm
@@ -147,7 +149,7 @@ async fn sign(
         proof_value: None,
         verification_method: options.verification_method.clone(),
         creator: None,
-        created: Some(options.created.unwrap_or(now_ms())),
+        created: Some(options.created.unwrap_or_else(now_ms)),
         domain: options.domain.clone(),
         challenge: options.challenge.clone(),
         nonce: None,

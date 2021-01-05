@@ -14,6 +14,7 @@ use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     InvalidSubject,
     InvalidCriticalHeader,
@@ -115,9 +116,6 @@ pub enum Error {
     IRI(IRIError),
     ParseInt(ParseIntError),
     CharTryFrom(CharTryFromError),
-
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 impl fmt::Display for Error {
@@ -216,6 +214,7 @@ impl fmt::Display for Error {
             Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
             Error::KeyRejected(e) => e.fmt(f),
+            Error::FromUtf8(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -225,7 +224,6 @@ impl fmt::Display for Error {
             Error::IRI(e) => e.fmt(f),
             Error::ParseInt(e) => e.fmt(f),
             Error::CharTryFrom(e) => e.fmt(f),
-            _ => unreachable!(),
         }
     }
 }

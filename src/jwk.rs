@@ -209,7 +209,7 @@ impl JWK {
                 x509_thumbprint_sha256: None,
             });
         }
-        return Err(Error::KeyTypeNotImplemented);
+        Err(Error::KeyTypeNotImplemented)
     }
 
     pub fn to_did(&self) -> Result<String, Error> {
@@ -281,9 +281,7 @@ impl OctetParams {
                     multibase::Base::Base58Btc,
                     [DID_KEY_ED25519_PREFIX.to_vec(), self.public_key.0.clone()].concat(),
                 )),
-            _ => {
-                return Err(Error::UnsupportedKeyType);
-            }
+            _ => Err(Error::UnsupportedKeyType),
         }
     }
 }

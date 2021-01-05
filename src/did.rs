@@ -6,7 +6,6 @@ use crate::one_or_many::OneOrMany;
 
 use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
-use serde_json;
 use serde_json::Value;
 
 // ***********************************************
@@ -185,14 +184,14 @@ impl DocumentBuilder {
             None => None,
             Some(Contexts::One(context)) => Some(context),
             Some(Contexts::Many(contexts)) => {
-                if contexts.len() > 0 {
+                if !contexts.is_empty() {
                     Some(&contexts[0])
                 } else {
                     None
                 }
             }
         } {
-            if first_context != &DEFAULT_CONTEXT && first_context != &V0_11_CONTEXT {
+            if first_context != DEFAULT_CONTEXT && first_context != V0_11_CONTEXT {
                 return Err(Error::InvalidContext);
             }
         }

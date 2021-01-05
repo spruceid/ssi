@@ -321,7 +321,7 @@ pub fn hash_n_degree_quads(
                 // 5.4.4.2
                 } else {
                     // 5.4.4.2.1
-                    if !issuer_copy.find_issued_identifier(&related.0).is_some() {
+                    if issuer_copy.find_issued_identifier(&related.0).is_none() {
                         recursion_list.push(related.0.to_string());
                     }
                     // 5.4.4.2.2

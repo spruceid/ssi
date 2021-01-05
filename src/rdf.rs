@@ -199,7 +199,7 @@ impl From<&BlankNodeLabel> for String {
 }
 
 fn parse_lang_subtag(chars: &mut Peekable<Chars>, string: &mut String) -> Result<(), Error> {
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n'
             | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B'
@@ -283,7 +283,7 @@ impl TryFrom<String> for IRIOrBlankNodeIdentifier {
         match first_char {
             Some('_') => Ok(Self::BlankNodeLabel(BlankNodeLabel(id))),
             Some(_) => Ok(Self::IRIRef(IRIRef::try_from(id)?)),
-            None => return Err(Error::ExpectedString),
+            None => Err(Error::ExpectedString),
         }
     }
 }
@@ -409,7 +409,7 @@ impl DataSet {
         self.named_graphs.insert(graph_name, graph);
     }
 
-    pub fn iterable<'a>(&'a self) -> DataSetGraphIter<'a> {
+    pub fn iterable(&self) -> DataSetGraphIter {
         DataSetGraphIter {
             dataset: self,
             named_graphs_iter: None,
