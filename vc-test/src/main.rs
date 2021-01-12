@@ -41,6 +41,12 @@ fn decode_jwt_unsigned(data: &String) -> String {
 
 fn generate_presentation(data: &String) -> String {
     let vp = Presentation::from_json(data).unwrap();
+
+    // work around https://github.com/w3c/vc-test-suite/issues/112
+    if vp.verifiable_credential.is_none() {
+        panic!("VP must include verifiableCredential");
+    }
+
     serde_json::to_string_pretty(&vp).unwrap()
 }
 

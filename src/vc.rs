@@ -230,7 +230,8 @@ pub struct Presentation {
     pub id: Option<URI>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
-    pub verifiable_credential: OneOrMany<CredentialOrJWT>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verifiable_credential: Option<OneOrMany<CredentialOrJWT>>,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
@@ -755,7 +756,7 @@ impl Presentation {
             return Err(Error::MissingTypeVerifiablePresentation);
         }
 
-        for ref vc in &self.verifiable_credential {
+        for ref vc in self.verifiable_credential.iter().flatten() {
             match vc {
                 CredentialOrJWT::Credential(vc) => {
                     vc.validate_unsigned_embedded()?;
@@ -1409,7 +1410,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
                 "http://example.org/presentations/3731".to_string(),
             )),
             type_: OneOrMany::One("VerifiablePresentation".to_string()),
-            verifiable_credential: OneOrMany::One(CredentialOrJWT::Credential(vc)),
+            verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
             proof: None,
             holder: None,
             property_set: None,
