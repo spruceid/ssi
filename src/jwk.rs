@@ -251,12 +251,12 @@ impl JWK {
         })
     }
 
-    #[cfg(feature = "ed25519-compact")]
+    #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
-        let seed = ed25519_compact::Seed::generate();
-        let keypair = ed25519_compact::KeyPair::from_seed(seed);
-        let sk_bytes = *keypair.sk;
-        let pk_bytes = *keypair.pk;
+        let mut csprng = rand::rngs::OsRng {};
+        let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
+        let sk_bytes = keypair.secret.to_bytes();
+        let pk_bytes = keypair.public.to_bytes();
         Ok(JWK {
             params: Params::OKP(OctetParams {
                 curve: "Ed25519".to_string(),
@@ -487,19 +487,19 @@ impl TryFrom<&RSAParams> for ring::signature::RsaKeyPair {
     }
 }
 
-#[cfg(feature = "ed25519-compact")]
-impl TryFrom<&OctetParams> for ed25519_compact::PublicKey {
+#[cfg(feature = "ed25519-dalek")]
+impl TryFrom<&OctetParams> for ed25519_dalek::PublicKey {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
         if params.curve != *"Ed25519" {
             return Err(Error::CurveNotImplemented(params.curve.to_string()));
         }
-        Ok(Self::from_slice(&params.public_key.0)?)
+        Ok(Self::from_bytes(&params.public_key.0)?)
     }
 }
 
-#[cfg(feature = "ed25519-compact")]
-impl TryFrom<&OctetParams> for ed25519_compact::SecretKey {
+#[cfg(feature = "ed25519-dalek")]
+impl TryFrom<&OctetParams> for ed25519_dalek::SecretKey {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
         if params.curve != *"Ed25519" {
@@ -509,8 +509,20 @@ impl TryFrom<&OctetParams> for ed25519_compact::SecretKey {
             .private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let bytes = [private_key.0.clone(), params.public_key.0.clone()].concat();
-        Ok(Self::from_slice(&bytes)?)
+        Ok(Self::from_bytes(&private_key.0)?)
+    }
+}
+
+#[cfg(feature = "ed25519-dalek")]
+impl TryFrom<&OctetParams> for ed25519_dalek::Keypair {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        let public = ed25519_dalek::PublicKey::try_from(params)?;
+        let secret = ed25519_dalek::SecretKey::try_from(params)?;
+        Ok(ed25519_dalek::Keypair { secret, public })
     }
 }
 

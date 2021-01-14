@@ -1,6 +1,6 @@
 use base64::DecodeError as Base64Error;
-#[cfg(feature = "ed25519-compact")]
-use ed25519_compact::Error as Ed25519CompatError;
+#[cfg(feature = "ed25519-dalek")]
+use ed25519_dalek::SignatureError as Ed25519SignatureError;
 use iref::Error as IRIError;
 use json::Error as JSONError;
 use json_ld::Error as JSONLDError;
@@ -117,8 +117,8 @@ pub enum Error {
     FromUtf8(FromUtf8Error),
     #[cfg(feature = "rsa")]
     Rsa(RsaError),
-    #[cfg(feature = "ed25519-compact")]
-    Ed25519Compat(Ed25519CompatError),
+    #[cfg(feature = "ed25519-dalek")]
+    Ed25519Signature(Ed25519SignatureError),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
@@ -232,8 +232,8 @@ impl fmt::Display for Error {
             Error::KeyRejected(e) => e.fmt(f),
             #[cfg(feature = "rsa")]
             Error::Rsa(e) => e.fmt(f),
-            #[cfg(feature = "ed25519-compact")]
-            Error::Ed25519Compat(e) => e.fmt(f),
+            #[cfg(feature = "ed25519-dalek")]
+            Error::Ed25519Signature(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -334,10 +334,10 @@ impl From<RsaError> for Error {
     }
 }
 
-#[cfg(feature = "ed25519-compact")]
-impl From<Ed25519CompatError> for Error {
-    fn from(err: Ed25519CompatError) -> Error {
-        Error::Ed25519Compat(err)
+#[cfg(feature = "ed25519-dalek")]
+impl From<Ed25519SignatureError> for Error {
+    fn from(err: Ed25519SignatureError) -> Error {
+        Error::Ed25519Signature(err)
     }
 }
 

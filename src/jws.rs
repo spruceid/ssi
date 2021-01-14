@@ -106,7 +106,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
             key_pair.sign(data).as_ref().to_vec()
         }
         // TODO: SymmetricParams
-        #[cfg(feature = "ed25519-compact")]
+        #[cfg(feature = "ed25519-dalek")]
         JWKParams::OKP(okp) => {
             if algorithm != Algorithm::EdDSA {
                 return Err(Error::UnsupportedAlgorithm);
@@ -114,10 +114,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
             if okp.curve != *"Ed25519" {
                 return Err(Error::CurveNotImplemented(okp.curve.to_string()));
             }
-            let secret_key = ed25519_compact::SecretKey::try_from(okp)?;
-            secret_key
-                .sign(data, Some(ed25519_compact::Noise::default()))
-                .to_vec()
+            let keypair = ed25519_dalek::Keypair::try_from(okp)?;
+            use ed25519_dalek::Signer;
+            keypair.sign(data).to_bytes().to_vec()
         }
         _ => return Err(Error::KeyTypeNotImplemented),
     };
@@ -174,13 +173,15 @@ pub fn verify_bytes(
             let public_key = UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
             public_key.verify(data, signature)?;
         }
-        #[cfg(feature = "ed25519-compact")]
+        #[cfg(feature = "ed25519-dalek")]
         JWKParams::OKP(okp) => {
+            use ed25519_dalek::ed25519::signature::Signature;
             if okp.curve != *"Ed25519" {
                 return Err(Error::CurveNotImplemented(okp.curve.to_string()));
             }
-            let public_key = ed25519_compact::PublicKey::try_from(okp)?;
-            let signature = ed25519_compact::Signature::from_slice(signature)?;
+            let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
+            let signature = ed25519_dalek::Signature::from_bytes(signature)?;
+            use ed25519_dalek::Verifier;
             public_key.verify(data, &signature)?;
         }
         _ => return Err(Error::KeyTypeNotImplemented),

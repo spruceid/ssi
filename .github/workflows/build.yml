@@ -43,7 +43,7 @@ jobs:
       run: cargo test --verbose --workspace
 
     - name: Test with alternative crypto libraries
-      run: cargo test --no-default-features --features rsa,ed25519-compact,sha2
+      run: cargo test --no-default-features --features rsa,ed25519-dalek,sha2,rand
 
     - name: Checkout vc-test-suite
       uses: actions/checkout@v2
