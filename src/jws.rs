@@ -70,8 +70,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
-            let padding_alg = match algorithm {
+            let padding_alg: &dyn ring::signature::RsaEncoding = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_SHA256,
+                Algorithm::PS256 => &ring::signature::RSA_PSS_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented),
             };
             let mut sig = vec![0u8; key_pair.public_modulus_len()];
@@ -88,6 +89,11 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                Algorithm::PS256 => {
+                    let rng = rand_core::OsRng;
+                    padding = rsa::padding::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = crate::hash::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
@@ -143,6 +149,7 @@ pub fn verify_bytes(
             let public_key = RsaPublicKeyComponents::try_from(rsa_params)?;
             let parameters = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+                Algorithm::PS256 => &ring::signature::RSA_PSS_2048_8192_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented),
             };
             public_key.verify(parameters, data, signature)?
@@ -157,6 +164,11 @@ pub fn verify_bytes(
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                Algorithm::PS256 => {
+                    let rng = rand_core::OsRng;
+                    padding = rsa::padding::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = crate::hash::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
@@ -346,5 +358,11 @@ mod tests {
         assert_eq!(jws, "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw");
 
         decode_verify(&jws, &key).unwrap();
+
+        // PS256
+        let jws_ps256 = encode_sign(Algorithm::PS256, payload, &key).unwrap();
+        decode_verify(&jws_ps256, &key).unwrap();
+        let jws_ps256_fixture = "eyJhbGciOiJQUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.NCJgIzM9NBUl36waEBoDAu7Wmk2lxtcnXjNaERgHgDQnmb26ux2RdSkew08G9Ek5zedAZPy3yceqkAe5gRr3IFRj8_RhH-4AV953MFrRTsX1TrTBv3oqLCvdFeWFQ4El1Fij9e3ZqkHPmruKLkXais8-1vI6ZACSdx71M5UR2NFG5xZYxF1Nuxi2jEZfe5cH5JpRIOlht9dNKGM-MieAEFH23s3qo_bIC5KMAPkPp-wYrUw2iAFdGh6OyYgfIVC-Gv65nNqwu_KQDFGr7TKlfJp10CPA8n1D_wLl12uu4uW30GbKBVr9hfJ4pnHgTw6AdQP9nvW4HP41tko0I0Vr4w";
+        decode_verify(&jws_ps256_fixture, &key).unwrap();
     }
 }
