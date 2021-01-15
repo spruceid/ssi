@@ -92,7 +92,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
                     hashed = crate::hash::sha256(data)?;
                 }
                 Algorithm::PS256 => {
-                    let rng = rand_core::OsRng;
+                    let rng = rand::rngs::OsRng;
                     padding = rsa::padding::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = crate::hash::sha256(data)?;
                 }
@@ -167,7 +167,7 @@ pub fn verify_bytes(
                     hashed = crate::hash::sha256(data)?;
                 }
                 Algorithm::PS256 => {
-                    let rng = rand_core::OsRng;
+                    let rng = rand::rngs::OsRng;
                     padding = rsa::padding::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = crate::hash::sha256(data)?;
                 }
