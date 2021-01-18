@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use bytes::Bytes;
 use chrono::prelude::{DateTime, Utc};
+use hyper::body::Bytes;
 use hyper::{header, Client, Request, StatusCode, Uri};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -8,7 +8,6 @@ use serde_json;
 use serde_urlencoded;
 use std::collections::HashMap;
 use tokio::stream::StreamExt;
-use tokio::stream::{self, Stream};
 
 // https://w3c-ccg.github.io/did-resolution/
 
@@ -87,15 +86,27 @@ pub trait DIDResolver {
         Option<Document>,
         Option<DocumentMetadata>,
     );
-    async fn resolve_stream(
+
+    async fn resolve_representation(
         &self,
         did: &str,
         input_metadata: &ResolutionInputMetadata,
-    ) -> (
-        ResolutionMetadata,
-        Box<dyn Stream<Item = Result<Bytes, hyper::Error>> + Unpin + Send>,
-        Option<DocumentMetadata>,
-    );
+    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
+        // Implement resolveRepresentation in terms of resolve.
+        let (mut res_meta, doc, doc_meta) = self.resolve(did, input_metadata).await;
+        let doc_representation = match doc {
+            None => Vec::new(),
+            Some(doc) => match serde_json::to_vec_pretty(&doc) {
+                Ok(vec) => vec,
+                Err(err) => {
+                    res_meta.error =
+                        Some("Error serializing JSON: ".to_string() + &err.to_string());
+                    Vec::new()
+                }
+            },
+        };
+        (res_meta, doc_representation, doc_meta)
+    }
 }
 
 pub struct HTTPDIDResolver {
@@ -181,12 +192,12 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let bytes = match resp
+        let doc_representation = match resp
             .body_mut()
             .collect::<Result<Bytes, hyper::Error>>()
             .await
         {
-            Ok(bytes) => bytes,
+            Ok(vec) => vec,
             Err(err) => {
                 return (
                     ResolutionMetadata {
@@ -199,7 +210,7 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let result: ResolutionResult = match serde_json::from_slice(&bytes) {
+        let result: ResolutionResult = match serde_json::from_slice(&doc_representation) {
             Ok(result) => result,
             Err(err) => ResolutionResult {
                 document: None,
@@ -240,33 +251,9 @@ impl DIDResolver for HTTPDIDResolver {
         };
         (res_meta, result.document, result.document_metadata)
     }
-
-    async fn resolve_stream(
-        &self,
-        did: &str,
-        input_metadata: &ResolutionInputMetadata,
-    ) -> (
-        ResolutionMetadata,
-        Box<dyn Stream<Item = Result<Bytes, hyper::Error>> + Unpin + Send>,
-        Option<DocumentMetadata>,
-    ) {
-        // Implement resolveStream in terms of resolve,
-        // until resolveStream has its own HTTP(S) binding:
-        // https://github.com/w3c-ccg/did-resolution/issues/57
-        let (mut res_meta, doc, doc_meta) = self.resolve(did, input_metadata).await;
-        let stream: Box<dyn Stream<Item = Result<Bytes, hyper::Error>> + Unpin + Send> = match doc {
-            None => Box::new(stream::empty()),
-            Some(doc) => match serde_json::to_vec_pretty(&doc) {
-                Ok(bytes) => Box::new(stream::iter(vec![Ok(Bytes::from(bytes))])),
-                Err(err) => {
-                    res_meta.error =
-                        Some("Error serializing JSON: ".to_string() + &err.to_string());
-                    Box::new(stream::empty())
-                }
-            },
-        };
-        (res_meta, stream, doc_meta)
-    }
+    // Use default resolveRepresentation implementation in terms of resolve,
+    // until resolveRepresentation has its own HTTP(S) binding:
+    // https://github.com/w3c-ccg/did-resolution/issues/57
 }
 
 #[cfg(test)]
@@ -274,7 +261,6 @@ mod tests {
     use hyper::{Body, Response, Server};
     // use std::future::Future;
     use serde_json::Value;
-    use tokio::stream;
 
     use super::*;
 
@@ -375,24 +361,20 @@ mod tests {
             }
         }
 
-        async fn resolve_stream(
+        async fn resolve_representation(
             &self,
             did: &str,
             _input_metadata: &ResolutionInputMetadata,
-        ) -> (
-            ResolutionMetadata,
-            Box<dyn Stream<Item = Result<Bytes, hyper::Error>> + Unpin + Send>,
-            Option<DocumentMetadata>,
-        ) {
+        ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
             if did == EXAMPLE_123_ID {
-                let bytes = Bytes::from_static(EXAMPLE_123_JSON.as_bytes());
+                let vec = EXAMPLE_123_JSON.as_bytes().to_vec();
                 (
                     ResolutionMetadata {
                         error: None,
                         content_type: Some(TYPE_DID_LD_JSON.to_string()),
                         property_set: None,
                     },
-                    Box::new(stream::iter(vec![Ok(bytes)])),
+                    vec,
                     Some(DocumentMetadata {
                         created: None,
                         updated: None,
@@ -406,7 +388,7 @@ mod tests {
                         content_type: None,
                         property_set: None,
                     },
-                    Box::new(stream::empty()),
+                    Vec::new(),
                     None,
                 )
             }
@@ -432,10 +414,10 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resolve_stream() {
+    async fn resolve_representation() {
         let resolver = ExampleResolver {};
-        let (res_meta, stream, doc_meta) = resolver
-            .resolve_stream(
+        let (res_meta, doc_representation, doc_meta) = resolver
+            .resolve_representation(
                 EXAMPLE_123_ID,
                 &ResolutionInputMetadata {
                     accept: None,
@@ -445,11 +427,7 @@ mod tests {
             .await;
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
-        let bytes = stream
-            .collect::<Result<Bytes, hyper::Error>>()
-            .await
-            .unwrap();
-        assert_eq!(bytes, EXAMPLE_123_JSON);
+        assert_eq!(doc_representation, EXAMPLE_123_JSON.as_bytes());
     }
 
     fn did_resolver_server() -> Result<(String, impl FnOnce() -> Result<(), ()>), hyper::Error> {
@@ -513,11 +491,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn http_resolve_stream() {
+    async fn http_resolve_representation() {
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
-        let (res_meta, stream, doc_meta) = resolver
-            .resolve_stream(
+        let (res_meta, doc_representation, doc_meta) = resolver
+            .resolve_representation(
                 EXAMPLE_123_ID,
                 &ResolutionInputMetadata {
                     accept: None,
@@ -527,11 +505,7 @@ mod tests {
             .await;
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
-        let bytes = stream
-            .collect::<Result<Bytes, hyper::Error>>()
-            .await
-            .unwrap();
-        let doc: Value = serde_json::from_slice(&bytes).unwrap();
+        let doc: Value = serde_json::from_slice(&doc_representation).unwrap();
         let doc_expected: Value = serde_json::from_str(&EXAMPLE_123_JSON).unwrap();
         assert_eq!(doc, doc_expected);
         shutdown().ok();

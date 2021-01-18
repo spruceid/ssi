@@ -6,7 +6,6 @@ use ssi_did_resolve::{DIDResolver, DocumentMetadata, ResolutionInputMetadata, Re
 
 use anyhow::Result;
 use async_trait::async_trait;
-use bytes::Bytes;
 use chrono::prelude::*;
 use serde_json;
 use std::collections::HashMap;
@@ -14,7 +13,6 @@ use std::fmt;
 use std::str::FromStr;
 use std::vec;
 use thiserror::Error;
-use tokio::stream::{self, Stream};
 
 pub struct TezosDIDResolver {}
 
@@ -58,33 +56,6 @@ impl DIDResolver for TezosDIDResolver {
         };
 
         (res_meta, Some(doc), Some(doc_meta))
-    }
-
-    async fn resolve_stream(
-        &self,
-        did: &str,
-        input_metadata: &ResolutionInputMetadata,
-    ) -> (
-        ResolutionMetadata,
-        Box<dyn Stream<Item = Result<Bytes, hyper::Error>> + Unpin + Send>,
-        Option<DocumentMetadata>,
-    ) {
-        // Implement resolveStream in terms of resolve,
-        // until resolveStream has its own HTTP(S) binding:
-        // https://github.com/w3c-ccg/did-resolution/issues/57
-        let (mut res_meta, doc, doc_meta) = self.resolve(did, input_metadata).await;
-        let stream: Box<dyn Stream<Item = Result<Bytes, hyper::Error>> + Unpin + Send> = match doc {
-            None => Box::new(stream::empty()),
-            Some(doc) => match serde_json::to_vec_pretty(&doc) {
-                Ok(bytes) => Box::new(stream::iter(vec![Ok(Bytes::from(bytes))])),
-                Err(err) => {
-                    res_meta.error =
-                        Some("Error serializing JSON: ".to_string() + &err.to_string());
-                    Box::new(stream::empty())
-                }
-            },
-        };
-        (res_meta, stream, doc_meta)
     }
 }
 
