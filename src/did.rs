@@ -2,9 +2,9 @@ use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 
 use crate::error::Error;
+use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
-use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -37,17 +37,23 @@ pub struct Document {
     pub context: Contexts,
     pub id: DID,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<DateTime<Utc>>,
+    pub also_known_as: Option<Vec<String>>, // TODO: URI
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updated: Option<DateTime<Utc>>,
+    pub controller: Option<OneOrMany<DID>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub verification_method: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authentication: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub assertion_method: Option<Vec<VerificationMethod>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_agreement: Option<Vec<VerificationMethod>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capability_invocation: Option<Vec<VerificationMethod>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capability_delegation: Option<Vec<VerificationMethod>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<Vec<Service>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key: Option<PublicKey>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub controller: Option<Controller>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<Proof>,
     #[serde(flatten)]
@@ -64,23 +70,7 @@ pub enum Contexts {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-#[serde(untagged)]
-pub enum PublicKey {
-    One(PublicKeyEntry),
-    Many(Vec<PublicKeyEntry>),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-#[serde(untagged)]
-pub enum PublicKeyEntry {
-    DIDURL(DIDURL),
-    PublicKeyObject(PublicKeyObject),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct PublicKeyObject {
+pub struct VerificationMethodMap {
     pub id: String,
     #[serde(rename = "type")]
     pub type_: String,
@@ -88,6 +78,13 @@ pub struct PublicKeyObject {
     //    The value of the controller property, which identifies the
     //    controller of the corresponding private key, MUST be a valid DID.
     pub controller: DID,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // TODO: make sure this JWK does not have private key material
+    pub public_key_jwk: Option<JWK>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // TODO: make Base58 type like Base64urlUIntString
+    pub public_key_base58: Option<String>,
+    // TODO: ensure that not both key parameters are set
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
@@ -97,15 +94,15 @@ pub struct PublicKeyObject {
 #[serde(untagged)]
 pub enum VerificationMethod {
     DIDURL(DIDURL),
-    PublicKey(PublicKey),
+    Map(VerificationMethodMap),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
-pub enum Controller {
-    One(DID),
-    Many(Vec<DID>),
+pub enum ServiceEndpoint {
+    URI(String),
+    Map(Value),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -113,8 +110,9 @@ pub enum Controller {
 pub struct Service {
     pub id: String,
     #[serde(rename = "type")]
-    pub type_: String,
-    pub service_endpoint: String,
+    pub type_: OneOrMany<String>, // TODO: set
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_endpoint: Option<OneOrMany<ServiceEndpoint>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -132,18 +130,7 @@ pub struct Proof {
 
 impl Default for Document {
     fn default() -> Self {
-        Document {
-            context: Contexts::One(DEFAULT_CONTEXT.to_string()),
-            id: "".to_string(),
-            created: None,
-            updated: None,
-            authentication: None,
-            service: None,
-            public_key: None,
-            controller: None,
-            proof: None,
-            property_set: None,
-        }
+        Document::new("")
     }
 }
 
@@ -204,12 +191,15 @@ impl Document {
         Document {
             context: Contexts::One(DEFAULT_CONTEXT.to_string()),
             id: String::from(id),
-            created: None,
-            updated: None,
-            authentication: None,
-            service: None,
-            public_key: None,
+            also_known_as: None,
             controller: None,
+            verification_method: None,
+            authentication: None,
+            assertion_method: None,
+            key_agreement: None,
+            capability_invocation: None,
+            capability_delegation: None,
+            service: None,
             proof: None,
             property_set: None,
         }
@@ -279,23 +269,25 @@ mod tests {
     }
 
     #[test]
-    fn public_key() {
+    fn verification_method() {
         let id = "did:test:deadbeefcafe";
         let mut doc = Document::new(id);
-        doc.public_key = Some(PublicKey::One(PublicKeyEntry::DIDURL(String::from(
+        doc.verification_method = Some(vec![VerificationMethod::DIDURL(String::from(
             "did:pubkey:okay",
-        ))));
+        ))]);
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
-        let pko = PublicKeyObject {
+        let pko = VerificationMethodMap {
             id: String::from("did:example:123456789abcdefghi#keys-1"),
-            type_: String::from("RSASignature2019"),
+            type_: String::from("Ed25519VerificationKey2018"),
             controller: String::from("did:example:123456789abcdefghi"),
+            public_key_jwk: None,
+            public_key_base58: None,
             property_set: None,
         };
-        doc.public_key = Some(PublicKey::Many(vec![
-            PublicKeyEntry::DIDURL(String::from("did:pubkey:okay")),
-            PublicKeyEntry::PublicKeyObject(pko),
-        ]));
+        doc.verification_method = Some(vec![
+            VerificationMethod::DIDURL(String::from("did:pubkey:okay")),
+            VerificationMethod::Map(pko),
+        ]);
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(doc.id, id);
     }
