@@ -97,7 +97,6 @@ impl LinkedDataProofs {
         match proof.type_.as_str() {
             "RsaSignature2018" => RsaSignature2018::verify(proof, document).await,
             "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document).await,
-            "Ed25519VerificationKey2018" => Ed25519Signature2018::verify(proof, document).await, // invalid/deprecated
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
