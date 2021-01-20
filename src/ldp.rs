@@ -32,8 +32,13 @@ pub trait ProofSuite {
         options: &LinkedDataProofOptions,
         key: &JWK,
     ) -> Result<Proof, Error>;
-    async fn verify(proof: &Proof, document: &(dyn LinkedDataDocument + Sync))
-        -> Result<(), Error>;
+
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+    ) -> Result<(), Error> {
+        verify(proof, document).await
+    }
 }
 
 pub struct LinkedDataProofs;
@@ -184,13 +189,6 @@ impl ProofSuite for RsaSignature2018 {
     ) -> Result<Proof, Error> {
         sign(document, options, key, "RsaSignature2018", Algorithm::RS256).await
     }
-
-    async fn verify(
-        proof: &Proof,
-        document: &(dyn LinkedDataDocument + Sync),
-    ) -> Result<(), Error> {
-        verify(proof, document).await
-    }
 }
 
 pub struct Ed25519Signature2018;
@@ -209,12 +207,5 @@ impl ProofSuite for Ed25519Signature2018 {
             Algorithm::EdDSA,
         )
         .await
-    }
-
-    async fn verify(
-        proof: &Proof,
-        document: &(dyn LinkedDataDocument + Sync),
-    ) -> Result<(), Error> {
-        verify(proof, document).await
     }
 }
