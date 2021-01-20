@@ -1,5 +1,6 @@
 pub mod der;
 pub mod did;
+pub mod did_resolve;
 pub mod error;
 pub mod hash;
 pub mod jsonld;

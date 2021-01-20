@@ -2,7 +2,9 @@ use ssi::did::{
     Contexts, Document, PublicKey, PublicKeyEntry, PublicKeyObject, VerificationMethod,
     DEFAULT_CONTEXT,
 };
-use ssi_did_resolve::{DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata};
+use ssi::did_resolve::{
+    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+};
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -206,7 +208,7 @@ impl TezosDIDResolver {
 mod tests {
     use super::*;
     use serde_json::json;
-    use ssi_did_resolve::ResolutionInputMetadata;
+    use ssi::did_resolve::ResolutionInputMetadata;
 
     #[test]
     fn test_from_str() -> Result<()> {

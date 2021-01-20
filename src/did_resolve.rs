@@ -1,17 +1,18 @@
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
-use hyper::body::Bytes;
+#[cfg(feature = "http-did")]
 use hyper::{header, Client, Request, StatusCode, Uri};
+#[cfg(feature = "http-did")]
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json;
+#[cfg(feature = "http-did")]
 use serde_urlencoded;
 use std::collections::HashMap;
-use tokio::stream::StreamExt;
 
 // https://w3c-ccg.github.io/did-resolution/
 
-use ssi::did::Document;
+use crate::did::Document;
 
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
 pub const ERROR_INVALID_DID: &str = "invalid-did";
@@ -109,10 +110,12 @@ pub trait DIDResolver {
     }
 }
 
+#[cfg(feature = "http")]
 pub struct HTTPDIDResolver {
     pub endpoint: String,
 }
 
+#[cfg(feature = "http")]
 #[async_trait]
 impl DIDResolver for HTTPDIDResolver {
     // https://w3c-ccg.github.io/did-resolution/#bindings-https
@@ -192,11 +195,7 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let doc_representation = match resp
-            .body_mut()
-            .collect::<Result<Bytes, hyper::Error>>()
-            .await
-        {
+        let doc_representation = match hyper::body::to_bytes(resp.body_mut()).await {
             Ok(vec) => vec,
             Err(err) => {
                 return (
@@ -258,9 +257,9 @@ impl DIDResolver for HTTPDIDResolver {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "http-did")]
     use hyper::{Body, Response, Server};
     // use std::future::Future;
-    use serde_json::Value;
 
     use super::*;
 
@@ -303,9 +302,12 @@ mod tests {
             }
         ]
     }"#;
+    #[cfg(feature = "http-did")]
     const DID_KEY_ID: &'static str = "did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6";
+    #[cfg(feature = "http-did")]
     const DID_KEY_TYPE: &'static str =
         "application/ld+json;profile=\"https://w3id.org/did-resolution\";charset=utf-8";
+    #[cfg(feature = "http-did")]
     const DID_KEY_JSON: &'static str = include_str!("../tests/did-key-uniresolver-resp.json");
 
     #[async_trait]
@@ -395,7 +397,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn resolve() {
         let resolver = ExampleResolver {};
         let (res_meta, doc, doc_meta) = resolver
@@ -413,7 +415,7 @@ mod tests {
         assert_eq!(doc.id, EXAMPLE_123_ID);
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn resolve_representation() {
         let resolver = ExampleResolver {};
         let (res_meta, doc_representation, doc_meta) = resolver
@@ -430,6 +432,7 @@ mod tests {
         assert_eq!(doc_representation, EXAMPLE_123_JSON.as_bytes());
     }
 
+    #[cfg(feature = "http-did")]
     fn did_resolver_server() -> Result<(String, impl FnOnce() -> Result<(), ()>), hyper::Error> {
         // @TODO:
         // - handle errors instead of using unwrap
@@ -479,7 +482,7 @@ mod tests {
         });
         let server = Server::try_bind(&addr)?.serve(make_svc);
         let url = "http://".to_string() + &server.local_addr().to_string() + "/";
-        let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+        let (shutdown_tx, shutdown_rx) = futures::channel::oneshot::channel();
         let graceful = server.with_graceful_shutdown(async {
             shutdown_rx.await.ok();
         });
@@ -491,7 +494,9 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http-did")]
     async fn http_resolve_representation() {
+        use serde_json::Value;
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
         let (res_meta, doc_representation, doc_meta) = resolver
@@ -512,6 +517,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http-did")]
     async fn http_resolve() {
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
@@ -532,6 +538,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "http-did")]
     async fn resolve_uniresolver_fixture() {
         let id = DID_KEY_ID;
         let (endpoint, shutdown) = did_resolver_server().unwrap();
