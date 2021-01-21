@@ -23,7 +23,16 @@ pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 
 // @TODO parsed data structs for DID and DIDURL
 type DID = String;
-type DIDURL = String;
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(try_from = "String")]
+#[serde(into = "String")]
+pub struct DIDURL {
+    pub did: String,
+    pub path_abempty: String,
+    pub query: Option<String>,
+    pub fragment: Option<String>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -128,6 +137,48 @@ pub struct Proof {
     pub property_set: Option<Map<String, Value>>,
 }
 
+impl TryFrom<String> for DIDURL {
+    type Error = Error;
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        if !s.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
+        let mut parts = s.splitn(2, '#');
+        let before_fragment = parts.next().unwrap().to_string();
+        let fragment = parts.next().map(|x| x.to_owned());
+        let mut parts = before_fragment.splitn(2, '?');
+        let before_query = parts.next().unwrap().to_string();
+        let query = parts.next().map(|x| x.to_owned());
+        let (did, path_abempty) = match before_query.find('/') {
+            Some(i) => match before_query.split_at(i) {
+                (did, path_abempty) => (did.to_string(), path_abempty.to_string()),
+            },
+            None => (before_query, "".to_string()),
+        };
+        Ok(Self {
+            did,
+            path_abempty,
+            query,
+            fragment,
+        })
+    }
+}
+
+impl From<DIDURL> for String {
+    fn from(didurl: DIDURL) -> String {
+        let mut didurl_string = didurl.did.to_owned() + &didurl.path_abempty;
+        if let Some(ref query) = didurl.query {
+            didurl_string.push('?');
+            didurl_string.push_str(query);
+        }
+        if let Some(ref fragment) = didurl.fragment {
+            didurl_string.push('#');
+            didurl_string.push_str(fragment);
+        }
+        didurl_string
+    }
+}
+
 impl Default for Document {
     fn default() -> Self {
         Document::new("")
@@ -219,6 +270,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn parse_did_url() {
+        // https://w3c.github.io/did-core/#example-3-a-did-url-with-a-service-did-parameter
+        let didurl_str = "did:foo:21tDAKCERh95uGgKbJNHYp?service=agent";
+        let didurl = DIDURL::try_from(didurl_str.to_string()).unwrap();
+        assert_eq!(
+            didurl,
+            DIDURL {
+                did: "did:foo:21tDAKCERh95uGgKbJNHYp".to_string(),
+                path_abempty: "".to_string(),
+                query: Some("service=agent".to_string()),
+                fragment: None,
+            }
+        );
+    }
+
+    #[test]
     fn new_document() {
         let id = "did:test:deadbeefcafe";
         let doc = Document::new(id);
@@ -272,9 +339,9 @@ mod tests {
     fn verification_method() {
         let id = "did:test:deadbeefcafe";
         let mut doc = Document::new(id);
-        doc.verification_method = Some(vec![VerificationMethod::DIDURL(String::from(
-            "did:pubkey:okay",
-        ))]);
+        doc.verification_method = Some(vec![VerificationMethod::DIDURL(
+            DIDURL::try_from("did:pubkey:okay".to_string()).unwrap(),
+        )]);
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
         let pko = VerificationMethodMap {
             id: String::from("did:example:123456789abcdefghi#keys-1"),
@@ -285,7 +352,7 @@ mod tests {
             property_set: None,
         };
         doc.verification_method = Some(vec![
-            VerificationMethod::DIDURL(String::from("did:pubkey:okay")),
+            VerificationMethod::DIDURL(DIDURL::try_from("did:pubkey:okay".to_string()).unwrap()),
             VerificationMethod::Map(pko),
         ]);
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
