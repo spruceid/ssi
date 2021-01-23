@@ -15,3 +15,5 @@ serde_json = "1.0"
 async-trait = "0.1"
 anyhow = "1.0.34"
 thiserror = "1.0"
+blake2b_simd = "0.5"
+bs58 = { version = "0.4", features = ["check"] }

@@ -1,10 +1,18 @@
 use std::collections::HashMap as Map;
+use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt;
+use std::str::FromStr;
 
+use crate::did_resolve::{
+    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
+    ERROR_NOT_FOUND,
+};
 use crate::error::Error;
 use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -24,7 +32,7 @@ pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 // @TODO parsed data structs for DID and DIDURL
 type DID = String;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct DIDURL {
@@ -77,7 +85,7 @@ pub enum Contexts {
     Many(Vec<String>),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationMethodMap {
     pub id: String,
@@ -137,13 +145,112 @@ pub struct Proof {
     pub property_set: Option<Map<String, Value>>,
 }
 
-impl TryFrom<String> for DIDURL {
-    type Error = Error;
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        if !s.starts_with("did:") {
+/// An object from a DID Document returned by DID URL dereferencing
+#[non_exhaustive]
+pub enum Resource {
+    VerificationMethod(VerificationMethodMap),
+    Object(Map<String, Value>),
+}
+
+/// Something that can be used to derive a DID
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum Source<'a> {
+    Key(&'a JWK),
+}
+
+#[async_trait]
+pub trait DIDMethod: DIDResolver {
+    /// Get the DID method name.
+    /// https://w3c.github.io/did-core/#method-schemes
+    fn name(&self) -> &'static str;
+
+    // TODO: allow returning errors
+    /// Generate a DID from some source
+    fn generate(&self, _source: &Source) -> Option<String> {
+        None
+    }
+
+    /// Upcast the DID method as a DID resolver.
+    ///
+    /// This is a workaround for [not being able to cast a trait object to a supertrait object](https://github.com/rust-lang/rfcs/issues/2765).
+    ///
+    /// Implementations should simply return `self`.
+    fn to_resolver(&self) -> &(dyn DIDResolver + Sync);
+}
+
+/// A collection of DID methods
+#[derive(Clone, Default)]
+pub struct DIDMethods<'a> {
+    pub methods: HashMap<&'a str, &'a (dyn DIDMethod + Sync)>,
+}
+
+impl<'a> DIDMethods<'a> {
+    /// Add a DID method to the set. Returns the previous one set for the given method name, if any.
+    pub fn insert(
+        &mut self,
+        method: &'a (dyn DIDMethod + Sync),
+    ) -> Option<&'a (dyn DIDMethod + Sync)> {
+        let name = method.name();
+        self.methods.insert(name, method)
+    }
+
+    /// Get a DID method from the set.
+    pub fn get(&self, method_name: &str) -> Option<&&'a (dyn DIDMethod + Sync)> {
+        self.methods.get(method_name)
+    }
+
+    pub fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+        self
+    }
+}
+
+#[async_trait]
+impl<'a> DIDResolver for DIDMethods<'a> {
+    async fn resolve(
+        &self,
+        did: &str,
+        input_metadata: &ResolutionInputMetadata,
+    ) -> (
+        ResolutionMetadata,
+        Option<Document>,
+        Option<DocumentMetadata>,
+    ) {
+        let mut parts = did.split(':');
+        if parts.next() != Some("did") {
+            return (
+                ResolutionMetadata::from_error(ERROR_INVALID_DID),
+                None,
+                None,
+            );
+        };
+        let method_name = match parts.next() {
+            Some(method_name) => method_name,
+            None => {
+                return (
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
+                    None,
+                    None,
+                );
+            }
+        };
+        let method = match self.methods.get(method_name) {
+            Some(method) => method,
+            None => {
+                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
+            }
+        };
+        method.resolve(did, input_metadata).await
+    }
+}
+
+impl FromStr for DIDURL {
+    type Err = Error;
+    fn from_str(didurl: &str) -> Result<Self, Self::Err> {
+        if !didurl.starts_with("did:") {
             return Err(Error::DIDURL);
         }
-        let mut parts = s.splitn(2, '#');
+        let mut parts = didurl.splitn(2, '#');
         let before_fragment = parts.next().unwrap().to_string();
         let fragment = parts.next().map(|x| x.to_owned());
         let mut parts = before_fragment.splitn(2, '?');
@@ -164,18 +271,31 @@ impl TryFrom<String> for DIDURL {
     }
 }
 
+impl fmt::Display for DIDURL {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", self.did, self.path_abempty)?;
+        if let Some(ref query) = self.query {
+            write!(f, "?{}", query)?;
+        }
+        if let Some(ref fragment) = self.fragment {
+            write!(f, "#{}", fragment)?;
+        }
+        Ok(())
+    }
+}
+
+/// needed for #[serde(try_from = "String")]
+impl TryFrom<String> for DIDURL {
+    type Error = Error;
+    fn try_from(didurl: String) -> Result<Self, Self::Error> {
+        DIDURL::from_str(&didurl)
+    }
+}
+
+/// needed for #[serde(into = "String")]
 impl From<DIDURL> for String {
     fn from(didurl: DIDURL) -> String {
-        let mut didurl_string = didurl.did.to_owned() + &didurl.path_abempty;
-        if let Some(ref query) = didurl.query {
-            didurl_string.push('?');
-            didurl_string.push_str(query);
-        }
-        if let Some(ref fragment) = didurl.fragment {
-            didurl_string.push('#');
-            didurl_string.push_str(fragment);
-        }
-        didurl_string
+        format!("{}", didurl)
     }
 }
 
@@ -262,6 +382,77 @@ impl Document {
 
     pub fn from_json_bytes(json: &[u8]) -> Result<Document, serde_json::Error> {
         serde_json::from_slice(json)
+    }
+
+    /// Select an object in the DID document.
+    /// For the [DID URL dereferencing algorithm, Step 1.1](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary)
+    pub fn select_object(&self, id: &DIDURL) -> Result<Resource, Error> {
+        let id_string = String::from(id.clone());
+        for vm in self.verification_method.iter().flatten() {
+            if let VerificationMethod::Map(map) = vm {
+                if map.id == id_string {
+                    return Ok(Resource::VerificationMethod(map.clone()));
+                }
+            }
+        }
+        // TODO: generalize. use json-ld
+        Err(Error::ResourceNotFound)
+    }
+}
+
+pub mod example {
+    use crate::did::{DIDMethod, Document};
+    use crate::did_resolve::{
+        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+        ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+    };
+    use async_trait::async_trait;
+
+    const DOC_JSON: &'static str = include_str!("../tests/did-example-foo.json");
+
+    pub struct DIDExample;
+
+    #[async_trait]
+    impl DIDMethod for DIDExample {
+        fn name(&self) -> &'static str {
+            return "example";
+        }
+
+        fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+            self
+        }
+    }
+
+    #[async_trait]
+    impl DIDResolver for DIDExample {
+        async fn resolve(
+            &self,
+            did: &str,
+            _input_metadata: &ResolutionInputMetadata,
+        ) -> (
+            ResolutionMetadata,
+            Option<Document>,
+            Option<DocumentMetadata>,
+        ) {
+            if did != "did:example:foo" {
+                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
+            }
+            let doc: Document = match serde_json::from_str(DOC_JSON) {
+                Ok(doc) => doc,
+                Err(err) => {
+                    return (ResolutionMetadata::from_error(&err.to_string()), None, None);
+                }
+            };
+            (
+                ResolutionMetadata {
+                    error: None,
+                    content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                    property_set: None,
+                },
+                Some(doc),
+                Some(DocumentMetadata::default()),
+            )
+        }
     }
 }
 

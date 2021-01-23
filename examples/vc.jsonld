@@ -4,15 +4,15 @@
   ],
   "type": "VerifiableCredential",
   "credentialSubject": {
-    "id": "urn:uuid:58485ecc-1f84-4d5e-a122-340fbd124148"
+    "id": "urn:uuid:2015e34c-9194-41a0-8b4e-ccc684255ba5"
   },
-  "issuer": "did:key:z6MkgKnUaGk7CNTuUjAoeLV9MWE6Y7QvFpdAhrmE8X9vJjYf",
-  "issuanceDate": "2020-12-11T21:05:24.506Z",
+  "issuer": "did:example:foo",
+  "issuanceDate": "2021-01-22T21:02:14.669Z",
   "proof": {
-    "type": "Ed25519Signature2018",
+    "type": "RsaSignature2018",
     "proofPurpose": "assertionMethod",
-    "verificationMethod": "did:key:z6MkgKnUaGk7CNTuUjAoeLV9MWE6Y7QvFpdAhrmE8X9vJjYf#z6MkgKnUaGk7CNTuUjAoeLV9MWE6Y7QvFpdAhrmE8X9vJjYf",
-    "created": "2020-12-11T21:05:24.507Z",
-    "jws": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..ypUd5O9jAEmzErLuk-TxpVE9sZMUqyheO8fPfZCZ8r4OzlxKircw0wOJJWTGtScOAPsOAmKk1461DBE0s8DiAA"
+    "verificationMethod": "did:example:foo#key1",
+    "created": "2021-01-22T21:02:14.669Z",
+    "jws": "eyJhbGciOiJSUzI1NiIsImtpZCI6InJzYTIwNDgtMjAyMC0wOC0yNSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..LhcGRaPpiM3Ls4BDOoWm5OuNrfpD1VWT2H6Q6z0LckxXgV2vk7YojHHkvcxesou6kBuy6kPZVfBPUIOVNU0KyrVcwV7jAhcXVumJGToiF3YbIm2D5k_mlT0pbaeaT81bMsPaar9qUwbdf8ZdCQ93e2c9LHqKTKJoB48TkBsKinCz3oJV815sUhEBN_OUj0EZa0l8_fopVWmwcxyp3nLW7YtxbqDoIbEGWH71QSu9_RVeFRuXl_0tfX0y7iqVYQTTl4E8ibuvBSp-eVqg6wrPgNd6lYUHefgNYiUtUe3X9J6zcOCCrTwXpAgx5yJP3REBDT2dPiQQKAR6eRreVoq0IQ"
   }
 }

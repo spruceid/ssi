@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 use chrono::prelude::*;
 
+// use crate::did::{VerificationMethod, VerificationMethodMap};
+use crate::did::Resource;
+use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMetadata};
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
@@ -36,8 +39,9 @@ pub trait ProofSuite {
     async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
+        resolver: &(dyn DIDResolver + Sync),
     ) -> Result<(), Error> {
-        verify(proof, document).await
+        verify(proof, document, resolver).await
     }
 }
 
@@ -93,26 +97,36 @@ impl LinkedDataProofs {
     pub async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
+        resolver: &(dyn DIDResolver + Sync),
     ) -> Result<(), Error> {
         match proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018::verify(proof, document).await,
-            "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document).await,
+            "RsaSignature2018" => RsaSignature2018::verify(proof, document, resolver).await,
+            "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document, resolver).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
 }
 
-/// Resolve a verificationMethod to a key, synchronously
-fn resolve_key(verification_method: &str) -> Result<JWK, Error> {
-    #[cfg(test)]
-    if &verification_method[..16] == "did:example:jwk:" {
-        let jwk: JWK = serde_json::from_str(&verification_method[16..])?;
-        return Ok(jwk);
+/// Resolve a verificationMethod to a key
+pub async fn resolve_key(
+    verification_method: &str,
+    resolver: &(dyn DIDResolver + Sync),
+) -> Result<JWK, Error> {
+    let (res_meta, object, _meta) = dereference(
+        resolver,
+        &verification_method,
+        &DereferencingInputMetadata::default(),
+    )
+    .await;
+    if let Some(error) = res_meta.error {
+        return Err(Error::DIDURLDereference(error));
     }
-    if &verification_method[..8] == "did:key:" {
-        return JWK::from_did_key(verification_method);
-    }
-    Err(Error::ResourceNotFound)
+    let vm = match object {
+        Content::Object(Resource::VerificationMethod(vm)) => vm,
+        Content::Null => return Err(Error::ResourceNotFound),
+        _ => return Err(Error::ExpectedObject),
+    };
+    vm.public_key_jwk.ok_or(Error::MissingKey)
 }
 
 async fn to_jws_payload(
@@ -166,13 +180,17 @@ async fn sign(
     Ok(proof)
 }
 
-async fn verify(proof: &Proof, document: &(dyn LinkedDataDocument + Sync)) -> Result<(), Error> {
+async fn verify(
+    proof: &Proof,
+    document: &(dyn LinkedDataDocument + Sync),
+    resolver: &(dyn DIDResolver + Sync),
+) -> Result<(), Error> {
     let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let verification_method = proof
         .verification_method
         .as_ref()
         .ok_or(Error::MissingVerificationMethod)?;
-    let key = resolve_key(&verification_method)?;
+    let key = resolve_key(&verification_method, resolver).await?;
     let message = to_jws_payload(document, proof).await?;
     crate::jws::detached_verify(&jws, &message, &key)?;
     Ok(())

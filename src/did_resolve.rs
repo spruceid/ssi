@@ -6,13 +6,14 @@ use hyper::{header, Client, Request, StatusCode, Uri};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json;
-#[cfg(feature = "http-did")]
 use serde_urlencoded;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
 
-use crate::did::Document;
+use crate::did::{Document, Resource, DIDURL};
+use crate::error::Error;
 
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
 pub const ERROR_INVALID_DID: &str = "invalid-did";
@@ -29,33 +30,114 @@ pub enum Metadata {
     Null,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
 pub struct ResolutionInputMetadata {
     pub accept: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_time: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub no_cache: Option<bool>,
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+/// https://w3c.github.io/did-core/#did-resolution-metadata-properties
 pub struct ResolutionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "content-type")]
     pub content_type: Option<String>,
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated: Option<DateTime<Utc>>,
+    #[serde(flatten)]
+    pub property_set: Option<HashMap<String, Metadata>>,
+}
+
+/// https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties
+/// https://w3c-ccg.github.io/did-resolution/#dereferencing-input-metadata-properties
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "kebab-case")]
+pub struct DereferencingInputMetadata {
+    pub accept: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub follow_redirect: Option<bool>,
+    #[serde(flatten)]
+    pub property_set: Option<HashMap<String, Metadata>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+/// https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties
+pub struct DereferencingMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_type: Option<String>,
+    #[serde(flatten)]
+    pub property_set: Option<HashMap<String, Metadata>>,
+}
+
+/// A resource returned by DID URL dereferencing
+pub enum Content {
+    DIDDocument(Document),
+    URL(String),
+    Object(Resource),
+    Null,
+}
+
+impl From<Error> for DereferencingMetadata {
+    fn from(err: Error) -> Self {
+        let mut metadata = DereferencingMetadata::default();
+        metadata.error = Some(err.to_string());
+        metadata
+    }
+}
+
+impl From<ResolutionMetadata> for DereferencingMetadata {
+    fn from(res_meta: ResolutionMetadata) -> Self {
+        Self {
+            error: res_meta.error,
+            content_type: res_meta.content_type,
+            property_set: res_meta.property_set,
+        }
+    }
+}
+
+impl DereferencingMetadata {
+    pub fn from_error(err: String) -> Self {
+        let mut metadata = DereferencingMetadata::default();
+        metadata.error = Some(err);
+        metadata
+    }
+}
+
+impl ResolutionMetadata {
+    pub fn from_error(err: &str) -> Self {
+        let mut metadata = Self::default();
+        metadata.error = Some(err.to_owned());
+        metadata
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ContentMetadata {
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
@@ -92,7 +174,10 @@ pub trait DIDResolver {
         &self,
         did: &str,
         input_metadata: &ResolutionInputMetadata,
-    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
+    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>)
+    where
+        Self: Sized,
+    {
         // Implement resolveRepresentation in terms of resolve.
         let (mut res_meta, doc, doc_meta) = self.resolve(did, input_metadata).await;
         let doc_representation = match doc {
@@ -107,6 +192,176 @@ pub trait DIDResolver {
             },
         };
         (res_meta, doc_representation, doc_meta)
+    }
+}
+
+/// Dereference a DID URL
+///
+/// https://w3c.github.io/did-core/#did-url-dereferencing
+/// https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm
+pub async fn dereference(
+    resolver: &(dyn DIDResolver + Sync),
+    did_url_str: &str,
+    did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
+) -> (DereferencingMetadata, Content, ContentMetadata) {
+    let mut did_url = match DIDURL::try_from(did_url_str.to_string()) {
+        Ok(did_url) => did_url,
+        Err(error) => {
+            return (
+                DereferencingMetadata::from(error),
+                Content::Null,
+                ContentMetadata::default(),
+            );
+        }
+    };
+    // 1
+    let did_res_input_metadata: ResolutionInputMetadata = match did_url.query.as_ref() {
+        Some(query) => match serde_urlencoded::from_str(query) {
+            Ok(meta) => meta,
+            Err(error) => {
+                return (
+                    DereferencingMetadata::from(Error::from(error)),
+                    Content::Null,
+                    ContentMetadata::default(),
+                );
+            }
+        },
+        None => ResolutionInputMetadata::default(),
+    };
+
+    let (did_doc_res_meta, did_doc_opt, did_doc_meta_opt) = resolver
+        .resolve(&did_url.did, &did_res_input_metadata)
+        .await;
+    let (did_doc, did_doc_meta) = match (did_doc_opt, did_doc_meta_opt) {
+        (Some(doc), Some(meta)) if did_doc_res_meta.error.as_deref() != Some(ERROR_NOT_FOUND) => {
+            (doc, meta)
+        }
+        _ => {
+            return (
+                DereferencingMetadata::from(Error::ResourceNotFound),
+                Content::Null,
+                ContentMetadata::default(),
+            );
+        }
+    };
+    if let Some(error) = did_doc_res_meta.error {
+        return (
+            DereferencingMetadata::from_error(error),
+            Content::Null,
+            ContentMetadata::default(),
+        );
+    }
+    // 2
+    let fragment = did_url.fragment.take();
+    let primary_resource_result = dereference_primary_resource(
+        resolver,
+        &did_url,
+        &did_url_dereferencing_input_metadata,
+        &did_doc_res_meta,
+        did_doc,
+        &did_doc_meta,
+    )
+    .await;
+    if let Some(fragment) = fragment {
+        // 3
+        return dereference_secondary_resource(
+            resolver,
+            did_url,
+            fragment,
+            &did_url_dereferencing_input_metadata,
+            primary_resource_result,
+        )
+        .await;
+    }
+    primary_resource_result
+}
+
+// https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary
+async fn dereference_primary_resource(
+    _resolver: &(dyn DIDResolver + Sync),
+    did_url: &DIDURL,
+    _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
+    res_meta: &ResolutionMetadata,
+    did_doc: Document,
+    _did_doc_meta: &DocumentMetadata,
+) -> (DereferencingMetadata, Content, ContentMetadata) {
+    // 1
+    // TODO
+    // 2
+    if did_url.path_abempty.is_empty() && did_url.query.is_none() {
+        // 2.1
+        return (
+            DereferencingMetadata::from(res_meta.clone()),
+            Content::DIDDocument(did_doc),
+            ContentMetadata::default(),
+        );
+    }
+    // 3
+    if !did_url.path_abempty.is_empty() || did_url.query.is_some() {
+        // 3.1
+        // TODO: allow DID method to dereference the DID URL
+        // 3.2
+        // TODO: allow the client to dereference the DID URL
+    }
+    (
+        DereferencingMetadata::default(),
+        Content::Null,
+        ContentMetadata::default(),
+    )
+}
+
+// https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary
+async fn dereference_secondary_resource(
+    _resolver: &(dyn DIDResolver + Sync),
+    mut did_url: DIDURL,
+    fragment: String,
+    _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
+    primary_resource_result: (DereferencingMetadata, Content, ContentMetadata),
+) -> (DereferencingMetadata, Content, ContentMetadata) {
+    // 1
+    match primary_resource_result {
+        (deref_meta, Content::DIDDocument(doc), _content_doc_meta)
+            if deref_meta.content_type == Some(TYPE_DID_LD_JSON.to_string()) =>
+        {
+            // put the fragment back in the URL
+            did_url.fragment.replace(fragment);
+            // 1.1
+            match doc.select_object(&did_url) {
+                Err(error) => {
+                    return (
+                        DereferencingMetadata::from_error(format!(
+                            "Unable to find object in DID document: {}",
+                            error
+                        )),
+                        Content::Null,
+                        ContentMetadata::default(),
+                    );
+                }
+                Ok(object) => {
+                    return (
+                        DereferencingMetadata::default(),
+                        Content::Object(object),
+                        ContentMetadata::default(),
+                    );
+                }
+            }
+        }
+        (deref_meta, Content::URL(mut url), content_meta) => {
+            // 2
+            // 2.1
+            url.push('#');
+            url.push_str(&fragment);
+            return (deref_meta, Content::URL(url), content_meta);
+        }
+        _ => {
+            // 3
+            // TODO
+            return (
+                DereferencingMetadata::from(Error::NotImplemented),
+                Content::Null,
+                ContentMetadata::default(),
+            );
+        }
     }
 }
 
@@ -255,6 +510,72 @@ impl DIDResolver for HTTPDIDResolver {
     // https://github.com/w3c-ccg/did-resolution/issues/57
 }
 
+/// Compose multiple DID resolvers
+#[derive(Clone, Default)]
+pub struct MultiResolver<'a> {
+    pub resolvers: HashMap<&'a str, &'a (dyn DIDResolver + Sync)>,
+    pub fallback_resolver: Option<&'a (dyn DIDResolver + Sync)>,
+}
+
+#[async_trait]
+impl<'a> DIDResolver for MultiResolver<'a> {
+    async fn resolve(
+        &self,
+        did: &str,
+        input_metadata: &ResolutionInputMetadata,
+    ) -> (
+        ResolutionMetadata,
+        Option<Document>,
+        Option<DocumentMetadata>,
+    ) {
+        let mut parts = did.split(':');
+        if parts.next() != Some("did") {
+            return (
+                ResolutionMetadata {
+                    error: Some(ERROR_INVALID_DID.to_string()),
+                    content_type: None,
+                    property_set: None,
+                },
+                None,
+                None,
+            );
+        };
+        let method_name = match parts.next() {
+            Some(method_name) => method_name,
+            None => {
+                return (
+                    ResolutionMetadata {
+                        error: Some(ERROR_INVALID_DID.to_string()),
+                        content_type: None,
+                        property_set: None,
+                    },
+                    None,
+                    None,
+                );
+            }
+        };
+        let resolver = match self
+            .resolvers
+            .get(method_name)
+            .or(self.fallback_resolver.as_ref())
+        {
+            Some(resolver) => resolver,
+            None => {
+                return (
+                    ResolutionMetadata {
+                        error: Some(ERROR_NOT_FOUND.to_string()),
+                        content_type: None,
+                        property_set: None,
+                    },
+                    None,
+                    None,
+                );
+            }
+        };
+        resolver.resolve(did, input_metadata).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "http-did")]
@@ -338,17 +659,9 @@ mod tests {
                     }
                 };
                 (
-                    ResolutionMetadata {
-                        error: None,
-                        content_type: None,
-                        property_set: None,
-                    },
+                    ResolutionMetadata::default(),
                     Some(doc),
-                    Some(DocumentMetadata {
-                        created: None,
-                        updated: None,
-                        property_set: None,
-                    }),
+                    Some(DocumentMetadata::default()),
                 )
             } else {
                 (
@@ -377,11 +690,7 @@ mod tests {
                         property_set: None,
                     },
                     vec,
-                    Some(DocumentMetadata {
-                        created: None,
-                        updated: None,
-                        property_set: None,
-                    }),
+                    Some(DocumentMetadata::default()),
                 )
             } else {
                 (
@@ -401,13 +710,7 @@ mod tests {
     async fn resolve() {
         let resolver = ExampleResolver {};
         let (res_meta, doc, doc_meta) = resolver
-            .resolve(
-                EXAMPLE_123_ID,
-                &ResolutionInputMetadata {
-                    accept: None,
-                    property_set: None,
-                },
-            )
+            .resolve(EXAMPLE_123_ID, &ResolutionInputMetadata::default())
             .await;
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
@@ -419,13 +722,7 @@ mod tests {
     async fn resolve_representation() {
         let resolver = ExampleResolver {};
         let (res_meta, doc_representation, doc_meta) = resolver
-            .resolve_representation(
-                EXAMPLE_123_ID,
-                &ResolutionInputMetadata {
-                    accept: None,
-                    property_set: None,
-                },
-            )
+            .resolve_representation(EXAMPLE_123_ID, &ResolutionInputMetadata::default())
             .await;
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
@@ -500,13 +797,7 @@ mod tests {
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
         let (res_meta, doc_representation, doc_meta) = resolver
-            .resolve_representation(
-                EXAMPLE_123_ID,
-                &ResolutionInputMetadata {
-                    accept: None,
-                    property_set: None,
-                },
-            )
+            .resolve_representation(EXAMPLE_123_ID, &ResolutionInputMetadata::default())
             .await;
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
@@ -522,13 +813,7 @@ mod tests {
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
         let (res_meta, doc, doc_meta) = resolver
-            .resolve(
-                EXAMPLE_123_ID,
-                &ResolutionInputMetadata {
-                    accept: None,
-                    property_set: None,
-                },
-            )
+            .resolve(EXAMPLE_123_ID, &ResolutionInputMetadata::default())
             .await;
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
@@ -544,13 +829,7 @@ mod tests {
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
         let (res_meta, doc, doc_meta) = resolver
-            .resolve(
-                &id,
-                &ResolutionInputMetadata {
-                    accept: None,
-                    property_set: None,
-                },
-            )
+            .resolve(&id, &ResolutionInputMetadata::default())
             .await;
         eprintln!("res_meta = {:?}", &res_meta);
         eprintln!("doc_meta = {:?}", &doc_meta);

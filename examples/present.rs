@@ -10,18 +10,20 @@ async fn main() {
     let vp = serde_json::json!({
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         "type": "VerifiablePresentation",
-        "holder": key.to_did().unwrap(),
+        "holder": "did:example:foo",
         "verifiableCredential": vc
     });
     let mut vp: ssi::vc::Presentation = serde_json::from_value(vp).unwrap();
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
-    let verification_method = key.to_verification_method().unwrap();
+    let verification_method = "did:example:foo#key2".to_string();
     proof_options.verification_method = Some(verification_method);
     proof_options.proof_purpose = Some(ssi::vc::ProofPurpose::Authentication);
     proof_options.challenge = Some("example".to_string());
     let proof = vp.generate_proof(&key, &proof_options).await.unwrap();
     vp.add_proof(proof);
-    let result = vp.verify(Some(proof_options)).await;
+    let result = vp
+        .verify(Some(proof_options), &ssi::did::example::DIDExample)
+        .await;
     if result.errors.len() > 0 {
         panic!("verify failed: {:#?}", result);
     }

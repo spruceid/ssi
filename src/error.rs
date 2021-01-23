@@ -13,6 +13,7 @@ use ring::error::Unspecified as RingUnspecified;
 #[cfg(feature = "rsa")]
 use rsa::errors::Error as RsaError;
 use serde_json::Error as SerdeJSONError;
+use serde_urlencoded::de::Error as SerdeUrlEncodedError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
 use std::array::TryFromSliceError;
 use std::char::CharTryFromError;
@@ -41,6 +42,7 @@ pub enum Error {
     ExpectedLang,
     AlgorithmMismatch,
     UnsupportedAlgorithm,
+    UnsupportedMultipleVMs,
     KeyTypeNotImplemented,
     CurveNotImplemented(String),
     MissingKey,
@@ -60,6 +62,7 @@ pub enum Error {
     TimeError,
     URI,
     DIDURL,
+    DIDURLDereference(String),
     InvalidContext,
     MissingContext,
     MissingDocumentId,
@@ -125,6 +128,7 @@ pub enum Error {
     Multibase(MultibaseError),
     JSON(JSONError),
     SerdeJSON(SerdeJSONError),
+    SerdeUrlEncoded(SerdeUrlEncodedError),
     JSONLD(JSONLDErrorCode),
     IRI(IRIError),
     ParseInt(ParseIntError),
@@ -154,7 +158,7 @@ impl fmt::Display for Error {
                 write!(f, "Missing type VerifiablePresentation")
             }
             Error::MissingIssuer => write!(f, "Missing issuer property"),
-            Error::MissingVerificationMethod => write!(f, "Missing proof verificationMethod"),
+            Error::MissingVerificationMethod => write!(f, "Missing verificationMethod"),
             Error::MissingCredential => write!(f, "Verifiable credential not found in JWT"),
             Error::Key => write!(f, "problem with JWT key"),
             Error::NotImplemented => write!(f, "Not implemented"),
@@ -171,6 +175,7 @@ impl fmt::Display for Error {
             Error::ExpectedLang => write!(f, "Expected RDF language tag"),
             Error::AlgorithmMismatch => write!(f, "Algorithm in JWS header does not match JWK"),
             Error::UnsupportedAlgorithm => write!(f, "Unsupported algorithm"),
+            Error::UnsupportedMultipleVMs => write!(f, "Unsupported multiple verification methods"),
             Error::KeyTypeNotImplemented => write!(f, "Key type not implemented"),
             Error::CurveNotImplemented(curve) => write!(f, "Curve not implemented: '{:?}'", curve),
             Error::TimeError => write!(f, "Unable to convert date/time"),
@@ -199,6 +204,7 @@ impl fmt::Display for Error {
             Error::InvalidKeyLength => write!(f, "Invalid key length"),
             Error::InconsistentDIDKey => write!(f, "Inconsistent DID Key"),
             Error::DIDURL => write!(f, "Invalid DID URL"),
+            Error::DIDURLDereference(error) => write!(f, "Unable to dereference DID URL: {}", error),
             Error::URI => write!(f, "Invalid URI"),
             Error::RingError => write!(f, "Crypto error"),
             Error::ExpectedObject => write!(f, "Expected object"),
@@ -241,6 +247,7 @@ impl fmt::Display for Error {
             Error::ASN1Encode(e) => e.fmt(f),
             Error::JSON(e) => e.fmt(f),
             Error::SerdeJSON(e) => e.fmt(f),
+            Error::SerdeUrlEncoded(e) => e.fmt(f),
             Error::JSONLD(e) => e.fmt(f),
             Error::IRI(e) => e.fmt(f),
             Error::ParseInt(e) => e.fmt(f),
@@ -276,6 +283,12 @@ impl From<JSONError> for Error {
 impl From<SerdeJSONError> for Error {
     fn from(err: SerdeJSONError) -> Error {
         Error::SerdeJSON(err)
+    }
+}
+
+impl From<SerdeUrlEncodedError> for Error {
+    fn from(err: SerdeUrlEncodedError) -> Error {
+        Error::SerdeUrlEncoded(err)
     }
 }
 

@@ -165,65 +165,7 @@ impl Default for Algorithm {
     }
 }
 
-const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
-
 impl JWK {
-    // TODO: Use TryFrom
-    pub fn from_did_key(mut did: &str) -> Result<JWK, Error> {
-        if did.len() < 8 {
-            return Err(Error::InvalidKeyLength);
-        }
-        if &did[..8] != "did:key:" {
-            return Err(Error::Key);
-        }
-        // Match "did:key:<data>#<data>"
-        if let Some(i) = did.find('#') {
-            let begin = &did[8..i];
-            let end = &did[(i + 1)..];
-            if begin != end {
-                return Err(Error::InconsistentDIDKey);
-            }
-            did = &did[0..i];
-        }
-        let (_base, data) = multibase::decode(&did[8..])?;
-        if data.len() < 2 {
-            return Err(Error::InvalidKeyLength);
-        }
-        if data[0] == DID_KEY_ED25519_PREFIX[0] && data[1] == DID_KEY_ED25519_PREFIX[1] {
-            if data.len() - 2 != 32 {
-                return Err(Error::InvalidKeyLength);
-            }
-            return Ok(JWK {
-                params: Params::OKP(OctetParams {
-                    curve: "Ed25519".to_string(),
-                    public_key: Base64urlUInt(data[2..].to_vec()),
-                    private_key: None,
-                }),
-                public_key_use: None,
-                key_operations: None,
-                algorithm: None,
-                key_id: None,
-                x509_url: None,
-                x509_certificate_chain: None,
-                x509_thumbprint_sha1: None,
-                x509_thumbprint_sha256: None,
-            });
-        }
-        Err(Error::KeyTypeNotImplemented)
-    }
-
-    pub fn to_did(&self) -> Result<String, Error> {
-        self.params.to_did()
-    }
-
-    pub fn to_verification_method(&self) -> Result<String, Error> {
-        let did = self.to_did()?;
-        if !did.starts_with("did:key") {
-            return Err(Error::UnsupportedKeyType);
-        }
-        Ok(did.clone() + "#" + &did[8..])
-    }
-
     #[cfg(feature = "ring")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         use ring::signature::KeyPair;
@@ -293,28 +235,6 @@ impl JWK {
         let mut key = self.clone();
         key.params = key.params.to_public();
         key
-    }
-}
-
-impl Params {
-    pub fn to_did(&self) -> Result<String, Error> {
-        match self {
-            Self::OKP(okp) => okp.to_did(),
-            _ => Err(Error::UnsupportedKeyType),
-        }
-    }
-}
-
-impl OctetParams {
-    pub fn to_did(&self) -> Result<String, Error> {
-        match &self.curve[..] {
-            "Ed25519" => Ok("did:key:".to_string()
-                + &multibase::encode(
-                    multibase::Base::Base58Btc,
-                    [DID_KEY_ED25519_PREFIX.to_vec(), self.public_key.0.clone()].concat(),
-                )),
-            _ => Err(Error::UnsupportedKeyType),
-        }
     }
 }
 
@@ -650,11 +570,6 @@ mod tests {
         let key: JWK = serde_json::from_str(RSA_JSON).unwrap();
         let der = simple_asn1::der_encode(&key).unwrap();
         assert_eq!(der, RSA_DER);
-    }
-
-    #[test]
-    fn from_did_key() {
-        JWK::from_did_key("did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH").unwrap();
     }
 
     #[test]
