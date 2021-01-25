@@ -301,7 +301,7 @@ pub fn hash_n_degree_quads(
         // 5.3
         let mut chosen_issuer = None;
         // 5.4
-        for permutation in permute::permutations_of(&blank_node_list) {
+        for permutation in combination::permutate::from_vec(&blank_node_list) {
             // 5.4.1
             let mut issuer_copy = issuer.clone();
             // 5.4.2
