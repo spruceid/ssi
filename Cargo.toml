@@ -30,7 +30,7 @@ json = "0.12"
 futures = "0.3"
 iref = "1.1"
 lazy_static = "1.4"
-permute = "0.1"
+combination = "0.1"
 sha2 = { version = "0.9", optional = true }
 
 [workspace]
