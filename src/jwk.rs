@@ -27,7 +27,7 @@ pub struct JWTKeys {
     pub rs256_private_key: Option<JWK>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 pub struct JWK {
     #[serde(rename = "use")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -57,7 +57,7 @@ pub struct JWK {
     pub params: Params,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 #[serde(tag = "kty")]
 pub enum Params {
     EC(ECParams),
@@ -66,7 +66,7 @@ pub enum Params {
     OKP(OctetParams),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 pub struct ECParams {
     // Parameters for Elliptic Curve Public Keys
     pub curve: Option<String>,
@@ -80,7 +80,7 @@ pub struct ECParams {
     pub ecc_private_key: Option<Base64urlUInt>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default, Hash, Eq)]
 pub struct RSAParams {
     // Parameters for RSA Public Keys
     #[serde(rename = "n")]
@@ -105,7 +105,7 @@ pub struct RSAParams {
     pub other_primes_info: Option<Vec<Prime>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 #[serde(rename = "oct")]
 pub struct SymmetricParams {
     // Parameters for Symmetric Keys
@@ -113,7 +113,7 @@ pub struct SymmetricParams {
     pub key_value: Option<Base64urlUInt>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 #[serde(rename = "OKP")]
 pub struct OctetParams {
     // Parameters for Octet Key Pair Public Keys
@@ -127,7 +127,7 @@ pub struct OctetParams {
     pub private_key: Option<Base64urlUInt>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 pub struct Prime {
     #[serde(rename = "r")]
     pub prime_factor: Base64urlUInt,
@@ -137,13 +137,13 @@ pub struct Prime {
     pub factor_crt_coefficient: Base64urlUInt,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 #[serde(try_from = "String")]
 #[serde(into = "Base64urlUIntString")]
 pub struct Base64urlUInt(pub Vec<u8>);
 type Base64urlUIntString = String;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum Algorithm {
     HS256,
     HS384,
@@ -286,6 +286,14 @@ impl JWK {
         };
         None
     }
+
+    /// Strip private key material
+    // TODO: use separate type
+    pub fn to_public(&self) -> Self {
+        let mut key = self.clone();
+        key.params = key.params.to_public();
+        key
+    }
 }
 
 impl Params {
@@ -319,6 +327,41 @@ impl ToASN1 for JWK {
             // Symmetric(params) => params.to_asn1_class(class),
             Params::OKP(params) => params.to_asn1_class(class),
             _ => Err(Error::KeyTypeNotImplemented),
+        }
+    }
+}
+
+impl Params {
+    /// Strip private key material
+    pub fn to_public(&self) -> Self {
+        match self {
+            Self::EC(params) => Self::EC(params.to_public()),
+            Self::RSA(params) => Self::RSA(params.to_public()),
+            Self::Symmetric(params) => Self::Symmetric(params.to_public()),
+            Self::OKP(params) => Self::OKP(params.to_public()),
+        }
+    }
+}
+
+impl ECParams {
+    /// Strip private key material
+    pub fn to_public(&self) -> Self {
+        Self {
+            curve: self.curve.clone(),
+            x_coordinate: self.x_coordinate.clone(),
+            y_coordinate: self.y_coordinate.clone(),
+            ecc_private_key: None,
+        }
+    }
+}
+
+impl RSAParams {
+    /// Strip private key material
+    pub fn to_public(&self) -> Self {
+        Self {
+            modulus: self.modulus.clone(),
+            exponent: self.modulus.clone(),
+            ..Default::default()
         }
     }
 }
@@ -368,6 +411,24 @@ impl ToASN1 for RSAParams {
                 public_exponent,
             };
             key.to_asn1_class(class)
+        }
+    }
+}
+
+impl SymmetricParams {
+    /// Strip private key material
+    pub fn to_public(&self) -> Self {
+        Self { key_value: None }
+    }
+}
+
+impl OctetParams {
+    /// Strip private key material
+    pub fn to_public(&self) -> Self {
+        Self {
+            curve: self.curve.clone(),
+            public_key: self.public_key.clone(),
+            private_key: None,
         }
     }
 }
