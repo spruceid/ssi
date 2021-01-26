@@ -44,6 +44,7 @@ tokio = { version = "1.0", optional = true, features = ["macros"] }
 members = [
   #"did-tezos",
   "did-key",
+  "did-web",
   "vc-test",
 ]
 
