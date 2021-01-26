@@ -5,7 +5,7 @@ authors = ["Charles E. Lehner <charles.lehner@spruceid.com>"]
 edition = "2018"
 
 [dependencies]
-ssi = { path = "../" }
+ssi = { path = "../", default-features = false }
 async-trait = "0.1"
 thiserror = "1.0"
 multibase = "0.8"
