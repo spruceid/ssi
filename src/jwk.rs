@@ -77,6 +77,7 @@ pub struct ECParams {
 
     // Parameters for Elliptic Curve Private Keys
     #[serde(rename = "d")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ecc_private_key: Option<Base64urlUInt>,
 }
 
@@ -90,18 +91,25 @@ pub struct RSAParams {
 
     // Parameters for RSA Private Keys
     #[serde(rename = "d")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub private_exponent: Option<Base64urlUInt>,
     #[serde(rename = "p")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_prime_factor: Option<Base64urlUInt>,
     #[serde(rename = "q")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub second_prime_factor: Option<Base64urlUInt>,
     #[serde(rename = "dp")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_prime_factor_crt_exponent: Option<Base64urlUInt>,
     #[serde(rename = "dq")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub second_prime_factor_crt_exponent: Option<Base64urlUInt>,
     #[serde(rename = "qi")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub first_crt_coefficient: Option<Base64urlUInt>,
     #[serde(rename = "oth")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub other_primes_info: Option<Vec<Prime>>,
 }
 
@@ -124,6 +132,7 @@ pub struct OctetParams {
 
     // Parameters for Octet Key Pair Private Keys
     #[serde(rename = "d")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub private_key: Option<Base64urlUInt>,
 }
 
