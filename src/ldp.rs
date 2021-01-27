@@ -82,6 +82,11 @@ impl LinkedDataProofs {
                 x509_thumbprint_sha256: _,
             } => match &curve[..] {
                 "Ed25519" => {
+                    if let Some(ref vm) = options.verification_method {
+                        if vm.starts_with("did:tz:tz1") {
+                            return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(document, options, &key).await;
+                        }
+                    }
                     return Ed25519Signature2018::sign(document, options, &key).await;
                 }
                 _ => {
@@ -102,6 +107,12 @@ impl LinkedDataProofs {
         match proof.type_.as_str() {
             "RsaSignature2018" => RsaSignature2018::verify(proof, document, resolver).await,
             "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document, resolver).await,
+            "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
+                    proof, document, resolver,
+                )
+                .await
+            }
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -161,7 +172,7 @@ async fn sign(
             return Err(Error::AlgorithmMismatch);
         }
     }
-    let mut proof = Proof {
+    let proof = Proof {
         type_: type_.to_string(),
         proof_purpose: options.proof_purpose.clone(),
         proof_value: None,
@@ -174,6 +185,15 @@ async fn sign(
         property_set: None,
         jws: None,
     };
+    sign_proof(document, proof, key, algorithm).await
+}
+
+async fn sign_proof(
+    document: &(dyn LinkedDataDocument + Sync),
+    mut proof: Proof,
+    key: &JWK,
+    algorithm: Algorithm,
+) -> Result<Proof, Error> {
     let message = to_jws_payload(document, &proof).await?;
     let jws = crate::jws::detached_sign_unencoded_payload(algorithm, &message, &key)?;
     proof.jws = Some(jws);
@@ -224,5 +244,59 @@ impl ProofSuite for Ed25519Signature2018 {
             Algorithm::EdDSA,
         )
         .await
+    }
+}
+
+/// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz1` addresses.
+pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+#[async_trait]
+impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        use std::collections::HashMap;
+        if let Some(key_algorithm) = key.algorithm {
+            if key_algorithm != Algorithm::EdDSA {
+                return Err(Error::AlgorithmMismatch);
+            }
+        }
+        let mut property_set = HashMap::new();
+        let jwk_value = serde_json::to_value(key.to_public())?;
+        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        let proof = Proof {
+            type_: "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021".to_string(),
+            proof_purpose: options.proof_purpose.clone(),
+            proof_value: None,
+            verification_method: options.verification_method.clone(),
+            creator: None,
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            nonce: None,
+            jws: None,
+            property_set: Some(property_set),
+        };
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        sign_proof(document, proof, key, Algorithm::EdDSA).await
+    }
+
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        _resolver: &(dyn DIDResolver + Sync),
+    ) -> Result<(), Error> {
+        let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+        let jwk: JWK = match proof.property_set {
+            Some(ref props) => {
+                let jwk_value = props.get("publicKeyJwk").ok_or(Error::MissingKey)?;
+                serde_json::from_value(jwk_value.clone())?
+            }
+            None => return Err(Error::MissingKey),
+        };
+        let message = to_jws_payload(document, proof).await?;
+        crate::jws::detached_verify(&jws, &message, &jwk)?;
+        Ok(())
     }
 }
