@@ -31,7 +31,13 @@ packages.
 
 ## Install
 
+Please note you must be using Rust 1.51.0 or higher, which is currently `nightly`.
+
 ```sh
+# if using rustup
+$ rustup toolchain install nightly
+$ rustup default nightly
+
 $ git clone https://github.com/spruceid/ssi .
 $ cd ssi
 $ git submodule update
