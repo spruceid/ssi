@@ -46,7 +46,7 @@ $ cargo build
 
 ## Additional resources
 
-[Rust]: https://www.rust-lang.org/
-[rustup]: https://rustup.rs/
-[Cargo]: https://doc.rust-lang.org/cargo/
-[installing-rust]: https://doc.rust-lang.org/nightly/edition-guide/rust-2018/rustup-for-managing-rust-versions.html
+- [Rust](https://www.rust-lang.org/)
+- [rustup](https://rustup.rs/)
+- [Cargo](https://doc.rust-lang.org/cargo/)
+- [installing-rust](https://doc.rust-lang.org/nightly/edition-guide/rust-2018/rustup-for-managing-rust-versions.html)
