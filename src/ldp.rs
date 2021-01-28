@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
-use crate::did::Resource;
+use crate::did::{Resource, Source};
 use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMetadata};
 use crate::error::Error;
 use crate::hash::sha256;
@@ -285,9 +285,10 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
-        _resolver: &(dyn DIDResolver + Sync),
+        resolver: &(dyn DIDResolver + Sync),
     ) -> Result<(), Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+        let didtz = resolver.to_did_method().ok_or(Error::MissingKey)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
                 let jwk_value = props.get("publicKeyJwk").ok_or(Error::MissingKey)?;
@@ -295,6 +296,12 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             }
             None => return Err(Error::MissingKey),
         };
+        let did = didtz
+            .generate(&Source::Key(&jwk))
+            .ok_or(Error::MissingKey)?;
+        if Some(did + "#blockchainAccountId") != proof.verification_method {
+            return Err(Error::KeyMismatch);
+        }
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
         Ok(())

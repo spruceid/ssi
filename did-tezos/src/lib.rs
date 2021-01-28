@@ -105,6 +105,10 @@ impl DIDResolver for DIDTz {
 
         (res_meta, Some(doc), Some(doc_meta))
     }
+
+    fn to_did_method(&self) -> Option<&(dyn DIDMethod + Sync)> {
+        Some(self)
+    }
 }
 
 fn curve_to_prefixes(curve: &str) -> Option<(&'static [u8; 4], &'static [u8; 3])> {
@@ -293,6 +297,7 @@ mod tests {
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
         eprintln!("vm {:?}", issue_options.verification_method);
+        let vc_no_proof = vc.clone();
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
@@ -302,7 +307,23 @@ mod tests {
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
-        vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None, &DIDTz).await.errors.len() > 0);
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
+        assert!(vc_bad_issuer.verify(None, &DIDTz).await.errors.len() > 0);
+
+        // Check that proof JWK must match proof verificationMethod
+        let mut vc_wrong_key = vc_no_proof.clone();
+        let other_key = JWK::generate_ed25519().unwrap();
+        use ssi::ldp::ProofSuite;
+        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
+            &vc_no_proof,
+            &issue_options,
+            &other_key,
+        )
+        .await
+        .unwrap();
+        vc_wrong_key.add_proof(proof_bad);
+        vc_wrong_key.validate().unwrap();
+        assert!(vc_wrong_key.verify(None, &DIDTz).await.errors.len() > 0);
     }
 }
