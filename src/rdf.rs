@@ -13,20 +13,20 @@ use crate::error::Error;
 // https://json-ld.github.io/normalization/spec/
 // https://www.w3.org/TR/n-quads/#terminals
 
-/// https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-dataset
+/// <https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-dataset>
 #[derive(Debug, Clone, Default)]
 pub struct DataSet {
     pub default_graph: Graph,
     pub named_graphs: HashMap<GraphLabel, Graph>,
 }
 
-/// https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-graph
+/// <https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-graph>
 #[derive(Debug, Clone, Default)]
 pub struct Graph {
     pub triples: Vec<Triple>,
 }
 
-/// https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple
+/// <https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple>
 #[derive(Debug, Clone)]
 pub struct Triple {
     pub subject: Subject,

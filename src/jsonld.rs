@@ -19,21 +19,21 @@ pub enum RdfDirection {
     CompoundLiteral,
 }
 
-/// https://w3c.github.io/json-ld-api/#the-jsonldoptions-type
+/// <https://w3c.github.io/json-ld-api/#the-jsonldoptions-type>
 // Options implemented as needed
 #[derive(Debug, Clone)]
 pub struct JsonLdOptions {
-    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-base
+    /// <https://w3c.github.io/json-ld-api/#dom-jsonldoptions-base>
     pub base: Option<String>,
-    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-expandcontext
+    /// <https://w3c.github.io/json-ld-api/#dom-jsonldoptions-expandcontext>
     pub expand_context: Option<String>,
-    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-ordered
+    /// <https://w3c.github.io/json-ld-api/#dom-jsonldoptions-ordered>
     pub ordered: bool,
-    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-processingmode
+    /// <https://w3c.github.io/json-ld-api/#dom-jsonldoptions-processingmode>
     pub processing_mode: ProcessingMode,
-    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-producegeneralizedrdf
+    /// <https://w3c.github.io/json-ld-api/#dom-jsonldoptions-producegeneralizedrdf>
     pub produce_generalized_rdf: Option<bool>,
-    /// https://w3c.github.io/json-ld-api/#dom-jsonldoptions-rdfdirection
+    /// <https://w3c.github.io/json-ld-api/#dom-jsonldoptions-rdfdirection>
     pub rdf_direction: Option<RdfDirection>,
 }
 
@@ -52,7 +52,7 @@ impl Default for JsonLdOptions {
     }
 }
 
-/// https://www.w3.org/TR/json-ld11/#keywords
+/// <https://www.w3.org/TR/json-ld11/#keywords>
 pub const AT_BASE: &str = "@base";
 pub const AT_CONTAINER: &str = "@container";
 pub const AT_CONTEXT: &str = "@context";
@@ -265,7 +265,7 @@ pub struct BlankNodeIdentifierGenerator {
 }
 
 impl BlankNodeIdentifierGenerator {
-    /// https://w3c.github.io/json-ld-api/#generate-blank-node-identifier
+    /// <https://w3c.github.io/json-ld-api/#generate-blank-node-identifier>
     pub fn generate(&mut self, identifier: &JsonValue) -> Result<JsonValue, Error> {
         let identifier_str = if identifier.is_null() {
             None
@@ -296,7 +296,7 @@ impl BlankNodeIdentifierGenerator {
     }
 }
 
-/// https://w3c.github.io/json-ld-api/#node-map-generation
+/// <https://w3c.github.io/json-ld-api/#node-map-generation>
 pub fn generate_node_map(
     element: JsonValue,
     node_map: &mut NodeMap,
@@ -705,7 +705,7 @@ pub fn generate_node_map(
     Ok(())
 }
 
-/// https://w3c.github.io/json-ld-api/#deserialize-json-ld-to-rdf-algorithm
+/// <https://w3c.github.io/json-ld-api/#deserialize-json-ld-to-rdf-algorithm>
 pub fn json_ld_to_rdf(
     node_map: &NodeMap,
     dataset: &mut DataSet,
@@ -820,14 +820,14 @@ pub enum ItemObject {
     Node(NodeObject),
 }
 
-/// https://www.w3.org/TR/json-ld11/#dfn-value-object
+/// <https://www.w3.org/TR/json-ld11/#dfn-value-object>
 #[derive(Debug, Clone)]
 pub struct NodeObject {
     pub id: Option<String>,
     pub entries: json::object::Object,
 }
 
-/// https://www.w3.org/TR/json-ld11/#dfn-list-object
+/// <https://www.w3.org/TR/json-ld11/#dfn-list-object>
 #[derive(Debug, Clone)]
 pub struct ListObject {
     pub list: JsonValue,
@@ -835,7 +835,7 @@ pub struct ListObject {
     pub more_properties: json::object::Object,
 }
 
-/// https://www.w3.org/TR/json-ld11/#value-objects
+/// <https://www.w3.org/TR/json-ld11/#value-objects>
 #[derive(Debug, Clone)]
 pub struct ValueObject {
     pub value: JsonValue,
@@ -1036,7 +1036,7 @@ impl TryFrom<&JsonValue> for ItemObject {
     }
 }
 
-/// https://w3c.github.io/json-ld-api/#object-to-rdf-conversion
+/// <https://w3c.github.io/json-ld-api/#object-to-rdf-conversion>
 pub fn object_to_rdf(
     item: ItemObject,
     list_triples: &mut Vec<Triple>,
@@ -1255,7 +1255,7 @@ pub fn object_to_rdf(
     Ok(Some(Object::Literal(literal)))
 }
 
-/// https://w3c.github.io/json-ld-api/#dfn-canonical-lexical-form
+/// <https://w3c.github.io/json-ld-api/#dfn-canonical-lexical-form>
 pub fn canonicalize_json(value: &JsonValue) -> String {
     // TODO: make sure it follows RFC 8785 (JCS)
     // Converting to serde Value loses the order of keys, and serde_jcs does not provide from_str
@@ -1301,7 +1301,7 @@ pub fn canonicalize_json(value: &JsonValue) -> String {
     }
 }
 
-/// https://www.w3.org/TR/json-ld11/#the-rdf-json-datatype
+/// <https://www.w3.org/TR/json-ld11/#the-rdf-json-datatype>
 pub fn canonicalize_json_string(string: &str) -> String {
     let mut out = String::with_capacity(string.len() + 6);
     out.push('"');
@@ -1336,7 +1336,7 @@ pub fn canonicalize_json_number(num: &JsonValue) -> String {
     num_str
 }
 
-/// https://w3c.github.io/json-ld-api/#list-to-rdf-conversion
+/// <https://w3c.github.io/json-ld-api/#list-to-rdf-conversion>
 pub fn list_to_rdf(
     list: JsonValue,
     list_triples: &mut Vec<Triple>,
@@ -1411,7 +1411,7 @@ pub fn list_to_rdf(
     Ok(first)
 }
 
-/// https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf
+/// <https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf>
 pub async fn json_to_dataset<T>(
     json: &str,
     more_contexts_json: Option<&String>,
@@ -1568,7 +1568,7 @@ mod tests {
     }
 
     #[async_std::test]
-    /// https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html
+    /// <https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html>
     async fn to_rdf_test_suite() {
         let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
         let manifest = json::parse(manifest_str).unwrap();

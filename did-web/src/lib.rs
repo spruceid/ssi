@@ -49,7 +49,7 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
     Ok(url)
 }
 
-/// https://w3c-ccg.github.io/did-method-web/#read-resolve
+/// <https://w3c-ccg.github.io/did-method-web/#read-resolve>
 #[async_trait]
 impl DIDResolver for DIDWeb {
     async fn resolve(

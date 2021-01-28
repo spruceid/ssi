@@ -162,7 +162,7 @@ pub enum Source<'a> {
 #[async_trait]
 pub trait DIDMethod: DIDResolver {
     /// Get the DID method name.
-    /// https://w3c.github.io/did-core/#method-schemes
+    /// <https://w3c.github.io/did-core/#method-schemes>
     fn name(&self) -> &'static str;
 
     // TODO: allow returning errors

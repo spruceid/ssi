@@ -46,7 +46,7 @@ pub struct ResolutionInputMetadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
-/// https://w3c.github.io/did-core/#did-resolution-metadata-properties
+/// <https://w3c.github.io/did-core/#did-resolution-metadata-properties>
 pub struct ResolutionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -67,8 +67,8 @@ pub struct DocumentMetadata {
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
-/// https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties
-/// https://w3c-ccg.github.io/did-resolution/#dereferencing-input-metadata-properties
+/// <https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties>
+/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-input-metadata-properties>
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct DereferencingInputMetadata {
@@ -83,7 +83,7 @@ pub struct DereferencingInputMetadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-/// https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties
+/// <https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties>
 pub struct DereferencingMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -202,8 +202,8 @@ pub trait DIDResolver {
 
 /// Dereference a DID URL
 ///
-/// https://w3c.github.io/did-core/#did-url-dereferencing
-/// https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm
+/// <https://w3c.github.io/did-core/#did-url-dereferencing>
+/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm>
 pub async fn dereference(
     resolver: &(dyn DIDResolver + Sync),
     did_url_str: &str,
