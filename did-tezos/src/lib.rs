@@ -1,5 +1,5 @@
 use ssi::did::{
-    Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
+    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
 };
 use ssi::did_resolve::{
@@ -77,7 +77,7 @@ impl DIDResolver for DIDTz {
         };
 
         let doc = Document {
-            context: Contexts::One(DEFAULT_CONTEXT.to_string()),
+            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
             id: did.to_string(),
             authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
             assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
