@@ -79,10 +79,17 @@ pub struct Document {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
-#[serde(try_from = "OneOrMany<String>")]
+pub enum Context {
+    URI(String),
+    Object(Map<String, Value>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(untagged)]
+#[serde(try_from = "OneOrMany<Context>")]
 pub enum Contexts {
-    One(String),
-    Many(Vec<String>),
+    One(Context),
+    Many(Vec<Context>),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
@@ -309,12 +316,13 @@ impl Default for Document {
     }
 }
 
-impl TryFrom<OneOrMany<String>> for Contexts {
+impl TryFrom<OneOrMany<Context>> for Contexts {
     type Error = Error;
-    fn try_from(context: OneOrMany<String>) -> Result<Self, Self::Error> {
+    fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
         let first_uri = match context.first() {
             None => return Err(Error::MissingContext),
-            Some(uri) => uri,
+            Some(Context::URI(uri)) => uri,
+            Some(Context::Object(_)) => return Err(Error::InvalidContext),
         };
         if first_uri != DEFAULT_CONTEXT && first_uri != V0_11_CONTEXT {
             return Err(Error::InvalidContext);
@@ -326,8 +334,8 @@ impl TryFrom<OneOrMany<String>> for Contexts {
     }
 }
 
-impl From<Contexts> for OneOrMany<String> {
-    fn from(contexts: Contexts) -> OneOrMany<String> {
+impl From<Contexts> for OneOrMany<Context> {
+    fn from(contexts: Contexts) -> OneOrMany<Context> {
         match contexts {
             Contexts::One(context) => OneOrMany::One(context),
             Contexts::Many(contexts) => OneOrMany::Many(contexts),
@@ -342,18 +350,22 @@ impl DocumentBuilder {
         if self.id == None || self.id == Some("".to_string()) {
             return Err(Error::MissingDocumentId);
         }
-        if let Some(first_context) = match &self.context {
-            None => None,
-            Some(Contexts::One(context)) => Some(context),
-            Some(Contexts::Many(contexts)) => {
-                if !contexts.is_empty() {
-                    Some(&contexts[0])
-                } else {
-                    None
+        if let Some(ref context) = self.context {
+            let first_context = match context {
+                Contexts::One(context) => context,
+                Contexts::Many(contexts) => {
+                    if contexts.is_empty() {
+                        return Err(Error::MissingContext);
+                    } else {
+                        &contexts[0]
+                    }
                 }
-            }
-        } {
-            if first_context != DEFAULT_CONTEXT && first_context != V0_11_CONTEXT {
+            };
+            let first_uri = match first_context {
+                Context::URI(uri) => uri,
+                Context::Object(_) => return Err(Error::InvalidContext),
+            };
+            if first_uri != DEFAULT_CONTEXT && first_uri != V0_11_CONTEXT {
                 return Err(Error::InvalidContext);
             }
         }
@@ -364,7 +376,7 @@ impl DocumentBuilder {
 impl Document {
     pub fn new(id: &str) -> Document {
         Document {
-            context: Contexts::One(DEFAULT_CONTEXT.to_string()),
+            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
             id: String::from(id),
             also_known_as: None,
             controller: None,
@@ -511,7 +523,7 @@ mod tests {
     fn build_document_invalid_context() {
         let id = "did:test:deadbeefcafe";
         let doc = DocumentBuilder::default()
-            .context(Contexts::One("example:bad".to_string()))
+            .context(Contexts::One(Context::URI("example:bad".to_string())))
             .id(id)
             .build()
             .unwrap();
