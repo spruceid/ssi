@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::hash::sha256;
 use crate::rdf::{BlankNodeLabel, DataSet, Predicate, Statement};
 
-/// https://json-ld.github.io/normalization/spec/#normalization-state
+/// <https://json-ld.github.io/normalization/spec/#normalization-state>
 #[derive(Debug, Clone)]
 pub struct NormalizationState<'a> {
     pub blank_node_to_quads: Map<&'a str, Vec<&'a Statement>>,
@@ -13,8 +13,8 @@ pub struct NormalizationState<'a> {
     pub canonical_issuer: IdentifierIssuer,
 }
 
-/// https://json-ld.github.io/normalization/spec/#dfn-identifier-issuer
-/// https://json-ld.github.io/normalization/spec/#blank-node-identifier-issuer-state
+/// <https://json-ld.github.io/normalization/spec/#dfn-identifier-issuer>  
+/// <https://json-ld.github.io/normalization/spec/#blank-node-identifier-issuer-state>
 #[derive(Debug, Clone)]
 pub struct IdentifierIssuer {
     pub identifier_prefix: String,
@@ -52,7 +52,7 @@ fn digest_to_lowerhex(digest: &[u8]) -> String {
         .collect::<String>()
 }
 
-/// https://json-ld.github.io/normalization/spec/#hash-first-degree-quads
+/// <https://json-ld.github.io/normalization/spec/#hash-first-degree-quads>
 pub fn hash_first_degree_quads(
     normalization_state: &mut NormalizationState,
     reference_blank_node_identifier: &str,
@@ -91,7 +91,7 @@ pub fn hash_first_degree_quads(
     Ok(hash_hex)
 }
 
-/// https://json-ld.github.io/normalization/spec/
+/// <https://json-ld.github.io/normalization/spec/>
 pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
     // https://json-ld.github.io/normalization/spec/#algorithm
     // 1
@@ -224,7 +224,7 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
     Ok(normalized_dataset)
 }
 
-/// https://json-ld.github.io/normalization/spec/#issue-identifier-algorithm
+/// <https://json-ld.github.io/normalization/spec/#issue-identifier-algorithm>
 pub fn issue_identifier(
     identifier_issuer: &mut IdentifierIssuer,
     existing_identifier: &str,
@@ -248,7 +248,7 @@ pub fn issue_identifier(
     Ok(issued_identifier)
 }
 
-/// https://json-ld.github.io/normalization/spec/#hash-n-degree-quads
+/// <https://json-ld.github.io/normalization/spec/#hash-n-degree-quads>
 pub fn hash_n_degree_quads(
     normalization_state: &mut NormalizationState,
     identifier: &str,
@@ -374,7 +374,7 @@ pub fn hash_n_degree_quads(
     })
 }
 
-/// https://json-ld.github.io/normalization/spec/#hash-related-blank-node
+/// <https://json-ld.github.io/normalization/spec/#hash-related-blank-node>
 pub fn hash_related_blank_node(
     normalization_state: &mut NormalizationState,
     related: &str,
@@ -416,7 +416,7 @@ mod tests {
     use super::*;
 
     #[test]
-    /// https://json-ld.github.io/normalization/tests/
+    /// <https://json-ld.github.io/normalization/tests/>
     fn normalization_test_suite() {
         use std::fs::{self};
         use std::path::PathBuf;
