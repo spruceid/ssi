@@ -6,6 +6,7 @@ use hyper::{header, Client, Request, StatusCode, Uri};
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json;
+use serde_json::Value;
 use serde_urlencoded;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -14,6 +15,7 @@ use std::convert::TryFrom;
 
 use crate::did::{DIDMethod, Document, Resource, DIDURL};
 use crate::error::Error;
+use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
 
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
 pub const ERROR_INVALID_DID: &str = "invalid-did";
@@ -145,18 +147,31 @@ pub struct ContentMetadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+/// <https://w3c-ccg.github.io/did-resolution/#did-resolution-result>
 pub struct ResolutionResult {
+    #[serde(rename = "@context")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "didDocument")]
-    document: Option<Document>,
+    pub context: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "didResolutionMetadata")]
-    resolution_metadata: Option<ResolutionMetadata>,
+    pub did_document: Option<Document>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "didDocumentMetadata")]
-    document_metadata: Option<DocumentMetadata>,
+    pub did_resolution_metadata: Option<ResolutionMetadata>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub did_document_metadata: Option<DocumentMetadata>,
     #[serde(flatten)]
-    property_set: Option<HashMap<String, Metadata>>,
+    pub property_set: Option<HashMap<String, Value>>,
+}
+
+impl Default for ResolutionResult {
+    fn default() -> Self {
+        Self {
+            context: Some(Value::String(DID_RESOLUTION_V1_CONTEXT.to_string())),
+            did_document: None,
+            did_resolution_metadata: None,
+            did_document_metadata: None,
+            property_set: None,
+        }
+    }
 }
 
 #[async_trait]
@@ -473,21 +488,15 @@ impl DIDResolver for HTTPDIDResolver {
         let result: ResolutionResult = match serde_json::from_slice(&doc_representation) {
             Ok(result) => result,
             Err(err) => ResolutionResult {
-                document: None,
-                resolution_metadata: Some(ResolutionMetadata {
+                did_resolution_metadata: Some(ResolutionMetadata {
                     error: Some("JSON Error: ".to_string() + &err.to_string()),
                     content_type: None,
                     property_set: None,
                 }),
-                document_metadata: None,
-                property_set: None,
+                ..Default::default()
             },
         };
-        let mut res_meta = result.resolution_metadata.unwrap_or(ResolutionMetadata {
-            error: None,
-            content_type: None,
-            property_set: None,
-        });
+        let mut res_meta = result.did_resolution_metadata.unwrap_or_default();
         if resp.status() == StatusCode::NOT_FOUND {
             res_meta.error = Some(ERROR_NOT_FOUND.to_string());
         }
@@ -509,7 +518,7 @@ impl DIDResolver for HTTPDIDResolver {
                 }
             }));
         };
-        (res_meta, result.document, result.document_metadata)
+        (res_meta, result.did_document, result.did_document_metadata)
     }
     // Use default resolveRepresentation implementation in terms of resolve,
     // until resolveRepresentation has its own HTTP(S) binding:
@@ -708,10 +717,10 @@ mod tests {
                         .insert(header::CONTENT_TYPE, content_type.parse().unwrap());
                 }
                 let result = ResolutionResult {
-                    document: doc_opt,
-                    resolution_metadata: Some(res_meta),
-                    document_metadata: doc_meta_opt,
-                    property_set: None,
+                    did_document: doc_opt,
+                    did_resolution_metadata: Some(res_meta),
+                    did_document_metadata: doc_meta_opt,
+                    ..Default::default()
                 };
                 let body = Body::from(serde_json::to_vec_pretty(&result).unwrap());
                 Ok::<_, hyper::Error>(Response::from_parts(parts, body))
