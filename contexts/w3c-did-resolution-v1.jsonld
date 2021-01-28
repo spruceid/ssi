@@ -1,0 +1,22 @@
+{
+  "@context": [
+    {
+      "@version": 1.1
+    },
+    {
+      "id": "@id",
+      "type": "@type",
+      "didDocument": {
+        "@id": "https://w3id.org/did-resolution#dfn-did-document"
+      },
+      "didResolutionMetadata": {
+        "@id": "https://w3id.org/did-resolution#output-resolutionmetadata",
+        "@type": "@json"
+      },
+      "didDocumentMetadata": {
+        "@id": "https://w3id.org/did-resolution#output-documentmetadata",
+        "@type": "@json"
+      }
+    }
+  ]
+}

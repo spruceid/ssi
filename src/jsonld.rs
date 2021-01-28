@@ -118,6 +118,7 @@ pub const SECURITY_V1_CONTEXT: &str = "https://w3id.org/security/v1";
 pub const SECURITY_V2_CONTEXT: &str = "https://w3id.org/security/v2";
 pub const SCHEMA_ORG_CONTEXT: &str = "https://schema.org/";
 pub const DID_V1_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+pub const DID_RESOLUTION_V1_CONTEXT: &str = "https://w3id.org/did-resolution/v1";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -160,6 +161,12 @@ lazy_static! {
         let jsonld = include_str!("../contexts/w3c-did-v1.jsonld");
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(DID_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
+    pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = include_str!("../contexts/w3c-did-resolution-v1.jsonld");
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
 }
