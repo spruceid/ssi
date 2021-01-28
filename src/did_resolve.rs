@@ -12,7 +12,7 @@ use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
 
-use crate::did::{Document, Resource, DIDURL};
+use crate::did::{DIDMethod, Document, Resource, DIDURL};
 use crate::error::Error;
 
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
@@ -192,6 +192,11 @@ pub trait DIDResolver {
             },
         };
         (res_meta, doc_representation, doc_meta)
+    }
+
+    /// Cast the resolver as a [`DIDMethod`], if possible.
+    fn to_did_method(&self) -> Option<&(dyn DIDMethod + Sync)> {
+        None
     }
 }
 
