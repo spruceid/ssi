@@ -19,6 +19,7 @@ pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
 pub const ERROR_INVALID_DID: &str = "invalid-did";
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
 pub const ERROR_NOT_FOUND: &str = "not-found";
+pub const ERROR_METHOD_NOT_SUPPORTED: &str = "method-not-supported";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
