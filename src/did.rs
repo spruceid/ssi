@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use crate::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    ERROR_NOT_FOUND,
+    ERROR_METHOD_NOT_SUPPORTED,
 };
 use crate::error::Error;
 use crate::jwk::JWK;
@@ -237,7 +237,11 @@ impl<'a> DIDResolver for DIDMethods<'a> {
         let method = match self.methods.get(method_name) {
             Some(method) => method,
             None => {
-                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
+                return (
+                    ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED),
+                    None,
+                    None,
+                );
             }
         };
         method.resolve(did, input_metadata).await
