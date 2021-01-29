@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.1.0] - 2021-01-27
+[Initial release with DIDKit][didkit-initial-release]
 ### Added
 - Issuing and verifying [LD-Proof][] and JWT [Verifiable Credentials][vc-data-model] and [Verifiable Presentations][].
 - Testing with [VC Test Suite][vc-test-suite].
@@ -41,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [did:key]: https://w3c-ccg.github.io/did-method-key/
 [did:tz]: https://did-tezos-draft.spruceid.com/
 [did:web]: https://w3c-ccg.github.io/did-method-web/
+[didkit-initial-release]: https://sprucesystems.medium.com/didkit-v0-1-is-live-d0ea6638dbc9
 [ed25519-dalek]: https://github.com/dalek-cryptography/ed25519-dalek
 [plugfest-2020]: https://github.com/w3c-ccg/vc-http-api/tree/master/packages/plugfest-2020
 [rfc7515]: https://tools.ietf.org/html/rfc7515
@@ -60,4 +64,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-http-api]: https://w3c-ccg.github.io/vc-http-api/
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
 
-[Unreleased]: https://github.com/spruceid/ssi/commits/main
+[Unreleased]: https://github.com/spruceid/ssi/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/spruceid/ssi/releases/tag/v0.1.0
