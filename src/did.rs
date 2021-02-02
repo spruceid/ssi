@@ -207,6 +207,27 @@ impl<'a> DIDMethods<'a> {
     pub fn to_resolver(&self) -> &dyn DIDResolver {
         self
     }
+
+    /// Get DID method to handle a given DID
+    pub fn get_method(&self, did: &str) -> Result<&&'a dyn DIDMethod, ResolutionMetadata> {
+        let mut parts = did.split(':');
+        if parts.next() != Some("did") {
+            return Err(ResolutionMetadata::from_error(ERROR_INVALID_DID));
+        };
+        let method_name = match parts.next() {
+            Some(method_name) => method_name,
+            None => {
+                return Err(ResolutionMetadata::from_error(ERROR_INVALID_DID));
+            }
+        };
+        let method = match self.methods.get(method_name) {
+            Some(method) => method,
+            None => {
+                return Err(ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED));
+            }
+        };
+        Ok(method)
+    }
 }
 
 #[async_trait]
@@ -220,35 +241,22 @@ impl<'a> DIDResolver for DIDMethods<'a> {
         Option<Document>,
         Option<DocumentMetadata>,
     ) {
-        let mut parts = did.split(':');
-        if parts.next() != Some("did") {
-            return (
-                ResolutionMetadata::from_error(ERROR_INVALID_DID),
-                None,
-                None,
-            );
-        };
-        let method_name = match parts.next() {
-            Some(method_name) => method_name,
-            None => {
-                return (
-                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
-                    None,
-                    None,
-                );
-            }
-        };
-        let method = match self.methods.get(method_name) {
-            Some(method) => method,
-            None => {
-                return (
-                    ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED),
-                    None,
-                    None,
-                );
-            }
+        let method = match self.get_method(did) {
+            Ok(method) => method,
+            Err(err_meta) => return (err_meta, None, None),
         };
         method.resolve(did, input_metadata).await
+    }
+    async fn resolve_representation(
+        &self,
+        did: &str,
+        input_metadata: &ResolutionInputMetadata,
+    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
+        let method = match self.get_method(did) {
+            Ok(method) => method,
+            Err(err_meta) => return (err_meta, Vec::new(), None),
+        };
+        method.resolve_representation(did, input_metadata).await
     }
 }
 
