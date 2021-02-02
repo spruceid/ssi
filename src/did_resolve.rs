@@ -175,7 +175,7 @@ impl Default for ResolutionResult {
 }
 
 #[async_trait]
-pub trait DIDResolver {
+pub trait DIDResolver: Sync {
     async fn resolve(
         &self,
         did: &str,
@@ -190,10 +190,7 @@ pub trait DIDResolver {
         &self,
         did: &str,
         input_metadata: &ResolutionInputMetadata,
-    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>)
-    where
-        Self: Sized,
-    {
+    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
         // Implement resolveRepresentation in terms of resolve.
         let (mut res_meta, doc, doc_meta) = self.resolve(did, input_metadata).await;
         let doc_representation = match doc {
@@ -211,7 +208,7 @@ pub trait DIDResolver {
     }
 
     /// Cast the resolver as a [`DIDMethod`], if possible.
-    fn to_did_method(&self) -> Option<&(dyn DIDMethod + Sync)> {
+    fn to_did_method(&self) -> Option<&dyn DIDMethod> {
         None
     }
 }
@@ -221,7 +218,7 @@ pub trait DIDResolver {
 /// <https://w3c.github.io/did-core/#did-url-dereferencing>
 /// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm>
 pub async fn dereference(
-    resolver: &(dyn DIDResolver + Sync),
+    resolver: &dyn DIDResolver,
     did_url_str: &str,
     did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
 ) -> (DereferencingMetadata, Content, ContentMetadata) {
@@ -299,7 +296,7 @@ pub async fn dereference(
 
 // https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary
 async fn dereference_primary_resource(
-    _resolver: &(dyn DIDResolver + Sync),
+    _resolver: &dyn DIDResolver,
     did_url: &DIDURL,
     _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
     res_meta: &ResolutionMetadata,
@@ -333,7 +330,7 @@ async fn dereference_primary_resource(
 
 // https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary
 async fn dereference_secondary_resource(
-    _resolver: &(dyn DIDResolver + Sync),
+    _resolver: &dyn DIDResolver,
     mut did_url: DIDURL,
     fragment: String,
     _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,

@@ -606,7 +606,7 @@ impl Credential {
     async fn filter_proofs(
         &self,
         options: Option<LinkedDataProofOptions>,
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> Vec<&Proof> {
         let mut options = options.unwrap_or_default();
         // Use issuer as default verificationMethod
@@ -630,7 +630,7 @@ impl Credential {
     pub async fn verify(
         &self,
         options: Option<LinkedDataProofOptions>,
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> VerificationResult {
         let proofs = self.filter_proofs(options, resolver).await;
         if proofs.is_empty() {
@@ -777,7 +777,7 @@ impl Presentation {
     async fn filter_proofs(
         &self,
         options: Option<LinkedDataProofOptions>,
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> Vec<&Proof> {
         let mut options = options.unwrap_or_default();
         // Use holder as default verificationMethod
@@ -796,7 +796,7 @@ impl Presentation {
     pub async fn verify(
         &self,
         options: Option<LinkedDataProofOptions>,
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> VerificationResult {
         let proofs = self.filter_proofs(options, resolver).await;
         if proofs.is_empty() {
@@ -820,7 +820,7 @@ impl Presentation {
 /// Get a DID's first verification method
 pub async fn get_verification_method(
     did: &str,
-    resolver: &(dyn DIDResolver + Sync),
+    resolver: &dyn DIDResolver,
 ) -> Option<String> {
     let (res_meta, doc_opt, _meta) = resolver
         .resolve(did, &ResolutionInputMetadata::default())
@@ -899,7 +899,7 @@ impl Proof {
     pub async fn verify(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> VerificationResult {
         LinkedDataProofs::verify(self, document, resolver)
             .await

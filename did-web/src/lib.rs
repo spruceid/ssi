@@ -161,7 +161,7 @@ impl DIDMethod for DIDWeb {
         return "web";
     }
 
-    fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+    fn to_resolver(&self) -> &dyn DIDResolver {
         self
     }
 }

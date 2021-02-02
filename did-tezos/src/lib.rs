@@ -106,7 +106,7 @@ impl DIDResolver for DIDTz {
         (res_meta, Some(doc), Some(doc_meta))
     }
 
-    fn to_did_method(&self) -> Option<&(dyn DIDMethod + Sync)> {
+    fn to_did_method(&self) -> Option<&dyn DIDMethod> {
         Some(self)
     }
 }
@@ -167,7 +167,7 @@ impl DIDMethod for DIDTz {
         Some(did)
     }
 
-    fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+    fn to_resolver(&self) -> &dyn DIDResolver {
         self
     }
 }

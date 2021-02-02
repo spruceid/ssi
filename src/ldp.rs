@@ -39,7 +39,7 @@ pub trait ProofSuite {
     async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
         verify(proof, document, resolver).await
     }
@@ -102,7 +102,7 @@ impl LinkedDataProofs {
     pub async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
         match proof.type_.as_str() {
             "RsaSignature2018" => RsaSignature2018::verify(proof, document, resolver).await,
@@ -121,7 +121,7 @@ impl LinkedDataProofs {
 /// Resolve a verificationMethod to a key
 pub async fn resolve_key(
     verification_method: &str,
-    resolver: &(dyn DIDResolver + Sync),
+    resolver: &dyn DIDResolver,
 ) -> Result<JWK, Error> {
     let (res_meta, object, _meta) = dereference(
         resolver,
@@ -203,7 +203,7 @@ async fn sign_proof(
 async fn verify(
     proof: &Proof,
     document: &(dyn LinkedDataDocument + Sync),
-    resolver: &(dyn DIDResolver + Sync),
+    resolver: &dyn DIDResolver,
 ) -> Result<(), Error> {
     let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let verification_method = proof
@@ -285,7 +285,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
-        resolver: &(dyn DIDResolver + Sync),
+        resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let didtz = resolver.to_did_method().ok_or(Error::MissingKey)?;

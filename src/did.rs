@@ -183,31 +183,28 @@ pub trait DIDMethod: DIDResolver {
     /// This is a workaround for [not being able to cast a trait object to a supertrait object](https://github.com/rust-lang/rfcs/issues/2765).
     ///
     /// Implementations should simply return `self`.
-    fn to_resolver(&self) -> &(dyn DIDResolver + Sync);
+    fn to_resolver(&self) -> &dyn DIDResolver;
 }
 
 /// A collection of DID methods
 #[derive(Clone, Default)]
 pub struct DIDMethods<'a> {
-    pub methods: HashMap<&'a str, &'a (dyn DIDMethod + Sync)>,
+    pub methods: HashMap<&'a str, &'a dyn DIDMethod>,
 }
 
 impl<'a> DIDMethods<'a> {
     /// Add a DID method to the set. Returns the previous one set for the given method name, if any.
-    pub fn insert(
-        &mut self,
-        method: &'a (dyn DIDMethod + Sync),
-    ) -> Option<&'a (dyn DIDMethod + Sync)> {
+    pub fn insert(&mut self, method: &'a dyn DIDMethod) -> Option<&'a dyn DIDMethod> {
         let name = method.name();
         self.methods.insert(name, method)
     }
 
     /// Get a DID method from the set.
-    pub fn get(&self, method_name: &str) -> Option<&&'a (dyn DIDMethod + Sync)> {
+    pub fn get(&self, method_name: &str) -> Option<&&'a dyn DIDMethod> {
         self.methods.get(method_name)
     }
 
-    pub fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+    pub fn to_resolver(&self) -> &dyn DIDResolver {
         self
     }
 }
@@ -434,7 +431,7 @@ pub mod example {
             return "example";
         }
 
-        fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+        fn to_resolver(&self) -> &dyn DIDResolver {
             self
         }
     }
