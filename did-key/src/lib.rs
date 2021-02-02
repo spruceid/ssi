@@ -160,7 +160,7 @@ impl DIDMethod for DIDKey {
         Some(did)
     }
 
-    fn to_resolver(&self) -> &(dyn DIDResolver + Sync) {
+    fn to_resolver(&self) -> &dyn DIDResolver {
         self
     }
 }
