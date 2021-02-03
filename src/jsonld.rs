@@ -1434,14 +1434,9 @@ where
         let iri = IriBuf::new(url).unwrap();
         let local_context = loader.load_context(iri.as_iri()).await?.into_context();
         context = local_context
-            .process_with(
-                &context,
-                json_ld::context::ProcessingStack::new(),
-                loader,
-                base,
-                options.into(),
-            )
-            .await?;
+            .process_with(&context, loader, base, options.into())
+            .await?
+            .into_inner();
     }
     let mut doc = json::parse(json)?;
     if let Some(more_contexts_json) = more_contexts_json {

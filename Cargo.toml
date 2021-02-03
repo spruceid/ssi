@@ -26,10 +26,11 @@ simple_asn1 = "0.5"
 num-bigint = "0.3"
 async-std = { version = "1.5", features = ["attributes"] }
 async-trait = "0.1"
-json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "448791ead1d4c1a78e4434e91d6f7e77b455b4f1" }
-json = "0.12"
+json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "fba5a917638d9f0fc87a450c6dc6de0efdf8ae06" }
+# json = "^0.12"
+json = { git = "https://github.com/timothee-haudebourg/json-rust", branch = "fix#190" }
 futures = "0.3"
-iref = "1.1"
+iref = "1.4"
 lazy_static = "1.4"
 combination = "0.1"
 sha2 = { version = "0.9", optional = true }
