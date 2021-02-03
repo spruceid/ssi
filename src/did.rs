@@ -5,14 +5,16 @@ use std::fmt;
 use std::str::FromStr;
 
 use crate::did_resolve::{
-    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    ERROR_METHOD_NOT_SUPPORTED,
+    Content, ContentMetadata, DIDResolver, DereferencingInputMetadata, DereferencingMetadata,
+    DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
+    ERROR_METHOD_NOT_SUPPORTED, TYPE_DID_LD_JSON,
 };
 use crate::error::Error;
 use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
 use async_trait::async_trait;
+use chrono::prelude::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -95,6 +97,9 @@ pub enum Contexts {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationMethodMap {
+    #[serde(rename = "@context")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<Value>,
     pub id: String,
     #[serde(rename = "type")]
     pub type_: String,
@@ -129,6 +134,7 @@ pub enum ServiceEndpoint {
     Map(Value),
 }
 
+// <https://w3c.github.io/did-core/#service-properties>
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
@@ -153,7 +159,9 @@ pub struct Proof {
 }
 
 /// An object from a DID Document returned by DID URL dereferencing
+#[derive(Debug, Serialize, Clone, PartialEq)]
 #[non_exhaustive]
+#[serde(untagged)]
 pub enum Resource {
     VerificationMethod(VerificationMethodMap),
     Object(Map<String, Value>),
@@ -164,6 +172,26 @@ pub enum Resource {
 #[non_exhaustive]
 pub enum Source<'a> {
     Key(&'a JWK),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+/// <https://w3c.github.io/did-core/#did-parameters>
+pub struct DIDParameters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service: Option<String>, // ASCII
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(alias = "relative-ref")]
+    pub relative_ref: Option<String>, // ASCII, percent-encoding
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>, // ASCII
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_time: Option<DateTime<Utc>>, // ASCII
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "hl")]
+    pub hashlink: Option<String>, // ASCII
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[async_trait]
@@ -209,21 +237,21 @@ impl<'a> DIDMethods<'a> {
     }
 
     /// Get DID method to handle a given DID
-    pub fn get_method(&self, did: &str) -> Result<&&'a dyn DIDMethod, ResolutionMetadata> {
+    pub fn get_method(&self, did: &str) -> Result<&&'a dyn DIDMethod, &'static str> {
         let mut parts = did.split(':');
         if parts.next() != Some("did") {
-            return Err(ResolutionMetadata::from_error(ERROR_INVALID_DID));
+            return Err(ERROR_INVALID_DID);
         };
         let method_name = match parts.next() {
             Some(method_name) => method_name,
             None => {
-                return Err(ResolutionMetadata::from_error(ERROR_INVALID_DID));
+                return Err(ERROR_INVALID_DID);
             }
         };
         let method = match self.methods.get(method_name) {
             Some(method) => method,
             None => {
-                return Err(ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED));
+                return Err(ERROR_METHOD_NOT_SUPPORTED);
             }
         };
         Ok(method)
@@ -243,10 +271,11 @@ impl<'a> DIDResolver for DIDMethods<'a> {
     ) {
         let method = match self.get_method(did) {
             Ok(method) => method,
-            Err(err_meta) => return (err_meta, None, None),
+            Err(err) => return (ResolutionMetadata::from_error(err), None, None),
         };
         method.resolve(did, input_metadata).await
     }
+
     async fn resolve_representation(
         &self,
         did: &str,
@@ -254,9 +283,27 @@ impl<'a> DIDResolver for DIDMethods<'a> {
     ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
         let method = match self.get_method(did) {
             Ok(method) => method,
-            Err(err_meta) => return (err_meta, Vec::new(), None),
+            Err(err) => return (ResolutionMetadata::from_error(err), Vec::new(), None),
         };
         method.resolve_representation(did, input_metadata).await
+    }
+
+    async fn dereference(
+        &self,
+        did_url: &DIDURL,
+        input_metadata: &DereferencingInputMetadata,
+    ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
+        let method = match self.get_method(&did_url.did) {
+            Ok(method) => method,
+            Err(err) => {
+                return Some((
+                    DereferencingMetadata::from_error(err),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
+        method.dereference(did_url, input_metadata).await
     }
 }
 
@@ -378,6 +425,37 @@ impl DocumentBuilder {
     }
 }
 
+// When selecting a object from JSON-LD document, @context should be copied into the sub-document.
+fn merge_context(dest_opt: &mut Option<Value>, source: &Contexts) {
+    let source = OneOrMany::<Context>::from(source.clone());
+    let dest = dest_opt.take().unwrap_or(Value::Null);
+    let mut dest_array = match dest {
+        Value::Array(array) => array,
+        Value::Object(object) => vec![Value::Object(object)],
+        _ => Vec::new(),
+    };
+    for context in source {
+        let value = match context {
+            Context::URI(uri) => Value::String(uri),
+            Context::Object(hash_map) => {
+                let serde_map = hash_map
+                    .into_iter()
+                    .collect::<serde_json::Map<String, Value>>();
+                Value::Object(serde_map)
+            }
+        };
+        dest_array.push(value);
+    }
+    if !dest_array.is_empty() {
+        let dest = if dest_array.len() == 1 {
+            dest_array.remove(0)
+        } else {
+            Value::Array(dest_array)
+        };
+        dest_opt.replace(dest);
+    }
+}
+
 impl Document {
     pub fn new(id: &str) -> Document {
         Document {
@@ -412,12 +490,37 @@ impl Document {
         for vm in self.verification_method.iter().flatten() {
             if let VerificationMethod::Map(map) = vm {
                 if map.id == id_string {
-                    return Ok(Resource::VerificationMethod(map.clone()));
+                    let mut map = map.clone();
+                    merge_context(&mut map.context, &self.context);
+                    return Ok(Resource::VerificationMethod(map));
                 }
             }
         }
         // TODO: generalize. use json-ld
         Err(Error::ResourceNotFound)
+    }
+
+    /// Select a service endpoint object in the DID document.
+    /// For the [DID URL Dereferencing - Dereferencing the Primary Resource, Step
+    /// 1.1](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary)
+    pub fn select_service(&self, fragment: &str) -> Option<&Service> {
+        for service in self.service.iter().flatten() {
+            if let [service_fragment, _] =
+                service.id.rsplitn(2, '#').collect::<Vec<&str>>().as_slice()
+            {
+                if service_fragment == &fragment {
+                    return Some(service);
+                }
+            }
+        }
+        None
+    }
+
+    pub fn to_representation(&self, content_type: &str) -> Result<Vec<u8>, Error> {
+        match content_type {
+            TYPE_DID_LD_JSON => Ok(serde_json::to_vec(self)?),
+            _ => Err(Error::RepresentationNotSupported),
+        }
     }
 }
 
@@ -559,9 +662,7 @@ mod tests {
             id: String::from("did:example:123456789abcdefghi#keys-1"),
             type_: String::from("Ed25519VerificationKey2018"),
             controller: String::from("did:example:123456789abcdefghi"),
-            public_key_jwk: None,
-            public_key_base58: None,
-            property_set: None,
+            ..Default::default()
         };
         doc.verification_method = Some(vec![
             VerificationMethod::DIDURL(DIDURL::try_from("did:pubkey:okay".to_string()).unwrap()),

@@ -13,15 +13,19 @@ use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
 
-use crate::did::{DIDMethod, Document, Resource, DIDURL};
+use crate::did::{DIDMethod, DIDParameters, Document, Resource, ServiceEndpoint, DIDURL};
 use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
+use crate::one_or_many::OneOrMany;
 
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
 pub const ERROR_INVALID_DID: &str = "invalid-did";
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
 pub const ERROR_NOT_FOUND: &str = "not-found";
 pub const ERROR_METHOD_NOT_SUPPORTED: &str = "method-not-supported";
+pub const ERROR_REPRESENTATION_NOT_SUPPORTED: &str = "representation-not-supported";
+pub const TYPE_DID_RESOLUTION: &'static str =
+    "application/ld+json;profile=\"https://w3id.org/did-resolution\";charset=utf-8";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -66,6 +70,8 @@ pub struct DocumentMetadata {
     pub created: Option<DateTime<Utc>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deactivated: Option<bool>,
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
@@ -96,7 +102,9 @@ pub struct DereferencingMetadata {
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
+#[derive(Debug, Serialize, Clone, PartialEq)]
 /// A resource returned by DID URL dereferencing
+#[serde(untagged)]
 pub enum Content {
     DIDDocument(Document),
     URL(String),
@@ -112,6 +120,9 @@ impl From<Error> for DereferencingMetadata {
     }
 }
 
+// needed for:
+// - https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary Step 2.1
+//   Returning a resolved DID document for DID URL dereferencing
 impl From<ResolutionMetadata> for DereferencingMetadata {
     fn from(res_meta: ResolutionMetadata) -> Self {
         Self {
@@ -122,10 +133,23 @@ impl From<ResolutionMetadata> for DereferencingMetadata {
     }
 }
 
+// needed for:
+// - https://w3c-ccg.github.io/did-resolution/#bindings-https Step 1.10.2.1
+//   Producing DID resolution result after DID URL deferencing.
+impl From<DereferencingMetadata> for ResolutionMetadata {
+    fn from(deref_meta: DereferencingMetadata) -> Self {
+        Self {
+            error: deref_meta.error,
+            content_type: deref_meta.content_type,
+            property_set: deref_meta.property_set,
+        }
+    }
+}
+
 impl DereferencingMetadata {
-    pub fn from_error(err: String) -> Self {
+    pub fn from_error(err: &str) -> Self {
         let mut metadata = DereferencingMetadata::default();
-        metadata.error = Some(err);
+        metadata.error = Some(err.to_owned());
         metadata
     }
 }
@@ -138,11 +162,17 @@ impl ResolutionMetadata {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ContentMetadata {
-    #[serde(flatten)]
-    pub property_set: Option<HashMap<String, Metadata>>,
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum ContentMetadata {
+    DIDDocument(DocumentMetadata),
+    Other(HashMap<String, Metadata>),
+}
+
+impl Default for ContentMetadata {
+    fn default() -> Self {
+        ContentMetadata::Other(HashMap::new())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -207,6 +237,20 @@ pub trait DIDResolver: Sync {
         (res_meta, doc_representation, doc_meta)
     }
 
+    /// Dereference a DID URL.
+    ///
+    /// DID methods implement this function to support dereferencing DID URLs with paths and query strings.
+    /// Callers should use [`dereference`] instead of this function.
+    ///
+    /// <https://w3c-ccg.github.io/did-resolution/#dereferencing>
+    async fn dereference(
+        &self,
+        _did_url: &DIDURL,
+        _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
+    ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
+        None
+    }
+
     /// Cast the resolver as a [`DIDMethod`], if possible.
     fn to_did_method(&self) -> Option<&dyn DIDMethod> {
         None
@@ -264,14 +308,14 @@ pub async fn dereference(
     };
     if let Some(error) = did_doc_res_meta.error {
         return (
-            DereferencingMetadata::from_error(error),
+            DereferencingMetadata::from_error(&error),
             Content::Null,
             ContentMetadata::default(),
         );
     }
     // 2
     let fragment = did_url.fragment.take();
-    let primary_resource_result = dereference_primary_resource(
+    let (deref_meta, content, content_meta) = dereference_primary_resource(
         resolver,
         &did_url,
         &did_url_dereferencing_input_metadata,
@@ -280,6 +324,9 @@ pub async fn dereference(
         &did_doc_meta,
     )
     .await;
+    if deref_meta.error.is_some() {
+        return (deref_meta, content, content_meta);
+    }
     if let Some(fragment) = fragment {
         // 3
         return dereference_secondary_resource(
@@ -287,24 +334,101 @@ pub async fn dereference(
             did_url,
             fragment,
             &did_url_dereferencing_input_metadata,
-            primary_resource_result,
+            deref_meta,
+            content,
+            content_meta,
         )
         .await;
     }
-    primary_resource_result
+    (deref_meta, content, content_meta)
 }
 
-// https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary
+/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary>
 async fn dereference_primary_resource(
-    _resolver: &dyn DIDResolver,
+    resolver: &dyn DIDResolver,
     did_url: &DIDURL,
-    _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
+    did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
     res_meta: &ResolutionMetadata,
     did_doc: Document,
     _did_doc_meta: &DocumentMetadata,
 ) -> (DereferencingMetadata, Content, ContentMetadata) {
+    let parameters: DIDParameters = match did_url.query {
+        Some(ref query) => match serde_urlencoded::from_str(query) {
+            Ok(params) => params,
+            Err(err) => {
+                return (
+                    DereferencingMetadata::from(Error::from(err)),
+                    Content::Null,
+                    ContentMetadata::default(),
+                );
+            }
+        },
+        None => Default::default(),
+    };
     // 1
-    // TODO
+    if let Some(ref service) = parameters.service {
+        // 1.1
+        let service = match did_doc.select_service(&service) {
+            Some(service) => service,
+            None => {
+                return (
+                    DereferencingMetadata::from_error("Service not found"),
+                    Content::Null,
+                    ContentMetadata::default(),
+                );
+            }
+        };
+        // 1.2, 1.2.1
+        // TODO: support these other cases?
+        let input_service_endpoint_url = match &service.service_endpoint {
+            None => {
+                return (
+                    DereferencingMetadata::from_error("Missing service endpoint"),
+                    Content::Null,
+                    ContentMetadata::default(),
+                );
+            }
+            Some(OneOrMany::One(ServiceEndpoint::URI(uri))) => uri,
+            Some(OneOrMany::One(ServiceEndpoint::Map(_))) => {
+                return (
+                    DereferencingMetadata::from_error("serviceEndpoint map not supported"),
+                    Content::Null,
+                    ContentMetadata::default(),
+                );
+            }
+            Some(OneOrMany::Many(_)) => {
+                return (
+                    DereferencingMetadata::from_error(
+                        "Multiple serviceEndpoint properties not supported",
+                    ),
+                    Content::Null,
+                    ContentMetadata::default(),
+                );
+            }
+        };
+
+        // 1.2.2, 1.2.3
+        let output_service_endpoint_url =
+            match construct_service_endpoint(did_url, &parameters, &input_service_endpoint_url) {
+                Ok(url) => url,
+                Err(err) => {
+                    return (
+                        DereferencingMetadata::from_error(&format!(
+                            "Unable to construct service endpoint: {}",
+                            err
+                        )),
+                        Content::Null,
+                        ContentMetadata::default(),
+                    );
+                }
+            };
+        // 1.3
+        return (
+            DereferencingMetadata::default(),
+            Content::URL(output_service_endpoint_url),
+            ContentMetadata::default(),
+        );
+    }
     // 2
     if did_url.path_abempty.is_empty() && did_url.query.is_none() {
         // 2.1
@@ -317,37 +441,47 @@ async fn dereference_primary_resource(
     // 3
     if !did_url.path_abempty.is_empty() || did_url.query.is_some() {
         // 3.1
-        // TODO: allow DID method to dereference the DID URL
+        if let Some(result) = resolver
+            .dereference(did_url, did_url_dereferencing_input_metadata)
+            .await
+        {
+            return result;
+        }
         // 3.2
-        // TODO: allow the client to dereference the DID URL
+        // TODO: enable the client to dereference the DID URL
     }
-    (
+    // 4
+    let null_result = (
         DereferencingMetadata::default(),
         Content::Null,
         ContentMetadata::default(),
-    )
+    );
+    // 4.1
+    null_result
 }
 
-// https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary
+/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary>
 async fn dereference_secondary_resource(
     _resolver: &dyn DIDResolver,
     mut did_url: DIDURL,
     fragment: String,
     _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
-    primary_resource_result: (DereferencingMetadata, Content, ContentMetadata),
+    deref_meta: DereferencingMetadata,
+    content: Content,
+    content_meta: ContentMetadata,
 ) -> (DereferencingMetadata, Content, ContentMetadata) {
+    let content_type = deref_meta.content_type.as_ref().map(String::as_str);
     // 1
-    match primary_resource_result {
-        (deref_meta, Content::DIDDocument(doc), _content_doc_meta)
-            if deref_meta.content_type == Some(TYPE_DID_LD_JSON.to_string()) =>
-        {
+    match content {
+        Content::DIDDocument(ref doc) if content_type == Some(TYPE_DID_LD_JSON) => {
             // put the fragment back in the URL
             did_url.fragment.replace(fragment);
             // 1.1
-            match doc.select_object(&did_url) {
+            let object = match doc.select_object(&did_url) {
+                Ok(object) => object,
                 Err(error) => {
                     return (
-                        DereferencingMetadata::from_error(format!(
+                        DereferencingMetadata::from_error(&format!(
                             "Unable to find object in DID document: {}",
                             error
                         )),
@@ -355,32 +489,109 @@ async fn dereference_secondary_resource(
                         ContentMetadata::default(),
                     );
                 }
-                Ok(object) => {
-                    return (
-                        DereferencingMetadata::default(),
-                        Content::Object(object),
-                        ContentMetadata::default(),
-                    );
-                }
-            }
+            };
+            return (
+                DereferencingMetadata::default(),
+                Content::Object(object),
+                ContentMetadata::default(),
+            );
         }
-        (deref_meta, Content::URL(mut url), content_meta) => {
+        Content::URL(mut url) => {
             // 2
             // 2.1
             url.push('#');
             url.push_str(&fragment);
             return (deref_meta, Content::URL(url), content_meta);
         }
-        _ => {
-            // 3
-            // TODO
-            return (
-                DereferencingMetadata::from(Error::NotImplemented),
-                Content::Null,
-                ContentMetadata::default(),
-            );
-        }
+        _ => {}
     }
+    // 3
+    match content_type {
+        None => (
+            DereferencingMetadata::from_error(&format!("Resource missing content type")),
+            Content::Null,
+            ContentMetadata::default(),
+        ),
+        Some(content_type) => (
+            DereferencingMetadata::from_error(&format!(
+                "Unsupported content type: {}",
+                content_type
+            )),
+            Content::Null,
+            ContentMetadata::default(),
+        ),
+    }
+}
+
+/// <https://w3c-ccg.github.io/did-resolution/#service-endpoint-construction>
+fn construct_service_endpoint(
+    did_url: &DIDURL,
+    did_parameters: &DIDParameters,
+    service_endpoint_url: &str,
+) -> Result<String, String> {
+    // https://w3c-ccg.github.io/did-resolution/#algorithm
+    // 1, 2, 3
+    let mut parts = service_endpoint_url.splitn(2, '#');
+    let service_endpoint_url = parts.next().unwrap();
+    let input_service_endpoint_fragment = parts.next();
+    if did_url.fragment.is_some() && input_service_endpoint_fragment.is_some() {
+        // https://w3c-ccg.github.io/did-resolution/#input
+        return Err(format!(
+            "DID URL and input service endpoint URL MUST NOT both have a fragment component"
+        ));
+    }
+    parts = service_endpoint_url.splitn(2, '?');
+    let service_endpoint_url = parts.next().unwrap();
+    let input_service_endpoint_query = parts.next();
+
+    let did_url_path: String;
+    let did_url_query: Option<String>;
+    // Work around https://github.com/w3c-ccg/did-resolution/issues/61
+    if let Some(ref relative_ref) = did_parameters.relative_ref {
+        parts = relative_ref.splitn(2, '?');
+        did_url_path = parts.next().unwrap().to_owned();
+        if !did_url.path_abempty.is_empty() {
+            return Err(format!(
+                "DID URL and relativeRef MUST NOT both have a path component"
+            ));
+        }
+        did_url_query = parts.next().map(|q| q.to_owned());
+    } else {
+        did_url_path = did_url.path_abempty.to_owned();
+        did_url_query = did_url.query.to_owned();
+        // TODO: do something with the DID URL query that is being ignored in favor of the
+        // relativeRef query
+    }
+    if did_url_query.is_some() && input_service_endpoint_query.is_some() {
+        return Err(format!(
+            "DID URL and input service endpoint URL MUST NOT both have a query component"
+        ));
+    }
+
+    let mut output_url = service_endpoint_url.to_owned();
+    // 4
+    output_url += &did_url_path;
+    // 5
+    if let Some(query) = input_service_endpoint_query {
+        output_url.push('?');
+        output_url.push_str(query);
+    }
+    // 6
+    if let Some(query) = did_url_query {
+        output_url.push('?');
+        output_url.push_str(&query);
+    }
+    // 7
+    if let Some(fragment) = input_service_endpoint_fragment {
+        output_url.push('#');
+        output_url.push_str(fragment);
+    }
+    // 8
+    if let Some(fragment) = &did_url.fragment {
+        output_url.push('#');
+        output_url.push_str(&fragment);
+    }
+    Ok(output_url)
 }
 
 #[cfg(feature = "http")]
@@ -618,9 +829,6 @@ mod tests {
     #[cfg(feature = "http-did")]
     const DID_KEY_ID: &'static str = "did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6";
     #[cfg(feature = "http-did")]
-    const DID_KEY_TYPE: &'static str =
-        "application/ld+json;profile=\"https://w3id.org/did-resolution\";charset=utf-8";
-    #[cfg(feature = "http-did")]
     const DID_KEY_JSON: &'static str = include_str!("../tests/did-key-uniresolver-resp.json");
 
     #[async_trait]
@@ -742,7 +950,7 @@ mod tests {
                     let mut response = Response::new(body);
                     response
                         .headers_mut()
-                        .insert(header::CONTENT_TYPE, DID_KEY_TYPE.parse().unwrap());
+                        .insert(header::CONTENT_TYPE, TYPE_DID_RESOLUTION.parse().unwrap());
                     return Ok::<_, hyper::Error>(response);
                 }
 
@@ -830,5 +1038,124 @@ mod tests {
         let doc = doc.unwrap();
         assert_eq!(doc.id, id);
         shutdown().ok();
+    }
+
+    #[test]
+    fn service_endpoint_construction() {
+        use std::str::FromStr;
+        // https://w3c-ccg.github.io/did-resolution/#example-11
+        let input_service_endpoint_url = "https://example.com/messages/8377464";
+        // TODO: https://github.com/w3c-ccg/did-resolution/issues/61
+        let input_did_url = DIDURL::from_str("did:example:123456789abcdefghi?service=messages&relative-ref=%2Fsome%2Fpath%3Fquery#frag").unwrap();
+        let expected_output_service_endpoint_url =
+            "https://example.com/messages/8377464/some/path?query#frag";
+        let input_did_parameters: DIDParameters =
+            serde_urlencoded::from_str(input_did_url.query.as_ref().unwrap()).unwrap();
+        let output_service_endpoint_url = construct_service_endpoint(
+            &input_did_url,
+            &input_did_parameters,
+            input_service_endpoint_url,
+        )
+        .unwrap();
+        assert_eq!(
+            output_service_endpoint_url,
+            expected_output_service_endpoint_url
+        );
+    }
+
+    // https://w3c-ccg.github.io/did-resolution/#examples
+    #[async_std::test]
+    async fn dereference_did_url() {
+        const DID: &str = "did:example:123456789abcdefghi";
+        // https://w3c-ccg.github.io/did-resolution/#example-7
+        const DOC_STR: &str = r#"
+{
+	"@context": "https://www.w3.org/ns/did/v1",
+	"id": "did:example:123456789abcdefghi",
+	"verificationMethod": [{
+		"id": "did:example:123456789abcdefghi#keys-1",
+		"type": "Ed25519VerificationKey2018",
+		"controller": "did:example:123456789abcdefghi",
+		"publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
+	}],
+	"service": [{
+		"id": "did:example:123456789abcdefghi#agent",
+		"type": "AgentService",
+		"serviceEndpoint": "https://agent.example.com/8377464"
+	}, {
+		"id": "did:example:123456789abcdefghi#messages",
+		"type": "MessagingService",
+		"serviceEndpoint": "https://example.com/messages/8377464"
+	}]
+}
+        "#;
+        struct DerefExampleResolver;
+        #[async_trait]
+        impl DIDResolver for DerefExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                if did != DID {
+                    panic!("Unexpected DID: {}", did);
+                }
+                let doc = Document::from_json(DOC_STR).unwrap();
+                (
+                    ResolutionMetadata {
+                        content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                        ..Default::default()
+                    },
+                    Some(doc),
+                    Some(DocumentMetadata::default()),
+                )
+            }
+        }
+
+        // https://w3c-ccg.github.io/did-resolution/#example-6
+        let did_url = "did:example:123456789abcdefghi#keys-1";
+        // https://w3c-ccg.github.io/did-resolution/#example-8
+        let expected_output_resource = r#"
+{
+	"@context": "https://www.w3.org/ns/did/v1",
+	"id": "did:example:123456789abcdefghi#keys-1",
+	"type": "Ed25519VerificationKey2018",
+	"controller": "did:example:123456789abcdefghi",
+	"publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
+}
+        "#;
+        use crate::did::VerificationMethodMap;
+        let vm: VerificationMethodMap = serde_json::from_str(&expected_output_resource).unwrap();
+        let expected_content = Content::Object(Resource::VerificationMethod(vm));
+        let (deref_meta, content, content_meta) = dereference(
+            &DerefExampleResolver,
+            did_url,
+            &DereferencingInputMetadata::default(),
+        )
+        .await;
+        assert_eq!(deref_meta.error, None);
+        assert_eq!(content, expected_content);
+        eprintln!("deferencing metadata: {:?}", deref_meta);
+        eprintln!("content: {:?}", content);
+        eprintln!("content metadata: {:?}", content_meta);
+
+        // https://w3c-ccg.github.io/did-resolution/#example-9
+        let did_url = "did:example:123456789abcdefghi?service=messages&relative-ref=%2Fsome%2Fpath%3Fquery#frag";
+        // https://w3c-ccg.github.io/did-resolution/#example-10
+        let expected_output_service_endpoint_url =
+            "https://example.com/messages/8377464/some/path?query#frag";
+        let expected_content = Content::URL(expected_output_service_endpoint_url.to_string());
+        let (deref_meta, content, _content_meta) = dereference(
+            &DerefExampleResolver,
+            did_url,
+            &DereferencingInputMetadata::default(),
+        )
+        .await;
+        assert_eq!(deref_meta.error, None);
+        assert_eq!(content, expected_content);
     }
 }

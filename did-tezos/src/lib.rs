@@ -92,15 +92,13 @@ impl DIDResolver for DIDTz {
         };
 
         let res_meta = ResolutionMetadata {
-            error: None,
             content_type: Some(TYPE_DID_LD_JSON.to_string()),
-            property_set: None,
+            ..Default::default()
         };
 
         let doc_meta = DocumentMetadata {
             created: Some(Utc::now()),
-            updated: None,
-            property_set: None,
+            ..Default::default()
         };
 
         (res_meta, Some(doc), Some(doc_meta))
