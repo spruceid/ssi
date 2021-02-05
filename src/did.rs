@@ -1,4 +1,4 @@
-use std::collections::HashMap as Map;
+use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
