@@ -12,7 +12,7 @@ use ssi::jwk::Params;
 use async_trait::async_trait;
 use chrono::prelude::*;
 use serde_json;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 const TZ1_EDPK: [u8; 4] = [0x65, 0x64, 0x70, 0x6b];
 const TZ2_SPPK: [u8; 4] = [0x73, 0x70, 0x70, 0x6b];
@@ -65,7 +65,7 @@ impl DIDResolver for DIDTz {
             }
         };
 
-        let mut property_set = HashMap::new();
+        let mut property_set = BTreeMap::new();
         property_set.insert(
             "blockchainAccountId".to_string(),
             serde_json::Value::String(format!("{}@tezos:{}", address.to_string(), network)),

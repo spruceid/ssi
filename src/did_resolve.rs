@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value;
 use serde_urlencoded;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
@@ -159,7 +159,7 @@ pub struct ResolutionResult {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub did_document_metadata: Option<DocumentMetadata>,
     #[serde(flatten)]
-    pub property_set: Option<HashMap<String, Value>>,
+    pub property_set: Option<BTreeMap<String, Value>>,
 }
 
 impl Default for ResolutionResult {
