@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
 #[cfg(feature = "http-did")]
-use hyper::{header, Client, Request, StatusCode, Uri};
+use hyper::{Client, Request, StatusCode, Uri};
 #[cfg(feature = "http-did")]
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -641,7 +641,11 @@ impl DIDResolver for HTTPDIDResolver {
         };
         let did_urlencoded =
             percent_encoding::utf8_percent_encode(&did, percent_encoding::CONTROLS).to_string();
-        let url = self.endpoint.clone() + &did_urlencoded + "?" + &querystring;
+        let mut url = self.endpoint.clone() + &did_urlencoded;
+        if !querystring.is_empty() {
+            url.push('?');
+            url.push_str(&querystring);
+        }
         let uri: Uri = match url.parse() {
             Ok(uri) => uri,
             Err(_) => {
@@ -659,7 +663,7 @@ impl DIDResolver for HTTPDIDResolver {
         let https = HttpsConnector::new();
         let client = Client::builder().build::<_, hyper::Body>(https);
         let request = match Request::get(uri)
-            .header("Accept", "application/json")
+            .header("Accept", TYPE_DID_RESOLUTION)
             .body(hyper::Body::default())
         {
             Ok(req) => req,
@@ -689,7 +693,7 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let doc_representation = match hyper::body::to_bytes(resp.body_mut()).await {
+        let res_result_representation = match hyper::body::to_bytes(resp.body_mut()).await {
             Ok(vec) => vec,
             Err(err) => {
                 return (
@@ -703,40 +707,73 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let result: ResolutionResult = match serde_json::from_slice(&doc_representation) {
-            Ok(result) => result,
-            Err(err) => ResolutionResult {
-                did_resolution_metadata: Some(ResolutionMetadata {
-                    error: Some("JSON Error: ".to_string() + &err.to_string()),
-                    content_type: None,
-                    property_set: None,
-                }),
-                ..Default::default()
-            },
-        };
-        let mut res_meta = result.did_resolution_metadata.unwrap_or_default();
-        if resp.status() == StatusCode::NOT_FOUND {
-            res_meta.error = Some(ERROR_NOT_FOUND.to_string());
-        }
-        if let Some(content_type) = resp.headers().get(header::CONTENT_TYPE) {
-            res_meta.content_type = Some(String::from(match content_type.to_str() {
+        let content_type = match resp.headers().get(header::CONTENT_TYPE) {
+            None => None,
+            Some(content_type) => Some(String::from(match content_type.to_str() {
                 Ok(content_type) => content_type,
                 Err(err) => {
                     return (
-                        ResolutionMetadata {
-                            error: Some(
-                                "Error reading HTTP header: ".to_string() + &err.to_string(),
-                            ),
-                            content_type: None,
-                            property_set: None,
-                        },
+                        ResolutionMetadata::from_error(&format!(
+                            "Error reading HTTP header: {}",
+                            err
+                        )),
                         None,
                         None,
                     )
                 }
-            }));
-        };
-        (res_meta, result.did_document, result.did_document_metadata)
+            })),
+        }
+        .unwrap_or_else(|| "".to_string());
+        let mut res_meta = ResolutionMetadata::default();
+        let doc_opt;
+        let doc_meta_opt;
+        match &content_type[..] {
+            TYPE_DID_RESOLUTION => {
+                let result: ResolutionResult =
+                    match serde_json::from_slice(&res_result_representation) {
+                        Ok(result) => result,
+                        Err(err) => {
+                            return (
+                                ResolutionMetadata::from_error(&format!(
+                                    "Error parsing resolution result: {}",
+                                    err
+                                )),
+                                None,
+                                None,
+                            )
+                        }
+                    };
+                if let Some(meta) = result.did_resolution_metadata {
+                    res_meta = meta
+                };
+                doc_opt = result.did_document;
+                doc_meta_opt = result.did_document_metadata;
+            }
+            _ => {
+                if resp.status() == StatusCode::NOT_FOUND {
+                    res_meta.error = Some(ERROR_NOT_FOUND.to_string());
+                    doc_opt = None;
+                } else {
+                    // Assume the response is a JSON-LD DID Document by default.
+                    let doc: Document = match serde_json::from_slice(&res_result_representation) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            return (
+                                ResolutionMetadata::from_error(&format!(
+                                    "Error parsing DID document: {}",
+                                    err
+                                )),
+                                None,
+                                None,
+                            )
+                        }
+                    };
+                    doc_opt = Some(doc);
+                }
+                doc_meta_opt = None;
+            }
+        }
+        (res_meta, doc_opt, doc_meta_opt)
     }
     // Use default resolveRepresentation implementation in terms of resolve,
     // until resolveRepresentation has its own HTTP(S) binding:
@@ -903,7 +940,10 @@ mod tests {
                     }
                 };
                 (
-                    ResolutionMetadata::default(),
+                    ResolutionMetadata {
+                        content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                        ..Default::default()
+                    },
                     Some(doc),
                     Some(DocumentMetadata::default()),
                 )
@@ -1006,11 +1046,9 @@ mod tests {
                 if res_meta.error == Some(ERROR_NOT_FOUND.to_string()) {
                     parts.status = StatusCode::NOT_FOUND;
                 }
-                if let Some(ref content_type) = res_meta.content_type {
-                    parts
-                        .headers
-                        .insert(header::CONTENT_TYPE, content_type.parse().unwrap());
-                }
+                parts
+                    .headers
+                    .insert(header::CONTENT_TYPE, TYPE_DID_RESOLUTION.parse().unwrap());
                 let result = ResolutionResult {
                     did_document: doc_opt,
                     did_resolution_metadata: Some(res_meta),
