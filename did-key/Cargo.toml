@@ -12,5 +12,5 @@ multibase = "0.8"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }
-async-std = { version = "1.5", features = ["attributes"] }
+async-std = { version = "1.9", features = ["attributes"] }
 serde_json = "1.0"
