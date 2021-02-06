@@ -27,6 +27,7 @@ use serde_json::Value;
 // @TODO `id` must be URI
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+pub const ALT_DEFAULT_CONTEXT: &str = crate::jsonld::W3ID_DID_V1_CONTEXT;
 
 // v0.11 context used by universal resolver
 pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
@@ -376,7 +377,10 @@ impl TryFrom<OneOrMany<Context>> for Contexts {
             Some(Context::URI(uri)) => uri,
             Some(Context::Object(_)) => return Err(Error::InvalidContext),
         };
-        if first_uri != DEFAULT_CONTEXT && first_uri != V0_11_CONTEXT {
+        if first_uri != DEFAULT_CONTEXT
+            && first_uri != V0_11_CONTEXT
+            && first_uri != ALT_DEFAULT_CONTEXT
+        {
             return Err(Error::InvalidContext);
         }
         Ok(match context {
@@ -417,7 +421,10 @@ impl DocumentBuilder {
                 Context::URI(uri) => uri,
                 Context::Object(_) => return Err(Error::InvalidContext),
             };
-            if first_uri != DEFAULT_CONTEXT && first_uri != V0_11_CONTEXT {
+            if first_uri != DEFAULT_CONTEXT
+                && first_uri != V0_11_CONTEXT
+                && first_uri != ALT_DEFAULT_CONTEXT
+            {
                 return Err(Error::InvalidContext);
             }
         }
