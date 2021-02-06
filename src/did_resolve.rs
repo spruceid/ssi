@@ -777,6 +777,50 @@ impl<'a> DIDResolver for SeriesResolver<'a> {
             None,
         )
     }
+
+    async fn resolve_representation(
+        &self,
+        did: &str,
+        input_metadata: &ResolutionInputMetadata,
+    ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
+        for resolver in &self.resolvers {
+            let (res_meta, doc_data, doc_meta_opt) =
+                resolver.resolve_representation(did, input_metadata).await;
+            let method_supported = match res_meta.error {
+                None => true,
+                Some(ref err) => err != ERROR_METHOD_NOT_SUPPORTED,
+            };
+            if method_supported {
+                return (res_meta, doc_data, doc_meta_opt);
+            }
+        }
+        (
+            ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED),
+            Vec::new(),
+            None,
+        )
+    }
+
+    async fn dereference(
+        &self,
+        did_url: &DIDURL,
+        input_metadata: &DereferencingInputMetadata,
+    ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
+        for resolver in &self.resolvers {
+            if let Some((deref_meta, content, content_meta)) =
+                resolver.dereference(did_url, input_metadata).await
+            {
+                let method_supported = match deref_meta.error {
+                    None => true,
+                    Some(ref err) => err != ERROR_METHOD_NOT_SUPPORTED,
+                };
+                if method_supported {
+                    return Some((deref_meta, content, content_meta));
+                }
+            }
+        }
+        None
+    }
 }
 
 #[cfg(test)]
