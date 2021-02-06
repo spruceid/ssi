@@ -384,8 +384,18 @@ async fn dereference_secondary_resource(
 }
 
 #[cfg(feature = "http")]
+#[derive(Debug, Clone, Default)]
 pub struct HTTPDIDResolver {
     pub endpoint: String,
+}
+
+#[cfg(feature = "http")]
+impl HTTPDIDResolver {
+    pub fn new(url: &str) -> Self {
+        Self {
+            endpoint: url.to_string(),
+        }
+    }
 }
 
 #[cfg(feature = "http")]
