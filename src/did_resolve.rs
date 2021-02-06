@@ -532,6 +532,42 @@ impl DIDResolver for HTTPDIDResolver {
     // https://github.com/w3c-ccg/did-resolution/issues/57
 }
 
+/// Compose multiple DID resolvers in series. They are tried in series until one supports the
+/// requested DID method.
+#[derive(Clone, Default)]
+pub struct SeriesResolver<'a> {
+    pub resolvers: Vec<&'a (dyn DIDResolver)>,
+}
+
+#[async_trait]
+impl<'a> DIDResolver for SeriesResolver<'a> {
+    async fn resolve(
+        &self,
+        did: &str,
+        input_metadata: &ResolutionInputMetadata,
+    ) -> (
+        ResolutionMetadata,
+        Option<Document>,
+        Option<DocumentMetadata>,
+    ) {
+        for resolver in &self.resolvers {
+            let (res_meta, doc_opt, doc_meta_opt) = resolver.resolve(did, input_metadata).await;
+            let method_supported = match res_meta.error {
+                None => true,
+                Some(ref err) => err != ERROR_METHOD_NOT_SUPPORTED,
+            };
+            if method_supported {
+                return (res_meta, doc_opt, doc_meta_opt);
+            }
+        }
+        (
+            ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED),
+            None,
+            None,
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "http-did")]
