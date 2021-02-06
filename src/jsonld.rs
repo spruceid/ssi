@@ -118,6 +118,7 @@ pub const SECURITY_V1_CONTEXT: &str = "https://w3id.org/security/v1";
 pub const SECURITY_V2_CONTEXT: &str = "https://w3id.org/security/v2";
 pub const SCHEMA_ORG_CONTEXT: &str = "https://schema.org/";
 pub const DID_V1_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+pub const W3ID_DID_V1_CONTEXT: &str = "https://w3id.org/did/v1";
 pub const DID_RESOLUTION_V1_CONTEXT: &str = "https://w3id.org/did-resolution/v1";
 
 lazy_static! {
@@ -189,7 +190,7 @@ impl Loader for StaticLoader {
                 SECURITY_V1_CONTEXT => Ok(SECURITY_V1_CONTEXT_DOCUMENT.clone()),
                 SECURITY_V2_CONTEXT => Ok(SECURITY_V2_CONTEXT_DOCUMENT.clone()),
                 SCHEMA_ORG_CONTEXT => Ok(SCHEMA_ORG_CONTEXT_DOCUMENT.clone()),
-                DID_V1_CONTEXT => Ok(DID_V1_CONTEXT_DOCUMENT.clone()),
+                DID_V1_CONTEXT | W3ID_DID_V1_CONTEXT => Ok(DID_V1_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
