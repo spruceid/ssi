@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
 #[cfg(feature = "http-did")]
-use hyper::{Client, Request, StatusCode, Uri};
+use hyper::{header, Client, Request, StatusCode, Uri};
 #[cfg(feature = "http-did")]
 use hyper_tls::HttpsConnector;
 use serde::{Deserialize, Serialize};
@@ -18,6 +18,8 @@ use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
 use crate::one_or_many::OneOrMany;
 
+pub const TYPE_JSON: &str = "application/json";
+pub const TYPE_LD_JSON: &str = "application/did+json";
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
 pub const ERROR_INVALID_DID: &str = "invalid-did";
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
@@ -109,7 +111,18 @@ pub enum Content {
     DIDDocument(Document),
     URL(String),
     Object(Resource),
+    Data(Vec<u8>),
     Null,
+}
+
+impl Content {
+    pub fn into_vec(self) -> Result<Vec<u8>, Error> {
+        if let Content::Data(data) = self {
+            Ok(data)
+        } else {
+            Ok(serde_json::to_vec(&self)?)
+        }
+    }
 }
 
 impl From<Error> for DereferencingMetadata {
@@ -775,9 +788,181 @@ impl DIDResolver for HTTPDIDResolver {
         }
         (res_meta, doc_opt, doc_meta_opt)
     }
+
     // Use default resolveRepresentation implementation in terms of resolve,
     // until resolveRepresentation has its own HTTP(S) binding:
     // https://github.com/w3c-ccg/did-resolution/issues/57
+
+    async fn dereference(
+        &self,
+        did_url: &DIDURL,
+        input_metadata: &DereferencingInputMetadata,
+    ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
+        let querystring = match serde_urlencoded::to_string(input_metadata) {
+            Ok(qs) => qs,
+            Err(err) => {
+                return Some((
+                    DereferencingMetadata::from_error(&format!(
+                        "Unable to serialize input metadata into query string: {}",
+                        err
+                    )),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
+        let did_url_urlencoded =
+            percent_encoding::utf8_percent_encode(&did_url.to_string(), percent_encoding::CONTROLS)
+                .to_string();
+        let mut url = self.endpoint.clone() + &did_url_urlencoded;
+        if !querystring.is_empty() {
+            url.push('?');
+            url.push_str(&querystring);
+        }
+        let uri: Uri = match url.parse() {
+            Ok(uri) => uri,
+            Err(_) => {
+                return Some((
+                    DereferencingMetadata::from_error(ERROR_INVALID_DID),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
+        let request = match Request::get(uri)
+            .header("Accept", TYPE_DID_RESOLUTION)
+            .body(hyper::Body::default())
+        {
+            Ok(req) => req,
+            Err(err) => {
+                return Some((
+                    DereferencingMetadata::from_error(&format!(
+                        "Error building HTTP request: {}",
+                        err
+                    )),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
+        let mut resp = match client.request(request).await {
+            Ok(resp) => resp,
+            Err(err) => {
+                return Some((
+                    DereferencingMetadata::from_error(&format!("HTTP Error: {}", err)),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
+        let mut deref_meta = DereferencingMetadata::default();
+        let mut content = Content::Null;
+        let mut content_meta = ContentMetadata::default();
+        deref_meta.error = match resp.status() {
+            StatusCode::NOT_FOUND => Some(ERROR_NOT_FOUND.to_string()),
+            StatusCode::BAD_REQUEST => Some(ERROR_INVALID_DID.to_string()),
+            StatusCode::NOT_ACCEPTABLE => Some(ERROR_REPRESENTATION_NOT_SUPPORTED.to_string()),
+            _ => None,
+        };
+        let deref_result_bytes = match hyper::body::to_bytes(resp.body_mut()).await {
+            Ok(vec) => vec,
+            Err(err) => {
+                return Some((
+                    DereferencingMetadata::from_error(&format!(
+                        "Error reading HTTP response: {}",
+                        err
+                    )),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
+        let content_type = match resp.headers().get(header::CONTENT_TYPE) {
+            None => None,
+            Some(content_type) => Some(String::from(match content_type.to_str() {
+                Ok(content_type) => content_type,
+                Err(err) => {
+                    return Some((
+                        DereferencingMetadata::from_error(&format!(
+                            "Error reading HTTP header: {}",
+                            err
+                        )),
+                        Content::Null,
+                        ContentMetadata::default(),
+                    ))
+                }
+            })),
+        }
+        .unwrap_or_else(|| "".to_string());
+        match &content_type[..] {
+            TYPE_DID_LD_JSON => {
+                let doc: Document = match serde_json::from_slice(&deref_result_bytes) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        return Some((
+                            DereferencingMetadata::from_error(&format!(
+                                "Error parsing DID document: {}",
+                                err
+                            )),
+                            Content::Null,
+                            ContentMetadata::default(),
+                        ))
+                    }
+                };
+                content = Content::DIDDocument(doc);
+                content_meta = ContentMetadata::DIDDocument(DocumentMetadata::default());
+                deref_meta.content_type = Some(TYPE_DID_LD_JSON.to_string());
+            }
+            TYPE_DID_RESOLUTION => {
+                let result: ResolutionResult = match serde_json::from_slice(&deref_result_bytes) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        return Some((
+                            DereferencingMetadata::from_error(&format!(
+                                "Error parsing DID resolution result: {}",
+                                err
+                            )),
+                            Content::Null,
+                            ContentMetadata::default(),
+                        ))
+                    }
+                };
+                if let Some(res_meta) = result.did_resolution_metadata {
+                    deref_meta = res_meta.into();
+                }
+                if let Some(doc) = result.did_document {
+                    content = Content::DIDDocument(doc);
+                }
+                content_meta =
+                    ContentMetadata::DIDDocument(result.did_document_metadata.unwrap_or_default());
+            }
+            TYPE_LD_JSON | TYPE_JSON => {
+                let object: BTreeMap<String, Value> =
+                    match serde_json::from_slice(&deref_result_bytes) {
+                        Ok(result) => result,
+                        Err(err) => {
+                            return Some((
+                                DereferencingMetadata::from_error(&format!(
+                                    "Error parsing JSON: {}",
+                                    err
+                                )),
+                                Content::Null,
+                                ContentMetadata::default(),
+                            ))
+                        }
+                    };
+                content = Content::Object(Resource::Object(object));
+                deref_meta.content_type = Some(content_type);
+            }
+            _ => {
+                deref_meta.content_type = Some(content_type);
+                content = Content::Data(deref_result_bytes.to_vec());
+            }
+        }
+        Some((deref_meta, content, content_meta))
+    }
 }
 
 /// Compose multiple DID resolvers in series. They are tried in series until one supports the
