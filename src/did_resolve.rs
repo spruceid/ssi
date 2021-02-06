@@ -38,7 +38,7 @@ pub enum Metadata {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct ResolutionInputMetadata {
     pub accept: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -52,7 +52,7 @@ pub struct ResolutionInputMetadata {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 /// <https://w3c.github.io/did-core/#did-resolution-metadata-properties>
 pub struct ResolutionMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -79,7 +79,7 @@ pub struct DocumentMetadata {
 /// <https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties>
 /// <https://w3c-ccg.github.io/did-resolution/#dereferencing-input-metadata-properties>
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "kebab-case")]
+#[serde(rename_all = "camelCase")]
 pub struct DereferencingInputMetadata {
     pub accept: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
