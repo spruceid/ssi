@@ -3,7 +3,7 @@ use chrono::prelude::{DateTime, Utc};
 #[cfg(feature = "http-did")]
 use hyper::{header, Client, Request, StatusCode, Uri};
 #[cfg(feature = "http-did")]
-use hyper_tls::HttpsConnector;
+use hyper_rustls::HttpsConnector;
 use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value;
@@ -673,7 +673,7 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let https = HttpsConnector::new();
+        let https = HttpsConnector::with_webpki_roots();
         let client = Client::builder().build::<_, hyper::Body>(https);
         let request = match Request::get(uri)
             .header("Accept", TYPE_DID_RESOLUTION)
@@ -829,7 +829,7 @@ impl DIDResolver for HTTPDIDResolver {
                 ))
             }
         };
-        let https = HttpsConnector::new();
+        let https = HttpsConnector::with_webpki_roots();
         let client = Client::builder().build::<_, hyper::Body>(https);
         let request = match Request::get(uri)
             .header("Accept", TYPE_DID_RESOLUTION)

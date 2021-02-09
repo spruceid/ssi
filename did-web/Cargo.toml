@@ -8,7 +8,7 @@ edition = "2018"
 ssi = { path = "../", default-features = false }
 async-trait = "0.1"
 hyper = { version = "0.14", features = ["server", "client", "http1", "http2", "stream"] }
-hyper-tls = "0.5"
+hyper-rustls = { version = "0.22", default-features = false, features = ["webpki-tokio"] }
 http = "0.2"
 serde_json = "1.0"
 tokio = { version = "1.0", features = ["macros"] }

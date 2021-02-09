@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use hyper::{Client, Request, StatusCode};
-use hyper_tls::HttpsConnector;
+use hyper_rustls::HttpsConnector;
 
 use ssi::did::{DIDMethod, Document};
 use ssi::did_resolve::{
@@ -91,7 +91,7 @@ impl DIDResolver for DIDWeb {
             Err(meta) => return (meta, Vec::new(), None),
             Ok(url) => url,
         };
-        let https = HttpsConnector::new();
+        let https = HttpsConnector::with_webpki_roots();
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
         let client = Client::builder().build::<_, hyper::Body>(https);
         let accept = input_metadata
