@@ -124,7 +124,7 @@ fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str)> {
     let curve_type = match prefix {
         "tz1" => (
             "Ed25519",
-            "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2020",
+            "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
         ),
         // "tz2" => ("secp256k1", "TODO"),
         // "tz3" => ("P-256", "TODO"),
@@ -206,7 +206,7 @@ mod tests {
               "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
               "verificationMethod": [{
                 "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
-                "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2020",
+                "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
                 "blockchainAccountId": "tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8@tezos:mainnet"
               }],
