@@ -1175,7 +1175,7 @@ mod tests {
         }
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn resolve() {
         let resolver = ExampleResolver {};
         let (res_meta, doc, doc_meta) = resolver
@@ -1187,7 +1187,7 @@ mod tests {
         assert_eq!(doc.id, EXAMPLE_123_ID);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn resolve_representation() {
         let resolver = ExampleResolver {};
         let (res_meta, doc_representation, doc_meta) = resolver
@@ -1331,7 +1331,7 @@ mod tests {
     }
 
     // https://w3c-ccg.github.io/did-resolution/#examples
-    #[async_std::test]
+    #[tokio::test]
     async fn dereference_did_url() {
         const DID: &str = "did:example:123456789abcdefghi";
         // https://w3c-ccg.github.io/did-resolution/#example-7

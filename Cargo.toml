@@ -6,7 +6,7 @@ edition = "2018"
 
 [features]
 default = ["ring"]
-http-did = ["hyper", "hyper-tls", "http", "percent-encoding", "tokio"]
+http-did = ["hyper", "hyper-tls", "http", "percent-encoding"]
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -24,7 +24,6 @@ rand = { version = "0.7", optional = true }
 multibase = "0.8"
 simple_asn1 = "0.5"
 num-bigint = "0.3"
-async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
 json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "fba5a917638d9f0fc87a450c6dc6de0efdf8ae06" }
 # json = "^0.12"
@@ -39,7 +38,7 @@ hyper-tls = { version = "0.5", optional = true }
 http = { version = "0.2", optional = true }
 serde_urlencoded = "0.7"
 percent-encoding = { version = "2.1", optional = true }
-tokio = { version = "1.0", optional = true, features = ["macros"] }
+tokio = { version = "1.0", features = ["macros"] }
 
 [workspace]
 members = [
@@ -50,5 +49,6 @@ members = [
 ]
 
 [dev-dependencies]
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"

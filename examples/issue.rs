@@ -1,7 +1,7 @@
 // To generate text fixture:
 // cargo run --example issue > examples/vc.jsonld
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();

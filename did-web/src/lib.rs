@@ -170,7 +170,7 @@ impl DIDMethod for DIDWeb {
 mod tests {
     use super::*;
 
-    #[async_std::test]
+    #[tokio::test]
     async fn parse_did_web() {
         // https://w3c-ccg.github.io/did-method-web/#example-3-creating-the-did
         assert_eq!(
