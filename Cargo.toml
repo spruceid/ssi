@@ -5,7 +5,7 @@ authors = ["wyc <wyc@fastmail.fm>"]
 edition = "2018"
 
 [features]
-default = ["ring"]
+default = ["ring", "http-did"]
 http-did = ["hyper", "hyper-rustls", "http", "percent-encoding"]
 
 [dependencies]
