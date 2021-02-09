@@ -171,7 +171,7 @@ mod tests {
     use ssi::did::Resource;
     use ssi::did_resolve::{dereference, Content, DereferencingInputMetadata};
 
-    #[async_std::test]
+    #[tokio::test]
     async fn from_did_key() {
         let vm = "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH";
         let (res_meta, object, _meta) =
@@ -184,7 +184,7 @@ mod tests {
         vm.public_key_jwk.unwrap();
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn credential_prove_verify_did_key() {
         use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
         let vc_str = r###"{

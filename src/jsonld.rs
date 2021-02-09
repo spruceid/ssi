@@ -1570,7 +1570,7 @@ mod tests {
         Ok(())
     }
 
-    #[async_std::test]
+    #[tokio::test]
     /// <https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html>
     async fn to_rdf_test_suite() {
         let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");

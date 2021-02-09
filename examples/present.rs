@@ -1,7 +1,7 @@
 // To generate text fixture:
 // cargo run --example present < examples/vc.jsonld > examples/vp.jsonld
 
-#[async_std::main]
+#[tokio::main]
 async fn main() {
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();

@@ -1121,7 +1121,7 @@ mod tests {
         assert_eq!(vc.id, vc1.id);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn credential_prove_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -1164,7 +1164,7 @@ mod tests {
         assert!(verification_result.errors.len() >= 1);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn proof_json_to_urdna2015() {
         use serde_json::json;
         let proof_str = r###"{
@@ -1202,7 +1202,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert_eq!(proof_urdna2015, urdna2015_expected);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn credential_json_to_urdna2015() {
         let credential_str = r#"{
             "@context": [
@@ -1233,7 +1233,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert_eq!(credential_urdna2015, urdna2015_expected);
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn credential_verify() {
         let vc_str = include_str!("../examples/vc.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();
@@ -1243,7 +1243,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert!(result.warnings.is_empty());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn cannot_add_properties_after_signing() {
         use serde_json::json;
         let vc_str = include_str!("../examples/vc.jsonld");
@@ -1256,7 +1256,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert!(result.warnings.is_empty());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn presentation_verify() {
         let vp_str = include_str!("../examples/vp.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
@@ -1268,7 +1268,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         assert!(result.warnings.is_empty());
     }
 
-    #[async_std::test]
+    #[tokio::test]
     async fn presentation_from_credential_issue_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
