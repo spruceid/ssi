@@ -202,10 +202,38 @@ impl JWK {
         })
     }
 
+    #[cfg(feature = "ring")]
+    pub fn generate_ed25519_from_secret(_secret: &str) -> Result<JWK, Error> {
+        // TODO figure out how to give a secret to ring API
+        Self::generate_ed25519()
+    }
+
     #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         let mut csprng = rand::rngs::OsRng {};
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
+        let sk_bytes = keypair.secret.to_bytes();
+        let pk_bytes = keypair.public.to_bytes();
+        Ok(JWK {
+            params: Params::OKP(OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: Base64urlUInt(pk_bytes.to_vec()),
+                private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        })
+    }
+
+    #[cfg(feature = "ed25519-dalek")]
+    pub fn generate_ed25519_from_secret(secret: &str) -> Result<JWK, Error> {
+        let keypair = ed25519_dalek::Keypair::generate_from_secret(secret)?;
         let sk_bytes = keypair.secret.to_bytes();
         let pk_bytes = keypair.public.to_bytes();
         Ok(JWK {
