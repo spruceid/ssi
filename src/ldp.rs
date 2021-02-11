@@ -9,7 +9,16 @@ use crate::hash::sha256;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::rdf::DataSet;
 use crate::urdna2015;
-use crate::vc::{LinkedDataProofOptions, Proof};
+use crate::vc::{Context, Contexts, LinkedDataProofOptions, Proof};
+
+// TODO: factor out proof types
+lazy_static! {
+    /// JSON-LD context for Linked Data Proofs based on Tezos addresses
+    pub static ref TZ_CONTEXT: Context = {
+        let context_str = include_str!("../contexts/tz-2021-v1.jsonld");
+        serde_json::from_str(&context_str).unwrap()
+    };
+}
 
 // Get current time to millisecond precision if possible
 pub fn now_ms() -> DateTime<Utc> {
@@ -259,8 +268,12 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         }
         let mut property_set = HashMap::new();
         let jwk_value = serde_json::to_value(key.to_public())?;
+        // This proof type must contain the public key, because the DID is based on the hash of the
+        // public key, and the public key is not otherwise recoverable.
         property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        // It needs custom JSON_LD context too.
         let proof = Proof {
+            context: Some(Contexts::One(TZ_CONTEXT.clone())),
             proof_purpose: options.proof_purpose.clone(),
             verification_method: options.verification_method.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
@@ -269,7 +282,6 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             property_set: Some(property_set),
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
-        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         sign_proof(document, proof, key, Algorithm::EdDSA).await
     }
 
