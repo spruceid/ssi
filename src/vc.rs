@@ -118,8 +118,9 @@ pub struct ObjectWithId {
 #[serde(rename_all = "camelCase")]
 pub struct Proof {
     #[serde(rename = "@context")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<Contexts>,
+    // TODO: use consistent types for context
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub context: Value,
     #[serde(rename = "type")]
     pub type_: String,
     #[serde(skip_serializing_if = "Option::is_none")]
