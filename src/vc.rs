@@ -114,9 +114,12 @@ pub struct ObjectWithId {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Proof {
+    #[serde(rename = "@context")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context: Option<Contexts>,
     #[serde(rename = "type")]
     pub type_: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -221,7 +224,7 @@ pub struct RefreshService {
 #[serde(rename_all = "camelCase")]
 pub struct Presentation {
     #[serde(rename = "@context")]
-    pub context: Vec<String>,
+    pub context: Contexts,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<URI>,
     #[serde(rename = "type")]
@@ -875,6 +878,13 @@ macro_rules! assert_local {
 }
 
 impl Proof {
+    pub fn new(type_: &str) -> Self {
+        Self {
+            type_: type_.to_string(),
+            ..Default::default()
+        }
+    }
+
     pub fn matches(&self, options: &LinkedDataProofOptions) -> bool {
         if let Some(ref verification_method) = options.verification_method {
             assert_local!(self.verification_method.as_ref() == Some(verification_method));
@@ -1298,7 +1308,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 
         // Issue Presentation with Credential
         let mut vp = Presentation {
-            context: vec![DEFAULT_CONTEXT.to_string()],
+            context: Contexts::Many(vec![Context::URI(URI::String(DEFAULT_CONTEXT.to_string()))]),
             id: Some(URI::String(
                 "http://example.org/presentations/3731".to_string(),
             )),

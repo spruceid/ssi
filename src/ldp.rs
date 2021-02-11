@@ -173,17 +173,12 @@ async fn sign(
         }
     }
     let proof = Proof {
-        type_: type_.to_string(),
         proof_purpose: options.proof_purpose.clone(),
-        proof_value: None,
         verification_method: options.verification_method.clone(),
-        creator: None,
         created: Some(options.created.unwrap_or_else(now_ms)),
         domain: options.domain.clone(),
         challenge: options.challenge.clone(),
-        nonce: None,
-        property_set: None,
-        jws: None,
+        ..Proof::new(type_)
     };
     sign_proof(document, proof, key, algorithm).await
 }
@@ -266,17 +261,13 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         let jwk_value = serde_json::to_value(key.to_public())?;
         property_set.insert("publicKeyJwk".to_string(), jwk_value);
         let proof = Proof {
-            type_: "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021".to_string(),
             proof_purpose: options.proof_purpose.clone(),
-            proof_value: None,
             verification_method: options.verification_method.clone(),
-            creator: None,
             created: Some(options.created.unwrap_or_else(now_ms)),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
-            nonce: None,
-            jws: None,
             property_set: Some(property_set),
+            ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         sign_proof(document, proof, key, Algorithm::EdDSA).await
