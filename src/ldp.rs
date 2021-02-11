@@ -10,11 +10,12 @@ use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, 
 use crate::rdf::DataSet;
 use crate::urdna2015;
 use crate::vc::{Context, Contexts, LinkedDataProofOptions, Proof};
+use serde_json::Value;
 
 // TODO: factor out proof types
 lazy_static! {
     /// JSON-LD context for Linked Data Proofs based on Tezos addresses
-    pub static ref TZ_CONTEXT: Context = {
+    pub static ref TZ_CONTEXT: Value = {
         let context_str = include_str!("../contexts/tz-2021-v1.jsonld");
         serde_json::from_str(&context_str).unwrap()
     };
@@ -273,7 +274,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         property_set.insert("publicKeyJwk".to_string(), jwk_value);
         // It needs custom JSON_LD context too.
         let proof = Proof {
-            context: Some(Contexts::One(TZ_CONTEXT.clone())),
+            context: TZ_CONTEXT.clone(),
             proof_purpose: options.proof_purpose.clone(),
             verification_method: options.verification_method.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
