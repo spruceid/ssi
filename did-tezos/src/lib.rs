@@ -1,3 +1,4 @@
+use ssi::blakesig::hash_public_key;
 use ssi::did::{
     Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
@@ -6,20 +7,11 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::jwk::Params;
 
 use async_trait::async_trait;
 use chrono::prelude::*;
 use serde_json;
 use std::collections::BTreeMap;
-
-const TZ1_EDPK: [u8; 4] = [0x65, 0x64, 0x70, 0x6b];
-const TZ2_SPPK: [u8; 4] = [0x73, 0x70, 0x70, 0x6b];
-const TZ3_P2PK: [u8; 4] = [0x70, 0x32, 0x70, 0x6b];
-
-const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
-const TZ2_HASH: [u8; 3] = [0x06, 0xa1, 0xa1];
-const TZ3_HASH: [u8; 3] = [0x06, 0xa1, 0xa4];
 
 /// did:tz DID Method
 ///
@@ -108,16 +100,6 @@ impl DIDResolver for DIDTz {
     }
 }
 
-fn curve_to_prefixes(curve: &str) -> Option<(&'static [u8; 4], &'static [u8; 3])> {
-    let prefix = match curve {
-        "Ed25519" => (&TZ1_EDPK, &TZ1_HASH),
-        "secp256k1" => (&TZ2_SPPK, &TZ2_HASH),
-        "P-256" => (&TZ3_P2PK, &TZ3_HASH),
-        _ => return None,
-    };
-    Some(prefix)
-}
-
 // addr must be at least 4 bytes
 fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str)> {
     let curve_type = match prefix {
@@ -142,25 +124,11 @@ impl DIDMethod for DIDTz {
             Source::Key(jwk) => jwk,
             _ => return None,
         };
-        let params = match jwk.params {
-            Params::OKP(ref okp_params) => okp_params,
+        let hash = match hash_public_key(jwk) {
+            Ok(hash) => hash,
             _ => return None,
         };
-        let (inner_prefix, outer_prefix) = curve_to_prefixes(&params.curve)?;
-        let encoded = bs58::encode(&params.public_key.0);
-        let pk_b58_vec = encoded.into_vec();
-        let mut inner = Vec::with_capacity(4 + pk_b58_vec.len());
-        inner.extend_from_slice(inner_prefix);
-        inner.extend(pk_b58_vec);
-        let mut hasher = blake2b_simd::Params::new();
-        hasher.hash_length(20);
-        let blake2b = hasher.hash(&inner);
-        let blake2b = blake2b.as_bytes();
-        let mut outer = Vec::with_capacity(23);
-        outer.extend_from_slice(outer_prefix);
-        outer.extend_from_slice(&blake2b);
-        let encoded = bs58::encode(&outer).with_check().into_string();
-        let did = "did:tz:".to_string() + &encoded;
+        let did = "did:tz:".to_string() + &hash;
         Some(did)
     }
 

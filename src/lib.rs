@@ -1,3 +1,4 @@
+pub mod blakesig;
 pub mod der;
 pub mod did;
 pub mod did_resolve;
