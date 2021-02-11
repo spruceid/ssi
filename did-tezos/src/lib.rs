@@ -6,7 +6,6 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-// use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 use ssi::jwk::Params;
 
 use async_trait::async_trait;
@@ -223,63 +222,10 @@ mod tests {
     #[tokio::test]
     async fn credential_prove_verify_did_tz() {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+
         let vc_str = r###"{
             "@context": [
-              "https://www.w3.org/2018/credentials/v1",
-              {
-                "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021": {
-                  "@id": "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021",
-                  "@context": {
-                    "@version": 1.1,
-                    "@protected": true,
-                    "id": "@id",
-                    "type": "@type",
-                    "challenge": "https://w3id.org/security#challenge",
-                    "created": {
-                      "@id": "http://purl.org/dc/terms/created",
-                      "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
-                    },
-                    "domain": "https://w3id.org/security#domain",
-                    "expires": {
-                      "@id": "https://w3id.org/security#expiration",
-                      "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
-                    },
-                    "nonce": "https://w3id.org/security#nonce",
-                    "proofPurpose": {
-                      "@id": "https://w3id.org/security#proofPurpose",
-                      "@type": "@vocab",
-                      "@context": {
-                        "@version": 1.1,
-                        "@protected": true,
-                        "id": "@id",
-                        "type": "@type",
-                        "assertionMethod": {
-                          "@id": "https://w3id.org/security#assertionMethod",
-                          "@type": "@id",
-                          "@container": "@set"
-                        },
-                        "authentication": {
-                          "@id": "https://w3id.org/security#authenticationMethod",
-                          "@type": "@id",
-                          "@container": "@set"
-                        }
-                      }
-                    },
-                    "proofValue": {
-                      "@id": "https://w3id.org/security#proofValue",
-                      "@type": "https://w3id.org/security#multibase"
-                    },
-                    "verificationMethod": {
-                      "@id": "https://w3id.org/security#verificationMethod",
-                      "@type": "@id"
-                    },
-                    "publicKeyJwk": {
-                      "@id": "https://w3id.org/security#publicKeyJwk",
-                      "@type": "@json"
-                    }
-                  }
-                }
-              }
+              "https://www.w3.org/2018/credentials/v1"
             ],
             "type": ["VerifiableCredential"],
             "issuer": "did:tz:tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK",
@@ -289,6 +235,7 @@ mod tests {
             }
         }"###;
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
         let key_str = include_str!("../../tests/ed25519-2020-10-18.json");
         let key: JWK = serde_json::from_str(key_str).unwrap();
         let did = DIDTz.generate(&Source::Key(&key)).unwrap();
@@ -323,5 +270,55 @@ mod tests {
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(vc_wrong_key.verify(None, &DIDTz).await.errors.len() > 0);
+
+        // Make it into a VP
+        use ssi::one_or_many::OneOrMany;
+        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        let mut vp = Presentation {
+            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+                DEFAULT_CONTEXT.to_string(),
+            ))]),
+
+            id: Some(URI::String(
+                "http://example.org/presentations/3731".to_string(),
+            )),
+            type_: OneOrMany::One("VerifiablePresentation".to_string()),
+            verifiable_credential: OneOrMany::One(CredentialOrJWT::Credential(vc)),
+            proof: None,
+            holder: None,
+            property_set: None,
+        };
+        let mut vp_issue_options = LinkedDataProofOptions::default();
+        vp.holder = Some(URI::String(did.to_string()));
+        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
+        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        vp.add_proof(vp_proof);
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        vp.validate().unwrap();
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTz).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.is_empty());
+
+        // mess with the VP proof to make verify fail
+        let mut vp1 = vp.clone();
+        match vp1.proof {
+            Some(OneOrMany::One(ref mut proof)) => match proof.jws {
+                Some(ref mut jws) => {
+                    jws.insert(0, 'x');
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTz).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.len() >= 1);
+
+        // test that holder is verified
+        let mut vp2 = vp.clone();
+        vp2.holder = Some(URI::String("did:example:bad".to_string()));
+        assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
     }
 }
