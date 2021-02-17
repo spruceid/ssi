@@ -65,7 +65,7 @@ fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
 
-pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String, Error> {
+pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8>, Error> {
     let signature = match &key.params {
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
@@ -120,6 +120,11 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String
         }
         _ => return Err(Error::KeyTypeNotImplemented),
     };
+    Ok(signature)
+}
+
+pub fn sign_bytes_b64(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<String, Error> {
+    let signature = sign_bytes(algorithm, data, key)?;
     let sig_b64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
     Ok(sig_b64)
 }
@@ -203,7 +208,7 @@ pub fn detached_sign_unencoded_payload(
     };
     let header_b64 = base64_encode_json(&header)?;
     let signing_input = [header_b64.as_bytes(), b".", payload].concat();
-    let sig_b64 = sign_bytes(header.algorithm, &signing_input, key)?;
+    let sig_b64 = sign_bytes_b64(header.algorithm, &signing_input, key)?;
     let jws = header_b64 + ".." + &sig_b64;
     Ok(jws)
 }
@@ -217,7 +222,7 @@ pub fn encode_sign(algorithm: Algorithm, payload: &str, key: &JWK) -> Result<Str
     let header_b64 = base64_encode_json(&header)?;
     let payload_b64 = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
     let signing_input = header_b64 + "." + &payload_b64;
-    let sig_b64 = sign_bytes(algorithm, signing_input.as_bytes(), key)?;
+    let sig_b64 = sign_bytes_b64(algorithm, signing_input.as_bytes(), key)?;
     let jws = [signing_input, sig_b64].join(".");
     Ok(jws)
 }
