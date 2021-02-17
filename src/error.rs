@@ -1,3 +1,5 @@
+use crate::caip10::BlockchainAccountIdParseError;
+use crate::caip10::BlockchainAccountIdVerifyError;
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ed25519-dalek")]
 use ed25519_dalek::SignatureError as Ed25519SignatureError;
@@ -12,6 +14,8 @@ use ring::error::KeyRejected as KeyRejectedError;
 use ring::error::Unspecified as RingUnspecified;
 #[cfg(feature = "rsa")]
 use rsa::errors::Error as RsaError;
+#[cfg(feature = "libsecp256k1")]
+use secp256k1::Error as Secp256k1Error;
 use serde_json::Error as SerdeJSONError;
 use serde_urlencoded::de::Error as SerdeUrlEncodedError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
@@ -32,6 +36,8 @@ pub enum Error {
     AlgorithmNotImplemented,
     ProofTypeNotImplemented,
     MissingAlgorithm,
+    MissingCurve,
+    MissingPoint,
     MissingIdentifier,
     MissingChosenIssuer,
     ExpectedTerm,
@@ -42,6 +48,7 @@ pub enum Error {
     ExpectedLang,
     AlgorithmMismatch,
     KeyMismatch,
+    VerificationMethodMismatch,
     UnsupportedAlgorithm,
     UnsupportedMultipleVMs,
     KeyTypeNotImplemented,
@@ -58,6 +65,7 @@ pub enum Error {
     MissingTypeVerifiableCredential,
     MissingTypeVerifiablePresentation,
     MissingIssuer,
+    MissingAccountId,
     MissingVerificationMethod,
     Key,
     TimeError,
@@ -125,6 +133,8 @@ pub enum Error {
     Rsa(RsaError),
     #[cfg(feature = "ed25519-dalek")]
     Ed25519Signature(Ed25519SignatureError),
+    #[cfg(feature = "libsecp256k1")]
+    Secp256k1(Secp256k1Error),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
@@ -136,6 +146,8 @@ pub enum Error {
     ParseInt(ParseIntError),
     CharTryFrom(CharTryFromError),
     TryFromSlice(TryFromSliceError),
+    BlockchainAccountIdParse(BlockchainAccountIdParseError),
+    BlockchainAccountIdVerify(BlockchainAccountIdVerifyError),
 }
 
 impl fmt::Display for Error {
@@ -160,6 +172,7 @@ impl fmt::Display for Error {
                 write!(f, "Missing type VerifiablePresentation")
             }
             Error::MissingIssuer => write!(f, "Missing issuer property"),
+            Error::MissingAccountId => write!(f, "Missing account id"),
             Error::MissingVerificationMethod => write!(f, "Missing verificationMethod"),
             Error::MissingCredential => write!(f, "Verifiable credential not found in JWT"),
             Error::Key => write!(f, "problem with JWT key"),
@@ -167,6 +180,8 @@ impl fmt::Display for Error {
             Error::AlgorithmNotImplemented => write!(f, "JWA algorithm not implemented"),
             Error::ProofTypeNotImplemented => write!(f, "Linked Data Proof type not implemented"),
             Error::MissingAlgorithm => write!(f, "Missing algorithm in JWT"),
+            Error::MissingCurve => write!(f, "Missing curve in JWK"),
+            Error::MissingPoint => write!(f, "Missing elliptic curve point in JWK"),
             Error::MissingIdentifier => write!(f, "Missing identifier"),
             Error::MissingChosenIssuer => write!(f, "Missing chosen issuer"),
             Error::ExpectedTerm => write!(f, "Expected RDF term"),
@@ -177,6 +192,7 @@ impl fmt::Display for Error {
             Error::ExpectedLang => write!(f, "Expected RDF language tag"),
             Error::AlgorithmMismatch => write!(f, "Algorithm in JWS header does not match JWK"),
             Error::KeyMismatch => write!(f, "Key mismatch"),
+            Error::VerificationMethodMismatch => write!(f, "Verification method mismatch"),
             Error::UnsupportedAlgorithm => write!(f, "Unsupported algorithm"),
             Error::UnsupportedMultipleVMs => write!(f, "Unsupported multiple verification methods"),
             Error::KeyTypeNotImplemented => write!(f, "Key type not implemented"),
@@ -246,6 +262,8 @@ impl fmt::Display for Error {
             Error::Rsa(e) => e.fmt(f),
             #[cfg(feature = "ed25519-dalek")]
             Error::Ed25519Signature(e) => e.fmt(f),
+            #[cfg(feature = "libsecp256k1")]
+            Error::Secp256k1(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -256,6 +274,8 @@ impl fmt::Display for Error {
             Error::IRI(e) => e.fmt(f),
             Error::ParseInt(e) => e.fmt(f),
             Error::CharTryFrom(e) => e.fmt(f),
+            Error::BlockchainAccountIdParse(e) => e.fmt(f),
+            Error::BlockchainAccountIdVerify(e) => e.fmt(f),
         }
     }
 }
@@ -360,8 +380,27 @@ impl From<Ed25519SignatureError> for Error {
     }
 }
 
+#[cfg(feature = "libsecp256k1")]
+impl From<Secp256k1Error> for Error {
+    fn from(err: Secp256k1Error) -> Error {
+        Error::Secp256k1(err)
+    }
+}
+
 impl From<TryFromSliceError> for Error {
     fn from(err: TryFromSliceError) -> Error {
         Error::TryFromSlice(err)
+    }
+}
+
+impl From<BlockchainAccountIdParseError> for Error {
+    fn from(err: BlockchainAccountIdParseError) -> Error {
+        Error::BlockchainAccountIdParse(err)
+    }
+}
+
+impl From<BlockchainAccountIdVerifyError> for Error {
+    fn from(err: BlockchainAccountIdVerifyError) -> Error {
+        Error::BlockchainAccountIdVerify(err)
     }
 }

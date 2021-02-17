@@ -45,6 +45,9 @@ jobs:
     - name: Test with alternative crypto libraries
       run: cargo test --no-default-features --features rsa,ed25519-dalek,sha2,rand
 
+    - name: Test with secp256k1
+      run: cargo test --verbose --workspace --features did-tezos/secp256k1,did-key/secp256k1
+
     - name: Test DID Resolution HTTP(S) Binding
       run: cargo test --features http-did
 

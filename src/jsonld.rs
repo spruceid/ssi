@@ -120,6 +120,7 @@ pub const SCHEMA_ORG_CONTEXT: &str = "https://schema.org/";
 pub const DID_V1_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
 pub const W3ID_DID_V1_CONTEXT: &str = "https://w3id.org/did/v1";
 pub const DID_RESOLUTION_V1_CONTEXT: &str = "https://w3id.org/did-resolution/v1";
+pub const DIF_ESRS2020_CONTEXT: &str = "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -170,6 +171,12 @@ lazy_static! {
         let iri = Iri::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = include_str!("../contexts/dif-lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(DIF_ESRS2020_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
 pub struct StaticLoader;
@@ -191,6 +198,8 @@ impl Loader for StaticLoader {
                 SECURITY_V2_CONTEXT => Ok(SECURITY_V2_CONTEXT_DOCUMENT.clone()),
                 SCHEMA_ORG_CONTEXT => Ok(SCHEMA_ORG_CONTEXT_DOCUMENT.clone()),
                 DID_V1_CONTEXT | W3ID_DID_V1_CONTEXT => Ok(DID_V1_CONTEXT_DOCUMENT.clone()),
+                DID_RESOLUTION_V1_CONTEXT => Ok(DID_RESOLUTION_V1_CONTEXT_DOCUMENT.clone()),
+                DIF_ESRS2020_CONTEXT => Ok(DIF_ESRS2020_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())

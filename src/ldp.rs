@@ -3,7 +3,8 @@ use chrono::prelude::*;
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
 use crate::blakesig;
-use crate::did::Resource;
+use crate::caip10::BlockchainAccountId;
+use crate::did::{Resource, VerificationMethodMap};
 use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMetadata};
 use crate::error::Error;
 use crate::hash::sha256;
@@ -18,6 +19,10 @@ lazy_static! {
     /// JSON-LD context for Linked Data Proofs based on Tezos addresses
     pub static ref TZ_CONTEXT: Value = {
         let context_str = include_str!("../contexts/tz-2021-v1.jsonld");
+        serde_json::from_str(&context_str).unwrap()
+    };
+    pub static ref ESRS2020_CONTEXT_EXTRA: Value = {
+        let context_str = include_str!("../contexts/esrs2020-extra.jsonld");
         serde_json::from_str(&context_str).unwrap()
     };
 }
@@ -104,6 +109,24 @@ impl LinkedDataProofs {
                     return Err(Error::ProofTypeNotImplemented);
                 }
             },
+            JWK {
+                params: JWKParams::EC(ec_params),
+                public_key_use: _,
+                key_operations: _,
+                algorithm,
+                key_id: _,
+                x509_url: _,
+                x509_certificate_chain: _,
+                x509_thumbprint_sha1: _,
+                x509_thumbprint_sha256: _,
+            } if ec_params.curve == Some("secp256k1".to_string()) => {
+                if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
+                    return EcdsaSecp256k1RecoverySignature2020::sign(document, options, &key)
+                        .await;
+                } else {
+                    return EcdsaSecp256k1Signature2019::sign(document, options, &key).await;
+                }
+            }
             _ => {}
         };
         Err(Error::ProofTypeNotImplemented)
@@ -124,6 +147,12 @@ impl LinkedDataProofs {
                 )
                 .await
             }
+            "EcdsaSecp256k1Signature2019" => {
+                EcdsaSecp256k1Signature2019::verify(proof, document, resolver).await
+            }
+            "EcdsaSecp256k1RecoverySignature2020" => {
+                EcdsaSecp256k1RecoverySignature2020::verify(proof, document, resolver).await
+            }
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -134,6 +163,16 @@ pub async fn resolve_key(
     verification_method: &str,
     resolver: &dyn DIDResolver,
 ) -> Result<JWK, Error> {
+    let vm = resolve_vm(verification_method, resolver).await?;
+    let key = vm.public_key_jwk.ok_or(Error::MissingKey)?;
+    Ok(key)
+}
+
+/// Resolve a verificationMethod
+pub async fn resolve_vm(
+    verification_method: &str,
+    resolver: &dyn DIDResolver,
+) -> Result<VerificationMethodMap, Error> {
     let (res_meta, object, _meta) = dereference(
         resolver,
         &verification_method,
@@ -148,7 +187,7 @@ pub async fn resolve_key(
         Content::Null => return Err(Error::ResourceNotFound(verification_method.to_string())),
         _ => return Err(Error::ExpectedObject),
     };
-    vm.public_key_jwk.ok_or(Error::MissingKey)
+    Ok(vm)
 }
 
 async fn to_jws_payload(
@@ -250,6 +289,77 @@ impl ProofSuite for Ed25519Signature2018 {
             Algorithm::EdDSA,
         )
         .await
+    }
+}
+
+pub struct EcdsaSecp256k1Signature2019;
+#[async_trait]
+impl ProofSuite for EcdsaSecp256k1Signature2019 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        sign(
+            document,
+            options,
+            key,
+            "EcdsaSecp256k1Signature2019",
+            Algorithm::ES256K,
+        )
+        .await
+    }
+}
+
+pub struct EcdsaSecp256k1RecoverySignature2020;
+#[async_trait]
+impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        if let Some(key_algorithm) = key.algorithm {
+            if key_algorithm != Algorithm::ES256KR {
+                return Err(Error::AlgorithmMismatch);
+            }
+        }
+        let proof = Proof {
+            context: serde_json::json!([
+                crate::jsonld::DIF_ESRS2020_CONTEXT,
+                ESRS2020_CONTEXT_EXTRA.clone(),
+            ]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
+        };
+        sign_proof(document, proof, key, Algorithm::ES256KR).await
+    }
+
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        if vm.type_ != "EcdsaSecp256k1RecoveryMethod2020" {
+            return Err(Error::VerificationMethodMismatch);
+        }
+        let message = to_jws_payload(document, proof).await?;
+        let (_header, jwk) = crate::jws::detached_recover(&jws, &message)?;
+        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
+        use std::str::FromStr;
+        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
+        account_id.verify(&jwk)?;
+        Ok(())
     }
 }
 

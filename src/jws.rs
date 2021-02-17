@@ -118,6 +118,27 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             use ed25519_dalek::Signer;
             keypair.sign(data).to_bytes().to_vec()
         }
+        #[cfg(feature = "libsecp256k1")]
+        JWKParams::EC(ec) => match algorithm {
+            Algorithm::ES256K | Algorithm::ES256KR => {
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "secp256k1" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let secret_key = secp256k1::SecretKey::try_from(ec)?;
+                let hashed = crate::hash::sha256(data)?;
+                let msg = secp256k1::Message::parse_slice(&hashed)?;
+                let (sig, rec_id) = secp256k1::sign(&msg, &secret_key);
+                let mut sig = sig.serialize().to_vec();
+                if algorithm == Algorithm::ES256KR {
+                    sig.push(rec_id.serialize());
+                }
+                sig
+            }
+            _ => {
+                return Err(Error::UnsupportedAlgorithm);
+            }
+        },
         _ => return Err(Error::KeyTypeNotImplemented),
     };
     Ok(signature)
@@ -189,9 +210,74 @@ pub fn verify_bytes(
             use ed25519_dalek::Verifier;
             public_key.verify(data, &signature)?;
         }
+        #[cfg(feature = "libsecp256k1")]
+        JWKParams::EC(ec) => match algorithm {
+            Algorithm::ES256K | Algorithm::ES256KR => {
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "secp256k1" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let hashed = crate::hash::sha256(data)?;
+                let msg = secp256k1::Message::parse_slice(&hashed)?;
+                let signature = if algorithm == Algorithm::ES256KR && signature.len() == 65 {
+                    // Drop recovery byte
+                    &signature[0..64]
+                } else {
+                    signature
+                };
+                let sig = secp256k1::Signature::parse_slice(&signature)?;
+                let public_key = secp256k1::PublicKey::try_from(ec)?;
+                let ok = secp256k1::verify(&msg, &sig, &public_key);
+                if !ok {
+                    Err(secp256k1::Error::InvalidSignature)?;
+                }
+            }
+            _ => {
+                return Err(Error::UnsupportedAlgorithm);
+            }
+        },
         _ => return Err(Error::KeyTypeNotImplemented),
     }
     Ok(())
+}
+
+/// Recover a key from a signature and message, if the algorithm supports this.  (e.g.
+/// [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r))
+pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JWK, Error> {
+    match algorithm {
+        #[cfg(feature = "libsecp256k1")]
+        Algorithm::ES256KR => {
+            let hashed = crate::hash::sha256(data)?;
+            let msg = secp256k1::Message::parse_slice(&hashed)?;
+            let (rec_byte, sig_bytes) = signature.split_last().ok_or(Error::InvalidSignature)?;
+            let rec_id = secp256k1::RecoveryId::parse(*rec_byte)?;
+            let sig = secp256k1::Signature::parse_slice(sig_bytes)?;
+            let public_key = secp256k1::recover(&msg, &sig, &rec_id)?;
+            // Is it redundant to verify after recover?
+            let ok = secp256k1::verify(&msg, &sig, &public_key);
+            if !ok {
+                Err(secp256k1::Error::InvalidSignature)?;
+            }
+            use crate::jwk::ECParams;
+            let jwk = JWK {
+                params: JWKParams::EC(ECParams::try_from(&public_key)?),
+                public_key_use: None,
+                key_operations: None,
+                algorithm: None,
+                key_id: None,
+                x509_url: None,
+                x509_certificate_chain: None,
+                x509_thumbprint_sha1: None,
+                x509_thumbprint_sha256: None,
+            };
+            return Ok(jwk);
+        }
+        _ => {
+            let _ = data;
+            let _ = signature;
+            return Err(Error::UnsupportedAlgorithm);
+        }
+    }
 }
 
 pub fn detached_sign_unencoded_payload(
@@ -286,6 +372,7 @@ fn decode_jws_parts(
     })
 }
 
+/// Verify a JWS with detached payload. Returns the JWS header on success.
 pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Header, Error> {
     let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
     if !omitted_payload.is_empty() {
@@ -299,6 +386,22 @@ pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Heade
     } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
     verify_bytes(header.algorithm, &signing_input, key, &signature)?;
     Ok(header)
+}
+
+/// Recover a JWK from a JWS and payload, if the algorithm supports that (such as [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r)).
+pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), Error> {
+    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
+    if !omitted_payload.is_empty() {
+        return Err(Error::InvalidJWS);
+    }
+    let DecodedJWS {
+        header,
+        signing_input,
+        payload: _,
+        signature,
+    } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    let key = recover(header.algorithm, &signing_input, &signature)?;
+    Ok((header, key))
 }
 
 pub fn decode_verify(jws: &str, key: &JWK) -> Result<(Header, Vec<u8>), Error> {
@@ -352,5 +455,32 @@ mod tests {
         assert_eq!(jws, "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw");
 
         decode_verify(&jws, &key).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "libsecp256k1")]
+    fn secp256k1_sign_verify() {
+        let key = JWK::generate_secp256k1().unwrap();
+        let data = b"asdf";
+        let sig = sign_bytes(Algorithm::ES256K, data, &key).unwrap();
+        verify_bytes(Algorithm::ES256K, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ES256K, b"no", &key, &sig).unwrap_err();
+
+        // ES256K-R
+        let key = JWK {
+            algorithm: Some(Algorithm::ES256KR),
+            ..key
+        };
+        verify_bytes(Algorithm::ES256KR, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ES256KR, b"no", &key, &sig).unwrap_err();
+
+        // Test recovery
+        let sig = sign_bytes(Algorithm::ES256KR, data, &key).unwrap();
+        verify_bytes(Algorithm::ES256KR, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ES256KR, b"nope", &key, &sig).unwrap_err();
+        let recovered_key = recover(Algorithm::ES256KR, data, &sig).unwrap();
+        verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
+        let other_key = JWK::generate_secp256k1().unwrap();
+        verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
     }
 }

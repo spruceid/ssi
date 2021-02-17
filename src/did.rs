@@ -115,6 +115,8 @@ pub struct VerificationMethodMap {
     // TODO: make Base58 type like Base64urlUIntString
     pub public_key_base58: Option<String>,
     // TODO: ensure that not both key parameters are set
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blockchain_account_id: Option<String>,
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }

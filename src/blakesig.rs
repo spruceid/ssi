@@ -10,8 +10,6 @@ const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
 const TZ2_HASH: [u8; 3] = [0x06, 0xa1, 0xa1];
 const TZ3_HASH: [u8; 3] = [0x06, 0xa1, 0xa4];
 
-// 'E' + 'd25519BLAKE2BDigestSize20Base58CheckEncoded'.length + 'Sig2021'
-
 fn curve_to_prefixes(curve: &str) -> Result<(&'static [u8; 4], &'static [u8; 3]), Error> {
     let prefix = match curve {
         "Ed25519" => (&TZ1_EDPK, &TZ1_HASH),
@@ -23,12 +21,20 @@ fn curve_to_prefixes(curve: &str) -> Result<(&'static [u8; 4], &'static [u8; 3])
 }
 
 pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
-    let params = match jwk.params {
-        Params::OKP(ref okp_params) => okp_params,
+    let bytes;
+    let (curve, public_key_bytes) = match jwk.params {
+        Params::OKP(ref params) => (&params.curve, &params.public_key.0),
+        Params::EC(ref params) => {
+            let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+            let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+            let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+            bytes = [x.as_slice(), y.as_slice()].concat();
+            (curve, &bytes)
+        }
         _ => return Err(Error::KeyTypeNotImplemented),
     };
-    let (inner_prefix, outer_prefix) = curve_to_prefixes(&params.curve)?;
-    let encoded = bs58::encode(&params.public_key.0);
+    let (inner_prefix, outer_prefix) = curve_to_prefixes(curve)?;
+    let encoded = bs58::encode(public_key_bytes);
     let pk_b58_vec = encoded.into_vec();
     let mut inner = Vec::with_capacity(4 + pk_b58_vec.len());
     inner.extend_from_slice(inner_prefix);
@@ -49,6 +55,7 @@ mod tests {
     use super::*;
     #[test]
     fn hash() {
+        // tz1
         let jwk: JWK = serde_json::from_str(
             r#"{
               "crv": "Ed25519",
@@ -59,5 +66,18 @@ mod tests {
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
         assert_eq!(hash, "tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK");
+
+        // tz2
+        use serde_json::json;
+        let jwk: JWK = serde_json::from_value(json!({
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "yclqMZ0MtyVkKm1eBh2AyaUtsqT0l5RJM3g4SzRT96A",
+            "y": "yQzUwKnftWCJPGs-faGaHiYi1sxA6fGJVw2Px_LCNe8",
+            "d": "meTmccmR_6ZsOa2YuTTkKkJ4ZPYsKdAH1Wx_RRf2j_E"
+        }))
+        .unwrap();
+        let hash = hash_public_key(&jwk).unwrap();
+        assert_eq!(hash, "tz2Kx6Ew2ghFQAS5GKPAjYxZsCAT1f12KE7J");
     }
 }
