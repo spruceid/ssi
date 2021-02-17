@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 // RFC 7517 - JSON Web Key (JWK)
 // RFC 7518 - JSON Web Algorithms (JWA)
 // RFC 8037 - CFRG ECDH and Signatures in JOSE
+// RFC 8812 - CBOR Object Signing and Encryption (COSE) and JSON Object Signing and Encryption
+//  (JOSE) Registrations for Web Authentication (WebAuthn) Algorithms
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JWTKeys {
@@ -166,6 +168,9 @@ pub enum Algorithm {
     PS512,
     EdDSA,
     ES256K,
+    /// https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r
+    #[serde(rename = "ES256K-R")]
+    ES256KR,
     None,
 }
 
@@ -226,6 +231,28 @@ impl JWK {
         })
     }
 
+    #[cfg(feature = "libsecp256k1")]
+    pub fn generate_secp256k1() -> Result<JWK, Error> {
+        let mut rng = rand::rngs::OsRng {};
+        let secret_key = secp256k1::SecretKey::random(&mut rng);
+        let sk_bytes = secret_key.serialize();
+        let public_key = secp256k1::PublicKey::from_secret_key(&secret_key);
+        Ok(JWK {
+            params: Params::EC(ECParams {
+                ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+                ..ECParams::try_from(&public_key)?
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        })
+    }
+
     pub fn get_algorithm(&self) -> Option<Algorithm> {
         if let Some(algorithm) = self.algorithm {
             return Some(algorithm);
@@ -233,6 +260,9 @@ impl JWK {
         match &self.params {
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
+            }
+            Params::EC(ec_params) if ec_params.curve == Some("secp256k1".to_string()) => {
+                return Some(Algorithm::ES256K);
             }
             _ => {}
         };
@@ -401,6 +431,7 @@ impl FromStr for Algorithm {
             "PS512" => Ok(Self::PS512),
             "EdDSA" => Ok(Self::EdDSA),
             "ES256K" => Ok(Self::ES256K),
+            "ES256K-R" => Ok(Self::ES256KR),
             _ => Err(Error::UnsupportedAlgorithm),
         }
     }
@@ -545,6 +576,58 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
     }
 }
 
+#[cfg(feature = "libsecp256k1")]
+impl TryFrom<&ECParams> for secp256k1::SecretKey {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        if curve != "secp256k1" {
+            return Err(Error::CurveNotImplemented(curve.to_string()));
+        }
+        let private_key = params
+            .ecc_private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let secret_key = secp256k1::SecretKey::parse_slice(&private_key.0)?;
+        Ok(secret_key)
+    }
+}
+
+#[cfg(feature = "libsecp256k1")]
+impl TryFrom<&ECParams> for secp256k1::PublicKey {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        if curve != "secp256k1" {
+            return Err(Error::CurveNotImplemented(curve.to_string()));
+        }
+        let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+        let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+        // TODO: add sign byte?
+        let pk_data = [x.as_slice(), y.as_slice()].concat();
+        let public_key =
+            secp256k1::PublicKey::parse_slice(&pk_data, Some(secp256k1::PublicKeyFormat::Raw))?;
+        Ok(public_key)
+    }
+}
+
+#[cfg(feature = "libsecp256k1")]
+impl TryFrom<&secp256k1::PublicKey> for ECParams {
+    type Error = Error;
+    fn try_from(pk: &secp256k1::PublicKey) -> Result<Self, Self::Error> {
+        let pk_bytes = pk.serialize();
+        if pk_bytes[0] != secp256k1::util::TAG_PUBKEY_FULL {
+            return Err(Error::UnsupportedKeyType);
+        }
+        Ok(ECParams {
+            curve: Some("secp256k1".to_string()),
+            x_coordinate: Some(Base64urlUInt(pk_bytes[1..33].to_vec())),
+            y_coordinate: Some(Base64urlUInt(pk_bytes[33..65].to_vec())),
+            ecc_private_key: None,
+        })
+    }
+}
+
 impl TryFrom<String> for Base64urlUInt {
     type Error = Error;
     fn try_from(data: String) -> Result<Self, Self::Error> {
@@ -595,5 +678,11 @@ mod tests {
     #[test]
     fn generate_ed25519() {
         let _key = JWK::generate_ed25519().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "libsecp256k1")]
+    fn secp256k1_generate() {
+        let _jwk = JWK::generate_secp256k1().unwrap();
     }
 }

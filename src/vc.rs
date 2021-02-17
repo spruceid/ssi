@@ -822,10 +822,7 @@ impl Presentation {
 }
 
 /// Get a DID's first verification method
-pub async fn get_verification_method(
-    did: &str,
-    resolver: &dyn DIDResolver,
-) -> Option<String> {
+pub async fn get_verification_method(did: &str, resolver: &dyn DIDResolver) -> Option<String> {
     let (res_meta, doc_opt, _meta) = resolver
         .resolve(did, &ResolutionInputMetadata::default())
         .await;
