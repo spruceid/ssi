@@ -313,7 +313,7 @@ pub async fn dereference(
         }
         _ => {
             return (
-                DereferencingMetadata::from(Error::ResourceNotFound),
+                DereferencingMetadata::from(Error::ResourceNotFound(did_url.did.to_string())),
                 Content::Null,
                 ContentMetadata::default(),
             );

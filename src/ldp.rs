@@ -145,7 +145,7 @@ pub async fn resolve_key(
     }
     let vm = match object {
         Content::Object(Resource::VerificationMethod(vm)) => vm,
-        Content::Null => return Err(Error::ResourceNotFound),
+        Content::Null => return Err(Error::ResourceNotFound(verification_method.to_string())),
         _ => return Err(Error::ExpectedObject),
     };
     vm.public_key_jwk.ok_or(Error::MissingKey)
