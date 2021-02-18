@@ -504,7 +504,7 @@ impl Document {
             }
         }
         // TODO: generalize. use json-ld
-        Err(Error::ResourceNotFound)
+        Err(Error::ResourceNotFound(id.to_string()))
     }
 
     /// Select a service endpoint object in the DID document.
