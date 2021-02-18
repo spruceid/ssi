@@ -69,6 +69,7 @@ pub enum Params {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
 pub struct ECParams {
     // Parameters for Elliptic Curve Public Keys
+    #[serde(rename = "crv")]
     pub curve: Option<String>,
     #[serde(rename = "x")]
     pub x_coordinate: Option<Base64urlUInt>,
