@@ -436,8 +436,8 @@ pub fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
 fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
     let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
         rs256_key
-    } else if keys.es256k_private_key.is_some() {
-        return Err(Error::AlgorithmNotImplemented);
+    } else if let Some(es256k_key) = &keys.es256k_private_key {
+        es256k_key
     } else {
         return Err(Error::MissingKey);
     };
