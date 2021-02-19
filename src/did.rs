@@ -75,7 +75,7 @@ pub struct Document {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<Vec<Service>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<Proof>,
+    pub proof: Option<OneOrMany<Proof>>,
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
