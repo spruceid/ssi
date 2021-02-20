@@ -7,7 +7,7 @@ use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
-use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs};
+use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 
@@ -665,6 +665,16 @@ impl Credential {
         LinkedDataProofs::sign(self, options, jwk).await
     }
 
+    /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
+    /// and then pass to [`ProofPreparation::complete`] to complete the proof.
+    pub async fn prepare_proof(
+        &self,
+        public_key: &JWK,
+        options: &LinkedDataProofOptions,
+    ) -> Result<ProofPreparation, Error> {
+        LinkedDataProofs::prepare(self, options, public_key).await
+    }
+
     pub fn add_proof(&mut self, proof: Proof) {
         self.proof = match self.proof.take() {
             None => Some(OneOrMany::One(proof)),
@@ -1148,6 +1158,54 @@ mod tests {
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some("did:example:foo#key1".to_string());
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // mess with the proof to make verify fail
+        match vc.proof {
+            None => unreachable!(),
+            Some(OneOrMany::Many(_)) => unreachable!(),
+            Some(OneOrMany::One(ref mut proof)) => match proof.jws {
+                None => unreachable!(),
+                Some(ref mut jws) => {
+                    jws.insert(0, 'x');
+                }
+            },
+        }
+        println!("{}", serde_json::to_string_pretty(&vc).unwrap());
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.len() >= 1);
+    }
+
+    #[async_std::test]
+    async fn credential_proof_preparation() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:foo",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some("did:example:foo#key1".to_string());
+        let algorithm = key.algorithm.unwrap();
+        let public_key = key.to_public();
+        let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
+        let sig = crate::jws::sign_bytes(algorithm, &preparation.signing_input, &key).unwrap();
+        let sig_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
+        let proof = preparation.complete(&sig_b64).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
