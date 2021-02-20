@@ -9,9 +9,11 @@ use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMe
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
+use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
 use crate::vc::{LinkedDataProofOptions, Proof};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 // TODO: factor out proof types
@@ -52,12 +54,48 @@ pub trait ProofSuite {
         key: &JWK,
     ) -> Result<Proof, Error>;
 
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error>;
+
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error>;
+
     async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
         verify(proof, document, resolver).await
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProofPreparation {
+    pub proof: Proof,
+    pub jws_header: Header,
+    pub signing_input: Vec<u8>,
+}
+
+impl ProofPreparation {
+    pub async fn complete(self, signature: &str) -> Result<Proof, Error> {
+        match self.proof.type_.as_str() {
+            "RsaSignature2018" => RsaSignature2018::complete(self, signature).await,
+            "Ed25519Signature2018" => Ed25519Signature2018::complete(self, signature).await,
+            "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::complete(self, signature)
+                    .await
+            }
+            "EcdsaSecp256k1Signature2019" => {
+                EcdsaSecp256k1Signature2019::complete(self, signature).await
+            }
+            "EcdsaSecp256k1RecoverySignature2020" => {
+                EcdsaSecp256k1RecoverySignature2020::complete(self, signature).await
+            }
+            _ => Err(Error::ProofTypeNotImplemented),
+        }
     }
 }
 
@@ -126,6 +164,40 @@ impl LinkedDataProofs {
                 } else {
                     return EcdsaSecp256k1Signature2019::sign(document, options, &key).await;
                 }
+            }
+            _ => {}
+        };
+        Err(Error::ProofTypeNotImplemented)
+    }
+
+    /// Prepare to create a linked data proof. Given a linked data document, proof options, and JWS
+    /// algorithm, calculate the signing input bytes. Returns a [`ProofPreparation`] - the data for the caller to sign, along with data to reconstruct the proof.
+    pub async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        match public_key.get_algorithm().ok_or(Error::MissingAlgorithm)? {
+            Algorithm::RS256 => {
+                return RsaSignature2018::prepare(document, options, public_key).await
+            }
+            Algorithm::EdDSA => {
+                if let Some(ref vm) = options.verification_method {
+                    if vm.starts_with("did:tz:tz1") {
+                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
+                            document, options, public_key,
+                        )
+                        .await;
+                    }
+                }
+                return Ed25519Signature2018::prepare(document, options, public_key).await;
+            }
+            Algorithm::ES256K => {
+                return EcdsaSecp256k1Signature2019::prepare(document, options, public_key).await
+            }
+            Algorithm::ES256KR => {
+                return EcdsaSecp256k1RecoverySignature2020::prepare(document, options, public_key)
+                    .await;
             }
             _ => {}
         };
@@ -245,6 +317,55 @@ async fn sign_proof(
     Ok(proof)
 }
 
+async fn prepare(
+    document: &(dyn LinkedDataDocument + Sync),
+    options: &LinkedDataProofOptions,
+    public_key: &JWK,
+    type_: &str,
+    algorithm: Algorithm,
+) -> Result<ProofPreparation, Error> {
+    if let Some(key_algorithm) = public_key.algorithm {
+        if key_algorithm != algorithm {
+            return Err(Error::AlgorithmMismatch);
+        }
+    }
+    let proof = Proof {
+        proof_purpose: options.proof_purpose.clone(),
+        verification_method: options.verification_method.clone(),
+        created: Some(options.created.unwrap_or_else(now_ms)),
+        domain: options.domain.clone(),
+        challenge: options.challenge.clone(),
+        ..Proof::new(type_)
+    };
+    prepare_proof(document, proof, algorithm).await
+}
+
+async fn prepare_proof(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: Proof,
+    algorithm: Algorithm,
+) -> Result<ProofPreparation, Error> {
+    let message = to_jws_payload(document, &proof).await?;
+    let (jws_header, signing_input) =
+        crate::jws::prepare_detached_unencoded_payload(algorithm, &message)?;
+    Ok(ProofPreparation {
+        proof,
+        jws_header,
+        signing_input,
+    })
+}
+
+async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    complete_proof(preparation, signature).await
+}
+
+async fn complete_proof(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    let mut proof = preparation.proof;
+    let jws = crate::jws::complete_sign_unencoded_payload(preparation.jws_header, signature)?;
+    proof.jws = Some(jws);
+    Ok(proof)
+}
+
 async fn verify(
     proof: &Proof,
     document: &(dyn LinkedDataDocument + Sync),
@@ -271,6 +392,23 @@ impl ProofSuite for RsaSignature2018 {
     ) -> Result<Proof, Error> {
         sign(document, options, key, "RsaSignature2018", Algorithm::RS256).await
     }
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        prepare(
+            document,
+            options,
+            public_key,
+            "RsaSignature2018",
+            Algorithm::RS256,
+        )
+        .await
+    }
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
+    }
 }
 
 pub struct Ed25519Signature2018;
@@ -290,6 +428,23 @@ impl ProofSuite for Ed25519Signature2018 {
         )
         .await
     }
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        prepare(
+            document,
+            options,
+            public_key,
+            "Ed25519Signature2018",
+            Algorithm::EdDSA,
+        )
+        .await
+    }
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
+    }
 }
 
 pub struct EcdsaSecp256k1Signature2019;
@@ -308,6 +463,23 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
             Algorithm::ES256K,
         )
         .await
+    }
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        prepare(
+            document,
+            options,
+            public_key,
+            "EcdsaSecp256k1Signature2019",
+            Algorithm::ES256K,
+        )
+        .await
+    }
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
     }
 }
 
@@ -337,6 +509,30 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
             ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
         };
         sign_proof(document, proof, key, Algorithm::ES256KR).await
+    }
+
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        let proof = Proof {
+            context: serde_json::json!([
+                crate::jsonld::DIF_ESRS2020_CONTEXT,
+                ESRS2020_CONTEXT_EXTRA.clone(),
+            ]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
+        };
+        prepare_proof(document, proof, Algorithm::ES256KR).await
+    }
+
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
     }
 
     async fn verify(
@@ -395,6 +591,34 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
         sign_proof(document, proof, key, Algorithm::EdDSA).await
+    }
+
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        use std::collections::HashMap;
+        let mut property_set = HashMap::new();
+        let jwk_value = serde_json::to_value(public_key.to_public())?;
+        // This proof type must contain the public key, because the DID is based on the hash of the
+        // public key, and the public key is not otherwise recoverable.
+        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        // It needs custom JSON_LD context too.
+        let proof = Proof {
+            context: TZ_CONTEXT.clone(),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+        };
+        prepare_proof(document, proof, Algorithm::EdDSA).await
+    }
+
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
     }
 
     async fn verify(

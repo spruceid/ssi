@@ -299,6 +299,27 @@ pub fn detached_sign_unencoded_payload(
     Ok(jws)
 }
 
+pub fn prepare_detached_unencoded_payload(
+    algorithm: Algorithm,
+    payload: &[u8],
+) -> Result<(Header, Vec<u8>), Error> {
+    let header = Header {
+        algorithm,
+        critical: Some(vec!["b64".to_string()]),
+        base64urlencode_payload: Some(false),
+        ..Default::default()
+    };
+    let header_b64 = base64_encode_json(&header)?;
+    let signing_input = [header_b64.as_bytes(), b".", payload].concat().to_vec();
+    Ok((header, signing_input))
+}
+
+pub fn complete_sign_unencoded_payload(header: Header, sig_b64: &str) -> Result<String, Error> {
+    let header_b64 = base64_encode_json(&header)?;
+    let jws = header_b64 + ".." + sig_b64;
+    Ok(jws)
+}
+
 pub fn encode_sign(algorithm: Algorithm, payload: &str, key: &JWK) -> Result<String, Error> {
     let header = Header {
         algorithm,
