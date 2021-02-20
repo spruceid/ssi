@@ -31,14 +31,8 @@ packages.
 
 ## Install
 
-Please note you must be using Rust 1.51.0 or higher, which is currently `nightly`.
-
 ```sh
-# if using rustup
-$ rustup toolchain install nightly
-$ rustup default nightly
-
-$ git clone https://github.com/spruceid/ssi .
+$ git clone https://github.com/spruceid/ssi
 $ cd ssi
 $ git submodule update
 $ cargo build
@@ -49,4 +43,3 @@ $ cargo build
 - [Rust](https://www.rust-lang.org/)
 - [rustup](https://rustup.rs/)
 - [Cargo](https://doc.rust-lang.org/cargo/)
-- [installing-rust](https://doc.rust-lang.org/nightly/edition-guide/rust-2018/rustup-for-managing-rust-versions.html)
