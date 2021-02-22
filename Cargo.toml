@@ -7,6 +7,7 @@ edition = "2018"
 [features]
 default = ["ring"]
 http-did = ["hyper", "hyper-tls", "http", "percent-encoding", "tokio"]
+secp256k1 = ["libsecp256k1", "rand"]
 
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
