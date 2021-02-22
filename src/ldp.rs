@@ -7,6 +7,8 @@ use chrono::prelude::*;
 use crate::caip10::BlockchainAccountId;
 use crate::did::{Resource, VerificationMethodMap};
 use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMetadata};
+#[cfg(feature = "keccak-hash")]
+use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
@@ -26,6 +28,10 @@ lazy_static! {
     };
     pub static ref ESRS2020_CONTEXT_EXTRA: Value = {
         let context_str = include_str!("../contexts/esrs2020-extra.jsonld");
+        serde_json::from_str(&context_str).unwrap()
+    };
+    pub static ref EIP712VM_CONTEXT: Value = {
+        let context_str = include_str!("../contexts/eip712vm.jsonld");
         serde_json::from_str(&context_str).unwrap()
     };
 }
@@ -76,8 +82,16 @@ pub trait ProofSuite {
 #[serde(rename_all = "camelCase")]
 pub struct ProofPreparation {
     pub proof: Proof,
-    pub jws_header: Header,
-    pub signing_input: Vec<u8>,
+    pub jws_header: Option<Header>,
+    pub signing_input: SigningInput,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum SigningInput {
+    Bytes(Vec<u8>),
+    #[cfg(feature = "keccak-hash")]
+    TypedData(TypedData),
 }
 
 impl ProofPreparation {
@@ -95,6 +109,8 @@ impl ProofPreparation {
             "EcdsaSecp256k1RecoverySignature2020" => {
                 EcdsaSecp256k1RecoverySignature2020::complete(self, signature).await
             }
+            #[cfg(feature = "keccak-hash")]
+            "Eip712Signature2021" => Eip712Signature2021::complete(self, signature).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -160,6 +176,12 @@ impl LinkedDataProofs {
                 x509_thumbprint_sha256: _,
             } if ec_params.curve == Some("secp256k1".to_string()) => {
                 if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
+                    #[cfg(feature = "keccak-hash")]
+                    if let Some(ref vm) = options.verification_method {
+                        if vm.ends_with("#Eip712Method2021") {
+                            return Eip712Signature2021::sign(document, options, &key).await;
+                        }
+                    }
                     return EcdsaSecp256k1RecoverySignature2020::sign(document, options, &key)
                         .await;
                 } else {
@@ -197,6 +219,12 @@ impl LinkedDataProofs {
                 return EcdsaSecp256k1Signature2019::prepare(document, options, public_key).await
             }
             Algorithm::ES256KR => {
+                #[cfg(feature = "keccak-hash")]
+                if let Some(ref vm) = options.verification_method {
+                    if vm.ends_with("#Eip712Method2021") {
+                        return Eip712Signature2021::prepare(document, options, public_key).await;
+                    }
+                }
                 return EcdsaSecp256k1RecoverySignature2020::prepare(document, options, public_key)
                     .await;
             }
@@ -226,6 +254,8 @@ impl LinkedDataProofs {
             "EcdsaSecp256k1RecoverySignature2020" => {
                 EcdsaSecp256k1RecoverySignature2020::verify(proof, document, resolver).await
             }
+            #[cfg(feature = "keccak-hash")]
+            "Eip712Signature2021" => Eip712Signature2021::verify(proof, document, resolver).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -351,8 +381,8 @@ async fn prepare_proof(
         crate::jws::prepare_detached_unencoded_payload(algorithm, &message)?;
     Ok(ProofPreparation {
         proof,
-        jws_header,
-        signing_input,
+        jws_header: Some(jws_header),
+        signing_input: SigningInput::Bytes(signing_input),
     })
 }
 
@@ -362,7 +392,8 @@ async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proo
 
 async fn complete_proof(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
     let mut proof = preparation.proof;
-    let jws = crate::jws::complete_sign_unencoded_payload(preparation.jws_header, signature)?;
+    let jws_header = preparation.jws_header.ok_or(Error::MissingJWSHeader)?;
+    let jws = crate::jws::complete_sign_unencoded_payload(jws_header, signature)?;
     proof.jws = Some(jws);
     Ok(proof)
 }
@@ -648,5 +679,139 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
         Ok(())
+    }
+}
+
+#[cfg(feature = "keccak-hash")]
+pub struct Eip712Signature2021;
+#[async_trait]
+#[cfg(feature = "keccak-hash")]
+impl ProofSuite for Eip712Signature2021 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        let mut proof = Proof {
+            context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("Eip712Signature2021")
+        };
+        let typed_data = TypedData::from_document_and_options(document, &proof).await?;
+        let bytes = typed_data.hash()?;
+        let sig = crate::jws::sign_bytes_b64(Algorithm::ES256KR, &bytes, &key)?;
+        proof.proof_value = Some(sig);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        // TODO
+        let proof = Proof {
+            context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("Eip712Signature2021")
+        };
+        let typed_data = TypedData::from_document_and_options(document, &proof).await?;
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::TypedData(typed_data),
+        })
+    }
+
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let sig_b64 = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        if vm.type_ != "Eip712Method2021" {
+            return Err(Error::VerificationMethodMismatch);
+        }
+        let typed_data = TypedData::from_document_and_options(document, &proof).await?;
+        let bytes = typed_data.hash()?;
+        let sig = base64::decode_config(sig_b64, base64::URL_SAFE_NO_PAD)?;
+        let jwk = crate::jws::recover(Algorithm::ES256KR, &bytes, &sig)?;
+        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
+        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
+        account_id.verify(&jwk)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct ExampleDocument;
+
+    #[async_trait]
+    impl LinkedDataDocument for ExampleDocument {
+        fn get_contexts(&self) -> Result<Option<String>, Error> {
+            // Ok(Some(serde_json::to_string(&*EIP712VM_CONTEXT)?))
+            Ok(None)
+        }
+        async fn to_dataset_for_signing(
+            &self,
+            _parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        ) -> Result<DataSet, Error> {
+            use crate::rdf;
+            let mut dataset = DataSet::default();
+            let statement = rdf::Statement {
+                subject: rdf::Subject::BlankNodeLabel(rdf::BlankNodeLabel("_:c14n0".to_string())),
+                predicate: rdf::Predicate::IRIRef(rdf::IRIRef(
+                    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+                )),
+                object: rdf::Object::IRIRef(rdf::IRIRef(
+                    "http://example.org/vocab#Foo".to_string(),
+                )),
+                graph_label: None,
+            };
+            dataset.add_statement(statement);
+            Ok(dataset)
+        }
+    }
+
+    #[cfg(feature = "secp256k1")]
+    #[async_std::test]
+    #[ignore]
+    async fn eip712vm() {
+        let mut key = JWK::generate_secp256k1().unwrap();
+        key.algorithm = Some(Algorithm::ES256KR);
+        let vm = format!("{}#Eip712Method2021", "did:example:foo");
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(vm),
+            ..Default::default()
+        };
+        let doc = ExampleDocument;
+        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &key)
+            .await
+            .unwrap();
     }
 }

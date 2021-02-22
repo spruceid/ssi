@@ -1,5 +1,9 @@
 use crate::caip10::BlockchainAccountIdParseError;
 use crate::caip10::BlockchainAccountIdVerifyError;
+#[cfg(feature = "keccak-hash")]
+use crate::eip712::TypedDataConstructionError;
+#[cfg(feature = "keccak-hash")]
+use crate::eip712::TypedDataHashError;
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ed25519-dalek")]
 use ed25519_dalek::SignatureError as Ed25519SignatureError;
@@ -82,6 +86,7 @@ pub enum Error {
     InvalidProofDomain,
     InvalidSignature,
     InvalidJWS,
+    MissingJWSHeader,
     MissingCredentialSchema,
     UnsupportedProperty,
     UnsupportedKeyType,
@@ -148,6 +153,10 @@ pub enum Error {
     TryFromSlice(TryFromSliceError),
     BlockchainAccountIdParse(BlockchainAccountIdParseError),
     BlockchainAccountIdVerify(BlockchainAccountIdVerifyError),
+    #[cfg(feature = "keccak-hash")]
+    TypedDataConstruction(TypedDataConstructionError),
+    #[cfg(feature = "keccak-hash")]
+    TypedDataHash(TypedDataHashError),
 }
 
 impl fmt::Display for Error {
@@ -206,6 +215,7 @@ impl fmt::Display for Error {
             Error::FutureProof => write!(f, "Proof creation time is in the future"),
             Error::InvalidSignature => write!(f, "Invalid Signature"),
             Error::InvalidJWS => write!(f, "Invalid JWS"),
+            Error::MissingJWSHeader => write!(f, "Missing JWS Header"),
             Error::InvalidProofPurpose => write!(f, "Invalid proof purpose"),
             Error::InvalidProofDomain => write!(f, "Invalid proof domain"),
             Error::MissingCredentialSchema => write!(f, "Missing credential schema for ZKP"),
@@ -276,6 +286,10 @@ impl fmt::Display for Error {
             Error::CharTryFrom(e) => e.fmt(f),
             Error::BlockchainAccountIdParse(e) => e.fmt(f),
             Error::BlockchainAccountIdVerify(e) => e.fmt(f),
+            #[cfg(feature = "keccak-hash")]
+            Error::TypedDataConstruction(e) => e.fmt(f),
+            #[cfg(feature = "keccak-hash")]
+            Error::TypedDataHash(e) => e.fmt(f),
         }
     }
 }
@@ -402,5 +416,19 @@ impl From<BlockchainAccountIdParseError> for Error {
 impl From<BlockchainAccountIdVerifyError> for Error {
     fn from(err: BlockchainAccountIdVerifyError) -> Error {
         Error::BlockchainAccountIdVerify(err)
+    }
+}
+
+#[cfg(feature = "keccak-hash")]
+impl From<TypedDataConstructionError> for Error {
+    fn from(err: TypedDataConstructionError) -> Error {
+        Error::TypedDataConstruction(err)
+    }
+}
+
+#[cfg(feature = "keccak-hash")]
+impl From<TypedDataHashError> for Error {
+    fn from(err: TypedDataHashError) -> Error {
+        Error::TypedDataHash(err)
     }
 }

@@ -1238,7 +1238,12 @@ mod tests {
         let algorithm = key.algorithm.unwrap();
         let public_key = key.to_public();
         let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
-        let sig = crate::jws::sign_bytes(algorithm, &preparation.signing_input, &key).unwrap();
+        let signing_input = match preparation.signing_input {
+            crate::ldp::SigningInput::Bytes(ref bytes) => bytes,
+            #[allow(unreachable_patterns)]
+            _ => panic!("Unexpected signing input type"),
+        };
+        let sig = crate::jws::sign_bytes(algorithm, &signing_input, &key).unwrap();
         let sig_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
         let proof = preparation.complete(&sig_b64).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());

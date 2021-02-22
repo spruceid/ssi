@@ -76,9 +76,21 @@ impl DIDResolver for DIDEthr {
             fragment: Some("controller".to_string()),
             ..Default::default()
         };
+        let eip712vm_didurl = DIDURL {
+            did: did.to_string(),
+            fragment: Some("Eip712Method2021".to_string()),
+            ..Default::default()
+        };
         let vm = VerificationMethod::Map(VerificationMethodMap {
             id: vm_didurl.to_string(),
             type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+            controller: did.to_string(),
+            blockchain_account_id: Some(blockchain_account_id.to_string()),
+            ..Default::default()
+        });
+        let eip712vm = VerificationMethod::Map(VerificationMethodMap {
+            id: eip712vm_didurl.to_string(),
+            type_: "Eip712Method2021".to_string(),
             controller: did.to_string(),
             blockchain_account_id: Some(blockchain_account_id.to_string()),
             ..Default::default()
@@ -89,7 +101,8 @@ impl DIDResolver for DIDEthr {
             id: did.to_string(),
             authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
             assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            verification_method: Some(vec![vm]),
+            // TODO: authentication/assertion_method?
+            verification_method: Some(vec![vm, eip712vm]),
             ..Default::default()
         };
 
@@ -177,6 +190,11 @@ mod tests {
                 "type": "EcdsaSecp256k1RecoveryMethod2020",
                 "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
                 "blockchainAccountId": "0xb9c5714089478a327f09197987f16f9e5d936e8a@eip155:1"
+              }, {
+                "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021",
+                "type": "Eip712Method2021",
+                "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+                "blockchainAccountId": "0xb9c5714089478a327f09197987f16f9e5d936e8a@eip155:1"
               }],
               "authentication": [
                 "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller"
@@ -190,13 +208,28 @@ mod tests {
 
     #[tokio::test]
     async fn credential_prove_verify_did_ethr() {
-        use ssi::jwk::Algorithm;
+        eprintln!("with EcdsaSecp256k1RecoveryMethod2020...");
+        credential_prove_verify_did_ethr2(false).await;
+        /*
+        eprintln!("with Eip712Method2021...");
+        credential_prove_verify_did_ethr2(true).await;
+        */
+    }
+
+    async fn credential_prove_verify_did_ethr2(eip712: bool) {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
-        let mut key = JWK::generate_secp256k1().unwrap();
-        // mark this key as being for use with key recovery
-        key.algorithm = Some(Algorithm::ES256KR);
+        let key: JWK = serde_json::from_value(json!({
+            "alg": "ES256K-R",
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "yclqMZ0MtyVkKm1eBh2AyaUtsqT0l5RJM3g4SzRT96A",
+            "y": "yQzUwKnftWCJPGs-faGaHiYi1sxA6fGJVw2Px_LCNe8",
+            "d": "meTmccmR_6ZsOa2YuTTkKkJ4ZPYsKdAH1Wx_RRf2j_E"
+        }))
+        .unwrap();
         let did = DIDEthr.generate(&Source::Key(&key)).unwrap();
+        eprintln!("did: {}", did);
         let mut vc: Credential = serde_json::from_value(json!({
             "@context": "https://www.w3.org/2018/credentials/v1",
             "type": "VerifiableCredential",
@@ -209,7 +242,11 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#controller");
+        if eip712 {
+            issue_options.verification_method = Some(did.to_string() + "#Eip712Method2021");
+        } else {
+            issue_options.verification_method = Some(did.to_string() + "#controller");
+        }
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
@@ -261,7 +298,6 @@ mod tests {
         vp.holder = Some(URI::String(did.to_string()));
         vp_issue_options.verification_method = Some(did.to_string() + "#controller");
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());

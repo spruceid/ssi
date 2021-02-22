@@ -5,7 +5,7 @@ use keccak_hash::keccak;
 use crate::error::Error;
 use crate::jwk::{Params, JWK};
 
-fn bytes_to_lowerhex(bytes: &[u8]) -> String {
+pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
     "0x".to_string()
         + &bytes
             .iter()
@@ -25,13 +25,20 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
     }
     let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
     let hash_last20 = &hash[12..32];
-    Ok(bytes_to_lowerhex(hash_last20))
+    let hash_last20_hex = bytes_to_lowerhex(hash_last20);
+    eprintln!(
+        "jwk {}. hex: {}",
+        serde_json::to_string_pretty(jwk)?,
+        hash_last20_hex
+    );
+    Ok(hash_last20_hex)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+
     #[test]
     fn hash() {
         let jwk: JWK = serde_json::from_value(json!({
