@@ -45,12 +45,14 @@ blake2b_simd = "0.5"
 bs58 = { version = "0.4", features = ["check"] }
 libsecp256k1 = { version = "0.3", optional = true }
 thiserror = "1.0"
+keccak-hash = { version = "0.7", optional = true }
 
 [workspace]
 members = [
   "did-tezos",
   "did-key",
   "did-web",
+  "did-ethr",
   "vc-test",
 ]
 

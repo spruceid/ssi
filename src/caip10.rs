@@ -1,5 +1,6 @@
 use crate::blakesig;
 use crate::jwk::JWK;
+use std::fmt;
 use std::str::FromStr;
 
 use thiserror::Error;
@@ -7,8 +8,8 @@ use thiserror::Error;
 /// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
 #[derive(Clone, PartialEq, Hash, Debug)]
 pub struct BlockchainAccountId {
-    account_address: String,
-    chain_id: String,
+    pub account_address: String,
+    pub chain_id: String,
 }
 
 #[derive(Error, Debug)]
@@ -24,22 +25,23 @@ pub enum BlockchainAccountIdVerifyError {
 impl BlockchainAccountId {
     /// Check that a given JWK corresponds to this account id
     pub fn verify(&self, jwk: &JWK) -> Result<(), BlockchainAccountIdVerifyError> {
-        match self.chain_id.split(':').collect::<Vec<&str>>().as_slice() {
-            ["tezos", _net] => {
-                let hash = blakesig::hash_public_key(&jwk)
-                    .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))?;
-                if hash != self.account_address {
-                    return Err(BlockchainAccountIdVerifyError::KeyMismatch(
-                        hash,
-                        self.account_address.clone(),
-                    ));
-                }
-                Ok(())
-            }
+        let hash = match self.chain_id.split(':').collect::<Vec<&str>>().as_slice() {
+            ["tezos", _net] => blakesig::hash_public_key(&jwk)
+                .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
+            #[cfg(feature = "keccak-hash")]
+            ["eip155", _net] => crate::keccak_hash::hash_public_key(&jwk)
+                .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
                 self.chain_id.clone(),
             )),
+        }?;
+        if hash != self.account_address {
+            return Err(BlockchainAccountIdVerifyError::KeyMismatch(
+                hash,
+                self.account_address.clone(),
+            ));
         }
+        Ok(())
     }
 }
 
@@ -107,14 +109,21 @@ impl FromStr for BlockchainAccountId {
     }
 }
 
+impl fmt::Display for BlockchainAccountId {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}@{}", self.account_address, self.chain_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[async_std::test]
-    async fn parse_account_id() {
+    async fn account_id() {
         // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
         let dummy_max_length = "bd57219062044ed77c7e5b865339a6d727309c548763141f11e26e9242bbd34@max-namespace-16:xip3343-8c3444cf8970a9e41a706fab93e7a6c4-xxxyyy";
-        BlockchainAccountId::from_str(&dummy_max_length).unwrap();
+        let account_id = BlockchainAccountId::from_str(&dummy_max_length).unwrap();
+        assert_eq!(account_id.to_string(), dummy_max_length);
     }
 
     #[test]
