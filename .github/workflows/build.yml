@@ -46,7 +46,10 @@ jobs:
       run: cargo test --no-default-features --features rsa,ed25519-dalek,sha2,rand
 
     - name: Test with secp256k1
-      run: cargo test --verbose --workspace --features did-tezos/secp256k1,did-key/secp256k1
+      run: |
+        cargo test --verbose --workspace --features secp256k1
+        cargo test --verbose --manifest-path did-key/Cargo.toml --features secp256k1,ssi/ring
+        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features secp256k1,ssi/ring
 
     - name: Test DID Resolution HTTP(S) Binding
       run: cargo test --features http-did
