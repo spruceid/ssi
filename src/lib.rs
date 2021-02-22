@@ -9,6 +9,8 @@ pub mod jsonld;
 pub mod jwk;
 pub mod jws;
 pub mod jwt;
+#[cfg(feature = "keccak-hash")]
+pub mod keccak_hash;
 pub mod ldp;
 pub mod one_or_many;
 pub mod rdf;
