@@ -1,8 +1,9 @@
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use chrono::prelude::*;
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
-use crate::blakesig;
 use crate::caip10::BlockchainAccountId;
 use crate::did::{Resource, VerificationMethodMap};
 use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMetadata};
@@ -552,7 +553,6 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         let message = to_jws_payload(document, proof).await?;
         let (_header, jwk) = crate::jws::detached_recover(&jws, &message)?;
         let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        use std::str::FromStr;
         let account_id = BlockchainAccountId::from_str(&account_id_str)?;
         account_id.verify(&jwk)?;
         Ok(())
@@ -624,7 +624,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
-        _resolver: &dyn DIDResolver,
+        resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
@@ -635,16 +635,16 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             None => return Err(Error::MissingKey),
         };
         // Ensure the verificationMethod corresponds to the hashed public key.
-        // The hash should be in the vM URL.
-        let vm = proof
+        let verification_method = proof
             .verification_method
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
-        let hash = blakesig::hash_public_key(&jwk)?;
-        let vm_base = vm.split('#').next().unwrap();
-        if vm_base.split(':').find(|&h| h == &hash).is_none() {
-            return Err(Error::KeyMismatch);
-        }
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        let account_id: BlockchainAccountId = vm
+            .blockchain_account_id
+            .ok_or(Error::MissingAccountId)?
+            .parse()?;
+        account_id.verify(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
         Ok(())
