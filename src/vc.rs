@@ -611,32 +611,44 @@ impl Credential {
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
-    ) -> Vec<&Proof> {
+    ) -> Result<Vec<&Proof>, String> {
+        // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
-        // Use issuer as default verificationMethod
-        if options.verification_method.is_none() {
-            if let Some(ref issuer) = self.issuer {
-                let issuer_uri = match issuer.clone() {
-                    Issuer::URI(uri) => uri,
-                    Issuer::Object(object_with_id) => object_with_id.id,
-                };
-                let URI::String(issuer_did) = issuer_uri;
-                options.verification_method = get_verification_method(&issuer_did, resolver).await;
+        let allowed_vms = match options.verification_method.take() {
+            Some(vm) => vec![vm],
+            None => {
+                if let Some(ref issuer) = self.issuer {
+                    let issuer_uri = match issuer.clone() {
+                        Issuer::URI(uri) => uri,
+                        Issuer::Object(object_with_id) => object_with_id.id,
+                    };
+                    let URI::String(issuer_did) = issuer_uri;
+                    get_verification_methods(&issuer_did, resolver).await?
+                } else {
+                    Vec::new()
+                }
             }
-        }
-        self.proof
+        };
+        Ok(self
+            .proof
             .iter()
             .flatten()
-            .filter(|proof| proof.matches(&options))
-            .collect()
+            .filter(|proof| proof.matches(&options, &allowed_vms))
+            .collect())
     }
 
+    // TODO: factor this out of VC and VP
     pub async fn verify(
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
-        let proofs = self.filter_proofs(options, resolver).await;
+        let proofs = match self.filter_proofs(options, resolver).await {
+            Ok(proofs) => proofs,
+            Err(err) => {
+                return VerificationResult::error(&format!("Unable to filter proofs: {}", err));
+            }
+        };
         if proofs.is_empty() {
             return VerificationResult::error("No applicable proof");
             // TODO: say why, e.g. expired
@@ -792,27 +804,39 @@ impl Presentation {
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
-    ) -> Vec<&Proof> {
+    ) -> Result<Vec<&Proof>, String> {
+        // Allow any of holder's verification methods by default
         let mut options = options.unwrap_or_default();
-        // Use holder as default verificationMethod
-        if options.verification_method.is_none() {
-            if let Some(URI::String(ref holder)) = self.holder {
-                options.verification_method = get_verification_method(holder, resolver).await;
+        let allowed_vms = match options.verification_method.take() {
+            Some(vm) => vec![vm],
+            None => {
+                if let Some(URI::String(ref holder)) = self.holder {
+                    get_verification_methods(&holder, resolver).await?
+                } else {
+                    Vec::new()
+                }
             }
-        }
-        self.proof
+        };
+        Ok(self
+            .proof
             .iter()
             .flatten()
-            .filter(|proof| proof.matches(&options))
-            .collect()
+            .filter(|proof| proof.matches(&options, &allowed_vms))
+            .collect())
     }
 
+    // TODO: factor this out of VC and VP
     pub async fn verify(
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
-        let proofs = self.filter_proofs(options, resolver).await;
+        let proofs = match self.filter_proofs(options, resolver).await {
+            Ok(proofs) => proofs,
+            Err(err) => {
+                return VerificationResult::error(&format!("Unable to filter proofs: {}", err));
+            }
+        };
         if proofs.is_empty() {
             return VerificationResult::error("No applicable proof");
             // TODO: say why, e.g. expired
@@ -833,26 +857,34 @@ impl Presentation {
 
 /// Get a DID's first verification method
 pub async fn get_verification_method(did: &str, resolver: &dyn DIDResolver) -> Option<String> {
+    let vms = get_verification_methods(did, resolver)
+        .await
+        .unwrap_or_default();
+    vms.into_iter().next()
+}
+
+/// Resolve a DID and get its the verification methods from its DID document.
+pub async fn get_verification_methods(
+    did: &str,
+    resolver: &dyn DIDResolver,
+) -> Result<Vec<String>, String> {
     let (res_meta, doc_opt, _meta) = resolver
         .resolve(did, &ResolutionInputMetadata::default())
         .await;
-    if res_meta.error.is_some() {
-        return None;
+    if let Some(err) = res_meta.error {
+        return Err(err.to_string());
     }
-    let doc = match doc_opt {
-        Some(doc) => doc,
-        None => return None,
-    };
-    // TODO: return multiple VMs
-    for vm in doc.verification_method.iter().flatten() {
-        match vm {
-            VerificationMethod::Map(map) => {
-                return Some(map.id.to_owned());
-            }
-            VerificationMethod::DIDURL(didurl) => return Some(didurl.to_string()),
-        }
-    }
-    None
+    let doc = doc_opt.ok_or("Missing document".to_string())?;
+    let vms = doc
+        .verification_method
+        .iter()
+        .flatten()
+        .map(|vm| match vm {
+            VerificationMethod::Map(map) => map.id.to_owned(),
+            VerificationMethod::DIDURL(didurl) => didurl.to_string(),
+        })
+        .collect();
+    Ok(vms)
 }
 
 #[async_trait]
@@ -893,9 +925,12 @@ impl Proof {
         }
     }
 
-    pub fn matches(&self, options: &LinkedDataProofOptions) -> bool {
+    pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
         if let Some(ref verification_method) = options.verification_method {
             assert_local!(self.verification_method.as_ref() == Some(verification_method));
+        }
+        if let Some(vm) = self.verification_method.as_ref() {
+            assert_local!(allowed_vms.contains(vm));
         }
         if let Some(created) = self.created {
             assert_local!(options.created.unwrap_or_else(now_ms) >= created);
