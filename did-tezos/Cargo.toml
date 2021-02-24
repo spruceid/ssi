@@ -8,10 +8,12 @@ edition = "2018"
 secp256k1 = ["libsecp256k1", "ssi/secp256k1", "ssi/rand"]
 
 [dependencies]
-ssi = { path = "../", default-features = false }
+ssi = { path = "../" }
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.0", features = ["macros", "rt"] }
+reqwest = { version = "0.11", features = ["json", "default-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 async-trait = "0.1"
 libsecp256k1 = { version = "0.3", optional = true }
+anyhow = "1.0.33"

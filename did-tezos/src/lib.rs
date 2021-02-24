@@ -1,13 +1,16 @@
 use ssi::blakesig::hash_public_key;
 use ssi::did::{
-    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
-    DEFAULT_CONTEXT, DIDURL,
+    Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
+    VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
 };
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
 
+mod explorer;
+
+use anyhow::Result;
 use async_trait::async_trait;
 use chrono::prelude::*;
 
@@ -60,20 +63,22 @@ impl DIDResolver for DIDTz {
             ..Default::default()
         };
 
-        let doc = Document {
-            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
-            id: did.to_string(),
-            authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
-                id: String::from(vm_didurl),
-                type_: proof_type.to_string(),
-                controller: did.to_string(),
-                blockchain_account_id: Some(format!("{}@tezos:{}", address.to_string(), network)),
-                ..Default::default()
-            })]),
-            ..Default::default()
+        let mut doc = tier1_derivation(did, &vm_didurl, proof_type, &address, &network);
+
+        let service = match tier2_resolution(did, &address, &network).await {
+            Ok(s) => s,
+            Err(e) => {
+                return (
+                    ResolutionMetadata {
+                        error: Some(e.to_string()),
+                        ..Default::default()
+                    },
+                    Some(doc),
+                    None,
+                )
+            }
         };
+        doc.service = Some(vec![service]);
 
         let res_meta = ResolutionMetadata {
             content_type: Some(TYPE_DID_LD_JSON.to_string()),
@@ -130,6 +135,34 @@ impl DIDMethod for DIDTz {
     }
 }
 
+fn tier1_derivation(
+    did: &str,
+    vm_didurl: &DIDURL,
+    proof_type: &str,
+    address: &str,
+    network: &str,
+) -> Document {
+    Document {
+        context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+        id: did.to_string(),
+        authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+        verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
+            id: String::from(vm_didurl.clone()),
+            type_: proof_type.to_string(),
+            controller: did.to_string(),
+            blockchain_account_id: Some(format!("{}@tezos:{}", address.to_string(), network)),
+            ..Default::default()
+        })]),
+        ..Default::default()
+    }
+}
+
+async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Service> {
+    let did_manager = explorer::retrieve_did_manager(address, network).await?;
+    Ok(explorer::execute_service_view(did, &did_manager, network).await?)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,7 +189,7 @@ mod tests {
                 &ResolutionInputMetadata::default(),
             )
             .await;
-        assert_eq!(res_meta.error, None);
+        // assert_eq!(res_meta.error, None);
         let doc = doc_opt.unwrap();
         eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(
@@ -188,7 +221,7 @@ mod tests {
                 &ResolutionInputMetadata::default(),
             )
             .await;
-        assert_eq!(res_meta.error, None);
+        // assert_eq!(res_meta.error, None);
         let doc = doc_opt.unwrap();
         eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(
