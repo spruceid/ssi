@@ -124,6 +124,7 @@ impl LinkedDataProofs {
         options: &LinkedDataProofOptions,
         key: &JWK,
     ) -> Result<Proof, Error> {
+        // TODO: select proof type by resolving DID instead of matching on the key.
         match key {
             JWK {
                 params: JWKParams::RSA(_),
@@ -176,10 +177,12 @@ impl LinkedDataProofs {
                 x509_thumbprint_sha256: _,
             } if ec_params.curve == Some("secp256k1".to_string()) => {
                 if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
-                    #[cfg(feature = "keccak-hash")]
                     if let Some(ref vm) = options.verification_method {
                         if vm.ends_with("#Eip712Method2021") {
+                            #[cfg(feature = "keccak-hash")]
                             return Eip712Signature2021::sign(document, options, &key).await;
+                            #[cfg(not(feature = "keccak-hash"))]
+                            return Err(Error::ProofTypeNotImplemented);
                         }
                     }
                     return EcdsaSecp256k1RecoverySignature2020::sign(document, options, &key)
@@ -219,10 +222,12 @@ impl LinkedDataProofs {
                 return EcdsaSecp256k1Signature2019::prepare(document, options, public_key).await
             }
             Algorithm::ES256KR => {
-                #[cfg(feature = "keccak-hash")]
                 if let Some(ref vm) = options.verification_method {
                     if vm.ends_with("#Eip712Method2021") {
+                        #[cfg(feature = "keccak-hash")]
                         return Eip712Signature2021::prepare(document, options, public_key).await;
+                        #[cfg(not(feature = "keccak-hash"))]
+                        return Err(Error::ProofTypeNotImplemented);
                     }
                 }
                 return EcdsaSecp256k1RecoverySignature2020::prepare(document, options, public_key)
