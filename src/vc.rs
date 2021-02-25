@@ -856,6 +856,20 @@ impl Presentation {
     }
 }
 
+impl Default for Presentation {
+    fn default() -> Self {
+        Self {
+            context: Contexts::Many(vec![Context::URI(URI::String(DEFAULT_CONTEXT.to_string()))]),
+            type_: OneOrMany::One("VerifiablePresentation".to_string()),
+            verifiable_credential: None,
+            id: None,
+            proof: None,
+            holder: None,
+            property_set: None,
+        }
+    }
+}
+
 /// Get a DID's first verification method
 pub async fn get_verification_method(did: &str, resolver: &dyn DIDResolver) -> Option<String> {
     let vms = get_verification_methods(did, resolver)
