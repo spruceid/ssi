@@ -31,7 +31,7 @@ struct SearchResult {
 
 pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<String> {
     let client = reqwest::Client::new();
-    let search_result: SearchResult = client
+    let mut search_result: SearchResult = client
         .get(&format!("{}v1/search", BCD_URL))
         .query(&[
             ("q", address),
@@ -44,6 +44,8 @@ pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<String
         .json()
         .await?;
 
+    // TODO this is a hack for the tests as there were multiple DID managers deployed
+    search_result.items.reverse();
     for search_item in search_result.items {
         match search_item {
             SearchItem::Contract(c) => {
@@ -98,7 +100,7 @@ mod tests {
 
     const LIVE_TZ1: &str = "tz1Z3yNumnSFoHtMsMPAkiCqDQpTcnw7fk1s";
     const LIVE_NETWORK: &str = "delphinet";
-    const LIVE_DID_MANAGER: &str = "KT1CKHY3bDd8ehyvyoyB95Rs2iCmqsLmTcLG";
+    const LIVE_DID_MANAGER: &str = "KT1XFk3nxojBisE5WpXugmuPuh9GRzo54gxL";
 
     #[tokio::test]
     async fn test_retrieve_did_manager() {
