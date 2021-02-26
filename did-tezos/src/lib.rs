@@ -13,6 +13,8 @@ mod explorer;
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::prelude::*;
+use json_patch::{patch, Patch};
+use serde::Deserialize;
 
 /// did:tz DID Method
 ///
@@ -24,7 +26,7 @@ impl DIDResolver for DIDTz {
     async fn resolve(
         &self,
         did: &str,
-        _input_metadata: &ResolutionInputMetadata,
+        input_metadata: &ResolutionInputMetadata,
     ) -> (
         ResolutionMetadata,
         Option<Document>,
@@ -79,6 +81,53 @@ impl DIDResolver for DIDTz {
             }
         };
         doc.service = Some(vec![service]);
+
+        match &input_metadata.property_set {
+            Some(s) => {
+                if s.contains_key("updates") {
+                    let updates_metadata = s.get("updates").unwrap();
+                    let updates: Vec<Update> = match serde_json::to_value(updates_metadata) {
+                        Ok(u) => match serde_json::from_value(u) {
+                            Ok(uu) => uu,
+                            Err(e) => {
+                                return (
+                                    ResolutionMetadata {
+                                        error: Some(e.to_string()),
+                                        ..Default::default()
+                                    },
+                                    Some(doc),
+                                    None,
+                                );
+                            }
+                        },
+                        Err(e) => {
+                            return (
+                                ResolutionMetadata {
+                                    error: Some(e.to_string()),
+                                    ..Default::default()
+                                },
+                                Some(doc),
+                                None,
+                            );
+                        }
+                    };
+                    match tier3_updates(&mut doc, updates) {
+                        Ok(()) => {}
+                        Err(e) => {
+                            return (
+                                ResolutionMetadata {
+                                    error: Some(e.to_string()),
+                                    ..Default::default()
+                                },
+                                Some(doc),
+                                None,
+                            );
+                        }
+                    };
+                }
+            }
+            None => (),
+        };
 
         let res_meta = ResolutionMetadata {
             content_type: Some(TYPE_DID_LD_JSON.to_string()),
@@ -163,12 +212,45 @@ async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Ser
     Ok(explorer::execute_service_view(did, &did_manager, network).await?)
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct SignedIetfJsonPatchPayload {
+    ietf_json_patch: Patch,
+}
+
+#[derive(Deserialize)]
+struct SignedIetfJsonPatch {
+    header: serde_json::Value,
+    payload: SignedIetfJsonPatchPayload,
+    signature: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum Update {
+    SignedIetfJsonPatch(SignedIetfJsonPatch),
+}
+
+fn tier3_updates(doc: &mut Document, updates: Vec<Update>) -> Result<()> {
+    for update in updates {
+        let mut doc_json = serde_json::to_value(&mut *doc)?;
+        match update {
+            Update::SignedIetfJsonPatch(p) => patch(&mut doc_json, &p.payload.ietf_json_patch)?,
+        }
+        *doc = serde_json::from_value(doc_json)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    use ssi::did::ServiceEndpoint;
     use ssi::did_resolve::ResolutionInputMetadata;
     use ssi::jwk::JWK;
+    use ssi::one_or_many::OneOrMany;
+    use std::collections::BTreeMap as Map;
 
     const TZ1: &'static str = "did:tz:tz1VFda3KmzRecjsYptDq5bJh1M1NyAqgBJf";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
@@ -450,5 +532,53 @@ mod tests {
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
         assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
+    }
+
+    #[test]
+    fn test_json_patch() {
+        let mut doc: Document = serde_json::from_value(json!({
+          "@context": "https://www.w3.org/ns/did/v1",
+          "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+          "authentication": [{
+            "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
+            "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+            "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+            "blockchainAccountId": "tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8@tezos:mainnet"
+          }],
+          "service": [{
+            "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#discovery",
+            "type": "TezosDiscoveryService",
+            "serviceEndpoint": "tezos-storage://KT1QDFEu8JijYbsJqzoXq7mKvfaQQamHD1kX/listing"
+          }]
+        }))
+        .unwrap();
+
+        let json_update = Update::SignedIetfJsonPatch(SignedIetfJsonPatch {
+            header: serde_json::Value::Null,
+            signature: "".to_string(),
+            payload: SignedIetfJsonPatchPayload {
+                ietf_json_patch: serde_json::from_str(
+                    r#"[ { "op": "add",
+                           "path": "/service/1",
+                           "value": { "id": "test_service_id",
+                                      "type": "test_service",
+                                      "serviceEndpoint": "test_service_endpoint"} } ]"#,
+                )
+                .unwrap(),
+            },
+        });
+
+        tier3_updates(&mut doc, vec![json_update]).unwrap();
+        assert_eq!(
+            doc.service.unwrap()[1],
+            Service {
+                id: "test_service_id".to_string(),
+                type_: OneOrMany::One("test_service".to_string()),
+                service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                    "test_service_endpoint".to_string()
+                ))),
+                property_set: Some(Map::new()) // TODO should be None
+            }
+        );
     }
 }
