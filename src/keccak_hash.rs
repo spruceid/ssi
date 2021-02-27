@@ -26,11 +26,6 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
     let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
     let hash_last20 = &hash[12..32];
     let hash_last20_hex = bytes_to_lowerhex(hash_last20);
-    eprintln!(
-        "jwk {}. hex: {}",
-        serde_json::to_string_pretty(jwk)?,
-        hash_last20_hex
-    );
     Ok(hash_last20_hex)
 }
 

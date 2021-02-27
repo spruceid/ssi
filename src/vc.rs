@@ -987,6 +987,7 @@ impl LinkedDataDocument for Proof {
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.jws = None;
+        copy.proof_value = None;
         let json = serde_json::to_string(&copy)?;
         let more_contexts = match parent {
             Some(parent) => parent.get_contexts()?,

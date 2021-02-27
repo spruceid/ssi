@@ -210,10 +210,8 @@ mod tests {
     async fn credential_prove_verify_did_ethr() {
         eprintln!("with EcdsaSecp256k1RecoveryMethod2020...");
         credential_prove_verify_did_ethr2(false).await;
-        /*
         eprintln!("with Eip712Method2021...");
         credential_prove_verify_did_ethr2(true).await;
-        */
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
@@ -325,5 +323,15 @@ mod tests {
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
         assert!(vp2.verify(None, &DIDEthr).await.errors.len() > 0);
+    }
+
+    #[tokio::test]
+    async fn credential_verify_eip712vm() {
+        use ssi::vc::Credential;
+        let vc: Credential = serde_json::from_str(include_str!("../tests/vc.jsonld")).unwrap();
+        eprintln!("vc {:?}", vc);
+        let verification_result = vc.verify(None, &DIDEthr).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
     }
 }

@@ -1,3 +1,5 @@
+#[cfg(feature = "keccak-hash")]
+use std::convert::TryFrom;
 use std::str::FromStr;
 
 use async_trait::async_trait;
@@ -708,8 +710,18 @@ impl ProofSuite for Eip712Signature2021 {
         };
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
         let bytes = typed_data.hash()?;
-        let sig = crate::jws::sign_bytes_b64(Algorithm::ES256KR, &bytes, &key)?;
-        proof.proof_value = Some(sig);
+        let ec_params = match &key.params {
+            JWKParams::EC(ec) => ec,
+            _ => return Err(Error::KeyTypeNotImplemented),
+        };
+        let secret_key = secp256k1::SecretKey::try_from(ec_params)?;
+        let msg = secp256k1::Message::parse_slice(&bytes)?;
+        let (sig, rec_id) = secp256k1::sign(&msg, &secret_key);
+        let mut sig = sig.serialize().to_vec();
+        // Use ethereum-style recovery byte
+        sig.push(rec_id.serialize() + 27);
+        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(&sig);
+        proof.proof_value = Some(sig_hex);
         Ok(proof)
     }
 
@@ -718,7 +730,6 @@ impl ProofSuite for Eip712Signature2021 {
         options: &LinkedDataProofOptions,
         _public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
-        // TODO
         let proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
             proof_purpose: options.proof_purpose.clone(),
@@ -747,7 +758,7 @@ impl ProofSuite for Eip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
-        let sig_b64 = proof
+        let sig_hex = proof
             .proof_value
             .as_ref()
             .ok_or(Error::MissingProofSignature)?;
@@ -761,8 +772,27 @@ impl ProofSuite for Eip712Signature2021 {
         }
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
         let bytes = typed_data.hash()?;
-        let sig = base64::decode_config(sig_b64, base64::URL_SAFE_NO_PAD)?;
-        let jwk = crate::jws::recover(Algorithm::ES256KR, &bytes, &sig)?;
+        if !sig_hex.starts_with("0x") {
+            return Err(Error::HexString);
+        }
+        let sig = hex::decode(&sig_hex[2..])?;
+        let msg = secp256k1::Message::parse_slice(&bytes)?;
+        let (rec_byte, sig_bytes) = sig.split_last().ok_or(Error::InvalidSignature)?;
+        let rec_id = secp256k1::RecoveryId::parse_rpc(*rec_byte)?;
+        let sig = secp256k1::Signature::parse_slice(sig_bytes)?;
+        let public_key = secp256k1::recover(&msg, &sig, &rec_id)?;
+        use crate::jwk::ECParams;
+        let jwk = JWK {
+            params: JWKParams::EC(ECParams::try_from(&public_key)?),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        };
         let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
         let account_id = BlockchainAccountId::from_str(&account_id_str)?;
         account_id.verify(&jwk)?;
@@ -773,14 +803,14 @@ impl ProofSuite for Eip712Signature2021 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::jsonld::CREDENTIALS_V1_CONTEXT;
 
     struct ExampleDocument;
 
     #[async_trait]
     impl LinkedDataDocument for ExampleDocument {
         fn get_contexts(&self) -> Result<Option<String>, Error> {
-            // Ok(Some(serde_json::to_string(&*EIP712VM_CONTEXT)?))
-            Ok(None)
+            Ok(Some(serde_json::to_string(&*CREDENTIALS_V1_CONTEXT)?))
         }
         async fn to_dataset_for_signing(
             &self,
@@ -805,7 +835,6 @@ mod tests {
 
     #[cfg(feature = "secp256k1")]
     #[async_std::test]
-    #[ignore]
     async fn eip712vm() {
         let mut key = JWK::generate_secp256k1().unwrap();
         key.algorithm = Some(Algorithm::ES256KR);

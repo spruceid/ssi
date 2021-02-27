@@ -157,6 +157,8 @@ pub enum Error {
     TypedDataConstruction(TypedDataConstructionError),
     #[cfg(feature = "keccak-hash")]
     TypedDataHash(TypedDataHashError),
+    FromHex(hex::FromHexError),
+    HexString,
 }
 
 impl fmt::Display for Error {
@@ -264,6 +266,7 @@ impl fmt::Display for Error {
             Error::ExpectedOutput(expected, found) => write!(f, "Expected output '{}', but found '{}'", expected, found),
             Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
+            Error::HexString => write!(f, "Expected string beginning with '0x'"),
             Error::FromUtf8(e) => e.fmt(f),
             Error::TryFromSlice(e) => e.fmt(f),
             #[cfg(feature = "ring")]
@@ -290,6 +293,7 @@ impl fmt::Display for Error {
             Error::TypedDataConstruction(e) => e.fmt(f),
             #[cfg(feature = "keccak-hash")]
             Error::TypedDataHash(e) => e.fmt(f),
+            Error::FromHex(e) => e.fmt(f),
         }
     }
 }
@@ -430,5 +434,11 @@ impl From<TypedDataConstructionError> for Error {
 impl From<TypedDataHashError> for Error {
     fn from(err: TypedDataHashError) -> Error {
         Error::TypedDataHash(err)
+    }
+}
+
+impl From<hex::FromHexError> for Error {
+    fn from(err: hex::FromHexError) -> Error {
+        Error::FromHex(err)
     }
 }
