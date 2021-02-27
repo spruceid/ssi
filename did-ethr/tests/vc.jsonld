@@ -1,0 +1,79 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    {
+      "sameAs": "https://www.w3.org/TR/owl-ref/#sameAs-def"
+    }
+  ],
+  "id": "urn:uuid:dc093ee6-e039-40e7-8599-da2075666e2c",
+  "type": [
+    "VerifiableCredential"
+  ],
+  "credentialSubject": {
+    "id": "did:example:foo",
+    "sameAs": "did:ethr:0xf7398bacf610bb4e3b567811279fcb3c41919f89"
+  },
+  "issuer": "did:ethr:0xf7398bacf610bb4e3b567811279fcb3c41919f89",
+  "issuanceDate": "2021-02-27T04:03:23.188Z",
+  "proof": {
+    "@context": [
+      {
+        "Eip712Method2021": "https://w3id.org/security#Eip712Method2021",
+        "Eip712Signature2021": {
+          "@context": {
+            "@protected": true,
+            "@version": 1.1,
+            "challenge": "https://w3id.org/security#challenge",
+            "created": {
+              "@id": "http://purl.org/dc/terms/created",
+              "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+            },
+            "domain": "https://w3id.org/security#domain",
+            "expires": {
+              "@id": "https://w3id.org/security#expiration",
+              "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+            },
+            "id": "@id",
+            "nonce": "https://w3id.org/security#nonce",
+            "proofPurpose": {
+              "@context": {
+                "@protected": true,
+                "@version": 1.1,
+                "assertionMethod": {
+                  "@container": "@set",
+                  "@id": "https://w3id.org/security#assertionMethod",
+                  "@type": "@id"
+                },
+                "authentication": {
+                  "@container": "@set",
+                  "@id": "https://w3id.org/security#authenticationMethod",
+                  "@type": "@id"
+                },
+                "id": "@id",
+                "type": "@type"
+              },
+              "@id": "https://w3id.org/security#proofPurpose",
+              "@type": "@vocab"
+            },
+            "proofValue": "https://w3id.org/security#proofValue",
+            "publicKeyJwk": {
+              "@id": "https://w3id.org/security#publicKeyJwk",
+              "@type": "@json"
+            },
+            "type": "@type",
+            "verificationMethod": {
+              "@id": "https://w3id.org/security#verificationMethod",
+              "@type": "@id"
+            }
+          },
+          "@id": "https://w3id.org/security#Eip712Signature2021"
+        }
+      }
+    ],
+    "type": "Eip712Signature2021",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "0x258e647f27ac39de2fe43b629b6189a20bfa1454bf76eb486f1461565c6c119c58b0676b2003c75ad51e88bbbca0a5ca944a2f292dc5f76f5d2db2be705a50ca1b",
+    "verificationMethod": "did:ethr:0xf7398bacf610bb4e3b567811279fcb3c41919f89#Eip712Method2021",
+    "created": "2021-02-27T04:03:23.189Z"
+  }
+}
