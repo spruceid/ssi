@@ -16,6 +16,7 @@ pub mod keccak_hash;
 pub mod ldp;
 pub mod one_or_many;
 pub mod rdf;
+pub mod soltx;
 pub mod urdna2015;
 pub mod vc;
 

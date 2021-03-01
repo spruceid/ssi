@@ -158,6 +158,7 @@ pub enum Error {
     #[cfg(feature = "keccak-hash")]
     TypedDataHash(TypedDataHashError),
     FromHex(hex::FromHexError),
+    Base58(bs58::decode::Error),
     HexString,
 }
 
@@ -294,6 +295,7 @@ impl fmt::Display for Error {
             #[cfg(feature = "keccak-hash")]
             Error::TypedDataHash(e) => e.fmt(f),
             Error::FromHex(e) => e.fmt(f),
+            Error::Base58(e) => e.fmt(f),
         }
     }
 }
@@ -440,5 +442,11 @@ impl From<TypedDataHashError> for Error {
 impl From<hex::FromHexError> for Error {
     fn from(err: hex::FromHexError) -> Error {
         Error::FromHex(err)
+    }
+}
+
+impl From<bs58::decode::Error> for Error {
+    fn from(err: bs58::decode::Error) -> Error {
+        Error::Base58(err)
     }
 }
