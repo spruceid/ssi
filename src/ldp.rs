@@ -13,6 +13,7 @@ use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMe
 use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
+use crate::jwk::Base64urlUInt;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
@@ -90,8 +91,9 @@ pub struct ProofPreparation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
+#[non_exhaustive]
 pub enum SigningInput {
-    Bytes(Vec<u8>),
+    Bytes(Base64urlUInt),
     #[cfg(feature = "keccak-hash")]
     TypedData(TypedData),
 }
@@ -389,7 +391,7 @@ async fn prepare_proof(
     Ok(ProofPreparation {
         proof,
         jws_header: Some(jws_header),
-        signing_input: SigningInput::Bytes(signing_input),
+        signing_input: SigningInput::Bytes(Base64urlUInt(signing_input)),
     })
 }
 

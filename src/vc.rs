@@ -1255,7 +1255,7 @@ mod tests {
         let public_key = key.to_public();
         let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
         let signing_input = match preparation.signing_input {
-            crate::ldp::SigningInput::Bytes(ref bytes) => bytes,
+            crate::ldp::SigningInput::Bytes(ref bytes) => &bytes.0,
             #[allow(unreachable_patterns)]
             _ => panic!("Unexpected signing input type"),
         };
