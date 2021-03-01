@@ -54,6 +54,7 @@ members = [
   "did-key",
   "did-web",
   "did-ethr",
+  "did-sol",
   "vc-test",
 ]
 

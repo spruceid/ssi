@@ -37,6 +37,10 @@ lazy_static! {
         let context_str = include_str!("../contexts/eip712vm.jsonld");
         serde_json::from_str(&context_str).unwrap()
     };
+    pub static ref SOLVM_CONTEXT: Value = {
+        let context_str = include_str!("../contexts/solvm.jsonld");
+        serde_json::from_str(&context_str).unwrap()
+    };
 }
 
 // Get current time to millisecond precision if possible
@@ -115,6 +119,7 @@ impl ProofPreparation {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021::complete(self, signature).await,
+            "SolanaSignature2021" => SolanaSignature2021::complete(self, signature).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -161,6 +166,9 @@ impl LinkedDataProofs {
                     if let Some(ref vm) = options.verification_method {
                         if vm.starts_with("did:tz:tz1") {
                             return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(document, options, &key).await;
+                        }
+                        if vm.ends_with("#SolanaMethod2021") {
+                            return SolanaSignature2021::sign(document, options, &key).await;
                         }
                     }
                     return Ed25519Signature2018::sign(document, options, &key).await;
@@ -219,6 +227,9 @@ impl LinkedDataProofs {
                         )
                         .await;
                     }
+                    if vm.ends_with("#SolanaMethod2021") {
+                        return SolanaSignature2021::prepare(document, options, public_key).await;
+                    }
                 }
                 return Ed25519Signature2018::prepare(document, options, public_key).await;
             }
@@ -265,6 +276,7 @@ impl LinkedDataProofs {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021::verify(proof, document, resolver).await,
+            "SolanaSignature2021" => SolanaSignature2021::verify(proof, document, resolver).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -802,6 +814,89 @@ impl ProofSuite for Eip712Signature2021 {
     }
 }
 
+pub struct SolanaSignature2021;
+#[async_trait]
+impl ProofSuite for SolanaSignature2021 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        let mut proof = Proof {
+            context: serde_json::json!([SOLVM_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("SolanaSignature2021")
+        };
+        let message = to_jws_payload(document, &proof).await?;
+        let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
+        let bytes = tx.to_bytes();
+        let sig = crate::jws::sign_bytes(Algorithm::EdDSA, &bytes, key)?;
+        let sig_b58 = bs58::encode(&sig).into_string();
+        proof.proof_value = Some(sig_b58);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        let proof = Proof {
+            context: serde_json::json!([SOLVM_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("SolanaSignature2021")
+        };
+        let message = to_jws_payload(document, &proof).await?;
+        let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
+        let bytes = tx.to_bytes();
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::Bytes(Base64urlUInt(bytes)),
+        })
+    }
+
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let sig_b58 = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        if vm.type_ != "SolanaMethod2021" {
+            return Err(Error::VerificationMethodMismatch);
+        }
+        let key = vm.public_key_jwk.ok_or(Error::MissingKey)?;
+        let message = to_jws_payload(document, &proof).await?;
+        let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
+        let bytes = tx.to_bytes();
+        let sig = bs58::decode(&sig_b58).into_vec()?;
+        crate::jws::verify_bytes(Algorithm::EdDSA, &bytes, &key, &sig)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -850,4 +945,21 @@ mod tests {
             .await
             .unwrap();
     }
+
+    /*
+    #[async_std::test]
+    async fn solvm() {
+        let mut key = JWK::generate_secp256k1().unwrap();
+        key.algorithm = Some(Algorithm::ES256KR);
+        let vm = format!("{}#SolanaMethod2021", "did:example:foo");
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(vm),
+            ..Default::default()
+        };
+        let doc = ExampleDocument;
+        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &key)
+            .await
+            .unwrap();
+    }
+    */
 }
