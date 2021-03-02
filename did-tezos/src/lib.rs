@@ -3,13 +3,13 @@ use ssi::did::{
     Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
     VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
 };
-use ssi::did_resolve::{dereference, DereferencingInputMetadata, Metadata};
+use ssi::did_resolve::Metadata;
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
 use ssi::jwk::{Base64urlUInt, ECParams, OctetParams, Params, JWK};
-use ssi::jws::{decode_unverified, decode_verify};
+use ssi::jws::decode_verify;
 
 mod explorer;
 use anyhow::{anyhow, Result};
@@ -17,7 +17,7 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 use json_patch::patch;
 use serde::Deserialize;
-use tezedge_client::{crypto::FromBase58Check, CombinedKey, PrivateKey, PublicKey};
+use tezedge_client::{crypto::FromBase58Check, PublicKey};
 
 /// did:tz DID Method
 ///
@@ -105,7 +105,7 @@ impl DIDResolver for DIDTz {
             };
 
             if let Some(updates_metadata) = s.get("updates") {
-                let updates: Vec<Update> = match serde_json::to_value(updates_metadata) {
+                let updates: Updates = match serde_json::to_value(updates_metadata) {
                     Ok(u) => match serde_json::from_value(u) {
                         Ok(uu) => uu,
                         Err(e) => {
@@ -209,8 +209,9 @@ struct SignedIetfJsonPatchPayload {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
-enum Update {
-    SignedIetfJsonPatch(String),
+#[serde(tag = "type", content = "value")]
+enum Updates {
+    SignedIetfJsonPatch(Vec<String>),
 }
 
 impl DIDTz {
@@ -246,13 +247,13 @@ impl DIDTz {
         &self,
         prefix: &str,
         doc: &mut Document,
-        updates: Vec<Update>,
+        updates: Updates,
         public_key: Option<String>,
     ) -> Result<()> {
-        for update in updates {
-            let mut doc_json = serde_json::to_value(&mut *doc)?;
-            match update {
-                Update::SignedIetfJsonPatch(jws) => {
+        match updates {
+            Updates::SignedIetfJsonPatch(patches) => {
+                for jws in patches {
+                    let mut doc_json = serde_json::to_value(&mut *doc)?;
                     let curve = prefix_to_curve_type(prefix)
                         .ok_or(anyhow!("Unsupported curve."))?
                         .0
@@ -319,9 +320,9 @@ impl DIDTz {
                                 .as_bytes(),
                         )?,
                     )?;
+                    *doc = serde_json::from_value(doc_json)?;
                 }
             }
-            *doc = serde_json::from_value(doc_json)?;
         }
         Ok(())
     }
@@ -337,11 +338,12 @@ mod tests {
     use ssi::jws::encode_sign;
     use ssi::one_or_many::OneOrMany;
     use std::collections::BTreeMap as Map;
+    use tezedge_client::PrivateKey;
 
     const TZ1: &'static str = "did:tz:tz1VFda3KmzRecjsYptDq5bJh1M1NyAqgBJf";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
-    const LIVE_TZ1: &str = "tz1Z3yNumnSFoHtMsMPAkiCqDQpTcnw7fk1s";
+    const LIVE_TZ1: &str = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";
     const LIVE_NETWORK: &str = "delphinet";
     const JSON_PATCH: &str = r#"{"ietf-json-patch": [
                                         {
@@ -428,7 +430,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn credential_prove_verify_did_tz() {
+    async fn credential_prove_verify_did_tz1() {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
         let vc_str = r###"{
@@ -674,9 +676,9 @@ mod tests {
             x509_thumbprint_sha256: None,
         };
         let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
-        let json_update = Update::SignedIetfJsonPatch(jws.clone());
+        let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTz
-            .tier3_updates("tz1", &mut doc, vec![json_update], Some(pk.to_string()))
+            .tier3_updates("tz1", &mut doc, json_update, Some(pk.to_string()))
             .await
             .unwrap();
         assert_eq!(
@@ -734,9 +736,9 @@ mod tests {
             x509_thumbprint_sha256: None,
         };
         let jws = encode_sign(ssi::jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
-        let json_update = Update::SignedIetfJsonPatch(jws.clone());
+        let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTz
-            .tier3_updates("tz2", &mut doc, vec![json_update], Some(pk.to_string()))
+            .tier3_updates("tz2", &mut doc, json_update, Some(pk.to_string()))
             .await
             .unwrap();
         assert_eq!(
@@ -754,11 +756,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_full_resolution() {
+        let jws = "eyJhbGciOiJFZERTQSJ9.eyJpZXRmLWpzb24tcGF0Y2giOiBbCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIm9wIjogImFkZCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInBhdGgiOiAiL3NlcnZpY2UvMSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInZhbHVlIjogewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAiaWQiOiAidGVzdF9zZXJ2aWNlX2lkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAidGVzdF9zZXJ2aWNlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInNlcnZpY2VFbmRwb2ludCI6ICJ0ZXN0X3NlcnZpY2VfZW5kcG9pbnQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBdfQ.tEUMFJzH557aHuD3UgXU7Wf1vcEI-ASdt1KeAYiejpa-FURWJ5aUjbfR3PAJfv4BTykcdYuwyM-3cJAsg4g-Cw".to_string();
+        let input_metadata: ResolutionInputMetadata = serde_json::from_value(
+            json!({"updates": {"type": "signed-ietf-json-patch", "value": [jws]},
+                   "public_key": "edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A"}),
+        )
+        .unwrap();
         let live_did = format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1);
-        let (res_meta, res_doc, _res_doc_meta) = DIDTz
-            .resolve(&live_did, &ResolutionInputMetadata::default())
-            .await;
-
+        let (res_meta, res_doc, _res_doc_meta) = DIDTz.resolve(&live_did, &input_metadata).await;
         assert_eq!(res_meta.error, None);
         let d = res_doc.unwrap();
         let expected = Document {
@@ -768,6 +773,7 @@ mod tests {
                 type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
                 blockchain_account_id: Some(format!("{}@tezos:{}", LIVE_TZ1, LIVE_NETWORK)),
                 controller: live_did.clone(),
+                property_set: Some(Map::new()), // TODO should be None
                 ..Default::default()
             })]),
             service: Some(vec![
@@ -777,16 +783,16 @@ mod tests {
                     service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
                         "test_service2".to_string(),
                     ))),
-                    property_set: None,
+                    property_set: Some(Map::new()), // TODO should be None
                 },
-                // Service {
-                //     id: "test_service_id".to_string(),
-                //     type_: OneOrMany::One("test_service".to_string()),
-                //     service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
-                //         "test_service_endpoint".to_string(),
-                //     ))),
-                //     property_set: Some(Map::new()),
-                // },
+                Service {
+                    id: "test_service_id".to_string(),
+                    type_: OneOrMany::One("test_service".to_string()),
+                    service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                        "test_service_endpoint".to_string(),
+                    ))),
+                    property_set: Some(Map::new()),
+                },
             ]),
             ..Default::default()
         };
