@@ -608,8 +608,12 @@ impl TryFrom<&ECParams> for secp256k1::PublicKey {
         let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
         // TODO: add sign byte?
         let pk_data = [x.as_slice(), y.as_slice()].concat();
-        let public_key =
-            secp256k1::PublicKey::parse_slice(&pk_data, Some(secp256k1::PublicKeyFormat::Raw))?;
+        let key_format = match pk_data.len() {
+            64 => Some(secp256k1::PublicKeyFormat::Raw),
+            33 => Some(secp256k1::PublicKeyFormat::Compressed),
+            _ => None,
+        };
+        let public_key = secp256k1::PublicKey::parse_slice(&pk_data, key_format)?;
         Ok(public_key)
     }
 }
