@@ -8,6 +8,8 @@ use ssi::did_resolve::{
     DIDResolver, DereferencingInputMetadata, DocumentMetadata, ResolutionInputMetadata,
     ResolutionMetadata, ERROR_INVALID_DID, TYPE_DID_LD_JSON,
 };
+#[cfg(feature = "p256")]
+use ssi::jwk::p256_parse;
 #[cfg(feature = "libsecp256k1")]
 use ssi::jwk::secp256k1_parse;
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
@@ -192,7 +194,10 @@ fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str)> {
             "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
         ),
         "tz2" => ("secp256k1", "EcdsaSecp256k1RecoveryMethod2020"),
-        // "tz3" => ("P-256", "TODO"),
+        "tz3" => (
+            "P-256",
+            "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+        ),
         _ => return None,
     };
     Some(curve_type)
@@ -387,6 +392,19 @@ impl DIDTz {
                                     ))
                                 })?
                             }
+                            #[cfg(feature = "p256")]
+                            "tz3" => {
+                                let pk = bs58::decode(public_key)
+                                    .with_check(None)
+                                    .into_vec()
+                                    .or_else(|e| {
+                                        Err(anyhow!("Couldn't decode public key: {}", e))
+                                    })?[4..]
+                                    .to_vec();
+                                p256_parse(&pk).or_else(|e| {
+                                    Err(anyhow!("Couldn't create JWK from P-256 public key: {}", e))
+                                })?
+                            }
                             p => return Err(anyhow!("{} not supported yet.", p)),
                         };
                         let (_, patch_) = decode_verify(&jws, &jwk)?;
@@ -416,8 +434,6 @@ mod tests {
     use serde_json::json;
     use ssi::did::ServiceEndpoint;
     use ssi::did_resolve::ResolutionInputMetadata;
-    #[cfg(feature = "libsecp256k1")]
-    use ssi::jwk::ECParams;
     use ssi::jws::encode_sign;
     use ssi::one_or_many::OneOrMany;
     use std::collections::BTreeMap as Map;
@@ -447,6 +463,21 @@ mod tests {
         let jwk: JWK = serde_json::from_str(&TZ1_JSON).unwrap();
         let tz1 = DIDTz.generate(&Source::Key(&jwk)).unwrap();
         assert_eq!(tz1, TZ1);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn jwk_to_tz3() {
+        let jwk: JWK = serde_json::from_value(serde_json::json!({
+            "kty": "EC",
+            "crv": "P-256",
+            "x": "UmzXjEZzlGmpaM_CmFEJtOO5JBntW8yl_fM1LEQlWQ4",
+            "y": "OmoZmcbUadg7dEC8bg5kXryN968CJqv2UFMUKRERZ6s"
+        }))
+        .unwrap();
+        let did = DIDTz.generate(&Source::Key(&jwk)).unwrap();
+        // https://github.com/murbard/pytezos/blob/a228a67fbc94b11dd7dbc7ff0df9e996d0ff5f01tests/test_crypto.py#L34
+        assert_eq!(did, "did:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX");
     }
 
     #[tokio::test]
@@ -871,6 +902,39 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(feature = "p256")]
+    async fn test_derivation_tz3() {
+        let (res_meta, doc_opt, _meta_opt) = DIDTz
+            .resolve(
+                "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
+                &ResolutionInputMetadata::default(),
+            )
+            .await;
+        assert_eq!(res_meta.error, None);
+        let doc = doc_opt.unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
+        assert_eq!(
+            serde_json::to_value(doc).unwrap(),
+            json!({
+              "@context": "https://www.w3.org/ns/did/v1",
+              "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
+              "verificationMethod": [{
+                "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId",
+                "type": "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+                "controller": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
+                "blockchainAccountId": "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX@tezos:mainnet"
+              }],
+              "authentication": [
+                "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"
+              ],
+              "assertionMethod": [
+                "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"
+              ]
+            })
+        );
+    }
+
+    #[tokio::test]
     async fn test_json_patch_tz1() {
         let address = "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb";
         let pk = "edpkvGfYw3LyB1UcCahKQk4rF2tvbMUk8GFiTuMjL75uGXrpvKXhjn";
@@ -955,6 +1019,7 @@ mod tests {
         .unwrap();
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
         let private_key = sk.from_base58check().unwrap()[4..].to_vec();
+        use ssi::jwk::ECParams;
         let key = JWK {
             params: ssi::jwk::Params::EC(ECParams {
                 curve: Some("secp256k1".to_string()),
@@ -975,6 +1040,67 @@ mod tests {
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTz
             .tier3_updates("tz2", &mut doc, json_update)
+            .await
+            .unwrap();
+        assert_eq!(
+            doc.service.unwrap()[1],
+            Service {
+                id: "test_service_id".to_string(),
+                type_: OneOrMany::One("test_service".to_string()),
+                service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                    "test_service_endpoint".to_string()
+                ))),
+                property_set: Some(Map::new()) // TODO should be None
+            }
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "p256")]
+    async fn test_json_patch_tz3() {
+        let address = "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX";
+        let pk = "p2pk679D18uQNkdjpRxuBXL5CqcDKTKzsiXVtc9oCUT6xb82zQmgUks";
+        let sk = "p2sk3PM77YMR99AvD3fSSxeLChMdiQ6kkEzqoPuSwQqhPsh29irGLC";
+        let did = format!("did:tz:{}:{}", "sandbox", address);
+        let mut doc: Document = serde_json::from_value(json!({
+          "@context": "https://www.w3.org/ns/did/v1",
+          "id": did,
+          "authentication": [{
+            "id": format!("{}#blockchainAccountId", did),
+            "type": "JsonWebKey2020",
+            "controller": did,
+            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "publicKeyBase58": pk
+          }],
+          "service": [{
+            "id": format!("{}#discovery", did),
+            "type": "TezosDiscoveryService",
+            "serviceEndpoint": "test_service"
+          }]
+        }))
+        .unwrap();
+        // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
+        let private_key = sk.from_base58check().unwrap()[4..].to_vec();
+        let key = JWK {
+            params: ssi::jwk::Params::EC(ssi::jwk::ECParams {
+                curve: Some("P-256".to_string()),
+                x_coordinate: None,
+                y_coordinate: None,
+                ecc_private_key: Some(Base64urlUInt(private_key)),
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: Some(format!("{}#blockchainAccountId", did)),
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        };
+        let jws = encode_sign(ssi::jwk::Algorithm::ES256, JSON_PATCH, &key).unwrap();
+        let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
+        DIDTz
+            .tier3_updates("tz3", &mut doc, json_update)
             .await
             .unwrap();
         assert_eq!(
@@ -1062,4 +1188,12 @@ mod tests {
         assert_eq!(d.service, expected.service);
         // assert_eq!(d, expected);
     }
+
+    /*
+    #[tokio::test]
+    #[cfg(feature = "p256")]
+    async fn credential_prove_verify_did_tz3() {
+        // TODO
+    }
+    */
 }

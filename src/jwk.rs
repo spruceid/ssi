@@ -167,6 +167,7 @@ pub enum Algorithm {
     PS384,
     PS512,
     EdDSA,
+    ES256,
     ES256K,
     /// https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r
     #[serde(rename = "ES256K-R")]
@@ -253,6 +254,29 @@ impl JWK {
         })
     }
 
+    #[cfg(feature = "p256")]
+    pub fn generate_p256() -> Result<JWK, Error> {
+        let mut rng = rand::rngs::OsRng {};
+        let secret_key = p256::SecretKey::random(&mut rng);
+        use p256::elliptic_curve::ff::PrimeField;
+        let sk_bytes = secret_key.secret_scalar().to_repr();
+        let public_key: p256::PublicKey = secret_key.public_key();
+        Ok(JWK {
+            params: Params::EC(ECParams {
+                ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+                ..ECParams::try_from(&public_key)?
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        })
+    }
+
     pub fn get_algorithm(&self) -> Option<Algorithm> {
         if let Some(algorithm) = self.algorithm {
             return Some(algorithm);
@@ -264,8 +288,20 @@ impl JWK {
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
             }
-            Params::EC(ec_params) if ec_params.curve == Some("secp256k1".to_string()) => {
-                return Some(Algorithm::ES256K);
+            Params::EC(ec_params) => {
+                let curve = match &ec_params.curve {
+                    Some(curve) => curve,
+                    None => return None,
+                };
+                match &curve[..] {
+                    "secp256k1" => {
+                        return Some(Algorithm::ES256K);
+                    }
+                    "P-256" => {
+                        return Some(Algorithm::ES256);
+                    }
+                    _ => {}
+                }
             }
             _ => {}
         };
@@ -637,6 +673,43 @@ pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, String> {
     Ok(jwk)
 }
 
+#[cfg(feature = "p256")]
+pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
+    let (x, y) = match pk_bytes.len() {
+        64 => (pk_bytes[0..32].to_vec(), pk_bytes[32..64].to_vec()),
+        33 => {
+            use p256::elliptic_curve::sec1::EncodedPoint;
+            let encoded_point: EncodedPoint<p256::NistP256> = EncodedPoint::from_bytes(&pk_bytes)?
+                .decompress()
+                .ok_or(Error::ECDecompress)?;
+            (
+                encoded_point.x().ok_or(Error::MissingPoint)?.to_vec(),
+                encoded_point.y().ok_or(Error::MissingPoint)?.to_vec(),
+            )
+        }
+        _ => {
+            return Err(Error::P256KeyLength(pk_bytes.len()));
+        }
+    };
+    let jwk = JWK {
+        params: Params::EC(ECParams {
+            curve: Some("P-256".to_string()),
+            x_coordinate: Some(Base64urlUInt(x)),
+            y_coordinate: Some(Base64urlUInt(y)),
+            ecc_private_key: None,
+        }),
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
+}
+
 #[cfg(feature = "libsecp256k1")]
 impl TryFrom<&secp256k1::PublicKey> for ECParams {
     type Error = Error;
@@ -649,6 +722,57 @@ impl TryFrom<&secp256k1::PublicKey> for ECParams {
             curve: Some("secp256k1".to_string()),
             x_coordinate: Some(Base64urlUInt(pk_bytes[1..33].to_vec())),
             y_coordinate: Some(Base64urlUInt(pk_bytes[33..65].to_vec())),
+            ecc_private_key: None,
+        })
+    }
+}
+
+#[cfg(feature = "p256")]
+impl TryFrom<&ECParams> for p256::SecretKey {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        if curve != "P-256" {
+            return Err(Error::CurveNotImplemented(curve.to_string()));
+        }
+        let private_key = params
+            .ecc_private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let secret_key = p256::SecretKey::from_bytes(&private_key.0)?;
+        Ok(secret_key)
+    }
+}
+
+#[cfg(feature = "p256")]
+impl TryFrom<&ECParams> for p256::PublicKey {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        if curve != "P-256" {
+            return Err(Error::CurveNotImplemented(curve.to_string()));
+        }
+        const EC_UNCOMPRESSED_POINT_TAG: &[u8] = &[0x04];
+        let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+        let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+        let pk_data = [EC_UNCOMPRESSED_POINT_TAG, x.as_slice(), y.as_slice()].concat();
+        let public_key = p256::PublicKey::from_sec1_bytes(&pk_data)?;
+        Ok(public_key)
+    }
+}
+
+#[cfg(feature = "p256")]
+impl TryFrom<&p256::PublicKey> for ECParams {
+    type Error = Error;
+    fn try_from(pk: &p256::PublicKey) -> Result<Self, Self::Error> {
+        use p256::elliptic_curve::sec1::ToEncodedPoint;
+        let encoded_point = pk.to_encoded_point(false);
+        let x = encoded_point.x().ok_or(Error::MissingPoint)?;
+        let y = encoded_point.y().ok_or(Error::MissingPoint)?;
+        Ok(ECParams {
+            curve: Some("P-256".to_string()),
+            x_coordinate: Some(Base64urlUInt(x.to_vec())),
+            y_coordinate: Some(Base64urlUInt(y.to_vec())),
             ecc_private_key: None,
         })
     }
@@ -710,5 +834,11 @@ mod tests {
     #[cfg(feature = "libsecp256k1")]
     fn secp256k1_generate() {
         let _jwk = JWK::generate_secp256k1().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "p256")]
+    fn p256_generate() {
+        let _jwk = JWK::generate_p256().unwrap();
     }
 }

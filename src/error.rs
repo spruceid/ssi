@@ -161,6 +161,13 @@ pub enum Error {
     FromHex(hex::FromHexError),
     Base58(bs58::decode::Error),
     HexString,
+    P256KeyLength(usize),
+    ECEncodingError,
+    ECDecompress,
+    #[cfg(feature = "p256")]
+    P256Ecdsa(p256::ecdsa::Error),
+    #[cfg(feature = "p256")]
+    P256EC(p256::elliptic_curve::Error),
 }
 
 impl fmt::Display for Error {
@@ -297,6 +304,13 @@ impl fmt::Display for Error {
             Error::TypedDataHash(e) => e.fmt(f),
             Error::FromHex(e) => e.fmt(f),
             Error::Base58(e) => e.fmt(f),
+            #[cfg(feature = "p256")]
+            Error::P256EC(e) => e.fmt(f),
+            #[cfg(feature = "p256")]
+            Error::P256Ecdsa(e) => e.fmt(f),
+            Error::P256KeyLength(len) => write!(f, "Expected 64 byte uncompressed key or 33 bytes compressed key but found length: {}", len),
+            Error::ECEncodingError => write!(f, "Unable to encode EC key"),
+            Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
         }
     }
 }
@@ -449,5 +463,19 @@ impl From<hex::FromHexError> for Error {
 impl From<bs58::decode::Error> for Error {
     fn from(err: bs58::decode::Error) -> Error {
         Error::Base58(err)
+    }
+}
+
+#[cfg(feature = "p256")]
+impl From<p256::elliptic_curve::Error> for Error {
+    fn from(err: p256::elliptic_curve::Error) -> Error {
+        Error::P256EC(err)
+    }
+}
+
+#[cfg(feature = "p256")]
+impl From<p256::ecdsa::Error> for Error {
+    fn from(err: p256::ecdsa::Error) -> Error {
+        Error::P256Ecdsa(err)
     }
 }

@@ -6,6 +6,7 @@ edition = "2018"
 
 [features]
 secp256k1 = ["libsecp256k1", "ssi/secp256k1", "ssi/rand"]
+p256 = ["ssi/p256"]
 
 [dependencies]
 ssi = { path = "../", default-features = false }

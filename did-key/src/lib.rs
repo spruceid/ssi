@@ -6,12 +6,15 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
 };
+#[cfg(feature = "p256")]
+use ssi::jwk::p256_parse;
 #[cfg(feature = "libsecp256k1")]
-use ssi::jwk::{secp256k1_parse, ECParams};
+use ssi::jwk::secp256k1_parse;
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
 const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 const DID_KEY_SECP256K1_PREFIX: [u8; 2] = [0xe7, 0x01];
+const DID_KEY_P256_PREFIX: [u8; 2] = [0x80, 0x24];
 
 #[derive(Error, Debug)]
 pub enum DIDKeyError {
@@ -125,6 +128,21 @@ impl DIDResolver for DIDKey {
                 None,
                 None,
             );
+        } else if data[0] == DID_KEY_P256_PREFIX[0] && data[1] == DID_KEY_P256_PREFIX[1] {
+            #[cfg(feature = "p256")]
+            match p256_parse(&data[2..]) {
+                Ok(jwk) => {
+                    vm_type = "JsonWebKey2020".to_string();
+                    jwk
+                }
+                Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
+            }
+            #[cfg(not(feature = "p256"))]
+            return (
+                ResolutionMetadata::from_error("did:key type P-256 not supported"),
+                None,
+                None,
+            );
         } else {
             return (
                 ResolutionMetadata {
@@ -207,6 +225,20 @@ impl DIDMethod for DIDKey {
                                 .concat(),
                             )
                     }
+                    #[cfg(feature = "p256")]
+                    "P-256" => {
+                        // P-256 did:key is uncompressed
+                        let (x, y) =
+                            match (params.x_coordinate.as_ref(), params.y_coordinate.as_ref()) {
+                                (Some(x), Some(y)) => (x.0.to_vec(), y.0.to_vec()),
+                                _ => return None,
+                            };
+                        "did:key:".to_string()
+                            + &multibase::encode(
+                                multibase::Base::Base58Btc,
+                                [DID_KEY_P256_PREFIX.to_vec(), x, y].concat(),
+                            )
+                    }
                     //_ => return Some(Err(DIDKeyError::UnsupportedCurve(params.curve.clone()))),
                     _ => return None,
                 }
@@ -260,6 +292,41 @@ mod tests {
         let key = vm.public_key_jwk.unwrap();
 
         // convert back to DID from JWK
+        let did1 = DIDKey.generate(&Source::Key(&key)).unwrap();
+        assert_eq!(did1, did);
+    }
+
+    #[cfg(feature = "p256")]
+    #[async_std::test]
+    async fn from_did_key_p256() {
+        // https://w3c-ccg.github.io/did-method-key/#p-256
+        let did = "did:key:zrurwcJZss4ruepVNu1H3xmSirvNbzgBk9qrCktB6kaewXnJAhYWwtP3bxACqBpzjZdN7TyHNzzGGSSH5qvZsSDir9z";
+        let (res_meta, _doc, _doc_meta) = DIDKey
+            .resolve(did, &ResolutionInputMetadata::default())
+            .await;
+        assert_eq!(res_meta.error, None);
+
+        let vm = "did:key:zrurwcJZss4ruepVNu1H3xmSirvNbzgBk9qrCktB6kaewXnJAhYWwtP3bxACqBpzjZdN7TyHNzzGGSSH5qvZsSDir9z#zrurwcJZss4ruepVNu1H3xmSirvNbzgBk9qrCktB6kaewXnJAhYWwtP3bxACqBpzjZdN7TyHNzzGGSSH5qvZsSDir9z";
+        let (res_meta, object, _meta) =
+            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+        assert_eq!(res_meta.error, None);
+        let vm = match object {
+            Content::Object(Resource::VerificationMethod(vm)) => vm,
+            _ => unreachable!(),
+        };
+        let key = vm.public_key_jwk.unwrap();
+        eprintln!("key {}", serde_json::to_string_pretty(&key).unwrap());
+
+        // https://github.com/w3c-ccg/did-method-key/blob/master/test-vectors/nist-curves.json#L64-L69
+        let key_expected: JWK = serde_json::from_value(serde_json::json!({
+            "kty": "EC",
+            "crv": "P-256",
+            "x": "fyNYMN0976ci7xqiSdag3buk-ZCwgXU4kz9XNkBlNUI",
+            "y": "hW2ojTNfH7Jbi8--CJUo3OCbH3y5n91g-IMA9MLMbTU"
+        }))
+        .unwrap();
+        assert_eq!(key, key_expected);
+
         let did1 = DIDKey.generate(&Source::Key(&key)).unwrap();
         assert_eq!(did1, did);
     }
@@ -332,4 +399,12 @@ mod tests {
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
         assert!(vc.verify(None, &DIDKey).await.errors.len() > 0);
     }
+
+    /*
+    #[async_std::test]
+    #[cfg(feature = "p256")]
+    async fn credential_prove_verify_did_key_p256() {
+        // TODO
+    }
+    */
 }
