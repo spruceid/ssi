@@ -8,7 +8,7 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::jwk::{Base64urlUInt, ECParams, OctetParams, Params, JWK};
+use ssi::jwk::{secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK};
 use ssi::jws::decode_verify;
 
 mod explorer;
@@ -293,24 +293,12 @@ impl DIDTz {
                                     .to_vec(),
                                 None => return Err(anyhow!("Need public key for signed patches")),
                             };
-                            JWK {
-                                // TODO I don't think the coordinates mean anything in compressed
-                                // form
-                                params: Params::EC(ECParams {
-                                    curve: Some("secp256k1".to_string()),
-                                    x_coordinate: Some(Base64urlUInt(pk[0..17].to_vec())),
-                                    y_coordinate: Some(Base64urlUInt(pk[17..33].to_vec())),
-                                    ecc_private_key: None,
-                                }),
-                                public_key_use: None,
-                                key_operations: None,
-                                algorithm: None,
-                                key_id: None,
-                                x509_url: None,
-                                x509_thumbprint_sha1: None,
-                                x509_certificate_chain: None,
-                                x509_thumbprint_sha256: None,
-                            }
+                            secp256k1_parse(&pk).or_else(|e| {
+                                Err(anyhow!(
+                                    "Couldn't create JWK from secp256k1 public key: {}",
+                                    e
+                                ))
+                            })?
                         }
                         p => return Err(anyhow!("{} not supported yet.", p)),
                     };

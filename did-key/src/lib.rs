@@ -7,7 +7,7 @@ use ssi::did_resolve::{
     ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
 };
 #[cfg(feature = "libsecp256k1")]
-use ssi::jwk::ECParams;
+use ssi::jwk::{secp256k1_parse, ECParams};
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
 const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
@@ -24,31 +24,6 @@ pub enum DIDKeyError {
 }
 
 pub struct DIDKey;
-
-#[cfg(feature = "libsecp256k1")]
-fn secp256k1_parse(data: &[u8]) -> Result<JWK, String> {
-    let pk =
-        match secp256k1::PublicKey::parse_slice(data, Some(secp256k1::PublicKeyFormat::Compressed))
-        {
-            Ok(pk) => pk,
-            Err(err) => {
-                return Err(format!("Error parsing key: {}", err));
-            }
-        };
-    use std::convert::TryFrom;
-    let jwk = JWK {
-        params: Params::EC(ECParams::try_from(&pk)?),
-        public_key_use: None,
-        key_operations: None,
-        algorithm: None,
-        key_id: None,
-        x509_url: None,
-        x509_certificate_chain: None,
-        x509_thumbprint_sha1: None,
-        x509_thumbprint_sha256: None,
-    };
-    Ok(jwk)
-}
 
 #[async_trait]
 impl DIDResolver for DIDKey {
