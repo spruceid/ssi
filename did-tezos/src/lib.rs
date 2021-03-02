@@ -183,6 +183,7 @@ impl DIDMethod for DIDTz {
         return "tz";
     }
 
+    // TODO need to handle different networks
     fn generate(&self, source: &Source) -> Option<String> {
         let jwk = match source {
             Source::Key(jwk) => jwk,
@@ -340,7 +341,7 @@ mod tests {
     use std::collections::BTreeMap as Map;
     use tezedge_client::PrivateKey;
 
-    const TZ1: &'static str = "did:tz:tz1VFda3KmzRecjsYptDq5bJh1M1NyAqgBJf";
+    const TZ1: &'static str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
     const LIVE_TZ1: &str = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";
@@ -438,7 +439,7 @@ mod tests {
               "https://www.w3.org/2018/credentials/v1"
             ],
             "type": ["VerifiableCredential"],
-            "issuer": "did:tz:tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK",
+            "issuer": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq",
             "issuanceDate": "2021-01-27T16:39:07Z",
             "credentialSubject": {
                 "id": "did:example:foo"
@@ -446,14 +447,98 @@ mod tests {
         }"###;
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
 
-        let key_str = include_str!("../../tests/ed25519-2020-10-18.json");
-        let key: JWK = serde_json::from_str(key_str).unwrap();
-        let did = DIDTz.generate(&Source::Key(&key)).unwrap();
+        // let public_key =
+        //     PublicKey::from_base58check("edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A")
+        //         .unwrap();
+        // let private_key =
+        //     PrivateKey::from_base58check("")
+        //         .unwrap();
+        // let key = JWK {
+        //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+        //         curve: "Ed25519".to_string(),
+        //         public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
+        //         private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
+        //     }),
+        //     public_key_use: None,
+        //     key_operations: None,
+        //     algorithm: None,
+        //     key_id: None,
+        //     x509_url: None,
+        //     x509_certificate_chain: None,
+        //     x509_thumbprint_sha1: None,
+        //     x509_thumbprint_sha256: None,
+        // };
+        let did = "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq".to_string();
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        // let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof_str = r###"
+{
+  "@context": {
+    "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021": {
+      "@context": {
+        "@protected": true,
+        "@version": 1.1,
+        "challenge": "https://w3id.org/security#challenge",
+        "created": {
+          "@id": "http://purl.org/dc/terms/created",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "domain": "https://w3id.org/security#domain",
+        "expires": {
+          "@id": "https://w3id.org/security#expiration",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "id": "@id",
+        "jws": "https://w3id.org/security#jws",
+        "nonce": "https://w3id.org/security#nonce",
+        "proofPurpose": {
+          "@context": {
+            "@protected": true,
+            "@version": 1.1,
+            "assertionMethod": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#assertionMethod",
+              "@type": "@id"
+            },
+            "authentication": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#authenticationMethod",
+              "@type": "@id"
+            },
+            "id": "@id",
+            "type": "@type"
+          },
+          "@id": "https://w3id.org/security#proofPurpose",
+          "@type": "@vocab"
+        },
+        "publicKeyJwk": {
+          "@id": "https://w3id.org/security#publicKeyJwk",
+          "@type": "@json"
+        },
+        "type": "@type",
+        "verificationMethod": {
+          "@id": "https://w3id.org/security#verificationMethod",
+          "@type": "@id"
+        }
+      },
+      "@id": "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"
+    }
+  },
+  "type": "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021",
+  "proofPurpose": "assertionMethod",
+  "verificationMethod": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
+  "created": "2021-03-02T18:59:44.462Z",
+  "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg",
+  "publicKeyJwk": {
+    "crv": "Ed25519",
+    "kty": "OKP",
+    "x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"
+  }
+}"###;
+        let proof = serde_json::from_str(proof_str).unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -503,7 +588,73 @@ mod tests {
         vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof_str = r###"
+{
+  "@context": {
+    "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021": {
+      "@context": {
+        "@protected": true,
+        "@version": 1.1,
+        "challenge": "https://w3id.org/security#challenge",
+        "created": {
+          "@id": "http://purl.org/dc/terms/created",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "domain": "https://w3id.org/security#domain",
+        "expires": {
+          "@id": "https://w3id.org/security#expiration",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "id": "@id",
+        "jws": "https://w3id.org/security#jws",
+        "nonce": "https://w3id.org/security#nonce",
+        "proofPurpose": {
+          "@context": {
+            "@protected": true,
+            "@version": 1.1,
+            "assertionMethod": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#assertionMethod",
+              "@type": "@id"
+            },
+            "authentication": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#authenticationMethod",
+              "@type": "@id"
+            },
+            "id": "@id",
+            "type": "@type"
+          },
+          "@id": "https://w3id.org/security#proofPurpose",
+          "@type": "@vocab"
+        },
+        "publicKeyJwk": {
+          "@id": "https://w3id.org/security#publicKeyJwk",
+          "@type": "@json"
+        },
+        "type": "@type",
+        "verificationMethod": {
+          "@id": "https://w3id.org/security#verificationMethod",
+          "@type": "@id"
+        }
+      },
+      "@id": "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"
+    }
+  },
+  "type": "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021",
+  "proofPurpose": "authentication",
+  "verificationMethod": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
+  "created": "2021-03-02T19:05:08.271Z",
+  "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw",
+  "publicKeyJwk": {
+    "crv": "Ed25519",
+    "kty": "OKP",
+    "x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"
+  }
+}"###;
+        let vp_proof = serde_json::from_str(vp_proof_str).unwrap();
+        println!("{}", serde_json::to_string_pretty(&vp_proof).unwrap());
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
@@ -660,7 +811,7 @@ mod tests {
         .unwrap();
         let public_key = PublicKey::from_base58check(pk).unwrap();
         let private_key = PrivateKey::from_base58check(sk).unwrap();
-        let key = ssi::jwk::JWK {
+        let key = JWK {
             params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
                 curve: "Ed25519".to_string(),
                 public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
@@ -719,7 +870,7 @@ mod tests {
         .unwrap();
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
         let private_key = sk.from_base58check().unwrap()[4..].to_vec();
-        let key = ssi::jwk::JWK {
+        let key = JWK {
             params: ssi::jwk::Params::EC(ECParams {
                 curve: Some("secp256k1".to_string()),
                 x_coordinate: None,
