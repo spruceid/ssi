@@ -262,10 +262,10 @@ impl DIDTz {
                     let jwk = match prefix {
                         "tz1" => {
                             let pk = match public_key {
-                                Some(ref p) => {
-                                    PublicKey::from_base58check(&p.clone()).unwrap().as_ref()[..]
-                                        .to_vec()
-                                }
+                                Some(ref p) => PublicKey::from_base58check(&p.clone())
+                                    .or_else(|e| Err(anyhow!("Couldn't decode public key: {}", e)))?
+                                    .as_ref()[..]
+                                    .to_vec(),
                                 None => return Err(anyhow!("Need public key for signed patches")),
                             };
                             JWK {
@@ -287,7 +287,10 @@ impl DIDTz {
                         "tz2" => {
                             // TODO use tezedge_client when it handles tz2
                             let pk = match public_key {
-                                Some(ref p) => p.from_base58check().unwrap()[4..].to_vec(),
+                                Some(ref p) => p.from_base58check().or_else(|e| {
+                                    Err(anyhow!("Couldn't decode public key: {}", e))
+                                })?[4..]
+                                    .to_vec(),
                                 None => return Err(anyhow!("Need public key for signed patches")),
                             };
                             JWK {
