@@ -8,7 +8,9 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::jwk::{secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK};
+#[cfg(feature = "libsecp256k1")]
+use ssi::jwk::secp256k1_parse;
+use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 use ssi::jws::decode_verify;
 
 mod explorer;
@@ -17,7 +19,9 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 use json_patch::patch;
 use serde::Deserialize;
-use tezedge_client::{crypto::FromBase58Check, PublicKey};
+#[cfg(feature = "libsecp256k1")]
+use tezedge_client::crypto::FromBase58Check;
+use tezedge_client::PublicKey;
 
 /// did:tz DID Method
 ///
@@ -284,6 +288,7 @@ impl DIDTz {
                                 x509_thumbprint_sha256: None,
                             }
                         }
+                        #[cfg(feature = "libsecp256k1")]
                         "tz2" => {
                             // TODO use tezedge_client when it handles tz2
                             let pk = match public_key {
@@ -326,7 +331,8 @@ mod tests {
     use serde_json::json;
     use ssi::did::ServiceEndpoint;
     use ssi::did_resolve::ResolutionInputMetadata;
-    use ssi::jwk::JWK;
+    #[cfg(feature = "libsecp256k1")]
+    use ssi::jwk::ECParams;
     use ssi::jws::encode_sign;
     use ssi::one_or_many::OneOrMany;
     use std::collections::BTreeMap as Map;
