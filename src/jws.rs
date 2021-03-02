@@ -118,8 +118,22 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             use ed25519_dalek::Signer;
             keypair.sign(data).to_bytes().to_vec()
         }
-        #[cfg(feature = "libsecp256k1")]
+        #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
+            #[cfg(feature = "p256")]
+            Algorithm::ES256 => {
+                use p256::ecdsa::signature::{Signature, Signer};
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "P-256" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let secret_key = p256::SecretKey::try_from(ec)?;
+                let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                let hashed = crate::hash::sha256(data)?;
+                let sig = signing_key.try_sign(&hashed)?;
+                sig.as_bytes().to_vec()
+            }
+            #[cfg(feature = "libsecp256k1")]
             Algorithm::ES256K | Algorithm::ES256KR => {
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
@@ -210,8 +224,22 @@ pub fn verify_bytes(
             use ed25519_dalek::Verifier;
             public_key.verify(data, &signature)?;
         }
-        #[cfg(feature = "libsecp256k1")]
+        #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
+            #[cfg(feature = "p256")]
+            Algorithm::ES256 => {
+                use p256::ecdsa::signature::{Signature, Verifier};
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "P-256" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let public_key = p256::PublicKey::try_from(ec)?;
+                let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
+                let sig = Signature::from_bytes(signature)?;
+                let hashed = crate::hash::sha256(data)?;
+                verifying_key.verify(&hashed, &sig)?;
+            }
+            #[cfg(feature = "libsecp256k1")]
             Algorithm::ES256K | Algorithm::ES256KR => {
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
@@ -503,5 +531,15 @@ mod tests {
         verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
         let other_key = JWK::generate_secp256k1().unwrap();
         verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
+    }
+
+    #[test]
+    #[cfg(feature = "p256")]
+    fn p256_sign_verify() {
+        let key = JWK::generate_p256().unwrap();
+        let data = b"asdf";
+        let sig = sign_bytes(Algorithm::ES256, data, &key).unwrap();
+        verify_bytes(Algorithm::ES256, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ES256, b"no", &key, &sig).unwrap_err();
     }
 }
