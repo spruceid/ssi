@@ -60,7 +60,7 @@ mod tests {
         )
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
-        assert_eq!(hash, "tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK");
+        assert_eq!(hash, "tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83");
 
         // tz2
         use serde_json::json;
@@ -73,6 +73,6 @@ mod tests {
         }))
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
-        assert_eq!(hash, "tz2Kx6Ew2ghFQAS5GKPAjYxZsCAT1f12KE7J");
+        assert_eq!(hash, "tz2A2DY3xyHHL7ZmyXKzVZJGPSbrqpLvCEYd");
     }
 }
