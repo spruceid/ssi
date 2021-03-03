@@ -106,7 +106,7 @@ mod tests {
     async fn test_retrieve_did_manager() {
         let did_manager = retrieve_did_manager(LIVE_TZ1, LIVE_NETWORK).await;
         assert!(did_manager.is_ok());
-        assert_eq!(did_manager.unwrap(), LIVE_DID_MANAGER.to_string());
+        assert_eq!(did_manager.unwrap().unwrap(), LIVE_DID_MANAGER.to_string());
     }
 
     #[tokio::test]

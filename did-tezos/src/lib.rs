@@ -454,7 +454,7 @@ mod tests {
                 &ResolutionInputMetadata::default(),
             )
             .await;
-        // assert_eq!(res_meta.error, None);
+        assert_eq!(res_meta.error, None);
         let doc = doc_opt.unwrap();
         eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(
@@ -486,7 +486,7 @@ mod tests {
                 &ResolutionInputMetadata::default(),
             )
             .await;
-        // assert_eq!(res_meta.error, None);
+        assert_eq!(res_meta.error, None);
         let doc = doc_opt.unwrap();
         eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(
@@ -794,7 +794,7 @@ mod tests {
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDTz).await;
         println!("{:#?}", verification_result);
-        // assert!(verification_result.errors.is_empty());
+        assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
@@ -844,7 +844,7 @@ mod tests {
         vp.validate().unwrap();
         let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTz).await;
         println!("{:#?}", vp_verification_result);
-        // assert!(vp_verification_result.errors.is_empty());
+        assert!(vp_verification_result.errors.is_empty());
 
         // mess with the VP proof to make verify fail
         let mut vp1 = vp.clone();
