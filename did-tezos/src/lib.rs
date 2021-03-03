@@ -97,7 +97,7 @@ impl DIDResolver for DIDTz {
         let mut doc =
             DIDTz::tier1_derivation(did, &vm_didurl, proof_type, &address, &network, public_key);
 
-        let service = match DIDTz::tier2_resolution(did, &address, &network).await {
+        if let Some(service) = match DIDTz::tier2_resolution(did, &address, &network).await {
             Ok(s) => s,
             Err(e) => {
                 return (
@@ -109,8 +109,9 @@ impl DIDResolver for DIDTz {
                     None,
                 )
             }
-        };
-        doc.service = Some(vec![service]);
+        } {
+            doc.service = Some(vec![service]);
+        }
 
         if let Some(s) = &input_metadata.property_set {
             if let Some(updates_metadata) = s.get("updates") {
@@ -290,9 +291,14 @@ impl DIDTz {
         }
     }
 
-    async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Service> {
-        let did_manager = explorer::retrieve_did_manager(address, network).await?;
-        Ok(explorer::execute_service_view(did, &did_manager, network).await?)
+    async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Option<Service>> {
+        if let Some(did_manager) = explorer::retrieve_did_manager(address, network).await? {
+            Ok(Some(
+                explorer::execute_service_view(did, &did_manager, network).await?,
+            ))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn tier3_updates(

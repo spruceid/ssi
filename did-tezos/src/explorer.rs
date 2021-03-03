@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use reqwest;
 use serde::Deserialize;
 use ssi::did::{Service, ServiceEndpoint};
@@ -29,7 +29,7 @@ struct SearchResult {
     items: Vec<SearchItem>,
 }
 
-pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<String> {
+pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<Option<String>> {
     let client = reqwest::Client::new();
     let mut search_result: SearchResult = client
         .get(&format!("{}v1/search", BCD_URL))
@@ -54,12 +54,12 @@ pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<String
                     .contains(&"rotateAuthentication".to_string())
                     && c.body.entrypoints.contains(&"rotateService".to_string())
                 {
-                    return Ok(c.value);
+                    return Ok(Some(c.value));
                 }
             }
         }
     }
-    Err(anyhow!("DID Manager not found."))
+    Ok(None)
 }
 
 #[derive(Deserialize)]
