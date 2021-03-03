@@ -20,9 +20,6 @@ use chrono::prelude::*;
 use json_patch::patch;
 use serde::Deserialize;
 use std::convert::TryInto;
-#[cfg(feature = "libsecp256k1")]
-use tezedge_client::crypto::FromBase58Check;
-use tezedge_client::PublicKey;
 
 /// did:tz DID Method
 ///
@@ -351,9 +348,12 @@ impl DIDTz {
                     if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
                         let jwk = match prefix {
                             "tz1" => {
-                                let pk = PublicKey::from_base58check(&public_key.clone())
-                                    .or_else(|e| Err(anyhow!("Couldn't decode public key: {}", e)))?
-                                    .as_ref()[..]
+                                let pk = bs58::decode(public_key)
+                                    .with_check(None)
+                                    .into_vec()
+                                    .or_else(|e| {
+                                        Err(anyhow!("Couldn't decode public key: {}", e))
+                                    })?[4..]
                                     .to_vec();
                                 JWK {
                                     params: Params::OKP(OctetParams {
@@ -373,10 +373,12 @@ impl DIDTz {
                             }
                             #[cfg(feature = "libsecp256k1")]
                             "tz2" => {
-                                // TODO use tezedge_client when it handles tz2
-                                let pk = public_key.from_base58check().or_else(|e| {
-                                    Err(anyhow!("Couldn't decode public key: {}", e))
-                                })?[4..]
+                                let pk = bs58::decode(public_key)
+                                    .with_check(None)
+                                    .into_vec()
+                                    .or_else(|e| {
+                                        Err(anyhow!("Couldn't decode public key: {}", e))
+                                    })?[4..]
                                     .to_vec();
                                 secp256k1_parse(&pk).or_else(|e| {
                                     Err(anyhow!(
@@ -419,7 +421,8 @@ mod tests {
     use ssi::jws::encode_sign;
     use ssi::one_or_many::OneOrMany;
     use std::collections::BTreeMap as Map;
-    use tezedge_client::PrivateKey;
+    use tezedge_client::crypto::FromBase58Check;
+    use tezedge_client::{PrivateKey, PublicKey};
 
     const TZ1: &'static str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
