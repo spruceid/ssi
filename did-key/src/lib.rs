@@ -400,11 +400,38 @@ mod tests {
         assert!(vc.verify(None, &DIDKey).await.errors.len() > 0);
     }
 
-    /*
     #[async_std::test]
     #[cfg(feature = "p256")]
     async fn credential_prove_verify_did_key_p256() {
-        // TODO
+        use serde_json::json;
+        use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
+        let key = JWK::generate_p256().unwrap();
+        let did = DIDKey.generate(&Source::Key(&key)).unwrap();
+        let mut vc: Credential = serde_json::from_value(json!({
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "type": ["VerifiableCredential"],
+            "issuer": did.clone(),
+            "issuanceDate": "2021-02-18T20:17:46Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }))
+        .unwrap();
+        vc.validate_unsigned().unwrap();
+
+        let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some(verification_method);
+        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDKey).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // test that issuer is verified
+        vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
+        assert!(vc.verify(None, &DIDKey).await.errors.len() > 0);
     }
-    */
 }
