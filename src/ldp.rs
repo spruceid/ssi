@@ -120,6 +120,7 @@ impl ProofPreparation {
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021::complete(self, signature).await,
             "SolanaSignature2021" => SolanaSignature2021::complete(self, signature).await,
+            "JsonWebSignature2020" => JsonWebSignature2020::complete(self, signature).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -187,20 +188,35 @@ impl LinkedDataProofs {
                 x509_certificate_chain: _,
                 x509_thumbprint_sha1: _,
                 x509_thumbprint_sha256: _,
-            } if ec_params.curve == Some("secp256k1".to_string()) => {
-                if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
-                    if let Some(ref vm) = options.verification_method {
-                        if vm.ends_with("#Eip712Method2021") {
-                            #[cfg(feature = "keccak-hash")]
-                            return Eip712Signature2021::sign(document, options, &key).await;
-                            #[cfg(not(feature = "keccak-hash"))]
-                            return Err(Error::ProofTypeNotImplemented);
+            } => {
+                let curve = ec_params.curve.as_ref().ok_or(Error::MissingCurve)?;
+                match &curve[..] {
+                    "secp256k1" => {
+                        if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
+                            if let Some(ref vm) = options.verification_method {
+                                if vm.ends_with("#Eip712Method2021") {
+                                    #[cfg(feature = "keccak-hash")]
+                                    return Eip712Signature2021::sign(document, options, &key)
+                                        .await;
+                                    #[cfg(not(feature = "keccak-hash"))]
+                                    return Err(Error::ProofTypeNotImplemented);
+                                }
+                            }
+                            return EcdsaSecp256k1RecoverySignature2020::sign(
+                                document, options, &key,
+                            )
+                            .await;
+                        } else {
+                            return EcdsaSecp256k1Signature2019::sign(document, options, &key)
+                                .await;
                         }
                     }
-                    return EcdsaSecp256k1RecoverySignature2020::sign(document, options, &key)
-                        .await;
-                } else {
-                    return EcdsaSecp256k1Signature2019::sign(document, options, &key).await;
+                    "P-256" => {
+                        return JsonWebSignature2020::sign(document, options, &key).await;
+                    }
+                    _ => {
+                        return Err(Error::CurveNotImplemented(curve.to_string()));
+                    }
                 }
             }
             _ => {}
@@ -232,6 +248,9 @@ impl LinkedDataProofs {
                     }
                 }
                 return Ed25519Signature2018::prepare(document, options, public_key).await;
+            }
+            Algorithm::ES256 => {
+                return JsonWebSignature2020::prepare(document, options, public_key).await;
             }
             Algorithm::ES256K => {
                 return EcdsaSecp256k1Signature2019::prepare(document, options, public_key).await
@@ -277,6 +296,7 @@ impl LinkedDataProofs {
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021::verify(proof, document, resolver).await,
             "SolanaSignature2021" => SolanaSignature2021::verify(proof, document, resolver).await,
+            "JsonWebSignature2020" => JsonWebSignature2020::verify(proof, document, resolver).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -894,6 +914,56 @@ impl ProofSuite for SolanaSignature2021 {
         let sig = bs58::decode(&sig_b58).into_vec()?;
         crate::jws::verify_bytes(Algorithm::EdDSA, &bytes, &key, &sig)?;
         Ok(())
+    }
+}
+
+/// <https://w3c-ccg.github.io/lds-jws2020/>
+pub struct JsonWebSignature2020;
+#[async_trait]
+impl ProofSuite for JsonWebSignature2020 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+        if algorithm != Algorithm::ES256 {
+            // TODO: support JsonWebSignature2020 more generally
+            return Err(Error::UnsupportedAlgorithm)?;
+        }
+        let proof = Proof {
+            context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("JsonWebSignature2020")
+        };
+        sign_proof(document, proof, key, algorithm).await
+    }
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+        if algorithm != Algorithm::ES256 {
+            return Err(Error::UnsupportedAlgorithm)?;
+        }
+        let proof = Proof {
+            context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("JsonWebSignature2020")
+        };
+        prepare_proof(document, proof, algorithm).await
+    }
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
     }
 }
 
