@@ -21,14 +21,21 @@ fn curve_to_prefixes(curve: &str) -> Result<(&'static [u8; 4], &'static [u8; 3])
 }
 
 pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
-    let bytes;
+    #[allow(unused)]
+    let bytes: Vec<u8>;
     let (curve, public_key_bytes) = match jwk.params {
         Params::OKP(ref params) => (&params.curve, &params.public_key.0),
+        #[cfg(feature = "secp256k1")]
         Params::EC(ref params) => {
             let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
             let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
             let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
-            bytes = [x.as_slice(), y.as_slice()].concat();
+            let pk_bytes_uncompressed = [x.as_slice(), y.as_slice()].concat();
+            let pk = secp256k1::PublicKey::parse_slice(
+                &pk_bytes_uncompressed,
+                Some(secp256k1::PublicKeyFormat::Raw),
+            )?;
+            bytes = pk.serialize_compressed().to_vec();
             (curve, &bytes)
         }
         _ => return Err(Error::KeyTypeNotImplemented),
@@ -61,18 +68,21 @@ mod tests {
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
         assert_eq!(hash, "tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83");
+    }
 
-        // tz2
+    #[cfg(feature = "secp256k1")]
+    #[test]
+    fn hash_tz2() {
         use serde_json::json;
         let jwk: JWK = serde_json::from_value(json!({
             "kty": "EC",
             "crv": "secp256k1",
-            "x": "yclqMZ0MtyVkKm1eBh2AyaUtsqT0l5RJM3g4SzRT96A",
-            "y": "yQzUwKnftWCJPGs-faGaHiYi1sxA6fGJVw2Px_LCNe8",
-            "d": "meTmccmR_6ZsOa2YuTTkKkJ4ZPYsKdAH1Wx_RRf2j_E"
+            "x": "ieabWBGH26ns_K6-aHS0RTSewO8mN2DqezH1l6fZ2QM",
+            "y": "YfCj40TxBad4Fx2ag8pkUxJV0xAdCUaF6QdHvYQoNbw"
         }))
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
-        assert_eq!(hash, "tz2A2DY3xyHHL7ZmyXKzVZJGPSbrqpLvCEYd");
+        // https://github.com/murbard/pytezos/blob/master/tests/test_crypto.py#L31
+        assert_eq!(hash, "tz28YZoayJjVz2bRgGeVjxE8NonMiJ3r2Wdu");
     }
 }
