@@ -114,9 +114,10 @@ impl DIDResolver for DIDTz {
 
         if let Some(s) = &input_metadata.property_set {
             if let Some(updates_metadata) = s.get("updates") {
-                let updates: Updates = match serde_json::to_value(updates_metadata) {
-                    Ok(u) => match serde_json::from_value(u) {
-                        Ok(uu) => uu,
+                let conversion: String = match updates_metadata {
+                    Metadata::String(s) => s.clone(),
+                    Metadata::Map(m) => match serde_json::to_string(m) {
+                        Ok(s) => s.clone(),
                         Err(e) => {
                             return (
                                 ResolutionMetadata {
@@ -125,9 +126,24 @@ impl DIDResolver for DIDTz {
                                 },
                                 Some(doc),
                                 None,
-                            );
+                            )
                         }
                     },
+                    _ => {
+                        return (
+                            ResolutionMetadata {
+                                error: Some(
+                                    "Cannot convert this type for off-chain updates.".to_string(),
+                                ),
+                                ..Default::default()
+                            },
+                            Some(doc),
+                            None,
+                        )
+                    }
+                };
+                let updates: Updates = match serde_json::from_str(&conversion) {
+                    Ok(uu) => uu,
                     Err(e) => {
                         return (
                             ResolutionMetadata {
