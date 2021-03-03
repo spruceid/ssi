@@ -1,15 +1,25 @@
 use ssi::blakesig::hash_public_key;
 use ssi::did::{
-    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
-    DEFAULT_CONTEXT, DIDURL,
+    Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
+    VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
 };
+use ssi::did_resolve::Metadata;
 use ssi::did_resolve::{
-    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    TYPE_DID_LD_JSON,
+    DIDResolver, DereferencingInputMetadata, DocumentMetadata, ResolutionInputMetadata,
+    ResolutionMetadata, ERROR_INVALID_DID, TYPE_DID_LD_JSON,
 };
+#[cfg(feature = "libsecp256k1")]
+use ssi::jwk::secp256k1_parse;
+use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi::jws::{decode_unverified, decode_verify};
 
+mod explorer;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use chrono::prelude::*;
+use json_patch::patch;
+use serde::Deserialize;
+use std::convert::TryInto;
 
 /// did:tz DID Method
 ///
@@ -21,7 +31,7 @@ impl DIDResolver for DIDTz {
     async fn resolve(
         &self,
         did: &str,
-        _input_metadata: &ResolutionInputMetadata,
+        input_metadata: &ResolutionInputMetadata,
     ) -> (
         ResolutionMetadata,
         Option<Document>,
@@ -43,7 +53,8 @@ impl DIDResolver for DIDTz {
             }
         };
 
-        let (_curve, proof_type) = match prefix_to_curve_type(&address[0..3]) {
+        let prefix = &address[0..3];
+        let (_curve, proof_type) = match prefix_to_curve_type(prefix) {
             Some(addr) => addr,
             None => {
                 return (
@@ -59,21 +70,101 @@ impl DIDResolver for DIDTz {
             fragment: Some("blockchainAccountId".to_string()),
             ..Default::default()
         };
-
-        let doc = Document {
-            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
-            id: did.to_string(),
-            authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
-                id: String::from(vm_didurl),
-                type_: proof_type.to_string(),
-                controller: did.to_string(),
-                blockchain_account_id: Some(format!("{}@tezos:{}", address.to_string(), network)),
-                ..Default::default()
-            })]),
-            ..Default::default()
+        let public_key = if let Some(s) = &input_metadata.property_set {
+            match s.get("public_key") {
+                Some(pk) => match pk {
+                    Metadata::String(pks) => Some(pks.clone()),
+                    _ => {
+                        return (
+                            ResolutionMetadata {
+                                error: Some("Public key is not a string.".to_string()),
+                                ..Default::default()
+                            },
+                            None,
+                            None,
+                        );
+                    }
+                },
+                None => None,
+            }
+        } else {
+            None
         };
+
+        let mut doc =
+            DIDTz::tier1_derivation(did, &vm_didurl, proof_type, &address, &network, public_key);
+
+        if let Some(service) = match DIDTz::tier2_resolution(did, &address, &network).await {
+            Ok(s) => s,
+            Err(e) => {
+                return (
+                    ResolutionMetadata {
+                        error: Some(e.to_string()),
+                        ..Default::default()
+                    },
+                    Some(doc),
+                    None,
+                )
+            }
+        } {
+            doc.service = Some(vec![service]);
+        }
+
+        if let Some(s) = &input_metadata.property_set {
+            if let Some(updates_metadata) = s.get("updates") {
+                let conversion: String = match updates_metadata {
+                    Metadata::String(s) => s.clone(),
+                    Metadata::Map(m) => match serde_json::to_string(m) {
+                        Ok(s) => s.clone(),
+                        Err(e) => {
+                            return (
+                                ResolutionMetadata {
+                                    error: Some(e.to_string()),
+                                    ..Default::default()
+                                },
+                                Some(doc),
+                                None,
+                            )
+                        }
+                    },
+                    _ => {
+                        return (
+                            ResolutionMetadata {
+                                error: Some(
+                                    "Cannot convert this type for off-chain updates.".to_string(),
+                                ),
+                                ..Default::default()
+                            },
+                            Some(doc),
+                            None,
+                        )
+                    }
+                };
+                let updates: Updates = match serde_json::from_str(&conversion) {
+                    Ok(uu) => uu,
+                    Err(e) => {
+                        return (
+                            ResolutionMetadata {
+                                error: Some(e.to_string()),
+                                ..Default::default()
+                            },
+                            Some(doc),
+                            None,
+                        );
+                    }
+                };
+                if let Err(e) = self.tier3_updates(prefix, &mut doc, updates).await {
+                    return (
+                        ResolutionMetadata {
+                            error: Some(e.to_string()),
+                            ..Default::default()
+                        },
+                        Some(doc),
+                        None,
+                    );
+                }
+            }
+        }
 
         let res_meta = ResolutionMetadata {
             content_type: Some(TYPE_DID_LD_JSON.to_string()),
@@ -107,11 +198,31 @@ fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str)> {
     Some(curve_type)
 }
 
+fn get_public_key_from_doc(doc: &Document, auth_vm_id: &str) -> Option<String> {
+    if let Some(vms) = &doc.authentication {
+        for vm in vms {
+            match vm {
+                VerificationMethod::Map(vmm) => {
+                    if vmm.id == auth_vm_id {
+                        return vmm.public_key_base58.clone();
+                    }
+                }
+                // TODO, derefencing
+                _ => {}
+            }
+        }
+        None
+    } else {
+        None
+    }
+}
+
 impl DIDMethod for DIDTz {
     fn name(&self) -> &'static str {
         return "tz";
     }
 
+    // TODO need to handle different networks
     fn generate(&self, source: &Source) -> Option<String> {
         let jwk = match source {
             Source::Key(jwk) => jwk,
@@ -130,15 +241,205 @@ impl DIDMethod for DIDTz {
     }
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct SignedIetfJsonPatchPayload {
+    ietf_json_patch: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+#[serde(tag = "type", content = "value")]
+enum Updates {
+    SignedIetfJsonPatch(Vec<String>),
+}
+
+impl DIDTz {
+    fn tier1_derivation(
+        did: &str,
+        vm_didurl: &DIDURL,
+        proof_type: &str,
+        address: &str,
+        network: &str,
+        public_key: Option<String>,
+    ) -> Document {
+        Document {
+            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+            id: did.to_string(),
+            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+            verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
+                id: String::from(vm_didurl.clone()),
+                type_: proof_type.to_string(),
+                controller: did.to_string(),
+                blockchain_account_id: Some(format!("{}@tezos:{}", address.to_string(), network)),
+                ..Default::default()
+            })]),
+            authentication: match public_key {
+                Some(_) => Some(vec![VerificationMethod::Map(VerificationMethodMap {
+                    id: vm_didurl.to_string(),
+                    controller: did.to_string(),
+                    public_key_base58: public_key,
+                    type_: prefix_to_curve_type(&address[..3]).unwrap().1.to_string(),
+                    ..Default::default()
+                })]),
+                None => Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+            },
+            ..Default::default()
+        }
+    }
+
+    async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Option<Service>> {
+        if let Some(did_manager) = explorer::retrieve_did_manager(address, network).await? {
+            Ok(Some(
+                explorer::execute_service_view(did, &did_manager, network).await?,
+            ))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn tier3_updates(
+        &self,
+        prefix: &str,
+        doc: &mut Document,
+        updates: Updates,
+    ) -> Result<()> {
+        match updates {
+            Updates::SignedIetfJsonPatch(patches) => {
+                for jws in patches {
+                    let mut doc_json = serde_json::to_value(&mut *doc)?;
+                    let (patch_metadata, _) = decode_unverified(&jws)?;
+                    let curve = prefix_to_curve_type(prefix)
+                        .ok_or(anyhow!("Unsupported curve."))?
+                        .0
+                        .to_string();
+                    let kid = match patch_metadata.key_id {
+                        Some(k) => k,
+                        None => return Err(anyhow!("No kid in JWS JSON patch.")),
+                    };
+                    let kid_didurl: DIDURL = kid.clone().try_into()?;
+                    let kid_doc = if kid_didurl.did == doc.id {
+                        doc.clone()
+                    } else {
+                        match DIDTz
+                            .dereference(&kid_didurl, &DereferencingInputMetadata::default())
+                            .await
+                        {
+                            Some((deref_meta, deref_content, _)) => {
+                                if deref_meta.error.is_some() {
+                                    return Err(anyhow!(
+                                        "Error dereferencing kid: {}",
+                                        deref_meta.error.unwrap()
+                                    ));
+                                } else {
+                                    match deref_content {
+                                        ssi::did_resolve::Content::DIDDocument(d) => d,
+                                        _ => {
+                                            return Err(anyhow!(
+                                                "Dereferenced content not a DID document."
+                                            ))
+                                        }
+                                    }
+                                }
+                            }
+                            None => return Err(anyhow!("Error dereference kid.")),
+                        }
+                    };
+                    if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
+                        let jwk = match prefix {
+                            "tz1" => {
+                                let pk = bs58::decode(public_key)
+                                    .with_check(None)
+                                    .into_vec()
+                                    .or_else(|e| {
+                                        Err(anyhow!("Couldn't decode public key: {}", e))
+                                    })?[4..]
+                                    .to_vec();
+                                JWK {
+                                    params: Params::OKP(OctetParams {
+                                        curve,
+                                        public_key: Base64urlUInt(pk),
+                                        private_key: None,
+                                    }),
+                                    public_key_use: None,
+                                    key_operations: None,
+                                    algorithm: None,
+                                    key_id: None,
+                                    x509_url: None,
+                                    x509_thumbprint_sha1: None,
+                                    x509_certificate_chain: None,
+                                    x509_thumbprint_sha256: None,
+                                }
+                            }
+                            #[cfg(feature = "libsecp256k1")]
+                            "tz2" => {
+                                let pk = bs58::decode(public_key)
+                                    .with_check(None)
+                                    .into_vec()
+                                    .or_else(|e| {
+                                        Err(anyhow!("Couldn't decode public key: {}", e))
+                                    })?[4..]
+                                    .to_vec();
+                                secp256k1_parse(&pk).or_else(|e| {
+                                    Err(anyhow!(
+                                        "Couldn't create JWK from secp256k1 public key: {}",
+                                        e
+                                    ))
+                                })?
+                            }
+                            p => return Err(anyhow!("{} not supported yet.", p)),
+                        };
+                        let (_, patch_) = decode_verify(&jws, &jwk)?;
+                        patch(
+                            &mut doc_json,
+                            &serde_json::from_slice(
+                                &serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)?
+                                    .ietf_json_patch
+                                    .to_string()
+                                    .as_bytes(),
+                            )?,
+                        )?;
+                        *doc = serde_json::from_value(doc_json)?;
+                    } else {
+                        return Err(anyhow!("Need public key for signed patches"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    use ssi::did::ServiceEndpoint;
     use ssi::did_resolve::ResolutionInputMetadata;
-    use ssi::jwk::JWK;
+    #[cfg(feature = "libsecp256k1")]
+    use ssi::jwk::ECParams;
+    use ssi::jws::encode_sign;
+    use ssi::one_or_many::OneOrMany;
+    use std::collections::BTreeMap as Map;
+    use tezedge_client::crypto::FromBase58Check;
+    use tezedge_client::{PrivateKey, PublicKey};
 
-    const TZ1: &'static str = "did:tz:tz1VFda3KmzRecjsYptDq5bJh1M1NyAqgBJf";
+    const TZ1: &'static str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
+
+    const LIVE_TZ1: &str = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";
+    const LIVE_NETWORK: &str = "delphinet";
+    const JSON_PATCH: &str = r#"{"ietf-json-patch": [
+                                        {
+                                            "op": "add",
+                                            "path": "/service/1",
+                                            "value": {
+                                                "id": "test_service_id",
+                                                "type": "test_service",
+                                                "serviceEndpoint": "test_service_endpoint"
+                                            }
+                                        }
+                                    ]}"#;
 
     #[test]
     fn jwk_to_did_tezos() {
@@ -149,7 +450,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_derivation() {
+    async fn test_derivation_tz1() {
         let (res_meta, doc_opt, _meta_opt) = DIDTz
             .resolve(
                 "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
@@ -213,7 +514,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn credential_prove_verify_did_tz() {
+    async fn credential_prove_verify_did_tz1() {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
         let vc_str = r###"{
@@ -221,7 +522,7 @@ mod tests {
               "https://www.w3.org/2018/credentials/v1"
             ],
             "type": ["VerifiableCredential"],
-            "issuer": "did:tz:tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK",
+            "issuer": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq",
             "issuanceDate": "2021-01-27T16:39:07Z",
             "credentialSubject": {
                 "id": "did:example:foo"
@@ -229,14 +530,98 @@ mod tests {
         }"###;
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
 
-        let key_str = include_str!("../../tests/ed25519-2020-10-18.json");
-        let key: JWK = serde_json::from_str(key_str).unwrap();
-        let did = DIDTz.generate(&Source::Key(&key)).unwrap();
+        // let public_key =
+        //     PublicKey::from_base58check("edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A")
+        //         .unwrap();
+        // let private_key =
+        //     PrivateKey::from_base58check("")
+        //         .unwrap();
+        // let key = JWK {
+        //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+        //         curve: "Ed25519".to_string(),
+        //         public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
+        //         private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
+        //     }),
+        //     public_key_use: None,
+        //     key_operations: None,
+        //     algorithm: None,
+        //     key_id: None,
+        //     x509_url: None,
+        //     x509_certificate_chain: None,
+        //     x509_thumbprint_sha1: None,
+        //     x509_thumbprint_sha256: None,
+        // };
+        let did = "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq".to_string();
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        // let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof_str = r###"
+{
+  "@context": {
+    "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021": {
+      "@context": {
+        "@protected": true,
+        "@version": 1.1,
+        "challenge": "https://w3id.org/security#challenge",
+        "created": {
+          "@id": "http://purl.org/dc/terms/created",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "domain": "https://w3id.org/security#domain",
+        "expires": {
+          "@id": "https://w3id.org/security#expiration",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "id": "@id",
+        "jws": "https://w3id.org/security#jws",
+        "nonce": "https://w3id.org/security#nonce",
+        "proofPurpose": {
+          "@context": {
+            "@protected": true,
+            "@version": 1.1,
+            "assertionMethod": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#assertionMethod",
+              "@type": "@id"
+            },
+            "authentication": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#authenticationMethod",
+              "@type": "@id"
+            },
+            "id": "@id",
+            "type": "@type"
+          },
+          "@id": "https://w3id.org/security#proofPurpose",
+          "@type": "@vocab"
+        },
+        "publicKeyJwk": {
+          "@id": "https://w3id.org/security#publicKeyJwk",
+          "@type": "@json"
+        },
+        "type": "@type",
+        "verificationMethod": {
+          "@id": "https://w3id.org/security#verificationMethod",
+          "@type": "@id"
+        }
+      },
+      "@id": "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"
+    }
+  },
+  "type": "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021",
+  "proofPurpose": "assertionMethod",
+  "verificationMethod": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
+  "created": "2021-03-02T18:59:44.462Z",
+  "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg",
+  "publicKeyJwk": {
+    "crv": "Ed25519",
+    "kty": "OKP",
+    "x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"
+  }
+}"###;
+        let proof = serde_json::from_str(proof_str).unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -286,7 +671,73 @@ mod tests {
         vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof_str = r###"
+{
+  "@context": {
+    "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021": {
+      "@context": {
+        "@protected": true,
+        "@version": 1.1,
+        "challenge": "https://w3id.org/security#challenge",
+        "created": {
+          "@id": "http://purl.org/dc/terms/created",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "domain": "https://w3id.org/security#domain",
+        "expires": {
+          "@id": "https://w3id.org/security#expiration",
+          "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+        },
+        "id": "@id",
+        "jws": "https://w3id.org/security#jws",
+        "nonce": "https://w3id.org/security#nonce",
+        "proofPurpose": {
+          "@context": {
+            "@protected": true,
+            "@version": 1.1,
+            "assertionMethod": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#assertionMethod",
+              "@type": "@id"
+            },
+            "authentication": {
+              "@container": "@set",
+              "@id": "https://w3id.org/security#authenticationMethod",
+              "@type": "@id"
+            },
+            "id": "@id",
+            "type": "@type"
+          },
+          "@id": "https://w3id.org/security#proofPurpose",
+          "@type": "@vocab"
+        },
+        "publicKeyJwk": {
+          "@id": "https://w3id.org/security#publicKeyJwk",
+          "@type": "@json"
+        },
+        "type": "@type",
+        "verificationMethod": {
+          "@id": "https://w3id.org/security#verificationMethod",
+          "@type": "@id"
+        }
+      },
+      "@id": "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"
+    }
+  },
+  "type": "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021",
+  "proofPurpose": "authentication",
+  "verificationMethod": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
+  "created": "2021-03-02T19:05:08.271Z",
+  "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw",
+  "publicKeyJwk": {
+    "crv": "Ed25519",
+    "kty": "OKP",
+    "x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"
+  }
+}"###;
+        let vp_proof = serde_json::from_str(vp_proof_str).unwrap();
+        println!("{}", serde_json::to_string_pretty(&vp_proof).unwrap());
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
@@ -417,5 +868,198 @@ mod tests {
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
         assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
+    }
+
+    #[tokio::test]
+    async fn test_json_patch_tz1() {
+        let address = "tz1VSUr8wwNhLAzempoch5d6hLRiTh8Cjcjb";
+        let pk = "edpkvGfYw3LyB1UcCahKQk4rF2tvbMUk8GFiTuMjL75uGXrpvKXhjn";
+        let sk = "edsk3QoqBuvdamxouPhin7swCvkQNgq4jP5KZPbwWNnwdZpSpJiEbq";
+        let did = format!("did:tz:{}:{}", "sandbox", address);
+        let mut doc: Document = serde_json::from_value(json!({
+          "@context": "https://www.w3.org/ns/did/v1",
+          "id": did,
+          "authentication": [{
+            "id": format!("{}#blockchainAccountId", did),
+            "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+            "controller": did,
+            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "publicKeyBase58": pk
+          }],
+          "service": [{
+            "id": format!("{}#discovery", did),
+            "type": "TezosDiscoveryService",
+            "serviceEndpoint": "test_service"
+          }]
+        }))
+        .unwrap();
+        let public_key = PublicKey::from_base58check(pk).unwrap();
+        let private_key = PrivateKey::from_base58check(sk).unwrap();
+        let key = JWK {
+            params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
+                private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: Some(format!("{}#blockchainAccountId", did)),
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        };
+        let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
+        let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
+        DIDTz
+            .tier3_updates("tz1", &mut doc, json_update)
+            .await
+            .unwrap();
+        assert_eq!(
+            doc.service.unwrap()[1],
+            Service {
+                id: "test_service_id".to_string(),
+                type_: OneOrMany::One("test_service".to_string()),
+                service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                    "test_service_endpoint".to_string()
+                ))),
+                property_set: Some(Map::new()) // TODO should be None
+            }
+        );
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "libsecp256k1")]
+    async fn test_json_patch_tz2() {
+        let address = "tz2RZoj9oqoA8bDeUoAKLjf8nLPQKmYjaj6Q";
+        let pk = "sppk7bRNbJ2n9PNQo295UJiYQ8iMma8ysRH9mCRFB14yhzLCwdGay9y";
+        let sk = "spsk1Uc5MDutpZmwPVeSLL2BbtCAqfrG8zbMs6dwoaeXX8kw35S474";
+        let did = format!("did:tz:{}:{}", "sandbox", address);
+        let mut doc: Document = serde_json::from_value(json!({
+          "@context": "https://www.w3.org/ns/did/v1",
+          "id": did,
+          "authentication": [{
+            "id": format!("{}#blockchainAccountId", did),
+            "type": "EcdsaSecp256k1RecoveryMethod2020",
+            "controller": did,
+            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "publicKeyBase58": pk
+          }],
+          "service": [{
+            "id": format!("{}#discovery", did),
+            "type": "TezosDiscoveryService",
+            "serviceEndpoint": "test_service"
+          }]
+        }))
+        .unwrap();
+        // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
+        let private_key = sk.from_base58check().unwrap()[4..].to_vec();
+        let key = JWK {
+            params: ssi::jwk::Params::EC(ECParams {
+                curve: Some("secp256k1".to_string()),
+                x_coordinate: None,
+                y_coordinate: None,
+                ecc_private_key: Some(Base64urlUInt(private_key)),
+            }),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: Some(format!("{}#blockchainAccountId", did)),
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        };
+        let jws = encode_sign(ssi::jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
+        let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
+        DIDTz
+            .tier3_updates("tz2", &mut doc, json_update)
+            .await
+            .unwrap();
+        assert_eq!(
+            doc.service.unwrap()[1],
+            Service {
+                id: "test_service_id".to_string(),
+                type_: OneOrMany::One("test_service".to_string()),
+                service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                    "test_service_endpoint".to_string()
+                ))),
+                property_set: Some(Map::new()) // TODO should be None
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn test_full_resolution() {
+        // let address = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";
+        // let pk = "edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A";
+        // let sk = "";
+        // let did = format!("did:tz:{}:{}", "delphinet", address);
+        // let public_key = PublicKey::from_base58check(pk).unwrap();
+        // let private_key = PrivateKey::from_base58check(sk).unwrap();
+        // let key = JWK {
+        //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+        //         curve: "Ed25519".to_string(),
+        //         public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
+        //         private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
+        //     }),
+        //     public_key_use: None,
+        //     key_operations: None,
+        //     algorithm: None,
+        //     key_id: Some(format!("{}#blockchainAccountId", did)),
+        //     x509_url: None,
+        //     x509_certificate_chain: None,
+        //     x509_thumbprint_sha1: None,
+        //     x509_thumbprint_sha256: None,
+        // };
+        // let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
+        // println!("{}", jws);
+        // assert!(false);
+        let jws = "eyJhbGciOiJFZERTQSIsImtpZCI6ImRpZDp0ejpkZWxwaGluZXQ6dHoxV3Z2YkVHcEJYR2VUVmJMaVI2RFlCZTFpem1naVl1WmJxI2Jsb2NrY2hhaW5BY2NvdW50SWQifQ.eyJpZXRmLWpzb24tcGF0Y2giOiBbCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIm9wIjogImFkZCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInBhdGgiOiAiL3NlcnZpY2UvMSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInZhbHVlIjogewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAiaWQiOiAidGVzdF9zZXJ2aWNlX2lkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAidGVzdF9zZXJ2aWNlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInNlcnZpY2VFbmRwb2ludCI6ICJ0ZXN0X3NlcnZpY2VfZW5kcG9pbnQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBdfQ.OTMe8ljEZEqZrdfkL1hhuiVXFGw_taFRVqNTfsycxFDq5FPu1ZSgaTOertyC61cQQXNLqTRo2kHAos8kx8PHAQ".to_string();
+        let input_metadata: ResolutionInputMetadata = serde_json::from_value(
+            json!({"updates": {"type": "signed-ietf-json-patch", "value": [jws]},
+                   "public_key": "edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A"}),
+        )
+        .unwrap();
+        let live_did = format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1);
+        let (res_meta, res_doc, _res_doc_meta) = DIDTz.resolve(&live_did, &input_metadata).await;
+        assert_eq!(res_meta.error, None);
+        let d = res_doc.unwrap();
+        let expected = Document {
+            id: live_did.clone(),
+            verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
+                id: format!("{}#blockchainAccountId", live_did),
+                type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
+                blockchain_account_id: Some(format!("{}@tezos:{}", LIVE_TZ1, LIVE_NETWORK)),
+                controller: live_did.clone(),
+                property_set: Some(Map::new()), // TODO should be None
+                ..Default::default()
+            })]),
+            service: Some(vec![
+                Service {
+                    id: format!("{}#discovery", live_did),
+                    type_: OneOrMany::One("TezosDiscoveryService".to_string()),
+                    service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                        "test_service2".to_string(),
+                    ))),
+                    property_set: Some(Map::new()), // TODO should be None
+                },
+                Service {
+                    id: "test_service_id".to_string(),
+                    type_: OneOrMany::One("test_service".to_string()),
+                    service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                        "test_service_endpoint".to_string(),
+                    ))),
+                    property_set: Some(Map::new()),
+                },
+            ]),
+            ..Default::default()
+        };
+        assert_eq!(d.id, expected.id);
+        assert_eq!(d.controller, expected.controller);
+        assert_eq!(d.verification_method, expected.verification_method);
+        assert_eq!(d.service, expected.service);
+        // assert_eq!(d, expected);
     }
 }

@@ -28,8 +28,9 @@ use std::char::CharTryFromError;
 use std::fmt;
 use std::num::ParseIntError;
 use std::string::FromUtf8Error;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
     InvalidSubject,

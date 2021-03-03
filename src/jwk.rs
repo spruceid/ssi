@@ -606,12 +606,35 @@ impl TryFrom<&ECParams> for secp256k1::PublicKey {
         }
         let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
         let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
-        // TODO: add sign byte?
         let pk_data = [x.as_slice(), y.as_slice()].concat();
         let public_key =
             secp256k1::PublicKey::parse_slice(&pk_data, Some(secp256k1::PublicKeyFormat::Raw))?;
         Ok(public_key)
     }
+}
+
+#[cfg(feature = "libsecp256k1")]
+pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, String> {
+    let pk =
+        match secp256k1::PublicKey::parse_slice(data, Some(secp256k1::PublicKeyFormat::Compressed))
+        {
+            Ok(pk) => pk,
+            Err(err) => {
+                return Err(format!("Error parsing key: {}", err));
+            }
+        };
+    let jwk = JWK {
+        params: Params::EC(ECParams::try_from(&pk)?),
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
 }
 
 #[cfg(feature = "libsecp256k1")]

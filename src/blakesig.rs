@@ -33,17 +33,12 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
         }
         _ => return Err(Error::KeyTypeNotImplemented),
     };
-    let (inner_prefix, outer_prefix) = curve_to_prefixes(curve)?;
-    let encoded = bs58::encode(public_key_bytes);
-    let pk_b58_vec = encoded.into_vec();
-    let mut inner = Vec::with_capacity(4 + pk_b58_vec.len());
-    inner.extend_from_slice(inner_prefix);
-    inner.extend(pk_b58_vec);
+    let (_, outer_prefix) = curve_to_prefixes(curve)?;
     let mut hasher = blake2b_simd::Params::new();
     hasher.hash_length(20);
-    let blake2b = hasher.hash(&inner);
+    let blake2b = hasher.hash(&public_key_bytes);
     let blake2b = blake2b.as_bytes();
-    let mut outer = Vec::with_capacity(23);
+    let mut outer = Vec::with_capacity(20);
     outer.extend_from_slice(outer_prefix);
     outer.extend_from_slice(&blake2b);
     let encoded = bs58::encode(&outer).with_check().into_string();
@@ -65,7 +60,7 @@ mod tests {
         )
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
-        assert_eq!(hash, "tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK");
+        assert_eq!(hash, "tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83");
 
         // tz2
         use serde_json::json;
@@ -78,6 +73,6 @@ mod tests {
         }))
         .unwrap();
         let hash = hash_public_key(&jwk).unwrap();
-        assert_eq!(hash, "tz2Kx6Ew2ghFQAS5GKPAjYxZsCAT1f12KE7J");
+        assert_eq!(hash, "tz2A2DY3xyHHL7ZmyXKzVZJGPSbrqpLvCEYd");
     }
 }

@@ -164,7 +164,7 @@ impl LinkedDataProofs {
             } => match &curve[..] {
                 "Ed25519" => {
                     if let Some(ref vm) = options.verification_method {
-                        if vm.starts_with("did:tz:tz1") {
+                        if vm.starts_with("did:tz") {
                             return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(document, options, &key).await;
                         }
                         if vm.ends_with("#SolanaMethod2021") {
@@ -221,7 +221,7 @@ impl LinkedDataProofs {
             }
             Algorithm::EdDSA => {
                 if let Some(ref vm) = options.verification_method {
-                    if vm.starts_with("did:tz:tz1") {
+                    if vm.starts_with("did:tz") {
                         return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
                             document, options, public_key,
                         )

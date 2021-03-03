@@ -136,7 +136,7 @@ mod tests {
         }))
         .unwrap();
         let account_id =
-            BlockchainAccountId::from_str("tz1iY7Am8EqrewptzQXYRZDPKvYnFLzWRgBK@tezos:mainnet")
+            BlockchainAccountId::from_str("tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83@tezos:mainnet")
                 .unwrap();
         account_id.verify(&jwk).unwrap();
     }
