@@ -1189,11 +1189,106 @@ mod tests {
         // assert_eq!(d, expected);
     }
 
-    /*
     #[tokio::test]
     #[cfg(feature = "p256")]
     async fn credential_prove_verify_did_tz3() {
-        // TODO
+        use ssi::jwk::Algorithm;
+        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+
+        let mut key = JWK::generate_p256().unwrap();
+        key.algorithm = Some(Algorithm::ES256);
+        let did = DIDTz.generate(&Source::Key(&key)).unwrap();
+        let mut vc: Credential = serde_json::from_value(json!({
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "type": "VerifiableCredential",
+            "issuer": did.clone(),
+            "issuanceDate": "2021-03-04T14:18:21Z",
+            "credentialSubject": {
+                "id": "did:example:foo"
+            }
+        }))
+        .unwrap();
+        vc.validate_unsigned().unwrap();
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        eprintln!("vm {:?}", issue_options.verification_method);
+        let vc_no_proof = vc.clone();
+        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDTz).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // test that issuer property is used for verification
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
+        assert!(vc_bad_issuer.verify(None, &DIDTz).await.errors.len() > 0);
+
+        // Check that proof JWK must match proof verificationMethod
+        let mut vc_wrong_key = vc_no_proof.clone();
+        let other_key = JWK::generate_p256().unwrap();
+        use ssi::ldp::ProofSuite;
+        let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
+            &vc_no_proof,
+            &issue_options,
+            &other_key,
+        )
+        .await
+        .unwrap();
+        vc_wrong_key.add_proof(proof_bad);
+        vc_wrong_key.validate().unwrap();
+        assert!(vc_wrong_key.verify(None, &DIDTz).await.errors.len() > 0);
+
+        // Make it into a VP
+        use ssi::one_or_many::OneOrMany;
+        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        let mut vp = Presentation {
+            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+                DEFAULT_CONTEXT.to_string(),
+            ))]),
+
+            id: Some(URI::String(
+                "http://example.org/presentations/3731".to_string(),
+            )),
+            type_: OneOrMany::One("VerifiablePresentation".to_string()),
+            verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
+            proof: None,
+            holder: None,
+            property_set: None,
+        };
+        let mut vp_issue_options = LinkedDataProofOptions::default();
+        vp.holder = Some(URI::String(did.to_string()));
+        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
+        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        vp.add_proof(vp_proof);
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        vp.validate().unwrap();
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTz).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.is_empty());
+
+        // mess with the VP proof to make verify fail
+        let mut vp1 = vp.clone();
+        match vp1.proof {
+            Some(OneOrMany::One(ref mut proof)) => match proof.jws {
+                Some(ref mut jws) => {
+                    jws.insert(0, 'x');
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTz).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.len() >= 1);
+
+        // test that holder is verified
+        let mut vp2 = vp.clone();
+        vp2.holder = Some(URI::String("did:example:bad".to_string()));
+        assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
     }
-    */
 }

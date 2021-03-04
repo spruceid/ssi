@@ -26,7 +26,7 @@ use serde_json::Value;
 lazy_static! {
     /// JSON-LD context for Linked Data Proofs based on Tezos addresses
     pub static ref TZ_CONTEXT: Value = {
-        let context_str = include_str!("../contexts/tz-2021-v1.jsonld");
+        let context_str = include_str!("../contexts/tz-2021-v2.jsonld");
         serde_json::from_str(&context_str).unwrap()
     };
     pub static ref ESRS2020_CONTEXT_EXTRA: Value = {
@@ -109,6 +109,10 @@ impl ProofPreparation {
             "Ed25519Signature2018" => Ed25519Signature2018::complete(self, signature).await,
             "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
                 Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::complete(self, signature)
+                    .await
+            }
+            "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::complete(self, signature)
                     .await
             }
             "EcdsaSecp256k1Signature2019" => {
@@ -212,6 +216,14 @@ impl LinkedDataProofs {
                         }
                     }
                     "P-256" => {
+                        if let Some(ref vm) = options.verification_method {
+                            if vm.starts_with("did:tz") {
+                                return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
+                                    document, options, &key,
+                                )
+                                .await;
+                            }
+                        }
                         return JsonWebSignature2020::sign(document, options, &key).await;
                     }
                     _ => {
@@ -250,6 +262,14 @@ impl LinkedDataProofs {
                 return Ed25519Signature2018::prepare(document, options, public_key).await;
             }
             Algorithm::ES256 => {
+                if let Some(ref vm) = options.verification_method {
+                    if vm.starts_with("did:tz") {
+                        return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
+                            document, options, public_key,
+                        )
+                        .await;
+                    }
+                }
                 return JsonWebSignature2020::prepare(document, options, public_key).await;
             }
             Algorithm::ES256K => {
@@ -283,6 +303,12 @@ impl LinkedDataProofs {
             "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document, resolver).await,
             "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
                 Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
+                    proof, document, resolver,
+                )
+                .await
+            }
+            "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
                     proof, document, resolver,
                 )
                 .await
@@ -687,6 +713,98 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
         prepare_proof(document, proof, Algorithm::EdDSA).await
+    }
+
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
+    }
+
+    async fn verify(
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+        let jwk: JWK = match proof.property_set {
+            Some(ref props) => {
+                let jwk_value = props.get("publicKeyJwk").ok_or(Error::MissingKey)?;
+                serde_json::from_value(jwk_value.clone())?
+            }
+            None => return Err(Error::MissingKey),
+        };
+        // Ensure the verificationMethod corresponds to the hashed public key.
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        let account_id: BlockchainAccountId = vm
+            .blockchain_account_id
+            .ok_or(Error::MissingAccountId)?
+            .parse()?;
+        account_id.verify(&jwk)?;
+        let message = to_jws_payload(document, proof).await?;
+        crate::jws::detached_verify(&jws, &message, &jwk)?;
+        Ok(())
+    }
+}
+
+/// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz3` addresses.
+pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+#[async_trait]
+impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        use std::collections::HashMap;
+        if let Some(key_algorithm) = key.algorithm {
+            if key_algorithm != Algorithm::ES256 {
+                return Err(Error::AlgorithmMismatch);
+            }
+        }
+        let mut property_set = HashMap::new();
+        let jwk_value = serde_json::to_value(key.to_public())?;
+        // This proof type must contain the public key, because the DID is based on the hash of the
+        // public key, and the public key is not otherwise recoverable.
+        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        // It needs custom JSON_LD context too.
+        let proof = Proof {
+            context: TZ_CONTEXT.clone(),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            property_set: Some(property_set),
+            ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+        };
+        sign_proof(document, proof, key, Algorithm::ES256).await
+    }
+
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        use std::collections::HashMap;
+        let mut property_set = HashMap::new();
+        let jwk_value = serde_json::to_value(public_key.to_public())?;
+        // This proof type must contain the public key, because the DID is based on the hash of the
+        // public key, and the public key is not otherwise recoverable.
+        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        // It needs custom JSON_LD context too.
+        let proof = Proof {
+            context: TZ_CONTEXT.clone(),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+        };
+        prepare_proof(document, proof, Algorithm::ES256).await
     }
 
     async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
