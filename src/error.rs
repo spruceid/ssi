@@ -5,8 +5,6 @@ use crate::eip712::TypedDataConstructionError;
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedDataHashError;
 use base64::DecodeError as Base64Error;
-#[cfg(feature = "ed25519-dalek")]
-use ed25519_dalek::SignatureError as Ed25519SignatureError;
 use iref::Error as IRIError;
 use json::Error as JSONError;
 use json_ld::Error as JSONLDError;
@@ -137,8 +135,7 @@ pub enum Error {
     FromUtf8(FromUtf8Error),
     #[cfg(feature = "rsa")]
     Rsa(RsaError),
-    #[cfg(feature = "ed25519-dalek")]
-    Ed25519Signature(Ed25519SignatureError),
+    Signature(signature::Error),
     #[cfg(feature = "libsecp256k1")]
     Secp256k1(Secp256k1Error),
     ASN1Encode(ASN1EncodeError),
@@ -164,8 +161,6 @@ pub enum Error {
     P256KeyLength(usize),
     ECEncodingError,
     ECDecompress,
-    #[cfg(feature = "p256")]
-    P256Ecdsa(p256::ecdsa::Error),
     #[cfg(feature = "p256")]
     P256EC(p256::elliptic_curve::Error),
 }
@@ -282,8 +277,7 @@ impl fmt::Display for Error {
             Error::KeyRejected(e) => e.fmt(f),
             #[cfg(feature = "rsa")]
             Error::Rsa(e) => e.fmt(f),
-            #[cfg(feature = "ed25519-dalek")]
-            Error::Ed25519Signature(e) => e.fmt(f),
+            Error::Signature(e) => e.fmt(f),
             #[cfg(feature = "libsecp256k1")]
             Error::Secp256k1(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
@@ -306,8 +300,6 @@ impl fmt::Display for Error {
             Error::Base58(e) => e.fmt(f),
             #[cfg(feature = "p256")]
             Error::P256EC(e) => e.fmt(f),
-            #[cfg(feature = "p256")]
-            Error::P256Ecdsa(e) => e.fmt(f),
             Error::P256KeyLength(len) => write!(f, "Expected 64 byte uncompressed key or 33 bytes compressed key but found length: {}", len),
             Error::ECEncodingError => write!(f, "Unable to encode EC key"),
             Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
@@ -408,10 +400,9 @@ impl From<RsaError> for Error {
     }
 }
 
-#[cfg(feature = "ed25519-dalek")]
-impl From<Ed25519SignatureError> for Error {
-    fn from(err: Ed25519SignatureError) -> Error {
-        Error::Ed25519Signature(err)
+impl From<signature::Error> for Error {
+    fn from(err: signature::Error) -> Error {
+        Error::Signature(err)
     }
 }
 
@@ -470,12 +461,5 @@ impl From<bs58::decode::Error> for Error {
 impl From<p256::elliptic_curve::Error> for Error {
     fn from(err: p256::elliptic_curve::Error) -> Error {
         Error::P256EC(err)
-    }
-}
-
-#[cfg(feature = "p256")]
-impl From<p256::ecdsa::Error> for Error {
-    fn from(err: p256::ecdsa::Error) -> Error {
-        Error::P256Ecdsa(err)
     }
 }
