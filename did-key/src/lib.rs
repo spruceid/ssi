@@ -132,7 +132,7 @@ impl DIDResolver for DIDKey {
             #[cfg(feature = "p256")]
             match p256_parse(&data[2..]) {
                 Ok(jwk) => {
-                    vm_type = "JsonWebKey2020".to_string();
+                    vm_type = "EcdsaSecp256r1VerificationKey2019".to_string();
                     jwk
                 }
                 Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
