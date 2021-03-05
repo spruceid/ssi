@@ -224,7 +224,7 @@ impl LinkedDataProofs {
                                 .await;
                             }
                         }
-                        return JsonWebSignature2020::sign(document, options, &key).await;
+                        return EcdsaSecp256r1Signature2019::sign(document, options, &key).await;
                     }
                     _ => {
                         return Err(Error::CurveNotImplemented(curve.to_string()));
@@ -270,7 +270,7 @@ impl LinkedDataProofs {
                         .await;
                     }
                 }
-                return JsonWebSignature2020::prepare(document, options, public_key).await;
+                return EcdsaSecp256r1Signature2019::prepare(document, options, public_key).await;
             }
             Algorithm::ES256K => {
                 return EcdsaSecp256k1Signature2019::prepare(document, options, public_key).await
@@ -323,6 +323,9 @@ impl LinkedDataProofs {
             "Eip712Signature2021" => Eip712Signature2021::verify(proof, document, resolver).await,
             "SolanaSignature2021" => SolanaSignature2021::verify(proof, document, resolver).await,
             "JsonWebSignature2020" => JsonWebSignature2020::verify(proof, document, resolver).await,
+            "EcdsaSecp256r1Signature2019" => {
+                EcdsaSecp256r1Signature2019::verify(proof, document, resolver).await
+            }
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -1032,6 +1035,42 @@ impl ProofSuite for SolanaSignature2021 {
         let sig = bs58::decode(&sig_b58).into_vec()?;
         crate::jws::verify_bytes(Algorithm::EdDSA, &bytes, &key, &sig)?;
         Ok(())
+    }
+}
+
+pub struct EcdsaSecp256r1Signature2019;
+#[async_trait]
+impl ProofSuite for EcdsaSecp256r1Signature2019 {
+    async fn sign(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        sign(
+            document,
+            options,
+            key,
+            "EcdsaSecp256r1Signature2019",
+            Algorithm::ES256,
+        )
+        .await
+    }
+    async fn prepare(
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        prepare(
+            document,
+            options,
+            public_key,
+            "EcdsaSecp256r1Signature2019",
+            Algorithm::ES256,
+        )
+        .await
+    }
+    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+        complete(preparation, signature).await
     }
 }
 
