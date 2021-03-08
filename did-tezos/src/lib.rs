@@ -28,7 +28,8 @@ use std::convert::TryInto;
 /// [Specification](https://github.com/spruceid/did-tezos/)
 pub struct DIDTz;
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDTz {
     async fn resolve(
         &self,

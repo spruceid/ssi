@@ -1,11 +1,9 @@
 use async_trait::async_trait;
-use hyper::{Client, Request, StatusCode};
-use hyper_tls::HttpsConnector;
 
 use ssi::did::{DIDMethod, Document};
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+    TYPE_DID_LD_JSON,
 };
 
 // For testing, enable handling requests at localhost.
@@ -50,7 +48,8 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
 }
 
 /// <https://w3c-ccg.github.io/did-method-web/#read-resolve>
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDWeb {
     async fn resolve(
         &self,
@@ -91,22 +90,13 @@ impl DIDResolver for DIDWeb {
             Err(meta) => return (meta, Vec::new(), None),
             Ok(url) => url,
         };
-        let https = HttpsConnector::new();
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
-        let client = Client::builder().build::<_, hyper::Body>(https);
-        let accept = input_metadata
-            .accept
-            .clone()
-            .unwrap_or_else(|| "application/json".to_string());
-        let request = match Request::get(url)
-            .header("Accept", accept)
-            .body(hyper::Body::default())
-        {
-            Ok(req) => req,
+        let client = match reqwest::Client::builder().build() {
+            Ok(c) => c,
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!(
-                        "Error building HTTP request: {}",
+                        "Error building HTTP client: {}",
                         err.to_string()
                     )),
                     Vec::new(),
@@ -114,24 +104,34 @@ impl DIDResolver for DIDWeb {
                 )
             }
         };
-        let mut resp = match client.request(request).await {
-            Ok(resp) => resp,
+        let accept = input_metadata
+            .accept
+            .clone()
+            .unwrap_or_else(|| "application/json".to_string());
+        let resp = match client.get(&url).header("Accept", accept).send().await {
+            Ok(req) => req,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("HTTP Error: {}", err.to_string())),
+                    ResolutionMetadata::from_error(&format!(
+                        "Error sending HTTP request : {}",
+                        err.to_string()
+                    )),
                     Vec::new(),
                     None,
                 )
             }
         };
-        if resp.status() == StatusCode::NOT_FOUND {
-            return (
-                ResolutionMetadata::from_error(ERROR_NOT_FOUND),
-                Vec::new(),
-                Some(DocumentMetadata::default()),
-            );
-        }
-        let doc_representation = match hyper::body::to_bytes(resp.body_mut()).await {
+        match resp.error_for_status_ref() {
+            Ok(_) => (),
+            Err(err) => {
+                return (
+                    ResolutionMetadata::from_error(&err.to_string()),
+                    Vec::new(),
+                    Some(DocumentMetadata::default()),
+                )
+            }
+        };
+        let doc_representation = match resp.bytes().await {
             Ok(bytes) => bytes.to_vec(),
             Err(err) => {
                 return (
@@ -228,7 +228,7 @@ mod tests {
                 }
 
                 let (mut parts, body) = Response::<Body>::default().into_parts();
-                parts.status = StatusCode::NOT_FOUND;
+                parts.status = hyper::StatusCode::NOT_FOUND;
                 let response = Response::from_parts(parts, body);
                 return Ok::<_, hyper::Error>(response);
             }))

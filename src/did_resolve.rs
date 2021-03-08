@@ -217,7 +217,8 @@ impl Default for ResolutionResult {
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait DIDResolver: Sync {
     async fn resolve(
         &self,
@@ -623,7 +624,8 @@ impl HTTPDIDResolver {
 }
 
 #[cfg(feature = "http")]
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for HTTPDIDResolver {
     // https://w3c-ccg.github.io/did-resolution/#bindings-https
     async fn resolve(
@@ -972,7 +974,8 @@ pub struct SeriesResolver<'a> {
     pub resolvers: Vec<&'a (dyn DIDResolver)>,
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<'a> DIDResolver for SeriesResolver<'a> {
     async fn resolve(
         &self,

@@ -30,7 +30,7 @@ struct SearchResult {
 }
 
 pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<Option<String>> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder().build()?;
     let mut search_result: SearchResult = client
         .get(&format!("{}v1/search", BCD_URL))
         .query(&[
@@ -73,7 +73,7 @@ struct ServiceResultItem {
 }
 
 pub async fn execute_service_view(did: &str, contract: &str, network: &str) -> Result<Service> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder().build()?;
     let service_result: ServiceResult = client
         .post(&format!(
             "{}v1/contract/{}/{}/views/execute",
