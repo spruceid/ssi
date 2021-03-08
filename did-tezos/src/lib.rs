@@ -294,10 +294,12 @@ impl DIDTz {
     }
 
     async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Option<Service>> {
-        if let Some(did_manager) = explorer::retrieve_did_manager(address, network).await? {
-            Ok(Some(
-                explorer::execute_service_view(did, &did_manager, network).await?,
-            ))
+        if let Some(did_manager) = explorer::retrieve_did_manager(address, network)? {
+            Ok(Some(explorer::execute_service_view(
+                did,
+                &did_manager,
+                network,
+            )?))
         } else {
             Ok(None)
         }

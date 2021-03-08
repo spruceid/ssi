@@ -1,4 +1,5 @@
 use anyhow::Result;
+use futures::executor::block_on;
 use reqwest;
 use serde::Deserialize;
 use ssi::did::{Service, ServiceEndpoint};
@@ -29,20 +30,22 @@ struct SearchResult {
     items: Vec<SearchItem>,
 }
 
-pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<Option<String>> {
-    let client = reqwest::Client::new();
-    let mut search_result: SearchResult = client
-        .get(&format!("{}v1/search", BCD_URL))
-        .query(&[
-            ("q", address),
-            ("f", "manager"),
-            ("n", network),
-            ("i", "contract"),
-        ])
-        .send()
-        .await?
-        .json()
-        .await?;
+pub fn retrieve_did_manager(address: &str, network: &str) -> Result<Option<String>> {
+    let client = reqwest::Client::builder().build()?;
+    let mut search_result: SearchResult = block_on(
+        block_on(
+            client
+                .get(&format!("{}v1/search", BCD_URL))
+                .query(&[
+                    ("q", address),
+                    ("f", "manager"),
+                    ("n", network),
+                    ("i", "contract"),
+                ])
+                .send(),
+        )?
+        .json(),
+    )?;
 
     // TODO this is a hack for the tests as there were multiple DID managers deployed
     search_result.items.reverse();
@@ -72,18 +75,20 @@ struct ServiceResultItem {
     value: String,
 }
 
-pub async fn execute_service_view(did: &str, contract: &str, network: &str) -> Result<Service> {
-    let client = reqwest::Client::new();
-    let service_result: ServiceResult = client
-        .post(&format!(
-            "{}v1/contract/{}/{}/views/execute",
-            BCD_URL, network, contract
-        ))
-        .json(&serde_json::json!({"data": {}, "name": "GetService", "implementation": 0}))
-        .send()
-        .await?
-        .json()
-        .await?;
+pub fn execute_service_view(did: &str, contract: &str, network: &str) -> Result<Service> {
+    let client = reqwest::Client::builder().build()?;
+    let service_result: ServiceResult = block_on(
+        block_on(
+            client
+                .post(&format!(
+                    "{}v1/contract/{}/{}/views/execute",
+                    BCD_URL, network, contract
+                ))
+                .json(&serde_json::json!({"data": {}, "name": "GetService", "implementation": 0}))
+                .send(),
+        )?
+        .json(),
+    )?;
     Ok(Service {
         id: format!("{}{}", did, "#discovery"),
         type_: OneOrMany::One(service_result.children[1].value.clone()),
@@ -104,7 +109,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retrieve_did_manager() {
-        let did_manager = retrieve_did_manager(LIVE_TZ1, LIVE_NETWORK).await;
+        let did_manager = retrieve_did_manager(LIVE_TZ1, LIVE_NETWORK);
         assert!(did_manager.is_ok());
         assert_eq!(did_manager.unwrap().unwrap(), LIVE_DID_MANAGER.to_string());
     }
@@ -115,8 +120,7 @@ mod tests {
             &format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1),
             LIVE_DID_MANAGER,
             LIVE_NETWORK,
-        )
-        .await;
+        );
         println!("{:?}", service_endpoint);
         assert!(service_endpoint.is_ok());
     }

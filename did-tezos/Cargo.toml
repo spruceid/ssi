@@ -13,8 +13,7 @@ p256 = ["ssi/p256"]
 [dependencies]
 ssi = { path = "../", default-features = false }
 chrono = { version = "0.4" }
-tokio = { version = "1.0", features = ["macros", "rt"] }
-reqwest = { version = "0.11", features = ["json", "default-tls"] }
+reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 async-trait = "0.1"
@@ -22,6 +21,8 @@ libsecp256k1 = { version = "0.3", optional = true }
 anyhow = "1.0.33"
 json-patch = "0.2.6"
 bs58 = { version = "0.4", features = ["check"] }
+futures = { version = "0.3", features = ["executor"] }
 
 [dev-dependencies]
+tokio = { version = "1.0", features = ["macros"] }
 tezedge_client = { git = "https://github.com/binier/tezedge-client", rev = "672e61297f0ba7d1d94168a2588b9b27d76c1fc4", package = "lib" }
