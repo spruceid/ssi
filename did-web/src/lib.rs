@@ -203,7 +203,8 @@ mod tests {
            "crv": "Ed25519",
            "x": "G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww"
          }
-      }]
+      }],
+      "assertionMethod": ["did:web:localhost#key1"]
     }"#;
 
     // localhost web server for serving did:web DID documents.

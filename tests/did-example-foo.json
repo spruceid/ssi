@@ -24,5 +24,13 @@
         "x": "G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww"
       }
     }
+  ],
+  "assertionMethod": [
+    "did:example:foo#key1",
+    "did:example:foo#key2"
+  ],
+  "authentication": [
+    "did:example:foo#key1",
+    "did:example:foo#key2"
   ]
 }
