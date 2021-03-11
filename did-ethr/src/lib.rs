@@ -45,7 +45,8 @@ fn parse_did(did: &str) -> Option<(i64, String)> {
     Some((chain_id, address))
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDEthr {
     async fn resolve(
         &self,

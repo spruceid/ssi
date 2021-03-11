@@ -197,7 +197,8 @@ pub struct DIDParameters {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait DIDMethod: DIDResolver {
     /// Get the DID method name.
     /// <https://w3c.github.io/did-core/#method-schemes>
@@ -261,7 +262,8 @@ impl<'a> DIDMethods<'a> {
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<'a> DIDResolver for DIDMethods<'a> {
     async fn resolve(
         &self,
@@ -545,7 +547,8 @@ pub mod example {
 
     pub struct DIDExample;
 
-    #[async_trait]
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl DIDMethod for DIDExample {
         fn name(&self) -> &'static str {
             return "example";
@@ -556,7 +559,8 @@ pub mod example {
         }
     }
 
-    #[async_trait]
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl DIDResolver for DIDExample {
         async fn resolve(
             &self,

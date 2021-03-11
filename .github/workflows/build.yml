@@ -65,3 +65,6 @@ jobs:
         npm i
         cp ../vc-test/config.json .
         npm test
+
+    - name: Test WASM compilation
+      return: cargo check --workspace --target wasm32-unknown-unknown

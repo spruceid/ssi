@@ -28,7 +28,8 @@ use std::convert::TryInto;
 /// [Specification](https://github.com/spruceid/did-tezos/)
 pub struct DIDTz;
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDTz {
     async fn resolve(
         &self,
@@ -294,12 +295,10 @@ impl DIDTz {
     }
 
     async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Option<Service>> {
-        if let Some(did_manager) = explorer::retrieve_did_manager(address, network)? {
-            Ok(Some(explorer::execute_service_view(
-                did,
-                &did_manager,
-                network,
-            )?))
+        if let Some(did_manager) = explorer::retrieve_did_manager(address, network).await? {
+            Ok(Some(
+                explorer::execute_service_view(did, &did_manager, network).await?,
+            ))
         } else {
             Ok(None)
         }

@@ -51,7 +51,8 @@ pub fn now_ms() -> DateTime<Utc> {
     datetime.with_nanosecond(ns).unwrap_or(datetime)
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait LinkedDataDocument {
     fn get_contexts(&self) -> Result<Option<String>, Error>;
     async fn to_dataset_for_signing(
@@ -60,7 +61,8 @@ pub trait LinkedDataDocument {
     ) -> Result<DataSet, Error>;
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait ProofSuite {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -485,7 +487,8 @@ async fn verify(
 }
 
 pub struct RsaSignature2018;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for RsaSignature2018 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -514,7 +517,8 @@ impl ProofSuite for RsaSignature2018 {
 }
 
 pub struct Ed25519Signature2018;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519Signature2018 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -550,7 +554,8 @@ impl ProofSuite for Ed25519Signature2018 {
 }
 
 pub struct EcdsaSecp256k1Signature2019;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1Signature2019 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -586,7 +591,8 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
 }
 
 pub struct EcdsaSecp256k1RecoverySignature2020;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -662,7 +668,8 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz1` addresses.
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -754,7 +761,8 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz3` addresses.
 pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -846,7 +854,8 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
 
 #[cfg(feature = "keccak-hash")]
 pub struct Eip712Signature2021;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg(feature = "keccak-hash")]
 impl ProofSuite for Eip712Signature2021 {
     async fn sign(
@@ -956,7 +965,8 @@ impl ProofSuite for Eip712Signature2021 {
 }
 
 pub struct SolanaSignature2021;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for SolanaSignature2021 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -1039,7 +1049,8 @@ impl ProofSuite for SolanaSignature2021 {
 }
 
 pub struct EcdsaSecp256r1Signature2019;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256r1Signature2019 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
@@ -1076,7 +1087,8 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
 
 /// <https://w3c-ccg.github.io/lds-jws2020/>
 pub struct JsonWebSignature2020;
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for JsonWebSignature2020 {
     async fn sign(
         document: &(dyn LinkedDataDocument + Sync),

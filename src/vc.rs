@@ -702,7 +702,8 @@ impl Credential {
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LinkedDataDocument for Credential {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
@@ -902,7 +903,8 @@ pub async fn get_verification_methods(
     Ok(vms)
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LinkedDataDocument for Presentation {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
@@ -975,7 +977,8 @@ impl Proof {
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LinkedDataDocument for Proof {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(None)

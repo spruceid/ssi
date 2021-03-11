@@ -30,7 +30,8 @@ fn parse_did(did: &str) -> Option<(String, Vec<u8>)> {
     Some((address, bytes))
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDSol {
     async fn resolve(
         &self,
