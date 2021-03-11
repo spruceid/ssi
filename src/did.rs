@@ -98,6 +98,9 @@ pub struct Document {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capability_delegation: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    // publicKey is used by legacy DID documents
+    pub public_key: Option<Vec<VerificationMethod>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<Vec<Service>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<OneOrMany<Proof>>,
@@ -655,6 +658,7 @@ impl Document {
             service: None,
             proof: None,
             property_set: None,
+            public_key: None,
         }
     }
 
@@ -678,6 +682,7 @@ impl Document {
             &self.key_agreement,
             &self.capability_invocation,
             &self.capability_delegation,
+            &self.public_key,
         ]
         .iter()
         .flat_map(|array| array.iter().flatten())
