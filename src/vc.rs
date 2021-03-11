@@ -1190,7 +1190,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn credential_prove_verify() {
+    async fn credential_issue_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
@@ -1207,6 +1207,50 @@ mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some("did:example:foo#key1".to_string());
+        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // mess with the proof to make verify fail
+        match vc.proof {
+            None => unreachable!(),
+            Some(OneOrMany::Many(_)) => unreachable!(),
+            Some(OneOrMany::One(ref mut proof)) => match proof.jws {
+                None => unreachable!(),
+                Some(ref mut jws) => {
+                    jws.insert(0, 'x');
+                }
+            },
+        }
+        println!("{}", serde_json::to_string_pretty(&vc).unwrap());
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.len() >= 1);
+    }
+
+    #[async_std::test]
+    async fn credential_issue_verify_bs58() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:foo",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
+        let key_str = include_str!("../tests/ed25519-2020-10-18.json");
+        let key: JWK = serde_json::from_str(key_str).unwrap();
+
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some("did:example:foo#key3".to_string());
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);

@@ -339,8 +339,43 @@ pub async fn resolve_key(
     resolver: &dyn DIDResolver,
 ) -> Result<JWK, Error> {
     let vm = resolve_vm(verification_method, resolver).await?;
-    let key = vm.public_key_jwk.ok_or(Error::MissingKey)?;
-    Ok(key)
+    if let Some(pk_jwk) = vm.public_key_jwk {
+        if vm.public_key_base58.is_some() {
+            // https://w3c.github.io/did-core/#verification-material
+            // "expressing key material in a verification method using both publicKeyJwk and
+            // publicKeyBase58 at the same time is prohibited."
+            return Err(Error::MultipleKeyMaterial);
+        }
+        return Ok(pk_jwk);
+    }
+    if let Some(pk_bs58) = vm.public_key_base58 {
+        return jwk_from_public_key_base58(&pk_bs58, &vm.type_);
+    }
+    Err(Error::MissingKey)
+}
+
+fn jwk_from_public_key_base58(pk_bs58: &str, vm_type: &str) -> Result<JWK, Error> {
+    let pk_bytes = bs58::decode(&pk_bs58).into_vec()?;
+    let params = match vm_type {
+        "Ed25519VerificationKey2018" => JWKParams::OKP(JWKOctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(pk_bytes),
+            private_key: None,
+        }),
+        _ => return Err(Error::UnsupportedKeyType),
+    };
+    let jwk = JWK {
+        params,
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
 }
 
 /// Resolve a verificationMethod

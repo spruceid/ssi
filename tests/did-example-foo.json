@@ -23,6 +23,12 @@
         "crv": "Ed25519",
         "x": "G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww"
       }
+    },
+    {
+      "id": "did:example:foo#key3",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:example:foo",
+      "publicKeyBase58": "2sXRz2VfrpySNEL6xmXJWQg6iY94qwNp1qrJJFBuPWmH"
     }
   ]
 }
