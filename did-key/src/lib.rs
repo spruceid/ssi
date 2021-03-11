@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use thiserror::Error;
 
-use ssi::did::{DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap};
+use ssi::did::{DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap, DIDURL};
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
@@ -155,6 +155,11 @@ impl DIDResolver for DIDKey {
                 None,
             );
         };
+        let vm_didurl = DIDURL {
+            did: did.to_string(),
+            fragment: Some(method_specific_id.to_string()),
+            ..Default::default()
+        };
         let doc = Document {
             id: did.to_string(),
             verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
@@ -164,6 +169,8 @@ impl DIDResolver for DIDKey {
                 public_key_jwk: Some(jwk),
                 ..Default::default()
             })]),
+            authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
             ..Default::default()
         };
         (

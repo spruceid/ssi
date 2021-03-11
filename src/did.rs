@@ -13,6 +13,9 @@ use crate::error::Error;
 use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
+/// <https://w3c.github.io/did-core/#dfn-verification-relationship>
+type VerificationRelationship = crate::vc::ProofPurpose;
+
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -713,6 +716,25 @@ impl Document {
             }
         }
         None
+    }
+
+    /// Get verification method ids from a DID document,
+    /// optionally limited to a specific [verification relationship](VerificationRelationship).
+    pub fn get_verification_method_ids(
+        &self,
+        verification_relationship: VerificationRelationship,
+    ) -> Result<Vec<String>, String> {
+        let did = &self.id;
+        let vms = match verification_relationship {
+            VerificationRelationship::AssertionMethod => &self.assertion_method,
+            VerificationRelationship::Authentication => &self.authentication,
+            VerificationRelationship::KeyAgreement => &self.key_agreement,
+            VerificationRelationship::CapabilityInvocation => &self.capability_invocation,
+            VerificationRelationship::CapabilityDelegation => &self.capability_delegation,
+            rel => return Err(format!("Unsupported verification relationship: {:?}", rel)),
+        };
+        let vm_ids = vms.iter().flatten().map(|vm| vm.get_id(did)).collect();
+        Ok(vm_ids)
     }
 
     pub fn to_representation(&self, content_type: &str) -> Result<Vec<u8>, Error> {

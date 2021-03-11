@@ -30,5 +30,13 @@
       "controller": "did:example:foo",
       "publicKeyBase58": "2sXRz2VfrpySNEL6xmXJWQg6iY94qwNp1qrJJFBuPWmH"
     }
+  ],
+  "assertionMethod": [
+    "did:example:foo#key1",
+    "did:example:foo#key2"
+  ],
+  "authentication": [
+    "did:example:foo#key1",
+    "did:example:foo#key2"
   ]
 }

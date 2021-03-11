@@ -100,9 +100,14 @@ impl DIDResolver for DIDEthr {
         let doc = Document {
             context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
             id: did.to_string(),
-            authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            // TODO: authentication/assertion_method?
+            authentication: Some(vec![
+                VerificationMethod::DIDURL(vm_didurl.clone()),
+                VerificationMethod::DIDURL(eip712vm_didurl.clone()),
+            ]),
+            assertion_method: Some(vec![
+                VerificationMethod::DIDURL(vm_didurl.clone()),
+                VerificationMethod::DIDURL(eip712vm_didurl.clone()),
+            ]),
             verification_method: Some(vec![vm, eip712vm]),
             ..Default::default()
         };
@@ -198,10 +203,12 @@ mod tests {
                 "blockchainAccountId": "0xb9c5714089478a327f09197987f16f9e5d936e8a@eip155:1"
               }],
               "authentication": [
-                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller"
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021"
               ],
               "assertionMethod": [
-                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller"
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
+                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021"
               ]
             })
         );
