@@ -2,7 +2,6 @@ use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use crate::did::VerificationMethod;
 use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader};
@@ -895,10 +894,7 @@ pub async fn get_verification_methods(
         .verification_method
         .iter()
         .flatten()
-        .map(|vm| match vm {
-            VerificationMethod::Map(map) => map.id.to_owned(),
-            VerificationMethod::DIDURL(didurl) => didurl.to_string(),
-        })
+        .map(|vm| vm.get_id(did))
         .collect();
     Ok(vms)
 }

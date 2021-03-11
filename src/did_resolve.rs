@@ -1338,7 +1338,7 @@ mod tests {
     async fn dereference_did_url() {
         const DID: &str = "did:example:123456789abcdefghi";
         // https://w3c-ccg.github.io/did-resolution/#example-7
-        const DOC_STR: &str = r#"
+        const DOC_STR: &str = r###"
 {
 	"@context": "https://www.w3.org/ns/did/v1",
 	"id": "did:example:123456789abcdefghi",
@@ -1347,6 +1347,11 @@ mod tests {
 		"type": "Ed25519VerificationKey2018",
 		"controller": "did:example:123456789abcdefghi",
 		"publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
+	}, {
+		"id": "#keys-2",
+		"type": "Ed25519VerificationKey2018",
+		"controller": "did:example:123456789abcdefghi",
+		"publicKeyBase58": "4BWwfeqdp1obQptLLMvPNgBw48p7og1ie6Hf9p5nTpNN"
 	}],
 	"service": [{
 		"id": "did:example:123456789abcdefghi#agent",
@@ -1358,7 +1363,7 @@ mod tests {
 		"serviceEndpoint": "https://example.com/messages/8377464"
 	}]
 }
-        "#;
+        "###;
         struct DerefExampleResolver;
         #[async_trait]
         impl DIDResolver for DerefExampleResolver {
@@ -1427,5 +1432,23 @@ mod tests {
         .await;
         assert_eq!(deref_meta.error, None);
         assert_eq!(content, expected_content);
+
+        // Dereference DID URL where id property is a relative IRI
+        let (deref_meta, _content, _content_meta) = dereference(
+            &DerefExampleResolver,
+            "did:example:123456789abcdefghi#keys-2",
+            &DereferencingInputMetadata::default(),
+        )
+        .await;
+        assert_eq!(deref_meta.error, None);
+
+        // Dereferencing unknown ID fails
+        let (deref_meta, _content, _content_meta) = dereference(
+            &DerefExampleResolver,
+            "did:example:123456789abcdefghi#nope",
+            &DereferencingInputMetadata::default(),
+        )
+        .await;
+        assert_ne!(deref_meta.error, None);
     }
 }

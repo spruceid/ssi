@@ -35,12 +35,37 @@ pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 // @TODO parsed data structs for DID and DIDURL
 type DID = String;
 
+/// [DID URL](https://w3c.github.io/did-core/#did-url-syntax)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct DIDURL {
     pub did: String,
     pub path_abempty: String,
+    pub query: Option<String>,
+    pub fragment: Option<String>,
+}
+
+/// Path component for a [Relative DID URL](https://w3c.github.io/did-core/#relative-did-urls).
+/// Based on [RFC 3886 - Path syntax](https://tools.ietf.org/html/rfc3986#section-3.3) and
+/// [Relative reference](https://tools.ietf.org/html/rfc3986#section-4.2)
+/// [rfc3986-3.3]: https://tools.ietf.org/html/rfc3986#section-3.3
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum RelativeDIDURLPath {
+    /// `path-absolute` from [RFC 3986 - 3.3. Path][rfc3986-3.3]
+    Absolute(String),
+    /// `path-noscheme` from [RFC 3986 - 3.3. Path][rfc3986-3.3]
+    NoScheme(String),
+    /// `path-empty` from [RFC 3986 - 3.3. Path][rfc3986-3.3]
+    Empty,
+}
+
+/// [Relative DID URL](https://w3c.github.io/did-core/#relative-did-urls)
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[serde(try_from = "String")]
+#[serde(into = "String")]
+pub struct RelativeDIDURL {
+    pub path: RelativeDIDURLPath,
     pub query: Option<String>,
     pub fragment: Option<String>,
 }
@@ -126,6 +151,7 @@ pub struct VerificationMethodMap {
 #[serde(untagged)]
 pub enum VerificationMethod {
     DIDURL(DIDURL),
+    RelativeDIDURL(RelativeDIDURL),
     Map(VerificationMethodMap),
 }
 
@@ -312,6 +338,58 @@ impl<'a> DIDResolver for DIDMethods<'a> {
     }
 }
 
+impl DIDURL {
+    /// Convert a DID URL to a [Relative DID URL][RelativeDIDURL], given a DID as base URI.
+    pub fn to_relative(&self, base_did: &str) -> Option<RelativeDIDURL> {
+        // TODO: support [Reference Resolution](https://tools.ietf.org/html/rfc3986#section-5) more
+        // generally, i.e. where the base is a DID URL (not necessarily a DID), and including [path
+        // segment normalization](https://tools.ietf.org/html/rfc3986#section-6.2.2.3)
+        if self.did != base_did {
+            return None;
+        }
+        Some(RelativeDIDURL {
+            path: match RelativeDIDURLPath::from_str(&self.path_abempty) {
+                Ok(path) => path,
+                Err(_) => return None,
+            },
+            query: self.query.as_ref().map(|x| x.clone()),
+            fragment: self.fragment.as_ref().map(|x| x.clone()),
+        })
+    }
+}
+
+impl RelativeDIDURL {
+    /// Convert a DID URL to a absolute DID URL, given a DID as base URI,
+    /// according to [DID Core - Relative DID URLs](https://w3c.github.io/did-core/#relative-did-urls).
+    pub fn to_absolute(&self, base_did: &str) -> DIDURL {
+        // TODO: support [Reference Resolution](https://tools.ietf.org/html/rfc3986#section-5) more
+        // generally, e.g. when base is not a DID
+        DIDURL {
+            did: base_did.to_string(),
+            path_abempty: self.path.to_string(),
+            query: self.query.as_ref().map(|x| x.clone()),
+            fragment: self.fragment.as_ref().map(|x| x.clone()),
+        }
+    }
+}
+
+impl VerificationMethod {
+    /// Return a DID URL for this verification method, given a DID as base URI
+    pub fn get_id(&self, did: &str) -> String {
+        match self {
+            Self::DIDURL(didurl) => didurl.to_string(),
+            Self::RelativeDIDURL(relative_did_url) => relative_did_url.to_absolute(did).to_string(),
+            Self::Map(map) => {
+                if let Ok(rel_did_url) = RelativeDIDURL::from_str(&map.id) {
+                    rel_did_url.to_absolute(did).to_string()
+                } else {
+                    map.id.to_string()
+                }
+            }
+        }
+    }
+}
+
 impl FromStr for DIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
@@ -339,6 +417,56 @@ impl FromStr for DIDURL {
     }
 }
 
+impl FromStr for RelativeDIDURL {
+    type Err = Error;
+    fn from_str(didurl: &str) -> Result<Self, Self::Err> {
+        let mut parts = didurl.splitn(2, '#');
+        let before_fragment = parts.next().unwrap().to_string();
+        let fragment = parts.next().map(|x| x.to_owned());
+        let mut parts = before_fragment.splitn(2, '?');
+        let before_query = parts.next().unwrap().to_string();
+        let query = parts.next().map(|x| x.to_owned());
+        let path = RelativeDIDURLPath::from_str(&before_query)?;
+        Ok(Self {
+            path,
+            query,
+            fragment,
+        })
+    }
+}
+
+impl FromStr for RelativeDIDURLPath {
+    type Err = Error;
+    fn from_str(path: &str) -> Result<Self, Self::Err> {
+        if path.is_empty() {
+            return Ok(Self::Empty);
+        }
+        if path.starts_with("/") {
+            // path-absolute = "/" [ segment-nz *( "/" segment ) ]
+            // segment-nz    = 1*pchar
+            // segment       = *pchar
+            if path.len() >= 2 {
+                if path.chars().nth(1) == Some('/') {
+                    // Beginning with "//" would make a scheme-relative URI.
+                    return Err(Error::DIDURL);
+                }
+            }
+            // TODO: validate segment and pchar
+            return Ok(Self::Absolute(path.to_string()));
+        } else {
+            // path-noscheme = segment-nz-nc *( "/" segment )
+            // segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
+            let first_segment = path.splitn(2, '/').next().unwrap().to_string();
+            if first_segment.contains(':') {
+                // First path segment containing ":" would make an absolute URI.
+                return Err(Error::DIDURL);
+            }
+            // TODO: validate segment-nz-nc and pchar more
+            return Ok(Self::NoScheme(path.to_string()));
+        }
+    }
+}
+
 impl fmt::Display for DIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{}", self.did, self.path_abempty)?;
@@ -349,6 +477,29 @@ impl fmt::Display for DIDURL {
             write!(f, "#{}", fragment)?;
         }
         Ok(())
+    }
+}
+
+impl fmt::Display for RelativeDIDURL {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.path.fmt(f)?;
+        if let Some(ref query) = self.query {
+            write!(f, "?{}", query)?;
+        }
+        if let Some(ref fragment) = self.fragment {
+            write!(f, "#{}", fragment)?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Display for RelativeDIDURLPath {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Empty => Ok(()),
+            Self::Absolute(string) => string.fmt(f),
+            Self::NoScheme(string) => string.fmt(f),
+        }
     }
 }
 
@@ -367,9 +518,30 @@ impl From<DIDURL> for String {
     }
 }
 
+/// needed for #[serde(try_from = "String")]
+impl TryFrom<String> for RelativeDIDURL {
+    type Error = Error;
+    fn try_from(relative_did_url: String) -> Result<Self, Self::Error> {
+        RelativeDIDURL::from_str(&relative_did_url)
+    }
+}
+
+/// needed for #[serde(into = "String")]
+impl From<RelativeDIDURL> for String {
+    fn from(relative_did_url: RelativeDIDURL) -> String {
+        relative_did_url.to_string()
+    }
+}
+
 impl Default for Document {
     fn default() -> Self {
         Document::new("")
+    }
+}
+
+impl Default for RelativeDIDURLPath {
+    fn default() -> Self {
+        Self::Empty
     }
 }
 
@@ -498,9 +670,10 @@ impl Document {
     /// For the [DID URL dereferencing algorithm, Step 1.1](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary)
     pub fn select_object(&self, id: &DIDURL) -> Result<Resource, Error> {
         let id_string = String::from(id.clone());
+        let id_relative_string_opt = id.to_relative(&self.id).map(|rel_url| rel_url.to_string());
         for vm in self.verification_method.iter().flatten() {
             if let VerificationMethod::Map(map) = vm {
-                if map.id == id_string {
+                if map.id == id_string || Some(&map.id) == id_relative_string_opt.as_ref() {
                     let mut map = map.clone();
                     merge_context(&mut map.context, &self.context);
                     return Ok(Resource::VerificationMethod(map));
@@ -611,6 +784,16 @@ mod tests {
                 fragment: None,
             }
         );
+    }
+
+    #[test]
+    fn did_url_relative_to_absolute() {
+        // https://w3c.github.io/did-core/#relative-did-urls
+        let relative_did_url_str = "#key-1";
+        let did_url_ref = RelativeDIDURL::from_str(relative_did_url_str).unwrap();
+        let did = "did:example:123456789abcdefghi";
+        let did_url = did_url_ref.to_absolute(did);
+        assert_eq!(did_url.to_string(), "did:example:123456789abcdefghi#key-1");
     }
 
     #[test]
