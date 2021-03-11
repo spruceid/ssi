@@ -623,7 +623,15 @@ impl Credential {
                         Issuer::Object(object_with_id) => object_with_id.id,
                     };
                     let URI::String(issuer_did) = issuer_uri;
-                    get_verification_methods(&issuer_did, resolver).await?
+                    // https://w3c.github.io/did-core/#assertion
+                    // assertionMethod is the verification relationship usually used for issuing
+                    // VCs.
+                    let proof_purpose = options
+                        .proof_purpose
+                        .clone()
+                        .unwrap_or_else(|| ProofPurpose::AssertionMethod);
+                    get_verification_methods_for_purpose(&issuer_did, resolver, proof_purpose)
+                        .await?
                 } else {
                     Vec::new()
                 }
@@ -812,7 +820,11 @@ impl Presentation {
             Some(vm) => vec![vm],
             None => {
                 if let Some(URI::String(ref holder)) = self.holder {
-                    get_verification_methods(&holder, resolver).await?
+                    let proof_purpose = options
+                        .proof_purpose
+                        .clone()
+                        .unwrap_or_else(|| ProofPurpose::Authentication);
+                    get_verification_methods_for_purpose(&holder, resolver, proof_purpose).await?
                 } else {
                     Vec::new()
                 }
@@ -872,13 +884,30 @@ impl Default for Presentation {
 
 /// Get a DID's first verification method
 pub async fn get_verification_method(did: &str, resolver: &dyn DIDResolver) -> Option<String> {
-    let vms = get_verification_methods(did, resolver)
-        .await
-        .unwrap_or_default();
-    vms.into_iter().next()
+    let (res_meta, doc_opt, _meta) = resolver
+        .resolve(did, &ResolutionInputMetadata::default())
+        .await;
+    if res_meta.error.is_some() {
+        return None;
+    }
+    let doc = match doc_opt {
+        Some(doc) => doc,
+        None => return None,
+    };
+    let vms_auth = doc
+        .get_verification_method_ids(ProofPurpose::Authentication)
+        .ok();
+    if let Some(id) = vms_auth.iter().flatten().next() {
+        return Some(id.to_owned());
+    }
+    let vms_assert = doc
+        .get_verification_method_ids(ProofPurpose::AssertionMethod)
+        .ok();
+    vms_assert.iter().flatten().next().cloned()
 }
 
 /// Resolve a DID and get its the verification methods from its DID document.
+#[deprecated(note = "Use get_verification_methods_for_purpose")]
 pub async fn get_verification_methods(
     did: &str,
     resolver: &dyn DIDResolver,
@@ -897,6 +926,21 @@ pub async fn get_verification_methods(
         .map(|vm| vm.get_id(did))
         .collect();
     Ok(vms)
+}
+
+pub async fn get_verification_methods_for_purpose(
+    did: &str,
+    resolver: &dyn DIDResolver,
+    proof_purpose: ProofPurpose,
+) -> Result<Vec<String>, String> {
+    let (res_meta, doc_opt, _meta) = resolver
+        .resolve(did, &ResolutionInputMetadata::default())
+        .await;
+    if let Some(err) = res_meta.error {
+        return Err(err.to_string());
+    }
+    let doc = doc_opt.ok_or("Missing document".to_string())?;
+    doc.get_verification_method_ids(proof_purpose)
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
