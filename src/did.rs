@@ -671,7 +671,17 @@ impl Document {
     pub fn select_object(&self, id: &DIDURL) -> Result<Resource, Error> {
         let id_string = String::from(id.clone());
         let id_relative_string_opt = id.to_relative(&self.id).map(|rel_url| rel_url.to_string());
-        for vm in self.verification_method.iter().flatten() {
+        for vm in vec![
+            &self.verification_method,
+            &self.authentication,
+            &self.assertion_method,
+            &self.key_agreement,
+            &self.capability_invocation,
+            &self.capability_delegation,
+        ]
+        .iter()
+        .flat_map(|array| array.iter().flatten())
+        {
             if let VerificationMethod::Map(map) = vm {
                 if map.id == id_string || Some(&map.id) == id_relative_string_opt.as_ref() {
                     let mut map = map.clone();
