@@ -22,6 +22,9 @@ anyhow = "1.0.33"
 json-patch = "0.2.6"
 bs58 = { version = "0.4", features = ["check"] }
 
+[target.'cfg(target_os = "android")'.dependencies.reqwest]
+features = ["native-tls-vendored"]
+
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
 tezedge_client = { git = "https://github.com/binier/tezedge-client", rev = "672e61297f0ba7d1d94168a2588b9b27d76c1fc4", package = "lib" }

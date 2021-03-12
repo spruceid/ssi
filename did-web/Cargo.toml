@@ -11,6 +11,9 @@ reqwest = { version = "0.11", features = ["json"] }
 http = "0.2"
 serde_json = "1.0"
 
+[target.'cfg(target_os = "android")'.dependencies.reqwest]
+features = ["native-tls-vendored"]
+
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
 serde = { version = "1.0", features = ["derive"] }
