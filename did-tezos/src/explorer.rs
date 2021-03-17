@@ -3,8 +3,7 @@ use reqwest;
 use serde::Deserialize;
 use ssi::did::{Service, ServiceEndpoint};
 use ssi::one_or_many::OneOrMany;
-
-const BCD_URL: &str = "https://better-call.dev/";
+use url::Url;
 
 #[derive(Deserialize)]
 struct Contract {
@@ -29,10 +28,15 @@ struct SearchResult {
     items: Vec<SearchItem>,
 }
 
-pub async fn retrieve_did_manager(address: &str, network: &str) -> Result<Option<String>> {
+pub async fn retrieve_did_manager(
+    bcd_url: &str,
+    address: &str,
+    network: &str,
+) -> Result<Option<String>> {
     let client = reqwest::Client::builder().build()?;
+    let url = Url::parse(bcd_url)?;
     let mut search_result: SearchResult = client
-        .get(&format!("{}v1/search", BCD_URL))
+        .get(url.join("/v1/search")?)
         .query(&[
             ("q", address),
             ("f", "manager"),
@@ -72,13 +76,19 @@ struct ServiceResultItem {
     value: String,
 }
 
-pub async fn execute_service_view(did: &str, contract: &str, network: &str) -> Result<Service> {
+pub async fn execute_service_view(
+    bcd_url: &str,
+    did: &str,
+    contract: &str,
+    network: &str,
+) -> Result<Service> {
     let client = reqwest::Client::builder().build()?;
+    let url = Url::parse(bcd_url)?;
     let service_result: ServiceResult = client
-        .post(&format!(
-            "{}v1/contract/{}/{}/views/execute",
-            BCD_URL, network, contract
-        ))
+        .post(url.join(&format!(
+            "/v1/contract/{}/{}/views/execute",
+            network, contract
+        ))?)
         .json(&serde_json::json!({"data": {}, "name": "GetService", "implementation": 0}))
         .send()
         .await?
@@ -98,13 +108,15 @@ pub async fn execute_service_view(did: &str, contract: &str, network: &str) -> R
 mod tests {
     use super::*;
 
+    // Not using the api endpoint because it returns empty results at the moment
+    const BCD_URL: &str = "https://better-call.dev/";
     const LIVE_TZ1: &str = "tz1Z3yNumnSFoHtMsMPAkiCqDQpTcnw7fk1s";
     const LIVE_NETWORK: &str = "delphinet";
     const LIVE_DID_MANAGER: &str = "KT1XFk3nxojBisE5WpXugmuPuh9GRzo54gxL";
 
     #[tokio::test]
     async fn test_retrieve_did_manager() {
-        let did_manager = retrieve_did_manager(LIVE_TZ1, LIVE_NETWORK).await;
+        let did_manager = retrieve_did_manager(BCD_URL, LIVE_TZ1, LIVE_NETWORK).await;
         assert!(did_manager.is_ok());
         assert_eq!(did_manager.unwrap().unwrap(), LIVE_DID_MANAGER.to_string());
     }
@@ -112,6 +124,7 @@ mod tests {
     #[tokio::test]
     async fn test_execute_view() {
         let service_endpoint = execute_service_view(
+            BCD_URL,
             &format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1),
             LIVE_DID_MANAGER,
             LIVE_NETWORK,

@@ -21,9 +21,11 @@ libsecp256k1 = { version = "0.3", optional = true }
 anyhow = "1.0.33"
 json-patch = "0.2.6"
 bs58 = { version = "0.4", features = ["check"] }
+url = "2.2.1"
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-features = ["native-tls-vendored"]
+version = "0.11"
+features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
