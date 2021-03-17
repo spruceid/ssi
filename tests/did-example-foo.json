@@ -33,10 +33,12 @@
   ],
   "assertionMethod": [
     "did:example:foo#key1",
-    "did:example:foo#key2"
+    "did:example:foo#key2",
+    "did:example:foo#key3"
   ],
   "authentication": [
     "did:example:foo#key1",
-    "did:example:foo#key2"
+    "did:example:foo#key2",
+    "did:example:foo#key3"
   ]
 }
