@@ -12,7 +12,8 @@ http = "0.2"
 serde_json = "1.0"
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-features = ["native-tls-vendored"]
+version = "0.11"
+features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }

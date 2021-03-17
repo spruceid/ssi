@@ -22,11 +22,22 @@ use chrono::prelude::*;
 use json_patch::patch;
 use serde::Deserialize;
 use std::convert::TryInto;
+use std::default::Default;
 
 /// did:tz DID Method
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
-pub struct DIDTz;
+pub struct DIDTz {
+    bcd_url: &'static str,
+}
+
+impl Default for DIDTz {
+    fn default() -> Self {
+        Self {
+            bcd_url: "https://api.better-call.dev/",
+        }
+    }
+}
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -97,7 +108,29 @@ impl DIDResolver for DIDTz {
         let mut doc =
             DIDTz::tier1_derivation(did, &vm_didurl, proof_type, &address, &network, public_key);
 
-        if let Some(service) = match DIDTz::tier2_resolution(did, &address, &network).await {
+        let mut bcd_url = self.bcd_url;
+        if let Some(s) = &input_metadata.property_set {
+            if let Some(url) = s.get("bcd_url") {
+                bcd_url = match url {
+                    Metadata::String(u) => u,
+                    _ => {
+                        return (
+                            ResolutionMetadata {
+                                error: Some(
+                                    "Better Call Dev API URL should be a string.".to_string(),
+                                ),
+                                ..Default::default()
+                            },
+                            Some(doc),
+                            None,
+                        )
+                    }
+                };
+            }
+        }
+
+        if let Some(service) = match DIDTz::tier2_resolution(bcd_url, did, &address, &network).await
+        {
             Ok(s) => s,
             Err(e) => {
                 return (
@@ -294,10 +327,16 @@ impl DIDTz {
         }
     }
 
-    async fn tier2_resolution(did: &str, address: &str, network: &str) -> Result<Option<Service>> {
-        if let Some(did_manager) = explorer::retrieve_did_manager(address, network).await? {
+    async fn tier2_resolution(
+        bcd_url: &str,
+        did: &str,
+        address: &str,
+        network: &str,
+    ) -> Result<Option<Service>> {
+        if let Some(did_manager) = explorer::retrieve_did_manager(bcd_url, address, network).await?
+        {
             Ok(Some(
-                explorer::execute_service_view(did, &did_manager, network).await?,
+                explorer::execute_service_view(bcd_url, did, &did_manager, network).await?,
             ))
         } else {
             Ok(None)
@@ -327,7 +366,7 @@ impl DIDTz {
                     let kid_doc = if kid_didurl.did == doc.id {
                         doc.clone()
                     } else {
-                        match DIDTz
+                        match self
                             .dereference(&kid_didurl, &DereferencingInputMetadata::default())
                             .await
                         {
@@ -458,11 +497,16 @@ mod tests {
                                         }
                                     ]}"#;
 
+    // Not using the api endpoint because it returns empty results at the moment
+    const DIDTZ: DIDTz = DIDTz {
+        bcd_url: "https://better-call.dev/",
+    };
+
     #[test]
     fn jwk_to_did_tezos() {
         // TODO: add tz2 and tz3 test cases
         let jwk: JWK = serde_json::from_str(&TZ1_JSON).unwrap();
-        let tz1 = DIDTz.generate(&Source::Key(&jwk)).unwrap();
+        let tz1 = DIDTZ.generate(&Source::Key(&jwk)).unwrap();
         assert_eq!(tz1, TZ1);
     }
 
@@ -476,14 +520,14 @@ mod tests {
             "y": "OmoZmcbUadg7dEC8bg5kXryN968CJqv2UFMUKRERZ6s"
         }))
         .unwrap();
-        let did = DIDTz.generate(&Source::Key(&jwk)).unwrap();
+        let did = DIDTZ.generate(&Source::Key(&jwk)).unwrap();
         // https://github.com/murbard/pytezos/blob/a228a67fbc94b11dd7dbc7ff0df9e996d0ff5f01tests/test_crypto.py#L34
         assert_eq!(did, "did:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX");
     }
 
     #[tokio::test]
     async fn test_derivation_tz1() {
-        let (res_meta, doc_opt, _meta_opt) = DIDTz
+        let (res_meta, doc_opt, _meta_opt) = DIDTZ
             .resolve(
                 "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
                 &ResolutionInputMetadata::default(),
@@ -515,7 +559,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_derivation_tz2() {
-        let (res_meta, doc_opt, _meta_opt) = DIDTz
+        let (res_meta, doc_opt, _meta_opt) = DIDTZ
             .resolve(
                 "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
                 &ResolutionInputMetadata::default(),
@@ -657,14 +701,14 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDTz).await;
+        let verification_result = vc.verify(None, &DIDTZ).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vc_bad_issuer.verify(None, &DIDTZ).await.errors.len() > 0);
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -679,7 +723,7 @@ mod tests {
         .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -773,7 +817,7 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTz).await;
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTZ).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -788,14 +832,14 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTz).await;
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTZ).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vp2.verify(None, &DIDTZ).await.errors.len() > 0);
     }
 
     #[tokio::test]
@@ -807,7 +851,7 @@ mod tests {
         let mut key = JWK::generate_secp256k1().unwrap();
         // mark this key as being for use with key recovery
         key.algorithm = Some(Algorithm::ES256KR);
-        let did = DIDTz.generate(&Source::Key(&key)).unwrap();
+        let did = DIDTZ.generate(&Source::Key(&key)).unwrap();
         let mut vc: Credential = serde_json::from_value(json!({
             "@context": "https://www.w3.org/2018/credentials/v1",
             "type": "VerifiableCredential",
@@ -827,14 +871,14 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDTz).await;
+        let verification_result = vc.verify(None, &DIDTZ).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vc_bad_issuer.verify(None, &DIDTZ).await.errors.len() > 0);
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -849,7 +893,7 @@ mod tests {
         .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -877,7 +921,7 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTz).await;
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTZ).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -892,20 +936,20 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTz).await;
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTZ).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vp2.verify(None, &DIDTZ).await.errors.len() > 0);
     }
 
     #[tokio::test]
     #[cfg(feature = "p256")]
     async fn test_derivation_tz3() {
-        let (res_meta, doc_opt, _meta_opt) = DIDTz
+        let (res_meta, doc_opt, _meta_opt) = DIDTZ
             .resolve(
                 "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
                 &ResolutionInputMetadata::default(),
@@ -977,7 +1021,7 @@ mod tests {
         };
         let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
-        DIDTz
+        DIDTZ
             .tier3_updates("tz1", &mut doc, json_update)
             .await
             .unwrap();
@@ -1039,7 +1083,7 @@ mod tests {
         };
         let jws = encode_sign(ssi::jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
-        DIDTz
+        DIDTZ
             .tier3_updates("tz2", &mut doc, json_update)
             .await
             .unwrap();
@@ -1100,7 +1144,7 @@ mod tests {
         };
         let jws = encode_sign(ssi::jwk::Algorithm::ES256, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
-        DIDTz
+        DIDTZ
             .tier3_updates("tz3", &mut doc, json_update)
             .await
             .unwrap();
@@ -1150,7 +1194,7 @@ mod tests {
         )
         .unwrap();
         let live_did = format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1);
-        let (res_meta, res_doc, _res_doc_meta) = DIDTz.resolve(&live_did, &input_metadata).await;
+        let (res_meta, res_doc, _res_doc_meta) = DIDTZ.resolve(&live_did, &input_metadata).await;
         assert_eq!(res_meta.error, None);
         let d = res_doc.unwrap();
         let expected = Document {
@@ -1198,7 +1242,7 @@ mod tests {
 
         let mut key = JWK::generate_p256().unwrap();
         key.algorithm = Some(Algorithm::ES256);
-        let did = DIDTz.generate(&Source::Key(&key)).unwrap();
+        let did = DIDTZ.generate(&Source::Key(&key)).unwrap();
         let mut vc: Credential = serde_json::from_value(json!({
             "@context": "https://www.w3.org/2018/credentials/v1",
             "type": "VerifiableCredential",
@@ -1218,14 +1262,14 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDTz).await;
+        let verification_result = vc.verify(None, &DIDTZ).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vc_bad_issuer.verify(None, &DIDTZ).await.errors.len() > 0);
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -1240,7 +1284,7 @@ mod tests {
         .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -1268,7 +1312,7 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTz).await;
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTZ).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -1283,13 +1327,13 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTz).await;
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTZ).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDTz).await.errors.len() > 0);
+        assert!(vp2.verify(None, &DIDTZ).await.errors.len() > 0);
     }
 }
