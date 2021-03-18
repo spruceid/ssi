@@ -65,24 +65,34 @@ pub trait LinkedDataDocument {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait ProofSuite {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
     ) -> Result<Proof, Error>;
 
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
     ) -> Result<ProofPreparation, Error>;
 
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error>;
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error>;
 
     async fn verify(
+        &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        Self: Sized,
+    {
         verify(proof, document, resolver).await
     }
 }
@@ -107,26 +117,30 @@ pub enum SigningInput {
 impl ProofPreparation {
     pub async fn complete(self, signature: &str) -> Result<Proof, Error> {
         match self.proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018::complete(self, signature).await,
-            "Ed25519Signature2018" => Ed25519Signature2018::complete(self, signature).await,
+            "RsaSignature2018" => RsaSignature2018.complete(self, signature).await,
+            "Ed25519Signature2018" => Ed25519Signature2018.complete(self, signature).await,
             "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::complete(self, signature)
+                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    .complete(self, signature)
                     .await
             }
             "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::complete(self, signature)
+                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    .complete(self, signature)
                     .await
             }
             "EcdsaSecp256k1Signature2019" => {
-                EcdsaSecp256k1Signature2019::complete(self, signature).await
+                EcdsaSecp256k1Signature2019.complete(self, signature).await
             }
             "EcdsaSecp256k1RecoverySignature2020" => {
-                EcdsaSecp256k1RecoverySignature2020::complete(self, signature).await
+                EcdsaSecp256k1RecoverySignature2020
+                    .complete(self, signature)
+                    .await
             }
             #[cfg(feature = "keccak-hash")]
-            "Eip712Signature2021" => Eip712Signature2021::complete(self, signature).await,
-            "SolanaSignature2021" => SolanaSignature2021::complete(self, signature).await,
-            "JsonWebSignature2020" => JsonWebSignature2020::complete(self, signature).await,
+            "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
+            "SolanaSignature2021" => SolanaSignature2021.complete(self, signature).await,
+            "JsonWebSignature2020" => JsonWebSignature2020.complete(self, signature).await,
             _ => Err(Error::ProofTypeNotImplemented),
         }
     }
@@ -152,7 +166,7 @@ impl LinkedDataProofs {
                 x509_certificate_chain: _,
                 x509_thumbprint_sha1: _,
                 x509_thumbprint_sha256: _,
-            } => return RsaSignature2018::sign(document, options, &key).await,
+            } => return RsaSignature2018.sign(document, options, &key).await,
             JWK {
                 params:
                     JWKParams::OKP(JWKOctetParams {
@@ -172,13 +186,15 @@ impl LinkedDataProofs {
                 "Ed25519" => {
                     if let Some(ref vm) = options.verification_method {
                         if vm.starts_with("did:tz") {
-                            return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(document, options, &key).await;
+                            return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                                .sign(document, options, &key)
+                                .await;
                         }
                         if vm.ends_with("#SolanaMethod2021") {
-                            return SolanaSignature2021::sign(document, options, &key).await;
+                            return SolanaSignature2021.sign(document, options, &key).await;
                         }
                     }
-                    return Ed25519Signature2018::sign(document, options, &key).await;
+                    return Ed25519Signature2018.sign(document, options, &key).await;
                 }
                 _ => {
                     return Err(Error::ProofTypeNotImplemented);
@@ -202,31 +218,31 @@ impl LinkedDataProofs {
                             if let Some(ref vm) = options.verification_method {
                                 if vm.ends_with("#Eip712Method2021") {
                                     #[cfg(feature = "keccak-hash")]
-                                    return Eip712Signature2021::sign(document, options, &key)
-                                        .await;
+                                    return Eip712Signature2021.sign(document, options, &key).await;
                                     #[cfg(not(feature = "keccak-hash"))]
                                     return Err(Error::ProofTypeNotImplemented);
                                 }
                             }
-                            return EcdsaSecp256k1RecoverySignature2020::sign(
-                                document, options, &key,
-                            )
-                            .await;
+                            return EcdsaSecp256k1RecoverySignature2020
+                                .sign(document, options, &key)
+                                .await;
                         } else {
-                            return EcdsaSecp256k1Signature2019::sign(document, options, &key)
+                            return EcdsaSecp256k1Signature2019
+                                .sign(document, options, &key)
                                 .await;
                         }
                     }
                     "P-256" => {
                         if let Some(ref vm) = options.verification_method {
                             if vm.starts_with("did:tz") {
-                                return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
-                                    document, options, &key,
-                                )
-                                .await;
+                                return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                                    .sign(document, options, &key)
+                                    .await;
                             }
                         }
-                        return EcdsaSecp256r1Signature2019::sign(document, options, &key).await;
+                        return EcdsaSecp256r1Signature2019
+                            .sign(document, options, &key)
+                            .await;
                     }
                     _ => {
                         return Err(Error::CurveNotImplemented(curve.to_string()));
@@ -247,46 +263,57 @@ impl LinkedDataProofs {
     ) -> Result<ProofPreparation, Error> {
         match public_key.get_algorithm().ok_or(Error::MissingAlgorithm)? {
             Algorithm::RS256 => {
-                return RsaSignature2018::prepare(document, options, public_key).await
+                return RsaSignature2018
+                    .prepare(document, options, public_key)
+                    .await
             }
             Algorithm::EdDSA => {
                 if let Some(ref vm) = options.verification_method {
                     if vm.starts_with("did:tz") {
-                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
-                            document, options, public_key,
-                        )
-                        .await;
+                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
                     }
                     if vm.ends_with("#SolanaMethod2021") {
-                        return SolanaSignature2021::prepare(document, options, public_key).await;
+                        return SolanaSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
                     }
                 }
-                return Ed25519Signature2018::prepare(document, options, public_key).await;
+                return Ed25519Signature2018
+                    .prepare(document, options, public_key)
+                    .await;
             }
             Algorithm::ES256 => {
                 if let Some(ref vm) = options.verification_method {
                     if vm.starts_with("did:tz") {
-                        return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
-                            document, options, public_key,
-                        )
-                        .await;
+                        return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
                     }
                 }
-                return EcdsaSecp256r1Signature2019::prepare(document, options, public_key).await;
+                return EcdsaSecp256r1Signature2019
+                    .prepare(document, options, public_key)
+                    .await;
             }
             Algorithm::ES256K => {
-                return EcdsaSecp256k1Signature2019::prepare(document, options, public_key).await
+                return EcdsaSecp256k1Signature2019
+                    .prepare(document, options, public_key)
+                    .await
             }
             Algorithm::ES256KR => {
                 if let Some(ref vm) = options.verification_method {
                     if vm.ends_with("#Eip712Method2021") {
                         #[cfg(feature = "keccak-hash")]
-                        return Eip712Signature2021::prepare(document, options, public_key).await;
+                        return Eip712Signature2021
+                            .prepare(document, options, public_key)
+                            .await;
                         #[cfg(not(feature = "keccak-hash"))]
                         return Err(Error::ProofTypeNotImplemented);
                     }
                 }
-                return EcdsaSecp256k1RecoverySignature2020::prepare(document, options, public_key)
+                return EcdsaSecp256k1RecoverySignature2020
+                    .prepare(document, options, public_key)
                     .await;
             }
             _ => {}
@@ -301,32 +328,36 @@ impl LinkedDataProofs {
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
         match proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018::verify(proof, document, resolver).await,
-            "Ed25519Signature2018" => Ed25519Signature2018::verify(proof, document, resolver).await,
+            "RsaSignature2018" => RsaSignature2018.verify(proof, document, resolver).await,
+            "Ed25519Signature2018" => Ed25519Signature2018.verify(proof, document, resolver).await,
             "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
-                    proof, document, resolver,
-                )
-                .await
+                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    .verify(proof, document, resolver)
+                    .await
             }
             "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
-                    proof, document, resolver,
-                )
-                .await
+                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    .verify(proof, document, resolver)
+                    .await
             }
             "EcdsaSecp256k1Signature2019" => {
-                EcdsaSecp256k1Signature2019::verify(proof, document, resolver).await
+                EcdsaSecp256k1Signature2019
+                    .verify(proof, document, resolver)
+                    .await
             }
             "EcdsaSecp256k1RecoverySignature2020" => {
-                EcdsaSecp256k1RecoverySignature2020::verify(proof, document, resolver).await
+                EcdsaSecp256k1RecoverySignature2020
+                    .verify(proof, document, resolver)
+                    .await
             }
             #[cfg(feature = "keccak-hash")]
-            "Eip712Signature2021" => Eip712Signature2021::verify(proof, document, resolver).await,
-            "SolanaSignature2021" => SolanaSignature2021::verify(proof, document, resolver).await,
-            "JsonWebSignature2020" => JsonWebSignature2020::verify(proof, document, resolver).await,
+            "Eip712Signature2021" => Eip712Signature2021.verify(proof, document, resolver).await,
+            "SolanaSignature2021" => SolanaSignature2021.verify(proof, document, resolver).await,
+            "JsonWebSignature2020" => JsonWebSignature2020.verify(proof, document, resolver).await,
             "EcdsaSecp256r1Signature2019" => {
-                EcdsaSecp256r1Signature2019::verify(proof, document, resolver).await
+                EcdsaSecp256r1Signature2019
+                    .verify(proof, document, resolver)
+                    .await
             }
             _ => Err(Error::ProofTypeNotImplemented),
         }
@@ -526,6 +557,7 @@ pub struct RsaSignature2018;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for RsaSignature2018 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -533,6 +565,7 @@ impl ProofSuite for RsaSignature2018 {
         sign(document, options, key, "RsaSignature2018", Algorithm::RS256).await
     }
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -546,7 +579,11 @@ impl ProofSuite for RsaSignature2018 {
         )
         .await
     }
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 }
@@ -556,6 +593,7 @@ pub struct Ed25519Signature2018;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519Signature2018 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -570,6 +608,7 @@ impl ProofSuite for Ed25519Signature2018 {
         .await
     }
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -583,7 +622,11 @@ impl ProofSuite for Ed25519Signature2018 {
         )
         .await
     }
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 }
@@ -593,6 +636,7 @@ pub struct EcdsaSecp256k1Signature2019;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1Signature2019 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -607,6 +651,7 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         .await
     }
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -620,7 +665,11 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         )
         .await
     }
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 }
@@ -630,6 +679,7 @@ pub struct EcdsaSecp256k1RecoverySignature2020;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -655,6 +705,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
     }
 
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _public_key: &JWK,
@@ -674,11 +725,16 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         prepare_proof(document, proof, Algorithm::ES256KR).await
     }
 
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 
     async fn verify(
+        &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -707,6 +763,7 @@ pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -737,6 +794,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     }
 
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -760,11 +818,16 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         prepare_proof(document, proof, Algorithm::EdDSA).await
     }
 
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 
     async fn verify(
+        &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -800,6 +863,7 @@ pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -830,6 +894,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     }
 
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -853,11 +918,16 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         prepare_proof(document, proof, Algorithm::ES256).await
     }
 
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 
     async fn verify(
+        &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -894,6 +964,7 @@ pub struct Eip712Signature2021;
 #[cfg(feature = "keccak-hash")]
 impl ProofSuite for Eip712Signature2021 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -925,6 +996,7 @@ impl ProofSuite for Eip712Signature2021 {
     }
 
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _public_key: &JWK,
@@ -946,13 +1018,18 @@ impl ProofSuite for Eip712Signature2021 {
         })
     }
 
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         let mut proof = preparation.proof;
         proof.proof_value = Some(signature.to_string());
         Ok(proof)
     }
 
     async fn verify(
+        &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -1004,6 +1081,7 @@ pub struct SolanaSignature2021;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for SolanaSignature2021 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -1027,6 +1105,7 @@ impl ProofSuite for SolanaSignature2021 {
     }
 
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _public_key: &JWK,
@@ -1050,13 +1129,18 @@ impl ProofSuite for SolanaSignature2021 {
         })
     }
 
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         let mut proof = preparation.proof;
         proof.proof_value = Some(signature.to_string());
         Ok(proof)
     }
 
     async fn verify(
+        &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -1088,6 +1172,7 @@ pub struct EcdsaSecp256r1Signature2019;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256r1Signature2019 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -1102,6 +1187,7 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         .await
     }
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -1115,7 +1201,11 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         )
         .await
     }
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 }
@@ -1126,6 +1216,7 @@ pub struct JsonWebSignature2020;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for JsonWebSignature2020 {
     async fn sign(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         key: &JWK,
@@ -1147,6 +1238,7 @@ impl ProofSuite for JsonWebSignature2020 {
         sign_proof(document, proof, key, algorithm).await
     }
     async fn prepare(
+        &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         public_key: &JWK,
@@ -1166,7 +1258,11 @@ impl ProofSuite for JsonWebSignature2020 {
         };
         prepare_proof(document, proof, algorithm).await
     }
-    async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
         complete(preparation, signature).await
     }
 }

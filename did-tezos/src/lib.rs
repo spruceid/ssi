@@ -721,13 +721,10 @@ mod tests {
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
-            &vc_no_proof,
-            &issue_options,
-            &other_key,
-        )
-        .await
-        .unwrap();
+        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            .sign(&vc_no_proof, &issue_options, &other_key)
+            .await
+            .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);
@@ -891,13 +888,10 @@ mod tests {
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
-            &vc_no_proof,
-            &issue_options,
-            &other_key,
-        )
-        .await
-        .unwrap();
+        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            .sign(&vc_no_proof, &issue_options, &other_key)
+            .await
+            .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);
@@ -1283,13 +1277,10 @@ mod tests {
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_p256().unwrap();
         use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
-            &vc_no_proof,
-            &issue_options,
-            &other_key,
-        )
-        .await
-        .unwrap();
+        let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            .sign(&vc_no_proof, &issue_options, &other_key)
+            .await
+            .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);

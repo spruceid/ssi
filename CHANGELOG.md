@@ -58,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow multiple proofs and multiple verification methods in a DID document
 - Bundle `json-ld` crate, for `crates.io` release.
 - Added `Source::KeyAndPattern` enum variant.
+- Made `ProofSuite` object-safe.
 
 ### Fixed
 - Fix `tz1` hashing.
