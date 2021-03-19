@@ -1,0 +1,18 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+  "verificationMethod": [
+    {
+      "id": "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a#Recovery2020",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+      "blockchainAccountId": "0xb9c5714089478a327f09197987f16f9e5d936e8a@eip155:mainnet"
+    }
+  ],
+  "authentication": [
+    "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a#Recovery2020"
+  ],
+  "assertionMethod": [
+    "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a#Recovery2020"
+  ]
+}

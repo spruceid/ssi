@@ -1,0 +1,34 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
+  "verificationMethod": [{
+    "id": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#controller",
+    "type": "Ed25519VerificationKey2018",
+    "controller": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
+    "blockchainAccountId": "CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev@solana",
+    "publicKeyJwk": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "qDkywhH-S6nNxQhA6SHKsoFW7A2gX-X0b3TtwVBMHm8"
+    }
+  }, {
+    "id": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#SolanaMethod2021",
+    "type": "SolanaMethod2021",
+    "controller": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
+    "blockchainAccountId": "CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev@solana",
+    "publicKeyJwk": {
+      "kty": "OKP",
+      "crv": "Ed25519",
+      "x": "qDkywhH-S6nNxQhA6SHKsoFW7A2gX-X0b3TtwVBMHm8"
+    }
+  }],
+  "authentication": [
+    "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#controller",
+    "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#SolanaMethod2021"
+  ],
+  "assertionMethod": [
+    "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#controller",
+    "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#SolanaMethod2021"
+  ]
+}
+

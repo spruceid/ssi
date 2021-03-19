@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support relative DID URLs in DID documents.
 - Support [publicKeyBase58][] for Ed25519.
 - Added `DIDMethods::generate` function.
+- Add `did:pkh` Public Key Hash DID Method.
 
 ### Changed
 - Make `ResolutionResult` struct public.

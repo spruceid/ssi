@@ -1,0 +1,19 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
+  "verificationMethod": [
+    {
+      "id": "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6#blockchainAccountId",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
+      "blockchainAccountId": "128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6@bip122:000000000019d6689c085ae165831e93"
+    }
+  ],
+  "authentication": [
+    "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6#blockchainAccountId"
+  ],
+  "assertionMethod": [
+    "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6#blockchainAccountId"
+  ]
+}
+

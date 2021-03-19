@@ -1,0 +1,18 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+  "verificationMethod": [
+    {
+      "id": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+      "blockchainAccountId": "tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq@tezos:mainnet"
+    }
+  ],
+  "authentication": [
+    "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
+  ],
+  "assertionMethod": [
+    "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
+  ]
+}

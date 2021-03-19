@@ -1,5 +1,5 @@
 use crate::blakesig;
-use crate::jwk::JWK;
+use crate::jwk::{Params, JWK};
 use std::fmt;
 use std::str::FromStr;
 
@@ -22,6 +22,17 @@ pub enum BlockchainAccountIdVerifyError {
     KeyMismatch(String, String),
 }
 
+// convert a JWK to a base58 byte string if it is Ed25519
+fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
+    let string = match jwk.params {
+        Params::OKP(ref params) if params.curve == "Ed25519" => {
+            bs58::encode(&params.public_key.0).into_string()
+        }
+        _ => return Err("Expected Ed25519 key"),
+    };
+    Ok(string)
+}
+
 impl BlockchainAccountId {
     /// Check that a given JWK corresponds to this account id
     pub fn verify(&self, jwk: &JWK) -> Result<(), BlockchainAccountIdVerifyError> {
@@ -31,6 +42,20 @@ impl BlockchainAccountId {
             #[cfg(feature = "keccak-hash")]
             ["eip155", _net] => crate::keccak_hash::hash_public_key(&jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
+            ["solana"] => encode_ed25519(&jwk)
+                .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
+            // Bitcoin
+            #[cfg(feature = "ripemd160")]
+            ["bip122", "000000000019d6689c085ae165831e93"] => {
+                crate::ripemd::hash_public_key(&jwk, 0x00)
+                    .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
+            }
+            // Dogecoin
+            #[cfg(feature = "ripemd160")]
+            ["bip122", "1a91e3dace36e2be3bf030a65679fe82"] => {
+                crate::ripemd::hash_public_key(&jwk, 0x1e)
+                    .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
+            }
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
                 self.chain_id.clone(),
             )),
