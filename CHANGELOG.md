@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support HTTP(S) requests in WASM and on Android.
 - Support relative DID URLs in DID documents.
 - Support [publicKeyBase58][] for Ed25519.
+- Added `DIDMethods::generate` function.
 
 ### Changed
 - Make `ResolutionResult` struct public.
@@ -56,6 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Make `jws::sign_bytes` return bytes instead of string.
 - Allow multiple proofs and multiple verification methods in a DID document
 - Bundle `json-ld` crate, for `crates.io` release.
+- Added `Source::KeyAndPattern` enum variant.
 
 ### Fixed
 - Fix `tz1` hashing.

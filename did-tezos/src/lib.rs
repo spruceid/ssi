@@ -265,6 +265,13 @@ impl DIDMethod for DIDTz {
     fn generate(&self, source: &Source) -> Option<String> {
         let jwk = match source {
             Source::Key(jwk) => jwk,
+            Source::KeyAndPattern(jwk, pattern) => {
+                if !pattern.is_empty() {
+                    // TODO: support pattern
+                    return None;
+                }
+                jwk
+            }
             _ => return None,
         };
         let hash = match hash_public_key(jwk) {

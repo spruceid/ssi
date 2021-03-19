@@ -206,7 +206,10 @@ pub enum Resource {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Source<'a> {
+    /// Public key
     Key(&'a JWK),
+    /// Public key and additional pattern
+    KeyAndPattern(&'a JWK, &'a str),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -291,6 +294,30 @@ impl<'a> DIDMethods<'a> {
             }
         };
         Ok(method)
+    }
+
+    /// Generate a DID given some input
+    pub fn generate(&self, source: &Source) -> Option<String> {
+        let (jwk, pattern) = match source {
+            Source::Key(_) => {
+                // Need name/pattern to select DID method
+                return None;
+            }
+            Source::KeyAndPattern(jwk, pattern) => (jwk, pattern),
+        };
+        let mut parts = pattern.splitn(2, ':');
+        let method_name = parts.next().unwrap();
+        let method = match self.methods.get(method_name) {
+            Some(method) => method,
+            None => return None,
+        };
+        if let Some(method_pattern) = parts.next() {
+            let source = Source::KeyAndPattern(jwk, method_pattern);
+            method.generate(&source)
+        } else {
+            let source = Source::Key(jwk);
+            method.generate(&source)
+        }
     }
 }
 

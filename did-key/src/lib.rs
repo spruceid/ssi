@@ -193,6 +193,13 @@ impl DIDMethod for DIDKey {
     fn generate(&self, source: &Source) -> Option<String> {
         let jwk = match source {
             Source::Key(jwk) => jwk,
+            Source::KeyAndPattern(jwk, pattern) => {
+                if !pattern.is_empty() {
+                    // pattern not supported
+                    return None;
+                }
+                jwk
+            }
             _ => return None,
         };
         let did = match jwk.params {
