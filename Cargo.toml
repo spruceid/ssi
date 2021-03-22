@@ -1,7 +1,7 @@
 [package]
 name = "ssi"
 version = "0.1.0"
-authors = ["wyc <wyc@fastmail.fm>"]
+authors = ["Spruce Systems, Inc."]
 edition = "2018"
 
 [features]
