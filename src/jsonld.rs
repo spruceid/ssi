@@ -8,6 +8,7 @@ use crate::rdf::{
     Object, Predicate, StringLiteral, Subject, Triple, LANG_STRING_IRI_STR,
 };
 
+use crate::json_ld;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;

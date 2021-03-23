@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add name to `Error::ResourceNotFound`.
 - Make `jws::sign_bytes` return bytes instead of string.
 - Allow multiple proofs and multiple verification methods in a DID document
+- Bundle `json-ld` crate, for `crates.io` release.
 
 ### Fixed
 - Fix `tz1` hashing.

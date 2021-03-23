@@ -14,3 +14,8 @@ Copyright © 2018-2021 World Wide Web Consortium, (Massachusetts Institute of Te
 Portions of this software are based in part on the work of schema.org. Because Spruce Systems, Inc. has included the work of schema.org in this product, Spruce Systems, Inc. is providing attribution in the following notice:
 
 Copyright in the schema by the sponsors of schema.org (Google, Inc., Yahoo, Inc., Microsoft Corporation and Yandex) are licensed to website publishers and other third parties under the Creative Commons Attribution-ShareAlike License (version 3.0) according to their Terms of Service, please visit https://schema.org/docs/terms.html. To view a copy of this license, please visit http://creativecommons.org/licenses/by-sa/3.0/.
+
+This software includes a modified copy of the json-ld crate by Timothée Haudebourg.
+The json-ld crate is available under either the Apache License, Version 2.0; or the MIT License.
+Original source: https://github.com/timothee-haudebourg/json-ld
+Modified source: https://github.com/spruceid/json-ld/tree/vendor

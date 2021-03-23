@@ -4,3 +4,6 @@
 [submodule "json-ld-normalization"]
 	path = json-ld-normalization
 	url = https://github.com/json-ld/normalization/
+[submodule "json-ld"]
+	path = json-ld
+	url = https://github.com/spruceid/json-ld

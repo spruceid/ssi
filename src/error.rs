@@ -4,6 +4,7 @@ use crate::caip10::BlockchainAccountIdVerifyError;
 use crate::eip712::TypedDataConstructionError;
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedDataHashError;
+use crate::json_ld;
 use base64::DecodeError as Base64Error;
 use iref::Error as IRIError;
 use json::Error as JSONError;

@@ -27,7 +27,6 @@ simple_asn1 = "0.5"
 num-bigint = "0.3"
 async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
-json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "5a30cfe37cfecd36808549caa983de3e5ced926b" }
 json = "^0.12"
 futures = "0.3"
 iref = "1.4"
@@ -49,6 +48,16 @@ keccak-hash = { version = "0.7", optional = true }
 p256 = { version = "0.7", optional = true, features = ["zeroize", "ecdsa"] }
 signature = { version = ">= 1.2.2, < 1.3.0" } # match ecdsa 0.10.2
 
+# dependencies for json-ld
+log = "^0.4"
+mown = "^0.2"
+# json = "^0.12"
+#iref = "^1.4.3"
+#futures = "^0.3"
+once_cell = "^1.4"
+reqwest = { version = "^0.10", optional = true }
+langtag = "^0.2"
+
 [workspace]
 members = [
   "did-tezos",
@@ -62,3 +71,9 @@ members = [
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
+
+# dev-dependencies for json-ld
+static-iref = "^1.0"
+iref-enum = "^1.2"
+stderrlog = "^0.5"
+tokio = { version = "1.0", features = ["macros"] }
