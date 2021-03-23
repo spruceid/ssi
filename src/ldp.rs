@@ -29,10 +29,6 @@ lazy_static! {
         let context_str = ssi_contexts::TZ_V2;
         serde_json::from_str(&context_str).unwrap()
     };
-    pub static ref ESRS2020_CONTEXT_EXTRA: Value = {
-        let context_str = ssi_contexts::ESRS2020_EXTRA;
-        serde_json::from_str(&context_str).unwrap()
-    };
     pub static ref EIP712VM_CONTEXT: Value = {
         let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(&context_str).unwrap()
@@ -692,7 +688,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         let proof = Proof {
             context: serde_json::json!([
                 crate::jsonld::DIF_ESRS2020_CONTEXT,
-                ESRS2020_CONTEXT_EXTRA.clone(),
+                crate::jsonld::ESRS2020_EXTRA_CONTEXT,
             ]),
             proof_purpose: options.proof_purpose.clone(),
             verification_method: options.verification_method.clone(),
@@ -713,7 +709,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         let proof = Proof {
             context: serde_json::json!([
                 crate::jsonld::DIF_ESRS2020_CONTEXT,
-                ESRS2020_CONTEXT_EXTRA.clone(),
+                crate::jsonld::ESRS2020_EXTRA_CONTEXT,
             ]),
             proof_purpose: options.proof_purpose.clone(),
             verification_method: options.verification_method.clone(),
