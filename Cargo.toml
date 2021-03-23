@@ -27,9 +27,8 @@ simple_asn1 = "0.5"
 num-bigint = "0.3"
 async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
-json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "2475710209fa2a89272294eff1dfe6bf19c2016e" }
-# json = "^0.12"
-json = { git = "https://github.com/timothee-haudebourg/json-rust", branch = "fix#190" }
+json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "5a30cfe37cfecd36808549caa983de3e5ced926b" }
+json = "^0.12"
 futures = "0.3"
 iref = "1.4"
 lazy_static = "1.4"
