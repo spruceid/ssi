@@ -5,6 +5,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Add function `HTTPDIDResolver::new`.
+- Add `SeriesResolver` struct, for combining multiple DID resolvers in series.
+- Add `DIDParameters` struct.
+- Add `DIDResolver::dereference` function.
+- Support W3id DID v1 context URL.
+- Add `jws::sign_bytes_b64` function.
+- Support `secp256k1` in `did:key`.
+- Support `P-256` (Secp256r1) in `did:key`.
+- Support `tz2` and `tz3` addresses in [did:tz][].
+- Implement [EcdsaSecp256k1Signature2019][] linked data signature suite.
+- Implement [EcdsaSecp256k1RecoveryMethod2020][] linked data signature suite.
+- Implement `EcdsaSecp256r1Signature2019` linked data signature suite.
+- Support [blockchainAccountId][] for certain proof types.
+- Support `ES256K` in [vc-test-suite][] driver.
+- Support Rust stable.
+- Implement external signing for linked data proofs: add `LinkedDataProofs::prepare` function and `ProofPreparation` struct.
+- Add non-registry implementation of [did:ethr][].
+- Implement [EIP-712][]-based linked data signature suite.
+- Add experimental `did:sol` DID method for Solana, with verification method.
+- Allow VP without VC, for [DIDAuth][] (except for in [vc-test-suite][]).
+- Implement `Default` for `Presentation`.
+- Complete `did:tz` resolution.
+- Add [Citizenship][] context.
+- Add [Vaccination][] context.
+- Add [DID Resolution][did-resolution-result] context.
+- Add [JSON Web Signature 2020][lds-jws2020] context.
+- Support HTTP(S) requests in WASM and on Android.
+- Support relative DID URLs in DID documents.
+- Support [publicKeyBase58][] for Ed25519.
+
+### Changed
+- Make `ResolutionResult` struct public.
+- Remove `ring` from default features.
+- Use `method-not-supported` DID resolution error.
+- Allow objects in `@context` property of DID document, VPs, and proofs.
+- Make `DIDResolver` object-safe.
+- Implement `DIDResolver::resolve_representation` for `DIDMethods`.
+- Preserve key order in `ResolutionResult` `property_set`.
+- Completed [DID URL Dereferencing][] implementation.
+- Update `iref` and `async-std` dependency versions.
+- Update DID metadata parameter names.
+- Support `ResolutionResult` or DID Document in `HTTPDIDResolver` response.
+- Implement DID URL dereferencing through `HTTPDIDResolver`.
+- Add `Data` variant to `Content` enum.
+- Change `did:tz` verification method type to `Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021`.
+- Add context to `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` linked data proofs.
+- Add name to `Error::ResourceNotFound`.
+- Make `jws::sign_bytes` return bytes instead of string.
+- Allow multiple proofs and multiple verification methods in a DID document
+
+### Fixed
+- Fix `tz1` hashing.
+- Add missing number in RDF lang subtag parsing.
+- Fix name of JWK EC `crv` property.
+- Update crate author fields.
+
+### Security
+- Verify [verification relationship][] for [proof purpose][].
 
 ## [0.1.0] - 2021-01-27
 [Initial release with DIDKit][didkit-initial-release]
@@ -32,21 +91,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Copyright notices.
 
 [ASN.1]: https://webstore.ansi.org/Standards/ISO/ISOIEC88252015
+[Citizenship]: https://w3c-ccg.github.io/citizenship-vocab/
 [DID Methods]: (https://w3c.github.io/did-core/#methods)
 [DID Resolvers]: https://w3c.github.io/did-core/#dfn-did-resolvers
 [DID URL Dereferencing]: https://w3c.github.io/did-core/#did-url-dereferencing
+[DIDAuth]: https://w3c-ccg.github.io/vp-request-spec/#did-authentication-request
+[EIP-712]: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md
+[EcdsaSecp256k1RecoveryMethod2020]: https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/
+[EcdsaSecp256k1Signature2019]: https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/
 [LD-Proof]: https://w3c-ccg.github.io/ld-proofs/
 [Linked data signature]: https://w3c-ccg.github.io/ld-proofs/#linked-data-signatures
 [Proof Types]: https://w3c-ccg.github.io/ld-proofs/#proof-types
 [Traits]: https://doc.rust-lang.org/book/ch10-02-traits.html
+[Vaccination]: https://w3c-ccg.github.io/vaccination-vocab/
 [Verifiable Presentations]: https://w3c.github.io/vc-data-model/#presentations-0
+[blockchainAccountId]: https://www.w3.org/TR/did-spec-registries/#blockchainaccountid
 [did-https]: https://w3c-ccg.github.io/did-resolution/#bindings-https
+[did-resolution-result]: https://w3c-ccg.github.io/did-resolution/#did-resolution-result
+[did:ethr]: https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md
 [did:key]: https://w3c-ccg.github.io/did-method-key/
 [did:tz]: https://did-tezos-draft.spruceid.com/
 [did:web]: https://w3c-ccg.github.io/did-method-web/
 [didkit-initial-release]: https://sprucesystems.medium.com/didkit-v0-1-is-live-d0ea6638dbc9
 [ed25519-dalek]: https://github.com/dalek-cryptography/ed25519-dalek
+[lds-jws2020]: https://w3c-ccg.github.io/lds-jws2020/
 [plugfest-2020]: https://github.com/w3c-ccg/vc-http-api/tree/master/packages/plugfest-2020
+[proof purpose]: https://w3c-ccg.github.io/ld-proofs/#proof-purpose
+[publicKeyBase58]: https://www.w3.org/TR/did-core/#dfn-publickeybase58
 [rfc7515]: https://tools.ietf.org/html/rfc7515
 [rfc7517]: https://tools.ietf.org/html/rfc7517
 [rfc7518]: https://tools.ietf.org/html/rfc7518
@@ -63,6 +134,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-data-model]: https://w3c.github.io/vc-data-model/
 [vc-http-api]: https://w3c-ccg.github.io/vc-http-api/
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
+[verification relationship]: https://www.w3.org/TR/did-core/#dfn-verification-relationship
 
 [Unreleased]: https://github.com/spruceid/ssi/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/spruceid/ssi/releases/tag/v0.1.0
