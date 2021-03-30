@@ -1161,6 +1161,7 @@ mod tests {
         );
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_full_resolution() {
         // let address = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";

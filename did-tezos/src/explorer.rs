@@ -115,6 +115,7 @@ mod tests {
     const LIVE_DID_MANAGER: &str = "KT1XFk3nxojBisE5WpXugmuPuh9GRzo54gxL";
 
     #[tokio::test]
+    #[ignore]
     async fn test_retrieve_did_manager() {
         let did_manager = retrieve_did_manager(BCD_URL, LIVE_TZ1, LIVE_NETWORK).await;
         assert!(did_manager.is_ok());
@@ -122,6 +123,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_execute_view() {
         let service_endpoint = execute_service_view(
             BCD_URL,
