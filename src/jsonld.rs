@@ -130,79 +130,79 @@ pub const TRACEABILITY_CONTEXT: &str = "https://w3id.org/traceability/v1";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-2018-credentials-v1.jsonld");
+        let jsonld = ssi_contexts::CREDENTIALS_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(CREDENTIALS_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-2018-credentials-examples-v1.jsonld");
+        let jsonld = ssi_contexts::CREDENTIALS_EXAMPLES_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(CREDENTIALS_EXAMPLES_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref ODRL_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-odrl.jsonld");
+        let jsonld = ssi_contexts::ODRL;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(ODRL_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref SCHEMA_ORG_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/schema.org.jsonld");
+        let jsonld = ssi_contexts::SCHEMA_ORG;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(SCHEMA_ORG_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref SECURITY_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3id-security-v1.jsonld");
+        let jsonld = ssi_contexts::SECURITY_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(SECURITY_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref SECURITY_V2_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3id-security-v2.jsonld");
+        let jsonld = ssi_contexts::SECURITY_V2;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(SECURITY_V2_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref DID_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-did-v1.jsonld");
+        let jsonld = ssi_contexts::DID_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(DID_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-did-resolution-v1.jsonld");
+        let jsonld = ssi_contexts::DID_RESOLUTION_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/dif-lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
+        let jsonld = ssi_contexts::DIF_ESRS2020;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(DIF_ESRS2020_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref LDS_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/lds-jws2020-v1.jsonld");
+        let jsonld = ssi_contexts::LDS_JWS2020_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(LDS_JWS2020_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref CITIZENSHIP_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-ccg-citizenship-v1.jsonld");
+        let jsonld = ssi_contexts::CITIZENSHIP_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(CITIZENSHIP_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref VACCINATION_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-ccg-vaccination-v1.jsonld");
+        let jsonld = ssi_contexts::VACCINATION_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(VACCINATION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref TRACEABILITY_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
-        let jsonld = include_str!("../contexts/w3c-ccg-traceability-v1.jsonld");
+        let jsonld = ssi_contexts::TRACEABILITY_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(TRACEABILITY_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)

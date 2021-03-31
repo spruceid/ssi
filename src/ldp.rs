@@ -26,19 +26,19 @@ use serde_json::Value;
 lazy_static! {
     /// JSON-LD context for Linked Data Proofs based on Tezos addresses
     pub static ref TZ_CONTEXT: Value = {
-        let context_str = include_str!("../contexts/tz-2021-v2.jsonld");
+        let context_str = ssi_contexts::TZ_V2;
         serde_json::from_str(&context_str).unwrap()
     };
     pub static ref ESRS2020_CONTEXT_EXTRA: Value = {
-        let context_str = include_str!("../contexts/esrs2020-extra.jsonld");
+        let context_str = ssi_contexts::ESRS2020_EXTRA;
         serde_json::from_str(&context_str).unwrap()
     };
     pub static ref EIP712VM_CONTEXT: Value = {
-        let context_str = include_str!("../contexts/eip712vm.jsonld");
+        let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(&context_str).unwrap()
     };
     pub static ref SOLVM_CONTEXT: Value = {
-        let context_str = include_str!("../contexts/solvm.jsonld");
+        let context_str = ssi_contexts::SOLVM;
         serde_json::from_str(&context_str).unwrap()
     };
 }
