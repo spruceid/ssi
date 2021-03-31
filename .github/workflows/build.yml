@@ -25,9 +25,9 @@ jobs:
           ~/.cargo/registry
           ~/.cargo/git
           target
-        key: ${{ runner.os }}-ssi-cargo-${{ hashFiles('Cargo.toml', '**.rs') }}
+        key: ${{ runner.os }}-ssi1-cargo-${{ hashFiles('Cargo.toml', '**.rs') }}
         restore-keys: |
-          ${{ runner.os }}-ssi-cargo-
+          ${{ runner.os }}-ssi1-cargo-
 
     - name: Build
       run: cargo build --verbose --workspace
