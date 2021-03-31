@@ -3,6 +3,15 @@ name = "ssi"
 version = "0.1.0"
 authors = ["Spruce Systems, Inc."]
 edition = "2018"
+license = "Apache-2.0"
+description = "Core library for Verifiable Credentials and Decentralized Identifiers."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi/"
+
+exclude = [
+  "json-ld-api/*",
+  "json-ld-normalization/*",
+]
 
 [features]
 default = ["ring"]
@@ -47,7 +56,7 @@ thiserror = "1.0"
 keccak-hash = { version = "0.7", optional = true }
 p256 = { version = "0.7", optional = true, features = ["zeroize", "ecdsa"] }
 signature = { version = ">= 1.2.2, < 1.3.0" } # match ecdsa 0.10.2
-ssi-contexts = { path = "contexts/" }
+ssi-contexts = { version = "0.0.1", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
 
 # dependencies for json-ld
