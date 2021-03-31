@@ -11,17 +11,6 @@ fn usage() {
 fn generate(data: String) -> String {
     let doc = Credential::from_json(&data).unwrap();
 
-    // work around https://github.com/w3c/vc-test-suite/issues/96
-    let contexts: &OneOrMany<Context> = &doc.context.clone().into();
-    if doc.type_.len() > 1 && contexts.len() <= 1 {
-        panic!("If there are multiple types, there should be multiple contexts.");
-    }
-
-    // work around https://github.com/w3c/vc-test-suite/issues/97
-    if contexts.len() > 1 && doc.type_.len() <= 1 {
-        panic!("If there are multiple contexts, there should be multiple types.");
-    }
-
     serde_json::to_string_pretty(&doc).unwrap()
 }
 
@@ -41,11 +30,6 @@ fn decode_jwt_unsigned(data: &String) -> String {
 
 fn generate_presentation(data: &String) -> String {
     let vp = Presentation::from_json(data).unwrap();
-
-    // work around https://github.com/w3c/vc-test-suite/issues/112
-    if vp.verifiable_credential.is_none() {
-        panic!("VP must include verifiableCredential");
-    }
 
     serde_json::to_string_pretty(&vp).unwrap()
 }
@@ -110,12 +94,6 @@ fn main() {
     }
     if cmd == None || filename == None {
         return usage();
-    }
-    // work around https://github.com/w3c/vc-test-suite/issues/98
-    if filename.as_ref().unwrap().contains("example-015-zkp") {
-        jwt_keys = None;
-        jwt_aud = None;
-        jwt_decode = false;
     }
 
     let cmd_str = cmd.unwrap();
