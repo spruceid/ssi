@@ -3,9 +3,16 @@ name = "did-pkh"
 version = "0.0.1"
 authors = ["Spruce Systems, Inc."]
 edition = "2018"
+license = "Apache-2.0"
+keywords = ["ssi", "did", "tor"]
+categories = ["cryptography"]
+description = "did:pkh DID method, using the ssi crate"
+repository = "https://github.com/spruceid/ssi/"
+homepage = "https://github.com/spruceid/ssi/tree/main/did-pkh/"
+documentation = "https://docs.rs/did-pkh/"
 
 [dependencies]
-ssi = { path = "../", default-features = false, features = ["secp256k1", "keccak-hash", "p256", "ripemd160"] }
+ssi = { version = "0.2", path = "../", default-features = false, features = ["secp256k1", "keccak-hash", "p256", "ripemd160"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

@@ -3,12 +3,18 @@ name = "did-onion"
 version = "0.1.0"
 authors = ["Spruce Systems, Inc."]
 edition = "2018"
+license = "Apache-2.0"
+keywords = ["ssi", "did", "tor", "onion"]
+description = "did:onion DID method, using the ssi crate"
+repository = "https://github.com/spruceid/ssi/"
+homepage = "https://github.com/spruceid/ssi/tree/main/did-onion/"
+documentation = "https://docs.rs/did-onion/"
 
 [features]
 tor-tests = []
 
 [dependencies]
-ssi = { path = "../", default-features = false }
+ssi = { version = "0.2", path = "../", default-features = false }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json", "socks"] }
 http = "0.2"

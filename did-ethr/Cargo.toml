@@ -3,9 +3,16 @@ name = "did-ethr"
 version = "0.0.1"
 authors = ["Spruce Systems, Inc."]
 edition = "2018"
+license = "Apache-2.0"
+keywords = ["ssi", "did", "ethereum"]
+categories = ["cryptography::cryptocurrencies"]
+description = "did:ethr DID method, using the ssi crate"
+repository = "https://github.com/spruceid/ssi/"
+homepage = "https://github.com/spruceid/ssi/tree/main/did-ethr/"
+documentation = "https://docs.rs/did-ethr/"
 
 [dependencies]
-ssi = { path = "../", default-features = false, features = ["secp256k1", "keccak-hash"] }
+ssi = { version = "0.2", path = "../", default-features = false, features = ["secp256k1", "keccak-hash"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
