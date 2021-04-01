@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.2.0] - 2021-04-01
 ### Added
 - Add function `HTTPDIDResolver::new`.
 - Add `SeriesResolver` struct, for combining multiple DID resolvers in series.
@@ -37,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support [publicKeyBase58][] for Ed25519.
 - Added `DIDMethods::generate` function.
 - Add `did:pkh` Public Key Hash DID Method.
+- Add `did:onion` implementation.
+- Update vc-test-suite` test driver to remove workarounds.
+- Use `ssi-contexts` crate.
 
 ### Changed
 - Make `ResolutionResult` struct public.
@@ -141,5 +146,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
 [verification relationship]: https://www.w3.org/TR/did-core/#dfn-verification-relationship
 
-[Unreleased]: https://github.com/spruceid/ssi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/spruceid/ssi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/spruceid/ssi/releases/tag/v0.2.0
 [0.1.0]: https://github.com/spruceid/ssi/releases/tag/v0.1.0
