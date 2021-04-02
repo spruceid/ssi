@@ -1,6 +1,6 @@
 # did-web
 
-Rust implementation of the [did:key][] DID Method, based on the [ssi][] library.
+Rust implementation of the [did:web][] DID Method, based on the [ssi][] library.
 
 ## License
 
