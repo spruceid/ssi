@@ -1,5 +1,5 @@
 [package]
-name = "did-tezos"
+name = "did-tz"
 version = "0.1.0"
 authors = ["Spruce Systems, Inc."]
 edition = "2018"
