@@ -21,3 +21,5 @@ bs58 = { version = "0.4", features = ["check"] }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros", "rt"] }
+hex = "0.4"
+blake2b_simd = "0.5"

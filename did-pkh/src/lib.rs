@@ -55,6 +55,7 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
         account_address,
         chain_id: "tezos:mainnet".to_string(),
     };
+
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some("blockchainAccountId".to_string()),
@@ -67,12 +68,32 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
         blockchain_account_id: Some(blockchain_account_id.to_string()),
         ..Default::default()
     });
+
+    let vm2_url = DIDURL {
+        did: did.to_string(),
+        fragment: Some("TezosMethod2021".to_string()),
+        ..Default::default()
+    };
+    let vm2 = VerificationMethod::Map(VerificationMethodMap {
+        id: String::from(vm2_url.clone()),
+        type_: "TezosMethod2021".to_string(),
+        controller: did.to_string(),
+        blockchain_account_id: Some(blockchain_account_id.to_string()),
+        ..Default::default()
+    });
+
     let doc = Document {
         context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
         id: did.to_string(),
-        verification_method: Some(vec![vm]),
-        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
-        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
+        verification_method: Some(vec![vm, vm2]),
+        authentication: Some(vec![
+            VerificationMethod::DIDURL(vm_url.clone()),
+            VerificationMethod::DIDURL(vm2_url.clone()),
+        ]),
+        assertion_method: Some(vec![
+            VerificationMethod::DIDURL(vm_url),
+            VerificationMethod::DIDURL(vm2_url),
+        ]),
         ..Default::default()
     };
     resolution_result(doc)
@@ -354,7 +375,7 @@ impl DIDMethod for DIDPKH {
 mod tests {
     use super::*;
     use serde_json::{from_str, from_value, json, Value};
-    use ssi::jwk::JWK;
+    use ssi::jwk::Algorithm;
     use ssi::ldp::ProofSuite;
     use ssi::one_or_many::OneOrMany;
     use ssi::vc::Proof;
@@ -593,6 +614,149 @@ mod tests {
         assert!(vp2.verify(None, &DIDPKH).await.errors.len() > 0);
     }
 
+    async fn credential_prepare_complete_verify_did_pkh_tz(
+        algorithm: Algorithm,
+        key: JWK,
+        wrong_key: JWK,
+        type_: &str,
+        vm_relative_url: &str,
+        proof_suite: &dyn ProofSuite,
+    ) {
+        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        let did = DIDPKH
+            .generate(&Source::KeyAndPattern(&key, type_))
+            .unwrap();
+        eprintln!("did: {}", did);
+        let mut vc: Credential = from_value(json!({
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "type": "VerifiableCredential",
+            "issuer": did.clone(),
+            "issuanceDate": "2021-03-18T16:38:25Z",
+            "credentialSubject": {
+                "id": "did:example:foo"
+            }
+        }))
+        .unwrap();
+        vc.validate_unsigned().unwrap();
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(did.to_string() + vm_relative_url),
+            ..Default::default()
+        };
+        eprintln!("vm {:?}", issue_options.verification_method);
+        let vc_no_proof = vc.clone();
+        let prep = proof_suite
+            .prepare(&vc, &issue_options, &key)
+            .await
+            .unwrap();
+
+        let sig = sign_tezos(&prep, algorithm, &key);
+        eprintln!("sig: {}", sig);
+
+        // Complete issuance
+        let proof = proof_suite.complete(prep, &sig).await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDPKH).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // test that issuer property is used for verification
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
+        assert!(vc_bad_issuer.verify(None, &DIDPKH).await.errors.len() > 0);
+
+        // Check that proof JWK must match proof verificationMethod
+        let mut vc_wrong_key = vc_no_proof.clone();
+        let proof_bad = proof_suite
+            .sign(&vc_no_proof, &issue_options, &wrong_key)
+            .await
+            .unwrap();
+        vc_wrong_key.add_proof(proof_bad);
+        vc_wrong_key.validate().unwrap();
+        assert!(vc_wrong_key.verify(None, &DIDPKH).await.errors.len() > 0);
+
+        // Mess with proof signature to make verify fail
+        let mut vc_fuzzed = vc.clone();
+        fuzz_proof_value(&mut vc_fuzzed.proof);
+        let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.len() >= 1);
+
+        // Make it into a VP
+        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        let mut vp = Presentation {
+            id: None,
+            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+                DEFAULT_CONTEXT.to_string(),
+            ))]),
+
+            type_: OneOrMany::One("VerifiablePresentation".to_string()),
+            verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
+            proof: None,
+            holder: None,
+            property_set: None,
+        };
+        let mut vp_issue_options = LinkedDataProofOptions::default();
+        vp.holder = Some(URI::String(did.to_string()));
+        vp_issue_options.verification_method = Some(did.to_string() + vm_relative_url);
+        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+
+        let prep = proof_suite
+            .prepare(&vp, &vp_issue_options, &key)
+            .await
+            .unwrap();
+        let sig = sign_tezos(&prep, algorithm, &key);
+        let vp_proof = proof_suite.complete(prep, &sig).await.unwrap();
+        vp.add_proof(vp_proof);
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        vp.validate().unwrap();
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDPKH).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.is_empty());
+
+        // Mess with proof signature to make verify fail
+        let mut vp_fuzzed = vp.clone();
+        fuzz_proof_value(&mut vp_fuzzed.proof);
+        let vp_verification_result = vp_fuzzed.verify(Some(vp_issue_options), &DIDPKH).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.len() >= 1);
+
+        // Test that holder is verified
+        let mut vp2 = vp.clone();
+        vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
+        assert!(vp2.verify(None, &DIDPKH).await.errors.len() > 0);
+    }
+
+    fn sign_tezos(prep: &ssi::ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
+        // Simulate signing with a Tezos wallet
+        let micheline = match prep.signing_input {
+            ssi::ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
+            _ => panic!("Expected Micheline expression for signing"),
+        };
+
+        let data = blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(&micheline)
+            .as_bytes()
+            .to_vec();
+        let sig = ssi::jws::sign_bytes(algorithm, &data, &key).unwrap();
+        let mut sig_prefixed = Vec::new();
+        const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
+        const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
+        const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
+        let prefix: &[u8] = match algorithm {
+            Algorithm::EdDSA => &EDSIG_PREFIX,
+            Algorithm::ES256K | Algorithm::ES256KR => &SPSIG_PREFIX,
+            Algorithm::ES256 => &P2SIG_PREFIX,
+            _ => panic!("Unsupported algorithm for Tezos signing"),
+        };
+        sig_prefixed.extend_from_slice(&prefix);
+        sig_prefixed.extend_from_slice(&sig);
+        let sig_bs58 = bs58::encode(sig_prefixed).with_check().into_string();
+        sig_bs58
+    }
+
     #[tokio::test]
     async fn resolve_vc_issue_verify() {
         let key_secp256k1_recovery: JWK = from_value(json!({
@@ -709,6 +873,39 @@ mod tests {
             "doge",
             "#blockchainAccountId",
             &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+        )
+        .await;
+
+        println!("did:pkh:tz:tz1 - TezosMethod2021");
+        credential_prepare_complete_verify_did_pkh_tz(
+            Algorithm::EdDSA,
+            key_ed25519.clone(),
+            other_key_ed25519.clone(),
+            "tz",
+            "#TezosMethod2021",
+            &ssi::ldp::TezosSignature2021,
+        )
+        .await;
+
+        println!("did:pkh:tz:tz2 - TezosMethod2021");
+        credential_prepare_complete_verify_did_pkh_tz(
+            Algorithm::ES256KR,
+            key_secp256k1_recovery.clone(),
+            other_key_secp256k1.clone(),
+            "tz",
+            "#TezosMethod2021",
+            &ssi::ldp::TezosSignature2021,
+        )
+        .await;
+
+        println!("did:pkh:tz:tz3 - TezosMethod2021");
+        credential_prepare_complete_verify_did_pkh_tz(
+            Algorithm::ES256,
+            key_p256.clone(),
+            other_key_p256.clone(),
+            "tz",
+            "#TezosMethod2021",
+            &ssi::ldp::TezosSignature2021,
         )
         .await;
     }

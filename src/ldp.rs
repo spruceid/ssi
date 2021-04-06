@@ -5,6 +5,12 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use chrono::prelude::*;
 
+const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
+const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
+const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
+const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
+const SPSIG: &str = "4sLJ";
+
 // use crate::did::{VerificationMethod, VerificationMethodMap};
 use crate::caip10::BlockchainAccountId;
 use crate::did::{Resource, VerificationMethodMap};
@@ -27,6 +33,10 @@ lazy_static! {
     /// JSON-LD context for Linked Data Proofs based on Tezos addresses
     pub static ref TZ_CONTEXT: Value = {
         let context_str = ssi_contexts::TZ_V2;
+        serde_json::from_str(&context_str).unwrap()
+    };
+    pub static ref TZVM_CONTEXT: Value = {
+        let context_str = ssi_contexts::TZVM_V1;
         serde_json::from_str(&context_str).unwrap()
     };
     pub static ref EIP712VM_CONTEXT: Value = {
@@ -108,6 +118,9 @@ pub enum SigningInput {
     Bytes(Base64urlUInt),
     #[cfg(feature = "keccak-hash")]
     TypedData(TypedData),
+    Micheline {
+        micheline: String,
+    },
 }
 
 impl ProofPreparation {
@@ -135,6 +148,7 @@ impl ProofPreparation {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
+            "TezosSignature2021" => TezosSignature2021.complete(self, signature).await,
             "SolanaSignature2021" => SolanaSignature2021.complete(self, signature).await,
             "JsonWebSignature2020" => JsonWebSignature2020.complete(self, signature).await,
             _ => Err(Error::ProofTypeNotImplemented),
@@ -181,6 +195,9 @@ impl LinkedDataProofs {
             } => match &curve[..] {
                 "Ed25519" => {
                     if let Some(ref vm) = options.verification_method {
+                        if vm.ends_with("#TezosMethod2021") {
+                            return TezosSignature2021.sign(document, options, &key).await;
+                        }
                         if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
                             return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                                 .sign(document, options, &key)
@@ -218,6 +235,9 @@ impl LinkedDataProofs {
                                     #[cfg(not(feature = "keccak-hash"))]
                                     return Err(Error::ProofTypeNotImplemented);
                                 }
+                                if vm.ends_with("#TezosMethod2021") {
+                                    return TezosSignature2021.sign(document, options, &key).await;
+                                }
                             }
                             return EcdsaSecp256k1RecoverySignature2020
                                 .sign(document, options, &key)
@@ -230,6 +250,9 @@ impl LinkedDataProofs {
                     }
                     "P-256" => {
                         if let Some(ref vm) = options.verification_method {
+                            if vm.ends_with("#TezosMethod2021") {
+                                return TezosSignature2021.sign(document, options, &key).await;
+                            }
                             if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:") {
                                 return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                                     .sign(document, options, &key)
@@ -265,6 +288,11 @@ impl LinkedDataProofs {
             }
             Algorithm::EdDSA => {
                 if let Some(ref vm) = options.verification_method {
+                    if vm.ends_with("#TezosMethod2021") {
+                        return TezosSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
+                    }
                     if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
                         return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                             .prepare(document, options, public_key)
@@ -282,6 +310,11 @@ impl LinkedDataProofs {
             }
             Algorithm::ES256 => {
                 if let Some(ref vm) = options.verification_method {
+                    if vm.ends_with("#TezosMethod2021") {
+                        return TezosSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
+                    }
                     if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
                         return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                             .prepare(document, options, public_key)
@@ -306,6 +339,11 @@ impl LinkedDataProofs {
                             .await;
                         #[cfg(not(feature = "keccak-hash"))]
                         return Err(Error::ProofTypeNotImplemented);
+                    }
+                    if vm.ends_with("#TezosMethod2021") {
+                        return TezosSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
                     }
                 }
                 return EcdsaSecp256k1RecoverySignature2020
@@ -348,6 +386,7 @@ impl LinkedDataProofs {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.verify(proof, document, resolver).await,
+            "TezosSignature2021" => TezosSignature2021.verify(proof, document, resolver).await,
             "SolanaSignature2021" => SolanaSignature2021.verify(proof, document, resolver).await,
             "JsonWebSignature2020" => JsonWebSignature2020.verify(proof, document, resolver).await,
             "EcdsaSecp256r1Signature2019" => {
@@ -1072,6 +1111,199 @@ impl ProofSuite for Eip712Signature2021 {
     }
 }
 
+async fn micheline_from_document_and_options(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: &Proof,
+) -> Result<Vec<u8>, Error> {
+    let doc_dataset = document.to_dataset_for_signing(None).await?;
+    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
+    let doc_normalized = doc_dataset_normalized.to_nquads()?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
+    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
+    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
+    let string_bytes = [
+        "Tezos Signed Message: ".to_string(),
+        sigopts_normalized,
+        doc_normalized,
+    ]
+    .join("\n")
+    .as_bytes()
+    .to_vec();
+    const BYTES_PREFIX: [u8; 2] = [05, 01];
+    let data = [
+        BYTES_PREFIX.to_vec(),
+        string_bytes.len().to_be_bytes().to_vec(),
+        string_bytes,
+    ]
+    .concat();
+    Ok(data)
+}
+
+pub struct TezosSignature2021;
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl ProofSuite for TezosSignature2021 {
+    async fn sign(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+        let mut proof = Proof {
+            context: TZVM_CONTEXT.clone(),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("TezosSignature2021")
+        };
+        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let data = blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(&micheline)
+            .as_bytes()
+            .to_vec();
+        let sig = crate::jws::sign_bytes(algorithm, &data, key)?;
+        let mut sig_prefixed = Vec::new();
+        let prefix: &[u8] = match algorithm {
+            Algorithm::EdDSA => &EDSIG_PREFIX,
+            Algorithm::ES256K | Algorithm::ES256KR => &SPSIG_PREFIX,
+            Algorithm::ES256 => &P2SIG_PREFIX,
+            _ => return Err(Error::UnsupportedAlgorithm),
+        };
+        sig_prefixed.extend_from_slice(&prefix);
+        sig_prefixed.extend_from_slice(&sig);
+        let sig_bs58 = bs58::encode(sig_prefixed).with_check().into_string();
+        proof.proof_value = Some(sig_bs58);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        let mut property_set = std::collections::HashMap::new();
+        if public_key.algorithm != Some(Algorithm::ES256KR) {
+            // Algorithm not supporting public key recovery: put public key in proof if it is not
+            // in the VM.
+            // TODO: dereference VM URL to check if VM contains public key.
+            let jwk_value = serde_json::to_value(public_key.to_public())?;
+            property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        }
+        let proof = Proof {
+            context: TZVM_CONTEXT.clone(),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            property_set: Some(property_set),
+            ..Proof::new("TezosSignature2021")
+        };
+        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let micheline_string = hex::encode(micheline);
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::Micheline {
+                micheline: micheline_string,
+            },
+        })
+    }
+
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let sig_bs58 = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let proof_jwk_opt: Option<JWK> = match proof.property_set {
+            Some(ref props) => match props.get("publicKeyJwk") {
+                Some(jwk_value) => serde_json::from_value(jwk_value.clone())?,
+                None => None,
+            },
+            None => None,
+        };
+        let sig = bs58::decode(&sig_bs58).with_check(None).into_vec()?;
+        let (algorithm, sig) = if sig_bs58.starts_with("edsig") {
+            (Algorithm::EdDSA, sig[5..].to_vec())
+        } else if sig_bs58.starts_with(SPSIG) {
+            let alg = if proof_jwk_opt.is_some() {
+                Algorithm::ES256K
+            } else {
+                Algorithm::ES256KR
+            };
+            (alg, sig[5..].to_vec())
+        } else if sig_bs58.starts_with("p2sig") {
+            (Algorithm::ES256, sig[4..].to_vec())
+        } else {
+            return Err(Error::SignaturePrefix);
+        };
+
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        if vm.type_ != "TezosMethod2021" {
+            return Err(Error::VerificationMethodMismatch);
+        }
+
+        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let data = blake2b_simd::Params::new()
+            .hash_length(32)
+            .hash(&micheline)
+            .as_bytes()
+            .to_vec();
+        let account_id_opt: Option<BlockchainAccountId> = match vm.blockchain_account_id {
+            Some(account_id_string) => Some(account_id_string.parse()?),
+            None => None,
+        };
+
+        // VM must have either publicKeyJwk or blockchainAccountId.
+        if let Some(vm_jwk) = vm.public_key_jwk {
+            // If VM has publicKey, use that to veify the signature.
+            crate::jws::verify_bytes(algorithm, &data, &vm_jwk, &sig)?;
+            // Note: VM blockchainAccountId is ignored in this case.
+        } else {
+            if let Some(account_id) = account_id_opt {
+                // VM does not have publicKeyJwk: either proof must have public key or algorithm must support
+                // public key recovery.
+                if let Some(proof_jwk) = proof_jwk_opt {
+                    // Proof has public key: verify it with blockchainAccountId.
+                    account_id.verify(&proof_jwk)?;
+                } else {
+                    // Proof has no public key: use public key recovery,
+                    let recovered_jwk = crate::jws::recover(algorithm, &data, &sig)?;
+                    // and then verify the recovered key with blockchainAccountId.
+                    account_id.verify(&recovered_jwk)?;
+                }
+            } else {
+                return Err(Error::MissingKey);
+            }
+        };
+        Ok(())
+    }
+}
+
 pub struct SolanaSignature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -1310,6 +1542,40 @@ mod tests {
         let _proof = LinkedDataProofs::sign(&doc, &issue_options, &key)
             .await
             .unwrap();
+    }
+
+    #[async_std::test]
+    async fn tezos_vm_tz1() {
+        let mut key = JWK::generate_ed25519().unwrap();
+        key.algorithm = Some(Algorithm::EdDSA);
+        let vm = format!("{}#TezosMethod2021", "did:example:foo");
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(vm),
+            ..Default::default()
+        };
+        let doc = ExampleDocument;
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &key)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&proof).unwrap());
+        // TODO: verify
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "secp256k1")]
+    async fn tezos_vm_tz2() {
+        let mut key = JWK::generate_secp256k1().unwrap();
+        key.algorithm = Some(Algorithm::ES256KR);
+        let vm = format!("{}#TezosMethod2021", "did:example:foo");
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(vm),
+            ..Default::default()
+        };
+        let doc = ExampleDocument;
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &key)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&proof).unwrap());
     }
 
     /*
