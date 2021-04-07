@@ -161,6 +161,7 @@ pub enum Error {
     Base58(bs58::decode::Error),
     HexString,
     SignaturePrefix,
+    KeyPrefix,
     P256KeyLength(usize),
     ECEncodingError,
     ECDecompress,
@@ -276,6 +277,7 @@ impl fmt::Display for Error {
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
             Error::HexString => write!(f, "Expected string beginning with '0x'"),
             Error::SignaturePrefix => write!(f, "Unknown signature prefix"),
+            Error::KeyPrefix => write!(f, "Unknown key prefix"),
             Error::FromUtf8(e) => e.fmt(f),
             Error::TryFromSlice(e) => e.fmt(f),
             #[cfg(feature = "ring")]
