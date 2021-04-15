@@ -139,8 +139,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [rsa]: https://github.com/RustCrypto/RSA
 [toRdf-tests]: https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html
 [toRdf]: https://w3c.github.io/json-ld-api/#rdf-serialization-deserialization-algorithms
-[urdna-tests]: https://json-ld.github.io/normalization/tests/
-[urdna]: https://json-ld.github.io/normalization/spec/
+[urdna-tests]: https://json-ld.github.io/rdf-dataset-canonicalization/tests/
+[urdna]: https://json-ld.github.io/rdf-dataset-canonicalization/spec/
 [vc-data-model]: https://w3c.github.io/vc-data-model/
 [vc-http-api]: https://w3c-ccg.github.io/vc-http-api/
 [vc-test-suite]: https://github.com/w3c/vc-test-suite

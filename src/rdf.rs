@@ -10,7 +10,7 @@ use iref::IriBuf;
 
 use crate::error::Error;
 
-// https://json-ld.github.io/normalization/spec/
+// https://json-ld.github.io/rdf-dataset-canonicalization/spec/
 // https://www.w3.org/TR/n-quads/#terminals
 
 /// <https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-dataset>
@@ -673,7 +673,7 @@ mod tests {
             "\"\t\x08\\n\\r\x0c\\\"'\\\\\u{221e}\""
         );
 
-        // Awaiting https://github.com/json-ld/normalization/issues/15
+        // Awaiting https://github.com/json-ld/rdf-dataset-canonicalization/issues/15
         // for adding tests of IRI ref escaping
         let iri_ref = IRIRef("urn:ex:s".to_string());
         assert_eq!(String::from(&iri_ref), "<urn:ex:s>");

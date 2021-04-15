@@ -5,7 +5,7 @@ use crate::error::Error;
 use crate::hash::sha256;
 use crate::rdf::{BlankNodeLabel, DataSet, Predicate, Statement};
 
-/// <https://json-ld.github.io/normalization/spec/#normalization-state>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#normalization-state>
 #[derive(Debug, Clone)]
 pub struct NormalizationState<'a> {
     pub blank_node_to_quads: Map<&'a str, Vec<&'a Statement>>,
@@ -13,8 +13,8 @@ pub struct NormalizationState<'a> {
     pub canonical_issuer: IdentifierIssuer,
 }
 
-/// <https://json-ld.github.io/normalization/spec/#dfn-identifier-issuer>  
-/// <https://json-ld.github.io/normalization/spec/#blank-node-identifier-issuer-state>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#dfn-identifier-issuer>  
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#blank-node-identifier-issuer-state>
 #[derive(Debug, Clone)]
 pub struct IdentifierIssuer {
     pub identifier_prefix: String,
@@ -52,12 +52,12 @@ fn digest_to_lowerhex(digest: &[u8]) -> String {
         .collect::<String>()
 }
 
-/// <https://json-ld.github.io/normalization/spec/#hash-first-degree-quads>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#hash-first-degree-quads>
 pub fn hash_first_degree_quads(
     normalization_state: &mut NormalizationState,
     reference_blank_node_identifier: &str,
 ) -> Result<String, Error> {
-    // https://json-ld.github.io/normalization/spec/#algorithm-1
+    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-1
     // 1
     let mut nquads: Vec<String> = Vec::new();
     // 2
@@ -91,9 +91,9 @@ pub fn hash_first_degree_quads(
     Ok(hash_hex)
 }
 
-/// <https://json-ld.github.io/normalization/spec/>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/>
 pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
-    // https://json-ld.github.io/normalization/spec/#algorithm
+    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm
     // 1
     let mut normalization_state = NormalizationState {
         blank_node_to_quads: Map::new(),
@@ -224,12 +224,12 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
     Ok(normalized_dataset)
 }
 
-/// <https://json-ld.github.io/normalization/spec/#issue-identifier-algorithm>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#issue-identifier-algorithm>
 pub fn issue_identifier(
     identifier_issuer: &mut IdentifierIssuer,
     existing_identifier: &str,
 ) -> Result<String, Error> {
-    // https://json-ld.github.io/normalization/spec/#algorithm-0
+    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-0
     // 1
     if let Some(id) = identifier_issuer.find_issued_identifier(existing_identifier) {
         return Ok(id.to_string());
@@ -248,14 +248,14 @@ pub fn issue_identifier(
     Ok(issued_identifier)
 }
 
-/// <https://json-ld.github.io/normalization/spec/#hash-n-degree-quads>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#hash-n-degree-quads>
 pub fn hash_n_degree_quads(
     normalization_state: &mut NormalizationState,
     identifier: &str,
     issuer: &mut IdentifierIssuer,
 ) -> Result<HashNDegreeQuadsOutput, Error> {
     let mut issuer = issuer;
-    // https://json-ld.github.io/normalization/spec/#algorithm-3
+    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-3
     let mut issuer_tmp: IdentifierIssuer;
     // 1
     let mut hash_to_related_blank_nodes: Map<String, Vec<&BlankNodeLabel>> = Map::new();
@@ -374,7 +374,7 @@ pub fn hash_n_degree_quads(
     })
 }
 
-/// <https://json-ld.github.io/normalization/spec/#hash-related-blank-node>
+/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#hash-related-blank-node>
 pub fn hash_related_blank_node(
     normalization_state: &mut NormalizationState,
     related: &str,
@@ -382,7 +382,7 @@ pub fn hash_related_blank_node(
     issuer: &mut IdentifierIssuer,
     position: char,
 ) -> Result<String, Error> {
-    // https://json-ld.github.io/normalization/spec/#algorithm-2
+    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-2
     // 1
     let identifier = match normalization_state
         .canonical_issuer
@@ -416,7 +416,7 @@ mod tests {
     use super::*;
 
     #[test]
-    /// <https://json-ld.github.io/normalization/tests/>
+    /// <https://json-ld.github.io/rdf-dataset-canonicalization/tests/>
     fn normalization_test_suite() {
         use std::fs::{self};
         use std::path::PathBuf;
