@@ -133,21 +133,17 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let sig = signing_key.try_sign(&hashed)?;
                 sig.as_bytes().to_vec()
             }
-            #[cfg(feature = "libsecp256k1")]
+            #[cfg(feature = "k256")]
             Algorithm::ES256K | Algorithm::ES256KR => {
+                use k256::ecdsa::signature::{Signature, Signer};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(Error::CurveNotImplemented(curve.to_string()));
                 }
-                let secret_key = secp256k1::SecretKey::try_from(ec)?;
-                let hashed = crate::hash::sha256(data)?;
-                let msg = secp256k1::Message::parse_slice(&hashed)?;
-                let (sig, rec_id) = secp256k1::sign(&msg, &secret_key);
-                let mut sig = sig.serialize().to_vec();
-                if algorithm == Algorithm::ES256KR {
-                    sig.push(rec_id.serialize());
-                }
-                sig
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let sig: k256::ecdsa::recoverable::Signature = signing_key.sign(&data);
+                sig.as_bytes().to_vec()
             }
             _ => {
                 return Err(Error::UnsupportedAlgorithm);
@@ -239,26 +235,19 @@ pub fn verify_bytes(
                 let hashed = crate::hash::sha256(data)?;
                 verifying_key.verify(&hashed, &sig)?;
             }
-            #[cfg(feature = "libsecp256k1")]
+            #[cfg(feature = "k256")]
             Algorithm::ES256K | Algorithm::ES256KR => {
+                use k256::ecdsa::signature::Verifier;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(Error::CurveNotImplemented(curve.to_string()));
                 }
-                let hashed = crate::hash::sha256(data)?;
-                let msg = secp256k1::Message::parse_slice(&hashed)?;
-                let signature = if algorithm == Algorithm::ES256KR && signature.len() == 65 {
-                    // Drop recovery byte
-                    &signature[0..64]
-                } else {
-                    signature
-                };
-                let sig = secp256k1::Signature::parse_slice(&signature)?;
-                let public_key = secp256k1::PublicKey::try_from(ec)?;
-                let ok = secp256k1::verify(&msg, &sig, &public_key);
-                if !ok {
-                    Err(secp256k1::Error::InvalidSignature)?;
-                }
+                let public_key = k256::PublicKey::try_from(ec)?;
+                // TODO the From trait will be in version 0.8
+                let verifying_key = k256::ecdsa::VerifyingKey::from(public_key.as_affine());
+                // TODO maybe use ecdsa::Signature when the length of the key is 64
+                let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
+                verifying_key.verify(&data, &sig)?;
             }
             _ => {
                 return Err(Error::UnsupportedAlgorithm);
@@ -273,22 +262,16 @@ pub fn verify_bytes(
 /// [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r))
 pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JWK, Error> {
     match algorithm {
-        #[cfg(feature = "libsecp256k1")]
+        #[cfg(feature = "k256")]
         Algorithm::ES256KR => {
-            let hashed = crate::hash::sha256(data)?;
-            let msg = secp256k1::Message::parse_slice(&hashed)?;
-            let (rec_byte, sig_bytes) = signature.split_last().ok_or(Error::InvalidSignature)?;
-            let rec_id = secp256k1::RecoveryId::parse(*rec_byte)?;
-            let sig = secp256k1::Signature::parse_slice(sig_bytes)?;
-            let public_key = secp256k1::recover(&msg, &sig, &rec_id)?;
-            // Is it redundant to verify after recover?
-            let ok = secp256k1::verify(&msg, &sig, &public_key);
-            if !ok {
-                Err(secp256k1::Error::InvalidSignature)?;
-            }
+            let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
+            // TODO not available for sha256
+            let recovered_key = sig.recover_verify_key(data)?;
             use crate::jwk::ECParams;
             let jwk = JWK {
-                params: JWKParams::EC(ECParams::try_from(&public_key)?),
+                params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
+                    &recovered_key.to_bytes(),
+                )?)?),
                 public_key_use: None,
                 key_operations: None,
                 algorithm: None,
@@ -507,7 +490,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "k256")]
     fn secp256k1_sign_verify() {
         let key = JWK::generate_secp256k1().unwrap();
         let data = b"asdf";

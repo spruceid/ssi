@@ -232,12 +232,12 @@ impl JWK {
         })
     }
 
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "k256")]
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
-        let secret_key = secp256k1::SecretKey::random(&mut rng);
-        let sk_bytes = secret_key.serialize();
-        let public_key = secp256k1::PublicKey::from_secret_key(&secret_key);
+        let secret_key = k256::SecretKey::random(&mut rng);
+        let sk_bytes = secret_key.to_bytes();
+        let public_key = secret_key.public_key();
         Ok(JWK {
             params: Params::EC(ECParams {
                 ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
@@ -615,50 +615,14 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
     }
 }
 
-#[cfg(feature = "libsecp256k1")]
-impl TryFrom<&ECParams> for secp256k1::SecretKey {
-    type Error = Error;
-    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
-        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
-        if curve != "secp256k1" {
-            return Err(Error::CurveNotImplemented(curve.to_string()));
-        }
-        let private_key = params
-            .ecc_private_key
-            .as_ref()
-            .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = secp256k1::SecretKey::parse_slice(&private_key.0)?;
-        Ok(secret_key)
-    }
-}
-
-#[cfg(feature = "libsecp256k1")]
-impl TryFrom<&ECParams> for secp256k1::PublicKey {
-    type Error = Error;
-    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
-        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
-        if curve != "secp256k1" {
-            return Err(Error::CurveNotImplemented(curve.to_string()));
-        }
-        let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
-        let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
-        let pk_data = [x.as_slice(), y.as_slice()].concat();
-        let public_key =
-            secp256k1::PublicKey::parse_slice(&pk_data, Some(secp256k1::PublicKeyFormat::Raw))?;
-        Ok(public_key)
-    }
-}
-
-#[cfg(feature = "libsecp256k1")]
+#[cfg(feature = "k256")]
 pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, String> {
-    let pk =
-        match secp256k1::PublicKey::parse_slice(data, Some(secp256k1::PublicKeyFormat::Compressed))
-        {
-            Ok(pk) => pk,
-            Err(err) => {
-                return Err(format!("Error parsing key: {}", err));
-            }
-        };
+    let pk = match k256::PublicKey::from_sec1_bytes(data) {
+        Ok(pk) => pk,
+        Err(err) => {
+            return Err(format!("Error parsing key: {}", err));
+        }
+    };
     let jwk = JWK {
         params: Params::EC(ECParams::try_from(&pk)?),
         public_key_use: None,
@@ -710,20 +674,20 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
-#[cfg(feature = "libsecp256k1")]
-impl TryFrom<&secp256k1::PublicKey> for ECParams {
+#[cfg(feature = "k256")]
+impl TryFrom<&ECParams> for k256::SecretKey {
     type Error = Error;
-    fn try_from(pk: &secp256k1::PublicKey) -> Result<Self, Self::Error> {
-        let pk_bytes = pk.serialize();
-        if pk_bytes[0] != secp256k1::util::TAG_PUBKEY_FULL {
-            return Err(Error::UnsupportedKeyType);
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        if curve != "secp256k1" {
+            return Err(Error::CurveNotImplemented(curve.to_string()));
         }
-        Ok(ECParams {
-            curve: Some("secp256k1".to_string()),
-            x_coordinate: Some(Base64urlUInt(pk_bytes[1..33].to_vec())),
-            y_coordinate: Some(Base64urlUInt(pk_bytes[33..65].to_vec())),
-            ecc_private_key: None,
-        })
+        let private_key = params
+            .ecc_private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let secret_key = k256::SecretKey::from_bytes(&private_key.0)?;
+        Ok(secret_key)
     }
 }
 
@@ -744,6 +708,23 @@ impl TryFrom<&ECParams> for p256::SecretKey {
     }
 }
 
+#[cfg(feature = "k256")]
+impl TryFrom<&ECParams> for k256::PublicKey {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        if curve != "secp256k1" {
+            return Err(Error::CurveNotImplemented(curve.to_string()));
+        }
+        const EC_UNCOMPRESSED_POINT_TAG: &[u8] = &[0x04];
+        let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+        let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
+        let pk_data = [EC_UNCOMPRESSED_POINT_TAG, x.as_slice(), y.as_slice()].concat();
+        let public_key = k256::PublicKey::from_sec1_bytes(&pk_data)?;
+        Ok(public_key)
+    }
+}
+
 #[cfg(feature = "p256")]
 impl TryFrom<&ECParams> for p256::PublicKey {
     type Error = Error;
@@ -758,6 +739,22 @@ impl TryFrom<&ECParams> for p256::PublicKey {
         let pk_data = [EC_UNCOMPRESSED_POINT_TAG, x.as_slice(), y.as_slice()].concat();
         let public_key = p256::PublicKey::from_sec1_bytes(&pk_data)?;
         Ok(public_key)
+    }
+}
+
+#[cfg(feature = "k256")]
+impl TryFrom<&k256::PublicKey> for ECParams {
+    type Error = Error;
+    fn try_from(pk: &k256::PublicKey) -> Result<Self, Self::Error> {
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let ec_points = pk.to_encoded_point(false);
+        let pk_bytes = ec_points.as_bytes();
+        Ok(ECParams {
+            curve: Some("secp256k1".to_string()),
+            x_coordinate: Some(Base64urlUInt(pk_bytes[1..33].to_vec())),
+            y_coordinate: Some(Base64urlUInt(pk_bytes[33..65].to_vec())),
+            ecc_private_key: None,
+        })
     }
 }
 
@@ -831,7 +828,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "k256")]
     fn secp256k1_generate() {
         let _jwk = JWK::generate_secp256k1().unwrap();
     }

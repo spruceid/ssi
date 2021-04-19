@@ -57,14 +57,13 @@ fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
     Ok(pk_compressed_bytes.to_vec())
 }
 
-#[cfg(feature = "secp256k1")]
+#[cfg(feature = "k256")]
 fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
-    let x = &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
-    let y = &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0;
-    let pk_bytes = [x.as_slice(), y.as_slice()].concat();
-    let pk = secp256k1::PublicKey::parse_slice(&pk_bytes, Some(secp256k1::PublicKeyFormat::Raw))?;
-    let pk_compressed_bytes = pk.serialize_compressed().to_vec();
-    Ok(pk_compressed_bytes.to_vec())
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    use std::convert::TryFrom;
+    let pk = k256::PublicKey::try_from(params)?;
+    let pk_compressed_bytes = pk.to_encoded_point(true);
+    Ok(pk_compressed_bytes.as_bytes().to_vec())
 }
 
 #[cfg(test)]

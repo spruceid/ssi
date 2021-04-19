@@ -12,13 +12,11 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-ethr/"
 documentation = "https://docs.rs/did-ethr/"
 
 [dependencies]
-ssi = { version = "0.2", path = "../", default-features = false, features = ["secp256k1", "keccak-hash"] }
+ssi = { version = "0.2", path = "../", default-features = false, features = ["secp256k1", "keccak"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 async-trait = "0.1"
-libsecp256k1 = { version = "0.3" }
-keccak-hash = "0.7"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
