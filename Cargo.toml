@@ -16,10 +16,15 @@ exclude = [
 [features]
 default = ["ring"]
 http-did = ["hyper", "hyper-tls", "http", "percent-encoding", "tokio"]
-secp256k1 = ["libsecp256k1", "rand"]
+libsecp256k1 = ["secp256k1"] # backward compatibility
+secp256k1 = ["k256", "rand", "k256/keccak256"]
+secp256r1 = ["p256", "rand"]
+ripemd-160 = ["ripemd160", "secp256k1"]
+# TODO handle better keccak and sha
+keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
+sha = ["sha2", "k256/sha256"]
 
 [dependencies]
-chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_jcs = "0.1"
@@ -32,8 +37,8 @@ rsa = { version = "0.3", optional = true }
 ed25519-dalek = { version = "1", optional = true }
 rand = { version = "0.7", optional = true }
 multibase = "0.8"
-simple_asn1 = "0.5"
-num-bigint = "0.3"
+simple_asn1 = "^0.5.2"
+num-bigint = "0.4"
 async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
 json = "^0.12"
@@ -51,11 +56,10 @@ percent-encoding = { version = "2.1", optional = true }
 tokio = { version = "1.0", optional = true, features = ["macros"] }
 blake2b_simd = "0.5"
 bs58 = { version = "0.4", features = ["check"] }
-libsecp256k1 = { version = "0.3", optional = true }
 thiserror = "1.0"
 keccak-hash = { version = "0.7", optional = true }
+k256 = { version = "0.7", optional = true, features = ["zeroize", "ecdsa"] }
 p256 = { version = "0.7", optional = true, features = ["zeroize", "ecdsa"] }
-signature = { version = ">= 1.2.2, < 1.3.0" } # match ecdsa 0.10.2
 ssi-contexts = { version = "0.0.2", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
 
@@ -68,6 +72,14 @@ mown = "^0.2"
 once_cell = "^1.4"
 reqwest = { version = "^0.10", optional = true }
 langtag = "^0.2"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+# https://docs.rs/getrandom/0.2.2/getrandom/#indirect-dependencies
+getrandom = { version = "0.2", features = ["js"] }
 
 [workspace]
 members = [

@@ -8,9 +8,9 @@ use ssi::did_resolve::{
     DIDResolver, DereferencingInputMetadata, DocumentMetadata, ResolutionInputMetadata,
     ResolutionMetadata, ERROR_INVALID_DID, TYPE_DID_LD_JSON,
 };
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 use ssi::jwk::p256_parse;
-#[cfg(feature = "libsecp256k1")]
+#[cfg(feature = "secp256k1")]
 use ssi::jwk::secp256k1_parse;
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 use ssi::jws::{decode_unverified, decode_verify};
@@ -423,7 +423,7 @@ impl DIDTz {
                                     x509_thumbprint_sha256: None,
                                 }
                             }
-                            #[cfg(feature = "libsecp256k1")]
+                            #[cfg(feature = "secp256k1")]
                             "tz2" => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
@@ -439,7 +439,7 @@ impl DIDTz {
                                     ))
                                 })?
                             }
-                            #[cfg(feature = "p256")]
+                            #[cfg(feature = "secp256r1")]
                             "tz3" => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
@@ -517,7 +517,7 @@ mod tests {
         assert_eq!(tz1, TZ1);
     }
 
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     #[test]
     fn jwk_to_tz3() {
         let jwk: JWK = serde_json::from_value(serde_json::json!({
@@ -847,7 +847,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_tz2() {
         use ssi::jwk::Algorithm;
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
@@ -948,7 +948,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     async fn test_derivation_tz3() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
             .resolve(
@@ -1040,7 +1040,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "secp256k1")]
     async fn test_json_patch_tz2() {
         let address = "tz2RZoj9oqoA8bDeUoAKLjf8nLPQKmYjaj6Q";
         let pk = "sppk7bRNbJ2n9PNQo295UJiYQ8iMma8ysRH9mCRFB14yhzLCwdGay9y";
@@ -1102,7 +1102,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     async fn test_json_patch_tz3() {
         let address = "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX";
         let pk = "p2pk679D18uQNkdjpRxuBXL5CqcDKTKzsiXVtc9oCUT6xb82zQmgUks";
@@ -1237,7 +1237,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_tz3() {
         use ssi::jwk::Algorithm;
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};

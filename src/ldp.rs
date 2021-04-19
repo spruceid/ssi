@@ -1004,6 +1004,7 @@ impl ProofSuite for Eip712Signature2021 {
         options: &LinkedDataProofOptions,
         key: &JWK,
     ) -> Result<Proof, Error> {
+        use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
             proof_purpose: options.proof_purpose.clone(),
@@ -1014,18 +1015,18 @@ impl ProofSuite for Eip712Signature2021 {
             ..Proof::new("Eip712Signature2021")
         };
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
-        let bytes = typed_data.hash()?;
+        let bytes = typed_data.bytes()?;
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
             _ => return Err(Error::KeyTypeNotImplemented),
         };
-        let secret_key = secp256k1::SecretKey::try_from(ec_params)?;
-        let msg = secp256k1::Message::parse_slice(&bytes)?;
-        let (sig, rec_id) = secp256k1::sign(&msg, &secret_key);
-        let mut sig = sig.serialize().to_vec();
-        // Use ethereum-style recovery byte
-        sig.push(rec_id.serialize() + 27);
-        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(&sig);
+        let secret_key = k256::SecretKey::try_from(ec_params)?;
+        let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&bytes)?;
+        let sig_bytes = &mut sig.as_ref().to_vec();
+        // Recovery ID starts at 27 instead of 0.
+        sig_bytes[64] = sig_bytes[64] + 27;
+        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(sig_bytes);
         proof.proof_value = Some(sig_hex);
         Ok(proof)
     }
@@ -1082,19 +1083,21 @@ impl ProofSuite for Eip712Signature2021 {
             return Err(Error::VerificationMethodMismatch);
         }
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
-        let bytes = typed_data.hash()?;
+        let bytes = typed_data.bytes()?;
         if !sig_hex.starts_with("0x") {
             return Err(Error::HexString);
         }
-        let sig = hex::decode(&sig_hex[2..])?;
-        let msg = secp256k1::Message::parse_slice(&bytes)?;
-        let (rec_byte, sig_bytes) = sig.split_last().ok_or(Error::InvalidSignature)?;
-        let rec_id = secp256k1::RecoveryId::parse_rpc(*rec_byte)?;
-        let sig = secp256k1::Signature::parse_slice(sig_bytes)?;
-        let public_key = secp256k1::recover(&msg, &sig, &rec_id)?;
+        let dec_sig = hex::decode(&sig_hex[2..])?;
+        let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
+        // TODO this step needs keccak-hash, may need better features management
+        let recovered_key = sig.recover_verify_key(&bytes)?;
         use crate::jwk::ECParams;
         let jwk = JWK {
-            params: JWKParams::EC(ECParams::try_from(&public_key)?),
+            params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
+                &recovered_key.to_bytes(),
+            )?)?),
             public_key_use: None,
             key_operations: None,
             algorithm: None,

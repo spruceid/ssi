@@ -1,5 +1,6 @@
 use std::convert::TryFrom;
 
+use k256::elliptic_curve::sec1::ToEncodedPoint;
 use keccak_hash::keccak;
 
 use crate::error::Error;
@@ -18,11 +19,9 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
         Params::EC(ref params) => params,
         _ => return Err(Error::UnsupportedKeyType),
     };
-    let pk = secp256k1::PublicKey::try_from(ec_params)?;
-    let pk_bytes = pk.serialize();
-    if pk_bytes[0] != secp256k1::util::TAG_PUBKEY_FULL || pk_bytes.len() != 65 {
-        return Err(Error::UnsupportedKeyType);
-    }
+    let pk = k256::PublicKey::try_from(ec_params)?;
+    let pk_ec = pk.to_encoded_point(false);
+    let pk_bytes = pk_ec.as_bytes();
     let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
     let hash_last20 = &hash[12..32];
     let hash_last20_hex = bytes_to_lowerhex(hash_last20);

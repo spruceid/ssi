@@ -6,19 +6,23 @@ use crate::eip712::TypedDataConstructionError;
 use crate::eip712::TypedDataHashError;
 use crate::json_ld;
 use base64::DecodeError as Base64Error;
+#[cfg(feature = "ed25519-dalek")]
+use ed25519_dalek::ed25519::Error as ED25519Error;
 use iref::Error as IRIError;
 use json::Error as JSONError;
 use json_ld::Error as JSONLDError;
 use json_ld::ErrorCode as JSONLDErrorCode;
+#[cfg(feature = "k256")]
+use k256::ecdsa::Error as Secp256k1Error;
 use multibase::Error as MultibaseError;
+#[cfg(feature = "p256")]
+use p256::ecdsa::Error as Secp256r1Error;
 #[cfg(feature = "ring")]
 use ring::error::KeyRejected as KeyRejectedError;
 #[cfg(feature = "ring")]
 use ring::error::Unspecified as RingUnspecified;
 #[cfg(feature = "rsa")]
 use rsa::errors::Error as RsaError;
-#[cfg(feature = "libsecp256k1")]
-use secp256k1::Error as Secp256k1Error;
 use serde_json::Error as SerdeJSONError;
 use serde_urlencoded::de::Error as SerdeUrlEncodedError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
@@ -137,9 +141,12 @@ pub enum Error {
     FromUtf8(FromUtf8Error),
     #[cfg(feature = "rsa")]
     Rsa(RsaError),
-    Signature(signature::Error),
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "ed25519-dalek")]
+    ED25519(ED25519Error),
+    #[cfg(feature = "k256")]
     Secp256k1(Secp256k1Error),
+    #[cfg(feature = "p256")]
+    Secp256r1(Secp256r1Error),
     ASN1Encode(ASN1EncodeError),
     Base64(Base64Error),
     Multibase(MultibaseError),
@@ -165,6 +172,8 @@ pub enum Error {
     P256KeyLength(usize),
     ECEncodingError,
     ECDecompress,
+    #[cfg(feature = "k256")]
+    K256EC(k256::elliptic_curve::Error),
     #[cfg(feature = "p256")]
     P256EC(p256::elliptic_curve::Error),
 }
@@ -284,9 +293,12 @@ impl fmt::Display for Error {
             Error::KeyRejected(e) => e.fmt(f),
             #[cfg(feature = "rsa")]
             Error::Rsa(e) => e.fmt(f),
-            Error::Signature(e) => e.fmt(f),
-            #[cfg(feature = "libsecp256k1")]
+            #[cfg(feature = "ed25519-dalek")]
+            Error::ED25519(e) => e.fmt(f),
+            #[cfg(feature = "k256")]
             Error::Secp256k1(e) => e.fmt(f),
+            #[cfg(feature = "p256")]
+            Error::Secp256r1(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -305,6 +317,8 @@ impl fmt::Display for Error {
             Error::TypedDataHash(e) => e.fmt(f),
             Error::FromHex(e) => e.fmt(f),
             Error::Base58(e) => e.fmt(f),
+            #[cfg(feature = "k256")]
+            Error::K256EC(e) => e.fmt(f),
             #[cfg(feature = "p256")]
             Error::P256EC(e) => e.fmt(f),
             Error::P256KeyLength(len) => write!(f, "Expected 64 byte uncompressed key or 33 bytes compressed key but found length: {}", len),
@@ -407,19 +421,6 @@ impl From<RsaError> for Error {
     }
 }
 
-impl From<signature::Error> for Error {
-    fn from(err: signature::Error) -> Error {
-        Error::Signature(err)
-    }
-}
-
-#[cfg(feature = "libsecp256k1")]
-impl From<Secp256k1Error> for Error {
-    fn from(err: Secp256k1Error) -> Error {
-        Error::Secp256k1(err)
-    }
-}
-
 impl From<TryFromSliceError> for Error {
     fn from(err: TryFromSliceError) -> Error {
         Error::TryFromSlice(err)
@@ -464,9 +465,43 @@ impl From<bs58::decode::Error> for Error {
     }
 }
 
-#[cfg(feature = "p256")]
+#[cfg(feature = "k256")]
+impl From<Secp256k1Error> for Error {
+    fn from(err: Secp256k1Error) -> Error {
+        Error::Secp256k1(err)
+    }
+}
+
+// Conflicting implementations as the underlying types are the same
+#[cfg(all(feature = "p256", not(feature = "k256")))]
+impl From<Secp256r1Error> for Error {
+    fn from(err: Secp256r1Error) -> Error {
+        Error::Secp256r1(err)
+    }
+}
+
+#[cfg(feature = "k256")]
+impl From<k256::elliptic_curve::Error> for Error {
+    fn from(err: k256::elliptic_curve::Error) -> Error {
+        Error::K256EC(err)
+    }
+}
+
+// Conflicting implementations as the underlying types are the same
+#[cfg(all(feature = "p256", not(feature = "k256")))]
 impl From<p256::elliptic_curve::Error> for Error {
     fn from(err: p256::elliptic_curve::Error) -> Error {
         Error::P256EC(err)
+    }
+}
+
+#[cfg(all(
+    feature = "ed25519-dalek",
+    not(feature = "k256"),
+    not(feature = "p256")
+))]
+impl From<ed25519_dalek::ed25519::Error> for Error {
+    fn from(err: ed25519_dalek::ed25519::Error) -> Error {
+        Error::ED25519(err)
     }
 }

@@ -6,9 +6,9 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
 };
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 use ssi::jwk::p256_parse;
-#[cfg(feature = "libsecp256k1")]
+#[cfg(feature = "secp256k1")]
 use ssi::jwk::secp256k1_parse;
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
@@ -115,7 +115,7 @@ impl DIDResolver for DIDKey {
                     None,
                 );
             }
-            #[cfg(feature = "libsecp256k1")]
+            #[cfg(feature = "secp256k1")]
             match secp256k1_parse(&data[2..]) {
                 Ok(jwk) => {
                     vm_type = "EcdsaSecp256k1VerificationKey2019".to_string();
@@ -123,14 +123,14 @@ impl DIDResolver for DIDKey {
                 }
                 Err(err) => return (ResolutionMetadata::from_error(&err), None, None),
             }
-            #[cfg(not(feature = "libsecp256k1"))]
+            #[cfg(not(feature = "secp256k1"))]
             return (
                 ResolutionMetadata::from_error("did:key type secp256k1 not supported"),
                 None,
                 None,
             );
         } else if data[0] == DID_KEY_P256_PREFIX[0] && data[1] == DID_KEY_P256_PREFIX[1] {
-            #[cfg(feature = "p256")]
+            #[cfg(feature = "secp256r1")]
             match p256_parse(&data[2..]) {
                 Ok(jwk) => {
                     vm_type = "EcdsaSecp256r1VerificationKey2019".to_string();
@@ -138,7 +138,7 @@ impl DIDResolver for DIDKey {
                 }
                 Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
             }
-            #[cfg(not(feature = "p256"))]
+            #[cfg(not(feature = "secp256r1"))]
             return (
                 ResolutionMetadata::from_error("did:key type P-256 not supported"),
                 None,
@@ -223,10 +223,11 @@ impl DIDMethod for DIDKey {
                     None => return None,
                 };
                 match &curve[..] {
-                    #[cfg(feature = "libsecp256k1")]
+                    #[cfg(feature = "secp256k1")]
                     "secp256k1" => {
+                        use k256::elliptic_curve::sec1::ToEncodedPoint;
                         use std::convert::TryFrom;
-                        let pk = match secp256k1::PublicKey::try_from(params) {
+                        let pk = match k256::PublicKey::try_from(params) {
                             Ok(pk) => pk,
                             Err(_err) => return None,
                         };
@@ -235,12 +236,12 @@ impl DIDMethod for DIDKey {
                                 multibase::Base::Base58Btc,
                                 [
                                     DID_KEY_SECP256K1_PREFIX.to_vec(),
-                                    pk.serialize_compressed().to_vec(),
+                                    pk.to_encoded_point(true).as_bytes().to_vec(),
                                 ]
                                 .concat(),
                             )
                     }
-                    #[cfg(feature = "p256")]
+                    #[cfg(feature = "secp256r1")]
                     "P-256" => {
                         // P-256 did:key is uncompressed
                         let (x, y) =
@@ -288,7 +289,7 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "secp256k1")]
     async fn from_did_key_secp256k1() {
         let did = "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme";
         let (res_meta, _doc, _doc_meta) = DIDKey
@@ -311,7 +312,7 @@ mod tests {
         assert_eq!(did1, did);
     }
 
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     #[async_std::test]
     async fn from_did_key_p256() {
         // https://w3c-ccg.github.io/did-method-key/#p-256
@@ -381,7 +382,7 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "libsecp256k1")]
+    #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_key_secp256k1() {
         use serde_json::json;
         use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
@@ -416,7 +417,7 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_key_p256() {
         use serde_json::json;
         use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};

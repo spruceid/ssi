@@ -699,6 +699,12 @@ impl TypedData {
     /// Encode a typed data message for hashing and signing.
     /// [Reference](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#specification)
     pub fn hash(&self) -> Result<Vec<u8>, TypedDataHashError> {
+        let bytes = self.bytes()?;
+        let hash = keccak(bytes).to_fixed_bytes().to_vec();
+        Ok(hash)
+    }
+
+    pub fn bytes(&self) -> Result<Vec<u8>, TypedDataHashError> {
         let message_hash = hash_struct(&self.message, &self.primary_type, &self.types)?;
         let domain_separator =
             hash_struct(&self.domain, &StructName::from("EIP712Domain"), &self.types)?;
@@ -709,8 +715,7 @@ impl TypedData {
             message_hash.to_vec(),
         ]
         .concat();
-        let hash = keccak(bytes).to_fixed_bytes().to_vec();
-        Ok(hash)
+        Ok(bytes)
     }
 }
 
