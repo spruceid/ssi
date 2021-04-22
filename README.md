@@ -34,7 +34,7 @@ packages.
 ```sh
 $ git clone https://github.com/spruceid/ssi
 $ cd ssi
-$ git submodule update
+$ git submodule update --init
 $ cargo build
 ```
 
