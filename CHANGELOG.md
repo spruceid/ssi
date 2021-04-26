@@ -6,6 +6,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2021-04-28
+### Added
+- Add `TezosSignature2021`/`TezosMethod2021`.
+- Parse Tezos-base58 keys.
+### Changed
+- Use `k256` instead of `libsecp256k1`.
+- Update `ssi-contexts` to `v0.1.0`
+### Fixed
+- Fix dependency conflict between `simple_asn1` and `num-bigint`.
+- Fix broken links.
+
 ## [0.2.0] - 2021-04-01
 ### Added
 - Add function `HTTPDIDResolver::new`.
@@ -146,6 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
 [verification relationship]: https://www.w3.org/TR/did-core/#dfn-verification-relationship
 
-[Unreleased]: https://github.com/spruceid/ssi/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/spruceid/ssi/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/spruceid/ssi/releases/tag/v0.2.1
 [0.2.0]: https://github.com/spruceid/ssi/releases/tag/v0.2.0
 [0.1.0]: https://github.com/spruceid/ssi/releases/tag/v0.1.0
