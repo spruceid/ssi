@@ -60,7 +60,7 @@ thiserror = "1.0"
 keccak-hash = { version = "0.7", optional = true }
 k256 = { version = "0.7", optional = true, features = ["zeroize", "ecdsa"] }
 p256 = { version = "0.7", optional = true, features = ["zeroize", "ecdsa"] }
-ssi-contexts = { version = "0.0.2", path = "contexts/" }
+ssi-contexts = { version = "0.1.0", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
 
 # dependencies for json-ld
