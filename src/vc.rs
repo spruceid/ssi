@@ -372,7 +372,7 @@ impl Default for LinkedDataProofOptions {
 }
 
 impl VerificationResult {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             checks: vec![],
             warnings: vec![],
@@ -380,7 +380,7 @@ impl VerificationResult {
         }
     }
 
-    fn error(err: &str) -> Self {
+    pub fn error(err: &str) -> Self {
         Self {
             checks: vec![],
             warnings: vec![],
@@ -388,7 +388,7 @@ impl VerificationResult {
         }
     }
 
-    fn append(&mut self, other: &mut Self) {
+    pub fn append(&mut self, other: &mut Self) {
         self.checks.append(&mut other.checks);
         self.warnings.append(&mut other.warnings);
         self.errors.append(&mut other.errors);
