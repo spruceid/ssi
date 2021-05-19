@@ -251,7 +251,7 @@ impl fmt::Display for Error {
             Error::InvalidProofDomain => write!(f, "Invalid proof domain"),
             Error::MissingCredentialSchema => write!(f, "Missing credential schema for ZKP"),
             Error::UnsupportedProperty => write!(f, "Unsupported property for LDP"),
-            Error::UnsupportedKeyType => write!(f, "Unsupported key type for did:key"),
+            Error::UnsupportedKeyType => write!(f, "Unsupported key type"),
             Error::TooManyBlankNodes => write!(f, "Multiple blank nodes not supported. Either credential or credential subject must have id property. Presentation must have id property."),
             Error::UnsupportedType => write!(f, "Unsupported type for LDP"),
             Error::UnsupportedProofPurpose => write!(f, "Unsupported proof purpose"),
