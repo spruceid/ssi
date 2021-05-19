@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 // RFC 7516 - JSON Web Encryption (JWE)
 // RFC 7517 - JSON Web Key (JWK)
 // RFC 7518 - JSON Web Algorithms (JWA)
+// RFC 7638 - JSON Web Key (JWK) Thumbprint
 // RFC 8037 - CFRG ECDH and Signatures in JOSE
 // RFC 8812 - CBOR Object Signing and Encryption (COSE) and JSON Object Signing and Encryption
 //  (JOSE) Registrations for Web Authentication (WebAuthn) Algorithms
@@ -317,6 +318,51 @@ impl JWK {
         let mut key = self.clone();
         key.params = key.params.to_public();
         key
+    }
+
+    pub fn thumbprint(&self) -> Result<String, Error> {
+        // JWK parameters for thumbprint hashing must be in lexicographical order, and without
+        // string escaping.
+        // https://datatracker.ietf.org/doc/html/rfc7638#section-3.1
+        let json_string = match &self.params {
+            Params::RSA(rsa_params) => {
+                let n = rsa_params.modulus.as_ref().ok_or(Error::MissingModulus)?;
+                let e = rsa_params.exponent.as_ref().ok_or(Error::MissingExponent)?;
+                format!(
+                    r#"{{"e":"{}","kty":"RSA","n":"{}"}}"#,
+                    String::from(e),
+                    String::from(n)
+                )
+            }
+            Params::OKP(okp_params) => {
+                format!(
+                    r#"{{"crv":"{}","kty":"OKP","x":"{}"}}"#,
+                    okp_params.curve.clone(),
+                    String::from(okp_params.public_key.clone())
+                )
+            }
+            Params::EC(ec_params) => {
+                let curve = ec_params.curve.as_ref().ok_or(Error::MissingCurve)?;
+                let x = ec_params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?;
+                let y = ec_params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?;
+                format!(
+                    r#"{{"crv":"{}","kty":"EC","x":"{}","y":"{}"}}"#,
+                    curve.clone(),
+                    String::from(x),
+                    String::from(y)
+                )
+            }
+            Params::Symmetric(sym_params) => {
+                let k = sym_params
+                    .key_value
+                    .as_ref()
+                    .ok_or(Error::MissingKeyValue)?;
+                format!(r#"{{"k":"{}","kty":"oct"}}"#, String::from(k))
+            }
+        };
+        let hash = crate::hash::sha256(json_string.as_bytes())?;
+        let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
+        Ok(thumbprint)
     }
 }
 
@@ -821,5 +867,51 @@ mod tests {
     #[cfg(feature = "p256")]
     fn p256_generate() {
         let _jwk = JWK::generate_p256().unwrap();
+    }
+
+    #[test]
+    fn jwk_thumbprint() {
+        // https://tools.ietf.org/html/rfc7638#section-3.1
+        let key: JWK = serde_json::from_value(serde_json::json!({
+            "kty": "RSA",
+            "n": "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECPebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQMicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRwr3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw",
+            "e": "AQAB",
+            "alg": "RS256",
+            "kid": "2011-04-29"
+        }))
+        .unwrap();
+        let thumbprint = key.thumbprint().unwrap();
+        assert_eq!(thumbprint, "NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs");
+
+        // https://tools.ietf.org/html/rfc8037#appendix-A.3
+        let key: JWK = serde_json::from_value(serde_json::json!({
+            "crv": "Ed25519",
+            "kty": "OKP",
+            "x":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+        }))
+        .unwrap();
+        let thumbprint = key.thumbprint().unwrap();
+        assert_eq!(thumbprint, "kPrK_qmxVWaYVA9wwBF6Iuo3vVzz7TxHCTwXBygrS4k");
+
+        // This EC JWK is from RFC 7518, its thumbprint is not.
+        // https://datatracker.ietf.org/doc/html/rfc7518#appendix-C
+        let key: JWK = serde_json::from_value(serde_json::json!({
+            "kty": "EC",
+            "crv": "P-256",
+            "x": "weNJy2HscCSM6AEDTDg04biOvhFhyyWvOHQfeF_PxMQ",
+            "y": "e8lnCO-AlStT-NJVX-crhB7QRYhiix03illJOVAOyck",
+        }))
+        .unwrap();
+        let thumbprint = key.thumbprint().unwrap();
+        assert_eq!(thumbprint, "Vy57XrArUrW0NbpI12tEzDHABxMwrTh6HHXRenSpnCo");
+
+        // Reuse the octet sequence from the Ed25519 example
+        let key: JWK = serde_json::from_value(serde_json::json!({
+            "kty": "oct",
+            "k": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+        }))
+        .unwrap();
+        let thumbprint = key.thumbprint().unwrap();
+        assert_eq!(thumbprint, "kcfv_I8tB4KY_ljAlRa1ip-y7jzbPdH0sUlCGb-1Jx8");
     }
 }
