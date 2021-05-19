@@ -145,6 +145,9 @@ impl ProofPreparation {
                     .complete(self, signature)
                     .await
             }
+            "EcdsaSecp256r1Signature2019" => {
+                EcdsaSecp256r1Signature2019.complete(self, signature).await
+            }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
             "TezosSignature2021" => TezosSignature2021.complete(self, signature).await,
