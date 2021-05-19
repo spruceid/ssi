@@ -19,6 +19,7 @@ pub mod rdf;
 #[cfg(feature = "ripemd160")]
 pub mod ripemd;
 pub mod soltx;
+pub mod ssh;
 pub mod tzkey;
 pub mod urdna2015;
 pub mod vc;

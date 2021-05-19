@@ -66,6 +66,7 @@ k256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
 p256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
 ssi-contexts = { version = "0.1.0", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
+sshkeys = "0.3"
 
 # dependencies for json-ld
 log = "^0.4"
@@ -94,6 +95,7 @@ members = [
   "did-sol",
   "did-pkh",
   "did-onion",
+  "did-webkey",
   "vc-test",
 ]
 

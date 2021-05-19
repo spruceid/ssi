@@ -366,6 +366,22 @@ impl JWK {
     }
 }
 
+impl From<Params> for JWK {
+    fn from(params: Params) -> Self {
+        Self {
+            params,
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        }
+    }
+}
+
 impl ToASN1 for JWK {
     type Error = Error;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
@@ -669,7 +685,7 @@ pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, String> {
 pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     let (x, y) = match pk_bytes.len() {
         64 => (pk_bytes[0..32].to_vec(), pk_bytes[32..64].to_vec()),
-        33 => {
+        33 | 65 => {
             use p256::elliptic_curve::sec1::EncodedPoint;
             let encoded_point: EncodedPoint<p256::NistP256> = EncodedPoint::from_bytes(&pk_bytes)?
                 .decompress()
