@@ -36,4 +36,4 @@ features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
-tezedge_client = { git = "https://github.com/binier/tezedge-client", rev = "672e61297f0ba7d1d94168a2588b9b27d76c1fc4", package = "lib" }
+tezedge_client = { git = "https://github.com/tezedge/tezedge-client", rev = "672e61297f0ba7d1d94168a2588b9b27d76c1fc4", package = "lib" }
