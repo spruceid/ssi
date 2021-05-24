@@ -9,7 +9,6 @@ const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
 const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
 const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
-const SPSIG: &str = "4sLJ";
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
 use crate::caip10::BlockchainAccountId;
@@ -1252,7 +1251,7 @@ impl ProofSuite for TezosSignature2021 {
         let sig = bs58::decode(&sig_bs58).with_check(None).into_vec()?;
         let (algorithm, sig) = if sig_bs58.starts_with("edsig") {
             (Algorithm::EdDSA, sig[5..].to_vec())
-        } else if sig_bs58.starts_with(SPSIG) {
+        } else if sig_bs58.starts_with("spsig") {
             let alg = if proof_jwk_opt.is_some() {
                 Algorithm::ES256K
             } else {
