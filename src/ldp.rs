@@ -325,9 +325,19 @@ impl LinkedDataProofs {
                     .await;
             }
             Algorithm::ES256K => {
+                if let Some(ref vm) = options.verification_method {
+                    // TODO: resolve the VM to get type, rather than comparing the string directly
+                    if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
+                        && vm.ends_with("#TezosMethod2021")
+                    {
+                        return TezosSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
+                    }
+                }
                 return EcdsaSecp256k1Signature2019
                     .prepare(document, options, public_key)
-                    .await
+                    .await;
             }
             Algorithm::ES256KR => {
                 if let Some(ref vm) = options.verification_method {
