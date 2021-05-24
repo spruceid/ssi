@@ -17,26 +17,19 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
                 private_key: None,
             }),
         ),
-        "sppk" => (
-            Algorithm::ES256KR,
-            Params::EC(ECParams {
-                curve: Some("secp256k1".into()),
-                // TODO
-                x_coordinate: None,
-                y_coordinate: None,
-                ecc_private_key: None,
-            }),
-        ),
-        "p2pk" => (
-            Algorithm::PS256,
-            Params::EC(ECParams {
-                curve: Some("P-256".into()),
-                // TODO
-                x_coordinate: None,
-                y_coordinate: None,
-                ecc_private_key: None,
-            }),
-        ),
+        #[cfg(feature = "secp256k1")]
+        "sppk" => {
+            let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
+            let jwk =
+                crate::jwk::secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?;
+            (Algorithm::ES256K, jwk.params)
+        }
+        #[cfg(feature = "k256")]
+        "p2pk" => {
+            let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
+            let jwk = crate::jwk::p256_parse(&pk_bytes)?;
+            (Algorithm::PS256, jwk.params)
+        }
         // TODO: secret keys?
         _ => return Err(Error::KeyPrefix),
     };
