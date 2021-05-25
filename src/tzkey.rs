@@ -24,7 +24,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
                 crate::jwk::secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?;
             (Algorithm::ES256K, jwk.params)
         }
-        #[cfg(feature = "k256")]
+        #[cfg(feature = "p256")]
         "p2pk" => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let jwk = crate::jwk::p256_parse(&pk_bytes)?;
