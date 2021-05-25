@@ -887,6 +887,7 @@ mod tests {
         )
         .await;
 
+        /* https://github.com/spruceid/ssi/issues/194
         println!("did:pkh:tz:tz2 - TezosMethod2021");
         credential_prepare_complete_verify_did_pkh_tz(
             Algorithm::ES256KR,
@@ -897,6 +898,7 @@ mod tests {
             &ssi::ldp::TezosSignature2021,
         )
         .await;
+        */
 
         println!("did:pkh:tz:tz3 - TezosMethod2021");
         credential_prepare_complete_verify_did_pkh_tz(
