@@ -1300,8 +1300,10 @@ impl ProofSuite for TezosSignature2021 {
                 // VM does not have publicKeyJwk: either proof must have public key or algorithm must support
                 // public key recovery.
                 if let Some(proof_jwk) = proof_jwk_opt {
-                    // Proof has public key: verify it with blockchainAccountId.
+                    // Proof has public key: verify it with blockchainAccountId,
                     account_id.verify(&proof_jwk)?;
+                    // and verify the signature.
+                    crate::jws::verify_bytes(algorithm, &data, &proof_jwk, &sig)?;
                 } else {
                     // Proof has no public key: use public key recovery,
                     let recovered_jwk = crate::jws::recover(algorithm, &data, &sig)?;
