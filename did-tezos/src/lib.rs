@@ -852,6 +852,8 @@ mod tests {
         assert!(vp2.verify(None, &DIDTZ).await.errors.len() > 0);
     }
 
+    // https://github.com/spruceid/ssi/issues/196
+    #[ignore]
     #[tokio::test]
     #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_tz2() {
