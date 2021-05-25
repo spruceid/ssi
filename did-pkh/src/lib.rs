@@ -757,6 +757,7 @@ mod tests {
         sig_bs58
     }
 
+    #[cfg(feature = "secp256k1")]
     #[tokio::test]
     async fn resolve_vc_issue_verify() {
         let key_secp256k1_recovery: JWK = from_value(json!({
