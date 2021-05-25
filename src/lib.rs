@@ -23,6 +23,9 @@ pub mod tzkey;
 pub mod urdna2015;
 pub mod vc;
 
+#[cfg(any(feature = "k256", feature = "p256"))]
+pub mod passthrough_digest;
+
 #[path = "../json-ld/src/lib.rs"]
 mod json_ld;
 

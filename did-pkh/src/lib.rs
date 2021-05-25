@@ -404,7 +404,7 @@ mod tests {
         test_generate(
             json!({
                 "kty": "OKP",
-                "crv": "Ed25519",
+                "crv": "EdBlake2b",
                 "x": "GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==",
                 "d": "K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-"
             }),
@@ -745,13 +745,13 @@ mod tests {
             algorithm: Some(Algorithm::ES256KR),
             ..key_secp256k1
         };
-        let key_ed25519: JWK =
+        let mut key_ed25519: JWK =
             from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap();
-        let key_p256: JWK =
+        let mut key_p256: JWK =
             from_str(include_str!("../../tests/secp256r1-2021-03-18.json")).unwrap();
         let other_key_secp256k1 = JWK::generate_secp256k1().unwrap();
-        let other_key_ed25519 = JWK::generate_ed25519().unwrap();
-        let other_key_p256 = JWK::generate_p256().unwrap();
+        let mut other_key_ed25519 = JWK::generate_ed25519().unwrap();
+        let mut other_key_p256 = JWK::generate_p256().unwrap();
 
         // eth/Recovery2020
         credential_prove_verify_did_pkh(
@@ -776,6 +776,8 @@ mod tests {
         */
 
         println!("did:pkh:tz:tz1");
+        key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
+        other_key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
         credential_prove_verify_did_pkh(
             key_ed25519.clone(),
             other_key_ed25519.clone(),
@@ -784,18 +786,23 @@ mod tests {
             &ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
         )
         .await;
+        key_ed25519.algorithm = Some(Algorithm::EdDSA);
+        other_key_ed25519.algorithm = Some(Algorithm::EdDSA);
 
-        println!("did:pkh:tz:tz2");
-        credential_prove_verify_did_pkh(
-            key_secp256k1_recovery.clone(),
-            other_key_secp256k1.clone(),
-            "tz",
-            "#blockchainAccountId",
-            &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
-        )
-        .await;
+        // TODO
+        // println!("did:pkh:tz:tz2");
+        // credential_prove_verify_did_pkh(
+        //     key_secp256k1_recovery.clone(),
+        //     other_key_secp256k1.clone(),
+        //     "tz",
+        //     "#blockchainAccountId",
+        //     &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+        // )
+        // .await;
 
         println!("did:pkh:tz:tz3");
+        key_p256.algorithm = Some(Algorithm::ESBlake2b);
+        other_key_p256.algorithm = Some(Algorithm::ESBlake2b);
         credential_prove_verify_did_pkh(
             key_p256.clone(),
             other_key_p256.clone(),
@@ -804,6 +811,8 @@ mod tests {
             &ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
         )
         .await;
+        key_p256.algorithm = Some(Algorithm::ES256);
+        other_key_p256.algorithm = Some(Algorithm::ES256);
 
         println!("did:pkh:sol");
         credential_prove_verify_did_pkh(
@@ -848,8 +857,10 @@ mod tests {
         .await;
 
         println!("did:pkh:tz:tz1 - TezosMethod2021");
+        key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
+        other_key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::EdDSA,
+            Algorithm::EdBlake2b,
             key_ed25519.clone(),
             other_key_ed25519.clone(),
             "tz",
@@ -857,11 +868,13 @@ mod tests {
             &ssi::ldp::TezosSignature2021,
         )
         .await;
+        key_ed25519.algorithm = Some(Algorithm::EdDSA);
+        other_key_ed25519.algorithm = Some(Algorithm::EdDSA);
 
         /* https://github.com/spruceid/ssi/issues/194
         println!("did:pkh:tz:tz2 - TezosMethod2021");
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::ES256KR,
+            Algorithm::ESBlake2bK,
             key_secp256k1_recovery.clone(),
             other_key_secp256k1.clone(),
             "tz",
@@ -872,8 +885,10 @@ mod tests {
         */
 
         println!("did:pkh:tz:tz3 - TezosMethod2021");
+        key_p256.algorithm = Some(Algorithm::ESBlake2b);
+        other_key_p256.algorithm = Some(Algorithm::ESBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::ES256,
+            Algorithm::ESBlake2b,
             key_p256.clone(),
             other_key_p256.clone(),
             "tz",
@@ -881,6 +896,8 @@ mod tests {
             &ssi::ldp::TezosSignature2021,
         )
         .await;
+        key_p256.algorithm = Some(Algorithm::ES256);
+        other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
     #[tokio::test]

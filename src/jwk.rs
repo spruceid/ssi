@@ -167,11 +167,14 @@ pub enum Algorithm {
     PS384,
     PS512,
     EdDSA,
+    EdBlake2b,
     ES256,
     ES256K,
     /// https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r
     #[serde(rename = "ES256K-R")]
     ES256KR,
+    ESBlake2b,
+    ESBlake2bK,
     None,
 }
 
@@ -211,7 +214,7 @@ impl JWK {
 
     #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
-        let mut csprng = rand::rngs::OsRng {};
+        let mut csprng = rand_old::rngs::OsRng {};
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
         let sk_bytes = keypair.secret.to_bytes();
         let pk_bytes = keypair.public.to_bytes();
@@ -451,27 +454,6 @@ impl ToASN1 for OctetParams {
         } else {
             let key = Ed25519PublicKey { public_key };
             key.to_asn1_class(class)
-        }
-    }
-}
-
-impl FromStr for Algorithm {
-    type Err = Error;
-    fn from_str(algorithm: &str) -> Result<Self, Self::Err> {
-        match algorithm {
-            "HS256" => Ok(Self::HS256),
-            "HS384" => Ok(Self::HS384),
-            "HS512" => Ok(Self::HS512),
-            "RS256" => Ok(Self::RS256),
-            "RS384" => Ok(Self::RS384),
-            "RS512" => Ok(Self::RS512),
-            "PS256" => Ok(Self::PS256),
-            "PS384" => Ok(Self::PS384),
-            "PS512" => Ok(Self::PS512),
-            "EdDSA" => Ok(Self::EdDSA),
-            "ES256K" => Ok(Self::ES256K),
-            "ES256K-R" => Ok(Self::ES256KR),
-            _ => Err(Error::UnsupportedAlgorithm),
         }
     }
 }
@@ -748,11 +730,13 @@ impl TryFrom<&k256::PublicKey> for ECParams {
     fn try_from(pk: &k256::PublicKey) -> Result<Self, Self::Error> {
         use k256::elliptic_curve::sec1::ToEncodedPoint;
         let ec_points = pk.to_encoded_point(false);
-        let pk_bytes = ec_points.as_bytes();
+        let x = ec_points.x().ok_or(Error::MissingPoint)?;
+        let y = ec_points.y().ok_or(Error::MissingPoint)?;
         Ok(ECParams {
+            // TODO according to https://tools.ietf.org/id/draft-jones-webauthn-secp256k1-00.html#rfc.section.2 it should be P-256K?
             curve: Some("secp256k1".to_string()),
-            x_coordinate: Some(Base64urlUInt(pk_bytes[1..33].to_vec())),
-            y_coordinate: Some(Base64urlUInt(pk_bytes[33..65].to_vec())),
+            x_coordinate: Some(Base64urlUInt(x.to_vec())),
+            y_coordinate: Some(Base64urlUInt(y.to_vec())),
             ecc_private_key: None,
         })
     }
