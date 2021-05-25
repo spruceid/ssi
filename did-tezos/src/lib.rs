@@ -532,6 +532,8 @@ mod tests {
         assert_eq!(did, "did:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX");
     }
 
+    // https://github.com/spruceid/ssi/issues/196
+    #[ignore]
     #[tokio::test]
     async fn test_derivation_tz1() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
@@ -564,6 +566,8 @@ mod tests {
         );
     }
 
+    // https://github.com/spruceid/ssi/issues/196
+    #[ignore]
     #[tokio::test]
     async fn test_derivation_tz2() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
@@ -596,6 +600,8 @@ mod tests {
         );
     }
 
+    // https://github.com/spruceid/ssi/issues/196
+    #[ignore]
     #[tokio::test]
     async fn credential_prove_verify_did_tz1() {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
