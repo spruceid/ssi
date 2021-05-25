@@ -234,14 +234,16 @@ impl LinkedDataProofs {
                                     #[cfg(not(feature = "keccak-hash"))]
                                     return Err(Error::ProofTypeNotImplemented);
                                 }
-                                if vm.ends_with("#TezosMethod2021") {
-                                    return TezosSignature2021.sign(document, options, &key).await;
-                                }
                             }
                             return EcdsaSecp256k1RecoverySignature2020
                                 .sign(document, options, &key)
                                 .await;
                         } else {
+                            if let Some(ref vm) = options.verification_method {
+                                if vm.ends_with("#TezosMethod2021") {
+                                    return TezosSignature2021.sign(document, options, &key).await;
+                                }
+                            }
                             return EcdsaSecp256k1Signature2019
                                 .sign(document, options, &key)
                                 .await;
@@ -287,16 +289,6 @@ impl LinkedDataProofs {
             }
             Algorithm::EdDSA => {
                 if let Some(ref vm) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key)
-                            .await;
-                    }
-                    if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                            .prepare(document, options, public_key)
-                            .await;
-                    }
                     if vm.ends_with("#SolanaMethod2021") {
                         return SolanaSignature2021
                             .prepare(document, options, public_key)
@@ -307,7 +299,26 @@ impl LinkedDataProofs {
                     .prepare(document, options, public_key)
                     .await;
             }
+            Algorithm::EdBlake2b => {
+                if let Some(ref vm) = options.verification_method {
+                    if vm.ends_with("#TezosMethod2021") {
+                        return TezosSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
+                    }
+                    if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
+                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
+                    }
+                }
+            }
             Algorithm::ES256 => {
+                return EcdsaSecp256r1Signature2019
+                    .prepare(document, options, public_key)
+                    .await;
+            }
+            Algorithm::ESBlake2b => {
                 if let Some(ref vm) = options.verification_method {
                     if vm.ends_with("#TezosMethod2021") {
                         return TezosSignature2021
@@ -320,12 +331,19 @@ impl LinkedDataProofs {
                             .await;
                     }
                 }
-                return EcdsaSecp256r1Signature2019
+            }
+            Algorithm::ES256K => {
+                return EcdsaSecp256k1Signature2019
                     .prepare(document, options, public_key)
                     .await;
             }
-            Algorithm::ES256K => {
+            Algorithm::ESBlake2bK => {
                 if let Some(ref vm) = options.verification_method {
+                    if vm.ends_with("#TezosMethod2021") {
+                        return TezosSignature2021
+                            .prepare(document, options, public_key)
+                            .await;
+                    }
                     // TODO: resolve the VM to get type, rather than comparing the string directly
                     if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
                         && vm.ends_with("#TezosMethod2021")
@@ -335,9 +353,6 @@ impl LinkedDataProofs {
                             .await;
                     }
                 }
-                return EcdsaSecp256k1Signature2019
-                    .prepare(document, options, public_key)
-                    .await;
             }
             Algorithm::ES256KR => {
                 if let Some(ref vm) = options.verification_method {
@@ -348,11 +363,6 @@ impl LinkedDataProofs {
                             .await;
                         #[cfg(not(feature = "keccak-hash"))]
                         return Err(Error::ProofTypeNotImplemented);
-                    }
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key)
-                            .await;
                     }
                 }
                 return EcdsaSecp256k1RecoverySignature2020
@@ -814,7 +824,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     ) -> Result<Proof, Error> {
         use std::collections::HashMap;
         if let Some(key_algorithm) = key.algorithm {
-            if key_algorithm != Algorithm::EdDSA {
+            if key_algorithm != Algorithm::EdBlake2b {
                 return Err(Error::AlgorithmMismatch);
             }
         }
@@ -834,7 +844,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             property_set: Some(property_set),
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
-        sign_proof(document, proof, key, Algorithm::EdDSA).await
+        sign_proof(document, proof, key, Algorithm::EdBlake2b).await
     }
 
     async fn prepare(
@@ -859,7 +869,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             challenge: options.challenge.clone(),
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
-        prepare_proof(document, proof, Algorithm::EdDSA).await
+        prepare_proof(document, proof, Algorithm::EdBlake2b).await
     }
 
     async fn complete(
@@ -914,7 +924,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     ) -> Result<Proof, Error> {
         use std::collections::HashMap;
         if let Some(key_algorithm) = key.algorithm {
-            if key_algorithm != Algorithm::ES256 {
+            if key_algorithm != Algorithm::ESBlake2b {
                 return Err(Error::AlgorithmMismatch);
             }
         }
@@ -934,7 +944,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             property_set: Some(property_set),
             ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
-        sign_proof(document, proof, key, Algorithm::ES256).await
+        sign_proof(document, proof, key, Algorithm::ESBlake2b).await
     }
 
     async fn prepare(
@@ -959,7 +969,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             challenge: options.challenge.clone(),
             ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
         };
-        prepare_proof(document, proof, Algorithm::ES256).await
+        prepare_proof(document, proof, Algorithm::ESBlake2b).await
     }
 
     async fn complete(
@@ -1159,17 +1169,12 @@ impl ProofSuite for TezosSignature2021 {
             ..Proof::new("TezosSignature2021")
         };
         let micheline = micheline_from_document_and_options(document, &proof).await?;
-        let data = blake2b_simd::Params::new()
-            .hash_length(32)
-            .hash(&micheline)
-            .as_bytes()
-            .to_vec();
-        let sig = crate::jws::sign_bytes(algorithm, &data, key)?;
+        let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
         let mut sig_prefixed = Vec::new();
         let prefix: &[u8] = match algorithm {
-            Algorithm::EdDSA => &EDSIG_PREFIX,
-            Algorithm::ES256K | Algorithm::ES256KR => &SPSIG_PREFIX,
-            Algorithm::ES256 => &P2SIG_PREFIX,
+            Algorithm::EdBlake2b => &EDSIG_PREFIX,
+            Algorithm::ESBlake2bK => &SPSIG_PREFIX,
+            Algorithm::ESBlake2b => &P2SIG_PREFIX,
             _ => return Err(Error::UnsupportedAlgorithm),
         };
         sig_prefixed.extend_from_slice(&prefix);
@@ -1186,13 +1191,9 @@ impl ProofSuite for TezosSignature2021 {
         public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
         let mut property_set = std::collections::HashMap::new();
-        if public_key.algorithm != Some(Algorithm::ES256KR) {
-            // Algorithm not supporting public key recovery: put public key in proof if it is not
-            // in the VM.
-            // TODO: dereference VM URL to check if VM contains public key.
-            let jwk_value = serde_json::to_value(public_key.to_public())?;
-            property_set.insert("publicKeyJwk".to_string(), jwk_value);
-        }
+        // TODO: dereference VM URL to check if VM already contains public key.
+        let jwk_value = serde_json::to_value(public_key.to_public())?;
+        property_set.insert("publicKeyJwk".to_string(), jwk_value);
         let proof = Proof {
             context: TZVM_CONTEXT.clone(),
             proof_purpose: options.proof_purpose.clone(),
@@ -1253,11 +1254,6 @@ impl ProofSuite for TezosSignature2021 {
         }
 
         let micheline = micheline_from_document_and_options(document, &proof).await?;
-        let data = blake2b_simd::Params::new()
-            .hash_length(32)
-            .hash(&micheline)
-            .as_bytes()
-            .to_vec();
         let account_id_opt: Option<BlockchainAccountId> = match vm.blockchain_account_id {
             Some(account_id_string) => Some(account_id_string.parse()?),
             None => None,
@@ -1266,22 +1262,18 @@ impl ProofSuite for TezosSignature2021 {
         // VM must have either publicKeyJwk or blockchainAccountId.
         if let Some(vm_jwk) = vm.public_key_jwk {
             // If VM has publicKey, use that to veify the signature.
-            crate::jws::verify_bytes(algorithm, &data, &vm_jwk, &sig)?;
+            crate::jws::verify_bytes(algorithm, &micheline, &vm_jwk, &sig)?;
             // Note: VM blockchainAccountId is ignored in this case.
         } else {
             if let Some(account_id) = account_id_opt {
-                // VM does not have publicKeyJwk: either proof must have public key or algorithm must support
-                // public key recovery.
+                // VM does not have publicKeyJwk: proof must have public key
                 if let Some(proof_jwk) = proof_jwk_opt {
                     // Proof has public key: verify it with blockchainAccountId,
                     account_id.verify(&proof_jwk)?;
                     // and verify the signature.
-                    crate::jws::verify_bytes(algorithm, &data, &proof_jwk, &sig)?;
+                    crate::jws::verify_bytes(algorithm, &micheline, &proof_jwk, &sig)?;
                 } else {
-                    // Proof has no public key: use public key recovery,
-                    let recovered_jwk = crate::jws::recover(algorithm, &data, &sig)?;
-                    // and then verify the recovered key with blockchainAccountId.
-                    account_id.verify(&recovered_jwk)?;
+                    return Err(Error::MissingKey);
                 }
             } else {
                 return Err(Error::MissingKey);
@@ -1534,7 +1526,7 @@ mod tests {
     #[async_std::test]
     async fn tezos_vm_tz1() {
         let mut key = JWK::generate_ed25519().unwrap();
-        key.algorithm = Some(Algorithm::EdDSA);
+        key.algorithm = Some(Algorithm::EdBlake2b);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
             verification_method: Some(vm),
@@ -1552,7 +1544,7 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     async fn tezos_vm_tz2() {
         let mut key = JWK::generate_secp256k1().unwrap();
-        key.algorithm = Some(Algorithm::ES256KR);
+        key.algorithm = Some(Algorithm::ESBlake2bK);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
             verification_method: Some(vm),
