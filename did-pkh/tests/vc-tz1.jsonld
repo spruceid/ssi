@@ -1,0 +1,78 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1"
+  ],
+  "type": [
+    "VerifiableCredential"
+  ],
+  "credentialSubject": {
+    "id": "did:pkh:tz:tz1TwZZZSShtM73oEr74aDtDcns3UmFqaca6"
+  },
+  "issuer": "did:pkh:tz:tz1TwZZZSShtM73oEr74aDtDcns3UmFqaca6",
+  "issuanceDate": "2021-05-26T12:58:11.975Z",
+  "proof": {
+    "@context": {
+      "TezosMethod2021": "https://w3id.org/security#TezosMethod2021",
+      "TezosSignature2021": {
+        "@context": {
+          "@protected": true,
+          "@version": 1.1,
+          "challenge": "https://w3id.org/security#challenge",
+          "created": {
+            "@id": "http://purl.org/dc/terms/created",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "domain": "https://w3id.org/security#domain",
+          "expires": {
+            "@id": "https://w3id.org/security#expiration",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "id": "@id",
+          "nonce": "https://w3id.org/security#nonce",
+          "proofPurpose": {
+            "@context": {
+              "@protected": true,
+              "@version": 1.1,
+              "assertionMethod": {
+                "@container": "@set",
+                "@id": "https://w3id.org/security#assertionMethod",
+                "@type": "@id"
+              },
+              "authentication": {
+                "@container": "@set",
+                "@id": "https://w3id.org/security#authenticationMethod",
+                "@type": "@id"
+              },
+              "id": "@id",
+              "type": "@type"
+            },
+            "@id": "https://w3id.org/security#proofPurpose",
+            "@type": "@vocab"
+          },
+          "proofValue": "https://w3id.org/security#proofValue",
+          "publicKeyJwk": {
+            "@id": "https://w3id.org/security#publicKeyJwk",
+            "@type": "@json"
+          },
+          "type": "@type",
+          "verificationMethod": {
+            "@id": "https://w3id.org/security#verificationMethod",
+            "@type": "@id"
+          }
+        },
+        "@id": "https://w3id.org/security#TezosSignature2021"
+      }
+    },
+    "type": "TezosSignature2021",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "edsigtjkcZnfSod2pmiZF9frSVx4YVd4mpsBZW9pgfRS1ykZexw18hgqGv29njawLAMsMypFR1uM6L28C4cj8vh49tpiPGMfApk",
+    "verificationMethod": "did:pkh:tz:tz1TwZZZSShtM73oEr74aDtDcns3UmFqaca6#TezosMethod2021",
+    "created": "2021-05-26T12:58:11.975Z",
+    "publicKeyJwk": {
+      "alg": "EdDSA",
+      "crv": "Ed25519",
+      "kty": "OKP",
+      "x": "rVEB0Icbomw1Ir-ck52iCZl1SICc5lCg2pxI8AmydDw"
+    }
+  }
+}

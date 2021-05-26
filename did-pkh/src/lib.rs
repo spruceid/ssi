@@ -891,4 +891,21 @@ mod tests {
         )
         .await;
     }
+
+    #[tokio::test]
+    async fn verify_vc() {
+        let vc_str = include_str!("../tests/vc-tz1.jsonld");
+        let mut vc = ssi::vc::Credential::from_json_unsigned(vc_str).unwrap();
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDPKH).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+        // Negative test: tamper with the VC and watch verification fail.
+        let mut map = std::collections::HashMap::new();
+        map.insert("foo".to_string(), serde_json::json!("bar"));
+        vc.property_set = Some(map);
+        let verification_result = vc.verify(None, &DIDPKH).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.len() > 0);
+    }
 }
