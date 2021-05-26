@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2021-05-26
+### Added
+- Add `ssi::tzkey::{sign_tezos, encode_tezos_signed_message, decode_tzsig}`
+### Fixed
+- Improve testing of Tezos signing, encoding and decoding.
+- Allow using TezosSignature2021 with `LinkedDataProofs::prepare`.
+- Fix parsing of `sppk` and `p2pk` Tezos signature types.
+### Security
+- Verify signature in `TezosSignature2021` when JWK is in proof object.
+
 ## [0.2.1] - 2021-04-28
 ### Added
 - Add `TezosSignature2021`/`TezosMethod2021`.
@@ -157,7 +167,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
 [verification relationship]: https://www.w3.org/TR/did-core/#dfn-verification-relationship
 
-[Unreleased]: https://github.com/spruceid/ssi/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/spruceid/ssi/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/spruceid/ssi/releases/tag/v0.2.2
 [0.2.1]: https://github.com/spruceid/ssi/releases/tag/v0.2.1
 [0.2.0]: https://github.com/spruceid/ssi/releases/tag/v0.2.0
 [0.1.0]: https://github.com/spruceid/ssi/releases/tag/v0.1.0
