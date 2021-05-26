@@ -5,6 +5,7 @@ use crate::eip712::TypedDataConstructionError;
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedDataHashError;
 use crate::json_ld;
+use crate::tzkey::{DecodeTezosSignatureError, EncodeTezosSignedMessageError};
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ed25519-dalek")]
 use ed25519_dalek::ed25519::Error as ED25519Error;
@@ -91,6 +92,7 @@ pub enum Error {
     InvalidProofPurpose,
     InvalidProofDomain,
     InvalidSignature,
+    UnexpectedSignatureLength(usize, usize),
     InvalidJWS,
     MissingJWSHeader,
     MissingCredentialSchema,
@@ -134,6 +136,8 @@ pub enum Error {
     IRIRefNotWellFormed,
     SerializeDouble,
     ExpectedFailure,
+    EncodeTezosSignedMessage(EncodeTezosSignedMessageError),
+    DecodeTezosSignature(DecodeTezosSignatureError),
     ExpectedOutput(String, String),
     UnknownProcessingMode(String),
     UnknownRdfDirection(String),
@@ -236,6 +240,7 @@ impl fmt::Display for Error {
             Error::ExpiredProof => write!(f, "Expired proof"),
             Error::FutureProof => write!(f, "Proof creation time is in the future"),
             Error::InvalidSignature => write!(f, "Invalid Signature"),
+            Error::UnexpectedSignatureLength(expected, actual) => write!(f, "Expected signature length {} but found {}", expected, actual),
             Error::InvalidJWS => write!(f, "Invalid JWS"),
             Error::MissingJWSHeader => write!(f, "Missing JWS Header"),
             Error::InvalidProofPurpose => write!(f, "Invalid proof purpose"),
@@ -283,6 +288,8 @@ impl fmt::Display for Error {
             Error::IRIRefNotWellFormed => write!(f, "IRI reference not well-formed"),
             Error::SerializeDouble => write!(f, "Unable to serialize double"),
             Error::ExpectedFailure => write!(f, "Expected failure"),
+            Error::EncodeTezosSignedMessage(e) => write!(f, "Unable to encode Signed Tezos Message: {}", e),
+            Error::DecodeTezosSignature(e) => write!(f, "Unable to decode Tezos Signature: {}", e),
             Error::ExpectedOutput(expected, found) => write!(f, "Expected output '{}', but found '{}'", expected, found),
             Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
@@ -486,6 +493,18 @@ impl From<Secp256r1Error> for Error {
 impl From<k256::elliptic_curve::Error> for Error {
     fn from(err: k256::elliptic_curve::Error) -> Error {
         Error::K256EC(err)
+    }
+}
+
+impl From<EncodeTezosSignedMessageError> for Error {
+    fn from(err: EncodeTezosSignedMessageError) -> Error {
+        Error::EncodeTezosSignedMessage(err)
+    }
+}
+
+impl From<DecodeTezosSignatureError> for Error {
+    fn from(err: DecodeTezosSignatureError) -> Error {
+        Error::DecodeTezosSignature(err)
     }
 }
 

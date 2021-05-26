@@ -734,27 +734,7 @@ mod tests {
             ssi::ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
             _ => panic!("Expected Micheline expression for signing"),
         };
-
-        let data = blake2b_simd::Params::new()
-            .hash_length(32)
-            .hash(&micheline)
-            .as_bytes()
-            .to_vec();
-        let sig = ssi::jws::sign_bytes(algorithm, &data, &key).unwrap();
-        let mut sig_prefixed = Vec::new();
-        const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
-        const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
-        const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
-        let prefix: &[u8] = match algorithm {
-            Algorithm::EdDSA => &EDSIG_PREFIX,
-            Algorithm::ES256K | Algorithm::ES256KR => &SPSIG_PREFIX,
-            Algorithm::ES256 => &P2SIG_PREFIX,
-            _ => panic!("Unsupported algorithm for Tezos signing"),
-        };
-        sig_prefixed.extend_from_slice(&prefix);
-        sig_prefixed.extend_from_slice(&sig);
-        let sig_bs58 = bs58::encode(sig_prefixed).with_check().into_string();
-        sig_bs58
+        ssi::tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
     }
 
     #[cfg(feature = "secp256k1")]

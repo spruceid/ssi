@@ -1133,21 +1133,8 @@ async fn micheline_from_document_and_options(
     let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
-    let string_bytes = [
-        "Tezos Signed Message: ".to_string(),
-        sigopts_normalized,
-        doc_normalized,
-    ]
-    .join("\n")
-    .as_bytes()
-    .to_vec();
-    const BYTES_PREFIX: [u8; 2] = [05, 01];
-    let data = [
-        BYTES_PREFIX.to_vec(),
-        string_bytes.len().to_be_bytes().to_vec(),
-        string_bytes,
-    ]
-    .concat();
+    let msg = ["", &sigopts_normalized, &doc_normalized].join("\n");
+    let data = crate::tzkey::encode_tezos_signed_message(&msg)?;
     Ok(data)
 }
 
@@ -1258,22 +1245,8 @@ impl ProofSuite for TezosSignature2021 {
             },
             None => None,
         };
-        let sig = bs58::decode(&sig_bs58).with_check(None).into_vec()?;
-        let (algorithm, sig) = if sig_bs58.starts_with("edsig") {
-            (Algorithm::EdDSA, sig[5..].to_vec())
-        } else if sig_bs58.starts_with("spsig") {
-            let alg = if proof_jwk_opt.is_some() {
-                Algorithm::ES256K
-            } else {
-                Algorithm::ES256KR
-            };
-            (alg, sig[5..].to_vec())
-        } else if sig_bs58.starts_with("p2sig") {
-            (Algorithm::ES256, sig[4..].to_vec())
-        } else {
-            return Err(Error::SignaturePrefix);
-        };
 
+        let (algorithm, sig) = crate::tzkey::decode_tzsig(sig_bs58)?;
         let vm = resolve_vm(&verification_method, resolver).await?;
         if vm.type_ != "TezosMethod2021" {
             return Err(Error::VerificationMethodMismatch);
