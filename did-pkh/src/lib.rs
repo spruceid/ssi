@@ -739,25 +739,16 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_vc_issue_verify() {
-        let key_secp256k1_recovery: JWK = from_value(json!({
-            "alg": "ES256K-R",
-            "kty": "EC",
-            "crv": "secp256k1",
-            "x": "yclqMZ0MtyVkKm1eBh2AyaUtsqT0l5RJM3g4SzRT96A",
-            "y": "yQzUwKnftWCJPGs-faGaHiYi1sxA6fGJVw2Px_LCNe8",
-            "d": "meTmccmR_6ZsOa2YuTTkKkJ4ZPYsKdAH1Wx_RRf2j_E"
-        }))
-        .unwrap();
+        let key_secp256k1: JWK =
+            from_str(include_str!("../../tests/secp256k1-2021-02-17.json")).unwrap();
+        let key_secp256k1_recovery = JWK {
+            algorithm: Some(Algorithm::ES256KR),
+            ..key_secp256k1
+        };
         let key_ed25519: JWK =
             from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap();
-        let key_p256: JWK = from_value(json!({
-            "kty": "EC",
-            "crv": "P-256",
-            "x": "OnI8cxizlWZUBw5icIHEUn5EVMpcz4bNr__HnrmYGrE",
-            "y": "IB3NJQlX9rCu0yyAYSm0k-Vk1NlNkkEcRUZLwZHnuGc",
-            "d": "Bb1hTpaG2OIWkq-mXEAga5_kYE8hJ_J35a_CB8rVOSM"
-        }))
-        .unwrap();
+        let key_p256: JWK =
+            from_str(include_str!("../../tests/secp256r1-2021-03-18.json")).unwrap();
         let other_key_secp256k1 = JWK::generate_secp256k1().unwrap();
         let other_key_ed25519 = JWK::generate_ed25519().unwrap();
         let other_key_p256 = JWK::generate_p256().unwrap();
