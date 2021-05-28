@@ -129,8 +129,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = p256::SecretKey::try_from(ec)?;
                 let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                let hashed = crate::hash::sha256(data)?;
-                let sig = signing_key.try_sign(&hashed)?;
+                let sig = signing_key.try_sign(&data)?;
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "k256")]
@@ -232,8 +231,7 @@ pub fn verify_bytes(
                 let public_key = p256::PublicKey::try_from(ec)?;
                 let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
                 let sig = Signature::from_bytes(signature)?;
-                let hashed = crate::hash::sha256(data)?;
-                verifying_key.verify(&hashed, &sig)?;
+                verifying_key.verify(&data, &sig)?;
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256K | Algorithm::ES256KR => {
