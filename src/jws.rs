@@ -522,5 +522,12 @@ mod tests {
         let sig = sign_bytes(Algorithm::ES256, data, &key).unwrap();
         verify_bytes(Algorithm::ES256, data, &key, &sig).unwrap();
         verify_bytes(Algorithm::ES256, b"no", &key, &sig).unwrap_err();
+
+        let key: JWK =
+            serde_json::from_str(include_str!("../tests/secp256r1-2021-03-18.json")).unwrap();
+        let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
+        let jws = encode_sign(Algorithm::ES256, payload, &key).unwrap();
+        assert_eq!(jws, "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.rJzO6MmTNS8Tn-L3baIf9_2Jr9OoK8E06MxJtofz8xMUGSom6eRUmWGZ7oQVjgP3HogOD80miTvuvKTWa54Nvw");
+        decode_verify(&jws, &key).unwrap();
     }
 }
