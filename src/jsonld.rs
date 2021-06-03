@@ -1199,6 +1199,10 @@ pub fn object_to_rdf(
             }
         } else {
             // 11
+            let num_f64 = match num_f64 {
+                -0.0 => 0.0,
+                nonzero => nonzero,
+            };
             let num = format!("{:.0}", num_f64);
             value = JsonValue::String(num);
             if datatype == None {
