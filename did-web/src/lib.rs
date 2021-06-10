@@ -91,7 +91,14 @@ impl DIDResolver for DIDWeb {
             Ok(url) => url,
         };
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
-        let client = match reqwest::Client::builder().build() {
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            "User-Agent",
+            reqwest::header::HeaderValue::from_static("ssi/0.2"),
+        );
+
+        let client = match reqwest::Client::builder().default_headers(headers).build() {
             Ok(c) => c,
             Err(err) => {
                 return (
