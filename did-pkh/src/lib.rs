@@ -743,7 +743,12 @@ mod tests {
             from_str(include_str!("../../tests/secp256k1-2021-02-17.json")).unwrap();
         let key_secp256k1_recovery = JWK {
             algorithm: Some(Algorithm::ES256KR),
-            ..key_secp256k1
+            ..key_secp256k1.clone()
+        };
+        let key_secp256k1_eip712vm = JWK {
+            algorithm: Some(Algorithm::ES256KR),
+            key_operations: Some(vec!["signTypedData".to_string()]),
+            ..key_secp256k1.clone()
         };
         let mut key_ed25519: JWK =
             from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap();
@@ -763,17 +768,15 @@ mod tests {
         )
         .await;
 
-        /*
         // eth/Eip712
         credential_prove_verify_did_pkh(
-            key_secp256k1_recovery.clone(),
+            key_secp256k1_eip712vm.clone(),
             other_key_secp256k1.clone(),
             "eth",
-            "#Eip712Method2021",
+            "#Recovery2020",
             &ssi::ldp::Eip712Signature2021,
         )
         .await;
-        */
 
         println!("did:pkh:tz:tz1");
         key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
