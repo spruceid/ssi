@@ -158,6 +158,22 @@ impl ProofPreparation {
     }
 }
 
+fn use_eip712vm(options: &LinkedDataProofOptions, key: &JWK) -> bool {
+    if let Some(ref vm) = options.verification_method {
+        if vm.ends_with("#Eip712Method2021") {
+            return true;
+        }
+    }
+    // Use unregistered "signTypedData" key operation value to indicate using Eip712Signature2021, until
+    // LinkedDataProofOptions has type property
+    if let Some(ref key_ops) = key.key_operations {
+        if key_ops.contains(&"signTypedData".to_string()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 pub struct LinkedDataProofs;
 impl LinkedDataProofs {
     // https://w3c-ccg.github.io/ld-proofs/#proof-algorithm
@@ -230,13 +246,11 @@ impl LinkedDataProofs {
                 match &curve[..] {
                     "secp256k1" => {
                         if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
-                            if let Some(ref vm) = options.verification_method {
-                                if vm.ends_with("#Eip712Method2021") {
-                                    #[cfg(feature = "keccak-hash")]
-                                    return Eip712Signature2021.sign(document, options, &key).await;
-                                    #[cfg(not(feature = "keccak-hash"))]
-                                    return Err(Error::ProofTypeNotImplemented);
-                                }
+                            if use_eip712vm(options, key) {
+                                #[cfg(feature = "keccak-hash")]
+                                return Eip712Signature2021.sign(document, options, &key).await;
+                                #[cfg(not(feature = "keccak-hash"))]
+                                return Err(Error::ProofTypeNotImplemented);
                             }
                             return EcdsaSecp256k1RecoverySignature2020
                                 .sign(document, options, &key)
@@ -358,15 +372,13 @@ impl LinkedDataProofs {
                 }
             }
             Algorithm::ES256KR => {
-                if let Some(ref vm) = options.verification_method {
-                    if vm.ends_with("#Eip712Method2021") {
-                        #[cfg(feature = "keccak-hash")]
-                        return Eip712Signature2021
-                            .prepare(document, options, public_key)
-                            .await;
-                        #[cfg(not(feature = "keccak-hash"))]
-                        return Err(Error::ProofTypeNotImplemented);
-                    }
+                if use_eip712vm(options, public_key) {
+                    #[cfg(feature = "keccak-hash")]
+                    return Eip712Signature2021
+                        .prepare(document, options, public_key)
+                        .await;
+                    #[cfg(not(feature = "keccak-hash"))]
+                    return Err(Error::ProofTypeNotImplemented);
                 }
                 return EcdsaSecp256k1RecoverySignature2020
                     .prepare(document, options, public_key)
@@ -1101,9 +1113,12 @@ impl ProofSuite for Eip712Signature2021 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(&verification_method, resolver).await?;
-        if vm.type_ != "Eip712Method2021" {
-            return Err(Error::VerificationMethodMismatch);
-        }
+        match &vm.type_[..] {
+            "Eip712Method2021" => (),
+            "EcdsaSecp256k1VerificationKey2019" => (),
+            "EcdsaSecp256k1RecoveryMethod2020" => (),
+            _ => Err(Error::VerificationMethodMismatch)?,
+        };
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
         let bytes = typed_data.bytes()?;
         if !sig_hex.starts_with("0x") {
@@ -1515,7 +1530,7 @@ mod tests {
     async fn eip712vm() {
         let mut key = JWK::generate_secp256k1().unwrap();
         key.algorithm = Some(Algorithm::ES256KR);
-        let vm = format!("{}#Eip712Method2021", "did:example:foo");
+        let vm = format!("{}#Recovery2020", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
             verification_method: Some(vm),
             ..Default::default()
