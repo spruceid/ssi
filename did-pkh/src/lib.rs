@@ -903,9 +903,7 @@ mod tests {
         other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
-    #[tokio::test]
-    async fn verify_vc() {
-        let vc_str = include_str!("../tests/vc-tz1.jsonld");
+    async fn test_verify_vc(vc_str: &str) {
         let mut vc = ssi::vc::Credential::from_json_unsigned(vc_str).unwrap();
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDPKH).await;
@@ -918,5 +916,11 @@ mod tests {
         let verification_result = vc.verify(None, &DIDPKH).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() > 0);
+    }
+
+    #[tokio::test]
+    async fn verify_vc() {
+        test_verify_vc(include_str!("../tests/vc-tz1.jsonld")).await;
+        test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld")).await;
     }
 }
