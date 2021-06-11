@@ -227,6 +227,7 @@ pub fn verify_bytes(
         if key_algorithm != algorithm
             && !(key_algorithm == Algorithm::EdDSA && algorithm == Algorithm::EdBlake2b)
             && !(key_algorithm == Algorithm::ES256 && algorithm == Algorithm::ESBlake2b)
+            && !(key_algorithm == Algorithm::ES256K && algorithm == Algorithm::ESBlake2bK)
             && !(key_algorithm == Algorithm::ES256KR && algorithm == Algorithm::ESBlake2bK)
         {
             return Err(Error::AlgorithmMismatch);
