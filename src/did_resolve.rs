@@ -12,7 +12,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
-
 use crate::did::{DIDMethod, DIDParameters, Document, Resource, ServiceEndpoint, DIDURL};
 use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
