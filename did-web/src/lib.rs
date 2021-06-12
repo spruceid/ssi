@@ -5,7 +5,7 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::VERSION;
+use ssi::SSI_INFO;
 
 // For testing, enable handling requests at localhost.
 #[cfg(test)]
@@ -94,9 +94,11 @@ impl DIDResolver for DIDWeb {
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
 
         let mut headers = reqwest::header::HeaderMap::new();
+        // let userAgentHeader = [PACKAGE_NAME, VERSION].join("/");
+
         headers.insert(
             "User-Agent",
-            reqwest::header::HeaderValue::from_static(VERSION),
+            reqwest::header::HeaderValue::from_static(SSI_INFO),
         );
 
         let client = match reqwest::Client::builder().default_headers(headers).build() {

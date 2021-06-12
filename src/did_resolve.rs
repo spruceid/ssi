@@ -676,16 +676,12 @@ impl DIDResolver for HTTPDIDResolver {
         };
         let https = HttpsConnector::new();
 
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert(
-            "User-Agent",
-            reqwest::header::HeaderValue::from_static(env!("CARGO_PKG_VERSION")),
-        );
-        let client = Client::builder()
-            .default_headers(headers)
-            .build::<_, hyper::Body>(https);
+        static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
+        let client = Client::builder().build::<_, hyper::Body>(https);
         let request = match Request::get(uri)
             .header("Accept", TYPE_DID_RESOLUTION)
+            .header("User-Agent", USER_AGENT)
             .body(hyper::Body::default())
         {
             Ok(req) => req,
