@@ -94,7 +94,6 @@ impl DIDResolver for DIDWeb {
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
 
         let mut headers = reqwest::header::HeaderMap::new();
-        // let userAgentHeader = [PACKAGE_NAME, VERSION].join("/");
 
         headers.insert(
             "User-Agent",

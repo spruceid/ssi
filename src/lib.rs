@@ -23,8 +23,6 @@ pub mod tzkey;
 pub mod urdna2015;
 pub mod vc;
 
-pub static VERSION: &str = env!("CARGO_PKG_VERSION");
-pub static PACKAGE_NAME: &str = env!("CARGO_PKG_NAME");
 pub static SSI_INFO: &str = concat!(env!("CARGO_PKG_VERSION"), "/", env!("CARGO_PKG_NAME"));
 
 #[cfg(any(feature = "k256", feature = "p256"))]
