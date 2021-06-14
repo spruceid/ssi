@@ -8,7 +8,7 @@ use crate::jwk::{JWTKeys, JWK};
 use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
-use crate::vc::{Check, LinkedDataProofOptions, Proof, VerificationResult, URI};
+use crate::vc::{Check, LinkedDataProofOptions, VerificationResult, URI};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -135,6 +135,49 @@ impl From<Contexts> for OneOrMany<Context> {
             Contexts::Many(contexts) => OneOrMany::Many(contexts),
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Proof {
+    #[serde(rename = "@context")]
+    // TODO: use consistent types for context
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub context: Value,
+    #[serde(rename = "type")]
+    pub r#type: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub proof_purpose: Option<ProofPurpose>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // Note: ld-proofs specifies verificationMethod as a "set of parameters",
+    // but all examples use a single string.
+    pub verification_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<DateTime<Utc>>, // ISO 8601
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jws: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(tag = "proofPurpose")]
+#[serde(rename_all = "camelCase")]
+pub enum ProofPurpose {
+    CapabilityDelegation { capability_chain: Vec<String> },
+    CapabilityInvocation { capability: String },
 }
 
 #[cfg(test)]
