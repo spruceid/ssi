@@ -3,7 +3,7 @@ use reqwest;
 use serde::Deserialize;
 use ssi::did::{Service, ServiceEndpoint};
 use ssi::one_or_many::OneOrMany;
-use ssi::SSI_INFO;
+use ssi::USER_AGENT;
 use url::Url;
 
 #[derive(Deserialize)]
@@ -86,7 +86,7 @@ pub async fn execute_service_view(
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "User-Agent",
-        reqwest::header::HeaderValue::from_static(SSI_INFO),
+        reqwest::header::HeaderValue::from_static(USER_AGENT),
     );
     let client = reqwest::Client::builder()
         .default_headers(headers)

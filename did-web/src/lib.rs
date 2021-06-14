@@ -5,7 +5,7 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::SSI_INFO;
+use ssi::USER_AGENT;
 
 // For testing, enable handling requests at localhost.
 #[cfg(test)]
@@ -97,7 +97,7 @@ impl DIDResolver for DIDWeb {
 
         headers.insert(
             "User-Agent",
-            reqwest::header::HeaderValue::from_static(SSI_INFO),
+            reqwest::header::HeaderValue::from_static(USER_AGENT),
         );
 
         let client = match reqwest::Client::builder().default_headers(headers).build() {
