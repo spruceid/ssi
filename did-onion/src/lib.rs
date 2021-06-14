@@ -6,6 +6,7 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
+use ssi::USER_AGENT;
 
 const TOR_SOCKS_PORT: usize = 9050;
 
@@ -95,7 +96,14 @@ impl DIDResolver for DIDOnion {
             Err(meta) => return (meta, Vec::new(), None),
             Ok(url) => url,
         };
-        let mut client_builder = reqwest::Client::builder();
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(
+            reqwest::header::USER_AGENT,
+            reqwest::header::HeaderValue::from_static(USER_AGENT),
+        );
+
+        let mut client_builder = reqwest::Client::builder().default_headers(headers);
         #[cfg(not(target_arch = "wasm32"))]
         match reqwest::Proxy::all(&self.proxy_url) {
             Ok(proxy) => {

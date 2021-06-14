@@ -12,7 +12,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
-
 use crate::did::{DIDMethod, DIDParameters, Document, Resource, ServiceEndpoint, DIDURL};
 use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
@@ -679,6 +678,7 @@ impl DIDResolver for HTTPDIDResolver {
         let client = Client::builder().build::<_, hyper::Body>(https);
         let request = match Request::get(uri)
             .header("Accept", TYPE_DID_RESOLUTION)
+            .header("User-Agent", crate::USER_AGENT)
             .body(hyper::Body::default())
         {
             Ok(req) => req,
