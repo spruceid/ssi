@@ -675,7 +675,6 @@ impl DIDResolver for HTTPDIDResolver {
             }
         };
         let https = HttpsConnector::new();
-
         let client = Client::builder().build::<_, hyper::Body>(https);
         let request = match Request::get(uri)
             .header("Accept", TYPE_DID_RESOLUTION)
