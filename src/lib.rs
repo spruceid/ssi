@@ -23,6 +23,8 @@ pub mod tzkey;
 pub mod urdna2015;
 pub mod vc;
 
+pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
 #[cfg(any(feature = "k256", feature = "p256"))]
 pub mod passthrough_digest;
 
