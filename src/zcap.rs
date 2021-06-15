@@ -62,6 +62,32 @@ where
             }
         }
     }
+
+    // https://w3c-ccg.github.io/ld-proofs/
+    pub async fn generate_proof(
+        &self,
+        jwk: &JWK,
+        options: &LinkedDataProofOptions,
+    ) -> Result<Proof, Error> {
+        LinkedDataProofs::sign(self, options, jwk).await
+    }
+
+    /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
+    /// and then pass to [`ProofPreparation::complete`] to complete the proof.
+    pub async fn prepare_proof(
+        &self,
+        public_key: &JWK,
+        options: &LinkedDataProofOptions,
+    ) -> Result<ProofPreparation, Error> {
+        LinkedDataProofs::prepare(self, options, public_key).await
+    }
+
+    pub fn set_proof(self, proof: Proof) -> Self {
+        Self {
+            proof: Some(proof),
+            ..self
+        }
+    }
 }
 
 #[async_trait]
@@ -164,6 +190,58 @@ where
                 };
                 result
             }
+        }
+    }
+
+    // https://w3c-ccg.github.io/ld-proofs/
+    pub async fn generate_proof(
+        &self,
+        jwk: &JWK,
+        options: &LinkedDataProofOptions,
+        target: &URI,
+    ) -> Result<Proof, Error> {
+        let mut proof = LinkedDataProofs::sign(self, options, jwk).await?;
+        proof.property_set = match (proof.property_set, target) {
+            (Some(mut ps), URI::String(t)) => {
+                ps.insert("capability".into(), Value::String(t.to_string()));
+                Some(ps)
+            }
+            (_, URI::String(t)) => {
+                let mut ps = Map::<String, Value>::new();
+                ps.insert("capability".into(), Value::String(t.to_string()));
+                Some(ps)
+            }
+        };
+        Ok(proof)
+    }
+
+    /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
+    /// and then pass to [`ProofPreparation::complete`] to complete the proof.
+    pub async fn prepare_proof(
+        &self,
+        public_key: &JWK,
+        options: &LinkedDataProofOptions,
+        target: &URI,
+    ) -> Result<ProofPreparation, Error> {
+        let mut prep = LinkedDataProofs::prepare(self, options, public_key).await?;
+        prep.proof.property_set = match (prep.proof.property_set, target) {
+            (Some(mut ps), URI::String(t)) => {
+                ps.insert("capability".into(), Value::String(t.to_string()));
+                Some(ps)
+            }
+            (_, URI::String(t)) => {
+                let mut ps = Map::<String, Value>::new();
+                ps.insert("capability".into(), Value::String(t.to_string()));
+                Some(ps)
+            }
+        };
+        Ok(prep)
+    }
+
+    pub fn set_proof(self, proof: Proof) -> Self {
+        Self {
+            proof: Some(proof),
+            ..self
         }
     }
 }
