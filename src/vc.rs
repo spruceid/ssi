@@ -201,6 +201,12 @@ pub enum URI {
     String(String),
 }
 
+impl Default for URI {
+    fn default() -> Self {
+        Self::String("".into())
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Schema {
