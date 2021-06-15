@@ -24,7 +24,6 @@ use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, 
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
-use crate::vc::LinkedDataProofOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -253,9 +252,50 @@ pub struct VerificationResult {
     pub errors: Vec<String>,
 }
 
+impl VerificationResult {
+    fn new() -> Self {
+        Self {
+            checks: vec![],
+            warnings: vec![],
+            errors: vec![],
+        }
+    }
+
+    fn error(err: &str) -> Self {
+        Self {
+            checks: vec![],
+            warnings: vec![],
+            errors: vec![err.to_string()],
+        }
+    }
+
+    fn append(&mut self, other: &mut Self) {
+        self.checks.append(&mut other.checks);
+        self.warnings.append(&mut other.warnings);
+        self.errors.append(&mut other.errors);
+    }
+}
+
+impl From<Result<(), Error>> for VerificationResult {
+    fn from(res: Result<(), Error>) -> Self {
+        Self {
+            checks: vec![],
+            warnings: vec![],
+            errors: match res {
+                Ok(_) => vec![],
+                Err(error) => vec![error.to_string()],
+            },
+        }
+    }
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl LinkedDataDocument for Proof {
+impl<T, P> LinkedDataDocument for Proof<T, P>
+where
+    T: Serialize + Send,
+    P: Serialize + Send,
+{
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(None)
     }
@@ -308,6 +348,54 @@ impl From<ProofPurpose> for String {
             ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
             ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
             ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
+        }
+    }
+}
+
+// https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+/// Options for specifying how the LinkedDataProof is created.
+/// Reference: vc-http-api
+pub struct LinkedDataProofOptions<T = Map<String, Value>, P = ProofPurpose> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The URI of the verificationMethod used for the proof. If omitted a default
+    /// assertionMethod will be used.
+    pub verification_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The purpose of the proof. If omitted "assertionMethod" will be used.
+    pub proof_purpose: Option<P>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The date of the proof. If omitted system time will be used.
+    pub created: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The challenge of the proof.
+    pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The domain of the proof.
+    pub domain: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Checks to perform
+    pub checks: Option<Vec<Check>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Arbitrary extra values to pass in to the proof
+    pub property_set: Option<T>,
+}
+
+impl<T, P> Default for LinkedDataProofOptions<T, P>
+where
+    P: Default,
+{
+    fn default() -> Self {
+        Self {
+            verification_method: None,
+            proof_purpose: Some(P::default()),
+            created: Some(now_ms()),
+            challenge: None,
+            domain: None,
+            property_set: None,
+            checks: Some(vec![Check::Proof]),
         }
     }
 }
