@@ -69,25 +69,34 @@ pub trait LinkedDataDocument {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait ProofSuite {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error>;
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone;
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error>;
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone;
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error>;
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone;
 
     async fn verify<T, P>(
         &self,
@@ -414,8 +423,8 @@ where
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ProofPreparation {
-    pub proof: Proof,
+pub struct ProofPreparation<T = Map<String, Value>, P = ProofPurpose> {
+    pub proof: Proof<T, P>,
     pub jws_header: Option<Header>,
     pub signing_input: SigningInput,
 }
@@ -432,8 +441,12 @@ pub enum SigningInput {
     },
 }
 
-impl ProofPreparation {
-    pub async fn complete(self, signature: &str) -> Result<Proof, Error> {
+impl<T, P> ProofPreparation<T, P>
+where
+    T: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
+{
+    pub async fn complete(self, signature: &str) -> Result<Proof<T, P>, Error> {
         match self.proof.type_.as_str() {
             "RsaSignature2018" => RsaSignature2018.complete(self, signature).await,
             "Ed25519Signature2018" => Ed25519Signature2018.complete(self, signature).await,
@@ -468,11 +481,15 @@ impl ProofPreparation {
 pub struct LinkedDataProofs;
 impl LinkedDataProofs {
     // https://w3c-ccg.github.io/ld-proofs/#proof-algorithm
-    pub async fn sign(
+    pub async fn sign<T, P>(
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         // TODO: select proof type by resolving DID instead of matching on the key.
         match key {
             JWK {
@@ -586,11 +603,15 @@ impl LinkedDataProofs {
 
     /// Prepare to create a linked data proof. Given a linked data document, proof options, and JWS
     /// algorithm, calculate the signing input bytes. Returns a [`ProofPreparation`] - the data for the caller to sign, along with data to reconstruct the proof.
-    pub async fn prepare(
+    pub async fn prepare<T, P>(
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         match public_key.get_algorithm().ok_or(Error::MissingAlgorithm)? {
             Algorithm::RS256 => {
                 return RsaSignature2018
@@ -823,13 +844,17 @@ where
     Ok(data)
 }
 
-async fn sign(
+async fn sign<T, P>(
     document: &(dyn LinkedDataDocument + Sync),
-    options: &LinkedDataProofOptions,
+    options: &LinkedDataProofOptions<T, P>,
     key: &JWK,
     type_: &str,
     algorithm: Algorithm,
-) -> Result<Proof, Error> {
+) -> Result<Proof<T, P>, Error>
+where
+    T: Serialize + Send + Sync + Clone + Default,
+    P: Serialize + Send + Sync + Clone + Default + PartialEq,
+{
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm {
             return Err(Error::AlgorithmMismatch);
@@ -841,36 +866,45 @@ async fn sign(
         created: Some(options.created.unwrap_or_else(now_ms)),
         domain: options.domain.clone(),
         challenge: options.challenge.clone(),
+        property_set: options.property_set.clone(),
         ..Proof::new(type_)
     };
     sign_proof(document, proof, key, algorithm).await
 }
 
-async fn sign_proof(
+async fn sign_proof<T, P>(
     document: &(dyn LinkedDataDocument + Sync),
-    mut proof: Proof,
+    mut proof: Proof<T, P>,
     key: &JWK,
     algorithm: Algorithm,
-) -> Result<Proof, Error> {
+) -> Result<Proof<T, P>, Error>
+where
+    T: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
+{
     let message = to_jws_payload(document, &proof).await?;
     let jws = crate::jws::detached_sign_unencoded_payload(algorithm, &message, &key)?;
     proof.jws = Some(jws);
     Ok(proof)
 }
 
-async fn prepare(
+async fn prepare<T, P>(
     document: &(dyn LinkedDataDocument + Sync),
-    options: &LinkedDataProofOptions,
+    options: &LinkedDataProofOptions<T, P>,
     public_key: &JWK,
     type_: &str,
     algorithm: Algorithm,
-) -> Result<ProofPreparation, Error> {
+) -> Result<ProofPreparation<T, P>, Error>
+where
+    T: Clone + Default + Send + Serialize + Sync,
+    P: Clone + Default + Send + PartialEq + Serialize + Sync,
+{
     if let Some(key_algorithm) = public_key.algorithm {
         if key_algorithm != algorithm {
             return Err(Error::AlgorithmMismatch);
         }
     }
-    let proof = Proof {
+    let proof = Proof::<T, P> {
         proof_purpose: options.proof_purpose.clone(),
         verification_method: options.verification_method.clone(),
         created: Some(options.created.unwrap_or_else(now_ms)),
@@ -881,11 +915,15 @@ async fn prepare(
     prepare_proof(document, proof, algorithm).await
 }
 
-async fn prepare_proof(
+async fn prepare_proof<T, P>(
     document: &(dyn LinkedDataDocument + Sync),
-    proof: Proof,
+    proof: Proof<T, P>,
     algorithm: Algorithm,
-) -> Result<ProofPreparation, Error> {
+) -> Result<ProofPreparation<T, P>, Error>
+where
+    T: Clone + Default + Send + Serialize + Sync,
+    P: Clone + Default + Send + PartialEq + Serialize + Sync,
+{
     let message = to_jws_payload(document, &proof).await?;
     let (jws_header, signing_input) =
         crate::jws::prepare_detached_unencoded_payload(algorithm, &message)?;
@@ -896,11 +934,25 @@ async fn prepare_proof(
     })
 }
 
-async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+async fn complete<T, P>(
+    preparation: ProofPreparation<T, P>,
+    signature: &str,
+) -> Result<Proof<T, P>, Error>
+where
+    T: Clone + Default + Send + Serialize + Sync,
+    P: Clone + Default + Send + Serialize + Sync,
+{
     complete_proof(preparation, signature).await
 }
 
-async fn complete_proof(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
+async fn complete_proof<T, P>(
+    preparation: ProofPreparation<T, P>,
+    signature: &str,
+) -> Result<Proof<T, P>, Error>
+where
+    T: Clone + Default + Send + Serialize + Sync,
+    P: Clone + Default + Send + Serialize + Sync,
+{
     let mut proof = preparation.proof;
     let jws_header = preparation.jws_header.ok_or(Error::MissingJWSHeader)?;
     let jws = crate::jws::complete_sign_unencoded_payload(jws_header, signature)?;
@@ -932,20 +984,28 @@ pub struct RsaSignature2018;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for RsaSignature2018 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         sign(document, options, key, "RsaSignature2018", Algorithm::RS256).await
     }
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         prepare(
             document,
             options,
@@ -955,11 +1015,15 @@ impl ProofSuite for RsaSignature2018 {
         )
         .await
     }
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 }
@@ -968,12 +1032,16 @@ pub struct Ed25519Signature2018;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519Signature2018 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         sign(
             document,
             options,
@@ -983,12 +1051,16 @@ impl ProofSuite for Ed25519Signature2018 {
         )
         .await
     }
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         prepare(
             document,
             options,
@@ -998,11 +1070,15 @@ impl ProofSuite for Ed25519Signature2018 {
         )
         .await
     }
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 }
@@ -1011,12 +1087,16 @@ pub struct EcdsaSecp256k1Signature2019;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1Signature2019 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         sign(
             document,
             options,
@@ -1026,12 +1106,16 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         )
         .await
     }
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         prepare(
             document,
             options,
@@ -1041,11 +1125,15 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         )
         .await
     }
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 }
@@ -1054,12 +1142,16 @@ pub struct EcdsaSecp256k1RecoverySignature2020;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         if let Some(key_algorithm) = key.algorithm {
             if key_algorithm != Algorithm::ES256KR {
                 return Err(Error::AlgorithmMismatch);
@@ -1080,12 +1172,16 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         sign_proof(document, proof, key, Algorithm::ES256KR).await
     }
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         _public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let proof = Proof {
             context: serde_json::json!([
                 crate::jsonld::DIF_ESRS2020_CONTEXT,
@@ -1101,11 +1197,15 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         prepare_proof(document, proof, Algorithm::ES256KR).await
     }
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 
@@ -1142,12 +1242,16 @@ pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         use std::collections::HashMap;
         if let Some(key_algorithm) = key.algorithm {
             if key_algorithm != Algorithm::EdBlake2b {
@@ -1173,12 +1277,16 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         sign_proof(document, proof, key, Algorithm::EdBlake2b).await
     }
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         use std::collections::HashMap;
         let mut property_set = HashMap::new();
         let jwk_value = serde_json::to_value(public_key.to_public())?;
@@ -1198,11 +1306,15 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         prepare_proof(document, proof, Algorithm::EdBlake2b).await
     }
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 
@@ -1240,12 +1352,16 @@ pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         use std::collections::HashMap;
         if let Some(key_algorithm) = key.algorithm {
             if key_algorithm != Algorithm::ESBlake2b {
@@ -1271,12 +1387,16 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         sign_proof(document, proof, key, Algorithm::ESBlake2b).await
     }
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         use std::collections::HashMap;
         let mut property_set = HashMap::new();
         let jwk_value = serde_json::to_value(public_key.to_public())?;
@@ -1296,11 +1416,15 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         prepare_proof(document, proof, Algorithm::ESBlake2b).await
     }
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 
@@ -1339,12 +1463,16 @@ pub struct Eip712Signature2021;
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 #[cfg(feature = "keccak-hash")]
 impl ProofSuite for Eip712Signature2021 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
@@ -1372,12 +1500,16 @@ impl ProofSuite for Eip712Signature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         _public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
             proof_purpose: options.proof_purpose.clone(),
@@ -1395,22 +1527,30 @@ impl ProofSuite for Eip712Signature2021 {
         })
     }
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let mut proof = preparation.proof;
         proof.proof_value = Some(signature.to_string());
         Ok(proof)
     }
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1478,12 +1618,16 @@ pub struct TezosSignature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for TezosSignature2021 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         let mut proof = Proof {
             context: TZVM_CONTEXT.clone(),
@@ -1510,12 +1654,16 @@ impl ProofSuite for TezosSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let mut property_set = std::collections::HashMap::new();
         // TODO: dereference VM URL to check if VM already contains public key.
         let jwk_value = serde_json::to_value(public_key.to_public())?;
@@ -1541,11 +1689,15 @@ impl ProofSuite for TezosSignature2021 {
         })
     }
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let mut proof = preparation.proof;
         proof.proof_value = Some(signature.to_string());
         Ok(proof)
@@ -1611,12 +1763,16 @@ pub struct SolanaSignature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for SolanaSignature2021 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let mut proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
             proof_purpose: options.proof_purpose.clone(),
@@ -1635,12 +1791,16 @@ impl ProofSuite for SolanaSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         _public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
             proof_purpose: options.proof_purpose.clone(),
@@ -1660,11 +1820,15 @@ impl ProofSuite for SolanaSignature2021 {
         })
     }
 
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let mut proof = preparation.proof;
         proof.proof_value = Some(signature.to_string());
         Ok(proof)
@@ -1706,12 +1870,16 @@ pub struct EcdsaSecp256r1Signature2019;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256r1Signature2019 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         sign(
             document,
             options,
@@ -1721,12 +1889,16 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         )
         .await
     }
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         prepare(
             document,
             options,
@@ -1736,11 +1908,15 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         )
         .await
     }
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 }
@@ -1750,12 +1926,16 @@ pub struct JsonWebSignature2020;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for JsonWebSignature2020 {
-    async fn sign(
+    async fn sign<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         key: &JWK,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         if algorithm != Algorithm::ES256 {
             // TODO: support JsonWebSignature2020 more generally
@@ -1772,12 +1952,16 @@ impl ProofSuite for JsonWebSignature2020 {
         };
         sign_proof(document, proof, key, algorithm).await
     }
-    async fn prepare(
+    async fn prepare<T, P>(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
-        options: &LinkedDataProofOptions,
+        options: &LinkedDataProofOptions<T, P>,
         public_key: &JWK,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         if algorithm != Algorithm::ES256 {
             return Err(Error::UnsupportedAlgorithm)?;
@@ -1793,11 +1977,15 @@ impl ProofSuite for JsonWebSignature2020 {
         };
         prepare_proof(document, proof, algorithm).await
     }
-    async fn complete(
+    async fn complete<T, P>(
         &self,
-        preparation: ProofPreparation,
+        preparation: ProofPreparation<T, P>,
         signature: &str,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof<T, P>, Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         complete(preparation, signature).await
     }
 }
