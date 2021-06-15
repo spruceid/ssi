@@ -11,15 +11,16 @@ use crate::rdf::DataSet;
 use crate::vc::{Check, LinkedDataProofOptions, VerificationResult, URI};
 
 use async_trait::async_trait;
+use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 const DEFAULT_CONTEXT: &str = "https://w3id.org/security/v2";
 
-// limited initial definition of a ZCAP, generic over Action and Caveat types
+// limited initial definition of a ZCAP Delegation, generic over Action and Caveat types
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct ZCAP<A, C> {
+pub struct Delegation<A, C> {
     #[serde(rename = "@context")]
     pub context: Contexts,
     pub id: URI,
@@ -40,7 +41,27 @@ pub struct ZCAP<A, C> {
     pub property_set: Option<Map<String, Value>>,
 }
 
-impl<A, C> ZCAP<A, C>
+// limited initial definition of a ZCAP Invokation, generic over Action and Caveat types
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Invokation<A> {
+    #[serde(rename = "@context")]
+    pub context: Contexts,
+    pub id: URI,
+    pub parent_capability: URI,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<A>,
+    // This field is populated only when using
+    // embedded proofs such as LD-PROOF
+    //   https://w3c-ccg.github.io/ld-proofs/
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof: Option<OneOrMany<Proof>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
+}
+
+impl<A, C> Delegation<A, C>
 where
     A: Serialize + Send + Sync + Clone,
     C: Serialize + Send + Sync + Clone,
@@ -70,7 +91,7 @@ where
 }
 
 #[async_trait]
-impl<A, C> LinkedDataDocument for ZCAP<A, C>
+impl<A, C> LinkedDataDocument for Delegation<A, C>
 where
     A: Serialize + Send + Sync + Clone,
     C: Serialize + Send + Sync + Clone,
@@ -186,8 +207,8 @@ mod tests {
 
     #[test]
     fn zcap_from_json() {
-        let zcap_str = include_str!("../examples/zcap.jsonld");
-        let zcap: ZCAP<(), ()> = serde_json::from_str(zcap_str).unwrap();
+        let zcap_str = include_str!("../examples/zcap_delegation.jsonld");
+        let zcap: Delegation<(), ()> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
             Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
