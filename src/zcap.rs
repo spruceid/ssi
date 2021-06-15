@@ -113,18 +113,55 @@ impl<A> Invocation<A>
 where
     A: Serialize + Send + Sync + Clone,
 {
-    pub async fn verify(
+    pub async fn verify<C>(
         &self,
         _options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
-    ) -> VerificationResult {
+        // TODO make this a list for delegation chains
+        target_capability: &Delegation<A, C>,
+    ) -> VerificationResult
+    where
+        C: Serialize + Send + Sync + Clone,
+    {
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
                 let mut result = proof.verify(self, resolver).await;
+                match (
+                    // get cap id from proof extra properties
+                    proof
+                        .property_set
+                        .as_ref()
+                        .and_then(|ps| ps.get("capability").map(|s| s.clone()))
+                        .and_then(|v| match v {
+                            Value::String(id) => Some(id),
+                            _ => None,
+                        }),
+                    &target_capability.id,
+                ) {
+                    (Some(ref id), URI::String(ref t_id)) => {
+                        // ensure proof target cap ID and given
+                        if id != t_id {
+                            result
+                                .errors
+                                .push("Target Capability IDs doesnt match".into())
+                        };
+                    }
+                    _ => result
+                        .errors
+                        .push("Missing proof target capability ID".into()),
+                };
+                // if there are invokers listed in the target, ensure the inoker here is the right one
+                if let (Some(URI::String(ref invoker)), Some(ref delegatee)) =
+                    (&target_capability.invoker, &proof.verification_method)
+                {
+                    if invoker == delegatee {
+                        result.errors.push("Incorrect Invoker".into());
+                    }
+                };
                 if result.errors.is_empty() {
                     result.checks.push(Check::Proof);
-                }
+                };
                 result
             }
         }
