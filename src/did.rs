@@ -14,7 +14,7 @@ use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
 /// <https://w3c.github.io/did-core/#dfn-verification-relationship>
-type VerificationRelationship = crate::vc::ProofPurpose;
+type VerificationRelationship = crate::ldp::ProofPurpose;
 
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};

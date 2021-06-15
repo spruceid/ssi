@@ -1,4 +1,4 @@
-#[cfg(feature = "keccak-hash")]
+use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
@@ -18,12 +18,13 @@ use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMe
 use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
+use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::Base64urlUInt;
 use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
-use crate::vc::{LinkedDataProofOptions, Proof};
+use crate::vc::LinkedDataProofOptions;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -99,6 +100,215 @@ pub trait ProofSuite {
         Self: Sized,
     {
         verify(proof, document, resolver).await
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct Proof<T = Map<String, Value>, P = ProofPurpose> {
+    #[serde(rename = "@context")]
+    // TODO: use consistent types for context
+    #[serde(default, skip_serializing_if = "Value::is_null")]
+    pub context: Value,
+    #[serde(rename = "type")]
+    pub type_: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_purpose: Option<P>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub challenge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub creator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    // Note: ld-proofs specifies verificationMethod as a "set of parameters",
+    // but all examples use a single string.
+    pub verification_method: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created: Option<DateTime<Utc>>, // ISO 8601
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub jws: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<T>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(try_from = "String")]
+// #[serde(untagged)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofPurpose {
+    AssertionMethod,
+    Authentication,
+    KeyAgreement,
+    ContractAgreement,
+    CapabilityDelegation,
+    CapabilityInvocation,
+}
+
+impl Default for ProofPurpose {
+    fn default() -> Self {
+        Self::AssertionMethod
+    }
+}
+
+macro_rules! assert_local {
+    ($cond:expr) => {
+        if !$cond {
+            return false;
+        }
+    };
+}
+
+impl Proof {
+    pub fn new(type_: &str) -> Self {
+        Self {
+            type_: type_.to_string(),
+            ..Default::default()
+        }
+    }
+
+    pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
+        if let Some(ref verification_method) = options.verification_method {
+            assert_local!(self.verification_method.as_ref() == Some(verification_method));
+        }
+        if let Some(vm) = self.verification_method.as_ref() {
+            assert_local!(allowed_vms.contains(vm));
+        }
+        if let Some(created) = self.created {
+            assert_local!(options.created.unwrap_or_else(now_ms) >= created);
+        } else {
+            return false;
+        }
+        if let Some(ref challenge) = options.challenge {
+            assert_local!(self.challenge.as_ref() == Some(challenge));
+        }
+        if let Some(ref domain) = options.domain {
+            assert_local!(self.domain.as_ref() == Some(domain));
+        }
+        if let Some(ref proof_purpose) = options.proof_purpose {
+            assert_local!(self.proof_purpose.as_ref() == Some(proof_purpose));
+        }
+        true
+    }
+
+    pub async fn verify(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
+        LinkedDataProofs::verify(self, document, resolver)
+            .await
+            .into()
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(try_from = "String")]
+#[serde(rename_all = "camelCase")]
+pub enum Check {
+    Proof,
+}
+
+impl FromStr for Check {
+    type Err = Error;
+    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
+        match purpose {
+            "proof" => Ok(Self::Proof),
+            _ => Err(Error::UnsupportedCheck),
+        }
+    }
+}
+
+impl TryFrom<String> for Check {
+    type Error = Error;
+    fn try_from(purpose: String) -> Result<Self, Self::Error> {
+        Self::from_str(&purpose)
+    }
+}
+
+impl From<Check> for String {
+    fn from(purpose: Check) -> String {
+        match purpose {
+            Check::Proof => "proof".to_string(),
+        }
+    }
+}
+
+// https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+/// Object summarizing a verification
+/// Reference: vc-http-api
+pub struct VerificationResult {
+    /// The checks performed
+    pub checks: Vec<Check>,
+    /// Warnings
+    pub warnings: Vec<String>,
+    /// Errors
+    pub errors: Vec<String>,
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl LinkedDataDocument for Proof {
+    fn get_contexts(&self) -> Result<Option<String>, Error> {
+        Ok(None)
+    }
+
+    async fn to_dataset_for_signing(
+        &self,
+        parent: Option<&(dyn LinkedDataDocument + Sync)>,
+    ) -> Result<DataSet, Error> {
+        let mut copy = self.clone();
+        copy.jws = None;
+        copy.proof_value = None;
+        let json = serde_json::to_string(&copy)?;
+        let more_contexts = match parent {
+            Some(parent) => parent.get_contexts()?,
+            None => None,
+        };
+        let mut loader = StaticLoader;
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+    }
+}
+
+impl FromStr for ProofPurpose {
+    type Err = Error;
+    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
+        match purpose {
+            "authentication" => Ok(Self::Authentication),
+            "assertionMethod" => Ok(Self::AssertionMethod),
+            "keyAgreement" => Ok(Self::KeyAgreement),
+            "contractAgreement" => Ok(Self::ContractAgreement),
+            "capabilityDelegation" => Ok(Self::CapabilityDelegation),
+            "capabilityInvocation" => Ok(Self::CapabilityInvocation),
+            _ => Err(Error::UnsupportedProofPurpose),
+        }
+    }
+}
+
+impl TryFrom<String> for ProofPurpose {
+    type Error = Error;
+    fn try_from(purpose: String) -> Result<Self, Self::Error> {
+        Self::from_str(&purpose)
+    }
+}
+
+impl From<ProofPurpose> for String {
+    fn from(purpose: ProofPurpose) -> String {
+        match purpose {
+            ProofPurpose::Authentication => "authentication".to_string(),
+            ProofPurpose::AssertionMethod => "assertionMethod".to_string(),
+            ProofPurpose::KeyAgreement => "keyAgreement".to_string(),
+            ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
+            ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
+            ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
+        }
     }
 }
 

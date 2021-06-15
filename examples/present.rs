@@ -17,7 +17,7 @@ async fn main() {
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key2".to_string();
     proof_options.verification_method = Some(verification_method);
-    proof_options.proof_purpose = Some(ssi::vc::ProofPurpose::Authentication);
+    proof_options.proof_purpose = Some(ssi::ldp::ProofPurpose::Authentication);
     proof_options.challenge = Some("example".to_string());
     let proof = vp.generate_proof(&key, &proof_options).await.unwrap();
     vp.add_proof(proof);
