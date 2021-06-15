@@ -15,7 +15,7 @@ async fn main() {
         }
     });
     let mut vc: ssi::vc::Credential = serde_json::from_value(vc).unwrap();
-    let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
+    let mut proof_options = ssi::ldp::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key1".to_string();
     proof_options.verification_method = Some(verification_method);
     let proof = vc.generate_proof(&key, &proof_options).await.unwrap();

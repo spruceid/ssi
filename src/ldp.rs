@@ -134,6 +134,8 @@ pub struct Proof<T = Map<String, Value>, P = ProofPurpose> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_jwk: Option<JWK>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<T>,
 }
@@ -1215,13 +1217,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         P: Serialize + Send + Sync + Clone,
     {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
-        let jwk: JWK = match proof.property_set {
-            Some(ref props) => {
-                let jwk_value = props.get("publicKeyJwk").ok_or(Error::MissingKey)?;
-                serde_json::from_value(jwk_value.clone())?
-            }
-            None => return Err(Error::MissingKey),
-        };
+        let jwk = proof.public_key_jwk.as_ref().ok_or(Error::MissingKey)?;
         // Ensure the verificationMethod corresponds to the hashed public key.
         let verification_method = proof
             .verification_method
@@ -1319,13 +1315,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         P: Serialize + Send + Sync + Clone,
     {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
-        let jwk: JWK = match proof.property_set {
-            Some(ref props) => {
-                let jwk_value = props.get("publicKeyJwk").ok_or(Error::MissingKey)?;
-                serde_json::from_value(jwk_value.clone())?
-            }
-            None => return Err(Error::MissingKey),
-        };
+        let jwk = proof.public_key_jwk.as_ref().ok_or(Error::MissingKey)?;
         // Ensure the verificationMethod corresponds to the hashed public key.
         let verification_method = proof
             .verification_method
@@ -1579,13 +1569,7 @@ impl ProofSuite for TezosSignature2021 {
             .verification_method
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
-        let proof_jwk_opt: Option<JWK> = match proof.property_set {
-            Some(ref props) => match props.get("publicKeyJwk") {
-                Some(jwk_value) => serde_json::from_value(jwk_value.clone())?,
-                None => None,
-            },
-            None => None,
-        };
+        let proof_jwk_opt: Option<&JWK> = proof.public_key_jwk.as_ref();
 
         let (algorithm, sig) = crate::tzkey::decode_tzsig(sig_bs58)?;
         let vm = resolve_vm(&verification_method, resolver).await?;

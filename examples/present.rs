@@ -14,7 +14,7 @@ async fn main() {
         "verifiableCredential": vc
     });
     let mut vp: ssi::vc::Presentation = serde_json::from_value(vp).unwrap();
-    let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
+    let mut proof_options = ssi::ldp::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key2".to_string();
     proof_options.verification_method = Some(verification_method);
     proof_options.proof_purpose = Some(ssi::ldp::ProofPurpose::Authentication);
