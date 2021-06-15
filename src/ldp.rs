@@ -89,14 +89,16 @@ pub trait ProofSuite {
         signature: &str,
     ) -> Result<Proof, Error>;
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error>
     where
         Self: Sized,
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
     {
         verify(proof, document, resolver).await
     }
@@ -163,7 +165,11 @@ macro_rules! assert_local {
     };
 }
 
-impl Proof {
+impl<T, P> Proof<T, P>
+where
+    T: Serialize + Send + Sync + Default + Clone,
+    P: Serialize + Send + Sync + Default + PartialEq + Clone,
+{
     pub fn new(type_: &str) -> Self {
         Self {
             type_: type_.to_string(),
@@ -171,7 +177,11 @@ impl Proof {
         }
     }
 
-    pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
+    pub fn matches(
+        &self,
+        options: &LinkedDataProofOptions<T, P>,
+        allowed_vms: &Vec<String>,
+    ) -> bool {
         if let Some(ref verification_method) = options.verification_method {
             assert_local!(self.verification_method.as_ref() == Some(verification_method));
         }
@@ -253,7 +263,7 @@ pub struct VerificationResult {
 }
 
 impl VerificationResult {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             checks: vec![],
             warnings: vec![],
@@ -261,7 +271,7 @@ impl VerificationResult {
         }
     }
 
-    fn error(err: &str) -> Self {
+    pub fn error(err: &str) -> Self {
         Self {
             checks: vec![],
             warnings: vec![],
@@ -269,7 +279,7 @@ impl VerificationResult {
         }
     }
 
-    fn append(&mut self, other: &mut Self) {
+    pub fn append(&mut self, other: &mut Self) {
         self.checks.append(&mut other.checks);
         self.warnings.append(&mut other.warnings);
         self.errors.append(&mut other.errors);
@@ -293,8 +303,8 @@ impl From<Result<(), Error>> for VerificationResult {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<T, P> LinkedDataDocument for Proof<T, P>
 where
-    T: Serialize + Send,
-    P: Serialize + Send,
+    T: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
 {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(None)
@@ -673,11 +683,15 @@ impl LinkedDataProofs {
     }
 
     // https://w3c-ccg.github.io/ld-proofs/#proof-verification-algorithm
-    pub async fn verify(
-        proof: &Proof,
+    pub async fn verify<T, P>(
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         match proof.type_.as_str() {
             "RsaSignature2018" => RsaSignature2018.verify(proof, document, resolver).await,
             "Ed25519Signature2018" => Ed25519Signature2018.verify(proof, document, resolver).await,
@@ -783,10 +797,14 @@ pub async fn resolve_vm(
     Ok(vm)
 }
 
-async fn to_jws_payload(
+async fn to_jws_payload<T, P>(
     document: &(dyn LinkedDataDocument + Sync),
-    proof: &Proof,
-) -> Result<Vec<u8>, Error> {
+    proof: &Proof<T, P>,
+) -> Result<Vec<u8>, Error>
+where
+    T: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
+{
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
@@ -888,11 +906,15 @@ async fn complete_proof(preparation: ProofPreparation, signature: &str) -> Resul
     Ok(proof)
 }
 
-async fn verify(
-    proof: &Proof,
+async fn verify<T, P>(
+    proof: &Proof<T, P>,
     document: &(dyn LinkedDataDocument + Sync),
     resolver: &dyn DIDResolver,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+where
+    T: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
+{
     let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let verification_method = proof
         .verification_method
@@ -1085,12 +1107,16 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         complete(preparation, signature).await
     }
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let verification_method = proof
             .verification_method
@@ -1178,12 +1204,16 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         complete(preparation, signature).await
     }
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
@@ -1278,12 +1308,16 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         complete(preparation, signature).await
     }
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
@@ -1431,10 +1465,14 @@ impl ProofSuite for Eip712Signature2021 {
     }
 }
 
-async fn micheline_from_document_and_options(
+async fn micheline_from_document_and_options<T, P>(
     document: &(dyn LinkedDataDocument + Sync),
-    proof: &Proof,
-) -> Result<Vec<u8>, Error> {
+    proof: &Proof<T, P>,
+) -> Result<Vec<u8>, Error>
+where
+    T: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
+{
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
@@ -1523,12 +1561,16 @@ impl ProofSuite for TezosSignature2021 {
         Ok(proof)
     }
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let sig_bs58 = proof
             .proof_value
             .as_ref()
@@ -1644,12 +1686,16 @@ impl ProofSuite for SolanaSignature2021 {
         Ok(proof)
     }
 
-    async fn verify(
+    async fn verify<T, P>(
         &self,
-        proof: &Proof,
+        proof: &Proof<T, P>,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        T: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+    {
         let sig_b58 = proof
             .proof_value
             .as_ref()
