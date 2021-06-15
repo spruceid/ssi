@@ -18,7 +18,7 @@ use serde_json::Value;
 const DEFAULT_CONTEXT: &str = "https://w3id.org/security/v2";
 
 // limited initial definition of a ZCAP Delegation, generic over Action and Caveat types
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Delegation<A, C> {
     #[serde(rename = "@context")]
@@ -117,7 +117,7 @@ where
 }
 
 // limited initial definition of a ZCAP Invocation, generic over Action
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Invocation<A> {
     #[serde(rename = "@context")]
@@ -279,6 +279,12 @@ pub enum Contexts {
     Many(Vec<Context>),
 }
 
+impl Default for Contexts {
+    fn default() -> Self {
+        Self::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Context {
@@ -316,7 +322,18 @@ impl From<Contexts> for OneOrMany<Context> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use did_method_key::DIDKey;
 
+    #[derive(Deserialize, PartialEq, Debug, Clone, Serialize)]
+    enum Actions {
+        Read,
+        Write,
+    }
+    impl Default for Actions {
+        fn default() -> Self {
+            Self::Read
+        }
+    }
     #[test]
     fn delegation_from_json() {
         let zcap_str = include_str!("../examples/zcap_delegation.jsonld");
@@ -343,12 +360,12 @@ mod tests {
 
     #[test]
     fn invocation_from_json() {
-        #[derive(Deserialize, PartialEq, Debug)]
-        enum Actions {
+        #[derive(Deserialize, PartialEq, Debug, Clone, Serialize)]
+        enum AC {
             Drive,
         }
         let zcap_str = include_str!("../examples/zcap_invocation.jsonld");
-        let zcap: Invocation<Actions> = serde_json::from_str(zcap_str).unwrap();
+        let zcap: Invocation<AC> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
             Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
@@ -357,6 +374,53 @@ mod tests {
             zcap.id,
             URI::String("urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4".into())
         );
-        assert_eq!(zcap.action, Some(Actions::Drive));
+        assert_eq!(zcap.action, Some(AC::Drive));
+    }
+
+    #[async_std::test]
+    async fn round_trip() {
+        use crate::did::{DIDMethod, Source};
+        use crate::did_resolve::DIDResolver;
+
+        let dk = DIDKey;
+        let alice = JWK::generate_ed25519().unwrap();
+        let alice_did = dk.generate(&Source::Key(&alice)).unwrap();
+        let bob = JWK::generate_ed25519().unwrap();
+        let bob_did = dk.generate(&Source::Key(&bob)).unwrap();
+
+        let del: Delegation<Actions, ()> = Delegation {
+            id: URI::String("a uri".into()),
+            parent_capability: URI::String("kepler://alices orbit".into()),
+            invoker: Some(URI::String(bob_did)),
+            action: Some(Actions::Read),
+            ..Default::default()
+        };
+        let inv: Invocation<Actions> = Invocation {
+            id: URI::String("a different uri".into()),
+            action: Some(Actions::Read),
+            ..Default::default()
+        };
+
+        let signed_del = del.clone().set_proof(
+            del.generate_proof(&alice, &Default::default())
+                .await
+                .unwrap(),
+        );
+        let signed_inv = inv.clone().set_proof(
+            inv.generate_proof(
+                &bob,
+                &Default::default(),
+                &URI::String("kepler://alices orbit".into()),
+            )
+            .await
+            .unwrap(),
+        );
+
+        assert!(signed_del.verify(None, &dk).await.errors.is_empty());
+        assert!(signed_inv
+            .verify(None, &dk, &signed_del)
+            .await
+            .errors
+            .is_empty());
     }
 }
