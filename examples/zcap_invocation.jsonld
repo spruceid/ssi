@@ -1,7 +1,7 @@
 {
     "@context": "https://w3id.org/security/v2",
  "id": "urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4",
- "action": "Drive",
+ "capabilityAction": "Drive",
  "proof": {
     "type": "RsaSignature2016",
     "proofPurpose": "capabilityInvocation",
