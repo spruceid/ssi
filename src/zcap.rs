@@ -28,7 +28,7 @@ pub struct Delegation<A, C> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invoker: Option<URI>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub action: Option<A>,
+    pub capability_action: Option<A>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caveat: Option<C>,
     // This field is populated only when using
@@ -124,7 +124,7 @@ pub struct Invocation<A> {
     pub context: Contexts,
     pub id: URI,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub action: Option<A>,
+    pub capability_action: Option<A>,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
@@ -374,7 +374,7 @@ mod tests {
             zcap.id,
             URI::String("urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4".into())
         );
-        assert_eq!(zcap.action, Some(AC::Drive));
+        assert_eq!(zcap.capability_action, Some(AC::Drive));
     }
 
     #[async_std::test]
@@ -400,12 +400,12 @@ mod tests {
             id: URI::String("a_uri".into()),
             parent_capability: URI::String("kepler://alices_orbit".into()),
             invoker: Some(URI::String(bob_did.into())),
-            action: Some(Actions::Read),
+            capability_action: Some(Actions::Read),
             ..Default::default()
         };
         let inv: Invocation<Actions> = Invocation {
             id: URI::String("a_different_uri".into()),
-            action: Some(Actions::Read),
+            capability_action: Some(Actions::Read),
             ..Default::default()
         };
 
