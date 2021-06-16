@@ -393,7 +393,7 @@ mod tests {
         let bob_did = "did:example:bar";
         let bob: JWK = JWK {
             key_id: Some(format!("{}#key1", bob_did)),
-            ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
+            ..serde_json::from_str(include_str!("../tests/ed25519-2021-06-16.json")).unwrap()
         };
 
         let del: Delegation<Actions, ()> = Delegation {
