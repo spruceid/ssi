@@ -610,12 +610,16 @@ impl TypedData {
             .map_err(|e| TypedDataConstructionError::DocumentToDataset(e.to_string()))?;
         let doc_dataset_normalized = crate::urdna2015::normalize(&doc_dataset)
             .map_err(|e| TypedDataConstructionError::NormalizeDocument(e.to_string()))?;
+        let mut doc_statements_normalized = doc_dataset_normalized.statements();
+        doc_statements_normalized.sort_by_cached_key(|statement| String::from(statement));
         let sigopts_dataset = proof
             .to_dataset_for_signing(Some(document))
             .await
             .map_err(|e| TypedDataConstructionError::ProofToDataset(e.to_string()))?;
         let sigopts_dataset_normalized = crate::urdna2015::normalize(&sigopts_dataset)
             .map_err(|e| TypedDataConstructionError::NormalizeProof(e.to_string()))?;
+        let mut sigopts_statements_normalized = sigopts_dataset_normalized.statements();
+        sigopts_statements_normalized.sort_by_cached_key(|statement| String::from(statement));
 
         let types = Types {
             eip712_domain: StructType(vec![MemberVariable {
@@ -671,8 +675,7 @@ impl TypedData {
                     (
                         "document".to_string(),
                         EIP712Value::Array(
-                            doc_dataset_normalized
-                                .statements()
+                            doc_statements_normalized
                                 .into_iter()
                                 .map(encode_statement)
                                 .collect(),
@@ -681,8 +684,7 @@ impl TypedData {
                     (
                         "proof".to_string(),
                         EIP712Value::Array(
-                            sigopts_dataset_normalized
-                                .statements()
+                            sigopts_statements_normalized
                                 .into_iter()
                                 .map(encode_statement)
                                 .collect(),
