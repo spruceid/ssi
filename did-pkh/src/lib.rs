@@ -743,8 +743,14 @@ mod tests {
             from_str(include_str!("../../tests/secp256k1-2021-02-17.json")).unwrap();
         let key_secp256k1_recovery = JWK {
             algorithm: Some(Algorithm::ES256KR),
-            ..key_secp256k1
+            ..key_secp256k1.clone()
         };
+        let key_secp256k1_eip712sig = JWK {
+            algorithm: Some(Algorithm::ES256KR),
+            key_operations: Some(vec!["signTypedData".to_string()]),
+            ..key_secp256k1.clone()
+        };
+
         let mut key_ed25519: JWK =
             from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap();
         let mut key_p256: JWK =
@@ -774,6 +780,16 @@ mod tests {
         )
         .await;
         */
+
+        // eth/Eip712
+        credential_prove_verify_did_pkh(
+            key_secp256k1_eip712sig.clone(),
+            other_key_secp256k1.clone(),
+            "eth",
+            "#Recovery2020",
+            &ssi::ldp::EthereumEip712Signature2021,
+        )
+        .await;
 
         println!("did:pkh:tz:tz1");
         key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
@@ -900,9 +916,7 @@ mod tests {
         other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
-    #[tokio::test]
-    async fn verify_vc() {
-        let vc_str = include_str!("../tests/vc-tz1.jsonld");
+    async fn verify_vc_str(vc_str: &str) {
         let mut vc = ssi::vc::Credential::from_json_unsigned(vc_str).unwrap();
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDPKH).await;
@@ -915,5 +929,11 @@ mod tests {
         let verification_result = vc.verify(None, &DIDPKH).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() > 0);
+    }
+
+    #[tokio::test]
+    async fn verify_vc() {
+        verify_vc_str(include_str!("../tests/vc-tz1.jsonld")).await;
+        // verify_vc_str(include_str!("../tests/vc-eth-eip712sig.jsonld")).await;
     }
 }

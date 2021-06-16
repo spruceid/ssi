@@ -696,6 +696,23 @@ impl TypedData {
         Ok(typed_data)
     }
 
+    /// Convert linked data document and proof to TypedData according to
+    /// [EthereumEip712Signature2021](https://uport-project.github.io/ethereum-eip712-signature-2021-spec/)
+    pub async fn from_document_and_options_1(
+        document: &(dyn LinkedDataDocument + Sync),
+        proof: &Proof,
+    ) -> Result<Self, TypedDataConstructionError> {
+        /* TODO
+         * - Get document as JSON.
+         * - Remove eip712Domain from proof.
+         * - Get Types from eip712Domain.messageSchema.
+         * - Get domain and primaryType from eip712Domain.
+         * - Add proof to document.
+         * - Create TypedData with Types, domain, primaryType, and message.
+         */
+        Err(Error::NotImplemented)
+    }
+
     /// Encode a typed data message for hashing and signing.
     /// [Reference](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#specification)
     pub fn hash(&self) -> Result<Vec<u8>, TypedDataHashError> {
