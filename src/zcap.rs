@@ -409,34 +409,60 @@ mod tests {
             ..Default::default()
         };
 
-        let signed_del = del.clone().set_proof(
-            del.generate_proof(
-                &alice,
-                &LinkedDataProofOptions {
-                    verification_method: alice.key_id.clone(),
-                    proof_purpose: Some(ProofPurpose::CapabilityDelegation),
-                    ..Default::default()
-                },
-            )
-            .await
-            .unwrap(),
-        );
-        let signed_inv = inv.clone().set_proof(
-            inv.generate_proof(
-                &bob,
-                &LinkedDataProofOptions {
-                    verification_method: bob.key_id.clone(),
-                    proof_purpose: Some(ProofPurpose::CapabilityInvocation),
-                    ..Default::default()
-                },
-                &del.id,
-            )
-            .await
-            .unwrap(),
-        );
+        let ldpo_alice = LinkedDataProofOptions {
+            verification_method: alice.key_id.clone(),
+            proof_purpose: Some(ProofPurpose::CapabilityDelegation),
+            ..Default::default()
+        };
+        let ldpo_bob = LinkedDataProofOptions {
+            verification_method: bob.key_id.clone(),
+            proof_purpose: Some(ProofPurpose::CapabilityInvocation),
+            ..Default::default()
+        };
+        let signed_del = del
+            .clone()
+            .set_proof(del.generate_proof(&alice, &ldpo_alice).await.unwrap());
+        let signed_inv = inv
+            .clone()
+            .set_proof(inv.generate_proof(&bob, &ldpo_bob, &del.id).await.unwrap());
 
+        // happy path
         assert!(signed_del.verify(None, &dk).await.errors.is_empty());
         assert!(signed_inv
+            .verify(None, &dk, &signed_del)
+            .await
+            .errors
+            .is_empty());
+
+        let bad_sig_del = Delegation {
+            invoker: Some(URI::String("someone else".into())),
+            ..signed_del.clone()
+        };
+        let bad_sig_inv = Invocation {
+            id: URI::String("different_id".into()),
+            ..signed_inv.clone()
+        };
+
+        // invalid proof for data
+        assert!(!bad_sig_del.verify(None, &dk).await.errors.is_empty());
+        assert!(!bad_sig_inv
+            .verify(None, &dk, &signed_del)
+            .await
+            .errors
+            .is_empty());
+
+        // invalid cap attrs
+        let wrong_inv = Invocation {
+            capability_action: None,
+            ..signed_inv.clone()
+        };
+        let proof = wrong_inv
+            .generate_proof(&bob, &ldpo_bob, &signed_del.id)
+            .await
+            .unwrap();
+        let signed_wrong_inv = wrong_inv.set_proof(proof);
+
+        assert!(!signed_wrong_inv
             .verify(None, &dk, &signed_del)
             .await
             .errors
