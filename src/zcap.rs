@@ -8,7 +8,7 @@ use crate::jwk::{JWTKeys, JWK};
 use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
-use crate::vc::{Check, LinkedDataProofOptions, Proof, VerificationResult, URI};
+use crate::vc::{Check, LinkedDataProofOptions, Proof, ProofPurpose, VerificationResult, URI};
 
 use async_trait::async_trait;
 use chrono::prelude::*;
@@ -322,7 +322,7 @@ impl From<Contexts> for OneOrMany<Context> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use did_method_key::DIDKey;
+    use crate::did::example::DIDExample;
 
     #[derive(Deserialize, PartialEq, Debug, Clone, Serialize)]
     enum Actions {
@@ -382,35 +382,54 @@ mod tests {
         use crate::did::{DIDMethod, Source};
         use crate::did_resolve::DIDResolver;
 
-        let dk = DIDKey;
-        let alice = JWK::generate_ed25519().unwrap();
-        let alice_did = dk.generate(&Source::Key(&alice)).unwrap();
-        let bob = JWK::generate_ed25519().unwrap();
-        let bob_did = dk.generate(&Source::Key(&bob)).unwrap();
+        let dk = DIDExample;
+
+        let alice_did = "did:example:foo";
+        let alice: JWK = JWK {
+            key_id: Some(format!("{}#key2", alice_did)),
+            ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
+        };
+
+        let bob_did = "did:example:bar";
+        let bob: JWK = JWK {
+            key_id: Some(format!("{}#key1", bob_did)),
+            ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
+        };
 
         let del: Delegation<Actions, ()> = Delegation {
-            id: URI::String("a uri".into()),
-            parent_capability: URI::String("kepler://alices orbit".into()),
-            invoker: Some(URI::String(bob_did)),
+            id: URI::String("a_uri".into()),
+            parent_capability: URI::String("kepler://alices_orbit".into()),
+            invoker: Some(URI::String(bob_did.into())),
             action: Some(Actions::Read),
             ..Default::default()
         };
         let inv: Invocation<Actions> = Invocation {
-            id: URI::String("a different uri".into()),
+            id: URI::String("a_different_uri".into()),
             action: Some(Actions::Read),
             ..Default::default()
         };
 
         let signed_del = del.clone().set_proof(
-            del.generate_proof(&alice, &Default::default())
-                .await
-                .unwrap(),
+            del.generate_proof(
+                &alice,
+                &LinkedDataProofOptions {
+                    verification_method: alice.key_id.clone(),
+                    proof_purpose: Some(ProofPurpose::CapabilityDelegation),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap(),
         );
         let signed_inv = inv.clone().set_proof(
             inv.generate_proof(
                 &bob,
-                &Default::default(),
-                &URI::String("kepler://alices orbit".into()),
+                &LinkedDataProofOptions {
+                    verification_method: bob.key_id.clone(),
+                    proof_purpose: Some(ProofPurpose::CapabilityInvocation),
+                    ..Default::default()
+                },
+                &del.id,
             )
             .await
             .unwrap(),
