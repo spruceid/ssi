@@ -1,20 +1,13 @@
 {
   "@context": [
-    "https://www.w3.org/2018/credentials/v1",
-    {
-      "sameAs": "https://www.w3.org/TR/owl-ref/#sameAs-def"
-    }
+    "https://www.w3.org/2018/credentials/v1"
   ],
-  "id": "urn:uuid:dc093ee6-e039-40e7-8599-da2075666e2c",
   "type": [
     "VerifiableCredential"
   ],
-  "credentialSubject": {
-    "id": "did:example:foo",
-    "sameAs": "did:ethr:0xf7398bacf610bb4e3b567811279fcb3c41919f89"
-  },
-  "issuer": "did:ethr:0xf7398bacf610bb4e3b567811279fcb3c41919f89",
-  "issuanceDate": "2021-02-27T04:03:23.188Z",
+  "credentialSubject": {},
+  "issuer": "did:ethr:0xdebee5349ba59faa2b9831f108a0f712d8ab26bb",
+  "issuanceDate": "2021-06-16T21:16:03.362Z",
   "proof": {
     "@context": [
       {
@@ -72,8 +65,8 @@
     ],
     "type": "Eip712Signature2021",
     "proofPurpose": "assertionMethod",
-    "proofValue": "0x258e647f27ac39de2fe43b629b6189a20bfa1454bf76eb486f1461565c6c119c58b0676b2003c75ad51e88bbbca0a5ca944a2f292dc5f76f5d2db2be705a50ca1b",
-    "verificationMethod": "did:ethr:0xf7398bacf610bb4e3b567811279fcb3c41919f89#Eip712Method2021",
-    "created": "2021-02-27T04:03:23.189Z"
+    "proofValue": "0xdb25f8a6cab65e3a83cd5933cc3a16a45b90f8a91ec447ca0f0bafcf9dbbabe25710a7d2082f34644faa484a156894d87998235adebeab8e44fa4ba74e122f581b",
+    "verificationMethod": "did:ethr:0xdebee5349ba59faa2b9831f108a0f712d8ab26bb#controller",
+    "created": "2021-06-16T21:16:03.362Z"
   }
 }
