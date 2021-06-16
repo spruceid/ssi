@@ -7,7 +7,7 @@
   ],
   "credentialSubject": {},
   "issuer": "did:pkh:eth:0xdebee5349ba59faa2b9831f108a0f712d8ab26bb",
-  "issuanceDate": "2021-06-11T17:21:41.204Z",
+  "issuanceDate": "2021-06-16T20:55:45.850Z",
   "proof": {
     "@context": [
       {
@@ -65,8 +65,8 @@
     ],
     "type": "Eip712Signature2021",
     "proofPurpose": "assertionMethod",
-    "proofValue": "0x647596d87c842e27126924310cf517059a5972cf8f510c5699798754ffbcafb0046efc185f7bf8d9af24e729394ba7248776a3bc204ac82a529c41407a884dec1c",
+    "proofValue": "0x97f9776899dfc8aacbffd96ca6bfbb34a1e2281fc5bedc39e3ce02c6dd9255cf238466eabfc4c7b10933362f488dbc7bcd230168d1f551f56827e1189c9448081c",
     "verificationMethod": "did:pkh:eth:0xdebee5349ba59faa2b9831f108a0f712d8ab26bb#Recovery2020",
-    "created": "2021-06-11T17:21:41.204Z"
+    "created": "2021-06-16T20:55:45.850Z"
   }
 }
