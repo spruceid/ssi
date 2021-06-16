@@ -1,0 +1,28 @@
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:example:bar",
+  "verificationMethod": [
+    {
+      "id": "did:example:bar#key1",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:example:bar",
+      "publicKeyJwk": {
+          "kty": "OKP",
+          "crv": "Ed25519",
+          "x": "jRSNg5xqr8WZ-kdPZFBebEHYHMHK38NI0lnbC9Tmc0Y"
+      }
+    }
+  ],
+  "assertionMethod": [
+    "did:example:bar#key1"
+  ],
+  "authentication": [
+    "did:example:bar#key1"
+  ],
+  "capabilityDelegation": [
+    "did:example:bar#key1"
+  ],
+  "capabilityInvokation": [
+    "did:example:bar#key1"
+  ]
+}
