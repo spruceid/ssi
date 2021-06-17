@@ -65,6 +65,7 @@ pub struct JWK {
 pub enum Params {
     EC(ECParams),
     RSA(RSAParams),
+    #[serde(rename = "oct")]
     Symmetric(SymmetricParams),
     OKP(OctetParams),
 }
@@ -118,7 +119,6 @@ pub struct RSAParams {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
-#[serde(rename = "oct")]
 pub struct SymmetricParams {
     // Parameters for Symmetric Keys
     #[serde(rename = "k")]
@@ -126,7 +126,6 @@ pub struct SymmetricParams {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
-#[serde(rename = "OKP")]
 pub struct OctetParams {
     // Parameters for Octet Key Pair Public Keys
     #[serde(rename = "crv")]
