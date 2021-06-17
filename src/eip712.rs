@@ -131,6 +131,8 @@ pub enum TypedDataHashError {
     IntegerLength(usize),
     #[error("Expected string to be hex bytes")]
     ExpectedHex,
+    #[error("Untyped properties: {0:?}")]
+    UntypedProperties(Vec<String>),
 }
 
 impl EIP712Value {
@@ -585,13 +587,21 @@ pub fn encode_data(
             let mut enc = Vec::with_capacity(32 * (struct_type.0.len() + 1));
             let type_hash = hash_type(&struct_name, &struct_type, types)?;
             enc.append(&mut type_hash.to_vec());
+            let mut keys: std::collections::HashSet<String> =
+                hash_map.keys().map(|k| k.to_owned()).collect();
             for member in &struct_type.0 {
                 let mut member_enc = match hash_map.get(&member.name) {
                     Some(value) => encode_field(value, &member.type_, types)?,
                     // Allow missing member structs
                     None => EMPTY_32.to_vec(),
                 };
+                keys.remove(&member.name);
                 enc.append(&mut member_enc);
+            }
+            if !keys.is_empty() {
+                // A key was remaining in the data that does not have a type in the struct.
+                let names: Vec<String> = keys.into_iter().collect();
+                return Err(TypedDataHashError::UntypedProperties(names));
             }
             enc
         }
