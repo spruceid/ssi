@@ -180,8 +180,10 @@ pub enum TypedDataHashError {
 
 #[derive(Error, Debug)]
 pub enum DereferenceTypesError {
-    #[error("Not Implemented")]
-    NotImplemented,
+    #[error("Remote types loading not implemented")]
+    RemoteLoadingNotImplemented,
+    #[error("Unable to convert types from JSON: {0}")]
+    JSON(serde_json::Error),
 }
 
 impl EIP712Value {
@@ -355,10 +357,80 @@ impl Types {
 
 impl TypesOrURI {
     async fn dereference(self) -> Result<Types, DereferenceTypesError> {
-        match self {
-            Self::URI(string) => Err(DereferenceTypesError::NotImplemented),
-            Self::Object(types) => Ok(types),
-        }
+        let uri = match self {
+            Self::URI(string) => string,
+            Self::Object(types) => return Ok(types),
+        };
+        let value = match &uri[..] {
+            "https://demo.spruceid.com/ld/eip712sig-2021/types/vc0-test.json" => serde_json::json!(
+              {
+                "EIP712Domain": [
+                  { "name": "name", "type": "string" }
+                ],
+                "VerifiableCredential": [
+                  { "name": "@context", "type": "string[]" },
+                  { "name": "type", "type": "string[]" },
+                  { "name": "issuer", "type": "string" },
+                  { "name": "issuanceDate", "type": "string" },
+                  { "name": "credentialSubject", "type": "CredentialSubject" },
+                  { "name": "proof", "type": "Proof" }
+                ],
+                "CredentialSubject": [
+                  { "name": "id", "type": "string" }
+                ],
+                "Proof": [
+                  { "name": "@context", "type": "string" },
+                  { "name": "verificationMethod", "type": "string" },
+                  { "name": "created", "type": "string" },
+                  { "name": "proofPurpose", "type": "string" },
+                  { "name": "type", "type": "string" }
+                ]
+              }
+            ),
+            "https://demo.spruceid.com/ld/eip712sig-2021/types/vp0-test.json" => serde_json::json!(
+              {
+                "EIP712Domain": [
+                  { "name": "name", "type": "string" }
+                ],
+                "VerifiablePresentation": [
+                  { "name": "@context", "type": "string[]" },
+                  { "name": "type", "type": "string" },
+                  { "name": "holder", "type": "string" },
+                  { "name": "verifiableCredential", "type": "VerifiableCredential" },
+                  { "name": "proof", "type": "Proof" }
+                ],
+                "VerifiableCredential": [
+                  { "name": "@context", "type": "string[]" },
+                  { "name": "type", "type": "string[]" },
+                  { "name": "issuer", "type": "string" },
+                  { "name": "issuanceDate", "type": "string" },
+                  { "name": "credentialSubject", "type": "CredentialSubject" },
+                  { "name": "proof", "type": "Proof" }
+                ],
+                "CredentialSubject": [
+                  { "name": "id", "type": "string" }
+                ],
+                "Proof": [
+                  { "name": "@context", "type": "string" },
+                  { "name": "verificationMethod", "type": "string" },
+                  { "name": "created", "type": "string" },
+                  { "name": "proofPurpose", "type": "string" },
+                  { "name": "proofValue", "type": "string" },
+                  { "name": "eip712Domain", "type": "EIP712DomainInfo" },
+                  { "name": "type", "type": "string" }
+                ],
+                "EIP712DomainInfo": [
+                  { "name": "domain", "type": "EIP712Domain" },
+                  { "name": "messageSchema", "type": "string" },
+                  { "name": "primaryType", "type": "string" }
+                ]
+              }
+            ),
+            _ => Err(DereferenceTypesError::RemoteLoadingNotImplemented)?,
+        };
+        let types: Types =
+            serde_json::from_value(value).map_err(|e| DereferenceTypesError::JSON(e))?;
+        Ok(types)
     }
 }
 

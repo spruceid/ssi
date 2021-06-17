@@ -21,68 +21,7 @@
       "domain": {
         "name": "EthereumEip712Signature2021"
       },
-      "messageSchema": {
-        "CredentialSubject": [
-          {
-            "name": "id",
-            "type": "string"
-          }
-        ],
-        "EIP712Domain": [
-          {
-            "name": "name",
-            "type": "string"
-          }
-        ],
-        "Proof": [
-          {
-            "name": "@context",
-            "type": "string"
-          },
-          {
-            "name": "verificationMethod",
-            "type": "string"
-          },
-          {
-            "name": "created",
-            "type": "string"
-          },
-          {
-            "name": "proofPurpose",
-            "type": "string"
-          },
-          {
-            "name": "type",
-            "type": "string"
-          }
-        ],
-        "VerifiableCredential": [
-          {
-            "name": "@context",
-            "type": "string[]"
-          },
-          {
-            "name": "type",
-            "type": "string[]"
-          },
-          {
-            "name": "issuer",
-            "type": "string"
-          },
-          {
-            "name": "issuanceDate",
-            "type": "string"
-          },
-          {
-            "name": "credentialSubject",
-            "type": "CredentialSubject"
-          },
-          {
-            "name": "proof",
-            "type": "Proof"
-          }
-        ]
-      },
+      "messageSchema": "https://demo.spruceid.com/ld/eip712sig-2021/types/vc0-test.json",
       "primaryType": "VerifiableCredential"
     }
   }
