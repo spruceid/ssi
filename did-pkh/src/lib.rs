@@ -519,6 +519,8 @@ mod tests {
         type_: &str,
         vm_relative_url: &str,
         proof_suite: &dyn ProofSuite,
+        eip712_domain_opt: Option<ssi::eip712::ProofInfo>,
+        vp_eip712_domain_opt: Option<ssi::eip712::ProofInfo>,
     ) {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         let did = DIDPKH
@@ -526,8 +528,8 @@ mod tests {
             .unwrap();
         eprintln!("did: {}", did);
         let mut vc: Credential = from_value(json!({
-            "@context": "https://www.w3.org/2018/credentials/v1",
-            "type": "VerifiableCredential",
+            "@context": ["https://www.w3.org/2018/credentials/v1"],
+            "type": ["VerifiableCredential"],
             "issuer": did.clone(),
             "issuanceDate": "2021-03-18T16:38:25Z",
             "credentialSubject": {
@@ -538,6 +540,7 @@ mod tests {
         vc.validate_unsigned().unwrap();
         let issue_options = LinkedDataProofOptions {
             verification_method: Some(did.to_string() + vm_relative_url),
+            eip712_domain: eip712_domain_opt,
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
@@ -548,6 +551,7 @@ mod tests {
         */
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
+        println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDPKH).await;
         println!("{:#?}", verification_result);
@@ -593,6 +597,7 @@ mod tests {
         vp.holder = Some(URI::String(did.to_string()));
         vp_issue_options.verification_method = Some(did.to_string() + vm_relative_url);
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        vp_issue_options.eip712_domain = vp_eip712_domain_opt;
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
@@ -766,6 +771,8 @@ mod tests {
             "eth",
             "#Recovery2020",
             &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+            None,
+            None,
         )
         .await;
 
@@ -782,12 +789,81 @@ mod tests {
         */
 
         // eth/Eip712
+        let eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
+          "messageSchema": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" }
+            ],
+            "VerifiableCredential": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string[]" },
+              { "name": "issuer", "type": "string" },
+              { "name": "issuanceDate", "type": "string" },
+              { "name": "credentialSubject", "type": "CredentialSubject" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "CredentialSubject": [
+              { "name": "id", "type": "string" },
+            ],
+            "Proof": [
+              { "name": "@context", "type": "string" },
+              { "name": "verificationMethod", "type": "string" },
+              { "name": "created", "type": "string" },
+              { "name": "proofPurpose", "type": "string" },
+              { "name": "type", "type": "string" }
+            ]
+          },
+          "domain": {
+            "name": "EthereumEip712Signature2021",
+          },
+          "primaryType": "VerifiableCredential"
+        }))
+        .unwrap();
+        let vp_eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
+          "messageSchema": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" }
+            ],
+            "VerifiablePresentation": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string" },
+              { "name": "holder", "type": "string" },
+              { "name": "verifiableCredential", "type": "VerifiableCredential" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "VerifiableCredential": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string[]" },
+              { "name": "issuer", "type": "string" },
+              { "name": "issuanceDate", "type": "string" },
+              { "name": "credentialSubject", "type": "CredentialSubject" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "CredentialSubject": [
+              { "name": "id", "type": "string" },
+            ],
+            "Proof": [
+              { "name": "@context", "type": "string" },
+              { "name": "verificationMethod", "type": "string" },
+              { "name": "created", "type": "string" },
+              { "name": "proofPurpose", "type": "string" },
+              { "name": "type", "type": "string" }
+            ]
+          },
+          "domain": {
+            "name": "EthereumEip712Signature2021",
+          },
+          "primaryType": "VerifiablePresentation"
+        }))
+        .unwrap();
         credential_prove_verify_did_pkh(
             key_secp256k1_eip712sig.clone(),
             other_key_secp256k1.clone(),
             "eth",
             "#Recovery2020",
             &ssi::ldp::EthereumEip712Signature2021,
+            Some(eip712_domain),
+            Some(vp_eip712_domain),
         )
         .await;
 
@@ -800,6 +876,8 @@ mod tests {
             "tz",
             "#blockchainAccountId",
             &ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            None,
+            None,
         )
         .await;
         key_ed25519.algorithm = Some(Algorithm::EdDSA);
@@ -825,6 +903,8 @@ mod tests {
             "tz",
             "#blockchainAccountId",
             &ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            None,
+            None,
         )
         .await;
         key_p256.algorithm = Some(Algorithm::ES256);
@@ -837,6 +917,8 @@ mod tests {
             "sol",
             "#controller",
             &ssi::ldp::Ed25519Signature2018,
+            None,
+            None,
         )
         .await;
 
@@ -859,6 +941,8 @@ mod tests {
             "btc",
             "#blockchainAccountId",
             &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+            None,
+            None,
         )
         .await;
 
@@ -869,6 +953,8 @@ mod tests {
             "doge",
             "#blockchainAccountId",
             &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+            None,
+            None,
         )
         .await;
 
@@ -934,6 +1020,6 @@ mod tests {
     #[tokio::test]
     async fn verify_vc() {
         verify_vc_str(include_str!("../tests/vc-tz1.jsonld")).await;
-        // verify_vc_str(include_str!("../tests/vc-eth-eip712sig.jsonld")).await;
+        verify_vc_str(include_str!("../tests/vc-eth-eip712sig.jsonld")).await;
     }
 }

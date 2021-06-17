@@ -304,6 +304,9 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Checks to perform
     pub checks: Option<Vec<Check>>,
+    /// Metadata for EthereumEip712Signature2021 (not standard in vc-http-api)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eip712_domain: Option<crate::eip712::ProofInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -342,6 +345,7 @@ impl Default for LinkedDataProofOptions {
             challenge: None,
             domain: None,
             checks: Some(vec![Check::Proof]),
+            eip712_domain: None,
         }
     }
 }
@@ -967,6 +971,10 @@ impl LinkedDataDocument for Presentation {
         };
         let mut loader = StaticLoader;
         json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+    }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
     }
 }
 

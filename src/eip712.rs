@@ -771,7 +771,6 @@ impl TypedData {
         let proof_obj = proof_value
             .as_object_mut()
             .ok_or(TypedDataConstructionJSONError::ExpectedProofObject)?;
-        dbg!(&proof_obj);
         let info = proof_obj
             .remove("eip712Domain")
             .ok_or(TypedDataConstructionJSONError::ExpectedEip712Domain)?;
@@ -781,9 +780,6 @@ impl TypedData {
             domain,
         } = serde_json::from_value(info)
             .map_err(|e| TypedDataConstructionJSONError::ParseInfo(e))?;
-        dbg!(&types_or_uri);
-        dbg!(&primary_type);
-        dbg!(&domain);
         doc_obj.insert("proof".to_string(), proof_value);
         let message = EIP712Value::try_from(doc_value)
             .map_err(|e| TypedDataConstructionJSONError::ConvertMessage(e))?;

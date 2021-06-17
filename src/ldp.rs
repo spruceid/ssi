@@ -42,10 +42,6 @@ lazy_static! {
         let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(&context_str).unwrap()
     };
-    pub static ref EIP712SIG_CONTEXT: Value = {
-        let context_str = ssi_contexts::EIP712SIG_V0_1;
-        serde_json::from_str(&context_str).unwrap()
-    };
     pub static ref SOLVM_CONTEXT: Value = {
         let context_str = ssi_contexts::SOLVM;
         serde_json::from_str(&context_str).unwrap()
@@ -1195,13 +1191,19 @@ impl ProofSuite for EthereumEip712Signature2021 {
     ) -> Result<Proof, Error> {
         use k256::ecdsa::signature::Signer;
         // TODO: conform to spec: no domain
+        let mut property_set = std::collections::HashMap::new();
+        if let Some(ref eip712_domain) = options.eip712_domain {
+            let info = serde_json::to_value(eip712_domain.clone())?;
+            property_set.insert("eip712Domain".to_string(), info);
+        }
         let mut proof = Proof {
-            context: serde_json::json!([EIP712SIG_CONTEXT.clone()]),
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
             proof_purpose: options.proof_purpose.clone(),
             verification_method: options.verification_method.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
+            property_set: Some(property_set),
             ..Proof::new("EthereumEip712Signature2021")
         };
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
@@ -1227,13 +1229,19 @@ impl ProofSuite for EthereumEip712Signature2021 {
         options: &LinkedDataProofOptions,
         _public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
+        let mut property_set = std::collections::HashMap::new();
+        if let Some(ref eip712_domain) = options.eip712_domain {
+            let info = serde_json::to_value(eip712_domain.clone())?;
+            property_set.insert("eip712Domain".to_string(), info);
+        }
         let proof = Proof {
-            context: serde_json::json!([EIP712SIG_CONTEXT.clone()]),
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
             proof_purpose: options.proof_purpose.clone(),
             verification_method: options.verification_method.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
+            property_set: Some(property_set),
             ..Proof::new("EthereumEip712Signature2021")
         };
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
@@ -1282,6 +1290,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
+        // TODO: ensure that values not in types trigger error
         let bytes = typed_data.bytes()?;
         let recovered_key = sig.recover_verify_key(&bytes)?;
         use crate::jwk::ECParams;
