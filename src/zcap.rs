@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
 use crate::error::Error;
-use crate::jsonld::{json_to_dataset, StaticLoader};
+use crate::jsonld::{json_to_dataset, StaticLoader, SECURITY_V2_CONTEXT};
 use crate::jwk::{JWTKeys, JWK};
 use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
@@ -15,7 +15,7 @@ use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const DEFAULT_CONTEXT: &str = "https://w3id.org/security/v2";
+const DEFAULT_CONTEXT: &str = SECURITY_V2_CONTEXT;
 
 // limited initial definition of a ZCAP Delegation, generic over Action and Caveat types
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -170,7 +170,7 @@ where
                         if id != t_id {
                             result
                                 .errors
-                                .push("Target Capability IDs doesnt match".into())
+                                .push("Target Capability IDs dont match".into())
                         };
                     }
                     _ => result
@@ -181,7 +181,7 @@ where
                 if let (Some(URI::String(ref invoker)), Some(ref delegatee)) =
                     (&target_capability.invoker, &proof.verification_method)
                 {
-                    if invoker == delegatee {
+                    if invoker != delegatee {
                         result.errors.push("Incorrect Invoker".into());
                     }
                 };
@@ -385,21 +385,23 @@ mod tests {
         let dk = DIDExample;
 
         let alice_did = "did:example:foo";
+        let alice_vm = format!("{}#key2", alice_did);
         let alice: JWK = JWK {
-            key_id: Some(format!("{}#key2", alice_did)),
+            key_id: Some(alice_vm),
             ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
         };
 
         let bob_did = "did:example:bar";
+        let bob_vm = format!("{}#key1", bob_did);
         let bob: JWK = JWK {
-            key_id: Some(format!("{}#key1", bob_did)),
+            key_id: Some(bob_vm.clone()),
             ..serde_json::from_str(include_str!("../tests/ed25519-2021-06-16.json")).unwrap()
         };
 
         let del: Delegation<Actions, ()> = Delegation {
             id: URI::String("a_uri".into()),
             parent_capability: URI::String("kepler://alices_orbit".into()),
-            invoker: Some(URI::String(bob_did.into())),
+            invoker: Some(URI::String(bob_vm)),
             capability_action: Some(Actions::Read),
             ..Default::default()
         };
@@ -427,12 +429,13 @@ mod tests {
             .set_proof(inv.generate_proof(&bob, &ldpo_bob, &del.id).await.unwrap());
 
         // happy path
-        assert!(signed_del.verify(None, &dk).await.errors.is_empty());
-        assert!(signed_inv
-            .verify(None, &dk, &signed_del)
-            .await
-            .errors
-            .is_empty());
+        let s_d_v = signed_del.verify(None, &dk).await;
+        assert!(s_d_v.errors.is_empty());
+        assert!(s_d_v.checks.iter().any(|c| c == &Check::Proof));
+
+        let s_i_v = signed_inv.verify(None, &dk, &signed_del).await;
+        assert!(s_i_v.errors.is_empty());
+        assert!(s_i_v.checks.iter().any(|c| c == &Check::Proof));
 
         let bad_sig_del = Delegation {
             invoker: Some(URI::String("someone else".into())),
@@ -452,18 +455,14 @@ mod tests {
             .is_empty());
 
         // invalid cap attrs
-        let wrong_inv = Invocation {
-            capability_action: None,
-            ..signed_inv.clone()
+        let wrong_del = Delegation {
+            invoker: Some(URI::String("did:example:someone else".into())),
+            ..del.clone()
         };
-        let proof = wrong_inv
-            .generate_proof(&bob, &ldpo_bob, &signed_del.id)
-            .await
-            .unwrap();
-        let signed_wrong_inv = wrong_inv.set_proof(proof);
-
-        assert!(!signed_wrong_inv
-            .verify(None, &dk, &signed_del)
+        let proof = wrong_del.generate_proof(&bob, &ldpo_bob).await.unwrap();
+        let signed_wrong_del = wrong_del.set_proof(proof);
+        assert!(signed_inv
+            .verify(None, &dk, &signed_wrong_del)
             .await
             .errors
             .is_empty());
