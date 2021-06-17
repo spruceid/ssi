@@ -615,6 +615,7 @@ async fn sign(
         created: Some(options.created.unwrap_or_else(now_ms)),
         domain: options.domain.clone(),
         challenge: options.challenge.clone(),
+        property_set: options.property_set.clone(),
         ..Proof::new(type_)
     };
     sign_proof(document, proof, key, algorithm).await

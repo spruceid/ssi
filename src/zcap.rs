@@ -200,19 +200,22 @@ where
         options: &LinkedDataProofOptions,
         target: &URI,
     ) -> Result<Proof, Error> {
-        let mut proof = LinkedDataProofs::sign(self, options, jwk).await?;
-        proof.property_set = match (proof.property_set, target) {
-            (Some(mut ps), URI::String(t)) => {
-                ps.insert("capability".into(), Value::String(t.to_string()));
-                Some(ps)
-            }
-            (_, URI::String(t)) => {
-                let mut ps = Map::<String, Value>::new();
-                ps.insert("capability".into(), Value::String(t.to_string()));
-                Some(ps)
-            }
+        let cl = options.clone();
+        let opts = LinkedDataProofOptions {
+            property_set: match (cl.property_set, target) {
+                (Some(mut ps), URI::String(t)) => {
+                    ps.insert("capability".into(), Value::String(t.to_string()));
+                    Some(ps)
+                }
+                (_, URI::String(t)) => {
+                    let mut ps = Map::<String, Value>::new();
+                    ps.insert("capability".into(), Value::String(t.to_string()));
+                    Some(ps)
+                }
+            },
+            ..cl
         };
-        Ok(proof)
+        LinkedDataProofs::sign(self, &opts, jwk).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -461,7 +464,7 @@ mod tests {
         };
         let proof = wrong_del.generate_proof(&bob, &ldpo_bob).await.unwrap();
         let signed_wrong_del = wrong_del.set_proof(proof);
-        assert!(signed_inv
+        assert!(!signed_inv
             .verify(None, &dk, &signed_wrong_del)
             .await
             .errors

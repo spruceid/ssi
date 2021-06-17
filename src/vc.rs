@@ -331,6 +331,9 @@ pub struct LinkedDataProofOptions {
     pub eip712_domain: Option<crate::eip712::ProofInfo>,
     #[cfg(not(feature = "keccak-hash"))]
     pub eip712_domain: Option<()>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Additional proof data parameters
+    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -373,6 +376,7 @@ impl Default for LinkedDataProofOptions {
             domain: None,
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
+            property_set: None,
         }
     }
 }
