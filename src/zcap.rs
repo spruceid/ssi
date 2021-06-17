@@ -399,14 +399,14 @@ mod tests {
         };
 
         let del: Delegation<Actions, ()> = Delegation {
-            id: URI::String("a_uri".into()),
+            id: URI::String("urn:a_urn".into()),
             parent_capability: URI::String("kepler://alices_orbit".into()),
             invoker: Some(URI::String(bob_vm)),
             capability_action: Some(Actions::Read),
             ..Default::default()
         };
         let inv: Invocation<Actions> = Invocation {
-            id: URI::String("a_different_uri".into()),
+            id: URI::String("urn:a_different_urn".into()),
             capability_action: Some(Actions::Read),
             ..Default::default()
         };
@@ -438,11 +438,11 @@ mod tests {
         assert!(s_i_v.checks.iter().any(|c| c == &Check::Proof));
 
         let bad_sig_del = Delegation {
-            invoker: Some(URI::String("someone else".into())),
+            invoker: Some(URI::String("did:someone_else".into())),
             ..signed_del.clone()
         };
         let bad_sig_inv = Invocation {
-            id: URI::String("different_id".into()),
+            id: URI::String("urn:different_id".into()),
             ..signed_inv.clone()
         };
 
@@ -456,7 +456,7 @@ mod tests {
 
         // invalid cap attrs
         let wrong_del = Delegation {
-            invoker: Some(URI::String("did:example:someone else".into())),
+            invoker: Some(URI::String("did:example:someone_else".into())),
             ..del.clone()
         };
         let proof = wrong_del.generate_proof(&bob, &ldpo_bob).await.unwrap();
