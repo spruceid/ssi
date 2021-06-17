@@ -1290,7 +1290,6 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
-        // TODO: ensure that values not in types trigger error
         let bytes = typed_data.bytes()?;
         let recovered_key = sig.recover_verify_key(&bytes)?;
         use crate::jwk::ECParams;

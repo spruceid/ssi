@@ -847,6 +847,7 @@ mod tests {
               { "name": "verificationMethod", "type": "string" },
               { "name": "created", "type": "string" },
               { "name": "proofPurpose", "type": "string" },
+              { "name": "proofValue", "type": "string" },
               { "name": "type", "type": "string" }
             ]
           },
