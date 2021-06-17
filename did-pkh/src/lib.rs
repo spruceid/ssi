@@ -790,7 +790,29 @@ mod tests {
 
         // eth/Eip712
         let eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
-          "messageSchema": "https://demo.spruceid.com/ld/eip712sig-2021/types/vc0-test.json",
+          "messageSchema": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" }
+            ],
+            "VerifiableCredential": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string[]" },
+              { "name": "issuer", "type": "string" },
+              { "name": "issuanceDate", "type": "string" },
+              { "name": "credentialSubject", "type": "CredentialSubject" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "CredentialSubject": [
+              { "name": "id", "type": "string" },
+            ],
+            "Proof": [
+              { "name": "@context", "type": "string" },
+              { "name": "verificationMethod", "type": "string" },
+              { "name": "created", "type": "string" },
+              { "name": "proofPurpose", "type": "string" },
+              { "name": "type", "type": "string" }
+            ]
+          },
           "domain": {
             "name": "EthereumEip712Signature2021",
           },
@@ -798,7 +820,53 @@ mod tests {
         }))
         .unwrap();
         let vp_eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
-          "messageSchema": "https://demo.spruceid.com/ld/eip712sig-2021/types/vp0-test.json",
+          "messageSchema": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" }
+            ],
+            "VerifiablePresentation": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string" },
+              { "name": "holder", "type": "string" },
+              { "name": "verifiableCredential", "type": "VerifiableCredential" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "VerifiableCredential": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string[]" },
+              { "name": "issuer", "type": "string" },
+              { "name": "issuanceDate", "type": "string" },
+              { "name": "credentialSubject", "type": "CredentialSubject" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "CredentialSubject": [
+              { "name": "id", "type": "string" },
+            ],
+            "Proof": [
+              { "name": "@context", "type": "string" },
+              { "name": "verificationMethod", "type": "string" },
+              { "name": "created", "type": "string" },
+              { "name": "proofPurpose", "type": "string" },
+              { "name": "proofValue", "type": "string" },
+              { "name": "eip712Domain", "type": "EIP712Info" },
+              { "name": "type", "type": "string" }
+            ],
+            "EIP712Info": [
+              { "name": "domain", "type": "EIP712Domain" },
+              { "name": "primaryType", "type": "string" },
+              { "name": "messageSchema", "type": "Types" },
+            ],
+            "Types": [
+              { "name": "EIP712Domain", "type": "Type[]" },
+              { "name": "VerifiableCredential", "type": "Type[]" },
+              { "name": "CredentialSubject", "type": "Type[]" },
+              { "name": "Proof", "type": "Type[]" },
+            ],
+            "Type": [
+              { "name": "name", "type": "string" },
+              { "name": "type", "type": "string" }
+            ]
+          },
           "domain": {
             "name": "EthereumEip712Signature2021",
           },
