@@ -42,7 +42,7 @@
           "messageSchema": "https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#message-schema",
           "primaryType": "https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#primary-type",
           "domain": {
-            "@id": "https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#domain"
+            "@id": "https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#domain",
             "@type": "@json"
           }
         }

@@ -64,6 +64,9 @@ pub fn now_ms() -> DateTime<Utc> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait LinkedDataDocument {
     fn get_contexts(&self) -> Result<Option<String>, Error>;
+    fn to_value(&self) -> Result<Value, Error> {
+        Err(Error::NotImplemented)
+    }
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
@@ -1201,7 +1204,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
             challenge: options.challenge.clone(),
             ..Proof::new("EthereumEip712Signature2021")
         };
-        let typed_data = TypedData::from_document_and_options_1(document, &proof).await?;
+        let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
         let bytes = typed_data.bytes()?;
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
@@ -1233,7 +1236,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
             challenge: options.challenge.clone(),
             ..Proof::new("EthereumEip712Signature2021")
         };
-        let typed_data = TypedData::from_document_and_options_1(document, &proof).await?;
+        let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
         Ok(ProofPreparation {
             proof,
             jws_header: None,
@@ -1278,7 +1281,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
-        let typed_data = TypedData::from_document_and_options_1(document, &proof).await?;
+        let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
         let bytes = typed_data.bytes()?;
         let recovered_key = sig.recover_verify_key(&bytes)?;
         use crate::jwk::ECParams;
