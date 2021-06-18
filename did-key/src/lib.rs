@@ -243,16 +243,20 @@ impl DIDMethod for DIDKey {
                     }
                     #[cfg(feature = "secp256r1")]
                     "P-256" => {
-                        // P-256 did:key is uncompressed
-                        let (x, y) =
-                            match (params.x_coordinate.as_ref(), params.y_coordinate.as_ref()) {
-                                (Some(x), Some(y)) => (x.0.to_vec(), y.0.to_vec()),
-                                _ => return None,
-                            };
+                        use p256::elliptic_curve::sec1::ToEncodedPoint;
+                        use std::convert::TryFrom;
+                        let pk = match k256::PublicKey::try_from(params) {
+                            Ok(pk) => pk,
+                            Err(_err) => return None,
+                        };
                         "did:key:".to_string()
                             + &multibase::encode(
                                 multibase::Base::Base58Btc,
-                                [DID_KEY_P256_PREFIX.to_vec(), x, y].concat(),
+                                [
+                                    DID_KEY_P256_PREFIX.to_vec(),
+                                    pk.to_encoded_point(true).as_bytes().to_vec(),
+                                ]
+                                .concat(),
                             )
                     }
                     //_ => return Some(Err(DIDKeyError::UnsupportedCurve(params.curve.clone()))),
@@ -316,13 +320,13 @@ mod tests {
     #[async_std::test]
     async fn from_did_key_p256() {
         // https://w3c-ccg.github.io/did-method-key/#p-256
-        let did = "did:key:zrurwcJZss4ruepVNu1H3xmSirvNbzgBk9qrCktB6kaewXnJAhYWwtP3bxACqBpzjZdN7TyHNzzGGSSH5qvZsSDir9z";
+        let did = "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169";
         let (res_meta, _doc, _doc_meta) = DIDKey
             .resolve(did, &ResolutionInputMetadata::default())
             .await;
         assert_eq!(res_meta.error, None);
 
-        let vm = "did:key:zrurwcJZss4ruepVNu1H3xmSirvNbzgBk9qrCktB6kaewXnJAhYWwtP3bxACqBpzjZdN7TyHNzzGGSSH5qvZsSDir9z#zrurwcJZss4ruepVNu1H3xmSirvNbzgBk9qrCktB6kaewXnJAhYWwtP3bxACqBpzjZdN7TyHNzzGGSSH5qvZsSDir9z";
+        let vm = "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169#zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169";
         let (res_meta, object, _meta) =
             dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
         assert_eq!(res_meta.error, None);
