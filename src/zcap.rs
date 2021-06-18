@@ -101,6 +101,10 @@ where
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
+    }
+
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
@@ -258,6 +262,10 @@ where
 {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
+    }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
     }
 
     async fn to_dataset_for_signing(
