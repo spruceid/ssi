@@ -1,5 +1,11 @@
 {
-  "@context": "https://www.w3.org/ns/did/v1",
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+      "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"
+    }
+  ],
   "id": "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a",
   "verificationMethod": [
     {

@@ -21,6 +21,8 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 use json_patch::patch;
 use serde::Deserialize;
+use serde_json::Value;
+use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::default::Default;
 
@@ -68,7 +70,7 @@ impl DIDResolver for DIDTz {
         };
 
         let prefix = &address[0..3];
-        let (_curve, proof_type) = match prefix_to_curve_type(prefix) {
+        let (_curve, proof_type, proof_type_iri) = match prefix_to_curve_type(prefix) {
             Some(addr) => addr,
             None => {
                 return (
@@ -105,8 +107,15 @@ impl DIDResolver for DIDTz {
             None
         };
 
-        let mut doc =
-            DIDTz::tier1_derivation(did, &vm_didurl, proof_type, &address, &network, public_key);
+        let mut doc = DIDTz::tier1_derivation(
+            did,
+            &vm_didurl,
+            proof_type,
+            proof_type_iri,
+            &address,
+            &network,
+            public_key,
+        );
 
         let mut bcd_url = self.bcd_url;
         if let Some(s) = &input_metadata.property_set {
@@ -221,16 +230,22 @@ impl DIDResolver for DIDTz {
 }
 
 // addr must be at least 4 bytes
-fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str)> {
+fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str, &'static str)> {
     let curve_type = match prefix {
         "tz1" => (
             "Ed25519",
             "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+            "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
         ),
-        "tz2" => ("secp256k1", "EcdsaSecp256k1RecoveryMethod2020"),
+        "tz2" => (
+            "secp256k1",
+            "EcdsaSecp256k1RecoveryMethod2020",
+            "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
+        ),
         "tz3" => (
             "P-256",
             "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+            "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
         ),
         _ => return None,
     };
@@ -305,12 +320,31 @@ impl DIDTz {
         did: &str,
         vm_didurl: &DIDURL,
         proof_type: &str,
+        proof_type_iri: &str,
         address: &str,
         network: &str,
         public_key: Option<String>,
     ) -> Document {
+        let mut context = BTreeMap::new();
+        context.insert(
+            "blockchainAccountId".to_string(),
+            Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+        );
+        context.insert(
+            proof_type.to_string(),
+            Value::String(proof_type_iri.to_string()),
+        );
+        if public_key.is_some() {
+            context.insert(
+                "publicKeyBase58".to_string(),
+                Value::String("https://w3id.org/security#publicKeyBase58".to_string()),
+            );
+        }
         Document {
-            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+            context: Contexts::Many(vec![
+                Context::URI(DEFAULT_CONTEXT.to_string()),
+                Context::Object(context),
+            ]),
             id: did.to_string(),
             assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
             verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
@@ -325,7 +359,7 @@ impl DIDTz {
                     id: vm_didurl.to_string(),
                     controller: did.to_string(),
                     public_key_base58: public_key,
-                    type_: prefix_to_curve_type(&address[..3]).unwrap().1.to_string(),
+                    type_: proof_type.to_string(),
                     ..Default::default()
                 })]),
                 None => Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
@@ -546,7 +580,13 @@ mod tests {
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
             json!({
-              "@context": "https://www.w3.org/ns/did/v1",
+              "@context": [
+                "https://www.w3.org/ns/did/v1",
+                {
+                  "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+                  "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+                }
+              ],
               "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
               "verificationMethod": [{
                 "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
@@ -580,7 +620,13 @@ mod tests {
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
             json!({
-              "@context": "https://www.w3.org/ns/did/v1",
+              "@context": [
+                "https://www.w3.org/ns/did/v1",
+                {
+                  "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+                  "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"
+                }
+              ],
               "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
               "verificationMethod": [{
                 "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",

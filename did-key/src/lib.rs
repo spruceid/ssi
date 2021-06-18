@@ -1,7 +1,12 @@
 use async_trait::async_trait;
+use serde_json::Value;
+use std::collections::BTreeMap;
 use thiserror::Error;
 
-use ssi::did::{DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap, DIDURL};
+use ssi::did::{
+    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
+    DEFAULT_CONTEXT, DIDURL,
+};
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
@@ -41,6 +46,7 @@ impl DIDResolver for DIDKey {
         Option<DocumentMetadata>,
     ) {
         let vm_type;
+        let vm_type_iri;
         if !did.starts_with("did:key:") {
             return (
                 ResolutionMetadata {
@@ -79,6 +85,15 @@ impl DIDResolver for DIDKey {
                 None,
             );
         }
+        let mut context = BTreeMap::new();
+        context.insert(
+            "publicKeyJwk".to_string(),
+            serde_json::json!({
+                "@id": "https://w3id.org/security#publicKeyJwk",
+                "@type": "@json"
+            }),
+        );
+
         let jwk = if data[0] == DID_KEY_ED25519_PREFIX[0] && data[1] == DID_KEY_ED25519_PREFIX[1] {
             if data.len() - 2 != 32 {
                 return (
@@ -92,6 +107,7 @@ impl DIDResolver for DIDKey {
                 );
             }
             vm_type = "Ed25519VerificationKey2018".to_string();
+            vm_type_iri = "https://w3id.org/security#Ed25519VerificationKey2018".to_string();
             JWK {
                 params: Params::OKP(OctetParams {
                     curve: "Ed25519".to_string(),
@@ -119,6 +135,8 @@ impl DIDResolver for DIDKey {
             match secp256k1_parse(&data[2..]) {
                 Ok(jwk) => {
                     vm_type = "EcdsaSecp256k1VerificationKey2019".to_string();
+                    vm_type_iri =
+                        "https://w3id.org/security#EcdsaSecp256k1VerificationKey2019".to_string();
                     jwk
                 }
                 Err(err) => return (ResolutionMetadata::from_error(&err), None, None),
@@ -134,6 +152,8 @@ impl DIDResolver for DIDKey {
             match p256_parse(&data[2..]) {
                 Ok(jwk) => {
                     vm_type = "EcdsaSecp256r1VerificationKey2019".to_string();
+                    vm_type_iri =
+                        "https://w3id.org/security#EcdsaSecp256r1VerificationKey2019".to_string();
                     jwk
                 }
                 Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
@@ -155,12 +175,17 @@ impl DIDResolver for DIDKey {
                 None,
             );
         };
+        context.insert(vm_type.to_string(), Value::String(vm_type_iri));
         let vm_didurl = DIDURL {
             did: did.to_string(),
             fragment: Some(method_specific_id.to_string()),
             ..Default::default()
         };
         let doc = Document {
+            context: Contexts::Many(vec![
+                Context::URI(DEFAULT_CONTEXT.to_string()),
+                Context::Object(context),
+            ]),
             id: did.to_string(),
             verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
                 id: did.to_string() + &"#" + method_specific_id,

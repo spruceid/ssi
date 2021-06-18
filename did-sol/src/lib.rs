@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use chrono::prelude::*;
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 use ssi::caip10::BlockchainAccountId;
 use ssi::did::{
@@ -52,6 +54,26 @@ impl DIDResolver for DIDSol {
                 )
             }
         };
+        let mut context = BTreeMap::new();
+        context.insert(
+            "blockchainAccountId".to_string(),
+            Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+        );
+        context.insert(
+            "publicKeyJwk".to_string(),
+            serde_json::json!({
+                "@id": "https://w3id.org/security#publicKeyJwk",
+                "@type": "@json"
+            }),
+        );
+        context.insert(
+            "Ed25519VerificationKey2018".to_string(),
+            Value::String("https://w3id.org/security#Ed25519VerificationKey2018".to_string()),
+        );
+        context.insert(
+            "SolanaMethod2021".to_string(),
+            Value::String("https://w3id.org/security#SolanaMethod2021".to_string()),
+        );
         let blockchain_account_id = BlockchainAccountId {
             account_address: address,
             chain_id: "solana".to_string(), // TODO: standardize
@@ -99,7 +121,10 @@ impl DIDResolver for DIDSol {
         });
 
         let doc = Document {
-            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+            context: Contexts::Many(vec![
+                Context::URI(DEFAULT_CONTEXT.to_string()),
+                Context::Object(context),
+            ]),
             id: did.to_string(),
             authentication: Some(vec![
                 VerificationMethod::DIDURL(vm_didurl.clone()),

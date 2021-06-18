@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use chrono::prelude::*;
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 use ssi::caip10::BlockchainAccountId;
 use ssi::did::{
@@ -68,6 +70,20 @@ impl DIDResolver for DIDEthr {
             }
         };
 
+        let mut context = BTreeMap::new();
+        context.insert(
+            "blockchainAccountId".to_string(),
+            Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+        );
+        context.insert(
+            "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+            Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+        );
+        context.insert(
+            "Eip712Method2021".to_string(),
+            Value::String("https://w3id.org/security#Eip712Method2021".to_string()),
+        );
+
         let blockchain_account_id = BlockchainAccountId {
             account_address: address,
             chain_id: format!("eip155:{}", chain_id),
@@ -98,7 +114,10 @@ impl DIDResolver for DIDEthr {
         });
 
         let doc = Document {
-            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+            context: Contexts::Many(vec![
+                Context::URI(DEFAULT_CONTEXT.to_string()),
+                Context::Object(context),
+            ]),
             id: did.to_string(),
             authentication: Some(vec![
                 VerificationMethod::DIDURL(vm_didurl.clone()),
@@ -196,7 +215,14 @@ mod tests {
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
             json!({
-              "@context": "https://www.w3.org/ns/did/v1",
+              "@context": [
+                "https://www.w3.org/ns/did/v1",
+                {
+                  "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+                  "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
+                  "Eip712Method2021": "https://w3id.org/security#Eip712Method2021"
+                }
+              ],
               "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
               "verificationMethod": [{
                 "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",

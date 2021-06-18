@@ -1,5 +1,7 @@
 use async_trait::async_trait;
 use chrono::prelude::*;
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 use ssi::caip10::BlockchainAccountId;
 use ssi::did::{
@@ -45,16 +47,26 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
     if account_address.len() < 3 {
         return resolution_error(&ERROR_INVALID_DID);
     }
-    let vm_type = match &account_address[0..3] {
-        "tz1" => "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
-        "tz2" => "EcdsaSecp256k1RecoveryMethod2020",
-        "tz3" => "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+    let (vm_type, vm_type_iri) = match &account_address[0..3] {
+        "tz1" => ("Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
+        "tz2" => ("EcdsaSecp256k1RecoveryMethod2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
+        "tz3" => ("P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
         _ => return resolution_error(&ERROR_INVALID_DID),
     };
     let blockchain_account_id = BlockchainAccountId {
         account_address,
         chain_id: "tezos:mainnet".to_string(),
     };
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(vm_type.to_string(), Value::String(vm_type_iri.to_string()));
+    context.insert(
+        "TezosMethod2021".to_string(),
+        Value::String("https://w3id.org/security#TezosMethod2021".to_string()),
+    );
 
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -83,7 +95,10 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
     });
 
     let doc = Document {
-        context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
         id: did.to_string(),
         verification_method: Some(vec![vm, vm2]),
         authentication: Some(vec![
@@ -103,6 +118,15 @@ async fn resolve_eth(did: &str, account_address: String) -> ResolutionResult {
     if !account_address.starts_with("0x") {
         return resolution_error(&ERROR_INVALID_DID);
     }
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(
+        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+    );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
         chain_id: "eip155:mainnet".to_string(),
@@ -134,7 +158,10 @@ async fn resolve_eth(did: &str, account_address: String) -> ResolutionResult {
     });
     */
     let doc = Document {
-        context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
         id: did.to_string(),
         verification_method: Some(vec![vm /*, eip712vm*/]),
         authentication: Some(vec![
@@ -162,6 +189,26 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
     if public_key_bytes.len() != 32 {
         return resolution_error(&ERROR_INVALID_DID);
     }
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(
+        "publicKeyJwk".to_string(),
+        serde_json::json!({
+            "@id": "https://w3id.org/security#publicKeyJwk",
+            "@type": "@json"
+        }),
+    );
+    context.insert(
+        "Ed25519VerificationKey2018".to_string(),
+        Value::String("https://w3id.org/security#Ed25519VerificationKey2018".to_string()),
+    );
+    context.insert(
+        "SolanaMethod2021".to_string(),
+        Value::String("https://w3id.org/security#SolanaMethod2021".to_string()),
+    );
     let pk_jwk = JWK {
         params: Params::OKP(OctetParams {
             curve: "Ed25519".to_string(),
@@ -208,7 +255,10 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
         ..Default::default()
     });
     let doc = Document {
-        context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
         id: did.to_string(),
         verification_method: Some(vec![vm, solvm]),
         authentication: Some(vec![
@@ -244,8 +294,20 @@ async fn resolve_btc(did: &str, account_address: String) -> ResolutionResult {
         blockchain_account_id: Some(blockchain_account_id.to_string()),
         ..Default::default()
     });
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(
+        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+    );
     let doc = Document {
-        context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
         id: did.to_string(),
         verification_method: Some(vec![vm]),
         authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
@@ -259,6 +321,15 @@ async fn resolve_doge(did: &str, account_address: String) -> ResolutionResult {
     if !account_address.starts_with("D") {
         return resolution_error(&ERROR_INVALID_DID);
     }
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(
+        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+    );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
         chain_id: CHAIN_ID_DOGECOIN_MAINNET.to_string(),
@@ -276,7 +347,10 @@ async fn resolve_doge(did: &str, account_address: String) -> ResolutionResult {
         ..Default::default()
     });
     let doc = Document {
-        context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
         id: did.to_string(),
         verification_method: Some(vec![vm]),
         authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
@@ -374,7 +448,7 @@ impl DIDMethod for DIDPKH {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{from_str, from_value, json, Value};
+    use serde_json::{from_str, from_value, json};
     use ssi::jwk::Algorithm;
     use ssi::ldp::ProofSuite;
     use ssi::one_or_many::OneOrMany;
