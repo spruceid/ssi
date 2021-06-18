@@ -90,7 +90,8 @@ where
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<A, C> LinkedDataDocument for Delegation<A, C>
 where
     A: Serialize + Send + Sync + Clone,
@@ -249,7 +250,8 @@ where
     }
 }
 
-#[async_trait]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<A> LinkedDataDocument for Invocation<A>
 where
     A: Serialize + Send + Sync + Clone,
