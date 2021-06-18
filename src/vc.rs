@@ -319,6 +319,7 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Additional proof data parameters
     pub property_set: Option<Map<String, Value>>,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(try_from = "String")]
