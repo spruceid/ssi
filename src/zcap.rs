@@ -2,10 +2,11 @@ use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 
 use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
+use crate::eip712::EIP712Value;
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader, SECURITY_V2_CONTEXT};
 use crate::jwk::{JWTKeys, JWK};
-use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
+use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation, SigningInput};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 use crate::vc::{Check, LinkedDataProofOptions, Proof, ProofPurpose, VerificationResult, URI};
@@ -232,17 +233,36 @@ where
         target: &URI,
     ) -> Result<ProofPreparation, Error> {
         let mut prep = LinkedDataProofs::prepare(self, options, public_key).await?;
-        prep.proof.property_set = match (prep.proof.property_set, target) {
+        let property_set = match (prep.proof.property_set, target) {
             (Some(mut ps), URI::String(t)) => {
                 ps.insert("capability".into(), Value::String(t.to_string()));
+                if let SigningInput::TypedData(ref mut s_input) = prep.signing_input {
+                    if let EIP712Value::Struct(ref mut s_message) = s_input.message {
+                        if let Some(EIP712Value::Struct(ref mut s_proof)) =
+                            s_message.get_mut("proof".into())
+                        {
+                            s_proof.insert("capability".into(), EIP712Value::String(t.to_string()));
+                        }
+                    }
+                }
                 Some(ps)
             }
             (_, URI::String(t)) => {
                 let mut ps = Map::<String, Value>::new();
                 ps.insert("capability".into(), Value::String(t.to_string()));
+                if let SigningInput::TypedData(ref mut s_input) = prep.signing_input {
+                    if let EIP712Value::Struct(ref mut s_message) = s_input.message {
+                        if let Some(EIP712Value::Struct(ref mut s_proof)) =
+                            s_message.get_mut("proof".into())
+                        {
+                            s_proof.insert("capability".into(), EIP712Value::String(t.to_string()));
+                        }
+                    }
+                }
                 Some(ps)
             }
         };
+        prep.proof.property_set = property_set;
         Ok(prep)
     }
 
