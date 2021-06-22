@@ -256,19 +256,22 @@ where
         options: &LinkedDataProofOptions,
         target: &URI,
     ) -> Result<ProofPreparation, Error> {
-        let mut prep = LinkedDataProofs::prepare(self, options, public_key).await?;
-        prep.proof.property_set = match (prep.proof.property_set, target) {
-            (Some(mut ps), URI::String(t)) => {
-                ps.insert("capability".into(), Value::String(t.to_string()));
-                Some(ps)
-            }
-            (_, URI::String(t)) => {
-                let mut ps = Map::<String, Value>::new();
-                ps.insert("capability".into(), Value::String(t.to_string()));
-                Some(ps)
-            }
+        let cl = options.clone();
+        let opts = LinkedDataProofOptions {
+            property_set: match (cl.property_set, target) {
+                (Some(mut ps), URI::String(t)) => {
+                    ps.insert("capability".into(), Value::String(t.to_string()));
+                    Some(ps)
+                }
+                (_, URI::String(t)) => {
+                    let mut ps = Map::<String, Value>::new();
+                    ps.insert("capability".into(), Value::String(t.to_string()));
+                    Some(ps)
+                }
+            },
+            ..cl
         };
-        Ok(prep)
+        LinkedDataProofs::prepare(self, &opts, public_key).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
