@@ -18,7 +18,7 @@ use serde_json::Value;
 const DEFAULT_CONTEXT: &str = SECURITY_V2_CONTEXT;
 
 // limited initial definition of a ZCAP Delegation, generic over Action and Caveat types
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Delegation<A, C> {
     #[serde(rename = "@context")]
@@ -46,6 +46,19 @@ where
     A: Serialize + Send + Sync + Clone,
     C: Serialize + Send + Sync + Clone,
 {
+    pub fn new(id: URI, parent_capability: URI) -> Self {
+        Self {
+            context: Contexts::default(),
+            id,
+            parent_capability,
+            invoker: None,
+            capability_action: None,
+            caveat: None,
+            proof: None,
+            property_set: None,
+        }
+    }
+
     pub async fn verify(
         &self,
         _options: Option<LinkedDataProofOptions>,
@@ -121,7 +134,7 @@ where
 }
 
 // limited initial definition of a ZCAP Invocation, generic over Action
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Invocation<A> {
     #[serde(rename = "@context")]
@@ -143,6 +156,16 @@ impl<A> Invocation<A>
 where
     A: Serialize + Send + Sync + Clone,
 {
+    pub fn new(id: URI) -> Self {
+        Self {
+            context: Contexts::default(),
+            id,
+            capability_action: None,
+            proof: None,
+            property_set: None,
+        }
+    }
+
     pub async fn verify<C>(
         &self,
         _options: Option<LinkedDataProofOptions>,
@@ -410,16 +433,16 @@ mod tests {
         };
 
         let del: Delegation<Actions, ()> = Delegation {
-            id: URI::String("urn:a_urn".into()),
-            parent_capability: URI::String("kepler://alices_orbit".into()),
             invoker: Some(URI::String(bob_vm)),
             capability_action: Some(Actions::Read),
-            ..Default::default()
+            ..Delegation::new(
+                URI::String("urn:a_urn".into()),
+                URI::String("kepler://alices_orbit".into()),
+            )
         };
         let inv: Invocation<Actions> = Invocation {
-            id: URI::String("urn:a_different_urn".into()),
             capability_action: Some(Actions::Read),
-            ..Default::default()
+            ..Invocation::new(URI::String("urn:a_different_urn".into()))
         };
 
         let ldpo_alice = LinkedDataProofOptions {
