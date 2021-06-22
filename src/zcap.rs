@@ -204,13 +204,17 @@ where
                         .errors
                         .push("Missing proof target capability ID".into()),
                 };
-                // if there are invokers listed in the target, ensure the inoker here is the right one
-                if let (Some(URI::String(ref invoker)), Some(ref delegatee)) =
-                    (&target_capability.invoker, &proof.verification_method)
-                {
-                    if invoker != delegatee {
-                        result.errors.push("Incorrect Invoker".into());
+                match (&target_capability.invoker, &proof.verification_method) {
+                    // if there are invokers listed in the target, ensure the inoker here is the right one
+                    (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
+                        if invoker != delegatee {
+                            result.errors.push("Incorrect Invoker".into());
+                        }
                     }
+                    (_, None) => result
+                        .errors
+                        .push("Missing Proof Verification Method".into()),
+                    _ => {}
                 };
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
                     result.errors.push("Incorrect Proof Purpose".into());
