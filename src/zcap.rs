@@ -55,6 +55,9 @@ where
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
                 let mut result = proof.verify(self, resolver).await;
+                if proof.proof_purpose != Some(ProofPurpose::CapabilityDelegation) {
+                    result.errors.push("Incorrect Proof Purpose".into());
+                };
                 if result.errors.is_empty() {
                     result.checks.push(Check::Proof);
                 }
@@ -185,6 +188,9 @@ where
                     if invoker != delegatee {
                         result.errors.push("Incorrect Invoker".into());
                     }
+                };
+                if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
+                    result.errors.push("Incorrect Proof Purpose".into());
                 };
                 if result.errors.is_empty() {
                     result.checks.push(Check::Proof);
