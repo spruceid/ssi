@@ -183,6 +183,7 @@ pub enum Error {
     K256EC(k256::elliptic_curve::Error),
     #[cfg(feature = "p256")]
     P256EC(p256::elliptic_curve::Error),
+    MissingFeatures(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -337,6 +338,7 @@ impl fmt::Display for Error {
             Error::P256KeyLength(len) => write!(f, "Expected 64 byte uncompressed key or 33 bytes compressed key but found length: {}", len),
             Error::ECEncodingError => write!(f, "Unable to encode EC key"),
             Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
+            Error::MissingFeatures(features) => write!(f, "Missing features: {}", features),
         }
     }
 }

@@ -484,8 +484,6 @@ mod tests {
     use ssi::jws::encode_sign;
     use ssi::one_or_many::OneOrMany;
     use std::collections::BTreeMap as Map;
-    use tezedge_client::crypto::FromBase58Check;
-    use tezedge_client::{PrivateKey, PublicKey};
 
     const TZ1: &'static str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
@@ -1011,22 +1009,9 @@ mod tests {
           }]
         }))
         .unwrap();
-        let public_key = PublicKey::from_base58check(pk).unwrap();
-        let private_key = PrivateKey::from_base58check(sk).unwrap();
         let key = JWK {
-            params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
-                curve: "Ed25519".to_string(),
-                public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
-                private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
-            }),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
             key_id: Some(format!("{}#blockchainAccountId", did)),
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
+            ..ssi::tzkey::jwk_from_tezos_key(sk).unwrap()
         };
         let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
@@ -1072,7 +1057,7 @@ mod tests {
         }))
         .unwrap();
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
-        let private_key = sk.from_base58check().unwrap()[4..].to_vec();
+        let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
         use ssi::jwk::ECParams;
         let key = JWK {
             params: ssi::jwk::Params::EC(ECParams {
@@ -1134,7 +1119,7 @@ mod tests {
         }))
         .unwrap();
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
-        let private_key = sk.from_base58check().unwrap()[4..].to_vec();
+        let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
         let key = JWK {
             params: ssi::jwk::Params::EC(ssi::jwk::ECParams {
                 curve: Some("P-256".to_string()),

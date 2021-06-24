@@ -18,6 +18,31 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
                 private_key: None,
             }),
         ),
+        "edsk" => {
+            let sk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
+            let pk_bytes;
+            #[cfg(feature = "ring")]
+            {
+                use ring::signature::KeyPair;
+                let keypair = ring::signature::Ed25519KeyPair::from_seed_unchecked(&sk_bytes)?;
+                pk_bytes = keypair.public_key().as_ref().to_vec()
+            }
+            #[cfg(feature = "ed25519-dalek")]
+            {
+                let sk = ed25519_dalek::SecretKey::from_bytes(&sk_bytes)?;
+                pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
+            }
+            #[cfg(all(not(feature = "ring"), not(feature = "ed25519-dalek")))]
+            return Err(Error::MissingFeatures("ring or ed25519-dalek"));
+            (
+                Algorithm::EdBlake2b,
+                Params::OKP(OctetParams {
+                    curve: "Ed25519".into(),
+                    public_key: Base64urlUInt(pk_bytes),
+                    private_key: Some(Base64urlUInt(sk_bytes)),
+                }),
+            )
+        }
         #[cfg(feature = "secp256k1")]
         "sppk" => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
@@ -31,7 +56,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
             let jwk = crate::jwk::p256_parse(&pk_bytes)?;
             (Algorithm::ESBlake2b, jwk.params)
         }
-        // TODO: secret keys?
+        // TODO: more secret keys
         _ => return Err(Error::KeyPrefix),
     };
     Ok(JWK {
