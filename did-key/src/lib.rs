@@ -270,7 +270,7 @@ impl DIDMethod for DIDKey {
                     "P-256" => {
                         use p256::elliptic_curve::sec1::ToEncodedPoint;
                         use std::convert::TryFrom;
-                        let pk = match k256::PublicKey::try_from(params) {
+                        let pk = match p256::PublicKey::try_from(params) {
                             Ok(pk) => pk,
                             Err(_err) => return None,
                         };
