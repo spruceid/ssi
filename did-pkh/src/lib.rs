@@ -761,6 +761,11 @@ mod tests {
             key_operations: Some(vec!["signTypedData".to_string()]),
             ..key_secp256k1.clone()
         };
+        let key_secp256k1_epsig = JWK {
+            algorithm: Some(Algorithm::ES256KR),
+            key_operations: Some(vec!["signPersonalMessage".to_string()]),
+            ..key_secp256k1.clone()
+        };
 
         let mut key_ed25519: JWK =
             from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap();
@@ -887,6 +892,18 @@ mod tests {
             &ssi::ldp::EthereumEip712Signature2021,
             Some(eip712_domain),
             Some(vp_eip712_domain),
+        )
+        .await;
+
+        // eth/Eip712
+        credential_prove_verify_did_pkh(
+            key_secp256k1_epsig.clone(),
+            other_key_secp256k1.clone(),
+            "eth",
+            "#Recovery2020",
+            &ssi::ldp::Eip712Signature2021,
+            None,
+            None,
         )
         .await;
 
@@ -1045,5 +1062,6 @@ mod tests {
         test_verify_vc(include_str!("../tests/vc-tz1.jsonld")).await;
         test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld")).await;
         test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld")).await;
+        test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld")).await;
     }
 }

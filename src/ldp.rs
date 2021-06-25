@@ -42,6 +42,10 @@ lazy_static! {
         let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(&context_str).unwrap()
     };
+    pub static ref EPSIG_CONTEXT: Value = {
+        let context_str = ssi_contexts::EPSIG_V0_1;
+        serde_json::from_str(&context_str).unwrap()
+    };
     pub static ref SOLVM_CONTEXT: Value = {
         let context_str = ssi_contexts::SOLVM;
         serde_json::from_str(&context_str).unwrap()
@@ -118,6 +122,10 @@ pub enum SigningInput {
     Bytes(Base64urlUInt),
     #[cfg(feature = "keccak-hash")]
     TypedData(TypedData),
+    #[serde(rename_all = "camelCase")]
+    EthereumPersonalMessage {
+        ethereum_personal_message: String,
+    },
     Micheline {
         micheline: String,
     },
@@ -152,6 +160,12 @@ impl ProofPreparation {
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
             #[cfg(feature = "keccak-hash")]
+            "EthereumPersonalSignature2021" => {
+                EthereumPersonalSignature2021
+                    .complete(self, signature)
+                    .await
+            }
+            #[cfg(feature = "keccak-hash")]
             "EthereumEip712Signature2021" => {
                 EthereumEip712Signature2021.complete(self, signature).await
             }
@@ -176,6 +190,17 @@ fn use_eip712sig(key: &JWK) -> bool {
 fn use_eip712vm(options: &LinkedDataProofOptions) -> bool {
     if let Some(ref vm) = options.verification_method {
         if vm.ends_with("#Eip712Method2021") {
+            return true;
+        }
+    }
+    return false;
+}
+
+fn use_epsig(key: &JWK) -> bool {
+    // Use unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021, until
+    // LinkedDataProofOptions has type property
+    if let Some(ref key_ops) = key.key_operations {
+        if key_ops.contains(&"signPersonalMessage".to_string()) {
             return true;
         }
     }
@@ -265,6 +290,14 @@ impl LinkedDataProofs {
                             if use_eip712vm(options) {
                                 #[cfg(feature = "keccak-hash")]
                                 return Eip712Signature2021.sign(document, options, &key).await;
+                                #[cfg(not(feature = "keccak-hash"))]
+                                return Err(Error::ProofTypeNotImplemented);
+                            }
+                            if use_epsig(key) {
+                                #[cfg(feature = "keccak-hash")]
+                                return EthereumPersonalSignature2021
+                                    .sign(document, options, &key)
+                                    .await;
                                 #[cfg(not(feature = "keccak-hash"))]
                                 return Err(Error::ProofTypeNotImplemented);
                             }
@@ -404,6 +437,14 @@ impl LinkedDataProofs {
                     #[cfg(not(feature = "keccak-hash"))]
                     return Err(Error::ProofTypeNotImplemented);
                 }
+                if use_epsig(public_key) {
+                    #[cfg(feature = "keccak-hash")]
+                    return EthereumPersonalSignature2021
+                        .prepare(document, options, public_key)
+                        .await;
+                    #[cfg(not(feature = "keccak-hash"))]
+                    return Err(Error::ProofTypeNotImplemented);
+                }
                 return EcdsaSecp256k1RecoverySignature2020
                     .prepare(document, options, public_key)
                     .await;
@@ -444,6 +485,12 @@ impl LinkedDataProofs {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.verify(proof, document, resolver).await,
+            #[cfg(feature = "keccak-hash")]
+            "EthereumPersonalSignature2021" => {
+                EthereumPersonalSignature2021
+                    .verify(proof, document, resolver)
+                    .await
+            }
             #[cfg(feature = "keccak-hash")]
             "EthereumEip712Signature2021" => {
                 EthereumEip712Signature2021
@@ -1317,6 +1364,134 @@ impl ProofSuite for EthereumEip712Signature2021 {
     }
 }
 
+#[cfg(feature = "keccak-hash")]
+pub struct EthereumPersonalSignature2021;
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg(feature = "keccak-hash")]
+impl ProofSuite for EthereumPersonalSignature2021 {
+    async fn sign(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        use crate::passthrough_digest::PassthroughDigest;
+        use k256::ecdsa::signature::{digest::Digest, DigestSigner};
+        let mut proof = Proof {
+            context: serde_json::json!([EPSIG_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("EthereumPersonalSignature2021")
+        };
+        let signing_string = string_from_document_and_options(document, &proof).await?;
+        let hash = crate::keccak_hash::hash_personal_message(&signing_string);
+        let ec_params = match &key.params {
+            JWKParams::EC(ec) => ec,
+            _ => return Err(Error::KeyTypeNotImplemented),
+        };
+        let secret_key = k256::SecretKey::try_from(ec_params)?;
+        let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+        let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
+        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign_digest(digest)?;
+        let sig_bytes = &mut sig.as_ref().to_vec();
+        // Recovery ID starts at 27 instead of 0.
+        sig_bytes[64] = sig_bytes[64] + 27;
+        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(sig_bytes);
+        proof.proof_value = Some(sig_hex);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        let proof = Proof {
+            context: serde_json::json!([EPSIG_CONTEXT.clone()]),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            ..Proof::new("EthereumPersonalSignature2021")
+        };
+        let signing_string = string_from_document_and_options(document, &proof).await?;
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::EthereumPersonalMessage {
+                ethereum_personal_message: signing_string,
+            },
+        })
+    }
+
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let sig_hex = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        match &vm.type_[..] {
+            "EcdsaSecp256k1VerificationKey2019" => (),
+            "EcdsaSecp256k1RecoveryMethod2020" => (),
+            _ => Err(Error::VerificationMethodMismatch)?,
+        };
+        if !sig_hex.starts_with("0x") {
+            return Err(Error::HexString);
+        }
+        let dec_sig = hex::decode(&sig_hex[2..])?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
+        let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
+        let signing_string = string_from_document_and_options(document, &proof).await?;
+        let hash = crate::keccak_hash::hash_personal_message(&signing_string);
+        let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
+        let recovered_key = sig.recover_verify_key_from_digest_bytes(&digest)?;
+        use crate::jwk::ECParams;
+        let jwk = JWK {
+            params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
+                &recovered_key.to_bytes(),
+            )?)?),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        };
+        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
+        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
+        account_id.verify(&jwk)?;
+        Ok(())
+    }
+}
+
 async fn micheline_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
@@ -1330,6 +1505,20 @@ async fn micheline_from_document_and_options(
     let msg = ["", &sigopts_normalized, &doc_normalized].join("\n");
     let data = crate::tzkey::encode_tezos_signed_message(&msg)?;
     Ok(data)
+}
+
+async fn string_from_document_and_options(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: &Proof,
+) -> Result<String, Error> {
+    let doc_dataset = document.to_dataset_for_signing(None).await?;
+    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
+    let doc_normalized = doc_dataset_normalized.to_nquads()?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
+    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
+    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
+    let msg = sigopts_normalized + "\n" + &doc_normalized;
+    Ok(msg)
 }
 
 pub struct TezosSignature2021;
