@@ -304,6 +304,12 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// Checks to perform
     pub checks: Option<Vec<Check>>,
+    /// Metadata for EthereumEip712Signature2021 (not standard in vc-http-api)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[cfg(feature = "keccak-hash")]
+    pub eip712_domain: Option<crate::eip712::ProofInfo>,
+    #[cfg(not(feature = "keccak-hash"))]
+    pub eip712_domain: Option<()>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -342,6 +348,7 @@ impl Default for LinkedDataProofOptions {
             challenge: None,
             domain: None,
             checks: Some(vec![Check::Proof]),
+            eip712_domain: None,
         }
     }
 }
@@ -730,6 +737,10 @@ impl LinkedDataDocument for Credential {
         let mut loader = StaticLoader;
         json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
+    }
 }
 
 impl Presentation {
@@ -964,6 +975,10 @@ impl LinkedDataDocument for Presentation {
         let mut loader = StaticLoader;
         json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
+    }
 }
 
 macro_rules! assert_local {
@@ -1038,6 +1053,10 @@ impl LinkedDataDocument for Proof {
         };
         let mut loader = StaticLoader;
         json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+    }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
     }
 }
 
@@ -1400,6 +1419,10 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
                 _parent: Option<&(dyn LinkedDataDocument + Sync)>,
             ) -> Result<DataSet, Error> {
                 Err(Error::NotImplemented)
+            }
+
+            fn to_value(&self) -> Result<Value, Error> {
+                Ok(self.0.clone())
             }
         }
         let parent = ProofContexts(json!(["https://w3id.org/security/v1", DEFAULT_CONTEXT]));

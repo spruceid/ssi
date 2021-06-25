@@ -60,6 +60,7 @@ pub fn now_ms() -> DateTime<Utc> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait LinkedDataDocument {
     fn get_contexts(&self) -> Result<Option<String>, Error>;
+    fn to_value(&self) -> Result<Value, Error>;
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
@@ -150,6 +151,10 @@ impl ProofPreparation {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
+            #[cfg(feature = "keccak-hash")]
+            "EthereumEip712Signature2021" => {
+                EthereumEip712Signature2021.complete(self, signature).await
+            }
             "TezosSignature2021" => TezosSignature2021.complete(self, signature).await,
             "SolanaSignature2021" => SolanaSignature2021.complete(self, signature).await,
             "JsonWebSignature2020" => JsonWebSignature2020.complete(self, signature).await,
@@ -158,16 +163,19 @@ impl ProofPreparation {
     }
 }
 
-fn use_eip712vm(options: &LinkedDataProofOptions, key: &JWK) -> bool {
-    if let Some(ref vm) = options.verification_method {
-        if vm.ends_with("#Eip712Method2021") {
+fn use_eip712sig(key: &JWK) -> bool {
+    // Use unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021, until
+    if let Some(ref key_ops) = key.key_operations {
+        if key_ops.contains(&"signTypedData".to_string()) {
             return true;
         }
     }
-    // Use unregistered "signTypedData" key operation value to indicate using Eip712Signature2021, until
-    // LinkedDataProofOptions has type property
-    if let Some(ref key_ops) = key.key_operations {
-        if key_ops.contains(&"signTypedData".to_string()) {
+    return false;
+}
+
+fn use_eip712vm(options: &LinkedDataProofOptions) -> bool {
+    if let Some(ref vm) = options.verification_method {
+        if vm.ends_with("#Eip712Method2021") {
             return true;
         }
     }
@@ -246,7 +254,15 @@ impl LinkedDataProofs {
                 match &curve[..] {
                     "secp256k1" => {
                         if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
-                            if use_eip712vm(options, key) {
+                            if use_eip712sig(key) {
+                                #[cfg(feature = "keccak-hash")]
+                                return EthereumEip712Signature2021
+                                    .sign(document, options, &key)
+                                    .await;
+                                #[cfg(not(feature = "keccak-hash"))]
+                                return Err(Error::ProofTypeNotImplemented);
+                            }
+                            if use_eip712vm(options) {
                                 #[cfg(feature = "keccak-hash")]
                                 return Eip712Signature2021.sign(document, options, &key).await;
                                 #[cfg(not(feature = "keccak-hash"))]
@@ -372,7 +388,15 @@ impl LinkedDataProofs {
                 }
             }
             Algorithm::ES256KR => {
-                if use_eip712vm(options, public_key) {
+                if use_eip712sig(public_key) {
+                    #[cfg(feature = "keccak-hash")]
+                    return EthereumEip712Signature2021
+                        .prepare(document, options, public_key)
+                        .await;
+                    #[cfg(not(feature = "keccak-hash"))]
+                    return Err(Error::ProofTypeNotImplemented);
+                }
+                if use_eip712vm(options) {
                     #[cfg(feature = "keccak-hash")]
                     return Eip712Signature2021
                         .prepare(document, options, public_key)
@@ -420,6 +444,12 @@ impl LinkedDataProofs {
             }
             #[cfg(feature = "keccak-hash")]
             "Eip712Signature2021" => Eip712Signature2021.verify(proof, document, resolver).await,
+            #[cfg(feature = "keccak-hash")]
+            "EthereumEip712Signature2021" => {
+                EthereumEip712Signature2021
+                    .verify(proof, document, resolver)
+                    .await
+            }
             "TezosSignature2021" => TezosSignature2021.verify(proof, document, resolver).await,
             "SolanaSignature2021" => SolanaSignature2021.verify(proof, document, resolver).await,
             "JsonWebSignature2020" => JsonWebSignature2020.verify(proof, document, resolver).await,
@@ -1151,6 +1181,142 @@ impl ProofSuite for Eip712Signature2021 {
     }
 }
 
+#[cfg(feature = "keccak-hash")]
+pub struct EthereumEip712Signature2021;
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg(feature = "keccak-hash")]
+impl ProofSuite for EthereumEip712Signature2021 {
+    async fn sign(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        key: &JWK,
+    ) -> Result<Proof, Error> {
+        use k256::ecdsa::signature::Signer;
+        // TODO: conform to spec: no domain
+        let mut property_set = std::collections::HashMap::new();
+        if let Some(ref eip712_domain) = options.eip712_domain {
+            let info = serde_json::to_value(eip712_domain.clone())?;
+            property_set.insert("eip712Domain".to_string(), info);
+        }
+        let mut proof = Proof {
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            property_set: Some(property_set),
+            ..Proof::new("EthereumEip712Signature2021")
+        };
+        let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
+        let bytes = typed_data.bytes()?;
+        let ec_params = match &key.params {
+            JWKParams::EC(ec) => ec,
+            _ => return Err(Error::KeyTypeNotImplemented),
+        };
+        let secret_key = k256::SecretKey::try_from(ec_params)?;
+        let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&bytes)?;
+        let sig_bytes = &mut sig.as_ref().to_vec();
+        // Recovery ID starts at 27 instead of 0.
+        sig_bytes[64] = sig_bytes[64] + 27;
+        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(sig_bytes);
+        proof.proof_value = Some(sig_hex);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _public_key: &JWK,
+    ) -> Result<ProofPreparation, Error> {
+        let mut property_set = std::collections::HashMap::new();
+        if let Some(ref eip712_domain) = options.eip712_domain {
+            let info = serde_json::to_value(eip712_domain.clone())?;
+            property_set.insert("eip712Domain".to_string(), info);
+        }
+        let proof = Proof {
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            property_set: Some(property_set),
+            ..Proof::new("EthereumEip712Signature2021")
+        };
+        let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::TypedData(typed_data),
+        })
+    }
+
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        let sig_hex = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        match &vm.type_[..] {
+            "EcdsaSecp256k1VerificationKey2019" => (),
+            "EcdsaSecp256k1RecoveryMethod2020" => (),
+            _ => Err(Error::VerificationMethodMismatch)?,
+        };
+        if !sig_hex.starts_with("0x") {
+            return Err(Error::HexString);
+        }
+        let dec_sig = hex::decode(&sig_hex[2..])?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
+        let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
+        let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
+        let bytes = typed_data.bytes()?;
+        let recovered_key = sig.recover_verify_key(&bytes)?;
+        use crate::jwk::ECParams;
+        let jwk = JWK {
+            params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
+                &recovered_key.to_bytes(),
+            )?)?),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        };
+        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
+        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
+        account_id.verify(&jwk)?;
+        Ok(())
+    }
+}
+
 async fn micheline_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
@@ -1522,6 +1688,10 @@ mod tests {
             };
             dataset.add_statement(statement);
             Ok(dataset)
+        }
+
+        fn to_value(&self) -> Result<Value, Error> {
+            Err(Error::NotImplemented)
         }
     }
 

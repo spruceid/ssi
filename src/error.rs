@@ -3,6 +3,8 @@ use crate::caip10::BlockchainAccountIdVerifyError;
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedDataConstructionError;
 #[cfg(feature = "keccak-hash")]
+use crate::eip712::TypedDataConstructionJSONError;
+#[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedDataHashError;
 use crate::json_ld;
 use crate::tzkey::{DecodeTezosSignatureError, EncodeTezosSignedMessageError};
@@ -170,6 +172,8 @@ pub enum Error {
     #[cfg(feature = "keccak-hash")]
     TypedDataConstruction(TypedDataConstructionError),
     #[cfg(feature = "keccak-hash")]
+    TypedDataConstructionJSON(TypedDataConstructionJSONError),
+    #[cfg(feature = "keccak-hash")]
     TypedDataHash(TypedDataHashError),
     FromHex(hex::FromHexError),
     Base58(bs58::decode::Error),
@@ -328,6 +332,8 @@ impl fmt::Display for Error {
             #[cfg(feature = "keccak-hash")]
             Error::TypedDataConstruction(e) => e.fmt(f),
             #[cfg(feature = "keccak-hash")]
+            Error::TypedDataConstructionJSON(e) => e.fmt(f),
+            #[cfg(feature = "keccak-hash")]
             Error::TypedDataHash(e) => e.fmt(f),
             Error::FromHex(e) => e.fmt(f),
             Error::Base58(e) => e.fmt(f),
@@ -458,6 +464,13 @@ impl From<BlockchainAccountIdVerifyError> for Error {
 impl From<TypedDataConstructionError> for Error {
     fn from(err: TypedDataConstructionError) -> Error {
         Error::TypedDataConstruction(err)
+    }
+}
+
+#[cfg(feature = "keccak-hash")]
+impl From<TypedDataConstructionJSONError> for Error {
+    fn from(err: TypedDataConstructionJSONError) -> Error {
+        Error::TypedDataConstructionJSON(err)
     }
 }
 

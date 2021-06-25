@@ -85,6 +85,25 @@ pub struct TypedData {
     pub message: EIP712Value,
 }
 
+/// Object containing EIP-712 types, or a URI for such.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum TypesOrURI {
+    URI(String),
+    Object(Types),
+}
+
+/// Object at eip712Domain property of [Ethereum EIP712 Signature 2021](https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021) proof object
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct ProofInfo {
+    #[serde(rename = "messageSchema")]
+    pub types_or_uri: TypesOrURI,
+    pub primary_type: StructName,
+    pub domain: EIP712Value,
+}
+
 #[derive(Error, Debug)]
 pub enum TypedDataConstructionError {
     #[error("Unable to convert document to data set: {0}")]
@@ -95,6 +114,30 @@ pub enum TypedDataConstructionError {
     NormalizeDocument(String),
     #[error("Unable to normalize proof: {0}")]
     NormalizeProof(String),
+}
+
+#[derive(Error, Debug)]
+pub enum TypedDataConstructionJSONError {
+    #[error("Not Implemented")]
+    NotImplemented,
+    #[error("Unable to convert document to JSON: {0}")]
+    DocumentToJSON(String),
+    #[error("Unable to convert proof object to JSON: {0}")]
+    ProofToJSON(String),
+    #[error("Expected document to be a JSON object")]
+    ExpectedDocumentObject,
+    #[error("Expected proof to be a JSON object")]
+    ExpectedProofObject,
+    #[error("Expected eip712Domain in proof object")]
+    ExpectedEip712Domain,
+    #[error("Expected types (messageSchema) in proof.eip712Domain")]
+    ExpectedTypes,
+    #[error("Unable to parse eip712Domain: {0}")]
+    ParseInfo(serde_json::Error),
+    #[error("Unable to convert document to EIP-712 message: {0}")]
+    ConvertMessage(TypedDataParseError),
+    #[error("Unable to dereference EIP-712 types: {0}")]
+    DereferenceTypes(DereferenceTypesError),
 }
 
 #[derive(Error, Debug)]
@@ -133,6 +176,14 @@ pub enum TypedDataHashError {
     ExpectedHex,
     #[error("Untyped properties: {0:?}")]
     UntypedProperties(Vec<String>),
+}
+
+#[derive(Error, Debug)]
+pub enum DereferenceTypesError {
+    #[error("Remote types loading not implemented")]
+    RemoteLoadingNotImplemented,
+    #[error("Unable to convert types from JSON: {0}")]
+    JSON(serde_json::Error),
 }
 
 impl EIP712Value {
@@ -301,6 +352,21 @@ impl Types {
         } else {
             self.types.get(struct_name)
         }
+    }
+}
+
+impl TypesOrURI {
+    async fn dereference(self) -> Result<Types, DereferenceTypesError> {
+        let uri = match self {
+            Self::URI(string) => string,
+            Self::Object(types) => return Ok(types),
+        };
+        let value = match &uri[..] {
+            _ => Err(DereferenceTypesError::RemoteLoadingNotImplemented)?,
+        };
+        let types: Types =
+            serde_json::from_value(value).map_err(|e| DereferenceTypesError::JSON(e))?;
+        Ok(types)
     }
 }
 
@@ -708,6 +774,49 @@ impl TypedData {
         Ok(typed_data)
     }
 
+    /// Convert linked data document and proof to TypedData according to
+    /// [EthereumEip712Signature2021](https://uport-project.github.io/ethereum-eip712-signature-2021-spec/)
+    pub async fn from_document_and_options_json(
+        document: &(dyn LinkedDataDocument + Sync),
+        proof: &Proof,
+    ) -> Result<Self, TypedDataConstructionJSONError> {
+        let mut doc_value = document
+            .to_value()
+            .map_err(|e| TypedDataConstructionJSONError::DocumentToJSON(e.to_string()))?;
+        let doc_obj = doc_value
+            .as_object_mut()
+            .ok_or(TypedDataConstructionJSONError::ExpectedDocumentObject)?;
+        let mut proof_value = serde_json::to_value(proof)
+            .map_err(|e| TypedDataConstructionJSONError::ProofToJSON(e.to_string()))?;
+        let proof_obj = proof_value
+            .as_object_mut()
+            .ok_or(TypedDataConstructionJSONError::ExpectedProofObject)?;
+        proof_obj.remove("proofValue");
+        let info = proof_obj
+            .remove("eip712Domain")
+            .ok_or(TypedDataConstructionJSONError::ExpectedEip712Domain)?;
+        let ProofInfo {
+            types_or_uri,
+            primary_type,
+            domain,
+        } = serde_json::from_value(info)
+            .map_err(|e| TypedDataConstructionJSONError::ParseInfo(e))?;
+        doc_obj.insert("proof".to_string(), proof_value);
+        let message = EIP712Value::try_from(doc_value)
+            .map_err(|e| TypedDataConstructionJSONError::ConvertMessage(e))?;
+        let types = types_or_uri
+            .dereference()
+            .await
+            .map_err(|e| TypedDataConstructionJSONError::DereferenceTypes(e))?;
+        let typed_data = Self {
+            types,
+            primary_type,
+            domain,
+            message,
+        };
+        Ok(typed_data)
+    }
+
     /// Encode a typed data message for hashing and signing.
     /// [Reference](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#specification)
     pub fn hash(&self) -> Result<Vec<u8>, TypedDataHashError> {
@@ -955,6 +1064,174 @@ mod tests {
         assert_eq!(
             bytes_to_lowerhex(&hash),
             "0x3128ae562d7141585a21f9c04e87520857ae9025d5c57293255f25d72f869b2e"
+        );
+    }
+
+    #[async_std::test]
+    async fn convert_typed_data() {
+        let proof: Proof = serde_json::from_value(json!({
+          "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
+          "created": "2010-01-01T19:23:24Z",
+          "proofPurpose": "assertionMethod",
+          "type": "EthereumEip712Signature2021",
+          "eip712Domain": {
+            "messageSchema": {
+              "EIP712Domain": [
+                { "name": "name", "type": "string" },
+                { "name": "version", "type": "string" },
+                { "name": "chainId", "type": "uint256" },
+                { "name": "salt", "type": "bytes32" }
+              ],
+              "VerifiableCredential": [
+                { "name": "@context", "type": "string[]" },
+                { "name": "type", "type": "string[]" },
+                { "name": "id", "type": "string" },
+                { "name": "issuer", "type": "string" },
+                { "name": "issuanceDate", "type": "string" },
+                { "name": "credentialSubject", "type": "CredentialSubject" },
+                { "name": "credentialSchema", "type": "CredentialSchema" },
+                { "name": "proof", "type": "Proof" }
+              ],
+              "CredentialSchema": [
+                { "name": "id", "type": "string" },
+                { "name": "type", "type": "string" }
+              ],
+              "CredentialSubject": [
+                { "name": "type", "type": "string" },
+                { "name": "id", "type": "string" },
+                { "name": "name", "type": "string" },
+                { "name": "child", "type": "Person" }
+              ],
+              "Person": [
+                { "name": "name", "type": "string" }
+              ],
+              "Proof": [
+                { "name": "verificationMethod", "type": "string" },
+                { "name": "created", "type": "string" },
+                { "name": "proofPurpose", "type": "string" },
+                { "name": "type", "type": "string" }
+              ]
+            },
+            "primaryType": "VerifiableCredential",
+            "domain": {
+              "name": "https://example.com",
+              "version": "2",
+              "chainId": 4,
+              "salt": "0xaaaabbbbccccdddd"
+            }
+          }
+        }))
+        .unwrap();
+        let vc: crate::vc::Credential = serde_json::from_value(json!({
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://schema.org"
+          ],
+          "type": [
+            "VerifiableCredential"
+          ],
+          "id": "https://example.org/person/1234",
+          "issuer": "did:example:aaaabbbb",
+          "issuanceDate": "2010-01-01T19:23:24Z",
+          "credentialSubject": {
+            "type": "Person",
+            "id": "did:example:bbbbaaaa",
+            "name": "Vitalik",
+            "child": {
+              "type": "Person",
+              "name": "Ethereum"
+            }
+          },
+          "credentialSchema": {
+            "id": "https://example.com/schemas/v1",
+            "type": "Eip712SchemaValidator2021"
+          }
+        }))
+        .unwrap();
+        let typed_data = TypedData::from_document_and_options_json(&vc, &proof)
+            .await
+            .unwrap();
+        // https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#example-4
+        let expected_typed_data = json!({
+          "types": {
+            "EIP712Domain": [
+              { "name": "name", "type": "string" },
+              { "name": "version", "type": "string" },
+              { "name": "chainId", "type": "uint256" },
+              { "name": "salt", "type": "bytes32" }
+            ],
+            "VerifiableCredential": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "type", "type": "string[]" },
+              { "name": "id", "type": "string" },
+              { "name": "issuer", "type": "string" },
+              { "name": "issuanceDate", "type": "string" },
+              { "name": "credentialSubject", "type": "CredentialSubject" },
+              { "name": "credentialSchema", "type": "CredentialSchema" },
+              { "name": "proof", "type": "Proof" }
+            ],
+            "CredentialSchema": [
+              { "name": "id", "type": "string" },
+              { "name": "type", "type": "string" }
+            ],
+            "CredentialSubject": [
+              { "name": "type", "type": "string" },
+              { "name": "id", "type": "string" },
+              { "name": "name", "type": "string" },
+              { "name": "child", "type": "Person" }
+            ],
+            "Person": [
+              { "name": "name", "type": "string" }
+            ],
+            "Proof": [
+              { "name": "verificationMethod", "type": "string" },
+              { "name": "created", "type": "string" },
+              { "name": "proofPurpose", "type": "string" },
+              { "name": "type", "type": "string" }
+            ]
+          },
+          "domain": {
+            "name": "https://example.com",
+            "version": "2",
+            "chainId": 4,
+            "salt": "0xaaaabbbbccccdddd"
+          },
+          "primaryType": "VerifiableCredential",
+          "message": {
+            "@context": [
+              "https://www.w3.org/2018/credentials/v1",
+              "https://schema.org"
+            ],
+            "type": [
+              "VerifiableCredential"
+            ],
+            "id": "https://example.org/person/1234",
+            "issuer": "did:example:aaaabbbb",
+            "issuanceDate": "2010-01-01T19:23:24Z",
+            "credentialSubject": {
+              "type": "Person",
+              "id": "did:example:bbbbaaaa",
+              "name": "Vitalik",
+              "child": {
+                "type": "Person",
+                "name": "Ethereum"
+              }
+            },
+            "credentialSchema": {
+              "id": "https://example.com/schemas/v1",
+              "type": "Eip712SchemaValidator2021"
+            },
+            "proof": {
+              "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
+              "created": "2010-01-01T19:23:24Z",
+              "proofPurpose": "assertionMethod",
+              "type": "EthereumEip712Signature2021"
+            }
+          }
+        });
+        assert_eq!(
+            serde_json::to_value(typed_data).unwrap(),
+            expected_typed_data
         );
     }
 }
