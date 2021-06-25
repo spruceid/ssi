@@ -17,10 +17,29 @@ use serde_json::Value;
 
 const DEFAULT_CONTEXT: &str = SECURITY_V2_CONTEXT;
 
-// limited initial definition of a ZCAP Delegation, generic over Action and Caveat types
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Delegation<A, C> {
+pub struct DefaultProps<A> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capability_action: Option<A>,
+    #[serde(flatten)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extra_fields: Option<Map<String, Value>>,
+}
+
+impl<A> DefaultProps<A> {
+    pub fn new(capability_action: Option<A>) -> Self {
+        Self {
+            capability_action,
+            extra_fields: None,
+        }
+    }
+}
+
+// limited initial definition of a ZCAP Delegation, generic over Caveat and additional properties
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Delegation<C, S = DefaultProps<String>> {
     #[serde(rename = "@context")]
     pub context: Contexts,
     pub id: URI,
@@ -28,37 +47,35 @@ pub struct Delegation<A, C> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invoker: Option<URI>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub capability_action: Option<A>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub caveat: Option<C>,
+    #[serde(flatten)]
+    pub property_set: S,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<Proof>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]
-    pub property_set: Option<Map<String, Value>>,
 }
 
-impl<A, C> Delegation<A, C>
-where
-    A: Serialize + Send + Sync + Clone,
-    C: Serialize + Send + Sync + Clone,
-{
-    pub fn new(id: URI, parent_capability: URI) -> Self {
+impl<C, S> Delegation<C, S> {
+    pub fn new(id: URI, parent_capability: URI, property_set: S) -> Self {
         Self {
             context: Contexts::default(),
             id,
             parent_capability,
             invoker: None,
-            capability_action: None,
             caveat: None,
             proof: None,
-            property_set: None,
+            property_set,
         }
     }
+}
 
+impl<C, S> Delegation<C, S>
+where
+    C: Serialize + Send + Sync + Clone,
+    S: Serialize + Send + Sync + Clone,
+{
     pub async fn verify(
         &self,
         _options: Option<LinkedDataProofOptions>,
@@ -108,10 +125,10 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<A, C> LinkedDataDocument for Delegation<A, C>
+impl<C, S> LinkedDataDocument for Delegation<C, S>
 where
-    A: Serialize + Send + Sync + Clone,
     C: Serialize + Send + Sync + Clone,
+    S: Serialize + Send + Sync + Clone,
 {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
@@ -136,45 +153,54 @@ where
 // limited initial definition of a ZCAP Invocation, generic over Action
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Invocation<A> {
+pub struct Invocation<S = DefaultProps<String>> {
     #[serde(rename = "@context")]
     pub context: Contexts,
     pub id: URI,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub capability_action: Option<A>,
+    #[serde(flatten)]
+    pub property_set: S,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<Proof>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]
-    pub property_set: Option<Map<String, Value>>,
 }
 
-impl<A> Invocation<A>
-where
-    A: Serialize + Send + Sync + Clone,
-{
-    pub fn new(id: URI) -> Self {
+impl<S> Invocation<S> {
+    pub fn new(id: URI, property_set: S) -> Self {
         Self {
             context: Contexts::default(),
             id,
-            capability_action: None,
             proof: None,
-            property_set: None,
+            property_set,
         }
     }
+}
 
-    pub async fn verify<C>(
+pub trait VerifyAttributes<I> {
+    type Err: std::string::ToString;
+    // Fn to be implemented for invocations to be verified against delegations
+    // If the property set contains e.g. Actions or Caveat-related fields, they should be checked here
+    fn verify_attributes(&self, invocation: &I) -> Result<(), Self::Err> {
+        Ok(())
+    }
+}
+
+impl<S> Invocation<S>
+where
+    S: Serialize + Send + Sync + Clone,
+{
+    pub async fn verify<C, P>(
         &self,
         _options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
         // TODO make this a list for delegation chains
-        target_capability: &Delegation<A, C>,
+        target_capability: &Delegation<C, P>,
     ) -> VerificationResult
     where
         C: Serialize + Send + Sync + Clone,
+        P: Serialize + Send + Sync + Clone,
+        Delegation<C, P>: VerifyAttributes<Self>,
     {
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
@@ -219,8 +245,8 @@ where
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
                     result.errors.push("Incorrect Proof Purpose".into());
                 };
-                if result.errors.is_empty() {
-                    result.checks.push(Check::Proof);
+                if let Result::Err(e) = target_capability.verify_attributes(self) {
+                    result.errors.push(e.to_string());
                 };
                 result
             }
@@ -288,9 +314,9 @@ where
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<A> LinkedDataDocument for Invocation<A>
+impl<S> LinkedDataDocument for Invocation<S>
 where
-    A: Serialize + Send + Sync + Clone,
+    S: Serialize + Send + Sync + Clone,
 {
     fn get_contexts(&self) -> Result<Option<String>, Error> {
         Ok(Some(serde_json::to_string(&self.context)?))
@@ -406,7 +432,7 @@ mod tests {
             Drive,
         }
         let zcap_str = include_str!("../examples/zcap_invocation.jsonld");
-        let zcap: Invocation<AC> = serde_json::from_str(zcap_str).unwrap();
+        let zcap: Invocation<DefaultProps<AC>> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
             Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
@@ -415,13 +441,14 @@ mod tests {
             zcap.id,
             URI::String("urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4".into())
         );
-        assert_eq!(zcap.capability_action, Some(AC::Drive));
+        assert_eq!(zcap.property_set.capability_action, Some(AC::Drive));
     }
 
     #[async_std::test]
     async fn round_trip() {
         use crate::did::{DIDMethod, Source};
         use crate::did_resolve::DIDResolver;
+        use std::collections::HashMap as Map;
 
         let dk = DIDExample;
 
@@ -439,18 +466,33 @@ mod tests {
             ..serde_json::from_str(include_str!("../tests/ed25519-2021-06-16.json")).unwrap()
         };
 
-        let del: Delegation<Actions, ()> = Delegation {
+        let del: Delegation<(), DefaultProps<Actions>> = Delegation {
             invoker: Some(URI::String(bob_vm)),
-            capability_action: Some(Actions::Read),
             ..Delegation::new(
                 URI::String("urn:a_urn".into()),
                 URI::String("kepler://alices_orbit".into()),
+                DefaultProps::new(Some(Actions::Read)),
             )
         };
-        let inv: Invocation<Actions> = Invocation {
-            capability_action: Some(Actions::Read),
-            ..Invocation::new(URI::String("urn:a_different_urn".into()))
-        };
+        let inv: Invocation<DefaultProps<Actions>> = Invocation::new(
+            URI::String("urn:a_different_urn".into()),
+            DefaultProps::new(Some(Actions::Read)),
+        );
+
+        impl VerifyAttributes<Invocation<DefaultProps<Actions>>> for Delegation<(), DefaultProps<Actions>> {
+            type Err = &'static str;
+            fn verify_attributes(
+                &self,
+                invocation: &Invocation<DefaultProps<Actions>>,
+            ) -> Result<(), Self::Err> {
+                if self.property_set.capability_action == invocation.property_set.capability_action
+                {
+                    Ok(())
+                } else {
+                    Err("Actions do not match")
+                }
+            }
+        }
 
         let ldpo_alice = LinkedDataProofOptions {
             verification_method: alice.key_id.clone(),
@@ -495,15 +537,31 @@ mod tests {
             .errors
             .is_empty());
 
-        // invalid cap attrs
+        // invalid cap attrs, invoker not matching
         let wrong_del = Delegation {
             invoker: Some(URI::String("did:example:someone_else".into())),
             ..del.clone()
         };
-        let proof = wrong_del.generate_proof(&bob, &ldpo_bob).await.unwrap();
+        let proof = wrong_del.generate_proof(&alice, &ldpo_alice).await.unwrap();
         let signed_wrong_del = wrong_del.set_proof(proof);
         assert!(!signed_inv
             .verify(None, &dk, &signed_wrong_del)
+            .await
+            .errors
+            .is_empty());
+
+        // invalid cap attrs, actions not matching
+        let wrong_inv = Invocation {
+            property_set: DefaultProps::new(Some(Actions::Write)),
+            ..inv.clone()
+        };
+        let proof = wrong_inv
+            .generate_proof(&bob, &ldpo_bob, &del.id)
+            .await
+            .unwrap();
+        let signed_wrong_inv = wrong_inv.set_proof(proof);
+        assert!(!signed_wrong_inv
+            .verify(None, &dk, &signed_del)
             .await
             .errors
             .is_empty());
