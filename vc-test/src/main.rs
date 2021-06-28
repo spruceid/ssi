@@ -1,7 +1,7 @@
 use ssi::jwk::JWTKeys;
-use ssi::one_or_many::OneOrMany;
-use ssi::vc::Context;
+use ssi::jwk::JWK;
 use ssi::vc::Credential;
+use ssi::vc::LinkedDataProofOptions;
 use ssi::vc::Presentation;
 
 fn usage() {
@@ -14,13 +14,26 @@ fn generate(data: String) -> String {
     serde_json::to_string_pretty(&doc).unwrap()
 }
 
-fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -> String {
-    let vc = Credential::from_json_unsigned(data).unwrap();
-    if sign {
-        vc.encode_sign_jwt(keys, aud).unwrap()
+fn take_key(keys: &JWTKeys) -> &JWK {
+    if let Some(rs256_key) = &keys.rs256_private_key {
+        rs256_key
+    } else if let Some(es256k_key) = &keys.es256k_private_key {
+        es256k_key
     } else {
-        vc.encode_jwt_unsigned(aud).unwrap()
+        panic!("Missing key");
     }
+}
+
+async fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -> String {
+    let vc = Credential::from_json_unsigned(data).unwrap();
+    let options = LinkedDataProofOptions {
+        domain: Some(aud.to_string()),
+        checks: None,
+        created: None,
+        ..Default::default()
+    };
+    let jwk_opt = if sign { Some(take_key(keys)) } else { None };
+    vc.generate_jwt(jwk_opt, &options).await.unwrap()
 }
 
 fn decode_jwt_unsigned(data: &String) -> String {
@@ -34,9 +47,17 @@ fn generate_presentation(data: &String) -> String {
     serde_json::to_string_pretty(&vp).unwrap()
 }
 
-fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) -> String {
+async fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) -> String {
     let vp = Presentation::from_json_unsigned(data).unwrap();
-    vp.encode_sign_jwt(keys, aud).unwrap()
+    let options = LinkedDataProofOptions {
+        domain: Some(aud.to_string()),
+        checks: None,
+        created: None,
+        proof_purpose: None,
+        ..Default::default()
+    };
+    let jwk = take_key(keys);
+    vp.generate_jwt(Some(jwk), &options).await.unwrap()
 }
 
 fn read_file(filename: &String) -> String {
@@ -53,7 +74,8 @@ fn write_out(data: String) {
     stdout.lock().write_all(data.as_bytes()).unwrap();
 }
 
-fn main() {
+#[async_std::main]
+async fn main() {
     let args = std::env::args();
     let mut cmd: Option<String> = None;
     let mut filename: Option<String> = None;
@@ -105,7 +127,7 @@ fn main() {
                 output = decode_jwt_unsigned(&data);
             } else if let Some(keys) = jwt_keys {
                 if let Some(aud) = jwt_aud {
-                    output = generate_jwt(&data, &keys, &aud, !jwt_no_jws);
+                    output = generate_jwt(&data, &keys, &aud, !jwt_no_jws).await;
                 } else {
                     panic!("Expected --jwt-aud with --jwt");
                 }
@@ -124,7 +146,7 @@ fn main() {
                         // to be always used.
                         panic!("Expected --jwt-presentation with --jwt");
                     }
-                    output = generate_jwt_presentation(&data, &keys, &aud);
+                    output = generate_jwt_presentation(&data, &keys, &aud).await;
                 } else {
                     panic!("Expected --jwt-aud with --jwt");
                 }

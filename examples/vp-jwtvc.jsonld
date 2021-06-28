@@ -1,0 +1,16 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1"
+  ],
+  "type": "VerifiablePresentation",
+  "verifiableCredential": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRpZDpleGFtcGxlOmZvbyNrZXkxIn0.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJuYmYiOjE2MjQzMDgxOTksInN1YiI6InVybjp1dWlkOmMyMzVjODIxLTcyNDktNGQ3My1hNzczLTIyMjliMGJmMWQxZSIsInZjIjp7IkBjb250ZXh0IjpbImh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIl0sInR5cGUiOiJWZXJpZmlhYmxlQ3JlZGVudGlhbCIsImNyZWRlbnRpYWxTdWJqZWN0Ijp7ImlkIjoidXJuOnV1aWQ6YzIzNWM4MjEtNzI0OS00ZDczLWE3NzMtMjIyOWIwYmYxZDFlIn0sImlzc3VhbmNlRGF0ZSI6IjIwMjEtMDYtMjFUMjA6NDM6MTkuMDY0WiJ9fQ.GiHdwdQFT8mWZTwPBONhrCd4dT7rp3GWineXBY9De4s1eed2rm8cBlXtuqe1ojFBSULjcChHYLsn8XfPmYYmP5uTsWlYlgH4XeqScZiUzNy9lioJYzjA-Y5k7J2mYJ5GVsqVeRqrm5e82y_B7ceq4SEPGjUP0pYjwnvNf5EetkdNGAJ6_wZ8tbUgfd3PU5P9d4R6EfaOfXahMcTsAaEEH51E5cyTV-VIjiGRDsdSEKww2Qe3aLgG8AaBFhmxe0YkpzIY12QrFcT-3-ir0gRPSa-C8somKATZoJE-ilJDyM-BQ40YIEQRQkW6oHoaheeCAYds5a-XWIifu2OLHATp-g",
+  "proof": {
+    "type": "Ed25519Signature2018",
+    "proofPurpose": "authentication",
+    "challenge": "example",
+    "verificationMethod": "did:example:foo#key2",
+    "created": "2021-06-22T17:53:00.408Z",
+    "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..mDPs0E7c1EcEigMTAqAPCVPnQg8USYGJbUpyM5EBrEoLUAgFdXCtH4E53tLo6UeVMfQ7TTl6kKTF4jQCFPiGAg"
+  },
+  "holder": "did:example:foo"
+}

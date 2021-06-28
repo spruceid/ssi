@@ -8,7 +8,6 @@
   "dp": "AIHFBPK2cRzchaIq3rVpLVHdveNzYexG_nOOxVVvwRANCUiB_b2Qj3Ts7aIGlS0zhTyxJql0Cig5eNtrBjVRvBdC2t1ebaeOdoC_enBsV8fDuG3-gExg-ySz4JwwiZ2252tg2qbb_a5hULYjARwpmkVDMzyR0mbsUfpRe3q_pcbB",
   "dq": "Id2bCVOVLXHdiKReor9k7A8cmaAL0gYkasu2lwVRXU9w1-NXAiOXHydVaEhlSXmbRJflkJJVNmZzIAwCf830tko-oAAhKJPPFA2XRoeVdn2fkynf2YrV_cloICP2skI23kkJeW8sAXnTJmL3ZvP6zNxYn8hZCaa5u5qqSdeX7FE",
   "qi": "WKIToXXnjl7GDbz7jCNbX9nWYOE5BDNzVmwiVOnyGoTZfwJ_qtgizj7pOapxi6dT9S9mMavmeAi6LAsEe1WUWtaKSNhbNh0PUGGXlXHGlhkS8jI1ot0e-scrHAuACE567YQ4VurpNorPKtZ5UENXIn74DEmt4l5m6902VF3X5Wo",
-  "alg": "RS256",
-  "kid": "rsa2048-2020-08-25"
+  "alg": "RS256"
 }
 

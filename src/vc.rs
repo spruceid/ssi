@@ -6,6 +6,7 @@ use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
+use crate::jws::Header;
 use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
@@ -251,13 +252,22 @@ pub enum CredentialOrJWT {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+#[serde(try_from = "String")]
+pub enum StringOrURI {
+    String(String),
+    URI(URI),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[non_exhaustive]
 pub struct JWTClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "exp")]
     pub expiration_time: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "iss")]
-    pub issuer: Option<String>,
+    pub issuer: Option<StringOrURI>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "nbf")]
     pub not_before: Option<i64>,
@@ -266,16 +276,21 @@ pub struct JWTClaims {
     pub jwt_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "sub")]
-    pub subject: Option<String>,
+    pub subject: Option<StringOrURI>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "aud")]
-    pub audience: Option<String>,
+    pub audience: Option<OneOrMany<StringOrURI>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "vc")]
     pub verifiable_credential: Option<Credential>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "vp")]
     pub verifiable_presentation: Option<Presentation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
 }
 
 // https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
@@ -315,8 +330,11 @@ pub struct LinkedDataProofOptions {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(try_from = "String")]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub enum Check {
     Proof,
+    #[serde(rename = "JWS")]
+    JWS,
 }
 
 // https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
@@ -435,11 +453,39 @@ impl From<URI> for String {
     }
 }
 
+impl TryFrom<String> for StringOrURI {
+    type Error = Error;
+    fn try_from(string: String) -> Result<Self, Self::Error> {
+        if string.contains(':') {
+            let uri = URI::try_from(string)?;
+            Ok(Self::URI(uri))
+        } else {
+            Ok(Self::String(string))
+        }
+    }
+}
+
+impl From<URI> for StringOrURI {
+    fn from(uri: URI) -> Self {
+        StringOrURI::URI(uri)
+    }
+}
+
+impl StringOrURI {
+    fn as_str(self: &Self) -> &str {
+        match self {
+            StringOrURI::URI(URI::String(string)) => string.as_str(),
+            StringOrURI::String(string) => string.as_str(),
+        }
+    }
+}
+
 pub fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
 
+// deprecated in favor of Credential::generate_jwt and Presentation::generate_jwt
 fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
     let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
         rs256_key
@@ -465,6 +511,7 @@ impl Credential {
         Ok(vp)
     }
 
+    #[deprecated(note = "Use decode_verify_jwt")]
     pub fn from_jwt_keys(jwt: &str, keys: &JWTKeys) -> Result<Self, Error> {
         let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
             rs256_key
@@ -504,7 +551,11 @@ impl Credential {
             vc.expiration_date = Utc.timestamp_opt(exp, 0).latest();
         }
         if let Some(iss) = claims.issuer {
-            vc.issuer = Some(Issuer::URI(URI::String(iss)));
+            if let StringOrURI::URI(issuer_uri) = iss {
+                vc.issuer = Some(Issuer::URI(issuer_uri));
+            } else {
+                return Err(Error::InvalidIssuer);
+            }
         }
         if let Some(nbf) = claims.not_before {
             if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
@@ -514,8 +565,12 @@ impl Credential {
             }
         }
         if let Some(sub) = claims.subject {
-            if let OneOrMany::One(ref mut subject) = vc.credential_subject {
-                subject.id = Some(URI::String(sub));
+            if let StringOrURI::URI(sub_uri) = sub {
+                if let OneOrMany::One(ref mut subject) = vc.credential_subject {
+                    subject.id = Some(sub_uri);
+                } else {
+                    return Err(Error::InvalidSubject);
+                }
             } else {
                 return Err(Error::InvalidSubject);
             }
@@ -527,7 +582,7 @@ impl Credential {
         Ok(vc)
     }
 
-    fn to_jwt_claims(&self, aud: &str) -> Result<JWTClaims, Error> {
+    pub fn to_jwt_claims(&self) -> Result<JWTClaims, Error> {
         let subject = match self.credential_subject.to_single() {
             Some(subject) => subject,
             None => return Err(Error::InvalidSubject),
@@ -544,27 +599,230 @@ impl Credential {
         Ok(JWTClaims {
             expiration_time: vc.expiration_date.map(|date| date.timestamp()),
             issuer: match vc.issuer.take() {
-                Some(Issuer::URI(URI::String(uri))) => Some(uri),
-                Some(Issuer::Object(_)) => return Err(Error::InvalidIssuer),
+                Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
+                Some(_) => return Err(Error::InvalidIssuer),
                 None => None,
             },
             not_before: vc.issuance_date.map(|date| date.timestamp()),
             jwt_id: vc.id.take().map(|id| id.into()),
-            subject: Some(subject_id),
-            audience: Some(aud.to_string()),
+            subject: Some(StringOrURI::String(subject_id)),
             verifiable_credential: Some(vc),
-            verifiable_presentation: None,
+            ..Default::default()
         })
     }
 
+    #[deprecated(note = "Use generate_jwt")]
     pub fn encode_jwt_unsigned(&self, aud: &str) -> Result<String, Error> {
-        let claims = self.to_jwt_claims(aud)?;
+        let claims = JWTClaims {
+            audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
+            ..self.to_jwt_claims()?
+        };
         Ok(crate::jwt::encode_unsigned(&claims)?)
     }
 
+    #[deprecated(note = "Use generate_jwt")]
     pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {
-        let claims = self.to_jwt_claims(aud)?;
+        let claims = JWTClaims {
+            audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
+            ..self.to_jwt_claims()?
+        };
         jwt_encode(&claims, &keys)
+    }
+
+    /// Encode the Verifiable Credential as JWT. If JWK is passed, sign it, otherwise it is
+    /// unsigned. Linked data proof options are translated into JWT claims if possible.
+    pub async fn generate_jwt(
+        &self,
+        jwk: Option<&JWK>,
+        options: &LinkedDataProofOptions,
+    ) -> Result<String, Error> {
+        let LinkedDataProofOptions {
+            verification_method,
+            proof_purpose,
+            created,
+            challenge,
+            domain,
+            checks,
+            eip712_domain,
+        } = options;
+        if checks.is_some() {
+            return Err(Error::UnencodableOptionClaim("checks".to_string()));
+        }
+        if created.is_some() {
+            return Err(Error::UnencodableOptionClaim("created".to_string()));
+        }
+        if eip712_domain.is_some() {
+            return Err(Error::UnencodableOptionClaim("eip712Domain".to_string()));
+        }
+        match proof_purpose {
+            None => (),
+            Some(ProofPurpose::AssertionMethod) => (),
+            Some(_) => return Err(Error::UnencodableOptionClaim("proofPurpose".to_string())),
+        }
+        let claims = JWTClaims {
+            nonce: challenge.clone(),
+            audience: match domain {
+                Some(domain) => Some(OneOrMany::One(StringOrURI::try_from(domain.to_string())?)),
+                None => None,
+            },
+            ..self.to_jwt_claims()?
+        };
+        let algorithm = if let Some(jwk) = jwk {
+            jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?
+        } else {
+            crate::jwk::Algorithm::None
+        };
+        let key_id = match (
+            jwk.and_then(|jwk| jwk.key_id.clone()),
+            verification_method.to_owned(),
+        ) {
+            (Some(jwk_kid), None) => Some(jwk_kid),
+            (None, Some(vm_id)) => Some(vm_id),
+            (None, None) => None,
+            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id => Some(vm_id),
+            (Some(jwk_kid), Some(vm_id)) => return Err(Error::KeyIdVMMismatch(vm_id, jwk_kid)),
+        };
+        let header = Header {
+            algorithm,
+            key_id,
+            ..Default::default()
+        };
+        let header_b64 = base64_encode_json(&header)?;
+        let payload_b64 = base64_encode_json(&claims)?;
+        if let Some(jwk) = jwk {
+            let signing_input = header_b64 + "." + &payload_b64;
+            let sig_b64 = crate::jws::sign_bytes_b64(algorithm, signing_input.as_bytes(), jwk)?;
+            let jws = signing_input + "." + &sig_b64;
+            Ok(jws)
+        } else {
+            let jwt = header_b64 + "." + &payload_b64 + ".";
+            Ok(jwt)
+        }
+    }
+
+    pub async fn verify_jwt(
+        jwt: &str,
+        options_opt: Option<LinkedDataProofOptions>,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
+        let (_vc, result) = Self::decode_verify_jwt(jwt, options_opt, resolver).await;
+        result
+    }
+
+    pub async fn decode_verify_jwt(
+        jwt: &str,
+        options_opt: Option<LinkedDataProofOptions>,
+        resolver: &dyn DIDResolver,
+    ) -> (Option<Self>, VerificationResult) {
+        let (header_b64, payload_enc, signature_b64) = match crate::jws::split_jws(jwt) {
+            Ok(parts) => parts,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to split JWS: {}", err)),
+                );
+            }
+        };
+        let crate::jws::DecodedJWS {
+            header,
+            signing_input,
+            payload,
+            signature,
+        } = match crate::jws::decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64) {
+            Ok(decoded_jws) => decoded_jws,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to decode JWS: {}", err)),
+                );
+            }
+        };
+        let claims: JWTClaims = match serde_json::from_slice(&payload) {
+            Ok(claims) => claims,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to decode JWS claims: {}", err)),
+                );
+            }
+        };
+        let vc = match Self::from_jwt_claims(claims.clone()) {
+            Ok(claims) => claims,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!(
+                        "Unable to convert JWT claims to VC: {}",
+                        err
+                    )),
+                );
+            }
+        };
+        if let Err(err) = vc.validate_unsigned() {
+            return (
+                None,
+                VerificationResult::error(&format!("Invalid VC: {}", err)),
+            );
+        }
+        // TODO: error if any unconvertable claims
+        // TODO: unify with verify function?
+        let (proofs, matched_jwt) = match vc
+            .filter_proofs(options_opt, Some((&header, &claims)), resolver)
+            .await
+        {
+            Ok(matches) => matches,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to filter proofs: {}", err)),
+                );
+            }
+        };
+        let verification_method = match header.key_id {
+            Some(kid) => kid,
+            None => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("JWT header missing key id")),
+                );
+            }
+        };
+        let key = match crate::ldp::resolve_key(&verification_method, resolver).await {
+            Ok(key) => key,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to resolve key for JWS: {}", err)),
+                );
+            }
+        };
+        let mut results = VerificationResult::new();
+        if matched_jwt {
+            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
+                Ok(()) => results.checks.push(Check::JWS),
+                Err(err) => results
+                    .errors
+                    .push(format!("Unable to filter proofs: {}", err)),
+            }
+            return (Some(vc), results);
+        }
+        // No JWS verified: try to verify a proof.
+        if proofs.is_empty() {
+            return (
+                None,
+                VerificationResult::error("No applicable JWS or proof"),
+            );
+        }
+        // Try verifying each proof until one succeeds
+        for proof in proofs {
+            let mut result = proof.verify(&vc, resolver).await;
+            if result.errors.is_empty() {
+                result.checks.push(Check::Proof);
+                return (Some(vc), result);
+            };
+            results.append(&mut result);
+        }
+        (Some(vc), results)
     }
 
     pub fn validate_unsigned(&self) -> Result<(), Error> {
@@ -617,8 +875,9 @@ impl Credential {
     async fn filter_proofs(
         &self,
         options: Option<LinkedDataProofOptions>,
+        jwt_params: Option<(&Header, &JWTClaims)>,
         resolver: &dyn DIDResolver,
-    ) -> Result<Vec<&Proof>, String> {
+    ) -> Result<(Vec<&Proof>, bool), String> {
         // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
         let allowed_vms = match options.verification_method.take() {
@@ -644,12 +903,23 @@ impl Credential {
                 }
             }
         };
-        Ok(self
+        let matched_proofs = self
             .proof
             .iter()
             .flatten()
             .filter(|proof| proof.matches(&options, &allowed_vms))
-            .collect())
+            .collect();
+        let matched_jwt = match jwt_params {
+            Some((header, claims)) => jwt_matches(
+                &header,
+                &claims,
+                &options,
+                &allowed_vms,
+                &ProofPurpose::AssertionMethod,
+            ),
+            None => false,
+        };
+        Ok((matched_proofs, matched_jwt))
     }
 
     // TODO: factor this out of VC and VP
@@ -658,7 +928,7 @@ impl Credential {
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
-        let proofs = match self.filter_proofs(options, resolver).await {
+        let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
                 return VerificationResult::error(&format!("Unable to filter proofs: {}", err));
@@ -756,18 +1026,241 @@ impl Presentation {
         Ok(vp)
     }
 
+    pub fn from_jwt_claims(claims: JWTClaims) -> Result<Self, Error> {
+        let mut vp = match claims.verifiable_presentation {
+            Some(vp) => vp,
+            None => return Err(Error::MissingPresentation),
+        };
+        if let Some(iss) = claims.issuer {
+            if let StringOrURI::URI(issuer_uri) = iss {
+                vp.holder = Some(issuer_uri);
+            } else {
+                return Err(Error::InvalidIssuer);
+            }
+        }
+        if let Some(id) = claims.jwt_id {
+            let uri = URI::try_from(id)?;
+            vp.id = Some(uri);
+        }
+        Ok(vp)
+    }
+
+    pub fn to_jwt_claims(&self) -> Result<JWTClaims, Error> {
+        let mut vp = self.clone();
+        Ok(JWTClaims {
+            issuer: vp.holder.take().map(|id| id.into()),
+            jwt_id: vp.id.take().map(|id| id.into()),
+            verifiable_presentation: Some(vp),
+            ..Default::default()
+        })
+    }
+
+    #[deprecated(note = "Use generate_jwt")]
     pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {
         let claims = JWTClaims {
-            expiration_time: None,
-            not_before: None,
-            subject: None,
-            issuer: self.holder.clone().map(|id| id.into()),
-            jwt_id: self.id.clone().map(|id| id.into()),
-            audience: Some(aud.to_string()),
-            verifiable_credential: None,
-            verifiable_presentation: Some(self.clone()),
+            audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
+            ..self.to_jwt_claims()?
         };
         jwt_encode(&claims, &keys)
+    }
+
+    /// Encode the Verifiable Presentation as JWT. If JWK is passed, sign it, otherwise it is
+    /// unsigned. Linked data proof options are translated into JWT claims if possible.
+    pub async fn generate_jwt(
+        &self,
+        jwk: Option<&JWK>,
+        options: &LinkedDataProofOptions,
+    ) -> Result<String, Error> {
+        let LinkedDataProofOptions {
+            verification_method,
+            proof_purpose,
+            created,
+            challenge,
+            domain,
+            checks,
+            eip712_domain,
+        } = options;
+        if checks.is_some() {
+            return Err(Error::UnencodableOptionClaim("checks".to_string()));
+        }
+        if created.is_some() {
+            return Err(Error::UnencodableOptionClaim("created".to_string()));
+        }
+        if eip712_domain.is_some() {
+            return Err(Error::UnencodableOptionClaim("eip712Domain".to_string()));
+        }
+        match proof_purpose {
+            None => (),
+            Some(ProofPurpose::Authentication) => (),
+            Some(_) => return Err(Error::UnencodableOptionClaim("proofPurpose".to_string())),
+        }
+        let claims = JWTClaims {
+            nonce: challenge.clone(),
+            audience: match domain {
+                Some(domain) => Some(OneOrMany::One(StringOrURI::try_from(domain.to_string())?)),
+                None => None,
+            },
+            ..self.to_jwt_claims()?
+        };
+        let algorithm = if let Some(jwk) = jwk {
+            jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?
+        } else {
+            crate::jwk::Algorithm::None
+        };
+        let key_id = match (
+            jwk.and_then(|jwk| jwk.key_id.clone()),
+            verification_method.to_owned(),
+        ) {
+            (Some(jwk_kid), None) => Some(jwk_kid),
+            (None, Some(vm_id)) => Some(vm_id),
+            (None, None) => None,
+            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id => Some(vm_id),
+            (Some(jwk_kid), Some(vm_id)) => return Err(Error::KeyIdVMMismatch(vm_id, jwk_kid)),
+        };
+        let header = Header {
+            algorithm,
+            key_id,
+            ..Default::default()
+        };
+        let header_b64 = base64_encode_json(&header)?;
+        let payload_b64 = base64_encode_json(&claims)?;
+        if let Some(jwk) = jwk {
+            let signing_input = header_b64 + "." + &payload_b64;
+            let sig_b64 = crate::jws::sign_bytes_b64(algorithm, signing_input.as_bytes(), jwk)?;
+            let jws = signing_input + "." + &sig_b64;
+            Ok(jws)
+        } else {
+            let jwt = header_b64 + "." + &payload_b64 + ".";
+            Ok(jwt)
+        }
+    }
+
+    // Decode and verify a JWT-encoded Verifiable Presentation. On success, returns the Verifiable
+    // Presentation and verification result.
+    pub async fn decode_verify_jwt(
+        jwt: &str,
+        options_opt: Option<LinkedDataProofOptions>,
+        resolver: &dyn DIDResolver,
+    ) -> (Option<Self>, VerificationResult) {
+        // let mut options = options_opt.unwrap_or_default();
+        let (header_b64, payload_enc, signature_b64) = match crate::jws::split_jws(jwt) {
+            Ok(parts) => parts,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to split JWS: {}", err)),
+                );
+            }
+        };
+        let crate::jws::DecodedJWS {
+            header,
+            signing_input,
+            payload,
+            signature,
+        } = match crate::jws::decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64) {
+            Ok(decoded_jws) => decoded_jws,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to decode JWS: {}", err)),
+                );
+            }
+        };
+        let claims: JWTClaims = match serde_json::from_slice(&payload) {
+            Ok(claims) => claims,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to decode JWS claims: {}", err)),
+                );
+            }
+        };
+        let vp = match Self::from_jwt_claims(claims.clone()) {
+            Ok(claims) => claims,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!(
+                        "Unable to convert JWT claims to VP: {}",
+                        err
+                    )),
+                );
+            }
+        };
+        if let Err(err) = vp.validate_unsigned() {
+            return (
+                None,
+                VerificationResult::error(&format!("Invalid VP: {}", err)),
+            );
+        }
+        // TODO: error if any unconvertable claims
+        // TODO: unify with verify function?
+        let (proofs, matched_jwt) = match vp
+            .filter_proofs(options_opt, Some((&header, &claims)), resolver)
+            .await
+        {
+            Ok(matches) => matches,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to filter proofs: {}", err)),
+                );
+            }
+        };
+        let verification_method = match header.key_id {
+            Some(kid) => kid,
+            None => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("JWT header missing key id")),
+                );
+            }
+        };
+        let key = match crate::ldp::resolve_key(&verification_method, resolver).await {
+            Ok(key) => key,
+            Err(err) => {
+                return (
+                    None,
+                    VerificationResult::error(&format!("Unable to resolve key for JWS: {}", err)),
+                );
+            }
+        };
+        let mut results = VerificationResult::new();
+        if matched_jwt {
+            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
+                Ok(()) => results.checks.push(Check::JWS),
+                Err(err) => results
+                    .errors
+                    .push(format!("Unable to filter proofs: {}", err)),
+            }
+            return (Some(vp), results);
+        }
+        // No JWS verified: try to verify a proof.
+        if proofs.is_empty() {
+            return (
+                None,
+                VerificationResult::error("No applicable JWS or proof"),
+            );
+        }
+        // Try verifying each proof until one succeeds
+        for proof in proofs {
+            let mut result = proof.verify(&vp, resolver).await;
+            if result.errors.is_empty() {
+                result.checks.push(Check::Proof);
+                return (Some(vp), result);
+            };
+            results.append(&mut result);
+        }
+        (Some(vp), results)
+    }
+
+    pub async fn verify_jwt(
+        jwt: &str,
+        options_opt: Option<LinkedDataProofOptions>,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
+        let (_vp, result) = Self::decode_verify_jwt(jwt, options_opt, resolver).await;
+        result
     }
 
     pub fn validate_unsigned(&self) -> Result<(), Error> {
@@ -823,10 +1316,14 @@ impl Presentation {
     async fn filter_proofs(
         &self,
         options: Option<LinkedDataProofOptions>,
+        jwt_params: Option<(&Header, &JWTClaims)>,
         resolver: &dyn DIDResolver,
-    ) -> Result<Vec<&Proof>, String> {
-        // Allow any of holder's verification methods by default
-        let mut options = options.unwrap_or_default();
+    ) -> Result<(Vec<&Proof>, bool), String> {
+        // Allow any of holder's verification methods matching proof purpose by default
+        let mut options = options.unwrap_or_else(|| LinkedDataProofOptions {
+            proof_purpose: Some(ProofPurpose::Authentication),
+            ..Default::default()
+        });
         let allowed_vms = match options.verification_method.take() {
             Some(vm) => vec![vm],
             None => {
@@ -841,12 +1338,23 @@ impl Presentation {
                 }
             }
         };
-        Ok(self
+        let matched_proofs = self
             .proof
             .iter()
             .flatten()
             .filter(|proof| proof.matches(&options, &allowed_vms))
-            .collect())
+            .collect();
+        let matched_jwt = match jwt_params {
+            Some((header, claims)) => jwt_matches(
+                &header,
+                &claims,
+                &options,
+                &allowed_vms,
+                &ProofPurpose::Authentication,
+            ),
+            None => false,
+        };
+        Ok((matched_proofs, matched_jwt))
     }
 
     // TODO: factor this out of VC and VP
@@ -855,7 +1363,7 @@ impl Presentation {
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
-        let proofs = match self.filter_proofs(options, resolver).await {
+        let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
                 return VerificationResult::error(&format!("Unable to filter proofs: {}", err));
@@ -1032,6 +1540,72 @@ impl Proof {
     }
 }
 
+/// Evaluate if a JWT (header and claims) matches some linked data proof options.
+fn jwt_matches(
+    header: &Header,
+    claims: &JWTClaims,
+    options: &LinkedDataProofOptions,
+    allowed_vms: &Vec<String>,
+    expected_proof_purpose: &ProofPurpose,
+) -> bool {
+    let LinkedDataProofOptions {
+        verification_method,
+        proof_purpose,
+        created,
+        challenge,
+        domain,
+        ..
+    } = options;
+    if let Some(ref vm) = verification_method {
+        assert_local!(header.key_id.as_ref() == Some(vm));
+    }
+    if let Some(kid) = header.key_id.as_ref() {
+        assert_local!(allowed_vms.contains(kid));
+    }
+    if let Some(nbf) = claims.not_before {
+        if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
+            assert_local!(created.unwrap_or_else(Utc::now) >= time);
+        } else {
+            return false;
+        }
+    }
+    if let Some(exp) = claims.expiration_time {
+        if let Some(time) = Utc.timestamp_opt(exp, 0).earliest() {
+            assert_local!(Utc::now() < time);
+        } else {
+            return false;
+        }
+    }
+    if let Some(ref challenge) = challenge {
+        assert_local!(claims.nonce.as_ref() == Some(challenge));
+    }
+    if let Some(ref aud) = claims.audience {
+        // https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3
+        //   Each principal intended to process the JWT MUST
+        //   identify itself with a value in the audience claim.
+        // https://www.w3.org/TR/vc-data-model/#jwt-encoding
+        //   aud MUST represent (i.e., identify) the intended audience of the verifiable
+        //   presentation (i.e., the verifier intended by the presenting holder to receive and
+        //   verify the verifiable presentation).
+        if let Some(domain) = domain {
+            // Use domain for audience, and require a match.
+            if aud.into_iter().find(|aud| aud.as_str() == domain).is_none() {
+                return false;
+            }
+        } else {
+            // TODO: allow using verifier DID for audience?
+            return false;
+        }
+    }
+    if let Some(ref proof_purpose) = proof_purpose {
+        if proof_purpose != expected_proof_purpose {
+            return false;
+        }
+    }
+    // TODO: support more claim checking via additional LDP options
+    true
+}
+
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LinkedDataDocument for Proof {
@@ -1100,6 +1674,7 @@ impl FromStr for Check {
     fn from_str(purpose: &str) -> Result<Self, Self::Err> {
         match purpose {
             "proof" => Ok(Self::Proof),
+            "JWS" => Ok(Self::JWS),
             _ => Err(Error::UnsupportedCheck),
         }
     }
@@ -1116,6 +1691,7 @@ impl From<Check> for String {
     fn from(purpose: Check) -> String {
         match purpose {
             Check::Proof => "proof".to_string(),
+            Check::JWS => "JWS".to_string(),
         }
     }
 }
@@ -1125,14 +1701,6 @@ mod tests {
     use super::*;
     use crate::did::example::DIDExample;
     use crate::urdna2015;
-
-    #[derive(Debug, Serialize, Deserialize, Clone)]
-    struct Config {
-        #[serde(rename = "jwt")]
-        pub keys: JWTKeys,
-        #[serde(flatten)]
-        pub property_set: Option<Map<String, Value>>,
-    }
 
     const JWK_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
 
@@ -1196,8 +1764,8 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
     }
 
-    #[test]
-    fn encode_sign_jwt() {
+    #[async_std::test]
+    async fn generate_jwt() {
         let vc_str = r###"{
             "@context": [
                 "https://www.w3.org/2018/credentials/v1",
@@ -1214,19 +1782,22 @@ mod tests {
             }
         }"###;
 
-        const CONFIG: &'static [u8] = include_bytes!("../vc-test/config.json");
-        let conf: Config = serde_json::from_slice(CONFIG).unwrap();
-
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
         let vc: Credential = serde_json::from_str(vc_str).unwrap();
         let aud = "did:example:90336644520443d28ba78beb949".to_string();
-        let signed_jwt = vc.encode_sign_jwt(&conf.keys, &aud).unwrap();
+        let options = LinkedDataProofOptions {
+            domain: Some(aud),
+            checks: None,
+            created: None,
+            ..Default::default()
+        };
+        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
         println!("{:?}", signed_jwt);
     }
 
-    #[test]
-    fn decode_verify_jwt() {
-        const CONFIG: &'static [u8] = include_bytes!("../vc-test/config.json");
-        let conf: Config = serde_json::from_slice(CONFIG).unwrap();
+    #[async_std::test]
+    async fn decode_verify_jwt() {
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
         let vc_str = r###"{
             "@context": [
@@ -1237,19 +1808,44 @@ mod tests {
             "type": "VerifiableCredential",
             "issuer": "https://example.org/issuers/1345",
             "issuanceDate": "2020-08-25T11:26:53Z",
-            "expirationDate": "2021-08-25T00:00:00Z",
             "credentialSubject": {
                 "id": "did:example:a6c78986cc36418b95a22d7f736",
                 "spouse": "Example Person"
             }
         }"###;
 
-        let vc: Credential = serde_json::from_str(vc_str).unwrap();
+        let vc = Credential {
+            expiration_date: Some(Utc::now() + chrono::Duration::weeks(1)),
+            ..serde_json::from_str(vc_str).unwrap()
+        };
         let aud = "did:example:90336644520443d28ba78beb949".to_string();
-        let signed_jwt = vc.encode_sign_jwt(&conf.keys, &aud).unwrap();
+        let options = LinkedDataProofOptions {
+            domain: Some(aud),
+            checks: None,
+            created: None,
+            verification_method: Some("did:example:foo#key1".to_string()),
+            ..Default::default()
+        };
+        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        println!("{:?}", signed_jwt);
 
-        let vc1 = Credential::from_jwt_keys(&signed_jwt, &conf.keys).unwrap();
+        let (vc1_opt, verification_result) =
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+        let vc1 = vc1_opt.unwrap();
         assert_eq!(vc.id, vc1.id);
+
+        // Test expiration date
+        let vc = Credential {
+            expiration_date: Some(Utc::now() - chrono::Duration::weeks(1)),
+            ..vc
+        };
+        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let (_vc_opt, verification_result) =
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.len() > 0);
     }
 
     #[async_std::test]
@@ -1473,6 +2069,14 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
+
+        let vc_jwt = include_str!("../examples/vc.jwt");
+        let (vc_opt, result) = Credential::decode_verify_jwt(vc_jwt, None, &DIDExample).await;
+        println!("{:#?}", result);
+        let vc = vc_opt.unwrap();
+        println!("{:#?}", vc);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
     }
 
     #[async_std::test]
@@ -1490,12 +2094,70 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 
     #[async_std::test]
     async fn presentation_verify() {
+        // LDP VC in LDP VP
         let vp_str = include_str!("../examples/vp.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
         let mut verify_options = LinkedDataProofOptions::default();
         verify_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let result = vp.verify(Some(verify_options), &DIDExample).await;
+        let result = vp.verify(Some(verify_options.clone()), &DIDExample).await;
         println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+        let vc = match vp.verifiable_credential.into_iter().flatten().next() {
+            Some(CredentialOrJWT::Credential(vc)) => vc,
+            _ => unreachable!(),
+        };
+        let result = vc.verify(None, &DIDExample).await;
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+
+        // LDP VC in JWT VP
+        let vp_jwt = include_str!("../examples/vp.jwt");
+        let (vp_opt, result) =
+            Presentation::decode_verify_jwt(vp_jwt, Some(verify_options.clone()), &DIDExample)
+                .await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+        let vp = vp_opt.unwrap();
+        let vc = match vp.verifiable_credential.into_iter().flatten().next() {
+            Some(CredentialOrJWT::Credential(vc)) => vc,
+            _ => unreachable!(),
+        };
+        let result = vc.verify(None, &DIDExample).await;
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+
+        // JWT VC in LDP VP
+        let vp_str = include_str!("../examples/vp-jwtvc.jsonld");
+        let vp = Presentation::from_json(vp_str).unwrap();
+        let result = vp.verify(Some(verify_options.clone()), &DIDExample).await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+        let vc_jwt = match vp.verifiable_credential.into_iter().flatten().next() {
+            Some(CredentialOrJWT::JWT(jwt)) => jwt,
+            _ => unreachable!(),
+        };
+        let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+
+        // JWT VC in JWT VP
+        let vp_jwt = include_str!("../examples/vp-jwtvc.jwt");
+        let (vp_opt, result) =
+            Presentation::decode_verify_jwt(vp_jwt, Some(verify_options.clone()), &DIDExample)
+                .await;
+        println!("{:#?}", result);
+        let vp = vp_opt.unwrap();
+
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+        let vc_jwt = match vp.verifiable_credential.into_iter().flatten().next() {
+            Some(CredentialOrJWT::JWT(jwt)) => jwt,
+            _ => unreachable!(),
+        };
+        let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
     }
@@ -1520,11 +2182,22 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let vc_issuer_vm = "did:example:foo#key1".to_string();
         vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
         vc_issue_options.verification_method = Some(vc_issuer_vm);
+        vc_issue_options.checks = None;
         let vc_proof = vc.generate_proof(&key, &vc_issue_options).await.unwrap();
         vc.add_proof(vc_proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         vc.validate().unwrap();
         let vc_verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", vc_verification_result);
+        assert!(vc_verification_result.errors.is_empty());
+
+        // Issue JWT credential
+        vc_issue_options.created = None;
+        let vc_jwt = vc
+            .generate_jwt(Some(&key), &vc_issue_options)
+            .await
+            .unwrap();
+        let vc_verification_result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
         println!("{:#?}", vc_verification_result);
         assert!(vc_verification_result.errors.is_empty());
 
@@ -1537,14 +2210,15 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             type_: OneOrMany::One("VerifiablePresentation".to_string()),
             verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
             proof: None,
-            holder: None,
+            holder: Some(URI::String("did:example:foo".to_string())),
             property_set: None,
         };
+        let vp_without_proof = vp.clone();
         let mut vp_issue_options = LinkedDataProofOptions::default();
         let vp_issuer_key = "did:example:foo#key1".to_string();
-        vp.holder = Some(URI::String(vp_issuer_key.to_string()));
         vp_issue_options.verification_method = Some(vp_issuer_key);
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        vp_issue_options.checks = None;
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
@@ -1564,7 +2238,9 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDExample).await;
+        let vp_verification_result = vp1
+            .verify(Some(vp_issue_options.clone()), &DIDExample)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
@@ -1572,5 +2248,67 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
         assert!(vp2.verify(None, &DIDExample).await.errors.len() > 0);
+
+        // Test JWT VP
+        let vp_jwt_issue_options = LinkedDataProofOptions {
+            created: None,
+            ..vp_issue_options.clone()
+        };
+        let vp_jwt = vp_without_proof
+            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone())
+            .await
+            .unwrap();
+        let vp_jwt_verify_options = LinkedDataProofOptions {
+            created: None,
+            checks: None,
+            proof_purpose: None,
+            ..Default::default()
+        };
+        let verification_result =
+            Presentation::verify_jwt(&vp_jwt, Some(vp_jwt_verify_options.clone()), &DIDExample)
+                .await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+        // Edit JWT to make it fail
+        let vp_jwt_bad = vp_jwt + "x";
+        let verification_result = Presentation::verify_jwt(
+            &vp_jwt_bad,
+            Some(vp_jwt_verify_options.clone()),
+            &DIDExample,
+        )
+        .await;
+        assert!(verification_result.errors.len() > 0);
+
+        // Test VP with JWT VC
+        let vp_jwtvc = Presentation {
+            verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::JWT(vc_jwt))),
+            holder: Some(URI::String("did:example:foo".to_string())),
+            ..Default::default()
+        };
+
+        // LDP VP
+        let proof = vp_jwtvc
+            .generate_proof(&key, &vp_issue_options.clone())
+            .await
+            .unwrap();
+        let mut vp_jwtvc_ldp = vp_jwtvc.clone();
+        vp_jwtvc_ldp.add_proof(proof);
+        let vp_verify_options = vp_issue_options.clone();
+        let verification_result = vp_jwtvc_ldp
+            .verify(Some(vp_verify_options.clone()), &DIDExample)
+            .await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // JWT VP
+        let vp_vc_jwt = vp_jwtvc
+            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone())
+            .await
+            .unwrap();
+        let verification_result =
+            Presentation::verify_jwt(&vp_vc_jwt, Some(vp_jwt_verify_options.clone()), &DIDExample)
+                .await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
     }
 }

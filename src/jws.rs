@@ -480,7 +480,7 @@ pub fn encode_unsigned(payload: &str) -> Result<String, Error> {
     Ok(header_b64 + "." + &payload_b64 + ".")
 }
 
-fn split_jws(jws: &str) -> Result<(&str, &str, &str), Error> {
+pub fn split_jws(jws: &str) -> Result<(&str, &str, &str), Error> {
     let mut parts = jws.splitn(3, '.');
     Ok(
         match (parts.next(), parts.next(), parts.next(), parts.next()) {
@@ -490,14 +490,17 @@ fn split_jws(jws: &str) -> Result<(&str, &str, &str), Error> {
     )
 }
 
-struct DecodedJWS {
-    header: Header,
-    signing_input: Vec<u8>,
-    payload: Vec<u8>,
-    signature: Vec<u8>,
+pub struct DecodedJWS {
+    pub header: Header,
+    pub signing_input: Vec<u8>,
+    pub payload: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
-fn decode_jws_parts(
+/// Decode JWS parts (JOSE header, payload, and signature) into useful values.
+/// The payload argument is bytes since it may be unencoded if the b64:false header parameter is used; otherwise it must be a base64url-encoded string. Header and signature are always expected to be base64url-encoded.
+/// "crit" (critical) header parameters are checked and disallowed if unrecognized/unsupported.
+pub fn decode_jws_parts(
     header_b64: &str,
     payload_enc: &[u8],
     signature_b64: &str,

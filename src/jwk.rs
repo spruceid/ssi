@@ -2,7 +2,6 @@ use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use std::convert::TryFrom;
 use std::result::Result;
-use std::str::FromStr;
 
 use crate::der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
@@ -20,6 +19,7 @@ use serde::{Deserialize, Serialize};
 // RFC 8812 - CBOR Object Signing and Encryption (COSE) and JSON Object Signing and Encryption
 //  (JOSE) Registrations for Web Authentication (WebAuthn) Algorithms
 
+/// Deprecated
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JWTKeys {
     #[serde(rename = "es256kPrivateKeyJwk")]
