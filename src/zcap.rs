@@ -248,6 +248,9 @@ where
                 if let Result::Err(e) = target_capability.verify_attributes(self) {
                     result.errors.push(e.to_string());
                 };
+                if result.errors.is_empty() {
+                    result.checks.push(Check::Proof);
+                };
                 result
             }
         }
