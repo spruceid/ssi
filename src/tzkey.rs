@@ -24,12 +24,23 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
             #[cfg(feature = "ring")]
             {
                 use ring::signature::KeyPair;
-                let keypair = ring::signature::Ed25519KeyPair::from_seed_unchecked(&sk_bytes)?;
+                let keypair = if sk_bytes.len() == 64 {
+                    ring::signature::Ed25519KeyPair::from_seed_and_public_key(
+                        &sk_bytes[..32],
+                        &sk_bytes[32..],
+                    )?
+                } else {
+                    ring::signature::Ed25519KeyPair::from_seed_unchecked(&sk_bytes)?
+                };
                 pk_bytes = keypair.public_key().as_ref().to_vec()
             }
             #[cfg(feature = "ed25519-dalek")]
             {
-                let sk = ed25519_dalek::SecretKey::from_bytes(&sk_bytes)?;
+                let sk = ed25519_dalek::SecretKey::from_bytes(if sk_bytes.len() == 64 {
+                    &sk_bytes[..32]
+                } else {
+                    &sk_bytes
+                })?;
                 pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
             }
             #[cfg(all(not(feature = "ring"), not(feature = "ed25519-dalek")))]

@@ -3,10 +3,9 @@ use ssi::did::{
     Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
     VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
 };
-use ssi::did_resolve::Metadata;
 use ssi::did_resolve::{
-    DIDResolver, DereferencingInputMetadata, DocumentMetadata, ResolutionInputMetadata,
-    ResolutionMetadata, ERROR_INVALID_DID, TYPE_DID_LD_JSON,
+    dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
+    ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID, TYPE_DID_LD_JSON,
 };
 #[cfg(feature = "secp256r1")]
 use ssi::jwk::p256_parse;
@@ -30,13 +29,13 @@ use std::default::Default;
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
 pub struct DIDTz {
-    bcd_url: &'static str,
+    tzkt_url: &'static str,
 }
 
 impl Default for DIDTz {
     fn default() -> Self {
         Self {
-            bcd_url: "https://api.better-call.dev/",
+            tzkt_url: "https://api.tzkt.io/",
         }
     }
 }
@@ -117,17 +116,15 @@ impl DIDResolver for DIDTz {
             public_key,
         );
 
-        let mut bcd_url = self.bcd_url;
+        let mut tzkt_url = self.tzkt_url;
         if let Some(s) = &input_metadata.property_set {
-            if let Some(url) = s.get("bcd_url") {
-                bcd_url = match url {
+            if let Some(url) = s.get("tzkt_url") {
+                tzkt_url = match url {
                     Metadata::String(u) => u,
                     _ => {
                         return (
                             ResolutionMetadata {
-                                error: Some(
-                                    "Better Call Dev API URL should be a string.".to_string(),
-                                ),
+                                error: Some("TzKT API URL should be a string.".to_string()),
                                 ..Default::default()
                             },
                             Some(doc),
@@ -138,21 +135,27 @@ impl DIDResolver for DIDTz {
             }
         }
 
-        if let Some(service) = match DIDTz::tier2_resolution(bcd_url, did, &address, &network).await
-        {
-            Ok(s) => s,
-            Err(e) => {
-                return (
-                    ResolutionMetadata {
-                        error: Some(e.to_string()),
-                        ..Default::default()
-                    },
-                    Some(doc),
-                    None,
-                )
+        if let (Some(service), Some(vm)) =
+            match DIDTz::tier2_resolution(tzkt_url, did, &address).await {
+                Ok(res) => res,
+                Err(e) => {
+                    return (
+                        ResolutionMetadata {
+                            error: Some(e.to_string()),
+                            ..Default::default()
+                        },
+                        Some(doc),
+                        None,
+                    )
+                }
             }
-        } {
+        {
             doc.service = Some(vec![service]);
+            if let Some(ref mut vms) = doc.verification_method {
+                vms.push(vm);
+            } else {
+                doc.verification_method = Some(vec![vm]);
+            }
         }
 
         if let Some(s) = &input_metadata.property_set {
@@ -369,18 +372,17 @@ impl DIDTz {
     }
 
     async fn tier2_resolution(
-        bcd_url: &str,
+        tzkt_url: &str,
         did: &str,
         address: &str,
-        network: &str,
-    ) -> Result<Option<Service>> {
-        if let Some(did_manager) = explorer::retrieve_did_manager(bcd_url, address, network).await?
-        {
-            Ok(Some(
-                explorer::execute_service_view(bcd_url, did, &did_manager, network).await?,
+    ) -> Result<(Option<Service>, Option<VerificationMethod>)> {
+        if let Some(did_manager) = explorer::retrieve_did_manager(tzkt_url, address).await? {
+            Ok((
+                Some(explorer::execute_service_view(tzkt_url, did, &did_manager).await?),
+                Some(explorer::execute_auth_view(tzkt_url, &did_manager).await?),
             ))
         } else {
-            Ok(None)
+            Ok((None, None))
         }
     }
 
@@ -404,31 +406,22 @@ impl DIDTz {
                         None => return Err(anyhow!("No kid in JWS JSON patch.")),
                     };
                     let kid_didurl: DIDURL = kid.clone().try_into()?;
+                    // TODO need to compare address + network instead of the String
+                    // did:tz:tz1blahblah == did:tz:mainnet:tz1blahblah
                     let kid_doc = if kid_didurl.did == doc.id {
                         doc.clone()
                     } else {
-                        match self
-                            .dereference(&kid_didurl, &DereferencingInputMetadata::default())
-                            .await
-                        {
-                            Some((deref_meta, deref_content, _)) => {
-                                if deref_meta.error.is_some() {
-                                    return Err(anyhow!(
-                                        "Error dereferencing kid: {}",
-                                        deref_meta.error.unwrap()
-                                    ));
-                                } else {
-                                    match deref_content {
-                                        ssi::did_resolve::Content::DIDDocument(d) => d,
-                                        _ => {
-                                            return Err(anyhow!(
-                                                "Dereferenced content not a DID document."
-                                            ))
-                                        }
-                                    }
+                        let (deref_meta, deref_content, _) =
+                            dereference(self, &kid, &DereferencingInputMetadata::default()).await;
+                        if let Some(e) = deref_meta.error {
+                            return Err(anyhow!("Error dereferencing kid: {}", e));
+                        } else {
+                            match deref_content {
+                                ssi::did_resolve::Content::DIDDocument(d) => d,
+                                _ => {
+                                    return Err(anyhow!("Dereferenced content not a DID document."))
                                 }
                             }
-                            None => return Err(anyhow!("Error dereference kid.")),
                         }
                     };
                     if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
@@ -522,23 +515,22 @@ mod tests {
     const TZ1: &'static str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
-    const LIVE_TZ1: &str = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";
-    const LIVE_NETWORK: &str = "delphinet";
+    const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
+    const LIVE_NETWORK: &str = "mainnet";
     const JSON_PATCH: &str = r#"{"ietf-json-patch": [
-                                        {
-                                            "op": "add",
-                                            "path": "/service/1",
-                                            "value": {
-                                                "id": "test_service_id",
-                                                "type": "test_service",
-                                                "serviceEndpoint": "test_service_endpoint"
-                                            }
+                                    {
+                                        "op": "add",
+                                        "path": "/service/1",
+                                        "value": {
+                                            "id": "test_service_id",
+                                            "type": "test_service",
+                                            "serviceEndpoint": "test_service_endpoint"
                                         }
-                                    ]}"#;
+                                    }
+                                ]}"#;
 
-    // Not using the api endpoint because it returns empty results at the moment
     const DIDTZ: DIDTz = DIDTz {
-        bcd_url: "https://better-call.dev/",
+        tzkt_url: "https://api.tzkt.io/",
     };
 
     #[test]
@@ -564,8 +556,6 @@ mod tests {
         assert_eq!(did, "did:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX");
     }
 
-    // https://github.com/spruceid/ssi/issues/196
-    #[ignore]
     #[tokio::test]
     async fn test_derivation_tz1() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
@@ -604,8 +594,6 @@ mod tests {
         );
     }
 
-    // https://github.com/spruceid/ssi/issues/196
-    #[ignore]
     #[tokio::test]
     async fn test_derivation_tz2() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
@@ -644,8 +632,6 @@ mod tests {
         );
     }
 
-    // https://github.com/spruceid/ssi/issues/196
-    #[ignore]
     #[tokio::test]
     async fn credential_prove_verify_did_tz1() {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
@@ -896,8 +882,6 @@ mod tests {
         assert!(vp2.verify(None, &DIDTZ).await.errors.len() > 0);
     }
 
-    // https://github.com/spruceid/ssi/issues/196
-    #[ignore]
     #[tokio::test]
     #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_tz2() {
@@ -1014,7 +998,13 @@ mod tests {
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
             json!({
-              "@context": "https://www.w3.org/ns/did/v1",
+              "@context": [
+                "https://www.w3.org/ns/did/v1",
+                {
+                  "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+                  "blockchainAccountId": "https://w3id.org/security#blockchainAccountId"
+                }
+              ],
               "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
               "verificationMethod": [{
                 "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId",
@@ -1201,59 +1191,71 @@ mod tests {
         );
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_full_resolution() {
-        // let address = "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq";
-        // let pk = "edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A";
+        // let address = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
+        // let pk = "edpkvRWhuk5cLe5vwR7TGfSJxVLmVDk5og45WAhsAAvfqQXmYKNPve";
         // let sk = "";
-        // let did = format!("did:tz:{}:{}", "delphinet", address);
-        // let public_key = PublicKey::from_base58check(pk).unwrap();
-        // let private_key = PrivateKey::from_base58check(sk).unwrap();
+        // let did = format!("did:tz:{}", address);
+        // // let public_key = bs58::decode(&pk).with_check(None).into_vec().unwrap()[4..].to_owned();
+        // // let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
+        // // println!("LEN: {}", private_key.len());
+        // // let key = JWK {
+        // //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+        // //         curve: "Ed25519".to_string(),
+        // //         public_key: ssi::jwk::Base64urlUInt(public_key),
+        // //         private_key: Some(ssi::jwk::Base64urlUInt(private_key)),
+        // //     }),
+        // //     public_key_use: None,
+        // //     key_operations: None,
+        // //     algorithm: None,
+        // //     key_id: Some(format!("{}#blockchainAccountId", did)),
+        // //     x509_url: None,
+        // //     x509_certificate_chain: None,
+        // //     x509_thumbprint_sha1: None,
+        // //     x509_thumbprint_sha256: None,
+        // // };
         // let key = JWK {
-        //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
-        //         curve: "Ed25519".to_string(),
-        //         public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
-        //         private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
-        //     }),
-        //     public_key_use: None,
-        //     key_operations: None,
-        //     algorithm: None,
         //     key_id: Some(format!("{}#blockchainAccountId", did)),
-        //     x509_url: None,
-        //     x509_certificate_chain: None,
-        //     x509_thumbprint_sha1: None,
-        //     x509_thumbprint_sha256: None,
+        //     ..ssi::tzkey::jwk_from_tezos_key(sk).unwrap()
         // };
         // let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         // println!("{}", jws);
         // assert!(false);
-        let jws = "eyJhbGciOiJFZERTQSIsImtpZCI6ImRpZDp0ejpkZWxwaGluZXQ6dHoxV3Z2YkVHcEJYR2VUVmJMaVI2RFlCZTFpem1naVl1WmJxI2Jsb2NrY2hhaW5BY2NvdW50SWQifQ.eyJpZXRmLWpzb24tcGF0Y2giOiBbCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIm9wIjogImFkZCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInBhdGgiOiAiL3NlcnZpY2UvMSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInZhbHVlIjogewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAiaWQiOiAidGVzdF9zZXJ2aWNlX2lkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAidGVzdF9zZXJ2aWNlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInNlcnZpY2VFbmRwb2ludCI6ICJ0ZXN0X3NlcnZpY2VfZW5kcG9pbnQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBdfQ.OTMe8ljEZEqZrdfkL1hhuiVXFGw_taFRVqNTfsycxFDq5FPu1ZSgaTOertyC61cQQXNLqTRo2kHAos8kx8PHAQ".to_string();
+        let jws = "eyJhbGciOiJFZERTQSIsImtpZCI6ImRpZDp0ejp0ejFnaURHc2lmV0I5cTlzaWVrQ0tRYUpLcm1DOWRhNU00M0ojYmxvY2tjaGFpbkFjY291bnRJZCJ9.eyJpZXRmLWpzb24tcGF0Y2giOiBbCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICJvcCI6ICJhZGQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInBhdGgiOiAiL3NlcnZpY2UvMSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAidmFsdWUiOiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgImlkIjogInRlc3Rfc2VydmljZV9pZCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAidGVzdF9zZXJ2aWNlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAic2VydmljZUVuZHBvaW50IjogInRlc3Rfc2VydmljZV9lbmRwb2ludCIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIF19.HqPI6jFXuEMZ-fQfSE9MstDlKifoqdt8sAtUJ8I3IYwMybLxrabl35hTXyf5Uj6XwnYKrKbBvXImt52WQla5CQ".to_string();
         let input_metadata: ResolutionInputMetadata = serde_json::from_value(
             json!({"updates": {"type": "signed-ietf-json-patch", "value": [jws]},
-                   "public_key": "edpkthtzpq4e8AhtjZ6BPK63iLfqpH7rzjDVbjxjbTuv3kMoGQi26A"}),
+                   "public_key": "edpkvRWhuk5cLe5vwR7TGfSJxVLmVDk5og45WAhsAAvfqQXmYKNPve"}),
         )
         .unwrap();
-        let live_did = format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1);
+        let live_did = format!("did:tz:{}", LIVE_TZ1);
         let (res_meta, res_doc, _res_doc_meta) = DIDTZ.resolve(&live_did, &input_metadata).await;
         assert_eq!(res_meta.error, None);
         let d = res_doc.unwrap();
         let expected = Document {
             id: live_did.clone(),
-            verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
-                id: format!("{}#blockchainAccountId", live_did),
-                type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
-                blockchain_account_id: Some(format!("{}@tezos:{}", LIVE_TZ1, LIVE_NETWORK)),
-                controller: live_did.clone(),
-                property_set: Some(Map::new()), // TODO should be None
-                ..Default::default()
-            })]),
+            verification_method: Some(vec![
+                VerificationMethod::Map(VerificationMethodMap {
+                    id: format!("{}#blockchainAccountId", live_did),
+                    type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
+                    blockchain_account_id: Some(format!("{}@tezos:{}", LIVE_TZ1, LIVE_NETWORK)),
+                    controller: live_did.clone(),
+                    property_set: Some(Map::new()), // TODO should be None
+                    ..Default::default()
+                }),
+                VerificationMethod::DIDURL(DIDURL {
+                    did: format!("did:pkh:tz:{}", LIVE_TZ1),
+                    path_abempty: "".to_string(),
+                    query: None,
+                    fragment: Some("TezosMethod2021".to_string()),
+                }),
+            ]),
             service: Some(vec![
                 Service {
                     id: format!("{}#discovery", live_did),
                     type_: OneOrMany::One("TezosDiscoveryService".to_string()),
                     service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
-                        "test_service2".to_string(),
+                        "http://example.com".to_string(),
                     ))),
                     property_set: Some(Map::new()), // TODO should be None
                 },
@@ -1282,7 +1284,7 @@ mod tests {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
         let mut key = JWK::generate_p256().unwrap();
-        key.algorithm = Some(Algorithm::ES256);
+        key.algorithm = Some(Algorithm::ESBlake2b);
         let did = DIDTZ.generate(&Source::Key(&key)).unwrap();
         let mut vc: Credential = serde_json::from_value(json!({
             "@context": "https://www.w3.org/2018/credentials/v1",

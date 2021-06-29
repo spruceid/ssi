@@ -15,7 +15,8 @@ documentation = "https://docs.rs/did-tezos/"
 default = ["ssi/ring"]
 dalek = ["ssi/ed25519-dalek", "ssi/rand", "ssi/sha2"]
 secp256k1 = ["libsecp256k1", "ssi/secp256k1", "ssi/rand"]
-p256 = ["ssi/p256"]
+secp256r1 = ["ssi/secp256r1"]
+p256 = ["secp256r1"]
 
 [dependencies]
 ssi = { version = "0.2", path = "../", default-features = false }
