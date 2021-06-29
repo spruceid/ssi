@@ -1,88 +1,49 @@
 use anyhow::Result;
 use reqwest;
 use serde::Deserialize;
-use ssi::did::{Service, ServiceEndpoint};
+use ssi::did::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
 use ssi::one_or_many::OneOrMany;
 use ssi::USER_AGENT;
+use std::convert::TryFrom;
 use url::Url;
 
-#[derive(Deserialize)]
-struct Contract {
-    value: String,
-    body: ContractDetails,
-}
-
-#[derive(Deserialize)]
-struct ContractDetails {
-    entrypoints: Vec<String>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "lowercase")]
-#[serde(tag = "type")]
-enum SearchItem {
-    Contract(Contract),
-}
-
-#[derive(Deserialize)]
-struct SearchResult {
-    items: Vec<SearchItem>,
-}
-
-pub async fn retrieve_did_manager(
-    bcd_url: &str,
-    address: &str,
-    network: &str,
-) -> Result<Option<String>> {
+pub async fn retrieve_did_manager(bcd_url: &str, address: &str) -> Result<Option<String>> {
     let client = reqwest::Client::builder().build()?;
     let url = Url::parse(bcd_url)?;
-    let mut search_result: SearchResult = client
-        .get(url.join("/v1/search")?)
+    let contracts: Vec<String> = client
+        .get(url.join("/v1/contracts")?)
         .query(&[
-            ("q", address),
-            ("f", "manager"),
-            ("n", network),
-            ("i", "contract"),
+            ("creator", address),
+            ("sort", "lastActivity"),
+            ("select", "address"),
+            // TODO using codeHash while all contracts have the same code and until tezedge-client provide a way to fetch TZIP-016 metadata.
+            ("codeHash", "1222545108"),
         ])
         .send()
         .await?
         .json()
         .await?;
 
-    // TODO this is a hack for the tests as there were multiple DID managers deployed
-    search_result.items.reverse();
-    for search_item in search_result.items {
-        match search_item {
-            SearchItem::Contract(c) => {
-                if c.body
-                    .entrypoints
-                    .contains(&"rotateAuthentication".to_string())
-                    && c.body.entrypoints.contains(&"rotateService".to_string())
-                {
-                    return Ok(Some(c.value));
-                }
-            }
-        }
+    if contracts.len() > 0 {
+        Ok(Some(contracts[0].clone()))
+    } else {
+        Ok(None)
     }
-    Ok(None)
 }
 
 #[derive(Deserialize)]
 struct ServiceResult {
-    children: Vec<ServiceResultItem>,
+    service: ServiceResultService,
 }
 
 #[derive(Deserialize)]
-struct ServiceResultItem {
-    value: String,
+struct ServiceResultService {
+    type_: String,
+    endpoint: String,
 }
 
-pub async fn execute_service_view(
-    bcd_url: &str,
-    did: &str,
-    contract: &str,
-    network: &str,
-) -> Result<Service> {
+// Not using TZIP-016 for now as TzKT doesn't have an endpoint to execute views and tezedge-client doesn't support it yet.
+pub async fn execute_service_view(tzkt_url: &str, did: &str, contract: &str) -> Result<Service> {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "User-Agent",
@@ -91,56 +52,83 @@ pub async fn execute_service_view(
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()?;
-    let url = Url::parse(bcd_url)?;
+    let url = Url::parse(tzkt_url)?;
     let service_result: ServiceResult = client
-        .post(url.join(&format!(
-            "/v1/contract/{}/{}/views/execute",
-            network, contract
-        ))?)
-        .json(&serde_json::json!({"data": {}, "name": "GetService", "implementation": 0}))
+        .get(url.join(&format!("/v1/contracts/{}/storage", contract))?)
         .send()
         .await?
         .json()
         .await?;
     Ok(Service {
         id: format!("{}{}", did, "#discovery"),
-        type_: OneOrMany::One(service_result.children[1].value.clone()),
+        type_: OneOrMany::One(service_result.service.type_.clone()),
         service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
-            service_result.children[0].value.clone(),
+            service_result.service.endpoint.clone(),
         ))),
         property_set: None,
     })
+}
+
+#[derive(Deserialize)]
+struct AuthResult {
+    verification_method: String,
+}
+
+pub async fn execute_auth_view(tzkt_url: &str, contract: &str) -> Result<VerificationMethod> {
+    let client = reqwest::Client::builder().build()?;
+    let url = Url::parse(tzkt_url)?;
+    let auth_result: AuthResult = client
+        .get(url.join(&format!("/v1/contracts/{}/storage", contract))?)
+        .send()
+        .await?
+        .json()
+        .await?;
+    Ok(VerificationMethod::DIDURL(DIDURL::try_from(
+        auth_result.verification_method,
+    )?))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    // Not using the api endpoint because it returns empty results at the moment
-    const BCD_URL: &str = "https://better-call.dev/";
-    const LIVE_TZ1: &str = "tz1Z3yNumnSFoHtMsMPAkiCqDQpTcnw7fk1s";
-    const LIVE_NETWORK: &str = "delphinet";
-    const LIVE_DID_MANAGER: &str = "KT1XFk3nxojBisE5WpXugmuPuh9GRzo54gxL";
+    const TZKT_URL: &str = "https://api.tzkt.io/";
+    const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
+    const LIVE_NETWORK: &str = "mainnet";
+    const LIVE_DID_MANAGER: &str = "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi";
 
     #[tokio::test]
-    #[ignore]
     async fn test_retrieve_did_manager() {
-        let did_manager = retrieve_did_manager(BCD_URL, LIVE_TZ1, LIVE_NETWORK).await;
+        let did_manager = retrieve_did_manager(TZKT_URL, LIVE_TZ1).await;
         assert!(did_manager.is_ok());
         assert_eq!(did_manager.unwrap().unwrap(), LIVE_DID_MANAGER.to_string());
     }
 
     #[tokio::test]
-    #[ignore]
     async fn test_execute_view() {
         let service_endpoint = execute_service_view(
-            BCD_URL,
+            TZKT_URL,
             &format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1),
             LIVE_DID_MANAGER,
-            LIVE_NETWORK,
         )
         .await;
-        println!("{:?}", service_endpoint);
         assert!(service_endpoint.is_ok());
+        match service_endpoint.unwrap().service_endpoint.unwrap() {
+            OneOrMany::One(ServiceEndpoint::URI(endpoint)) => {
+                assert_eq!(endpoint, "http://example.com")
+            }
+            _ => panic!("Should have many."),
+        };
+        let verification_method = execute_auth_view(TZKT_URL, LIVE_DID_MANAGER).await;
+        assert!(verification_method.is_ok());
+        match verification_method.unwrap() {
+            VerificationMethod::DIDURL(did_url) => {
+                assert_eq!(
+                    did_url.to_string(),
+                    format!("did:pkh:tz:{}#TezosMethod2021", LIVE_TZ1)
+                )
+            }
+            _ => panic!("Impossible format."),
+        };
     }
 }
