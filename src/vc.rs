@@ -648,6 +648,7 @@ impl Credential {
             domain,
             checks,
             eip712_domain,
+            property_set,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1083,6 +1084,7 @@ impl Presentation {
             domain,
             checks,
             eip712_domain,
+            property_set,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));

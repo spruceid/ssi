@@ -148,6 +148,10 @@ where
         let mut loader = StaticLoader;
         json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
     }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
+    }
 }
 
 // limited initial definition of a ZCAP Invocation, generic over Action
@@ -338,6 +342,10 @@ where
         };
         let mut loader = StaticLoader;
         json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+    }
+
+    fn to_value(&self) -> Result<Value, Error> {
+        Ok(serde_json::to_value(&self)?)
     }
 }
 
