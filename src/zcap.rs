@@ -235,7 +235,7 @@ where
                         .push("Missing proof target capability ID".into()),
                 };
                 match (&target_capability.invoker, &proof.verification_method) {
-                    // if there are invokers listed in the target, ensure the inoker here is the right one
+                    // Ensure the proof's verification method is authorized as an invoker. TODO: also allow target_capability's capabilityDelegation verification methods.
                     (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
                         if invoker != delegatee {
                             result.errors.push("Incorrect Invoker".into());
