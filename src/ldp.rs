@@ -1199,7 +1199,9 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let mut opts = options.clone();
         if let Some(ref eip712_domain) = options.eip712_domain {
             let info = serde_json::to_value(eip712_domain.clone())?;
-            opts.property_set.insert("eip712Domain".to_string(), info);
+            opts.property_set
+                .get_or_insert(Map::new())
+                .insert("eip712Domain".to_string(), info);
         }
         let mut proof = Proof {
             context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
@@ -1231,7 +1233,9 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let mut opts = options.clone();
         if let Some(ref eip712_domain) = options.eip712_domain {
             let info = serde_json::to_value(eip712_domain.clone())?;
-            opts.property_set.insert("eip712Domain".to_string(), info);
+            opts.property_set
+                .get_or_insert(Map::new())
+                .insert("eip712Domain".to_string(), info);
         }
         let proof = Proof {
             context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
