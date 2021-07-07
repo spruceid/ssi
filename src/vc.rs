@@ -1507,7 +1507,19 @@ impl Proof {
     pub fn new(type_: &str) -> Self {
         Self {
             type_: type_.to_string(),
-            ..Default::default()
+            ..Self::default()
+        }
+    }
+
+    pub fn with_options(self, options: &LinkedDataProofOptions) -> Self {
+        Self {
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            property_set: options.property_set.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            ..self
         }
     }
 

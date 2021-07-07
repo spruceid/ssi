@@ -1,3 +1,4 @@
+use std::collections::HashMap as Map;
 #[cfg(feature = "keccak-hash")]
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -609,15 +610,7 @@ async fn sign(
             return Err(Error::AlgorithmMismatch);
         }
     }
-    let proof = Proof {
-        proof_purpose: options.proof_purpose.clone(),
-        verification_method: options.verification_method.clone(),
-        created: Some(options.created.unwrap_or_else(now_ms)),
-        domain: options.domain.clone(),
-        challenge: options.challenge.clone(),
-        property_set: options.property_set.clone(),
-        ..Proof::new(type_)
-    };
+    let proof = Proof::new(type_).with_options(options);
     sign_proof(document, proof, key, algorithm).await
 }
 
@@ -645,14 +638,7 @@ async fn prepare(
             return Err(Error::AlgorithmMismatch);
         }
     }
-    let proof = Proof {
-        proof_purpose: options.proof_purpose.clone(),
-        verification_method: options.verification_method.clone(),
-        created: Some(options.created.unwrap_or_else(now_ms)),
-        domain: options.domain.clone(),
-        challenge: options.challenge.clone(),
-        ..Proof::new(type_)
-    };
+    let proof = Proof::new(type_).with_options(options);
     prepare_proof(document, proof, algorithm).await
 }
 
@@ -841,12 +827,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
                 crate::jsonld::DIF_ESRS2020_CONTEXT,
                 crate::jsonld::ESRS2020_EXTRA_CONTEXT,
             ]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
+            ..Proof::new("EcdsaSecp256k1RecoverySignature2020").with_options(options)
         };
         sign_proof(document, proof, key, Algorithm::ES256KR).await
     }
@@ -862,12 +843,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
                 crate::jsonld::DIF_ESRS2020_CONTEXT,
                 crate::jsonld::ESRS2020_EXTRA_CONTEXT,
             ]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
+            ..Proof::new("EcdsaSecp256k1RecoverySignature2020").with_options(options)
         };
         prepare_proof(document, proof, Algorithm::ES256KR).await
     }
@@ -915,27 +891,24 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         options: &LinkedDataProofOptions,
         key: &JWK,
     ) -> Result<Proof, Error> {
-        use std::collections::HashMap;
         if let Some(key_algorithm) = key.algorithm {
             if key_algorithm != Algorithm::EdBlake2b {
                 return Err(Error::AlgorithmMismatch);
             }
         }
-        let mut property_set = HashMap::new();
+        let mut opts = options.clone();
         let jwk_value = serde_json::to_value(key.to_public())?;
         // This proof type must contain the public key, because the DID is based on the hash of the
         // public key, and the public key is not otherwise recoverable.
-        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        opts.property_set
+            .get_or_insert(Map::new())
+            .insert("publicKeyJwk".to_string(), jwk_value);
+
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            property_set: Some(property_set),
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+                .with_options(&opts)
         };
         sign_proof(document, proof, key, Algorithm::EdBlake2b).await
     }
@@ -946,21 +919,18 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         options: &LinkedDataProofOptions,
         public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
-        use std::collections::HashMap;
-        let mut property_set = HashMap::new();
+        let mut opts = options.clone();
         let jwk_value = serde_json::to_value(public_key.to_public())?;
         // This proof type must contain the public key, because the DID is based on the hash of the
         // public key, and the public key is not otherwise recoverable.
-        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        opts.property_set
+            .get_or_insert(Map::new())
+            .insert("publicKeyJwk".to_string(), jwk_value);
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
             ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+                .with_options(&opts)
         };
         prepare_proof(document, proof, Algorithm::EdBlake2b).await
     }
@@ -1015,27 +985,23 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         options: &LinkedDataProofOptions,
         key: &JWK,
     ) -> Result<Proof, Error> {
-        use std::collections::HashMap;
         if let Some(key_algorithm) = key.algorithm {
             if key_algorithm != Algorithm::ESBlake2b {
                 return Err(Error::AlgorithmMismatch);
             }
         }
-        let mut property_set = HashMap::new();
+        let mut opts = options.clone();
         let jwk_value = serde_json::to_value(key.to_public())?;
         // This proof type must contain the public key, because the DID is based on the hash of the
         // public key, and the public key is not otherwise recoverable.
-        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        opts.property_set
+            .get_or_insert(Map::new())
+            .insert("publicKeyJwk".to_string(), jwk_value);
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            property_set: Some(property_set),
             ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+                .with_options(&opts)
         };
         sign_proof(document, proof, key, Algorithm::ESBlake2b).await
     }
@@ -1046,21 +1012,18 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         options: &LinkedDataProofOptions,
         public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
-        use std::collections::HashMap;
-        let mut property_set = HashMap::new();
+        let mut opts = options.clone();
         let jwk_value = serde_json::to_value(public_key.to_public())?;
         // This proof type must contain the public key, because the DID is based on the hash of the
         // public key, and the public key is not otherwise recoverable.
-        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        opts.property_set
+            .get_or_insert(Map::new())
+            .insert("publicKeyJwk".to_string(), jwk_value);
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
             ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+                .with_options(&opts)
         };
         prepare_proof(document, proof, Algorithm::ESBlake2b).await
     }
@@ -1119,12 +1082,7 @@ impl ProofSuite for Eip712Signature2021 {
         use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("Eip712Signature2021")
+            ..Proof::new("Eip712Signature2021").with_options(options)
         };
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
         let bytes = typed_data.bytes()?;
@@ -1151,12 +1109,7 @@ impl ProofSuite for Eip712Signature2021 {
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("Eip712Signature2021")
+            ..Proof::new("Eip712Signature2021").with_options(options)
         };
         let typed_data = TypedData::from_document_and_options(document, &proof).await?;
         Ok(ProofPreparation {
@@ -1243,20 +1196,14 @@ impl ProofSuite for EthereumEip712Signature2021 {
     ) -> Result<Proof, Error> {
         use k256::ecdsa::signature::Signer;
         // TODO: conform to spec: no domain
-        let mut property_set = std::collections::HashMap::new();
+        let mut opts = options.clone();
         if let Some(ref eip712_domain) = options.eip712_domain {
             let info = serde_json::to_value(eip712_domain.clone())?;
-            property_set.insert("eip712Domain".to_string(), info);
+            opts.property_set.insert("eip712Domain".to_string(), info);
         }
         let mut proof = Proof {
             context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            property_set: Some(property_set),
-            ..Proof::new("EthereumEip712Signature2021")
+            ..Proof::new("EthereumEip712Signature2021").with_options(&opts)
         };
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
         let bytes = typed_data.bytes()?;
@@ -1281,20 +1228,14 @@ impl ProofSuite for EthereumEip712Signature2021 {
         options: &LinkedDataProofOptions,
         _public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
-        let mut property_set = std::collections::HashMap::new();
+        let mut opts = options.clone();
         if let Some(ref eip712_domain) = options.eip712_domain {
             let info = serde_json::to_value(eip712_domain.clone())?;
-            property_set.insert("eip712Domain".to_string(), info);
+            opts.property_set.insert("eip712Domain".to_string(), info);
         }
         let proof = Proof {
             context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            property_set: Some(property_set),
-            ..Proof::new("EthereumEip712Signature2021")
+            ..Proof::new("EthereumEip712Signature2021").with_options(&opts)
         };
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
         Ok(ProofPreparation {
@@ -1381,12 +1322,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         use k256::ecdsa::signature::{digest::Digest, DigestSigner};
         let mut proof = Proof {
             context: serde_json::json!([EPSIG_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("EthereumPersonalSignature2021")
+            ..Proof::new("EthereumPersonalSignature2021").with_options(options)
         };
         let signing_string = string_from_document_and_options(document, &proof).await?;
         let hash = crate::keccak_hash::hash_personal_message(&signing_string);
@@ -1414,12 +1350,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([EPSIG_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("EthereumPersonalSignature2021")
+            ..Proof::new("EthereumPersonalSignature2021").with_options(options)
         };
         let signing_string = string_from_document_and_options(document, &proof).await?;
         Ok(ProofPreparation {
@@ -1535,12 +1466,7 @@ impl ProofSuite for TezosSignature2021 {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         let mut proof = Proof {
             context: TZVM_CONTEXT.clone(),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("TezosSignature2021")
+            ..Proof::new("TezosSignature2021").with_options(options)
         };
         let micheline = micheline_from_document_and_options(document, &proof).await?;
         let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
@@ -1564,19 +1490,15 @@ impl ProofSuite for TezosSignature2021 {
         options: &LinkedDataProofOptions,
         public_key: &JWK,
     ) -> Result<ProofPreparation, Error> {
-        let mut property_set = std::collections::HashMap::new();
+        let mut opts = options.clone();
         // TODO: dereference VM URL to check if VM already contains public key.
         let jwk_value = serde_json::to_value(public_key.to_public())?;
-        property_set.insert("publicKeyJwk".to_string(), jwk_value);
+        opts.property_set
+            .get_or_insert(Map::new())
+            .insert("publicKeyJwk".to_string(), jwk_value);
         let proof = Proof {
             context: TZVM_CONTEXT.clone(),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            property_set: Some(property_set),
-            ..Proof::new("TezosSignature2021")
+            ..Proof::new("TezosSignature2021").with_options(&opts)
         };
         let micheline = micheline_from_document_and_options(document, &proof).await?;
         let micheline_string = hex::encode(micheline);
@@ -1669,12 +1591,7 @@ impl ProofSuite for SolanaSignature2021 {
     ) -> Result<Proof, Error> {
         let mut proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("SolanaSignature2021")
+            ..Proof::new("SolanaSignature2021").with_options(options)
         };
         let message = to_jws_payload(document, &proof).await?;
         let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
@@ -1693,12 +1610,7 @@ impl ProofSuite for SolanaSignature2021 {
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("SolanaSignature2021")
+            ..Proof::new("SolanaSignature2021").with_options(options)
         };
         let message = to_jws_payload(document, &proof).await?;
         let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
@@ -1809,12 +1721,7 @@ impl ProofSuite for JsonWebSignature2020 {
         }
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("JsonWebSignature2020")
+            ..Proof::new("JsonWebSignature2020").with_options(options)
         };
         sign_proof(document, proof, key, algorithm).await
     }
@@ -1830,12 +1737,7 @@ impl ProofSuite for JsonWebSignature2020 {
         }
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            ..Proof::new("JsonWebSignature2020")
+            ..Proof::new("JsonWebSignature2020").with_options(options)
         };
         prepare_proof(document, proof, algorithm).await
     }
