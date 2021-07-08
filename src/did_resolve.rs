@@ -43,6 +43,7 @@ pub enum Metadata {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolutionInputMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub accept: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version_id: Option<String>,
@@ -84,6 +85,7 @@ pub struct DocumentMetadata {
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DereferencingInputMetadata {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub accept: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_type: Option<String>,
