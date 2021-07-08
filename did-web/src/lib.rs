@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use ssi::did::{DIDMethod, Document};
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    TYPE_DID_LD_JSON,
+    ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
 };
 use ssi::USER_AGENT;
 
@@ -133,16 +133,20 @@ impl DIDResolver for DIDWeb {
                 )
             }
         };
-        match resp.error_for_status_ref() {
-            Ok(_) => (),
-            Err(err) => {
+        if let Err(err) = resp.error_for_status_ref() {
+            if err.status() == Some(reqwest::StatusCode::NOT_FOUND) {
                 return (
-                    ResolutionMetadata::from_error(&err.to_string()),
+                    ResolutionMetadata::from_error(ERROR_NOT_FOUND),
                     Vec::new(),
                     Some(DocumentMetadata::default()),
-                )
+                );
             }
-        };
+            return (
+                ResolutionMetadata::from_error(&err.to_string()),
+                Vec::new(),
+                Some(DocumentMetadata::default()),
+            );
+        }
         let doc_representation = match resp.bytes().await {
             Ok(bytes) => bytes.to_vec(),
             Err(err) => {

@@ -21,11 +21,12 @@ pub const TYPE_JSON: &str = "application/json";
 pub const TYPE_LD_JSON: &str = "application/ld+json";
 pub const TYPE_DID_JSON: &str = "application/did+json";
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
-pub const ERROR_INVALID_DID: &str = "invalid-did";
+pub const ERROR_INVALID_DID: &str = "invalidDid";
+pub const ERROR_INVALID_DID_URL: &str = "invalidDidUrl";
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
-pub const ERROR_NOT_FOUND: &str = "not-found";
-pub const ERROR_METHOD_NOT_SUPPORTED: &str = "method-not-supported";
-pub const ERROR_REPRESENTATION_NOT_SUPPORTED: &str = "representation-not-supported";
+pub const ERROR_NOT_FOUND: &str = "notFound";
+pub const ERROR_METHOD_NOT_SUPPORTED: &str = "methodNotSupported";
+pub const ERROR_REPRESENTATION_NOT_SUPPORTED: &str = "representationNotSupported";
 pub const TYPE_DID_RESOLUTION: &'static str =
     "application/ld+json;profile=\"https://w3id.org/did-resolution\";charset=utf-8";
 
@@ -284,9 +285,9 @@ pub async fn dereference(
 ) -> (DereferencingMetadata, Content, ContentMetadata) {
     let mut did_url = match DIDURL::try_from(did_url_str.to_string()) {
         Ok(did_url) => did_url,
-        Err(error) => {
+        Err(_error) => {
             return (
-                DereferencingMetadata::from(error),
+                DereferencingMetadata::from_error(ERROR_INVALID_DID_URL),
                 Content::Null,
                 ContentMetadata::default(),
             );
@@ -310,25 +311,23 @@ pub async fn dereference(
     let (did_doc_res_meta, did_doc_opt, did_doc_meta_opt) = resolver
         .resolve(&did_url.did, &did_res_input_metadata)
         .await;
-    let (did_doc, did_doc_meta) = match (did_doc_opt, did_doc_meta_opt) {
-        (Some(doc), Some(meta)) if did_doc_res_meta.error.as_deref() != Some(ERROR_NOT_FOUND) => {
-            (doc, meta)
-        }
-        _ => {
-            return (
-                DereferencingMetadata::from(Error::ResourceNotFound(did_url.did.to_string())),
-                Content::Null,
-                ContentMetadata::default(),
-            );
-        }
-    };
-    if let Some(error) = did_doc_res_meta.error {
+    if let Some(ref error) = did_doc_res_meta.error {
         return (
             DereferencingMetadata::from_error(&error),
             Content::Null,
             ContentMetadata::default(),
         );
     }
+    let (did_doc, did_doc_meta) = match (did_doc_opt, did_doc_meta_opt) {
+        (Some(doc), Some(meta)) => (doc, meta),
+        _ => {
+            return (
+                DereferencingMetadata::from_error(ERROR_NOT_FOUND),
+                Content::Null,
+                ContentMetadata::default(),
+            );
+        }
+    };
     // 2
     let fragment = did_url.fragment.take();
     let (deref_meta, content, content_meta) = dereference_primary_resource(
