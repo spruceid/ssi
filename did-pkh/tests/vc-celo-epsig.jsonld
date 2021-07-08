@@ -1,0 +1,79 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    {
+      "identifier": "https://docs.celo.org/identifier",
+      "PhoneNumberType": "https://docs.celo.org/PhoneNumberType",
+      "phoneNumberTypeProvider": "https://docs.celo.org/phone_type_providers",
+      "phoneNumberType": "https://docs.celo.org/phone_types"
+    }
+  ],
+  "type": [
+    "VerifiableCredential",
+    "PhoneNumberType"
+  ],
+  "credentialSubject": {
+    "id": "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+    "phoneNumberType": "mobile",
+    "identifier": "0xb94a339651d98d48fe1776210b9cfb58c581bc29533826275752be9121ec36d4",
+    "phoneNumberTypeProvider": "vonage"
+  },
+  "issuer": "did:pkh:celo:0xc0f4e7b1a61538447e08fad89f561a2d07f78a93",
+  "issuanceDate": "2021-07-08T15:16:09.632Z",
+  "proof": {
+    "@context": [
+      {
+        "EthereumPersonalSignature2021": {
+          "@context": {
+            "@protected": true,
+            "@version": 1.1,
+            "challenge": "https://w3id.org/security#challenge",
+            "created": {
+              "@id": "http://purl.org/dc/terms/created",
+              "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+            },
+            "domain": "https://w3id.org/security#domain",
+            "expires": {
+              "@id": "https://w3id.org/security#expiration",
+              "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+            },
+            "id": "@id",
+            "nonce": "https://w3id.org/security#nonce",
+            "proofPurpose": {
+              "@context": {
+                "@protected": true,
+                "@version": 1.1,
+                "assertionMethod": {
+                  "@container": "@set",
+                  "@id": "https://w3id.org/security#assertionMethod",
+                  "@type": "@id"
+                },
+                "authentication": {
+                  "@container": "@set",
+                  "@id": "https://w3id.org/security#authenticationMethod",
+                  "@type": "@id"
+                },
+                "id": "@id",
+                "type": "@type"
+              },
+              "@id": "https://w3id.org/security#proofPurpose",
+              "@type": "@vocab"
+            },
+            "proofValue": "https://w3id.org/security#proofValue",
+            "type": "@type",
+            "verificationMethod": {
+              "@id": "https://w3id.org/security#verificationMethod",
+              "@type": "@id"
+            }
+          },
+          "@id": "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021"
+        }
+      }
+    ],
+    "type": "EthereumPersonalSignature2021",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "0xe2b7825e6d8d1991d6b7e2d6e3a52c66d65a448b89ed45c70f6e87b38cfeddcd7a1c6b4ca7bb0f85db947a2237ad6fb75c6dd3d15b60df96038380cede137a3f1c",
+    "verificationMethod": "did:pkh:celo:0xc0f4e7b1a61538447e08fad89f561a2d07f78a93#Recovery2020",
+    "created": "2021-07-08T15:16:09.633Z"
+  }
+}
