@@ -204,8 +204,6 @@ No deletion possible. did:pkh DID Documents are, like [did:key] documents, inten
 |:---:|:---:|:---:|:---:|
 |Spruce Systems, USA|[DIDKit](https://github.com/spruceid/didkit/)|`did-pkh` crate in ssi [core library](https://github.com/spruceid/ssi/tree/main/did-pkh)|July 2,2021|
 
-## Resources
-
 [did-core]: https://www.w3.org/TR/did-core/
 [did:key]: https://w3c-ccg.github.io/did-method-key/
 [vm type]: https://www.w3.org/TR/did-core/#verification-methods
