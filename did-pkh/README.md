@@ -1,6 +1,6 @@
 # did-pkh
 
-Rust implementation of the `did:pkh` [DID Method][], based on the [ssi][] library.
+Rust implementation of the `did:pkh` [DID Method][], based on the [ssi][] library.  A draft specification can be found [here](did-pkh-method-draft.md).
 
 ## License
 
