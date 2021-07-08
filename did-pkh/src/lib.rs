@@ -527,7 +527,7 @@ mod tests {
         test_generate(
             secp256k1_pk.clone(),
             "celo",
-            "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+            "did:pkh:celo:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758",
         );
         test_generate(
             json!({
