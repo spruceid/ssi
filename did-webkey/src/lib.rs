@@ -7,7 +7,6 @@ use sshkeys::PublicKeyKind;
 use ssi::did::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    TYPE_DID_LD_JSON,
 };
 use ssi::ssh::ssh_pkk_to_jwk;
 
@@ -311,11 +310,7 @@ impl DIDResolver for DIDWebKey {
         };
         // TODO: set document created/updated metadata from HTTP headers?
         (
-            ResolutionMetadata {
-                error: None,
-                content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                property_set: None,
-            },
+            ResolutionMetadata::default(),
             Some(doc),
             Some(DocumentMetadata::default()),
         )

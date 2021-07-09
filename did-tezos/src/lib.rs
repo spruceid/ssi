@@ -5,7 +5,7 @@ use ssi::did::{
 };
 use ssi::did_resolve::{
     dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
-    ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID, TYPE_DID_LD_JSON,
+    ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
 };
 #[cfg(feature = "secp256r1")]
 use ssi::jwk::p256_parse;
@@ -215,7 +215,6 @@ impl DIDResolver for DIDTz {
         }
 
         let res_meta = ResolutionMetadata {
-            content_type: Some(TYPE_DID_LD_JSON.to_string()),
             ..Default::default()
         };
 

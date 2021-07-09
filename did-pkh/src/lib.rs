@@ -10,7 +10,6 @@ use ssi::did::{
 };
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    TYPE_DID_LD_JSON,
 };
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
@@ -29,7 +28,6 @@ type ResolutionResult = (
 
 fn resolution_result(doc: Document) -> ResolutionResult {
     let res_meta = ResolutionMetadata {
-        content_type: Some(TYPE_DID_LD_JSON.to_string()),
         ..Default::default()
     };
     let doc_meta = DocumentMetadata {

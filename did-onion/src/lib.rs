@@ -66,7 +66,7 @@ impl DIDResolver for DIDOnion {
         Option<Document>,
         Option<DocumentMetadata>,
     ) {
-        let (res_meta, doc_data, doc_meta_opt) =
+        let (mut res_meta, doc_data, doc_meta_opt) =
             self.resolve_representation(did, input_metadata).await;
         let doc_opt = if doc_data.is_empty() {
             None
@@ -84,6 +84,9 @@ impl DIDResolver for DIDOnion {
                 }
             }
         };
+        // https://www.w3.org/TR/did-core/#did-resolution-metadata
+        // contentType - "MUST NOT be present if the resolve function was called"
+        res_meta.content_type = None;
         (res_meta, doc_opt, doc_meta_opt)
     }
 

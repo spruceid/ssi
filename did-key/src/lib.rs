@@ -9,7 +9,7 @@ use ssi::did::{
 };
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+    ERROR_NOT_FOUND,
 };
 #[cfg(feature = "secp256r1")]
 use ssi::jwk::p256_parse;
@@ -199,11 +199,7 @@ impl DIDResolver for DIDKey {
             ..Default::default()
         };
         (
-            ResolutionMetadata {
-                error: None,
-                content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                property_set: None,
-            },
+            ResolutionMetadata::default(),
             Some(doc),
             Some(DocumentMetadata::default()),
         )
