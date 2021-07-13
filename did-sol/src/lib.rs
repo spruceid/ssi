@@ -145,7 +145,6 @@ impl DIDResolver for DIDSol {
         };
 
         let doc_meta = DocumentMetadata {
-            created: Some(Utc::now()),
             ..Default::default()
         };
 

@@ -219,7 +219,6 @@ impl DIDResolver for DIDTz {
         };
 
         let doc_meta = DocumentMetadata {
-            created: Some(Utc::now()),
             ..Default::default()
         };
 

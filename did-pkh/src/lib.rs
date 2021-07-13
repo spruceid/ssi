@@ -31,7 +31,6 @@ fn resolution_result(doc: Document) -> ResolutionResult {
         ..Default::default()
     };
     let doc_meta = DocumentMetadata {
-        created: Some(Utc::now()),
         ..Default::default()
     };
     (res_meta, Some(doc), Some(doc_meta))
