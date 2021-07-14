@@ -21,6 +21,7 @@ pub const TYPE_JSON: &str = "application/json";
 pub const TYPE_LD_JSON: &str = "application/ld+json";
 pub const TYPE_DID_JSON: &str = "application/did+json";
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
+pub const TYPE_URL: &str = "text/url";
 pub const ERROR_INVALID_DID: &str = "invalidDid";
 pub const ERROR_INVALID_DID_URL: &str = "invalidDidUrl";
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
@@ -441,7 +442,10 @@ async fn dereference_primary_resource(
             };
         // 1.3
         return (
-            DereferencingMetadata::default(),
+            DereferencingMetadata {
+                content_type: Some(TYPE_URL.to_string()),
+                ..Default::default()
+            },
             Content::URL(output_service_endpoint_url),
             ContentMetadata::default(),
         );
@@ -542,7 +546,6 @@ async fn dereference_secondary_resource(
             // 2.1
             url.push('#');
             url.push_str(&fragment);
-            // TODO: should set contentType?
             return (deref_meta, Content::URL(url), content_meta);
         }
         _ => {}
