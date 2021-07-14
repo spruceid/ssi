@@ -325,9 +325,6 @@ pub struct LinkedDataProofOptions {
     pub eip712_domain: Option<crate::eip712::ProofInfo>,
     #[cfg(not(feature = "keccak-hash"))]
     pub eip712_domain: Option<()>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Additional proof data parameters
-    pub property_set: Option<Map<String, Value>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -370,7 +367,6 @@ impl Default for LinkedDataProofOptions {
             domain: None,
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
-            property_set: None,
         }
     }
 }
@@ -648,7 +644,6 @@ impl Credential {
             domain,
             checks,
             eip712_domain,
-            property_set,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -964,7 +959,7 @@ impl Credential {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk).await
+        LinkedDataProofs::sign(self, options, jwk, None).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -974,7 +969,7 @@ impl Credential {
         public_key: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, public_key).await
+        LinkedDataProofs::prepare(self, options, public_key, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1084,7 +1079,6 @@ impl Presentation {
             domain,
             checks,
             eip712_domain,
-            property_set,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1303,7 +1297,7 @@ impl Presentation {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk).await
+        LinkedDataProofs::sign(self, options, jwk, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1517,8 +1511,14 @@ impl Proof {
             verification_method: options.verification_method.clone(),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
-            property_set: options.property_set.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
+            ..self
+        }
+    }
+
+    pub fn with_properties(self, properties: Option<Map<String, Value>>) -> Self {
+        Self {
+            property_set: properties,
             ..self
         }
     }

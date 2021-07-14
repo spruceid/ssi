@@ -772,7 +772,7 @@ mod tests {
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key)
+            .sign(&vc_no_proof, &issue_options, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -941,7 +941,7 @@ mod tests {
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key)
+            .sign(&vc_no_proof, &issue_options, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -1317,7 +1317,7 @@ mod tests {
         let other_key = JWK::generate_p256().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key)
+            .sign(&vc_no_proof, &issue_options, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);

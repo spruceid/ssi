@@ -624,7 +624,10 @@ mod tests {
         */
         // Sign with proof suite directly because there is not currently a way to do it
         // for Eip712Signature2021 in did-pkh otherwise.
-        let proof = proof_suite.sign(&vc, &issue_options, &key).await.unwrap();
+        let proof = proof_suite
+            .sign(&vc, &issue_options, &key, None)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
@@ -641,7 +644,7 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let proof_bad = proof_suite
-            .sign(&vc_no_proof, &issue_options, &wrong_key)
+            .sign(&vc_no_proof, &issue_options, &wrong_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -676,7 +679,7 @@ mod tests {
         vp_issue_options.eip712_domain = vp_eip712_domain_opt;
         // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         let vp_proof = proof_suite
-            .sign(&vp, &vp_issue_options, &key)
+            .sign(&vp, &vp_issue_options, &key, None)
             .await
             .unwrap();
         vp.add_proof(vp_proof);
@@ -730,7 +733,7 @@ mod tests {
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
         let prep = proof_suite
-            .prepare(&vc, &issue_options, &key)
+            .prepare(&vc, &issue_options, &key, None)
             .await
             .unwrap();
 
@@ -754,7 +757,7 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let proof_bad = proof_suite
-            .sign(&vc_no_proof, &issue_options, &wrong_key)
+            .sign(&vc_no_proof, &issue_options, &wrong_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -788,7 +791,7 @@ mod tests {
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
 
         let prep = proof_suite
-            .prepare(&vp, &vp_issue_options, &key)
+            .prepare(&vp, &vp_issue_options, &key, None)
             .await
             .unwrap();
         let sig = sign_tezos(&prep, algorithm, &key);

@@ -1,17 +1,16 @@
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 
-use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
+use crate::did_resolve::DIDResolver;
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader, SECURITY_V2_CONTEXT};
-use crate::jwk::{JWTKeys, JWK};
-use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
+use crate::jwk::JWK;
+use crate::ldp::{LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 use crate::vc::{Check, LinkedDataProofOptions, Proof, ProofPurpose, VerificationResult, URI};
 
 use async_trait::async_trait;
-use chrono::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -101,8 +100,14 @@ where
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        capability_chain: &[&str],
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk).await
+        let mut ps = Map::<String, Value>::new();
+        ps.insert(
+            "capabilityChain".into(),
+            serde_json::to_value(capability_chain)?,
+        );
+        LinkedDataProofs::sign(self, options, jwk, Some(ps)).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -111,8 +116,14 @@ where
         &self,
         public_key: &JWK,
         options: &LinkedDataProofOptions,
+        capability_chain: &[&str],
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, public_key).await
+        let mut ps = Map::<String, Value>::new();
+        ps.insert(
+            "capabilityChain".into(),
+            serde_json::to_value(capability_chain)?,
+        );
+        LinkedDataProofs::prepare(self, options, public_key, Some(ps)).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -185,7 +196,7 @@ pub trait VerifyAttributes<I> {
     type Err: std::string::ToString;
     // Fn to be implemented for invocations to be verified against delegations
     // If the property set contains e.g. Actions or Caveat-related fields, they should be checked here
-    fn verify_attributes(&self, invocation: &I) -> Result<(), Self::Err> {
+    fn verify_attributes(&self, _invocation: &I) -> Result<(), Self::Err> {
         Ok(())
     }
 }
@@ -267,22 +278,9 @@ where
         options: &LinkedDataProofOptions,
         target: &URI,
     ) -> Result<Proof, Error> {
-        let cl = options.clone();
-        let opts = LinkedDataProofOptions {
-            property_set: match (cl.property_set, target) {
-                (Some(mut ps), URI::String(t)) => {
-                    ps.insert("capability".into(), Value::String(t.to_string()));
-                    Some(ps)
-                }
-                (_, URI::String(t)) => {
-                    let mut ps = Map::<String, Value>::new();
-                    ps.insert("capability".into(), Value::String(t.to_string()));
-                    Some(ps)
-                }
-            },
-            ..cl
-        };
-        LinkedDataProofs::sign(self, &opts, jwk).await
+        let mut ps = Map::<String, Value>::new();
+        ps.insert("capability".into(), serde_json::to_value(target)?);
+        LinkedDataProofs::sign(self, options, jwk, Some(ps)).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -293,22 +291,9 @@ where
         options: &LinkedDataProofOptions,
         target: &URI,
     ) -> Result<ProofPreparation, Error> {
-        let cl = options.clone();
-        let opts = LinkedDataProofOptions {
-            property_set: match (cl.property_set, target) {
-                (Some(mut ps), URI::String(t)) => {
-                    ps.insert("capability".into(), Value::String(t.to_string()));
-                    Some(ps)
-                }
-                (_, URI::String(t)) => {
-                    let mut ps = Map::<String, Value>::new();
-                    ps.insert("capability".into(), Value::String(t.to_string()));
-                    Some(ps)
-                }
-            },
-            ..cl
-        };
-        LinkedDataProofs::prepare(self, &opts, public_key).await
+        let mut ps = Map::<String, Value>::new();
+        ps.insert("capability".into(), serde_json::to_value(target)?);
+        LinkedDataProofs::prepare(self, options, public_key, Some(ps)).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -517,7 +502,7 @@ mod tests {
         };
         let signed_del = del
             .clone()
-            .set_proof(del.generate_proof(&alice, &ldpo_alice).await.unwrap());
+            .set_proof(del.generate_proof(&alice, &ldpo_alice, &[]).await.unwrap());
         let signed_inv = inv
             .clone()
             .set_proof(inv.generate_proof(&bob, &ldpo_bob, &del.id).await.unwrap());
@@ -553,7 +538,10 @@ mod tests {
             invoker: Some(URI::String("did:example:someone_else".into())),
             ..del.clone()
         };
-        let proof = wrong_del.generate_proof(&alice, &ldpo_alice).await.unwrap();
+        let proof = wrong_del
+            .generate_proof(&alice, &ldpo_alice, &[])
+            .await
+            .unwrap();
         let signed_wrong_del = wrong_del.set_proof(proof);
         assert!(!signed_inv
             .verify(None, &dk, &signed_wrong_del)
