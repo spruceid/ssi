@@ -1,0 +1,12 @@
+{
+    "@context": "https://w3id.org/security/v2",
+ "id": "urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4",
+ "capabilityAction": "Drive",
+ "proof": {
+    "type": "RsaSignature2016",
+    "proofPurpose": "capabilityInvocation",
+    "capability": "https://whatacar.example/a-fancy-car/proc/7a397d7b",
+    "created": "2016-02-08T17:13:48Z",
+    "creator": "https://social.example/alyssa/#key-for-car",
+     "signatureValue": "..."}
+}

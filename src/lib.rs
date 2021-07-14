@@ -23,6 +23,7 @@ pub mod ssh;
 pub mod tzkey;
 pub mod urdna2015;
 pub mod vc;
+pub mod zcap;
 
 pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 

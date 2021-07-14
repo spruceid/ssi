@@ -780,7 +780,8 @@ pub mod example {
     };
     use async_trait::async_trait;
 
-    const DOC_JSON: &'static str = include_str!("../tests/did-example-foo.json");
+    const DOC_JSON_FOO: &'static str = include_str!("../tests/did-example-foo.json");
+    const DOC_JSON_BAR: &'static str = include_str!("../tests/did-example-bar.json");
 
     pub struct DIDExample;
 
@@ -808,10 +809,12 @@ pub mod example {
             Option<Document>,
             Option<DocumentMetadata>,
         ) {
-            if did != "did:example:foo" {
-                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
-            }
-            let doc: Document = match serde_json::from_str(DOC_JSON) {
+            let doc_str = match did {
+                "did:example:foo" => DOC_JSON_FOO,
+                "did:example:bar" => DOC_JSON_BAR,
+                _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
+            };
+            let doc: Document = match serde_json::from_str(doc_str) {
                 Ok(doc) => doc,
                 Err(err) => {
                     return (ResolutionMetadata::from_error(&err.to_string()), None, None);

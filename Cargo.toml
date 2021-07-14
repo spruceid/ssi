@@ -102,6 +102,7 @@ members = [
 [dev-dependencies]
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
+did-method-key = { path = "./did-key" }
 
 # dev-dependencies for json-ld
 static-iref = "^1.0"

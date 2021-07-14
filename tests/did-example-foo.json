@@ -40,5 +40,15 @@
     "did:example:foo#key1",
     "did:example:foo#key2",
     "did:example:foo#key3"
+  ],
+  "capabilityDelegation": [
+    "did:example:foo#key1",
+    "did:example:foo#key2",
+    "did:example:foo#key3"
+  ],
+  "capabilityInvokation": [
+    "did:example:foo#key1",
+    "did:example:foo#key2",
+    "did:example:foo#key3"
   ]
 }

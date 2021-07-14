@@ -372,7 +372,7 @@ impl Default for LinkedDataProofOptions {
 }
 
 impl VerificationResult {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             checks: vec![],
             warnings: vec![],
@@ -380,7 +380,7 @@ impl VerificationResult {
         }
     }
 
-    fn error(err: &str) -> Self {
+    pub fn error(err: &str) -> Self {
         Self {
             checks: vec![],
             warnings: vec![],
@@ -388,7 +388,7 @@ impl VerificationResult {
         }
     }
 
-    fn append(&mut self, other: &mut Self) {
+    pub fn append(&mut self, other: &mut Self) {
         self.checks.append(&mut other.checks);
         self.warnings.append(&mut other.warnings);
         self.errors.append(&mut other.errors);
@@ -959,7 +959,7 @@ impl Credential {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk).await
+        LinkedDataProofs::sign(self, options, jwk, None).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -969,7 +969,7 @@ impl Credential {
         public_key: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, public_key).await
+        LinkedDataProofs::prepare(self, options, public_key, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1297,7 +1297,7 @@ impl Presentation {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk).await
+        LinkedDataProofs::sign(self, options, jwk, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1501,7 +1501,25 @@ impl Proof {
     pub fn new(type_: &str) -> Self {
         Self {
             type_: type_.to_string(),
-            ..Default::default()
+            ..Self::default()
+        }
+    }
+
+    pub fn with_options(self, options: &LinkedDataProofOptions) -> Self {
+        Self {
+            proof_purpose: options.proof_purpose.clone(),
+            verification_method: options.verification_method.clone(),
+            domain: options.domain.clone(),
+            challenge: options.challenge.clone(),
+            created: Some(options.created.unwrap_or_else(now_ms)),
+            ..self
+        }
+    }
+
+    pub fn with_properties(self, properties: Option<Map<String, Value>>) -> Self {
+        Self {
+            property_set: properties,
+            ..self
         }
     }
 
