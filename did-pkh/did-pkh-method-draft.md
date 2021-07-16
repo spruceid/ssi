@@ -196,7 +196,25 @@ No updates possible. did:pkh DID Documents are, like [did:key] documents, intend
 
 No deletion possible. did:pkh DID Documents are, like [did:key] documents, intended for local-only usage.
 
-## Security & Privacy
+## Security & Privacy Considerations (non-normative)
+
+There are a number of security and privacy considerations that implementers will want to take into consideration when implementing this specification. These are adapted from the analogous considerations proposed by the did:key authors.
+
+### Key Rotation Not Supported
+
+The did:pkh method is a purely generative method, which means that updates are not supported. This can be an issue if a did:pkh is expected to be used over a long period of time. For example, if a did:pkh is ever compromised, it is not possible to rotate the compromised key. For this reason, using a did:pkh for interactions that last weeks to months is strongly discouraged.
+
+5.2 Deactivation Not Supported
+
+The did:pkh method is a purely generative method, which means that deactivations and "tombstoning" are not supported internally, and would require a separate system with its own availablity, privacy, and security concerns. This can be an issue if a did:pkh is expected to be used over a long period of time. For example, if a did:pkh is ever compromised, it is not possible to deactivate the DID to stop an attacker from using it. For this reason, using a did:pkh for interactions that last weeks to months is strongly discouraged.
+
+5.3 Key Derivation Lacks Proof
+
+Some implementations might utlize a key derivation function when converting from an ed25519 public key to a Curve25519 ECDH key, used in the keyAgreement verification method. It is expected that this is a relatively safe operation, but implementers might consider that there exists no mathematical proof that confirms this assumption.
+
+5.4 Long Term Usage is Discouraged
+
+Since there is no support for update and deactivate for the did:pkh method, it is not possible to recover from a security compromise. For this reason, using a did:pkh for interactions that last weeks to months is strongly discouraged. Instead, the recovery, rotation, and in most cases authentication properties of the system from which the PKH originates should be relied on directly.
 
 ## Ref Impl
 
