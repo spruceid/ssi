@@ -91,6 +91,7 @@ JSON-LD DID document derived from each:
 | doge | [did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-doge.jsonld) |
 | eth | [did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-eth.jsonld) |
 | sol | [did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-sol.jsonld) |
+| celo | [did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-celo.jsonld) |
 | tz (tz1) | [did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-tz1.jsonld) |
 | tz (tz2) | [did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-tz2.jsonld) |
 | tz (tz3) | [did:pkh:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-tz3.jsonld) |
@@ -116,7 +117,8 @@ blockchain without a mechanism to override and select alternatives.*
 |`tz` (tz1)|`tezos:mainnet`|Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|
 |`tz` (tz2)|`tezos:mainnet`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
 |`tz` (tz3)|`tezos:mainnet`|P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|
-|`eth`|`eip155:mainnet`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|`eth`|`eip155:1`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|`celo`|`eip155:42220`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
 |`sol`|`solana`|Ed25519VerificationKey2018|https://w3id.org/security#Ed25519VerificationKey2018|
 |`btc`|`bip122:000000000019d6689c085ae165831e93`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
 |`doge`|`bip122:1a91e3dace36e2be3bf030a65679fe82`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
