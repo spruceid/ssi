@@ -12,7 +12,7 @@
       "id": "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#Recovery2020",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
       "controller": "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
-      "blockchainAccountId": "0xa0ae58da58dfa46fa55c3b86545e7065f90ff011@eip155:mainnet"
+      "blockchainAccountId": "0xa0ae58da58dfa46fa55c3b86545e7065f90ff011@eip155:42220"
     }
   ],
   "authentication": [
