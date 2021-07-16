@@ -193,7 +193,7 @@ async fn resolve_celo(did: &str, account_address: String) -> ResolutionResult {
     );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: "eip155:mainnet".to_string(),
+        chain_id: "eip155:42220".to_string(),
     };
     let vm_url = DIDURL {
         did: did.to_string(),
