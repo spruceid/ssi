@@ -12,7 +12,8 @@ use crate::json_ld;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
-use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
+use json_ld::{util::AsJson, Document, JsonContext, ProcessingMode, RemoteDocument};
+pub use json_ld::Loader;
 
 #[derive(Debug, Clone)]
 pub enum RdfDirection {
