@@ -97,6 +97,7 @@ members = [
   "did-onion",
   "did-webkey",
   "vc-test",
+  "did-test",
 ]
 
 [dev-dependencies]
