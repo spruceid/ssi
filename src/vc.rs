@@ -50,14 +50,14 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub issuer: Option<Issuer>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuance_date: Option<DateTime<Utc>>, // must be RFC3339
+    pub issuance_date: Option<VCDateTime>,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<OneOrMany<Proof>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiration_date: Option<DateTime<Utc>>, // must be RFC3339
+    pub expiration_date: Option<VCDateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credential_status: Option<Status>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,6 +71,20 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
+}
+
+/// RFC3339 date-time as used in VC Data Model
+/// <https://www.w3.org/TR/vc-data-model/#issuance-date>
+/// <https://www.w3.org/TR/vc-data-model/#expiration>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(try_from = "String")]
+#[serde(into = "String")]
+pub struct VCDateTime {
+    /// The date-time
+    date_time: DateTime<FixedOffset>,
+    /// Whether to use "Z" or "+00:00" when formatting the date-time in UTC
+    use_z: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -480,6 +494,41 @@ impl StringOrURI {
     }
 }
 
+impl FromStr for VCDateTime {
+    type Err = chrono::format::ParseError;
+    fn from_str(date_time: &str) -> Result<Self, Self::Err> {
+        let use_z = date_time.ends_with("Z");
+        let date_time = DateTime::parse_from_rfc3339(&date_time)?.into();
+        Ok(VCDateTime { date_time, use_z })
+    }
+}
+
+impl TryFrom<String> for VCDateTime {
+    type Error = chrono::format::ParseError;
+    fn try_from(date_time: String) -> Result<Self, Self::Error> {
+        Self::from_str(&date_time)
+    }
+}
+
+impl From<VCDateTime> for String {
+    fn from(z_date_time: VCDateTime) -> String {
+        let VCDateTime { date_time, use_z } = z_date_time;
+        date_time.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, use_z)
+    }
+}
+
+impl<Tz: chrono::TimeZone> From<DateTime<Tz>> for VCDateTime
+where
+    chrono::DateTime<chrono::FixedOffset>: From<chrono::DateTime<Tz>>,
+{
+    fn from(date_time: DateTime<Tz>) -> Self {
+        Self {
+            date_time: date_time.into(),
+            use_z: true,
+        }
+    }
+}
+
 pub fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
@@ -548,7 +597,10 @@ impl Credential {
             None => return Err(Error::MissingCredential),
         };
         if let Some(exp) = claims.expiration_time {
-            vc.expiration_date = Utc.timestamp_opt(exp, 0).latest();
+            vc.expiration_date = Utc.timestamp_opt(exp, 0).latest().map(|time| VCDateTime {
+                date_time: time.into(),
+                use_z: true,
+            });
         }
         if let Some(iss) = claims.issuer {
             if let StringOrURI::URI(issuer_uri) = iss {
@@ -559,7 +611,10 @@ impl Credential {
         }
         if let Some(nbf) = claims.not_before {
             if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
-                vc.issuance_date = Some(time);
+                vc.issuance_date = Some(VCDateTime {
+                    date_time: time.into(),
+                    use_z: true,
+                });
             } else {
                 return Err(Error::TimeError);
             }
@@ -597,13 +652,19 @@ impl Credential {
         // Remove fields from vc that are duplicated into the claims,
         // except for timestamps (in case of conversion discrepencies).
         Ok(JWTClaims {
-            expiration_time: vc.expiration_date.map(|date| date.timestamp()),
+            expiration_time: vc
+                .expiration_date
+                .as_ref()
+                .map(|date| date.date_time.timestamp()),
             issuer: match vc.issuer.take() {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
                 Some(_) => return Err(Error::InvalidIssuer),
                 None => None,
             },
-            not_before: vc.issuance_date.map(|date| date.timestamp()),
+            not_before: vc
+                .issuance_date
+                .as_ref()
+                .map(|date| date.date_time.timestamp()),
             jwt_id: vc.id.take().map(|id| id.into()),
             subject: Some(StringOrURI::String(subject_id)),
             verifiable_credential: Some(vc),
@@ -1833,7 +1894,7 @@ mod tests {
         }"###;
 
         let vc = Credential {
-            expiration_date: Some(Utc::now() + chrono::Duration::weeks(1)),
+            expiration_date: Some(VCDateTime::from(Utc::now() + chrono::Duration::weeks(1))),
             ..serde_json::from_str(vc_str).unwrap()
         };
         let aud = "did:example:90336644520443d28ba78beb949".to_string();
@@ -1856,7 +1917,7 @@ mod tests {
 
         // Test expiration date
         let vc = Credential {
-            expiration_date: Some(Utc::now() - chrono::Duration::weeks(1)),
+            expiration_date: Some(VCDateTime::from(Utc::now() - chrono::Duration::weeks(1))),
             ..vc
         };
         let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
@@ -1951,6 +2012,33 @@ mod tests {
         let verification_result = vc.verify(None, &DIDExample).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() >= 1);
+    }
+
+    #[async_std::test]
+    async fn credential_issue_verify_no_z() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:foo",
+            "issuanceDate": "2020-08-19T21:41:50+00:00",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some("did:example:foo#key1".to_string());
+        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
     }
 
     #[async_std::test]
