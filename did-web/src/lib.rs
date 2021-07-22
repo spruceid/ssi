@@ -302,7 +302,7 @@ mod tests {
         let key_str = include_str!("../../tests/ed25519-2020-10-18.json");
         let key: JWK = serde_json::from_str(key_str).unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:web:localhost#key1".to_string());
+        issue_options.verification_method = Some(URI::String("did:web:localhost#key1".to_string()));
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);

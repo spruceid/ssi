@@ -281,9 +281,10 @@ mod tests {
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         if eip712 {
-            issue_options.verification_method = Some(did.to_string() + "#Eip712Method2021");
+            issue_options.verification_method =
+                Some(URI::String(did.to_string() + "#Eip712Method2021"));
         } else {
-            issue_options.verification_method = Some(did.to_string() + "#controller");
+            issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         }
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
@@ -331,7 +332,7 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#controller");
+        vp_issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         vp.add_proof(vp_proof);

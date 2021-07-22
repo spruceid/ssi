@@ -18,7 +18,7 @@ async fn main() {
     let mut vc: ssi::vc::Credential = serde_json::from_value(vc).unwrap();
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key1".to_string();
-    proof_options.verification_method = Some(verification_method);
+    proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
     let proof_format = std::env::args().skip(1).next();
     match &proof_format.unwrap()[..] {
         "ldp" => {

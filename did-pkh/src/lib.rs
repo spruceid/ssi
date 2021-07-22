@@ -669,7 +669,7 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(did.to_string() + vm_relative_url),
+            verification_method: Some(URI::String(did.to_string() + vm_relative_url)),
             eip712_domain: eip712_domain_opt,
             ..Default::default()
         };
@@ -730,7 +730,7 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + vm_relative_url);
+        vp_issue_options.verification_method = Some(URI::String(did.to_string() + vm_relative_url));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.eip712_domain = vp_eip712_domain_opt;
         // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
@@ -783,7 +783,7 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(did.to_string() + vm_relative_url),
+            verification_method: Some(URI::String(did.to_string() + vm_relative_url)),
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
@@ -843,7 +843,7 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + vm_relative_url);
+        vp_issue_options.verification_method = Some(URI::String(did.to_string() + vm_relative_url));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
 
         let prep = proof_suite

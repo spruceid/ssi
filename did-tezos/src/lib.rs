@@ -670,7 +670,8 @@ mod tests {
         // };
         let did = "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq".to_string();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
         // let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
@@ -782,7 +783,8 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
         // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
@@ -902,7 +904,8 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
@@ -949,7 +952,8 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
@@ -1296,7 +1300,8 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
@@ -1343,7 +1348,8 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();

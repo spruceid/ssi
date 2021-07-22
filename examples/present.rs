@@ -39,7 +39,7 @@ async fn main() {
     let mut vp: ssi::vc::Presentation = serde_json::from_value(vp).unwrap();
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key2".to_string();
-    proof_options.verification_method = Some(verification_method);
+    proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
     proof_options.proof_purpose = Some(ssi::vc::ProofPurpose::Authentication);
     proof_options.challenge = Some("example".to_string());
 

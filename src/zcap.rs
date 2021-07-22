@@ -451,7 +451,7 @@ mod tests {
         let alice_did = "did:example:foo";
         let alice_vm = format!("{}#key2", alice_did);
         let alice: JWK = JWK {
-            key_id: Some(alice_vm),
+            key_id: Some(alice_vm.clone()),
             ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
         };
 
@@ -463,7 +463,7 @@ mod tests {
         };
 
         let del: Delegation<(), DefaultProps<Actions>> = Delegation {
-            invoker: Some(URI::String(bob_vm)),
+            invoker: Some(URI::String(bob_vm.clone())),
             ..Delegation::new(
                 URI::String("urn:a_urn".into()),
                 URI::String("kepler://alices_orbit".into()),
@@ -491,12 +491,12 @@ mod tests {
         }
 
         let ldpo_alice = LinkedDataProofOptions {
-            verification_method: alice.key_id.clone(),
+            verification_method: Some(URI::String(alice_vm.clone())),
             proof_purpose: Some(ProofPurpose::CapabilityDelegation),
             ..Default::default()
         };
         let ldpo_bob = LinkedDataProofOptions {
-            verification_method: bob.key_id.clone(),
+            verification_method: Some(URI::String(bob_vm.clone())),
             proof_purpose: Some(ProofPurpose::CapabilityInvocation),
             ..Default::default()
         };

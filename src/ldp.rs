@@ -24,7 +24,7 @@ use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, 
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
-use crate::vc::{LinkedDataProofOptions, Proof};
+use crate::vc::{LinkedDataProofOptions, Proof, URI};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -191,7 +191,7 @@ fn use_eip712sig(key: &JWK) -> bool {
 }
 
 fn use_eip712vm(options: &LinkedDataProofOptions) -> bool {
-    if let Some(ref vm) = options.verification_method {
+    if let Some(URI::String(ref vm)) = options.verification_method {
         if vm.ends_with("#Eip712Method2021") {
             return true;
         }
@@ -253,7 +253,7 @@ impl LinkedDataProofs {
                 x509_thumbprint_sha256: _,
             } => match &curve[..] {
                 "Ed25519" => {
-                    if let Some(ref vm) = options.verification_method {
+                    if let Some(URI::String(ref vm)) = options.verification_method {
                         if vm.ends_with("#TezosMethod2021") {
                             return TezosSignature2021
                                 .sign(document, options, &key, extra_proof_properties)
@@ -321,7 +321,7 @@ impl LinkedDataProofs {
                                 .sign(document, options, &key, extra_proof_properties)
                                 .await;
                         } else {
-                            if let Some(ref vm) = options.verification_method {
+                            if let Some(URI::String(ref vm)) = options.verification_method {
                                 if vm.ends_with("#TezosMethod2021") {
                                     return TezosSignature2021
                                         .sign(document, options, &key, extra_proof_properties)
@@ -334,7 +334,7 @@ impl LinkedDataProofs {
                         }
                     }
                     "P-256" => {
-                        if let Some(ref vm) = options.verification_method {
+                        if let Some(URI::String(ref vm)) = options.verification_method {
                             if vm.ends_with("#TezosMethod2021") {
                                 return TezosSignature2021
                                     .sign(document, options, &key, extra_proof_properties)
@@ -375,7 +375,7 @@ impl LinkedDataProofs {
                     .await
             }
             Algorithm::EdDSA => {
-                if let Some(ref vm) = options.verification_method {
+                if let Some(URI::String(ref vm)) = options.verification_method {
                     if vm.ends_with("#SolanaMethod2021") {
                         return SolanaSignature2021
                             .prepare(document, options, public_key, extra_proof_properties)
@@ -387,7 +387,7 @@ impl LinkedDataProofs {
                     .await;
             }
             Algorithm::EdBlake2b => {
-                if let Some(ref vm) = options.verification_method {
+                if let Some(URI::String(ref vm)) = options.verification_method {
                     if vm.ends_with("#TezosMethod2021") {
                         return TezosSignature2021
                             .prepare(document, options, public_key, extra_proof_properties)
@@ -406,7 +406,7 @@ impl LinkedDataProofs {
                     .await;
             }
             Algorithm::ESBlake2b => {
-                if let Some(ref vm) = options.verification_method {
+                if let Some(URI::String(ref vm)) = options.verification_method {
                     if vm.ends_with("#TezosMethod2021") {
                         return TezosSignature2021
                             .prepare(document, options, public_key, extra_proof_properties)
@@ -425,7 +425,7 @@ impl LinkedDataProofs {
                     .await;
             }
             Algorithm::ESBlake2bK => {
-                if let Some(ref vm) = options.verification_method {
+                if let Some(URI::String(ref vm)) = options.verification_method {
                     if vm.ends_with("#TezosMethod2021") {
                         return TezosSignature2021
                             .prepare(document, options, public_key, extra_proof_properties)
@@ -1911,7 +1911,7 @@ mod tests {
         key.algorithm = Some(Algorithm::ES256KR);
         let vm = format!("{}#Recovery2020", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(vm),
+            verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
         let doc = ExampleDocument;
@@ -1926,7 +1926,7 @@ mod tests {
         key.algorithm = Some(Algorithm::EdBlake2b);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(vm),
+            verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
         let doc = ExampleDocument;
@@ -1944,7 +1944,7 @@ mod tests {
         key.algorithm = Some(Algorithm::ESBlake2bK);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(vm),
+            verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
         let doc = ExampleDocument;

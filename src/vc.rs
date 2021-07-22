@@ -317,7 +317,7 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The URI of the verificationMethod used for the proof. If omitted a default
     /// assertionMethod will be used.
-    pub verification_method: Option<String>,
+    pub verification_method: Option<URI>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The purpose of the proof. If omitted "assertionMethod" will be used.
     pub proof_purpose: Option<ProofPurpose>,
@@ -464,6 +464,14 @@ impl From<URI> for String {
     fn from(uri: URI) -> String {
         let URI::String(string) = uri;
         string
+    }
+}
+
+impl std::fmt::Display for URI {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::String(ref string) => write!(f, "{}", string),
+        }
     }
 }
 
@@ -738,10 +746,12 @@ impl Credential {
             verification_method.to_owned(),
         ) {
             (Some(jwk_kid), None) => Some(jwk_kid),
-            (None, Some(vm_id)) => Some(vm_id),
+            (None, Some(vm_id)) => Some(vm_id.to_string()),
             (None, None) => None,
-            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id => Some(vm_id),
-            (Some(jwk_kid), Some(vm_id)) => return Err(Error::KeyIdVMMismatch(vm_id, jwk_kid)),
+            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id.to_string() => Some(vm_id.to_string()),
+            (Some(jwk_kid), Some(vm_id)) => {
+                return Err(Error::KeyIdVMMismatch(vm_id.to_string(), jwk_kid))
+            }
         };
         let header = Header {
             algorithm,
@@ -942,7 +952,7 @@ impl Credential {
         // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
         let allowed_vms = match options.verification_method.take() {
-            Some(vm) => vec![vm],
+            Some(vm) => vec![vm.to_string()],
             None => {
                 if let Some(ref issuer) = self.issuer {
                     let issuer_uri = match issuer.clone() {
@@ -1173,10 +1183,12 @@ impl Presentation {
             verification_method.to_owned(),
         ) {
             (Some(jwk_kid), None) => Some(jwk_kid),
-            (None, Some(vm_id)) => Some(vm_id),
+            (None, Some(vm_id)) => Some(vm_id.to_string()),
             (None, None) => None,
-            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id => Some(vm_id),
-            (Some(jwk_kid), Some(vm_id)) => return Err(Error::KeyIdVMMismatch(vm_id, jwk_kid)),
+            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id.to_string() => Some(vm_id.to_string()),
+            (Some(jwk_kid), Some(vm_id)) => {
+                return Err(Error::KeyIdVMMismatch(vm_id.to_string(), jwk_kid))
+            }
         };
         let header = Header {
             algorithm,
@@ -1386,7 +1398,7 @@ impl Presentation {
             ..Default::default()
         });
         let allowed_vms = match options.verification_method.take() {
-            Some(vm) => vec![vm],
+            Some(vm) => vec![vm.to_string()],
             None => {
                 if let Some(URI::String(ref holder)) = self.holder {
                     let proof_purpose = options
@@ -1569,7 +1581,10 @@ impl Proof {
     pub fn with_options(self, options: &LinkedDataProofOptions) -> Self {
         Self {
             proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
+            verification_method: options
+                .verification_method
+                .clone()
+                .map(|uri| uri.to_string()),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
@@ -1586,7 +1601,9 @@ impl Proof {
 
     pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
         if let Some(ref verification_method) = options.verification_method {
-            assert_local!(self.verification_method.as_ref() == Some(verification_method));
+            assert_local!(
+                self.verification_method.as_ref() == Some(&verification_method.to_string())
+            );
         }
         if let Some(vm) = self.verification_method.as_ref() {
             assert_local!(allowed_vms.contains(vm));
@@ -1636,7 +1653,7 @@ fn jwt_matches(
         ..
     } = options;
     if let Some(ref vm) = verification_method {
-        assert_local!(header.key_id.as_ref() == Some(vm));
+        assert_local!(header.key_id.as_ref() == Some(&vm.to_string()));
     }
     if let Some(kid) = header.key_id.as_ref() {
         assert_local!(allowed_vms.contains(kid));
@@ -1902,7 +1919,7 @@ mod tests {
             domain: Some(aud),
             checks: None,
             created: None,
-            verification_method: Some("did:example:foo#key1".to_string()),
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
             ..Default::default()
         };
         let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
@@ -1944,7 +1961,7 @@ mod tests {
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key1".to_string());
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
@@ -1988,7 +2005,7 @@ mod tests {
         let key: JWK = serde_json::from_str(key_str).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key3".to_string());
+        issue_options.verification_method = Some(URI::String("did:example:foo#key3".to_string()));
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
@@ -2031,7 +2048,7 @@ mod tests {
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key1".to_string());
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
@@ -2058,7 +2075,7 @@ mod tests {
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key1".to_string());
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
         let algorithm = key.algorithm.unwrap();
         let public_key = key.to_public();
         let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
@@ -2287,7 +2304,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let vc_issuer_key = "did:example:foo".to_string();
         let vc_issuer_vm = "did:example:foo#key1".to_string();
         vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
-        vc_issue_options.verification_method = Some(vc_issuer_vm);
+        vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
         vc_issue_options.checks = None;
         let vc_proof = vc.generate_proof(&key, &vc_issue_options).await.unwrap();
         vc.add_proof(vc_proof);
@@ -2322,7 +2339,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let vp_without_proof = vp.clone();
         let mut vp_issue_options = LinkedDataProofOptions::default();
         let vp_issuer_key = "did:example:foo#key1".to_string();
-        vp_issue_options.verification_method = Some(vp_issuer_key);
+        vp_issue_options.verification_method = Some(URI::String(vp_issuer_key));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
         let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
