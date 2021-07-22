@@ -460,6 +460,13 @@ impl TryFrom<String> for URI {
     }
 }
 
+impl FromStr for URI {
+    type Err = Error;
+    fn from_str(uri: &str) -> Result<Self, Self::Err> {
+        URI::try_from(String::from(uri))
+    }
+}
+
 impl From<URI> for String {
     fn from(uri: URI) -> String {
         let URI::String(string) = uri;
