@@ -53,8 +53,8 @@ lazy_static! {
     };
 }
 
-pub fn get_proof_suite(proof_type: &str) -> Option<&(dyn ProofSuite + Sync)> {
-    let suite: &(dyn ProofSuite + Sync) = match proof_type {
+pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Error> {
+    Ok(match proof_type {
         "RsaSignature2018" => &RsaSignature2018,
         "Ed25519Signature2018" => &Ed25519Signature2018,
         "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
@@ -75,9 +75,76 @@ pub fn get_proof_suite(proof_type: &str) -> Option<&(dyn ProofSuite + Sync)> {
         "SolanaSignature2021" => &SolanaSignature2021,
         "JsonWebSignature2020" => &JsonWebSignature2020,
         "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
-        _ => return None,
-    };
-    Some(suite)
+        _ => return Err(Error::ProofTypeNotImplemented),
+    })
+}
+
+fn pick_proof_suite<'a, 'b>(
+    jwk: &JWK,
+    verification_method: Option<&'a URI>,
+) -> Result<&'b (dyn ProofSuite + Sync), Error> {
+    let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+    Ok(match algorithm {
+        Algorithm::RS256 => &RsaSignature2018,
+
+        Algorithm::EdDSA => match verification_method {
+            Some(URI::String(ref vm)) if vm.ends_with("#SolanaMethod2021") => &SolanaSignature2021,
+            _ => &Ed25519Signature2018,
+        },
+        Algorithm::EdBlake2b => match verification_method {
+            Some(URI::String(ref vm))
+                if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
+                    && vm.ends_with("#TezosMethod2021") =>
+            {
+                &TezosSignature2021
+            }
+            _ => &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+        },
+        Algorithm::ES256 => &EcdsaSecp256r1Signature2019,
+        Algorithm::ESBlake2b => match verification_method {
+            Some(URI::String(ref vm))
+                if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
+                    && vm.ends_with("#TezosMethod2021") =>
+            {
+                &TezosSignature2021
+            }
+            _ => &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+        },
+        Algorithm::ES256K => &EcdsaSecp256k1Signature2019,
+        Algorithm::ESBlake2bK => match verification_method {
+            Some(URI::String(ref vm))
+                if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
+                    && vm.ends_with("#TezosMethod2021") =>
+            {
+                &TezosSignature2021
+            }
+            _ => &EcdsaSecp256k1RecoverySignature2020,
+        },
+        Algorithm::ES256KR => {
+            if use_eip712sig(jwk) {
+                #[cfg(not(feature = "keccak-hash"))]
+                return Err(Error::ProofTypeNotImplemented);
+                &EthereumEip712Signature2021
+            } else if use_epsig(jwk) {
+                #[cfg(not(feature = "keccak-hash"))]
+                return Err(Error::ProofTypeNotImplemented);
+                &EthereumPersonalSignature2021
+            } else {
+                match verification_method {
+                    Some(URI::String(ref vm))
+                        if (vm.starts_with("did:ethr:") || vm.starts_with("did:pkh:eth:"))
+                            && vm.ends_with("#Eip712Method2021") =>
+                    {
+                        #[cfg(not(feature = "keccak-hash"))]
+                        return Err(Error::ProofTypeNotImplemented);
+                        &Eip712Signature2021
+                    }
+                    _ => &EcdsaSecp256k1RecoverySignature2020,
+                }
+            }
+        }
+        _ => return Err(Error::ProofTypeNotImplemented),
+    })
 }
 
 // Get current time to millisecond precision if possible
@@ -159,7 +226,7 @@ pub enum SigningInput {
 impl ProofPreparation {
     pub async fn complete(self, signature: &str) -> Result<Proof, Error> {
         let proof_type = self.proof.type_.clone();
-        let suite = get_proof_suite(&proof_type).ok_or(Error::ProofTypeNotImplemented)?;
+        let suite = get_proof_suite(&proof_type)?;
         suite.complete(self, signature).await
     }
 }
@@ -204,152 +271,16 @@ impl LinkedDataProofs {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         // Use type property if present
-        if let Some(ref type_) = options.type_ {
-            let suite = get_proof_suite(type_).ok_or(Error::ProofTypeNotImplemented)?;
-            return suite
-                .sign(document, options, &key, extra_proof_properties)
-                .await;
+        let suite = if let Some(ref type_) = options.type_ {
+            get_proof_suite(type_)?
         }
         // Otherwise pick proof type based on key and options.
-        // TODO: select proof type by resolving DID instead of matching on the key.
-        match key {
-            JWK {
-                params: JWKParams::RSA(_),
-                public_key_use: _,
-                key_operations: _,
-                algorithm: _,
-                key_id: _,
-                x509_url: _,
-                x509_certificate_chain: _,
-                x509_thumbprint_sha1: _,
-                x509_thumbprint_sha256: _,
-            } => {
-                return RsaSignature2018
-                    .sign(document, options, &key, extra_proof_properties)
-                    .await
-            }
-            JWK {
-                params:
-                    JWKParams::OKP(JWKOctetParams {
-                        curve,
-                        public_key: _,
-                        private_key: _,
-                    }),
-                public_key_use: _,
-                key_operations: _,
-                algorithm: _,
-                key_id: _,
-                x509_url: _,
-                x509_certificate_chain: _,
-                x509_thumbprint_sha1: _,
-                x509_thumbprint_sha256: _,
-            } => match &curve[..] {
-                "Ed25519" => {
-                    if let Some(URI::String(ref vm)) = options.verification_method {
-                        if vm.ends_with("#TezosMethod2021") {
-                            return TezosSignature2021
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                        if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                            return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                        if vm.ends_with("#SolanaMethod2021") {
-                            return SolanaSignature2021
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                    }
-                    return Ed25519Signature2018
-                        .sign(document, options, &key, extra_proof_properties)
-                        .await;
-                }
-                _ => {
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-            },
-            JWK {
-                params: JWKParams::EC(ec_params),
-                public_key_use: _,
-                key_operations: _,
-                algorithm,
-                key_id: _,
-                x509_url: _,
-                x509_certificate_chain: _,
-                x509_thumbprint_sha1: _,
-                x509_thumbprint_sha256: _,
-            } => {
-                let curve = ec_params.curve.as_ref().ok_or(Error::MissingCurve)?;
-                match &curve[..] {
-                    "secp256k1" => {
-                        if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
-                            if use_eip712sig(key) {
-                                #[cfg(feature = "keccak-hash")]
-                                return EthereumEip712Signature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                                #[cfg(not(feature = "keccak-hash"))]
-                                return Err(Error::ProofTypeNotImplemented);
-                            }
-                            if use_eip712vm(options) {
-                                #[cfg(feature = "keccak-hash")]
-                                return Eip712Signature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                                #[cfg(not(feature = "keccak-hash"))]
-                                return Err(Error::ProofTypeNotImplemented);
-                            }
-                            if use_epsig(key) {
-                                #[cfg(feature = "keccak-hash")]
-                                return EthereumPersonalSignature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                                #[cfg(not(feature = "keccak-hash"))]
-                                return Err(Error::ProofTypeNotImplemented);
-                            }
-                            return EcdsaSecp256k1RecoverySignature2020
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        } else {
-                            if let Some(URI::String(ref vm)) = options.verification_method {
-                                if vm.ends_with("#TezosMethod2021") {
-                                    return TezosSignature2021
-                                        .sign(document, options, &key, extra_proof_properties)
-                                        .await;
-                                }
-                            }
-                            return EcdsaSecp256k1Signature2019
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                    }
-                    "P-256" => {
-                        if let Some(URI::String(ref vm)) = options.verification_method {
-                            if vm.ends_with("#TezosMethod2021") {
-                                return TezosSignature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                            }
-                            if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:") {
-                                return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                            }
-                        }
-                        return EcdsaSecp256r1Signature2019
-                            .sign(document, options, &key, extra_proof_properties)
-                            .await;
-                    }
-                    _ => {
-                        return Err(Error::CurveNotImplemented(curve.to_string()));
-                    }
-                }
-            }
-            _ => {}
+        else {
+            pick_proof_suite(key, options.verification_method.as_ref())?
         };
-        Err(Error::ProofTypeNotImplemented)
+        suite
+            .sign(document, options, &key, extra_proof_properties)
+            .await
     }
 
     /// Prepare to create a linked data proof. Given a linked data document, proof options, and JWS
@@ -361,118 +292,16 @@ impl LinkedDataProofs {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         // Use type property if present
-        if let Some(ref type_) = options.type_ {
-            let suite = get_proof_suite(type_).ok_or(Error::ProofTypeNotImplemented)?;
-            return suite
-                .prepare(document, options, public_key, extra_proof_properties)
-                .await;
+        let suite = if let Some(ref type_) = options.type_ {
+            get_proof_suite(type_)?
         }
         // Otherwise pick proof type based on key and options.
-        match public_key.get_algorithm().ok_or(Error::MissingAlgorithm)? {
-            Algorithm::RS256 => {
-                return RsaSignature2018
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await
-            }
-            Algorithm::EdDSA => {
-                if let Some(URI::String(ref vm)) = options.verification_method {
-                    if vm.ends_with("#SolanaMethod2021") {
-                        return SolanaSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-                return Ed25519Signature2018
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            Algorithm::EdBlake2b => {
-                if let Some(URI::String(ref vm)) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                    if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-            }
-            Algorithm::ES256 => {
-                return EcdsaSecp256r1Signature2019
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            Algorithm::ESBlake2b => {
-                if let Some(URI::String(ref vm)) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                    if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                        return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-            }
-            Algorithm::ES256K => {
-                return EcdsaSecp256k1Signature2019
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            Algorithm::ESBlake2bK => {
-                if let Some(URI::String(ref vm)) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                    // TODO: resolve the VM to get type, rather than comparing the string directly
-                    if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
-                        && vm.ends_with("#TezosMethod2021")
-                    {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-            }
-            Algorithm::ES256KR => {
-                if use_eip712sig(public_key) {
-                    #[cfg(feature = "keccak-hash")]
-                    return EthereumEip712Signature2021
-                        .prepare(document, options, public_key, extra_proof_properties)
-                        .await;
-                    #[cfg(not(feature = "keccak-hash"))]
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-                if use_eip712vm(options) {
-                    #[cfg(feature = "keccak-hash")]
-                    return Eip712Signature2021
-                        .prepare(document, options, public_key, extra_proof_properties)
-                        .await;
-                    #[cfg(not(feature = "keccak-hash"))]
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-                if use_epsig(public_key) {
-                    #[cfg(feature = "keccak-hash")]
-                    return EthereumPersonalSignature2021
-                        .prepare(document, options, public_key, extra_proof_properties)
-                        .await;
-                    #[cfg(not(feature = "keccak-hash"))]
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-                return EcdsaSecp256k1RecoverySignature2020
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            _ => {}
+        else {
+            pick_proof_suite(public_key, options.verification_method.as_ref())?
         };
-        Err(Error::ProofTypeNotImplemented)
+        suite
+            .prepare(document, options, public_key, extra_proof_properties)
+            .await
     }
 
     // https://w3c-ccg.github.io/ld-proofs/#proof-verification-algorithm
@@ -481,7 +310,7 @@ impl LinkedDataProofs {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
-        let suite = get_proof_suite(proof.type_.as_str()).ok_or(Error::ProofTypeNotImplemented)?;
+        let suite = get_proof_suite(proof.type_.as_str())?;
         suite.verify(proof, document, resolver).await
     }
 }
@@ -1921,6 +1750,7 @@ mod tests {
         key.algorithm = Some(Algorithm::EdBlake2b);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
+            type_: Some(String::from("TezosSignature2021")),
             verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
@@ -1939,6 +1769,7 @@ mod tests {
         key.algorithm = Some(Algorithm::ESBlake2bK);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
+            type_: Some(String::from("TezosSignature2021")),
             verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
