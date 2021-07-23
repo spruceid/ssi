@@ -129,12 +129,7 @@ pub trait ProofSuite {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error>
-    where
-        Self: Sized,
-    {
-        verify(proof, document, resolver).await
-    }
+    ) -> Result<(), Error>;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -163,47 +158,9 @@ pub enum SigningInput {
 
 impl ProofPreparation {
     pub async fn complete(self, signature: &str) -> Result<Proof, Error> {
-        match self.proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018.complete(self, signature).await,
-            "Ed25519Signature2018" => Ed25519Signature2018.complete(self, signature).await,
-            "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .complete(self, signature)
-                    .await
-            }
-            "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .complete(self, signature)
-                    .await
-            }
-            "EcdsaSecp256k1Signature2019" => {
-                EcdsaSecp256k1Signature2019.complete(self, signature).await
-            }
-            "EcdsaSecp256k1RecoverySignature2020" => {
-                EcdsaSecp256k1RecoverySignature2020
-                    .complete(self, signature)
-                    .await
-            }
-            "EcdsaSecp256r1Signature2019" => {
-                EcdsaSecp256r1Signature2019.complete(self, signature).await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
-            #[cfg(feature = "keccak-hash")]
-            "EthereumPersonalSignature2021" => {
-                EthereumPersonalSignature2021
-                    .complete(self, signature)
-                    .await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "EthereumEip712Signature2021" => {
-                EthereumEip712Signature2021.complete(self, signature).await
-            }
-            "TezosSignature2021" => TezosSignature2021.complete(self, signature).await,
-            "SolanaSignature2021" => SolanaSignature2021.complete(self, signature).await,
-            "JsonWebSignature2020" => JsonWebSignature2020.complete(self, signature).await,
-            _ => Err(Error::ProofTypeNotImplemented),
-        }
+        let proof_type = self.proof.type_.clone();
+        let suite = get_proof_suite(&proof_type).ok_or(Error::ProofTypeNotImplemented)?;
+        suite.complete(self, signature).await
     }
 }
 
@@ -524,53 +481,8 @@ impl LinkedDataProofs {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
-        match proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018.verify(proof, document, resolver).await,
-            "Ed25519Signature2018" => Ed25519Signature2018.verify(proof, document, resolver).await,
-            "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "EcdsaSecp256k1Signature2019" => {
-                EcdsaSecp256k1Signature2019
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "EcdsaSecp256k1RecoverySignature2020" => {
-                EcdsaSecp256k1RecoverySignature2020
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "Eip712Signature2021" => Eip712Signature2021.verify(proof, document, resolver).await,
-            #[cfg(feature = "keccak-hash")]
-            "EthereumPersonalSignature2021" => {
-                EthereumPersonalSignature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "EthereumEip712Signature2021" => {
-                EthereumEip712Signature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "TezosSignature2021" => TezosSignature2021.verify(proof, document, resolver).await,
-            "SolanaSignature2021" => SolanaSignature2021.verify(proof, document, resolver).await,
-            "JsonWebSignature2020" => JsonWebSignature2020.verify(proof, document, resolver).await,
-            "EcdsaSecp256r1Signature2019" => {
-                EcdsaSecp256r1Signature2019
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            _ => Err(Error::ProofTypeNotImplemented),
-        }
+        let suite = get_proof_suite(proof.type_.as_str()).ok_or(Error::ProofTypeNotImplemented)?;
+        suite.verify(proof, document, resolver).await
     }
 }
 
@@ -792,6 +704,14 @@ impl ProofSuite for RsaSignature2018 {
         )
         .await
     }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        verify(proof, document, resolver).await
+    }
     async fn complete(
         &self,
         preparation: ProofPreparation,
@@ -839,6 +759,14 @@ impl ProofSuite for Ed25519Signature2018 {
         )
         .await
     }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        verify(proof, document, resolver).await
+    }
     async fn complete(
         &self,
         preparation: ProofPreparation,
@@ -885,6 +813,14 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
             extra_proof_properties,
         )
         .await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        verify(proof, document, resolver).await
     }
     async fn complete(
         &self,
@@ -1848,6 +1784,14 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         )
         .await
     }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        verify(proof, document, resolver).await
+    }
     async fn complete(
         &self,
         preparation: ProofPreparation,
@@ -1900,6 +1844,14 @@ impl ProofSuite for JsonWebSignature2020 {
                 .with_properties(extra_proof_properties)
         };
         prepare_proof(document, proof, algorithm).await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<(), Error> {
+        verify(proof, document, resolver).await
     }
     async fn complete(
         &self,
