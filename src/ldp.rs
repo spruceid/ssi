@@ -100,7 +100,12 @@ fn pick_proof_suite<'a, 'b>(
         Algorithm::RS256 => &RsaSignature2018,
 
         Algorithm::EdDSA => match verification_method {
-            Some(URI::String(ref vm)) if vm.ends_with("#SolanaMethod2021") => &SolanaSignature2021,
+            Some(URI::String(ref vm))
+                if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
+                    && vm.ends_with("#SolanaMethod2021") =>
+            {
+                &SolanaSignature2021
+            }
             _ => &Ed25519Signature2018,
         },
         Algorithm::EdBlake2b => match verification_method {
