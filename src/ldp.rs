@@ -53,6 +53,33 @@ lazy_static! {
     };
 }
 
+pub fn get_proof_suite(proof_type: &str) -> Option<&(dyn ProofSuite + Sync)> {
+    let suite: &(dyn ProofSuite + Sync) = match proof_type {
+        "RsaSignature2018" => &RsaSignature2018,
+        "Ed25519Signature2018" => &Ed25519Signature2018,
+        "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+            &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        }
+        "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+            &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        }
+        "EcdsaSecp256k1Signature2019" => &EcdsaSecp256k1Signature2019,
+        "EcdsaSecp256k1RecoverySignature2020" => &EcdsaSecp256k1RecoverySignature2020,
+        #[cfg(feature = "keccak-hash")]
+        "Eip712Signature2021" => &Eip712Signature2021,
+        #[cfg(feature = "keccak-hash")]
+        "EthereumPersonalSignature2021" => &EthereumPersonalSignature2021,
+        #[cfg(feature = "keccak-hash")]
+        "EthereumEip712Signature2021" => &EthereumEip712Signature2021,
+        "TezosSignature2021" => &TezosSignature2021,
+        "SolanaSignature2021" => &SolanaSignature2021,
+        "JsonWebSignature2020" => &JsonWebSignature2020,
+        "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
+        _ => return None,
+    };
+    Some(suite)
+}
+
 // Get current time to millisecond precision if possible
 pub fn now_ms() -> DateTime<Utc> {
     let datetime = Utc::now();
@@ -219,6 +246,14 @@ impl LinkedDataProofs {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
+        // Use type property if present
+        if let Some(ref type_) = options.type_ {
+            let suite = get_proof_suite(type_).ok_or(Error::ProofTypeNotImplemented)?;
+            return suite
+                .sign(document, options, &key, extra_proof_properties)
+                .await;
+        }
+        // Otherwise pick proof type based on key and options.
         // TODO: select proof type by resolving DID instead of matching on the key.
         match key {
             JWK {
@@ -368,6 +403,14 @@ impl LinkedDataProofs {
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
+        // Use type property if present
+        if let Some(ref type_) = options.type_ {
+            let suite = get_proof_suite(type_).ok_or(Error::ProofTypeNotImplemented)?;
+            return suite
+                .prepare(document, options, public_key, extra_proof_properties)
+                .await;
+        }
+        // Otherwise pick proof type based on key and options.
         match public_key.get_algorithm().ok_or(Error::MissingAlgorithm)? {
             Algorithm::RS256 => {
                 return RsaSignature2018

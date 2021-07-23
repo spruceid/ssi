@@ -315,6 +315,10 @@ pub struct JWTClaims {
 /// Reference: vc-http-api
 pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    /// The type of the proof. Default is an appropriate proof type corresponding to the verification method.
+    pub type_: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// The URI of the verificationMethod used for the proof. If omitted a default
     /// assertionMethod will be used.
     pub verification_method: Option<URI>,
@@ -381,6 +385,7 @@ impl Default for LinkedDataProofOptions {
             domain: None,
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
+            type_: None,
         }
     }
 }
@@ -720,6 +725,7 @@ impl Credential {
             domain,
             checks,
             eip712_domain,
+            type_,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -729,6 +735,9 @@ impl Credential {
         }
         if eip712_domain.is_some() {
             return Err(Error::UnencodableOptionClaim("eip712Domain".to_string()));
+        }
+        if type_.is_some() {
+            return Err(Error::UnencodableOptionClaim("type".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -1157,6 +1166,7 @@ impl Presentation {
             domain,
             checks,
             eip712_domain,
+            type_,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1166,6 +1176,9 @@ impl Presentation {
         }
         if eip712_domain.is_some() {
             return Err(Error::UnencodableOptionClaim("eip712Domain".to_string()));
+        }
+        if type_.is_some() {
+            return Err(Error::UnencodableOptionClaim("type".to_string()));
         }
         match proof_purpose {
             None => (),
