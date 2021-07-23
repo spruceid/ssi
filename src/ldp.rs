@@ -65,12 +65,24 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
         }
         "EcdsaSecp256k1Signature2019" => &EcdsaSecp256k1Signature2019,
         "EcdsaSecp256k1RecoverySignature2020" => &EcdsaSecp256k1RecoverySignature2020,
-        #[cfg(feature = "keccak-hash")]
-        "Eip712Signature2021" => &Eip712Signature2021,
-        #[cfg(feature = "keccak-hash")]
-        "EthereumPersonalSignature2021" => &EthereumPersonalSignature2021,
-        #[cfg(feature = "keccak-hash")]
-        "EthereumEip712Signature2021" => &EthereumEip712Signature2021,
+        "Eip712Signature2021" => {
+            #[cfg(not(feature = "keccak-hash"))]
+            return Err(Error::MissingFeatures("keccak-hash"));
+            #[cfg(feature = "keccak-hash")]
+            &Eip712Signature2021
+        }
+        "EthereumPersonalSignature2021" => {
+            #[cfg(not(feature = "keccak-hash"))]
+            return Err(Error::MissingFeatures("keccak-hash"));
+            #[cfg(feature = "keccak-hash")]
+            &EthereumPersonalSignature2021
+        }
+        "EthereumEip712Signature2021" => {
+            #[cfg(not(feature = "keccak-hash"))]
+            return Err(Error::MissingFeatures("keccak-hash"));
+            #[cfg(feature = "keccak-hash")]
+            &EthereumEip712Signature2021
+        }
         "TezosSignature2021" => &TezosSignature2021,
         "SolanaSignature2021" => &SolanaSignature2021,
         "JsonWebSignature2020" => &JsonWebSignature2020,
@@ -123,11 +135,13 @@ fn pick_proof_suite<'a, 'b>(
         Algorithm::ES256KR => {
             if use_eip712sig(jwk) {
                 #[cfg(not(feature = "keccak-hash"))]
-                return Err(Error::ProofTypeNotImplemented);
+                return Err(Error::MissingFeatures("keccak-hash"));
+                #[cfg(feature = "keccak-hash")]
                 &EthereumEip712Signature2021
             } else if use_epsig(jwk) {
                 #[cfg(not(feature = "keccak-hash"))]
-                return Err(Error::ProofTypeNotImplemented);
+                return Err(Error::MissingFeatures("keccak-hash"));
+                #[cfg(feature = "keccak-hash")]
                 &EthereumPersonalSignature2021
             } else {
                 match verification_method {
@@ -136,7 +150,8 @@ fn pick_proof_suite<'a, 'b>(
                             && vm.ends_with("#Eip712Method2021") =>
                     {
                         #[cfg(not(feature = "keccak-hash"))]
-                        return Err(Error::ProofTypeNotImplemented);
+                        return Err(Error::MissingFeatures("keccak-hash"));
+                        #[cfg(feature = "keccak-hash")]
                         &Eip712Signature2021
                     }
                     _ => &EcdsaSecp256k1RecoverySignature2020,
