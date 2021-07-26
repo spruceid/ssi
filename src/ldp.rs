@@ -252,7 +252,7 @@ impl ProofPreparation {
 }
 
 fn use_eip712sig(key: &JWK) -> bool {
-    // Use unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021, until
+    // deprecated: allow using unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021
     if let Some(ref key_ops) = key.key_operations {
         if key_ops.contains(&"signTypedData".to_string()) {
             return true;
@@ -261,18 +261,8 @@ fn use_eip712sig(key: &JWK) -> bool {
     return false;
 }
 
-fn use_eip712vm(options: &LinkedDataProofOptions) -> bool {
-    if let Some(URI::String(ref vm)) = options.verification_method {
-        if vm.ends_with("#Eip712Method2021") {
-            return true;
-        }
-    }
-    return false;
-}
-
 fn use_epsig(key: &JWK) -> bool {
-    // Use unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021, until
-    // LinkedDataProofOptions has type property
+    // deprecated: allow using unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021
     if let Some(ref key_ops) = key.key_operations {
         if key_ops.contains(&"signPersonalMessage".to_string()) {
             return true;
