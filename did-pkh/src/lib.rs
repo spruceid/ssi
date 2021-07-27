@@ -1237,12 +1237,13 @@ mod tests {
         other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
-    async fn test_verify_vc(vc_str: &str) {
+    async fn test_verify_vc(vc_str: &str, num_warnings: usize) {
         let mut vc = ssi::vc::Credential::from_json_unsigned(vc_str).unwrap();
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDPKH).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
+        assert_eq!(verification_result.warnings.len(), num_warnings);
         // Negative test: tamper with the VC and watch verification fail.
         let mut map = std::collections::HashMap::new();
         map.insert("foo".to_string(), serde_json::json!("bar"));
@@ -1254,12 +1255,13 @@ mod tests {
 
     #[tokio::test]
     async fn verify_vc() {
-        test_verify_vc(include_str!("../tests/vc-tz1.jsonld")).await;
-        test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld")).await;
-        test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld")).await;
-        test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld")).await;
-        test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld")).await;
-        test_verify_vc(include_str!("../tests/vc-poly-epsig.jsonld")).await;
-        test_verify_vc(include_str!("../tests/vc-poly-eip712sig.jsonld")).await;
+        test_verify_vc(include_str!("../tests/vc-tz1.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
+        test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-poly-epsig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-poly-eip712sig.jsonld"), 0).await;
     }
 }

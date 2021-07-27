@@ -662,6 +662,44 @@ impl<'a> GraphRef<'a> {
         Ok(())
     }
 
+    /// Given a multibase-encoded string, assert that a statement exists with the given subject, predicate and
+    /// object, and remove it; or given no object, assert that no statement with given subject and
+    /// predicate exists.
+    pub fn match_multibase_property(
+        &mut self,
+        subject: &Subject,
+        predicate_iri: &str,
+        value_opt: Option<&serde_json::Value>,
+    ) -> Result<(), Error> {
+        let triple_opt = self.take(
+            Some(subject),
+            Some(&Predicate::IRIRef(IRIRef(predicate_iri.to_string()))),
+            None,
+        );
+        match (value_opt, triple_opt) {
+            (None, None) => {}
+            (Some(_value), None) => {
+                return Err(Error::MissingStatement);
+            }
+            (Some(serde_json::Value::String(value_string)), Some(triple)) => {
+                let object_str = match &triple.object {
+                    Object::Literal(Literal::Typed {
+                        string: StringLiteral(string_literal),
+                        type_: IRIRef(type_iri),
+                    }) if type_iri == "https://w3id.org/security#multibase" => string_literal,
+                    _ => return Err(Error::UnexpectedTriple(triple.clone())),
+                };
+                if value_string != object_str {
+                    return Err(Error::UnexpectedTriple(triple.clone()));
+                }
+            }
+            (_, Some(triple)) => {
+                return Err(Error::UnexpectedTriple(triple.clone()));
+            }
+        }
+        Ok(())
+    }
+
     /// Given a JSON object, assert that a statement exists with the given subject, predicate and
     /// object, and remove it; or given no object, assert that no statement with given subject and
     /// predicate exists.

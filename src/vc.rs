@@ -1798,6 +1798,7 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
         ("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
         ("Eip712Signature2021", "https://w3id.org/security#Eip712Signature2021") => (),
         ("TezosSignature2021", "https://w3id.org/security#TezosSignature2021") => (),
+        ("TezosJcsSignature2021", "https://w3id.org/security#TezosJcsSignature2021") => (),
         ("SolanaSignature2021", "https://w3id.org/security#SolanaSignature2021") => (),
         _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
     };
@@ -1835,6 +1836,14 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
             .property_set
             .as_ref()
             .and_then(|cc| cc.get("publicKeyJwk")),
+    )?;
+    graph_ref.match_multibase_property(
+        proof_id,
+        "https://w3id.org/security#publicKeyMultibase",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("publicKeyMultibase")),
     )?;
     graph_ref.match_iri_property(
         proof_id,
