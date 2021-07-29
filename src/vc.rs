@@ -2223,6 +2223,16 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
     }
 
     #[async_std::test]
+    async fn credential_verify_jws2020() {
+        let vc_str = include_str!("../examples/vc-jws2020.jsonld");
+        let vc = Credential::from_json(vc_str).unwrap();
+        let result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[async_std::test]
     async fn cannot_add_properties_after_signing() {
         use serde_json::json;
         let vc_str = include_str!("../examples/vc.jsonld");

@@ -73,8 +73,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
-            let padding_alg = match algorithm {
+            let padding_alg: &dyn ring::signature::RsaEncoding = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_SHA256,
+                Algorithm::PS256 => &ring::signature::RSA_PSS_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented),
             };
             let mut sig = vec![0u8; key_pair.public_modulus_len()];
@@ -91,6 +92,13 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                Algorithm::PS256 => {
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    let rng = rand_old::rngs::OsRng {};
+                    padding =
+                        rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
                     hashed = crate::hash::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
@@ -240,6 +248,7 @@ pub fn verify_bytes(
             let public_key = RsaPublicKeyComponents::try_from(rsa_params)?;
             let parameters = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+                Algorithm::PS256 => &ring::signature::RSA_PSS_2048_8192_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented),
             };
             public_key.verify(parameters, data, signature)?
@@ -254,6 +263,12 @@ pub fn verify_bytes(
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                Algorithm::PS256 => {
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    let rng = rand_old::rngs::OsRng {};
+                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = crate::hash::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),

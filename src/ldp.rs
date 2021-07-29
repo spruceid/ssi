@@ -98,7 +98,7 @@ fn pick_proof_suite<'a, 'b>(
     let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
     Ok(match algorithm {
         Algorithm::RS256 => &RsaSignature2018,
-
+        Algorithm::PS256 => &JsonWebSignature2020,
         Algorithm::EdDSA => match verification_method {
             Some(URI::String(ref vm))
                 if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
@@ -1653,10 +1653,6 @@ impl ProofSuite for JsonWebSignature2020 {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-        if algorithm != Algorithm::ES256 {
-            // TODO: support JsonWebSignature2020 more generally
-            return Err(Error::UnsupportedAlgorithm)?;
-        }
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
             ..Proof::new("JsonWebSignature2020")
@@ -1673,9 +1669,6 @@ impl ProofSuite for JsonWebSignature2020 {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-        if algorithm != Algorithm::ES256 {
-            return Err(Error::UnsupportedAlgorithm)?;
-        }
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
             ..Proof::new("JsonWebSignature2020")

@@ -7,7 +7,6 @@
       "type": "RSAVerificationKey2018",
       "controller": "did:example:foo",
       "publicKeyJwk": {
-        "alg": "RS256",
         "kid": "rsa2048-2020-08-25",
         "kty": "RSA",
         "n": "ALG1_NjU1eiMpcQoezH1eIZcr2p4gmo7j_exsjqkr05qBHQTn5Rb2dOpEf_Q-nLbeORZOobJH52oNhhuvTQC1R9qOEQkerUIi0aSnDEbQ2BP7YRJnwbw85v1VZDiGH8bviKbqPSf0uVwzQ43M8dr_t6A4efgiB5FOOobxXgr6VEvi_EyUm4F9JI1ZP5uHiG_cIet67Zg-lM_ygbQqOZpkeExLXC2SmHajKd8Aozfk5YB4s_-KFV1mx1HnwhHvKxZ19YkJ6Qx1OPf0ml0KLndYwmnsRZ9uZ_gGvH_G3OVZvuUnkcInR2uhK7xIU739Xc-hqDT6dokb5vsCdYMcFiRGD0",
