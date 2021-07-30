@@ -2096,7 +2096,7 @@ mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
-        let algorithm = key.algorithm.unwrap();
+        let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
         let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
         let signing_input = match preparation.signing_input {
