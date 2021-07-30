@@ -1,0 +1,60 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    {
+      "JsonWebKey2020": "https://w3id.org/security#JsonWebKey2020",
+      "JsonWebSignature2020": {
+        "@id": "https://w3id.org/security#JsonWebSignature2020",
+        "@context": {
+          "@protected": true,
+          "id": "@id",
+          "type": "@type",
+          "challenge": "https://w3id.org/security#challenge",
+          "created": {
+            "@id": "http://purl.org/dc/terms/created",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "domain": "https://w3id.org/security#domain",
+          "expires": {
+            "@id": "https://w3id.org/security#expiration",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "jws": "https://w3id.org/security#jws",
+          "nonce": "https://w3id.org/security#nonce",
+          "proofPurpose": {
+            "@id": "https://w3id.org/security#proofPurpose",
+            "@type": "@vocab",
+            "@context": {
+              "@protected": true,
+              "id": "@id",
+              "type": "@type",
+              "authentication": {
+                "@id": "https://w3id.org/security#assertionMethod",
+                "@type": "@id",
+                "@container": "@set"
+              }
+            }
+          },
+          "proofValue": "https://w3id.org/security#proofValue",
+          "verificationMethod": {
+            "@id": "https://w3id.org/security#verificationMethod",
+            "@type": "@id"
+          }
+        }
+      }
+    }
+  ],
+  "type": "VerifiableCredential",
+  "credentialSubject": {
+    "id": "did:example:foo"
+  },
+  "issuer": "did:example:foo",
+  "issuanceDate": "2021-07-29T17:48:02.875Z",
+  "proof": {
+    "type": "JsonWebSignature2020",
+    "proofPurpose": "authentication",
+    "verificationMethod": "did:example:foo#key1",
+    "created": "2021-07-29T17:48:02.875Z",
+    "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..qF9zUpfnPabXF87lziemYSnfjXHSi8FIF-QvFo18ITtauIP89pkQ2vPF3xA3TbqY455xkBvnh8DcS57izSlsXUSi0Y8TaUXYPQ5R7jn41xqmfMcEkSXA_rjPwCK_y7E_avxEO-_1KgMZyR2sz4INa2-slWf2smA0e54o--iUNW-cFcOlpzZSJK8dhAmNWHRiyFxNyBGqg_s5geqGswm1ZXMucCASfQlICpI2PTs0mftIohkLV5kF69nhKNlUZXI7aDvoqwLiPLy6-2QRz76QZOmP56SNgHdi1Rnhj2uyWTY0CqeDqG4OykLvtvsXtTszyBD8ig9bVq7ATJB7K0hMnw"
+  }
+}

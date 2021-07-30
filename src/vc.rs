@@ -2206,12 +2206,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 
     #[async_std::test]
     async fn credential_verify() {
-        let vc_str = include_str!("../examples/vc.jsonld");
-        let vc = Credential::from_json(vc_str).unwrap();
-        let result = vc.verify(None, &DIDExample).await;
-        println!("{:#?}", result);
-        assert!(result.errors.is_empty());
-        assert!(result.warnings.is_empty());
+        good_vc(include_str!("../examples/vc.jsonld")).await;
 
         let vc_jwt = include_str!("../examples/vc.jwt");
         let (vc_opt, result) = Credential::decode_verify_jwt(vc_jwt, None, &DIDExample).await;
@@ -2220,6 +2215,41 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         println!("{:#?}", vc);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
+    }
+
+    async fn good_vc(vc_str: &str) {
+        let vc = Credential::from_json(vc_str).unwrap();
+        let result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    async fn bad_vc(vc_str: &str) {
+        let vc = Credential::from_json(vc_str).unwrap();
+        let result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", result);
+        assert!(result.errors.len() > 0);
+    }
+
+    #[async_std::test]
+    async fn credential_verify_jws2020() {
+        // These test vectors were generated using examples/issue.rs with the verify part disabled,
+        // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
+        // object into the VC.
+        good_vc(include_str!("../examples/vc-jws2020-inline-context.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-type.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-purpose.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-method.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-type-json.jsonld")).await;
+        bad_vc(include_str!(
+            "../examples/vc-jws2020-bad-purpose-json.jsonld"
+        ))
+        .await;
+        bad_vc(include_str!(
+            "../examples/vc-jws2020-bad-method-json.jsonld"
+        ))
+        .await;
     }
 
     #[async_std::test]
