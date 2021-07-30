@@ -1,22 +1,44 @@
 {
-  "@context": [
-    {
-      "@version": 1.1
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+    "id": "@id",
+    "type": "@type",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "didDocument": "https://www.w3.org/ns/did/v1",
+
+    "didResolutionMetadata": "https://w3id.org/did-resolution#didResolutionMetadata",
+    "contentType": "https://w3id.org/did-resolution#contentType",
+    "error": "https://w3id.org/did-resolution#error",
+
+    "didDocumentMetadata": "https://w3id.org/did-resolution#didDocumentMetadata",
+    "created": {
+      "@id": "https://w3id.org/did-resolution#created",
+      "@type": "xsd:dateTime"
     },
-    {
-      "id": "@id",
-      "type": "@type",
-      "didDocument": {
-        "@id": "https://w3id.org/did-resolution#dfn-did-document"
-      },
-      "didResolutionMetadata": {
-        "@id": "https://w3id.org/did-resolution#output-resolutionmetadata",
-        "@type": "@json"
-      },
-      "didDocumentMetadata": {
-        "@id": "https://w3id.org/did-resolution#output-documentmetadata",
-        "@type": "@json"
-      }
+    "updated": {
+      "@id": "https://w3id.org/did-resolution#updated",
+      "@type": "xsd:dateTime"
+    },
+    "deactivated": {
+      "@id": "https://w3id.org/did-resolution#deactivated",
+      "@type": "xsd:boolean"
+    },
+    "nextUpdate": {
+      "@id": "https://w3id.org/did-resolution#nextUpdate",
+      "@type": "xsd:dateTime"
+    },
+    "versionId": "https://w3id.org/did-resolution#versionId",
+    "nextVersionId": "https://w3id.org/did-resolution#nextVersionId",
+    "equivalentId": {
+      "@id": "https://w3id.org/did-resolution#equivalentId",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "canonicalId": {
+      "@id": "https://w3id.org/did-resolution#canonicalId",
+      "@type": "@id"
     }
-  ]
+  }
 }
