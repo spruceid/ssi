@@ -509,6 +509,14 @@ pub fn split_jws(jws: &str) -> Result<(&str, &str, &str), Error> {
     )
 }
 
+pub fn split_detached_jws(jws: &str) -> Result<(&str, &str), Error> {
+    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
+    if !omitted_payload.is_empty() {
+        return Err(Error::InvalidJWS);
+    }
+    Ok((header_b64, signature_b64))
+}
+
 pub struct DecodedJWS {
     pub header: Header,
     pub signing_input: Vec<u8>,
@@ -553,10 +561,7 @@ pub fn decode_jws_parts(
 
 /// Verify a JWS with detached payload. Returns the JWS header on success.
 pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Header, Error> {
-    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
-    if !omitted_payload.is_empty() {
-        return Err(Error::InvalidJWS);
-    }
+    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
     let DecodedJWS {
         header,
         signing_input,
@@ -569,10 +574,7 @@ pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Heade
 
 /// Recover a JWK from a JWS and payload, if the algorithm supports that (such as [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r)).
 pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), Error> {
-    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
-    if !omitted_payload.is_empty() {
-        return Err(Error::InvalidJWS);
-    }
+    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
     let DecodedJWS {
         header,
         signing_input,
