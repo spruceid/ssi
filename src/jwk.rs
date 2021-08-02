@@ -427,6 +427,15 @@ impl RSAParams {
             ..Default::default()
         }
     }
+
+    /// Validate key size is at least 2048 bits, per [RFC 7518 section 3.3](https://www.rfc-editor.org/rfc/rfc7518#section-3.3).
+    pub fn validate_key_size(&self) -> Result<(), Error> {
+        let ref n = self.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
+        if n.len() < 256 {
+            return Err(Error::InvalidKeyLength);
+        }
+        Ok(())
+    }
 }
 
 impl ToASN1 for RSAParams {

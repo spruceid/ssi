@@ -72,6 +72,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
     let signature = match &key.params {
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
             let padding_alg: &dyn ring::signature::RsaEncoding = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_SHA256,
@@ -85,6 +86,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         }
         #[cfg(feature = "rsa")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             let private_key = rsa::RSAPrivateKey::try_from(rsa_params)?;
             let padding;
             let hashed;
@@ -244,6 +246,7 @@ pub fn verify_bytes(
     match &key.params {
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             use ring::signature::RsaPublicKeyComponents;
             let public_key = RsaPublicKeyComponents::try_from(rsa_params)?;
             let parameters = match algorithm {
@@ -255,6 +258,7 @@ pub fn verify_bytes(
         }
         #[cfg(feature = "rsa")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             use rsa::PublicKey;
             let public_key = rsa::RSAPublicKey::try_from(rsa_params)?;
             let padding;
