@@ -70,10 +70,10 @@ impl<C, S> Delegation<C, S> {
     }
 }
 
-impl<C, S> Delegation<C, S>
+impl<C, P> Delegation<C, P>
 where
     C: Serialize + Send + Sync + Clone,
-    S: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
 {
     pub async fn verify(
         &self,
@@ -90,6 +90,55 @@ where
                 if result.errors.is_empty() {
                     result.checks.push(Check::Proof);
                 }
+                result
+            }
+        }
+    }
+
+    pub fn validate_invocation<S>(&self, invocation: &Invocation<S>) -> VerificationResult
+    where
+        S: Serialize + Send + Sync + Clone,
+    {
+        match &invocation.proof {
+            None => VerificationResult::error("No applicable proof"),
+            Some(proof) => {
+                let mut result = VerificationResult::new();
+                match (
+                    // get cap id from proof extra properties
+                    proof
+                        .property_set
+                        .as_ref()
+                        .and_then(|ps| ps.get("capability").map(|s| s.clone()))
+                        .and_then(|v| match v {
+                            Value::String(id) => Some(id),
+                            _ => None,
+                        }),
+                    &self.id,
+                ) {
+                    (Some(ref id), URI::String(ref t_id)) => {
+                        // ensure proof target cap ID and given
+                        if id != t_id {
+                            result
+                                .errors
+                                .push("Target Capability IDs dont match".into())
+                        };
+                    }
+                    _ => result
+                        .errors
+                        .push("Missing proof target capability ID".into()),
+                };
+                match (&self.invoker, &proof.verification_method) {
+                    // Ensure the proof's verification method is authorized as an invoker. TODO: also allow target_capability's capabilityDelegation verification methods.
+                    (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
+                        if invoker != delegatee {
+                            result.errors.push("Incorrect Invoker".into());
+                        }
+                    }
+                    (_, None) => result
+                        .errors
+                        .push("Missing Proof Verification Method".into()),
+                    _ => {}
+                };
                 result
             }
         }
@@ -198,7 +247,7 @@ where
 {
     pub async fn verify<C, P>(
         &self,
-        _options: Option<LinkedDataProofOptions>,
+        options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, P>,
@@ -207,46 +256,21 @@ where
         C: Serialize + Send + Sync + Clone,
         P: Serialize + Send + Sync + Clone,
     {
+        let mut result = target_capability.validate_invocation(self);
+        let mut r2 = self.verify_signature(options, resolver).await;
+        result.append(&mut r2);
+        result
+    }
+
+    pub async fn verify_signature(
+        &self,
+        _options: Option<LinkedDataProofOptions>,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
                 let mut result = proof.verify(self, resolver).await;
-                match (
-                    // get cap id from proof extra properties
-                    proof
-                        .property_set
-                        .as_ref()
-                        .and_then(|ps| ps.get("capability").map(|s| s.clone()))
-                        .and_then(|v| match v {
-                            Value::String(id) => Some(id),
-                            _ => None,
-                        }),
-                    &target_capability.id,
-                ) {
-                    (Some(ref id), URI::String(ref t_id)) => {
-                        // ensure proof target cap ID and given
-                        if id != t_id {
-                            result
-                                .errors
-                                .push("Target Capability IDs dont match".into())
-                        };
-                    }
-                    _ => result
-                        .errors
-                        .push("Missing proof target capability ID".into()),
-                };
-                match (&target_capability.invoker, &proof.verification_method) {
-                    // Ensure the proof's verification method is authorized as an invoker. TODO: also allow target_capability's capabilityDelegation verification methods.
-                    (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
-                        if invoker != delegatee {
-                            result.errors.push("Incorrect Invoker".into());
-                        }
-                    }
-                    (_, None) => result
-                        .errors
-                        .push("Missing Proof Verification Method".into()),
-                    _ => {}
-                };
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
                     result.errors.push("Incorrect Proof Purpose".into());
                 };
