@@ -1653,6 +1653,7 @@ impl ProofSuite for JsonWebSignature2020 {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+        self.validate_key_and_algorithm(key, algorithm)?;
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
             ..Proof::new("JsonWebSignature2020")
@@ -1669,6 +1670,7 @@ impl ProofSuite for JsonWebSignature2020 {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+        self.validate_key_and_algorithm(public_key, algorithm)?;
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
             ..Proof::new("JsonWebSignature2020")
@@ -1683,7 +1685,25 @@ impl ProofSuite for JsonWebSignature2020 {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<(), Error> {
-        verify(proof, document, resolver).await
+        let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+        let message = to_jws_payload(document, proof).await?;
+        let crate::jws::DecodedJWS {
+            header,
+            signing_input,
+            payload: _,
+            signature,
+        } = crate::jws::decode_jws_parts(header_b64, &message, signature_b64)?;
+        // Redundant early algorithm check before expensive key lookup and signature verification.
+        self.validate_algorithm(header.algorithm)?;
+        let key = resolve_key(&verification_method, resolver).await?;
+        self.validate_key_and_algorithm(&key, header.algorithm)?;
+        crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature)?;
+        Ok(())
     }
     async fn complete(
         &self,
@@ -1691,6 +1711,72 @@ impl ProofSuite for JsonWebSignature2020 {
         signature: &str,
     ) -> Result<Proof, Error> {
         complete(preparation, signature).await
+    }
+}
+
+impl JsonWebSignature2020 {
+    fn validate_algorithm(&self, algorithm: Algorithm) -> Result<(), Error> {
+        Ok(match algorithm {
+            Algorithm::EdDSA => (),
+            Algorithm::ES256K => (),
+            Algorithm::ES256 => (),
+            // Algorithm::ES384 => (), TODO
+            Algorithm::PS256 => (),
+            _ => return Err(Error::UnsupportedAlgorithm),
+        })
+    }
+    // https://w3c-ccg.github.io/lds-jws2020/#jose-conformance
+    fn validate_key_and_algorithm(&self, key: &JWK, algorithm: Algorithm) -> Result<(), Error> {
+        if let Some(key_algorithm) = key.algorithm {
+            if key_algorithm != algorithm {
+                return Err(Error::AlgorithmMismatch);
+            }
+        }
+        match &key.params {
+            JWKParams::RSA(rsa_params) => {
+                let ref public_modulus =
+                    rsa_params.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
+                // Ensure 2048-bit key. Note it may have an extra byte:
+                // https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.1
+                match public_modulus.len() {
+                    256 | 257 => (),
+                    _ => {
+                        return Err(Error::InvalidKeyLength);
+                    }
+                }
+                match algorithm {
+                    Algorithm::PS256 => (),
+                    _ => return Err(Error::UnsupportedAlgorithm),
+                }
+            }
+            JWKParams::EC(ec_params) => {
+                match &ec_params.curve.as_ref().ok_or(Error::MissingCurve)?[..] {
+                    "secp256k1" => match algorithm {
+                        Algorithm::ES256K => (),
+                        _ => return Err(Error::UnsupportedAlgorithm),
+                    },
+                    "P-256" => match algorithm {
+                        Algorithm::ES256 => (),
+                        // Algorithm::ES384 => (), TODO
+                        _ => return Err(Error::UnsupportedAlgorithm),
+                    },
+                    _ => {
+                        return Err(Error::UnsupportedCurve);
+                    }
+                }
+            }
+            JWKParams::OKP(okp_params) => match &okp_params.curve[..] {
+                "Ed25519" => match algorithm {
+                    Algorithm::EdDSA => (),
+                    _ => return Err(Error::UnsupportedAlgorithm),
+                },
+                _ => {
+                    return Err(Error::UnsupportedCurve);
+                }
+            },
+            _ => {}
+        }
+        Ok(())
     }
 }
 
