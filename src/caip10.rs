@@ -85,52 +85,65 @@ pub enum BlockchainAccountIdParseError {
     ChainChar(char),
     #[error("Chain id bad length: {0}")]
     ChainLength(usize),
+    #[error("Missing separator between chain id and account address")]
+    MissingSeparator,
 }
 
 impl FromStr for BlockchainAccountId {
     type Err = BlockchainAccountIdParseError;
     fn from_str(account_id: &str) -> Result<Self, Self::Err> {
-        let mut account_address = String::with_capacity(ACCOUNT_ADDRESS_MAX_LENGTH);
-        let mut chain_id = String::with_capacity(CHAIN_ID_MAX_LENGTH);
-        let mut chars = account_id.chars();
-        while let Some(c) = chars.next() {
-            match c {
-                'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
-                | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
-                | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M'
-                | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
-                | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
-                    account_address.push(c);
-                }
-                '@' => {
-                    break;
-                }
-                c => {
-                    return Err(BlockchainAccountIdParseError::AddressChar(c));
-                }
-            }
+        let is_legacy = account_id.contains('@');
+        let (chain_id, account_address) = match if is_legacy {
+            // https://github.com/ChainAgnostic/CAIPs/blob/0697e26/CAIPs/caip-10.md#backwards-compatibility
+            account_id
+                .rsplitn(2, '@')
+                .map(String::from)
+                .collect::<Vec<String>>()
+        } else {
+            account_id
+                .rsplitn(2, ':')
+                .map(String::from)
+                .collect::<Vec<String>>()
+                .into_iter()
+                .rev()
+                .collect::<Vec<String>>()
+        }
+        .as_slice()
+        {
+            [account_address, chain_id] => (account_address.to_owned(), chain_id.to_owned()),
+            _ => return Err(BlockchainAccountIdParseError::MissingSeparator),
+        };
+        let chain_len = chain_id.len();
+        if chain_len < CHAIN_ID_MIN_LENGTH || chain_len > CHAIN_ID_MAX_LENGTH {
+            return Err(BlockchainAccountIdParseError::ChainLength(chain_len));
         }
         let address_len = account_address.len();
         if address_len < ACCOUNT_ADDRESS_MIN_LENGTH || address_len > ACCOUNT_ADDRESS_MAX_LENGTH {
             return Err(BlockchainAccountIdParseError::AddressLength(address_len));
         }
-        for c in chars {
+        for c in account_address.chars() {
             match c {
                 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
                 | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
                 | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M'
                 | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
-                | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | ':' | '-' => {
-                    chain_id.push(c);
+                | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {}
+                c => {
+                    return Err(BlockchainAccountIdParseError::AddressChar(c));
                 }
+            }
+        }
+        for c in chain_id.chars() {
+            match c {
+                'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
+                | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
+                | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M'
+                | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+                | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | ':' | '-' => {}
                 c => {
                     return Err(BlockchainAccountIdParseError::ChainChar(c));
                 }
             }
-        }
-        let chain_len = chain_id.len();
-        if chain_len < CHAIN_ID_MIN_LENGTH || chain_len > CHAIN_ID_MAX_LENGTH {
-            return Err(BlockchainAccountIdParseError::ChainLength(chain_len));
         }
         Ok(Self {
             account_address,
@@ -141,19 +154,25 @@ impl FromStr for BlockchainAccountId {
 
 impl fmt::Display for BlockchainAccountId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}@{}", self.account_address, self.chain_id)
+        write!(f, "{}:{}", self.chain_id, self.account_address)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[async_std::test]
     async fn account_id() {
         // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
-        let dummy_max_length = "6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7@chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
+        let dummy_max_length = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4:6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7";
         let account_id = BlockchainAccountId::from_str(&dummy_max_length).unwrap();
         assert_eq!(account_id.to_string(), dummy_max_length);
+
+        // Support old format, for backwards compatibility
+        let old = "6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7@chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
+        let account_id_old = BlockchainAccountId::from_str(&dummy_max_length).unwrap();
+        assert_eq!(account_id_old.to_string(), dummy_max_length);
     }
 
     #[test]
@@ -166,7 +185,7 @@ mod tests {
         }))
         .unwrap();
         let account_id =
-            BlockchainAccountId::from_str("tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83@tezos:mainnet")
+            BlockchainAccountId::from_str("tezos:mainnet:tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83")
                 .unwrap();
         account_id.verify(&jwk).unwrap();
     }

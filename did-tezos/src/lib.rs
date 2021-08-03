@@ -352,7 +352,7 @@ impl DIDTz {
                 id: String::from(vm_didurl.clone()),
                 type_: proof_type.to_string(),
                 controller: did.to_string(),
-                blockchain_account_id: Some(format!("{}@tezos:{}", address.to_string(), network)),
+                blockchain_account_id: Some(format!("tezos:{}:{}", network, address.to_string())),
                 ..Default::default()
             })]),
             authentication: match public_key {
@@ -580,7 +580,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
                 "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
-                "blockchainAccountId": "tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8@tezos:mainnet"
+                "blockchainAccountId": "tezos:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
               }],
               "authentication": [
                 "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
@@ -618,7 +618,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",
                 "type": "EcdsaSecp256k1RecoveryMethod2020",
                 "controller": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
-                "blockchainAccountId": "tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq@tezos:mainnet"
+                "blockchainAccountId": "tezos:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
               }],
               "authentication": [
                 "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
@@ -1012,7 +1012,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId",
                 "type": "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-                "blockchainAccountId": "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX@tezos:mainnet"
+                "blockchainAccountId": "tezos:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"
               }],
               "authentication": [
                 "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"
@@ -1037,7 +1037,7 @@ mod tests {
             "id": format!("{}#blockchainAccountId", did),
             "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
             "controller": did,
-            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "blockchainAccountId": format!("tezos:sandbox:{}", address),
             "publicKeyBase58": pk
           }],
           "service": [{
@@ -1084,7 +1084,7 @@ mod tests {
             "id": format!("{}#blockchainAccountId", did),
             "type": "EcdsaSecp256k1RecoveryMethod2020",
             "controller": did,
-            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "blockchainAccountId": format!("tezos:sandbox:{}", address),
             "publicKeyBase58": pk
           }],
           "service": [{
@@ -1146,7 +1146,7 @@ mod tests {
             "id": format!("{}#blockchainAccountId", did),
             "type": "JsonWebKey2020",
             "controller": did,
-            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "blockchainAccountId": format!("tezos:sandbox:{}", address),
             "publicKeyBase58": pk
           }],
           "service": [{
@@ -1240,7 +1240,7 @@ mod tests {
                 VerificationMethod::Map(VerificationMethodMap {
                     id: format!("{}#blockchainAccountId", live_did),
                     type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
-                    blockchain_account_id: Some(format!("{}@tezos:{}", LIVE_TZ1, LIVE_NETWORK)),
+                    blockchain_account_id: Some(format!("tezos:{}:{}", LIVE_NETWORK, LIVE_TZ1)),
                     controller: live_did.clone(),
                     property_set: Some(Map::new()), // TODO should be None
                     ..Default::default()

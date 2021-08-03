@@ -13,13 +13,13 @@
       "id": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
       "controller": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
-      "blockchainAccountId": "tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq@tezos:mainnet"
+      "blockchainAccountId": "tezos:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
     },
     {
       "id": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#TezosMethod2021",
       "type": "TezosMethod2021",
       "controller": "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
-      "blockchainAccountId": "tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq@tezos:mainnet"
+      "blockchainAccountId": "tezos:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
     }
   ],
   "authentication": [

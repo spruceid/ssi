@@ -12,7 +12,7 @@
       "id": "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6#blockchainAccountId",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
       "controller": "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
-      "blockchainAccountId": "128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6@bip122:000000000019d6689c085ae165831e93"
+      "blockchainAccountId": "bip122:000000000019d6689c085ae165831e93:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6"
     }
   ],
   "authentication": [
