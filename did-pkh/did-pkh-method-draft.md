@@ -98,7 +98,7 @@ JSON-LD DID document derived from each:
 
 As you can see, the did:pkh address simply consists of a prefix to identify the
 namespace on which the address is valid (and could be published, but isn't
-necessarily). Validity is checked according to the [[CAIP-10]] standard before
+necessarily). Validity is checked according to [CAIP-10][] before
 generating.   
 
 ### Networks
@@ -127,7 +127,8 @@ blockchain without a mechanism to override and select alternatives.*
 
 The following should be manually inserted into each DID Document. This will
 likely change over time as new verification methods are supported, and
-general-purpose methods are specified.
+general-purpose methods are specified. Term definitions may be omitted from
+these if they are not needed in particular DID documents.
 
 ```
 {
@@ -137,6 +138,8 @@ general-purpose methods are specified.
     "@type": "@json"
   },
   "Ed25519VerificationKey2018": "https://w3id.org/security#Ed25519VerificationKey2018",
+  "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+  "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
   "TezosMethod2021": "https://w3id.org/security#TezosMethod2021",
   "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"
 }
@@ -145,8 +148,8 @@ general-purpose methods are specified.
 
 ### Create
 
-The blockchain account is validated according to [[caip]] and then appended to
-`did:pkh:{network}`, where `network` is the supported prefix corresponding to
+The blockchain account id is validated according to [CAIP-10][] and then appended to
+`did:pkh:{network}:`, where `{network}` is the supported prefix corresponding to
 the blockchain where it is valid.
 
 ### Read (Resolve)
@@ -160,33 +163,30 @@ resolve(did, resolutionOptions) →
 Construct the DID Document for *did* as follows:
 - Parse the DID into its network id, *network* and account address, *address*,
   according to Syntax and Interpretation above.
-- Initialize a DID document, *doc*, as a JSON-LD document, with `id` property
-  set to *did* and `@context` property set to `["https://www.w3.org/ns/did/v1",
-  "https://TODO.spruceid.com/TODO/v1"]`
-    - the contents of the latter context can be added manually if the above is
-      unavailable in the implementation process or cannot be made available at
-      runtime; see above in section [context](#context).
+- Initialize a DID document, *doc*, as a JSON-LD document.
+- Set the `id` property of *doc* to *did*.
+- Set the `@context` property of *doc* to an array,
+  `["https://www.w3.org/ns/did/v1", context]`, where `context` is the [did:pkh JSON-LD context object](#context).
 - Construct the verification method ID, *vm*, by appending
   "#blockchainAccountId" to *did*.
-- Construct the verification method object, *vmObj* as follows:
-  - define `id` as *vm* with `#blockchainAccountId` appended
-  - define `type` using the appropriate [[vM type]] value listed above per
-    blockchain/address type (see [networks](#networks) section)
-  - define `controller` as *vm*
-  - define `blockchainAccountId` as *vm* with `@` and the appropriate [[caip]]
-    chain id listed above per blockchain (see [networks](#networks) section)
+- Construct the [verification method][] object, *vmObj* as follows:
+  - Insert property `id` into *vmObj* with value *vm*.
+  - Look up network id *network* in the did:pkh [Networks][#networks] table, to
+    get verification method type *vmType* and [CAIP-2][] chain id *chainId*. If
+    there are multiple entries in the table for *network*, use one that
+    matches *address*.
+  - Insert property `type` into *vmObj* with value *vmType*.
+  - Insert property `controller` into *vmObj* with value *did*.
+  - Construct string *accountId* by concatenating *address* + "@" + *chainId*.
+  - Insert property `blockchainAccountId` into *vmObj* with value *accountId*.
 - Insert a property into *doc* with key name `verificationMethod` and a value of
   an array containing only *vmObj*.
 - Insert a property into *doc* with key name `authentication` and a value of an
   array containing only *vm*.
 - Insert a property into *doc* with key name `assertionMethod` and value of an
   array containing only *vm*.
-- Construct a DID Resolution metadata object, *resMeta*.
-    - Set the `content-type` property of *resMeta* to "application/did+ld+json".
-- Construct a DID Document metadata object, *docMeta*.
-    - Set the `created` property of *docMeta* to the current time, in the format
-      according to [DID
-      Core](https://www.w3.org/TR/did-core/#did-document-metadata).
+- Construct an empty DID Resolution metadata object, *resMeta*.
+- Construct an empty DID Document metadata object, *docMeta*.
 - Return *resMeta*, *doc*, and *docMeta*.
 
 
@@ -224,9 +224,10 @@ Since there is no support for update and deactivate for the did:pkh method, it i
 |:---:|:---:|:---:|:---:|
 |Spruce Systems, USA|[DIDKit](https://github.com/spruceid/didkit/)|`did-pkh` crate in ssi [core library](https://github.com/spruceid/ssi/tree/main/did-pkh)|July 2,2021|
 
-[did-core]: https://www.w3.org/TR/did-core/
+[DID Core]: https://www.w3.org/TR/did-core/
 [did:key]: https://w3c-ccg.github.io/did-method-key/
-[vm type]: https://www.w3.org/TR/did-core/#verification-methods
+[verification method]: https://www.w3.org/TR/did-core/#verification-methods
 [blockchainaccountid]: https://www.w3.org/TR/did-spec-registries/#blockchainaccountid
-[caip-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
+[CAIP-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
+[CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 [eip712]: https://github.com/uport-project/ethereum-eip712-signature-2021-spec
