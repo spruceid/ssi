@@ -85,8 +85,8 @@ pub enum BlockchainAccountIdParseError {
 impl FromStr for BlockchainAccountId {
     type Err = BlockchainAccountIdParseError;
     fn from_str(account_id: &str) -> Result<Self, Self::Err> {
-        let mut account_address = String::with_capacity(63);
-        let mut chain_id = String::with_capacity(64);
+        let mut account_address = String::with_capacity(64);
+        let mut chain_id = String::with_capacity(41);
         let mut chars = account_id.chars();
         while let Some(c) = chars.next() {
             match c {
@@ -106,7 +106,7 @@ impl FromStr for BlockchainAccountId {
             }
         }
         let address_len = account_address.len();
-        if address_len < 1 || address_len > 63 {
+        if address_len < 1 || address_len > 64 {
             return Err(BlockchainAccountIdParseError::AddressLength(address_len));
         }
         for c in chars {
@@ -124,7 +124,7 @@ impl FromStr for BlockchainAccountId {
             }
         }
         let chain_len = chain_id.len();
-        if chain_len < 5 || chain_len > 64 {
+        if chain_len < 5 || chain_len > 41 {
             return Err(BlockchainAccountIdParseError::ChainLength(chain_len));
         }
         Ok(Self {
@@ -146,7 +146,7 @@ mod tests {
     #[async_std::test]
     async fn account_id() {
         // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
-        let dummy_max_length = "bd57219062044ed77c7e5b865339a6d727309c548763141f11e26e9242bbd34@max-namespace-16:xip3343-8c3444cf8970a9e41a706fab93e7a6c4-xxxyyy";
+        let dummy_max_length = "6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7@chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
         let account_id = BlockchainAccountId::from_str(&dummy_max_length).unwrap();
         assert_eq!(account_id.to_string(), dummy_max_length);
     }
