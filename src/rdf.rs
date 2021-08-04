@@ -26,6 +26,12 @@ pub struct Graph {
     pub triples: Vec<Triple>,
 }
 
+/// Reference to a [Graph]
+#[derive(Debug, Clone, Default)]
+pub struct GraphRef<'a> {
+    pub triples: Vec<&'a Triple>,
+}
+
 /// <https://www.w3.org/TR/rdf11-concepts/#dfn-rdf-triple>
 #[derive(Debug, Clone)]
 pub struct Triple {
@@ -42,18 +48,18 @@ pub struct Statement {
     pub graph_label: Option<GraphLabel>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Subject {
     IRIRef(IRIRef),
     BlankNodeLabel(BlankNodeLabel),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Predicate {
     IRIRef(IRIRef),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Object {
     IRIRef(IRIRef),
     BlankNodeLabel(BlankNodeLabel),
@@ -80,7 +86,7 @@ pub enum IRIOrBlankNodeIdentifier {
 
 pub const LANG_STRING_IRI_STR: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString";
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal {
     String {
         string: StringLiteral,
@@ -95,10 +101,10 @@ pub enum Literal {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct StringLiteral(pub String);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Lang(pub String);
 
 impl From<&Statement> for String {
@@ -347,6 +353,32 @@ impl TryFrom<IRIOrBlankNodeIdentifier> for Predicate {
     }
 }
 
+impl Triple {
+    pub fn matches(
+        &self,
+        subject_opt: Option<&Subject>,
+        predicate_opt: Option<&Predicate>,
+        object_opt: Option<&Object>,
+    ) -> bool {
+        if let Some(subject) = subject_opt {
+            if subject != &self.subject {
+                return false;
+            }
+        }
+        if let Some(predicate) = predicate_opt {
+            if predicate != &self.predicate {
+                return false;
+            }
+        }
+        if let Some(object) = object_opt {
+            if object != &self.object {
+                return false;
+            }
+        }
+        true
+    }
+}
+
 impl Statement {
     pub fn blank_node_components(&self) -> Vec<&BlankNodeLabel> {
         self.blank_node_components_with_position()
@@ -465,6 +497,285 @@ impl Graph {
 
     pub fn add(&mut self, triple: Triple) {
         self.triples.push(triple);
+    }
+
+    pub fn as_ref(&self) -> GraphRef {
+        GraphRef {
+            triples: self.triples.iter().collect(),
+        }
+    }
+}
+
+impl<'a> GraphRef<'a> {
+    /// Remove triple matching given terms
+    pub fn take(
+        &mut self,
+        subject_opt: Option<&Subject>,
+        predicate_opt: Option<&Predicate>,
+        object_opt: Option<&Object>,
+    ) -> Option<&'a Triple> {
+        for (i, element) in self.triples.iter().enumerate() {
+            if element.matches(subject_opt, predicate_opt, object_opt) {
+                return Some(self.triples.swap_remove(i));
+            }
+        }
+        None
+    }
+
+    /// Given a string, assert that a statement exists with the given subject, predicate and string
+    /// as object (IRI), and remove it; or given no string, assert that no statement with given
+    /// subject and predicate exists.
+    pub fn match_iri_property(
+        &mut self,
+        subject: &Subject,
+        predicate_iri: &str,
+        object_opt_expected: Option<&str>,
+    ) -> Result<(), Error> {
+        let triple_opt = self.take(
+            Some(subject),
+            Some(&Predicate::IRIRef(IRIRef(predicate_iri.to_string()))),
+            None,
+        );
+        let object_iri_opt = match triple_opt {
+            None => None,
+            Some(triple) => match &triple.object {
+                Object::IRIRef(IRIRef(iri)) => Some(iri),
+                _ => return Err(Error::UnexpectedTriple(triple.clone())),
+            },
+        };
+        match (object_iri_opt, object_opt_expected) {
+            (None, None) => {}
+            (Some(object), Some(object_expected)) => {
+                if object != object_expected {
+                    return Err(Error::ObjectMismatch(
+                        predicate_iri.to_string(),
+                        object_expected.to_string(),
+                        object.to_string(),
+                    ));
+                }
+            }
+            (None, Some(object_expected)) => {
+                return Err(Error::ExpectedObjectForPredicate(
+                    predicate_iri.to_string(),
+                    object_expected.to_string(),
+                ));
+            }
+            (Some(object), None) => {
+                return Err(Error::UnexpectedObjectForPredicate(
+                    predicate_iri.to_string(),
+                    object.to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Given a string, assert that a statement exists with the given subject, predicate and string
+    /// as object (IRI or String), and remove it; or given no string, assert that no statement with
+    /// given subject and predicate exists.
+    pub fn match_iri_or_string_property(
+        &mut self,
+        subject: &Subject,
+        predicate_iri: &str,
+        object_opt_expected: Option<&str>,
+    ) -> Result<(), Error> {
+        let triple_opt = self.take(
+            Some(subject),
+            Some(&Predicate::IRIRef(IRIRef(predicate_iri.to_string()))),
+            None,
+        );
+        let object_opt = match triple_opt {
+            None => None,
+            Some(triple) => match &triple.object {
+                Object::IRIRef(IRIRef(iri)) => Some(iri),
+                Object::Literal(Literal::String {
+                    string: StringLiteral(string_literal),
+                }) => Some(string_literal),
+                _ => return Err(Error::UnexpectedTriple(triple.clone())),
+            },
+        };
+        match (object_opt, object_opt_expected) {
+            (None, None) => {}
+            (Some(object), Some(object_expected)) => {
+                if object != object_expected {
+                    return Err(Error::ObjectMismatch(
+                        predicate_iri.to_string(),
+                        object_expected.to_string(),
+                        object.to_string(),
+                    ));
+                }
+            }
+            (None, Some(object_expected)) => {
+                return Err(Error::ExpectedObjectForPredicate(
+                    predicate_iri.to_string(),
+                    object_expected.to_string(),
+                ));
+            }
+            (Some(object), None) => {
+                return Err(Error::UnexpectedObjectForPredicate(
+                    predicate_iri.to_string(),
+                    object.to_string(),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Given a date-time, assert that a statement exists with the given subject, predicate and
+    /// object, and remove it; or given no object, assert that no statement with given subject and
+    /// predicate exists.
+    pub fn match_date_property(
+        &mut self,
+        subject: &Subject,
+        predicate_iri: &str,
+        value_opt: Option<&DateTime<Utc>>,
+    ) -> Result<(), Error> {
+        let triple_opt = self.take(
+            Some(subject),
+            Some(&Predicate::IRIRef(IRIRef(predicate_iri.to_string()))),
+            None,
+        );
+        match (value_opt, triple_opt) {
+            (None, None) => {}
+            (None, Some(triple)) => {
+                return Err(Error::UnexpectedTriple(triple.clone()));
+            }
+            (Some(_value), None) => {
+                return Err(Error::MissingStatement);
+            }
+            (Some(datetime), Some(triple)) => {
+                let object_datetime = match &triple.object {
+                    Object::Literal(Literal::Typed {
+                        string: StringLiteral(string_literal),
+                        type_: IRIRef(type_iri),
+                    }) if type_iri == "http://www.w3.org/2001/XMLSchema#dateTime" => {
+                        DateTime::parse_from_rfc3339(&string_literal)
+                            .map_err(|_| Error::UnexpectedTriple(triple.clone()))?
+                    }
+                    _ => return Err(Error::UnexpectedTriple(triple.clone())),
+                };
+                if datetime != &object_datetime {
+                    return Err(Error::UnexpectedTriple(triple.clone()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Given a JSON object, assert that a statement exists with the given subject, predicate and
+    /// object, and remove it; or given no object, assert that no statement with given subject and
+    /// predicate exists.
+    pub fn match_json_property(
+        &mut self,
+        subject: &Subject,
+        predicate_iri: &str,
+        value_opt: Option<&serde_json::Value>,
+    ) -> Result<(), Error> {
+        let triple_opt = self.take(
+            Some(subject),
+            Some(&Predicate::IRIRef(IRIRef(predicate_iri.to_string()))),
+            None,
+        );
+        match (value_opt, triple_opt) {
+            (None, None) => {}
+            (None, Some(triple)) => {
+                return Err(Error::UnexpectedTriple(triple.clone()));
+            }
+            (Some(_value), None) => {
+                return Err(Error::MissingStatement);
+            }
+            (Some(value), Some(triple)) => {
+                let object_value: serde_json::Value = match &triple.object {
+                    Object::Literal(Literal::Typed {
+                        string: StringLiteral(string_literal),
+                        type_: IRIRef(type_iri),
+                    }) if type_iri == "http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON" => {
+                        serde_json::from_str(&string_literal)?
+                    }
+                    _ => return Err(Error::UnexpectedTriple(triple.clone())),
+                };
+                if value != &object_value {
+                    return Err(Error::UnexpectedTriple(triple.clone()));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Given a JSON array value, assert that a statement exists with the given subject, predicate
+    /// and list id as object, and subsequent statements exist for the list values corresponding to
+    /// the given array. Remove all these matching statements from the graph reference.  If given
+    /// no JSON value, assert that no statement with given subject and predicate exists in the
+    /// graph reference.
+    pub fn match_list_property(
+        &mut self,
+        subject: &Subject,
+        predicate_iri: &str,
+        value_opt: Option<&serde_json::Value>,
+    ) -> Result<(), Error> {
+        let triple_opt = self.take(
+            Some(subject),
+            Some(&Predicate::IRIRef(IRIRef(predicate_iri.to_string()))),
+            None,
+        );
+        match (value_opt, triple_opt) {
+            (None, None) => {}
+            (None, Some(triple)) => {
+                return Err(Error::UnexpectedTriple(triple.clone()));
+            }
+            (Some(_value), None) => {
+                return Err(Error::MissingStatement);
+            }
+            (Some(value), Some(mut triple)) => {
+                let array_vec = value.as_array().ok_or(Error::ExpectedArray)?;
+                let mut array_iter = array_vec.into_iter();
+                // Iterate through list and match it with array values.
+                // More info about lists in JSON-LD/RDF: https://www.w3.org/TR/json-ld11/#lists
+                while triple.object
+                    != Object::IRIRef(IRIRef(
+                        "http://www.w3.org/1999/02/22-rdf-syntax-ns#nil".to_string(),
+                    ))
+                {
+                    let item_id = match triple.object {
+                        Object::BlankNodeLabel(ref bn) => Subject::BlankNodeLabel(bn.clone()),
+                        _ => return Err(Error::UnexpectedTriple(triple.clone())),
+                    };
+                    let item_triple = self
+                        .take(
+                            Some(&item_id),
+                            Some(&Predicate::IRIRef(IRIRef(
+                                "http://www.w3.org/1999/02/22-rdf-syntax-ns#first".to_string(),
+                            ))),
+                            None,
+                        )
+                        .ok_or(Error::ExpectedListValue)?;
+                    let item_object = match item_triple.object {
+                        Object::IRIRef(IRIRef(ref iri)) => iri,
+                        _ => return Err(Error::UnexpectedTriple(item_triple.clone())),
+                    };
+                    let value = array_iter.next().ok_or(Error::ExpectedEndOfList)?;
+                    if item_object != value {
+                        return Err(Error::ListItemMismatch(
+                            item_object.to_string(),
+                            value.to_string(),
+                        ));
+                    }
+                    triple = self
+                        .take(
+                            Some(&item_id),
+                            Some(&Predicate::IRIRef(IRIRef(
+                                "http://www.w3.org/1999/02/22-rdf-syntax-ns#rest".to_string(),
+                            ))),
+                            None,
+                        )
+                        .ok_or(Error::ExpectedRestOfList)?;
+                }
+                if array_iter.next().is_some() {
+                    return Err(Error::UnexpectedEndOfList);
+                }
+            }
+        }
+        Ok(())
     }
 }
 

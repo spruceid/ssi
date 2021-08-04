@@ -396,10 +396,10 @@ async fn to_jws_payload(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let sigopts_digest = sha256(sigopts_normalized.as_bytes())?;
@@ -1335,10 +1335,10 @@ async fn micheline_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let msg = ["", &sigopts_normalized, &doc_normalized].join("\n");
@@ -1350,10 +1350,10 @@ async fn string_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<String, Error> {
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let msg = sigopts_normalized + "\n" + &doc_normalized;

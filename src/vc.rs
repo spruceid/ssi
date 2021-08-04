@@ -1742,12 +1742,111 @@ impl LinkedDataDocument for Proof {
             None => None,
         };
         let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+        let dataset =
+            json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await?;
+        verify_proof_consistency(self, &dataset)?;
+        Ok(dataset)
     }
 
     fn to_value(&self) -> Result<Value, Error> {
         Ok(serde_json::to_value(&self)?)
     }
+}
+
+/// Verify alignment of proof options in JSON with RDF terms
+fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Error> {
+    use crate::rdf;
+    let mut graph_ref = dataset.default_graph.as_ref();
+
+    let type_triple = graph_ref
+        .take(
+            None,
+            Some(&rdf::Predicate::IRIRef(rdf::IRIRef(
+                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+            ))),
+            None,
+        )
+        .ok_or(Error::MissingType)?;
+    let type_iri = match type_triple.object {
+        rdf::Object::IRIRef(rdf::IRIRef(ref iri)) => iri,
+        _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
+    };
+    match (proof.type_.as_str(), type_iri.as_str()) {
+        ("RsaSignature2018", "https://w3id.org/security#RsaSignature2018") => (),
+        ("Ed25519Signature2018", "https://w3id.org/security#Ed25519Signature2018") => (),
+        ("EcdsaSecp256k1Signature2019", "https://w3id.org/security#EcdsaSecp256k1Signature2019") => (),
+        ("EcdsaSecp256r1Signature2019", "https://w3id.org/security#EcdsaSecp256r1Signature2019") => (),
+        ("EcdsaSecp256k1RecoverySignature2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020") => (),
+        ("EcdsaSecp256k1RecoverySignature2020", "https://w3id.org/security#EcdsaSecp256k1RecoverySignature2020") => (),
+        ("JsonWebSignature2020", "https://w3id.org/security#JsonWebSignature2020") => (),
+        ("EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021") => (),
+        ("EthereumPersonalSignature2021", "https://w3id.org/security#EthereumPersonalSignature2021") => (),
+        ("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
+        ("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
+        ("Eip712Signature2021", "https://w3id.org/security#Eip712Signature2021") => (),
+        ("TezosSignature2021", "https://w3id.org/security#TezosSignature2021") => (),
+        ("SolanaSignature2021", "https://w3id.org/security#SolanaSignature2021") => (),
+        _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
+    };
+    let proof_id = &type_triple.subject;
+
+    graph_ref.match_iri_property(
+        proof_id,
+        "https://w3id.org/security#proofPurpose",
+        proof.proof_purpose.as_ref().map(|pp| pp.to_iri()),
+    )?;
+    graph_ref.match_iri_property(
+        proof_id,
+        "https://w3id.org/security#verificationMethod",
+        proof.verification_method.as_ref().map(|vm| vm.as_str()),
+    )?;
+    graph_ref.match_iri_or_string_property(
+        proof_id,
+        "https://w3id.org/security#challenge",
+        proof.challenge.as_ref().map(|challenge| challenge.as_str()),
+    )?;
+    graph_ref.match_iri_or_string_property(
+        proof_id,
+        "https://w3id.org/security#domain",
+        proof.domain.as_ref().map(|domain| domain.as_str()),
+    )?;
+    graph_ref.match_date_property(
+        proof_id,
+        "http://purl.org/dc/terms/created",
+        proof.created.as_ref(),
+    )?;
+    graph_ref.match_json_property(
+        proof_id,
+        "https://w3id.org/security#publicKeyJwk",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("publicKeyJwk")),
+    )?;
+    graph_ref.match_iri_property(
+        proof_id,
+        "https://w3id.org/security#capability",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("capability"))
+            .and_then(|cap| cap.as_str()),
+    )?;
+    graph_ref.match_list_property(
+        proof_id,
+        "https://w3id.org/security#capabilityChain",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("capabilityChain")),
+    )?;
+
+    // Disallow additional unexpected statements
+    for triple in graph_ref.triples.into_iter() {
+        return Err(Error::UnexpectedTriple(triple.clone()));
+    }
+
+    Ok(())
 }
 
 impl FromStr for ProofPurpose {
@@ -1781,6 +1880,23 @@ impl From<ProofPurpose> for String {
             ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
             ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
             ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
+        }
+    }
+}
+
+impl ProofPurpose {
+    pub fn to_iri(&self) -> &'static str {
+        match self {
+            ProofPurpose::Authentication => "https://w3id.org/security#authenticationMethod",
+            ProofPurpose::AssertionMethod => "https://w3id.org/security#assertionMethod",
+            ProofPurpose::KeyAgreement => "https://w3id.org/security#keyAgreementMethod",
+            ProofPurpose::ContractAgreement => "https://w3id.org/security#contractAgreementMethod",
+            ProofPurpose::CapabilityInvocation => {
+                "https://w3id.org/security#capabilityInvocationMethod"
+            }
+            ProofPurpose::CapabilityDelegation => {
+                "https://w3id.org/security#capabilityDelegationMethod"
+            }
         }
     }
 }
@@ -2137,13 +2253,13 @@ mod tests {
         let proof_str = r###"{
             "type": "RsaSignature2018",
             "created": "2020-09-03T15:15:39Z",
-            "creator": "https://example.org/foo/1",
+            "verificationMethod": "https://example.org/foo/1",
             "proofPurpose": "assertionMethod"
         }"###;
         let urdna2015_expected = r###"_:c14n0 <http://purl.org/dc/terms/created> "2020-09-03T15:15:39Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
-_:c14n0 <http://purl.org/dc/terms/creator> <https://example.org/foo/1> .
 _:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://w3id.org/security#RsaSignature2018> .
 _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#assertionMethod> .
+_:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/1> .
 "###;
         let proof: Proof = serde_json::from_str(proof_str).unwrap();
         struct ProofContexts(Value);
@@ -2233,7 +2349,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
     }
 
     #[async_std::test]
-    async fn credential_verify_jws2020() {
+    async fn credential_verify_proof_consistency() {
         // These test vectors were generated using examples/issue.rs with the verify part disabled,
         // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
         // object into the VC.
