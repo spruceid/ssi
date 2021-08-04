@@ -22,6 +22,11 @@ pub enum BlockchainAccountIdVerifyError {
     KeyMismatch(String, String),
 }
 
+const ACCOUNT_ADDRESS_MIN_LENGTH: usize = 1;
+const ACCOUNT_ADDRESS_MAX_LENGTH: usize = 64;
+const CHAIN_ID_MIN_LENGTH: usize = 5;
+const CHAIN_ID_MAX_LENGTH: usize = 41;
+
 // convert a JWK to a base58 byte string if it is Ed25519
 fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
     let string = match jwk.params {
@@ -85,8 +90,8 @@ pub enum BlockchainAccountIdParseError {
 impl FromStr for BlockchainAccountId {
     type Err = BlockchainAccountIdParseError;
     fn from_str(account_id: &str) -> Result<Self, Self::Err> {
-        let mut account_address = String::with_capacity(64);
-        let mut chain_id = String::with_capacity(41);
+        let mut account_address = String::with_capacity(ACCOUNT_ADDRESS_MAX_LENGTH);
+        let mut chain_id = String::with_capacity(CHAIN_ID_MAX_LENGTH);
         let mut chars = account_id.chars();
         while let Some(c) = chars.next() {
             match c {
@@ -106,7 +111,7 @@ impl FromStr for BlockchainAccountId {
             }
         }
         let address_len = account_address.len();
-        if address_len < 1 || address_len > 64 {
+        if address_len < ACCOUNT_ADDRESS_MIN_LENGTH || address_len > ACCOUNT_ADDRESS_MAX_LENGTH {
             return Err(BlockchainAccountIdParseError::AddressLength(address_len));
         }
         for c in chars {
@@ -124,7 +129,7 @@ impl FromStr for BlockchainAccountId {
             }
         }
         let chain_len = chain_id.len();
-        if chain_len < 5 || chain_len > 41 {
+        if chain_len < CHAIN_ID_MIN_LENGTH || chain_len > CHAIN_ID_MAX_LENGTH {
             return Err(BlockchainAccountIdParseError::ChainLength(chain_len));
         }
         Ok(Self {
