@@ -25,6 +25,8 @@ pub const CITIZENSHIP_V1: &str = include_str!("../w3c-ccg-citizenship-v1.jsonld"
 pub const VACCINATION_V1: &str = include_str!("../w3c-ccg-vaccination-v1.jsonld");
 /// <https://w3id.org/traceability/v1>
 pub const TRACEABILITY_V1: &str = include_str!("../w3c-ccg-traceability-v1.jsonld");
+/// <https://w3id.org/vc-revocation-list-2020/v1>
+pub const REVOCATION_LIST_2020_V1: &str = include_str!("../w3id-vc-revocation-list-2020-v1.jsonld");
 /// <https://demo.spruceid.com/EcdsaSecp256k1RecoverySignature2020/esrs2020-extra-0.0.jsonld>
 pub const ESRS2020_EXTRA: &str = include_str!("../esrs2020-extra-0.0.jsonld");
 pub const EIP712SIG_V0_1: &str = include_str!("../eip712sig-v0.1.jsonld");

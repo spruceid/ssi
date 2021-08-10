@@ -129,6 +129,7 @@ pub const LDS_JWS2020_V1_CONTEXT: &str =
 pub const CITIZENSHIP_V1_CONTEXT: &str = "https://w3id.org/citizenship/v1";
 pub const VACCINATION_V1_CONTEXT: &str = "https://w3id.org/vaccination/v1";
 pub const TRACEABILITY_CONTEXT: &str = "https://w3id.org/traceability/v1";
+pub const REVOCATION_LIST_2020_V1_CONTEXT: &str = "https://w3id.org/vc-revocation-list-2020/v1";
 pub const EIP712SIG_V0_1_CONTEXT: &str = "https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld";
 
 lazy_static! {
@@ -216,6 +217,12 @@ lazy_static! {
         let iri = Iri::new(TRACEABILITY_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::REVOCATION_LIST_2020_V1;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(REVOCATION_LIST_2020_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
     pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
         let jsonld = ssi_contexts::EIP712SIG_V0_1;
         let doc = json::parse(jsonld).unwrap();
@@ -250,6 +257,9 @@ impl Loader for StaticLoader {
                 CITIZENSHIP_V1_CONTEXT => Ok(CITIZENSHIP_V1_CONTEXT_DOCUMENT.clone()),
                 VACCINATION_V1_CONTEXT => Ok(VACCINATION_V1_CONTEXT_DOCUMENT.clone()),
                 TRACEABILITY_CONTEXT => Ok(TRACEABILITY_CONTEXT_DOCUMENT.clone()),
+                REVOCATION_LIST_2020_V1_CONTEXT => {
+                    Ok(REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT.clone())
+                }
                 EIP712SIG_V0_1_CONTEXT => Ok(EIP712SIG_V0_1_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
