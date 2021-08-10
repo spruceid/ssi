@@ -1040,7 +1040,7 @@ impl ProofSuite for Eip712Signature2021 {
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         // TODO this step needs keccak-hash, may need better features management
         let recovered_key = sig.recover_verify_key(&bytes)?;
@@ -1172,7 +1172,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
@@ -1303,7 +1303,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let signing_string = string_from_document_and_options(document, &proof).await?;
