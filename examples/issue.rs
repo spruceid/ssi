@@ -6,6 +6,7 @@
 async fn main() {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
+    let resolver = &ssi::did::example::DIDExample;
     let vc = serde_json::json!({
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         "type": "VerifiableCredential",
@@ -22,9 +23,12 @@ async fn main() {
     let proof_format = std::env::args().skip(1).next();
     match &proof_format.unwrap()[..] {
         "ldp" => {
-            let proof = vc.generate_proof(&key, &proof_options).await.unwrap();
+            let proof = vc
+                .generate_proof(&key, &proof_options, resolver)
+                .await
+                .unwrap();
             vc.add_proof(proof);
-            let result = vc.verify(None, &ssi::did::example::DIDExample).await;
+            let result = vc.verify(None, resolver).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }
@@ -34,9 +38,11 @@ async fn main() {
         "jwt" => {
             proof_options.created = None;
             proof_options.checks = None;
-            let jwt = vc.generate_jwt(Some(&key), &proof_options).await.unwrap();
-            let result =
-                ssi::vc::Credential::verify_jwt(&jwt, None, &ssi::did::example::DIDExample).await;
+            let jwt = vc
+                .generate_jwt(Some(&key), &proof_options, resolver)
+                .await
+                .unwrap();
+            let result = ssi::vc::Credential::verify_jwt(&jwt, None, resolver).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }

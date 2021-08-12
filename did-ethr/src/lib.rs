@@ -288,7 +288,10 @@ mod tests {
         }
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDEthr)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -306,7 +309,7 @@ mod tests {
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &DIDEthr, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -334,7 +337,10 @@ mod tests {
         vp.holder = Some(URI::String(did.to_string()));
         vp_issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDEthr)
+            .await
+            .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();

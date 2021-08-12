@@ -13,6 +13,7 @@ async fn main() {
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let mut reader = std::io::BufReader::new(std::io::stdin());
+    let resolver = &ssi::did::example::DIDExample;
     let vc = match &proof_format_in[..] {
         "ldp" => {
             let vc_ldp = serde_json::from_reader(reader).unwrap();
@@ -45,11 +46,12 @@ async fn main() {
 
     match &proof_format_out[..] {
         "ldp" => {
-            let proof = vp.generate_proof(&key, &proof_options).await.unwrap();
+            let proof = vp
+                .generate_proof(&key, &proof_options, resolver)
+                .await
+                .unwrap();
             vp.add_proof(proof);
-            let result = vp
-                .verify(Some(proof_options), &ssi::did::example::DIDExample)
-                .await;
+            let result = vp.verify(Some(proof_options), resolver).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }
@@ -59,10 +61,12 @@ async fn main() {
         "jwt" => {
             proof_options.created = None;
             proof_options.checks = None;
-            let jwt = vp.generate_jwt(Some(&key), &proof_options).await.unwrap();
+            let jwt = vp
+                .generate_jwt(Some(&key), &proof_options, resolver)
+                .await
+                .unwrap();
             print!("{}", jwt);
-            let result =
-                ssi::vc::Presentation::verify_jwt(&jwt, None, &ssi::did::example::DIDExample).await;
+            let result = ssi::vc::Presentation::verify_jwt(&jwt, None, resolver).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }

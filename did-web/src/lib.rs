@@ -303,7 +303,10 @@ mod tests {
         let key: JWK = serde_json::from_str(key_str).unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:web:localhost#key1".to_string()));
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDWeb)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();

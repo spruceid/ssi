@@ -722,6 +722,7 @@ impl Credential {
         &self,
         jwk: Option<&JWK>,
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
     ) -> Result<String, Error> {
         let LinkedDataProofOptions {
             verification_method,
@@ -775,6 +776,7 @@ impl Credential {
                 return Err(Error::KeyIdVMMismatch(vm_id.to_string(), jwk_kid))
             }
         };
+        // TODO: use resolver to pick a default key id
         let header = Header {
             algorithm,
             key_id,
@@ -1051,8 +1053,9 @@ impl Credential {
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk, None).await
+        LinkedDataProofs::sign(self, options, resolver, jwk, None).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -1061,8 +1064,9 @@ impl Credential {
         &self,
         public_key: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, public_key, None).await
+        LinkedDataProofs::prepare(self, options, resolver, public_key, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1163,6 +1167,7 @@ impl Presentation {
         &self,
         jwk: Option<&JWK>,
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
     ) -> Result<String, Error> {
         let LinkedDataProofOptions {
             verification_method,
@@ -1216,6 +1221,7 @@ impl Presentation {
                 return Err(Error::KeyIdVMMismatch(vm_id.to_string(), jwk_kid))
             }
         };
+        // TODO: use resolver to pick a default key id
         let header = Header {
             algorithm,
             key_id,
@@ -1395,8 +1401,9 @@ impl Presentation {
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk, None).await
+        LinkedDataProofs::sign(self, options, resolver, jwk, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -2029,7 +2036,11 @@ mod tests {
             created: None,
             ..Default::default()
         };
-        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let resolver = &DIDExample;
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, resolver)
+            .await
+            .unwrap();
         println!("{:?}", signed_jwt);
     }
 
@@ -2064,7 +2075,10 @@ mod tests {
             verification_method: Some(URI::String("did:example:foo#key1".to_string())),
             ..Default::default()
         };
-        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, &DIDExample)
+            .await
+            .unwrap();
         println!("{:?}", signed_jwt);
 
         let (vc1_opt, verification_result) =
@@ -2079,7 +2093,10 @@ mod tests {
             expiration_date: Some(VCDateTime::from(Utc::now() - chrono::Duration::weeks(1))),
             ..vc
         };
-        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, &DIDExample)
+            .await
+            .unwrap();
         let (_vc_opt, verification_result) =
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
         println!("{:#?}", verification_result);
@@ -2104,7 +2121,10 @@ mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -2148,7 +2168,10 @@ mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key3".to_string()));
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -2191,7 +2214,10 @@ mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -2220,7 +2246,10 @@ mod tests {
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
         let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
-        let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
+        let preparation = vc
+            .prepare_proof(&public_key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         let signing_input = match preparation.signing_input {
             crate::ldp::SigningInput::Bytes(ref bytes) => &bytes.0,
             #[allow(unreachable_patterns)]
@@ -2478,7 +2507,10 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
         vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
         vc_issue_options.checks = None;
-        let vc_proof = vc.generate_proof(&key, &vc_issue_options).await.unwrap();
+        let vc_proof = vc
+            .generate_proof(&key, &vc_issue_options, &DIDExample)
+            .await
+            .unwrap();
         vc.add_proof(vc_proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         vc.validate().unwrap();
@@ -2489,7 +2521,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // Issue JWT credential
         vc_issue_options.created = None;
         let vc_jwt = vc
-            .generate_jwt(Some(&key), &vc_issue_options)
+            .generate_jwt(Some(&key), &vc_issue_options, &DIDExample)
             .await
             .unwrap();
         let vc_verification_result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
@@ -2514,7 +2546,10 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         vp_issue_options.verification_method = Some(URI::String(vp_issuer_key));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDExample)
+            .await
+            .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
@@ -2550,7 +2585,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ..vp_issue_options.clone()
         };
         let vp_jwt = vp_without_proof
-            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone())
+            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone(), &DIDExample)
             .await
             .unwrap();
         let vp_jwt_verify_options = LinkedDataProofOptions {
@@ -2583,7 +2618,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // LDP VP
         let proof = vp_jwtvc
-            .generate_proof(&key, &vp_issue_options.clone())
+            .generate_proof(&key, &vp_issue_options.clone(), &DIDExample)
             .await
             .unwrap();
         let mut vp_jwtvc_ldp = vp_jwtvc.clone();
@@ -2597,7 +2632,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // JWT VP
         let vp_vc_jwt = vp_jwtvc
-            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone())
+            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone(), &DIDExample)
             .await
             .unwrap();
         let verification_result =

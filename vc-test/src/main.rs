@@ -1,3 +1,4 @@
+use ssi::did::example::DIDExample;
 use ssi::jwk::JWTKeys;
 use ssi::jwk::JWK;
 use ssi::vc::Credential;
@@ -25,6 +26,7 @@ fn take_key(keys: &JWTKeys) -> &JWK {
 }
 
 async fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -> String {
+    let resolver = DIDExample;
     let vc = Credential::from_json_unsigned(data).unwrap();
     let options = LinkedDataProofOptions {
         domain: Some(aud.to_string()),
@@ -33,7 +35,7 @@ async fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -
         ..Default::default()
     };
     let jwk_opt = if sign { Some(take_key(keys)) } else { None };
-    vc.generate_jwt(jwk_opt, &options).await.unwrap()
+    vc.generate_jwt(jwk_opt, &options, &resolver).await.unwrap()
 }
 
 fn decode_jwt_unsigned(data: &String) -> String {
@@ -48,6 +50,7 @@ fn generate_presentation(data: &String) -> String {
 }
 
 async fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) -> String {
+    let resolver = DIDExample;
     let vp = Presentation::from_json_unsigned(data).unwrap();
     let options = LinkedDataProofOptions {
         domain: Some(aud.to_string()),
@@ -57,7 +60,9 @@ async fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) 
         ..Default::default()
     };
     let jwk = take_key(keys);
-    vp.generate_jwt(Some(jwk), &options).await.unwrap()
+    vp.generate_jwt(Some(jwk), &options, &resolver)
+        .await
+        .unwrap()
 }
 
 fn read_file(filename: &String) -> String {
