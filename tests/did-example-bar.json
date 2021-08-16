@@ -1,5 +1,15 @@
 {
-  "@context": "https://www.w3.org/ns/did/v1",
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "Ed25519VerificationKey2018": "https://w3id.org/security#Ed25519VerificationKey2018",
+      "publicKeyBase58": "https://w3id.org/security#publicKeyBase58",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
   "id": "did:example:bar",
   "verificationMethod": [
     {
@@ -22,7 +32,7 @@
   "capabilityDelegation": [
     "did:example:bar#key1"
   ],
-  "capabilityInvokation": [
+  "capabilityInvocation": [
     "did:example:bar#key1"
   ]
 }
