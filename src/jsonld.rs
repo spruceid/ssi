@@ -12,8 +12,7 @@ use crate::json_ld;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
-use json_ld::{util::AsJson, Document, JsonContext, ProcessingMode, RemoteDocument};
-pub use json_ld::Loader;
+use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
 
 #[derive(Debug, Clone)]
 pub enum RdfDirection {
@@ -131,6 +130,8 @@ pub const CITIZENSHIP_V1_CONTEXT: &str = "https://w3id.org/citizenship/v1";
 pub const VACCINATION_V1_CONTEXT: &str = "https://w3id.org/vaccination/v1";
 pub const TRACEABILITY_CONTEXT: &str = "https://w3id.org/traceability/v1";
 pub const EIP712SIG_V0_1_CONTEXT: &str = "https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld";
+pub const BBS_V1_CONTEXT: &str = "https://w3id.org/security/bbs/v1";
+pub const SUBMISSION_CONTEXT: &str = "https://identity.foundation/presentation-exchange/submission/v1";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -223,6 +224,18 @@ lazy_static! {
         let iri = Iri::new(EIP712SIG_V0_1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref BBS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::BBS_V1;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(BBS_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
+    pub static ref SUBMISSION_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::PRESENTATION_SUBMISSION_V1;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(SUBMISSION_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
 pub struct StaticLoader;
@@ -252,6 +265,8 @@ impl Loader for StaticLoader {
                 VACCINATION_V1_CONTEXT => Ok(VACCINATION_V1_CONTEXT_DOCUMENT.clone()),
                 TRACEABILITY_CONTEXT => Ok(TRACEABILITY_CONTEXT_DOCUMENT.clone()),
                 EIP712SIG_V0_1_CONTEXT => Ok(EIP712SIG_V0_1_CONTEXT_DOCUMENT.clone()),
+                BBS_V1_CONTEXT => Ok(BBS_V1_CONTEXT_DOCUMENT.clone()),
+                SUBMISSION_CONTEXT => Ok(SUBMISSION_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
@@ -1484,16 +1499,15 @@ pub fn list_to_rdf(
     Ok(first)
 }
 
-/// <https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf>
-pub async fn json_to_dataset<T>(
+pub async fn expand_json<T>(
     json: &str,
     more_contexts_json: Option<&String>,
     lax: bool,
     options: Option<&JsonLdOptions>,
     loader: &mut T,
-) -> Result<DataSet, Error>
-where
-    T: Loader<Document = JsonValue> + std::marker::Send + Sync,
+) -> Result<Vec<JsonValue>, Error>
+    where
+        T: Loader<Document = JsonValue> + std::marker::Send + Sync
 {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     let base = match options.base {
@@ -1538,13 +1552,34 @@ where
     expansion_options.ordered = false;
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = expanding.await?;
+
+    let documents = expanded_doc
+        .iter()
+        .map(|item| item.as_json())
+        .collect();
+
+    Ok(documents)
+}
+
+/// <https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf>
+pub async fn json_to_dataset<T>(
+    json: &str,
+    more_contexts_json: Option<&String>,
+    lax: bool,
+    options: Option<&JsonLdOptions>,
+    loader: &mut T,
+) -> Result<DataSet, Error>
+    where
+        T: Loader<Document = JsonValue> + std::marker::Send + Sync,
+{
+    let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
+    let expanded_doc = expand_json(json, more_contexts_json, lax, Some(&options), loader).await?;
     let mut node_map = Map::new();
     node_map.insert(AT_DEFAULT.to_string(), Map::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();
     for object in expanded_doc {
-        let object_json = object.as_json();
         generate_node_map(
-            object_json,
+            object,
             &mut node_map,
             None,
             None,

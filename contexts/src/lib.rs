@@ -34,3 +34,5 @@ pub const TZVM_V1: &str = include_str!("../tzvm-2021-v1.jsonld");
 pub const EIP712VM: &str = include_str!("../eip712vm.jsonld");
 pub const EPSIG_V0_1: &str = include_str!("../epsig-v0.1.jsonld");
 pub const SOLVM: &str = include_str!("../solvm.jsonld");
+pub const BBS_V1: &str = include_str!("../bbs-v1.jsonld");
+pub const PRESENTATION_SUBMISSION_V1: &str = include_str!("../presentation-submission.jsonld");
