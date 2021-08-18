@@ -783,6 +783,12 @@ pub mod example {
     const DOC_JSON_FOO: &'static str = include_str!("../tests/did-example-foo.json");
     const DOC_JSON_BAR: &'static str = include_str!("../tests/did-example-bar.json");
 
+    // For vc-test-suite
+    const DOC_JSON_TEST_ISSUER: &'static str =
+        include_str!("../tests/did-example-test-issuer.json");
+    const DOC_JSON_TEST_HOLDER: &'static str =
+        include_str!("../tests/did-example-test-holder.json");
+
     pub struct DIDExample;
 
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -812,6 +818,8 @@ pub mod example {
             let doc_str = match did {
                 "did:example:foo" => DOC_JSON_FOO,
                 "did:example:bar" => DOC_JSON_BAR,
+                "did:example:0xab" => DOC_JSON_TEST_ISSUER,
+                "did:example:ebfeb1f712ebc6f1c276e12ec21" => DOC_JSON_TEST_HOLDER,
                 _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
             };
             let doc: Document = match serde_json::from_str(doc_str) {
