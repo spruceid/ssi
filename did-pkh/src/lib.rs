@@ -17,6 +17,9 @@ use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 const CHAIN_ID_BITCOIN_MAINNET: &str = "bip122:000000000019d6689c085ae165831e93";
 const CHAIN_ID_DOGECOIN_MAINNET: &str = "bip122:1a91e3dace36e2be3bf030a65679fe82";
 
+// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
+const CHAIN_ID_TEZOS_MAINNET: &str = "tezos:NetXdQprcVkpaWU";
+
 /// did:pkh DID Method
 pub struct DIDPKH;
 
@@ -52,7 +55,7 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
     };
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: "tezos:mainnet".to_string(),
+        chain_id: CHAIN_ID_TEZOS_MAINNET.to_string(),
     };
     let mut context = BTreeMap::new();
     context.insert(

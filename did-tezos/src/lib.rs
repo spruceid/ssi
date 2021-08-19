@@ -53,12 +53,25 @@ impl DIDResolver for DIDTz {
         Option<DocumentMetadata>,
     ) {
         let (network, address) = match did.split(':').collect::<Vec<&str>>().as_slice() {
-            ["did", "tz", address] if address.len() == 36 => {
-                ("mainnet".to_string(), address.to_string())
-            }
+            ["did", "tz", address] if address.len() == 36 => ("mainnet", address.to_string()),
             ["did", "tz", network, address] if address.len() == 36 => {
-                (network.to_string(), address.to_string())
+                (*network, address.to_string())
             }
+            _ => {
+                return (
+                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    None,
+                    None,
+                )
+            }
+        };
+        // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
+        let genesis_block_hash = match network {
+            "mainnet" => "NetXdQprcVkpaWU",
+            "delphinet" => "NetXm8tYqnMWky1",
+            "granadanet" => "NetXz969SFaFn8k",
+            "edonet" => "NetXSgo1ZT2DRUG",
+            "florencenet" => "NetXxkAx4woPLyu",
             _ => {
                 return (
                     ResolutionMetadata::from_error(&ERROR_INVALID_DID),
@@ -112,7 +125,7 @@ impl DIDResolver for DIDTz {
             proof_type,
             proof_type_iri,
             &address,
-            &network,
+            &genesis_block_hash,
             public_key,
         );
 
@@ -323,7 +336,7 @@ impl DIDTz {
         proof_type: &str,
         proof_type_iri: &str,
         address: &str,
-        network: &str,
+        genesis_block_hash: &str,
         public_key: Option<String>,
     ) -> Document {
         let mut context = BTreeMap::new();
@@ -352,7 +365,11 @@ impl DIDTz {
                 id: String::from(vm_didurl.clone()),
                 type_: proof_type.to_string(),
                 controller: did.to_string(),
-                blockchain_account_id: Some(format!("tezos:{}:{}", network, address.to_string())),
+                blockchain_account_id: Some(format!(
+                    "tezos:{}:{}",
+                    genesis_block_hash,
+                    address.to_string()
+                )),
                 ..Default::default()
             })]),
             authentication: match public_key {
@@ -514,7 +531,7 @@ mod tests {
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
     const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
-    const LIVE_NETWORK: &str = "mainnet";
+    const LIVE_NETWORK: &str = "NetXdQprcVkpaWU";
     const JSON_PATCH: &str = r#"{"ietf-json-patch": [
                                     {
                                         "op": "add",
@@ -580,7 +597,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
                 "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
-                "blockchainAccountId": "tezos:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
               }],
               "authentication": [
                 "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
@@ -618,7 +635,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",
                 "type": "EcdsaSecp256k1RecoveryMethod2020",
                 "controller": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
-                "blockchainAccountId": "tezos:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
               }],
               "authentication": [
                 "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
@@ -1012,7 +1029,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId",
                 "type": "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-                "blockchainAccountId": "tezos:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"
               }],
               "authentication": [
                 "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"

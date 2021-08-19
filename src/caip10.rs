@@ -184,9 +184,10 @@ mod tests {
           "x": "G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww"
         }))
         .unwrap();
-        let account_id =
-            BlockchainAccountId::from_str("tezos:mainnet:tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83")
-                .unwrap();
+        let account_id = BlockchainAccountId::from_str(
+            "tezos:NetXdQprcVkpaWU:tz1NcJyMQzUw7h85baBA6vwRGmpwPnM1fz83",
+        )
+        .unwrap();
         account_id.verify(&jwk).unwrap();
     }
 }
