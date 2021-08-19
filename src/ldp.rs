@@ -1080,7 +1080,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
                 .insert("eip712Domain".to_string(), info);
         }
         let mut proof = Proof {
-            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V1_CONTEXT),
             ..Proof::new("EthereumEip712Signature2021")
                 .with_options(options)
                 .with_properties(props)
@@ -1118,7 +1118,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
                 .insert("eip712Domain".to_string(), info);
         }
         let proof = Proof {
-            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V1_CONTEXT),
             ..Proof::new("EthereumEip712Signature2021")
                 .with_options(options)
                 .with_properties(props)
