@@ -216,8 +216,10 @@ pub trait ProofSuite {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error>;
+    ) -> Result<VerificationWarnings, Error>;
 }
+
+pub type VerificationWarnings = Vec<String>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -319,7 +321,7 @@ impl LinkedDataProofs {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let suite = get_proof_suite(proof.type_.as_str())?;
         suite.verify(proof, document, resolver).await
     }
@@ -493,7 +495,7 @@ async fn verify(
     proof: &Proof,
     document: &(dyn LinkedDataDocument + Sync),
     resolver: &dyn DIDResolver,
-) -> Result<(), Error> {
+) -> Result<VerificationWarnings, Error> {
     let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let verification_method = proof
         .verification_method
@@ -502,7 +504,7 @@ async fn verify(
     let key = resolve_key(&verification_method, resolver).await?;
     let message = to_jws_payload(document, proof).await?;
     crate::jws::detached_verify(&jws, &message, &key)?;
-    Ok(())
+    Ok(Default::default())
 }
 
 pub struct RsaSignature2018;
@@ -548,7 +550,7 @@ impl ProofSuite for RsaSignature2018 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         verify(proof, document, resolver).await
     }
     async fn complete(
@@ -603,7 +605,7 @@ impl ProofSuite for Ed25519Signature2018 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         verify(proof, document, resolver).await
     }
     async fn complete(
@@ -658,7 +660,7 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         verify(proof, document, resolver).await
     }
     async fn complete(
@@ -730,7 +732,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let verification_method = proof
             .verification_method
@@ -745,7 +747,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
         let account_id = BlockchainAccountId::from_str(&account_id_str)?;
         account_id.verify(&jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -821,7 +823,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
@@ -843,7 +845,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         account_id.verify(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -918,7 +920,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
@@ -940,7 +942,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         account_id.verify(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1017,7 +1019,7 @@ impl ProofSuite for Eip712Signature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1061,7 +1063,7 @@ impl ProofSuite for Eip712Signature2021 {
         let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
         let account_id = BlockchainAccountId::from_str(&account_id_str)?;
         account_id.verify(&jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1153,7 +1155,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1203,7 +1205,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
             let account_id = BlockchainAccountId::from_str(&account_id_str)?;
             account_id.verify(&jwk)?;
         }
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1284,7 +1286,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1327,7 +1329,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
         let account_id = BlockchainAccountId::from_str(&account_id_str)?;
         account_id.verify(&jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1445,7 +1447,7 @@ impl ProofSuite for TezosSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_bs58 = proof
             .proof_value
             .as_ref()
@@ -1494,7 +1496,7 @@ impl ProofSuite for TezosSignature2021 {
                 return Err(Error::MissingKey);
             }
         };
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1562,7 +1564,7 @@ impl ProofSuite for SolanaSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_b58 = proof
             .proof_value
             .as_ref()
@@ -1581,7 +1583,7 @@ impl ProofSuite for SolanaSignature2021 {
         let bytes = tx.to_bytes();
         let sig = bs58::decode(&sig_b58).into_vec()?;
         crate::jws::verify_bytes(Algorithm::EdDSA, &bytes, &key, &sig)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1628,7 +1630,7 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         verify(proof, document, resolver).await
     }
     async fn complete(
@@ -1684,7 +1686,7 @@ impl ProofSuite for JsonWebSignature2020 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let verification_method = proof
             .verification_method
@@ -1703,7 +1705,7 @@ impl ProofSuite for JsonWebSignature2020 {
         let key = resolve_key(&verification_method, resolver).await?;
         self.validate_key_and_algorithm(&key, header.algorithm)?;
         crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature)?;
-        Ok(())
+        Ok(Default::default())
     }
     async fn complete(
         &self,

@@ -7,7 +7,9 @@ use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
 use crate::jws::Header;
-use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
+use crate::ldp::{
+    now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation, VerificationWarnings,
+};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 
@@ -414,14 +416,18 @@ impl VerificationResult {
     }
 }
 
-impl From<Result<(), Error>> for VerificationResult {
-    fn from(res: Result<(), Error>) -> Self {
-        Self {
-            checks: vec![],
-            warnings: vec![],
-            errors: match res {
-                Ok(_) => vec![],
-                Err(error) => vec![error.to_string()],
+impl From<Result<VerificationWarnings, Error>> for VerificationResult {
+    fn from(res: Result<VerificationWarnings, Error>) -> Self {
+        match res {
+            Ok(warnings) => Self {
+                checks: vec![],
+                warnings,
+                errors: vec![],
+            },
+            Err(error) => Self {
+                checks: vec![],
+                warnings: vec![],
+                errors: vec![error.to_string()],
             },
         }
     }
