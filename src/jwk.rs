@@ -423,7 +423,7 @@ impl RSAParams {
     pub fn to_public(&self) -> Self {
         Self {
             modulus: self.modulus.clone(),
-            exponent: self.modulus.clone(),
+            exponent: self.exponent.clone(),
             ..Default::default()
         }
     }
