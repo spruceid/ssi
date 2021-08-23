@@ -99,43 +99,47 @@ fn pick_proof_suite<'a, 'b>(
     Ok(match algorithm {
         Algorithm::RS256 => &RsaSignature2018,
         Algorithm::PS256 => &JsonWebSignature2020,
-        Algorithm::EdDSA => match verification_method {
+        Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
             Some(URI::String(ref vm))
                 if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
                     && vm.ends_with("#SolanaMethod2021") =>
             {
                 &SolanaSignature2021
             }
+            Some(URI::String(ref vm))
+                if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
+            {
+                if vm.ends_with("#TezosMethod2021") {
+                    &TezosSignature2021
+                } else {
+                    &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                }
+            }
             _ => &Ed25519Signature2018,
         },
-        Algorithm::EdBlake2b => match verification_method {
+        Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
             Some(URI::String(ref vm))
-                if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
-                    && vm.ends_with("#TezosMethod2021") =>
+                if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
             {
-                &TezosSignature2021
+                if vm.ends_with("#TezosMethod2021") {
+                    &TezosSignature2021
+                } else {
+                    &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                }
             }
-            _ => &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            _ => &EcdsaSecp256r1Signature2019,
         },
-        Algorithm::ES256 => &EcdsaSecp256r1Signature2019,
-        Algorithm::ESBlake2b => match verification_method {
+        Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
             Some(URI::String(ref vm))
-                if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
-                    && vm.ends_with("#TezosMethod2021") =>
+                if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
             {
-                &TezosSignature2021
+                if vm.ends_with("#TezosMethod2021") {
+                    &TezosSignature2021
+                } else {
+                    &EcdsaSecp256k1RecoverySignature2020
+                }
             }
-            _ => &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-        },
-        Algorithm::ES256K => &EcdsaSecp256k1Signature2019,
-        Algorithm::ESBlake2bK => match verification_method {
-            Some(URI::String(ref vm))
-                if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
-                    && vm.ends_with("#TezosMethod2021") =>
-            {
-                &TezosSignature2021
-            }
-            _ => &EcdsaSecp256k1RecoverySignature2020,
+            _ => &EcdsaSecp256k1Signature2019,
         },
         Algorithm::ES256KR => {
             if use_eip712sig(jwk) {
