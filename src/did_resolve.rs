@@ -12,7 +12,9 @@ use std::collections::{BTreeMap, HashMap};
 use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
-use crate::did::{DIDMethod, DIDParameters, Document, Resource, ServiceEndpoint, DIDURL};
+use crate::did::{
+    DIDMethod, DIDParameters, Document, PrimaryDIDURL, Resource, ServiceEndpoint, DIDURL,
+};
 use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
 use crate::one_or_many::OneOrMany;
@@ -152,7 +154,7 @@ impl From<ResolutionMetadata> for DereferencingMetadata {
 
 // needed for:
 // - https://w3c-ccg.github.io/did-resolution/#bindings-https Step 1.10.2.1
-//   Producing DID resolution result after DID URL deferencing.
+//   Producing DID resolution result after DID URL dereferencing.
 impl From<DereferencingMetadata> for ResolutionMetadata {
     fn from(deref_meta: DereferencingMetadata) -> Self {
         Self {
@@ -265,7 +267,7 @@ pub trait DIDResolver: Sync {
     /// <https://w3c-ccg.github.io/did-resolution/#dereferencing>
     async fn dereference(
         &self,
-        _did_url: &DIDURL,
+        _primary_did_url: &PrimaryDIDURL,
         _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
     ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
         None
@@ -286,7 +288,7 @@ pub async fn dereference(
     did_url_str: &str,
     did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
 ) -> (DereferencingMetadata, Content, ContentMetadata) {
-    let mut did_url = match DIDURL::try_from(did_url_str.to_string()) {
+    let did_url = match DIDURL::try_from(did_url_str.to_string()) {
         Ok(did_url) => did_url,
         Err(_error) => {
             return (
@@ -332,10 +334,10 @@ pub async fn dereference(
         }
     };
     // 2
-    let fragment = did_url.fragment.take();
+    let (primary_did_url, fragment) = did_url.remove_fragment();
     let (deref_meta, content, content_meta) = dereference_primary_resource(
         resolver,
-        &did_url,
+        &primary_did_url,
         &did_url_dereferencing_input_metadata,
         &did_doc_res_meta,
         did_doc,
@@ -349,7 +351,7 @@ pub async fn dereference(
         // 3
         return dereference_secondary_resource(
             resolver,
-            did_url,
+            primary_did_url,
             fragment,
             &did_url_dereferencing_input_metadata,
             deref_meta,
@@ -364,13 +366,13 @@ pub async fn dereference(
 /// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary>
 async fn dereference_primary_resource(
     resolver: &dyn DIDResolver,
-    did_url: &DIDURL,
+    primary_did_url: &PrimaryDIDURL,
     did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
     res_meta: &ResolutionMetadata,
     did_doc: Document,
     _did_doc_meta: &DocumentMetadata,
 ) -> (DereferencingMetadata, Content, ContentMetadata) {
-    let parameters: DIDParameters = match did_url.query {
+    let parameters: DIDParameters = match primary_did_url.query {
         Some(ref query) => match serde_urlencoded::from_str(query) {
             Ok(params) => params,
             Err(err) => {
@@ -426,8 +428,9 @@ async fn dereference_primary_resource(
         };
 
         // 1.2.2, 1.2.3
+        let did_url = DIDURL::from(primary_did_url.clone());
         let output_service_endpoint_url =
-            match construct_service_endpoint(did_url, &parameters, &input_service_endpoint_url) {
+            match construct_service_endpoint(&did_url, &parameters, &input_service_endpoint_url) {
                 Ok(url) => url,
                 Err(err) => {
                     return (
@@ -451,7 +454,7 @@ async fn dereference_primary_resource(
         );
     }
     // 2
-    if did_url.path_abempty.is_empty() && did_url.query.is_none() {
+    if primary_did_url.path.is_none() && primary_did_url.query.is_none() {
         // 2.1
         // Add back contentType, since the resolve function does not include it, but we need
         // it to dereference the secondary resource.
@@ -467,10 +470,10 @@ async fn dereference_primary_resource(
         );
     }
     // 3
-    if !did_url.path_abempty.is_empty() || did_url.query.is_some() {
+    if primary_did_url.path.is_some() || primary_did_url.query.is_some() {
         // 3.1
         if let Some(result) = resolver
-            .dereference(did_url, did_url_dereferencing_input_metadata)
+            .dereference(primary_did_url, did_url_dereferencing_input_metadata)
             .await
         {
             return result;
@@ -491,7 +494,7 @@ async fn dereference_primary_resource(
 /// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary>
 async fn dereference_secondary_resource(
     _resolver: &dyn DIDResolver,
-    mut did_url: DIDURL,
+    primary_did_url: PrimaryDIDURL,
     fragment: String,
     _did_url_dereferencing_input_metadata: &DereferencingInputMetadata,
     deref_meta: DereferencingMetadata,
@@ -513,7 +516,7 @@ async fn dereference_secondary_resource(
             if content_type == Some(TYPE_DID_LD_JSON) || content_type == Some(TYPE_DID_JSON) =>
         {
             // put the fragment back in the URL
-            did_url.fragment.replace(fragment);
+            let did_url = primary_did_url.with_fragment(fragment);
             // 1.1
             let object = match doc.select_object(&did_url) {
                 Ok(object) => object,
@@ -832,7 +835,7 @@ impl DIDResolver for HTTPDIDResolver {
 
     async fn dereference(
         &self,
-        did_url: &DIDURL,
+        primary_did_url: &PrimaryDIDURL,
         input_metadata: &DereferencingInputMetadata,
     ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
         let querystring = match serde_urlencoded::to_string(input_metadata) {
@@ -848,9 +851,11 @@ impl DIDResolver for HTTPDIDResolver {
                 ))
             }
         };
-        let did_url_urlencoded =
-            percent_encoding::utf8_percent_encode(&did_url.to_string(), percent_encoding::CONTROLS)
-                .to_string();
+        let did_url_urlencoded = percent_encoding::utf8_percent_encode(
+            &primary_did_url.to_string(),
+            percent_encoding::CONTROLS,
+        )
+        .to_string();
         let mut url = self.endpoint.clone() + &did_url_urlencoded;
         if !querystring.is_empty() {
             url.push('?');
@@ -1063,12 +1068,12 @@ impl<'a> DIDResolver for SeriesResolver<'a> {
 
     async fn dereference(
         &self,
-        did_url: &DIDURL,
+        primary_did_url: &PrimaryDIDURL,
         input_metadata: &DereferencingInputMetadata,
     ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
         for resolver in &self.resolvers {
             if let Some((deref_meta, content, content_meta)) =
-                resolver.dereference(did_url, input_metadata).await
+                resolver.dereference(primary_did_url, input_metadata).await
             {
                 let method_supported = match deref_meta.error {
                     None => true,
@@ -1449,7 +1454,7 @@ mod tests {
         .await;
         assert_eq!(deref_meta.error, None);
         assert_eq!(content, expected_content);
-        eprintln!("deferencing metadata: {:?}", deref_meta);
+        eprintln!("dereferencing metadata: {:?}", deref_meta);
         eprintln!("content: {:?}", content);
         eprintln!("content metadata: {:?}", content_meta);
 
