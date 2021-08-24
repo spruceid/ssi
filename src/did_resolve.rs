@@ -547,6 +547,14 @@ async fn dereference_secondary_resource(
         Content::URL(mut url) => {
             // 2
             // 2.1
+            if url.contains('#') {
+                // https://w3c-ccg.github.io/did-resolution/#input
+                return (
+                    DereferencingMetadata::from_error(&format!("DID URL and input service endpoint URL MUST NOT both have a fragment component")),
+                    Content::Null,
+                    ContentMetadata::default()
+                );
+            }
             url.push('#');
             url.push_str(&fragment);
             return (deref_meta, Content::URL(url), content_meta);
