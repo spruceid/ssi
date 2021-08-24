@@ -228,6 +228,53 @@ async fn resolve_celo(did: &str, account_address: String) -> ResolutionResult {
     resolution_result(doc)
 }
 
+async fn resolve_poly(did: &str, account_address: String) -> ResolutionResult {
+    if !account_address.starts_with("0x") {
+        return resolution_error(&ERROR_INVALID_DID);
+    }
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(
+        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+    );
+    let blockchain_account_id = BlockchainAccountId {
+        account_address,
+        chain_id: "eip155:137".to_string(),
+    };
+    let vm_url = DIDURL {
+        did: did.to_string(),
+        fragment: Some("Recovery2020".to_string()),
+        ..Default::default()
+    };
+    let vm = VerificationMethod::Map(VerificationMethodMap {
+        id: vm_url.to_string(),
+        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        controller: did.to_string(),
+        blockchain_account_id: Some(blockchain_account_id.to_string()),
+        ..Default::default()
+    });
+    let doc = Document {
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
+        id: did.to_string(),
+        verification_method: Some(vec![vm]),
+        authentication: Some(vec![
+            VerificationMethod::DIDURL(vm_url.clone()),
+        ]),
+        assertion_method: Some(vec![
+            VerificationMethod::DIDURL(vm_url),
+        ]),
+        ..Default::default()
+    };
+    resolution_result(doc)
+}
+
 async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
     let public_key_bytes = match bs58::decode(&account_address).into_vec() {
         Ok(bytes) => bytes,
@@ -424,6 +471,7 @@ impl DIDResolver for DIDPKH {
             "tz" => resolve_tz(did, data).await,
             "eth" => resolve_eth(did, data).await,
             "celo" => resolve_celo(did, data).await,
+            "poly" => resolve_poly(did, data).await,
             "sol" => resolve_sol(did, data).await,
             "btc" => resolve_btc(did, data).await,
             "doge" => resolve_doge(did, data).await,
@@ -477,6 +525,7 @@ impl DIDMethod for DIDPKH {
             "tz" => ssi::blakesig::hash_public_key(key).ok(),
             "eth" => ssi::keccak_hash::hash_public_key(key).ok(),
             "celo" => ssi::keccak_hash::hash_public_key(key).ok(),
+            "poly" => ssi::keccak_hash::hash_public_key(key).ok(),
             "sol" => generate_sol(key),
             "btc" => generate_btc(key).ok(),
             "doge" => generate_doge(key).ok(),
@@ -528,6 +577,11 @@ mod tests {
             secp256k1_pk.clone(),
             "celo",
             "did:pkh:celo:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758",
+        );
+        test_generate(
+            secp256k1_pk.clone(),
+            "poly",
+            "did:pkh:poly:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758",
         );
         test_generate(
             json!({
@@ -604,6 +658,11 @@ mod tests {
         test_resolve(
             "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
             include_str!("../tests/did-celo.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
+            include_str!("../tests/did-poly.jsonld"),
         )
         .await;
         test_resolve(
@@ -1200,5 +1259,7 @@ mod tests {
         test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld")).await;
         test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld")).await;
         test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld")).await;
+        test_verify_vc(include_str!("../tests/vc-poly-epsig.jsonld")).await;
+        test_verify_vc(include_str!("../tests/vc-poly-eip712sig.jsonld")).await;
     }
 }
