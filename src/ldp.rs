@@ -20,7 +20,7 @@ use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jwk::Base64urlUInt;
-use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
+use crate::jwk::{Algorithm, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
@@ -739,9 +739,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         }
         let message = to_jws_payload(document, proof).await?;
         let (_header, jwk) = crate::jws::detached_recover(&jws, &message)?;
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         Ok(Default::default())
     }
 }
@@ -835,11 +833,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(&verification_method, resolver).await?;
-        let account_id: BlockchainAccountId = vm
-            .blockchain_account_id
-            .ok_or(Error::MissingAccountId)?
-            .parse()?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
         Ok(Default::default())
@@ -934,11 +928,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(&verification_method, resolver).await?;
-        let account_id: BlockchainAccountId = vm
-            .blockchain_account_id
-            .ok_or(Error::MissingAccountId)?
-            .parse()?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
         Ok(Default::default())
@@ -1061,9 +1051,7 @@ impl ProofSuite for Eip712Signature2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         Ok(Default::default())
     }
 }
@@ -1331,9 +1319,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         Ok(Default::default())
     }
 }

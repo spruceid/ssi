@@ -1,3 +1,4 @@
+use crate::caip10::BlockchainAccountId;
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -457,6 +458,20 @@ impl VerificationMethodMap {
                 return Err(Error::MultipleKeyMaterial);
             }
         }
+    }
+
+    /// Verify that a given JWK can be used to satisfy this verification method.
+    pub fn match_jwk(&self, jwk: &JWK) -> Result<(), Error> {
+        if let Some(ref account_id) = self.blockchain_account_id {
+            let account_id = BlockchainAccountId::from_str(&account_id)?;
+            account_id.verify(&jwk)?;
+        } else {
+            let resolved_jwk = self.get_jwk()?;
+            if !resolved_jwk.equals_public(&jwk) {
+                Err(Error::KeyMismatch)?;
+            }
+        }
+        Ok(())
     }
 }
 

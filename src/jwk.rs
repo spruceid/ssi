@@ -319,6 +319,51 @@ impl JWK {
         key
     }
 
+    /// Compare JWK equality by public key properties.
+    /// Equivalent to comparing by [JWK Thumbprint][thumbprint].
+    pub fn equals_public(&self, other: &JWK) -> bool {
+        match (&self.params, &other.params) {
+            (
+                Params::RSA(RSAParams {
+                    modulus: Some(n1),
+                    exponent: Some(e1),
+                    ..
+                }),
+                Params::RSA(RSAParams {
+                    modulus: Some(n2),
+                    exponent: Some(e2),
+                    ..
+                }),
+            ) => n1 == n2 && e1 == e2,
+            (Params::OKP(okp1), Params::OKP(okp2)) => {
+                okp1.curve == okp2.curve && okp1.public_key == okp2.public_key
+            }
+            (
+                Params::EC(ECParams {
+                    curve: Some(crv1),
+                    x_coordinate: Some(x1),
+                    y_coordinate: Some(y1),
+                    ..
+                }),
+                Params::EC(ECParams {
+                    curve: Some(crv2),
+                    x_coordinate: Some(x2),
+                    y_coordinate: Some(y2),
+                    ..
+                }),
+            ) => crv1 == crv2 && x1 == x2 && y1 == y2,
+            (
+                Params::Symmetric(SymmetricParams {
+                    key_value: Some(kv1),
+                }),
+                Params::Symmetric(SymmetricParams {
+                    key_value: Some(kv2),
+                }),
+            ) => kv1 == kv2,
+            _ => false,
+        }
+    }
+
     pub fn thumbprint(&self) -> Result<String, Error> {
         // JWK parameters for thumbprint hashing must be in lexicographical order, and without
         // string escaping.
