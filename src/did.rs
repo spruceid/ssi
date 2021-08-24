@@ -412,13 +412,18 @@ impl VerificationMethod {
         match self {
             Self::DIDURL(didurl) => didurl.to_string(),
             Self::RelativeDIDURL(relative_did_url) => relative_did_url.to_absolute(did).to_string(),
-            Self::Map(map) => {
-                if let Ok(rel_did_url) = RelativeDIDURL::from_str(&map.id) {
-                    rel_did_url.to_absolute(did).to_string()
-                } else {
-                    map.id.to_string()
-                }
-            }
+            Self::Map(map) => map.get_id(did),
+        }
+    }
+}
+
+impl VerificationMethodMap {
+    /// Return a DID URL for this verification method, given a DID as base URI
+    pub fn get_id(&self, did: &str) -> String {
+        if let Ok(rel_did_url) = RelativeDIDURL::from_str(&self.id) {
+            rel_did_url.to_absolute(did).to_string()
+        } else {
+            self.id.to_string()
         }
     }
 }
