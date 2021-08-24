@@ -426,6 +426,38 @@ impl VerificationMethodMap {
             self.id.to_string()
         }
     }
+
+    /// Get the verification material as a JWK, from the publicKeyJwk property, or converting from other
+    /// public key properties as needed.
+    pub fn get_jwk(&self) -> Result<JWK, Error> {
+        match (
+            self.public_key_jwk.as_ref(),
+            self.public_key_base58.as_ref(),
+        ) {
+            (Some(pk_jwk), None) => Ok(pk_jwk.clone()),
+            (None, Some(pk_bs58)) => {
+                let pk_bytes = bs58::decode(&pk_bs58).into_vec()?;
+                let params = match &self.type_[..] {
+                    "Ed25519VerificationKey2018" => {
+                        crate::jwk::Params::OKP(crate::jwk::OctetParams {
+                            curve: "Ed25519".to_string(),
+                            public_key: crate::jwk::Base64urlUInt(pk_bytes),
+                            private_key: None,
+                        })
+                    }
+                    _ => return Err(Error::UnsupportedKeyType),
+                };
+                Ok(JWK::from(params))
+            }
+            (None, None) => Err(Error::MissingKey),
+            _ => {
+                // https://w3c.github.io/did-core/#verification-material
+                // "expressing key material in a verification method using both publicKeyJwk and
+                // publicKeyBase58 at the same time is prohibited."
+                return Err(Error::MultipleKeyMaterial);
+            }
+        }
+    }
 }
 
 impl FromStr for DIDURL {
