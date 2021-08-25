@@ -1,3 +1,4 @@
+pub mod bbs;
 pub mod blakesig;
 pub mod caip10;
 pub mod der;
