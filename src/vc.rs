@@ -121,6 +121,19 @@ pub enum Issuer {
     Object(ObjectWithId),
 }
 
+impl Issuer {
+    /// Get the issuer's URI.
+    pub fn get_id(self: &Self) -> &str {
+        match self {
+            Self::URI(URI::String(uri)) => uri,
+            Self::Object(ObjectWithId {
+                id: URI::String(uri),
+                ..
+            }) => uri,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectWithId {
@@ -1001,11 +1014,7 @@ impl Credential {
             Some(vm) => vec![vm.to_string()],
             None => {
                 if let Some(ref issuer) = self.issuer {
-                    let issuer_uri = match issuer.clone() {
-                        Issuer::URI(uri) => uri,
-                        Issuer::Object(object_with_id) => object_with_id.id,
-                    };
-                    let URI::String(issuer_did) = issuer_uri;
+                    let issuer_did = issuer.get_id();
                     // https://w3c.github.io/did-core/#assertion
                     // assertionMethod is the verification relationship usually used for issuing
                     // VCs.
