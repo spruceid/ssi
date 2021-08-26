@@ -1,0 +1,27 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://w3id.org/vc-revocation-list-2020/v1"
+  ],
+  "id": "https://example.test/revocationList.json",
+  "type": [
+    "VerifiableCredential",
+    "RevocationList2020Credential"
+  ],
+  "credentialSubject": {
+    "encodedList": "H4sIAAAAAAAAA-3BMQ0AAAACIGf_0MbwARoAAAAAAAAAAAAAAAAAAADgbbmHB0sAQAAA",
+    "type": "RevocationList2020"
+  },
+  "issuer": "did:example:foo",
+  "issuanceDate": "2021-08-26T18:53:42.485Z",
+  "proof": {
+    "@context": [
+      "https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json"
+    ],
+    "type": "JsonWebSignature2020",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "did:example:foo#key1",
+    "created": "2021-08-26T18:53:42.485Z",
+    "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..WbAwCb5pgLAohpVL-FJ15nDL4S_P9wQgCZhVsQDkwDbDsu20s2fZehrxY2uHrlysZORUfWbF7IKjn77e5lyWNzY5qRNfflhlH3TG5AT1-PdYvnUs_gaj6pdr5FH8uIEZImK5CGxfTZCkx7yLQ69UfBA3pNUSGmH7pz84xlN7com8q_S3Sn7t8lO85JUhdSEFydrfdCgkOudZ55wnioIz-FH8YwxtmzF8W_3HcV7RkEvZ6yK_SJ5TJLpcFcghyaLogyeBfy1FY-MJnEtwaT4VtjlJ_pXjXjLFGSoX4ZyY3GwKwjd9DycZYK28xATke91WZESFSTVj1SXLJlM--NUlOA"
+  }
+}
