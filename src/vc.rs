@@ -227,6 +227,7 @@ pub struct Status {
 #[serde(tag = "type")]
 pub enum CheckableStatus {
     RevocationList2020Status(crate::revocation::RevocationList2020Status),
+    RevocationList2021Status(crate::revocation::RevocationList2021Status),
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -1193,6 +1194,7 @@ impl CheckableStatus {
     ) -> VerificationResult {
         match self {
             Self::RevocationList2020Status(status) => status.check(credential, resolver).await,
+            Self::RevocationList2021Status(status) => status.check(credential, resolver).await,
         }
     }
 }

@@ -22,8 +22,22 @@ pub struct RevocationList2020Status {
     pub revocation_list_credential: URL,
 }
 
+/// Credential Status object for use in a Verifiable Credential.
+/// <https://w3c-ccg.github.io/vc-status-list-2021/#revocationlist2021>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RevocationList2021Status {
+    /// URL for status information of the verifiable credential - but not the URL of the status
+    /// list.
+    pub id: URL,
+    /// Index of this credential's status in the status list credential
+    pub status_list_index: RevocationListIndex,
+    /// URL to a [StatusList2021Credential]
+    pub status_list_credential: URL,
+}
+
 /// Integer identifying a bit position of the revocation status of a verifiable credential in a
-/// revocation list, e.g. in a [RevocationList2020].
+/// revocation list, e.g. in a [RevocationList2020] or [RevocationList2021].
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
@@ -46,11 +60,29 @@ pub enum RevocationList2020Subject {
     RevocationList2020(RevocationList2020),
 }
 
+/// Verifiable Credential of type StatusList2021Credential.
+/// <https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021credential>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusList2021Credential {
+    id: URI,
+    issuer: Issuer,
+    credential_subject: RevocationList2021,
+}
+
 /// Credential subject of type RevocationList2020, expected to be used in a Verifiable Credential of type [RevocationList2020Credential]
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020credential>
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RevocationList2020 {
+    encoded_list: EncodedList,
+}
+
+/// Credential subject of type RevocationList2021, expected to be used in a Verifiable Credential of type [StatusList2021Credential]
+/// <https://w3c-ccg.github.io/vc-status-list-2021/#revocationlist2021>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RevocationList2021 {
     encoded_list: EncodedList,
 }
 
@@ -61,6 +93,7 @@ pub struct EncodedList(pub String);
 #[serde(tag = "type")]
 pub enum RevocationSubject {
     RevocationList2020(RevocationList2020),
+    RevocationList2021(RevocationList2021),
 }
 
 /// A decoded [revocation list][EncodedList].
@@ -233,6 +266,18 @@ impl CredentialStatus for RevocationList2020Status {
             return result.with_error("Credential is revoked.".to_string());
         }
         result
+    }
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl CredentialStatus for RevocationList2021Status {
+    async fn check(
+        &self,
+        _credential: &Credential,
+        _resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
+        todo!();
     }
 }
 
