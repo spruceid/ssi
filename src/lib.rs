@@ -16,6 +16,7 @@ pub mod keccak_hash;
 pub mod ldp;
 pub mod one_or_many;
 pub mod rdf;
+pub mod revocation;
 #[cfg(feature = "ripemd160")]
 pub mod ripemd;
 pub mod soltx;

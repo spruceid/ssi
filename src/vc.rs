@@ -225,7 +225,9 @@ pub struct Status {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
-pub enum CheckableStatus {}
+pub enum CheckableStatus {
+    RevocationList2020Status(crate::revocation::RevocationList2020Status),
+}
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -442,6 +444,11 @@ impl VerificationResult {
         self.warnings.append(&mut other.warnings);
         self.errors.append(&mut other.errors);
     }
+
+    pub fn with_error(mut self, error: String) -> Self {
+        self.errors.push(error);
+        self
+    }
 }
 
 impl From<Result<VerificationWarnings, Error>> for VerificationResult {
@@ -485,6 +492,31 @@ impl From<Contexts> for OneOrMany<Context> {
             Contexts::One(context) => OneOrMany::One(context),
             Contexts::Many(contexts) => OneOrMany::Many(contexts),
         }
+    }
+}
+
+impl Contexts {
+    /// Check if the contexts contains the given URI.
+    pub fn contains_uri(&self, uri: &str) -> bool {
+        match self {
+            Self::One(context) => {
+                if let Context::URI(URI::String(context_uri)) = context {
+                    if context_uri == uri {
+                        return true;
+                    }
+                }
+            }
+            Self::Many(contexts) => {
+                for context in contexts {
+                    if let Context::URI(URI::String(context_uri)) = context {
+                        if context_uri == uri {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 }
 
@@ -1159,7 +1191,9 @@ impl CheckableStatus {
         credential: &Credential,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
-        VerificationResult::error("no credentialStatus supported")
+        match self {
+            Self::RevocationList2020Status(status) => status.check(credential, resolver).await,
+        }
     }
 }
 
@@ -2056,10 +2090,15 @@ impl From<Check> for String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::did::example::DIDExample;
     use crate::urdna2015;
+
+    pub const EXAMPLE_REVOCATION_2020_LIST_URL: &'static str =
+        "https://example.test/revocationList.json";
+    pub const EXAMPLE_REVOCATION_2020_LIST: &'static [u8] =
+        include_bytes!("../tests/revocationList.json");
 
     const JWK_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
 
@@ -2598,6 +2637,83 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
+    }
+
+    #[tokio::test]
+    async fn credential_status() {
+        use serde_json::json;
+        let mut unrevoked_vc: Credential = serde_json::from_value(json!({
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                "https://w3id.org/vc-revocation-list-2020/v1"
+            ],
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:foo",
+            "issuanceDate": "2021-08-25T18:38:54Z",
+            "credentialSubject": {},
+            "credentialStatus": {
+                "id": "_:1",
+                "type": "RevocationList2020Status",
+                "revocationListCredential": EXAMPLE_REVOCATION_2020_LIST_URL,
+                "revocationListIndex": "0"
+            }
+        }))
+        .unwrap();
+        let mut revoked_vc: Credential = serde_json::from_value(json!({
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                "https://w3id.org/vc-revocation-list-2020/v1"
+            ],
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:foo",
+            "issuanceDate": "2021-08-25T20:15:45Z",
+            "credentialSubject": {},
+            "credentialStatus": {
+                "id": "_:1",
+                "type": "RevocationList2020Status",
+                "revocationListCredential": EXAMPLE_REVOCATION_2020_LIST_URL,
+                "revocationListIndex": "1"
+            }
+        }))
+        .unwrap();
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let verify_options = LinkedDataProofOptions {
+            checks: Some(vec![Check::Proof, Check::CredentialStatus]),
+            ..Default::default()
+        };
+
+        // Issue unrevoked VC
+        let proof = unrevoked_vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        unrevoked_vc.add_proof(proof);
+        unrevoked_vc.validate().unwrap();
+
+        // Issue revoked VC
+        let proof = revoked_vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        revoked_vc.add_proof(proof);
+        revoked_vc.validate().unwrap();
+
+        // Verify unrevoked VC
+        let verification_result = unrevoked_vc
+            .verify(Some(verify_options.clone()), &DIDExample)
+            .await;
+        println!("{:#?}", verification_result);
+        assert_eq!(verification_result.errors.len(), 0);
+
+        // Verify revoked VC
+        let verification_result = revoked_vc.verify(Some(verify_options), &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert_ne!(verification_result.errors.len(), 0);
     }
 
     #[async_std::test]
