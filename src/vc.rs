@@ -210,6 +210,20 @@ pub struct Status {
     pub property_set: Option<Map<String, Value>>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum CheckableStatus {}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+pub trait CredentialStatus: Sync {
+    async fn check(
+        &self,
+        credential: &Credential,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult;
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(try_from = "String")]
 #[serde(untagged)]
@@ -355,6 +369,7 @@ pub enum Check {
     Proof,
     #[serde(rename = "JWS")]
     JWS,
+    CredentialStatus,
 }
 
 // https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
@@ -809,6 +824,10 @@ impl Credential {
         options_opt: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> (Option<Self>, VerificationResult) {
+        let checks = options_opt
+            .as_ref()
+            .and_then(|opts| opts.checks.clone())
+            .unwrap_or_default();
         let (header_b64, payload_enc, signature_b64) = match crate::jws::split_jws(jwt) {
             Ok(parts) => parts,
             Err(err) => {
@@ -911,11 +930,14 @@ impl Credential {
         // Try verifying each proof until one succeeds
         for proof in proofs {
             let mut result = proof.verify(&vc, resolver).await;
-            if result.errors.is_empty() {
-                result.checks.push(Check::Proof);
-                return (Some(vc), result);
-            };
             results.append(&mut result);
+            if results.errors.is_empty() {
+                results.checks.push(Check::Proof);
+                break;
+            };
+        }
+        if checks.contains(&Check::CredentialStatus) {
+            results.append(&mut vc.check_status(resolver).await);
         }
         (Some(vc), results)
     }
@@ -1023,6 +1045,10 @@ impl Credential {
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
+        let checks = options
+            .as_ref()
+            .and_then(|opts| opts.checks.clone())
+            .unwrap_or_default();
         let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
@@ -1037,11 +1063,14 @@ impl Credential {
         // Try verifying each proof until one succeeds
         for proof in proofs {
             let mut result = proof.verify(self, resolver).await;
-            if result.errors.is_empty() {
-                result.checks.push(Check::Proof);
-                return result;
-            };
             results.append(&mut result);
+            if result.errors.is_empty() {
+                results.checks.push(Check::Proof);
+                break;
+            };
+        }
+        if checks.contains(&Check::CredentialStatus) {
+            results.append(&mut self.check_status(resolver).await);
         }
         results
     }
@@ -1080,6 +1109,48 @@ impl Credential {
                 Some(OneOrMany::Many(proofs))
             }
         }
+    }
+
+    /// Check the credentials [status](https://www.w3.org/TR/vc-data-model/#status)
+    pub async fn check_status(&self, resolver: &dyn DIDResolver) -> VerificationResult {
+        let status = match self.credential_status {
+            Some(ref status) => status,
+            None => return VerificationResult::error("Missing credentialStatus"),
+        };
+        let status_value = match serde_json::to_value(status.clone()) {
+            Ok(status) => status,
+            Err(e) => {
+                return VerificationResult::error(&format!(
+                    "Unable to convert credentialStatus: {}",
+                    e
+                ))
+            }
+        };
+        let checkable_status: CheckableStatus = match serde_json::from_value(status_value) {
+            Ok(checkable_status) => checkable_status,
+            Err(e) => {
+                return VerificationResult::error(&format!(
+                    "Unable to parse credentialStatus: {}",
+                    e
+                ))
+            }
+        };
+        let mut result = checkable_status.check(self, resolver).await;
+        if result.errors.len() > 0 {
+            return result;
+        }
+        result.checks.push(Check::CredentialStatus);
+        result
+    }
+}
+
+impl CheckableStatus {
+    async fn check(
+        &self,
+        credential: &Credential,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
+        VerificationResult::error("no credentialStatus supported")
     }
 }
 
@@ -1247,6 +1318,19 @@ impl Presentation {
         options_opt: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> (Option<Self>, VerificationResult) {
+        let checks = options_opt
+            .as_ref()
+            .and_then(|opts| opts.checks.clone())
+            .unwrap_or_default();
+        if checks.contains(&Check::CredentialStatus) {
+            // TODO: apply check to embedded VCs
+            return (
+                None,
+                VerificationResult::error(
+                    "credentialStatus check not valid for VerifiablePresentation",
+                ),
+            );
+        }
         // let mut options = options_opt.unwrap_or_default();
         let (header_b64, payload_enc, signature_b64) = match crate::jws::split_jws(jwt) {
             Ok(parts) => parts,
@@ -1469,6 +1553,16 @@ impl Presentation {
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
     ) -> VerificationResult {
+        let checks = options
+            .as_ref()
+            .and_then(|opts| opts.checks.clone())
+            .unwrap_or_default();
+        if checks.contains(&Check::CredentialStatus) {
+            // TODO: apply check to embedded VCs
+            return VerificationResult::error(
+                "credentialStatus check not valid for VerifiablePresentation",
+            );
+        }
         let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
@@ -1929,6 +2023,7 @@ impl FromStr for Check {
         match purpose {
             "proof" => Ok(Self::Proof),
             "JWS" => Ok(Self::JWS),
+            "credentialStatus" => Ok(Self::CredentialStatus),
             _ => Err(Error::UnsupportedCheck),
         }
     }
@@ -1942,10 +2037,11 @@ impl TryFrom<String> for Check {
 }
 
 impl From<Check> for String {
-    fn from(purpose: Check) -> String {
-        match purpose {
+    fn from(check: Check) -> String {
+        match check {
             Check::Proof => "proof".to_string(),
             Check::JWS => "JWS".to_string(),
+            Check::CredentialStatus => "credentialStatus".to_string(),
         }
     }
 }
