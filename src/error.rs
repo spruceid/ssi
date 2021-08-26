@@ -197,6 +197,7 @@ pub enum Error {
     HexString,
     SignaturePrefix,
     KeyPrefix,
+    UnableToResolve(String),
     P256KeyLength(usize),
     ECEncodingError,
     ECDecompress,
@@ -339,6 +340,7 @@ impl fmt::Display for Error {
             Error::HexString => write!(f, "Expected string beginning with '0x'"),
             Error::SignaturePrefix => write!(f, "Unknown signature prefix"),
             Error::KeyPrefix => write!(f, "Unknown key prefix"),
+            Error::UnableToResolve(error) => write!(f, "Unable to resolve: {}", error),
             Error::FromUtf8(e) => e.fmt(f),
             Error::TryFromSlice(e) => e.fmt(f),
             #[cfg(feature = "ring")]

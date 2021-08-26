@@ -1096,6 +1096,20 @@ impl<'a> DIDResolver for SeriesResolver<'a> {
     }
 }
 
+// TODO: replace with Try trait implementation once stabilized.
+// <https://github.com/rust-lang/rust/issues/84277>
+pub(crate) async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Result<Document, Error> {
+    let (res_meta, doc_opt, _meta) = resolver
+        .resolve(did, &ResolutionInputMetadata::default())
+        .await;
+    if let Some(err) = res_meta.error {
+        return Err(Error::UnableToResolve(err.to_string()));
+    }
+    let doc = doc_opt
+        .ok_or_else(|| Error::UnableToResolve(format!("Missing document for DID: {}", did)))?;
+    Ok(doc)
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "http-did")]

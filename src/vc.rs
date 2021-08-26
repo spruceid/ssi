@@ -1646,15 +1646,9 @@ impl Default for Presentation {
 
 /// Get a DID's first verification method
 pub async fn get_verification_method(did: &str, resolver: &dyn DIDResolver) -> Option<String> {
-    let (res_meta, doc_opt, _meta) = resolver
-        .resolve(did, &ResolutionInputMetadata::default())
-        .await;
-    if res_meta.error.is_some() {
-        return None;
-    }
-    let doc = match doc_opt {
-        Some(doc) => doc,
-        None => return None,
+    let doc = match crate::did_resolve::easy_resolve(did, resolver).await {
+        Ok(doc) => doc,
+        Err(_) => return None,
     };
     let vms_auth = doc
         .get_verification_method_ids(ProofPurpose::Authentication)
@@ -1674,13 +1668,9 @@ pub async fn get_verification_methods(
     did: &str,
     resolver: &dyn DIDResolver,
 ) -> Result<Vec<String>, String> {
-    let (res_meta, doc_opt, _meta) = resolver
-        .resolve(did, &ResolutionInputMetadata::default())
-        .await;
-    if let Some(err) = res_meta.error {
-        return Err(err.to_string());
-    }
-    let doc = doc_opt.ok_or("Missing document".to_string())?;
+    let doc = crate::did_resolve::easy_resolve(did, resolver)
+        .await
+        .map_err(String::from)?;
     let vms = doc
         .verification_method
         .iter()
