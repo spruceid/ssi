@@ -1685,14 +1685,10 @@ pub async fn get_verification_methods_for_purpose(
     resolver: &dyn DIDResolver,
     proof_purpose: ProofPurpose,
 ) -> Result<Vec<String>, String> {
-    let (res_meta, doc_opt, _meta) = resolver
-        .resolve(did, &ResolutionInputMetadata::default())
-        .await;
-    if let Some(err) = res_meta.error {
-        return Err(err.to_string());
-    }
-    let doc = doc_opt.ok_or("Missing document".to_string())?;
-    doc.get_verification_method_ids(proof_purpose)
+    let vmms = crate::did_resolve::get_verification_methods(did, proof_purpose.clone(), resolver)
+        .await
+        .map_err(String::from)?;
+    Ok(vmms.into_keys().collect())
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

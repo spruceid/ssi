@@ -15,7 +15,7 @@ use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
 /// <https://w3c.github.io/did-core/#dfn-verification-relationship>
-type VerificationRelationship = crate::vc::ProofPurpose;
+pub type VerificationRelationship = crate::vc::ProofPurpose;
 
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
@@ -796,7 +796,7 @@ impl DocumentBuilder {
 }
 
 // When selecting a object from JSON-LD document, @context should be copied into the sub-document.
-fn merge_context(dest_opt: &mut Option<Value>, source: &Contexts) {
+pub(crate) fn merge_context(dest_opt: &mut Option<Value>, source: &Contexts) {
     let source = OneOrMany::<Context>::from(source.clone());
     let dest = dest_opt.take().unwrap_or(Value::Null);
     let mut dest_array = match dest {

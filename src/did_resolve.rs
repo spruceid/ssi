@@ -8,12 +8,13 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value;
 use serde_urlencoded;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
 use crate::did::{
-    DIDMethod, DIDParameters, Document, PrimaryDIDURL, Resource, ServiceEndpoint, DIDURL,
+    DIDMethod, DIDParameters, Document, PrimaryDIDURL, Resource, ServiceEndpoint,
+    VerificationMethod, VerificationMethodMap, VerificationRelationship, DIDURL,
 };
 use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
@@ -32,6 +33,9 @@ pub const ERROR_METHOD_NOT_SUPPORTED: &str = "methodNotSupported";
 pub const ERROR_REPRESENTATION_NOT_SUPPORTED: &str = "representationNotSupported";
 pub const TYPE_DID_RESOLUTION: &'static str =
     "application/ld+json;profile=\"https://w3id.org/did-resolution\";charset=utf-8";
+
+// Maximum number of DID controllers to resolve at once
+pub const MAX_CONTROLLERS: usize = 100;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -1110,6 +1114,72 @@ pub(crate) async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Resul
     Ok(doc)
 }
 
+/// Get the resolved verification method maps for a given DID (including its controllers,
+/// recursively) and verification relationship (proof purpose).
+pub async fn get_verification_methods(
+    did: &str,
+    verification_relationship: VerificationRelationship,
+    resolver: &dyn DIDResolver,
+) -> Result<HashMap<String, VerificationMethodMap>, Error> {
+    // Resolve DIDs, recursing through DID controllers.
+    let mut did_docs: HashMap<String, Document> = HashMap::new();
+    let mut dids_to_resolve = vec![did.to_string()];
+    while let Some(did) = dids_to_resolve.pop() {
+        if !did_docs.contains_key(&did) {
+            let doc = easy_resolve(&did, resolver).await?;
+            for controller in doc.controller.iter().flatten() {
+                dids_to_resolve.push(controller.clone());
+            }
+            if did_docs.len() > MAX_CONTROLLERS {
+                return Err(Error::ControllerLimit);
+            }
+            did_docs.insert(did, doc);
+        }
+    }
+    let mut vm_ids_for_purpose = HashSet::new();
+    let mut vmms_by_id: HashMap<String, VerificationMethodMap> = HashMap::new();
+    for (_did, doc) in did_docs {
+        // Find verification method ids for this proof purpose.
+        let vm_ids = doc
+            .get_verification_method_ids(verification_relationship.clone())
+            .map_err(|e| {
+                Error::UnableToResolve(format!("Unable to get verification method ids: {:?}", e))
+            })?;
+        for id in vm_ids {
+            vm_ids_for_purpose.insert(id);
+        }
+        // Find all verification method maps defined in the resolved DID document.
+        for vm in doc
+            .verification_method
+            .into_iter()
+            .chain(doc.public_key.into_iter())
+            .chain(doc.authentication.into_iter())
+            .chain(doc.assertion_method.into_iter())
+            .chain(doc.key_agreement.into_iter())
+            .chain(doc.capability_invocation.into_iter())
+            .chain(doc.capability_delegation.into_iter())
+            .flatten()
+        {
+            if let VerificationMethod::Map(mut vmm) = vm {
+                let vm_id = vmm.get_id(&doc.id);
+                crate::did::merge_context(&mut vmm.context, &doc.context);
+                vmms_by_id.insert(vm_id, vmm);
+            }
+        }
+    }
+    let mut vmms = HashMap::new();
+    for id in vm_ids_for_purpose {
+        let vmm = if let Some(vmm) = vmms_by_id.remove(&id) {
+            vmm
+        } else {
+            crate::ldp::resolve_vm(&id, resolver).await?
+        };
+        vmms.insert(id, vmm);
+    }
+    // TODO: verify VM controller properties.
+    Ok(vmms)
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(feature = "http-did")]
@@ -1465,7 +1535,6 @@ mod tests {
 	"publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
 }
         "#;
-        use crate::did::VerificationMethodMap;
         let vm: VerificationMethodMap = serde_json::from_str(&expected_output_resource).unwrap();
         let expected_content = Content::Object(Resource::VerificationMethod(vm));
         let (deref_meta, content, content_meta) = dereference(
