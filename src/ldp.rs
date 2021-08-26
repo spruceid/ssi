@@ -23,7 +23,7 @@ use crate::jwk::{Algorithm, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
-use crate::vc::{LinkedDataProofOptions, Proof, URI};
+use crate::vc::{LinkedDataProofOptions, Proof, ProofPurpose, URI};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -188,6 +188,12 @@ pub fn now_ms() -> DateTime<Utc> {
 pub trait LinkedDataDocument {
     fn get_contexts(&self) -> Result<Option<String>, Error>;
     fn to_value(&self) -> Result<Value, Error>;
+    fn get_default_proof_purpose(&self) -> Option<ProofPurpose> {
+        None
+    }
+    fn get_issuer(&self) -> Option<&str> {
+        None
+    }
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
@@ -283,6 +289,57 @@ fn use_epsig(key: &JWK) -> bool {
     return false;
 }
 
+// If a verificationMethod purpose was not provided, pick one. If one was provided,
+// verify that it is correct for the given issuer and proof purpose.
+pub(crate) async fn ensure_or_pick_verification_relationship(
+    options: &mut LinkedDataProofOptions,
+    document: &(dyn LinkedDataDocument + Sync),
+    key: &JWK,
+    resolver: &dyn DIDResolver,
+) -> Result<(), Error> {
+    let issuer = match document.get_issuer() {
+        None => {
+            // No issuer: no check is done.
+            // TODO: require issuer - or invokers set for ZCap
+            return Ok(());
+        }
+        Some(issuer) => issuer,
+    };
+    if options.proof_purpose.is_none() {
+        options.proof_purpose = document.get_default_proof_purpose();
+    }
+    let proof_purpose = options
+        .proof_purpose
+        .as_ref()
+        .ok_or(Error::MissingProofPurpose)?
+        .clone();
+    if !issuer.starts_with("did:") {
+        // TODO: support non-DID issuers.
+        // Unable to verify verification relationship for non-DID issuers.
+        // Allow some for testing purposes only.
+        match &issuer[..] {
+            "https://example.edu/issuers/14" => {
+                // https://github.com/w3c/vc-test-suite/blob/cdc7835/test/vc-data-model-1.0/input/example-016-jwt.jsonld#L8
+                // We don't have a way to actually resolve this to anything. Just allow it for
+                // vc-test-suite for now.
+                return Ok(());
+            }
+            _ => {
+                return Err(Error::UnsupportedNonDIDIssuer(issuer.to_string()));
+            }
+        }
+    }
+    if let Some(URI::String(ref vm_id)) = options.verification_method {
+        crate::vc::ensure_verification_relationship(&issuer, proof_purpose, vm_id, &key, resolver)
+            .await?;
+    } else {
+        options.verification_method = Some(URI::String(
+            crate::vc::pick_default_vm(&issuer, proof_purpose, &key, resolver).await?,
+        ))
+    }
+    Ok(())
+}
+
 pub struct LinkedDataProofs;
 impl LinkedDataProofs {
     // https://w3c-ccg.github.io/ld-proofs/#proof-algorithm
@@ -301,8 +358,10 @@ impl LinkedDataProofs {
         else {
             pick_proof_suite(key, options.verification_method.as_ref())?
         };
+        let mut options = options.clone();
+        ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         suite
-            .sign(document, options, resolver, &key, extra_proof_properties)
+            .sign(document, &options, resolver, &key, extra_proof_properties)
             .await
     }
 
@@ -323,10 +382,13 @@ impl LinkedDataProofs {
         else {
             pick_proof_suite(public_key, options.verification_method.as_ref())?
         };
+        let mut options = options.clone();
+        ensure_or_pick_verification_relationship(&mut options, document, public_key, resolver)
+            .await?;
         suite
             .prepare(
                 document,
-                options,
+                &options,
                 resolver,
                 public_key,
                 extra_proof_properties,

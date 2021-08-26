@@ -214,6 +214,15 @@ where
     fn to_value(&self) -> Result<Value, Error> {
         Ok(serde_json::to_value(&self)?)
     }
+
+    fn get_issuer(&self) -> Option<&str> {
+        // TODO: implement this and use it.
+        None
+    }
+
+    fn get_default_proof_purpose(&self) -> Option<ProofPurpose> {
+        Some(ProofPurpose::CapabilityDelegation)
+    }
 }
 
 // limited initial definition of a ZCAP Invocation, generic over Action
@@ -346,6 +355,15 @@ where
 
     fn to_value(&self) -> Result<Value, Error> {
         Ok(serde_json::to_value(&self)?)
+    }
+
+    fn get_issuer(&self) -> Option<&str> {
+        // TODO: implement this and use it.
+        None
+    }
+
+    fn get_default_proof_purpose(&self) -> Option<ProofPurpose> {
+        Some(ProofPurpose::CapabilityInvocation)
     }
 }
 
