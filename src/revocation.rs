@@ -1,12 +1,22 @@
 use crate::did_resolve::DIDResolver;
+use crate::jsonld::REVOCATION_LIST_2020_V1_CONTEXT;
 use crate::one_or_many::OneOrMany;
 use crate::vc::{Credential, CredentialStatus, Issuer, VerificationResult, URI};
 use async_trait::async_trait;
+use bitvec::prelude::Lsb0;
+use bitvec::slice::BitSlice;
+use bitvec::vec::BitVec;
 use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
 
 type URL = String;
+
+/// Minimum size of a revocation list bitstring, in bytes
+pub const MIN_BITSTRING_SIZE_BYTES: usize = 16384;
+
+const EMPTY_RLIST: &str = "H4sIAAAAAAAA_-3AMQEAAADCoPVPbQwfKAAAAAAAAAAAAAAAAAAAAOBthtJUqwBAAAA";
 
 /// Credential Status object for use in a Verifiable Credential.
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020status>
@@ -48,9 +58,11 @@ pub struct RevocationListIndex(usize);
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RevocationList2020Credential {
-    id: URI,
-    issuer: Issuer,
-    credential_subject: RevocationList2020Subject,
+    pub id: URI,
+    pub issuer: Issuer,
+    pub credential_subject: RevocationList2020Subject,
+    #[serde(flatten)]
+    pub more_properties: Value,
 }
 
 /// [Credential subject](https://www.w3.org/TR/vc-data-model/#credential-subject) of a [RevocationList2020Credential]
@@ -72,10 +84,12 @@ pub struct StatusList2021Credential {
 
 /// Credential subject of type RevocationList2020, expected to be used in a Verifiable Credential of type [RevocationList2020Credential]
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020credential>
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct RevocationList2020 {
-    encoded_list: EncodedList,
+    pub encoded_list: EncodedList,
+    #[serde(flatten)]
+    pub more_properties: Value,
 }
 
 /// Credential subject of type RevocationList2021, expected to be used in a Verifiable Credential of type [StatusList2021Credential]
@@ -86,7 +100,7 @@ pub struct RevocationList2021 {
     encoded_list: EncodedList,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct EncodedList(pub String);
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -97,7 +111,7 @@ pub enum RevocationSubject {
 }
 
 /// A decoded [revocation list][EncodedList].
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct List(pub Vec<u8>);
 
 impl TryFrom<String> for RevocationListIndex {
@@ -114,6 +128,68 @@ impl From<RevocationListIndex> for String {
 }
 
 #[derive(Error, Debug)]
+pub enum SetStatusError {
+    #[error("Encode list: {0}")]
+    Encode(#[from] EncodeListError),
+    #[error("Decode list: {0}")]
+    Decode(#[from] DecodeListError),
+    #[error("Out of bounds: index {0} but length is {1}")]
+    OutOfBounds(usize, usize),
+    #[error("Revocation list too large for BitVec: {0}")]
+    ListTooLarge(usize),
+    #[error("Revocation list is too small: {0}. Minimum: {1}")]
+    ListTooSmall(usize, usize),
+}
+
+impl RevocationList2020 {
+    /// Set the revocation status for a given index in the list.
+    pub fn set_status(&mut self, index: usize, revoked: bool) -> Result<(), SetStatusError> {
+        let mut list = List::try_from(&self.encoded_list)?;
+        let byte_len = list.0.len();
+        if byte_len < MIN_BITSTRING_SIZE_BYTES {
+            return Err(SetStatusError::ListTooSmall(
+                byte_len * 8,
+                MIN_BITSTRING_SIZE_BYTES,
+            ));
+        }
+        let mut bitstring = BitVec::<Lsb0, u8>::try_from_vec(list.0)
+            .map_err(|_| SetStatusError::ListTooLarge(byte_len * 8))?;
+        if let Some(mut bitref) = bitstring.get_mut(index) {
+            *bitref = revoked;
+        } else {
+            return Err(SetStatusError::OutOfBounds(index, byte_len * 8));
+        }
+        list.0 = bitstring.into_vec();
+        self.encoded_list = EncodedList::try_from(&list)?;
+        Ok(())
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ListIterDecodeError {
+    #[error("Unable to reference indexes: {0}")]
+    ListTooLarge(#[from] bitvec::ptr::BitSpanError<u8>),
+    #[error("Revocation list is too small: {0}. Minimum: {1}")]
+    ListTooSmall(usize, usize),
+}
+
+impl List {
+    /// Get an array of indices in the revocation list for credentials that are revoked.
+    pub fn iter_revoked_indexes(
+        &self,
+    ) -> Result<bitvec::slice::IterOnes<Lsb0, u8>, ListIterDecodeError> {
+        if self.0.len() < MIN_BITSTRING_SIZE_BYTES {
+            return Err(ListIterDecodeError::ListTooSmall(
+                self.0.len() * 8,
+                MIN_BITSTRING_SIZE_BYTES,
+            ));
+        }
+        let bitstring = BitSlice::<Lsb0, u8>::from_slice(&self.0[..])?;
+        Ok(bitstring.iter_ones())
+    }
+}
+
+#[derive(Error, Debug)]
 pub enum DecodeListError {
     #[error("Base64url: {0}")]
     Build(#[from] base64::DecodeError),
@@ -125,6 +201,13 @@ pub enum DecodeListError {
 pub enum EncodeListError {
     #[error("Compression: {0}")]
     Compress(#[from] std::io::Error),
+}
+
+impl Default for EncodedList {
+    /// Generate a 16KB list of zeros.
+    fn default() -> Self {
+        Self(EMPTY_RLIST.to_string())
+    }
 }
 
 impl TryFrom<&EncodedList> for List {
@@ -369,7 +452,6 @@ pub enum CredentialConversionError {
 impl TryFrom<Credential> for RevocationList2020Credential {
     type Error = CredentialConversionError;
     fn try_from(credential: Credential) -> Result<Self, Self::Error> {
-        use crate::jsonld::REVOCATION_LIST_2020_V1_CONTEXT;
         if !credential
             .context
             .contains_uri(REVOCATION_LIST_2020_V1_CONTEXT)
@@ -392,5 +474,49 @@ impl TryFrom<Credential> for RevocationList2020Credential {
         let credential = serde_json::from_value(credential)
             .map_err(|e| CredentialConversionError::FromValue(e))?;
         Ok(credential)
+    }
+}
+
+impl TryFrom<RevocationList2020Credential> for Credential {
+    type Error = CredentialConversionError;
+    fn try_from(credential: RevocationList2020Credential) -> Result<Self, Self::Error> {
+        let mut credential =
+            serde_json::to_value(credential).map_err(|e| CredentialConversionError::ToValue(e))?;
+        use crate::vc::DEFAULT_CONTEXT;
+        use serde_json::json;
+        credential["@context"] = json!([DEFAULT_CONTEXT, REVOCATION_LIST_2020_V1_CONTEXT]);
+        credential["type"] = json!(["VerifiableCredential", "RevocationList2020Credential"]);
+        let credential = serde_json::from_value(credential)
+            .map_err(|e| CredentialConversionError::FromValue(e))?;
+        Ok(credential)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn default_list() {
+        let list = List(vec![0; MIN_BITSTRING_SIZE_BYTES]);
+        let revoked_indexes = list.iter_revoked_indexes().unwrap().collect::<Vec<usize>>();
+        let empty: Vec<usize> = Vec::new();
+        assert_eq!(revoked_indexes, empty);
+        let el = EncodedList::try_from(&list).unwrap();
+        assert_eq!(EncodedList::default(), el);
+        let decoded_list = List::try_from(&el).unwrap();
+        assert_eq!(decoded_list, list);
+    }
+
+    #[test]
+    fn set_status() {
+        let mut rl = RevocationList2020::default();
+        rl.set_status(1, true).unwrap();
+        rl.set_status(5, true).unwrap();
+        let decoded_list = List::try_from(&rl.encoded_list).unwrap();
+        let revoked_indexes = decoded_list
+            .iter_revoked_indexes()
+            .unwrap()
+            .collect::<Vec<usize>>();
+        assert_eq!(revoked_indexes, vec![1, 5]);
     }
 }
