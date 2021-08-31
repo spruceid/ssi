@@ -74,6 +74,17 @@ pub struct RelativeDIDURL {
     pub fragment: Option<String>,
 }
 
+/// A [DID URL][DIDURL] without a fragment. Used for [Dereferencing the Primary
+/// Resource][dereference_primary_resource] in DID URL Dereferencing.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[serde(try_from = "String")]
+#[serde(into = "String")]
+pub struct PrimaryDIDURL {
+    pub did: String,
+    pub path: Option<String>,
+    pub query: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[builder(
@@ -355,7 +366,7 @@ impl<'a> DIDResolver for DIDMethods<'a> {
 
     async fn dereference(
         &self,
-        did_url: &DIDURL,
+        did_url: &PrimaryDIDURL,
         input_metadata: &DereferencingInputMetadata,
     ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
         let method = match self.get_method(&did_url.did) {
@@ -390,6 +401,22 @@ impl DIDURL {
             fragment: self.fragment.as_ref().map(|x| x.clone()),
         })
     }
+
+    /// Convert to a fragment-less DID URL and return the removed fragment.
+    pub fn remove_fragment(self) -> (PrimaryDIDURL, Option<String>) {
+        (
+            PrimaryDIDURL {
+                did: self.did,
+                path: if self.path_abempty.len() > 0 {
+                    Some(self.path_abempty)
+                } else {
+                    None
+                },
+                query: self.query,
+            },
+            self.fragment,
+        )
+    }
 }
 
 impl RelativeDIDURL {
@@ -403,6 +430,15 @@ impl RelativeDIDURL {
             path_abempty: self.path.to_string(),
             query: self.query.as_ref().map(|x| x.clone()),
             fragment: self.fragment.as_ref().map(|x| x.clone()),
+        }
+    }
+}
+
+impl PrimaryDIDURL {
+    pub fn with_fragment(self, fragment: String) -> DIDURL {
+        DIDURL {
+            fragment: Some(fragment),
+            ..DIDURL::from(self)
         }
     }
 }
@@ -478,30 +514,38 @@ impl VerificationMethodMap {
 impl FromStr for DIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
-        if !didurl.starts_with("did:") {
-            return Err(Error::DIDURL);
-        }
         let mut parts = didurl.splitn(2, '#');
         let before_fragment = parts.next().unwrap().to_string();
         let fragment = parts.next().map(|x| x.to_owned());
-        let mut parts = before_fragment.splitn(2, '?');
-        let before_query = parts.next().unwrap().to_string();
-        let query = parts.next().map(|x| x.to_owned());
-        let (did, path_abempty) = match before_query.find('/') {
-            Some(i) => match before_query.split_at(i) {
-                (did, path_abempty) => (did.to_string(), path_abempty.to_string()),
-            },
-            None => (before_query, "".to_string()),
-        };
+        let primary_did_url = PrimaryDIDURL::try_from(before_fragment)?;
         Ok(Self {
-            did,
-            path_abempty,
-            query,
             fragment,
+            ..DIDURL::from(primary_did_url)
         })
     }
 }
 
+impl FromStr for PrimaryDIDURL {
+    type Err = Error;
+    fn from_str(didurl: &str) -> Result<Self, Self::Err> {
+        if !didurl.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
+        if didurl.contains('#') {
+            return Err(Error::UnexpectedDIDFragment);
+        }
+        let mut parts = didurl.splitn(2, '?');
+        let before_query = parts.next().unwrap();
+        let query = parts.next().map(|x| x.to_owned());
+        let (did, path) = match before_query.find('/') {
+            Some(i) => match before_query.split_at(i) {
+                (did, path) => (did.to_string(), Some(path.to_string())),
+            },
+            None => (before_query.to_string(), None),
+        };
+        Ok(Self { did, path, query })
+    }
+}
 impl FromStr for RelativeDIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
@@ -588,6 +632,19 @@ impl fmt::Display for RelativeDIDURLPath {
     }
 }
 
+impl fmt::Display for PrimaryDIDURL {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.did)?;
+        if let Some(ref path) = self.path {
+            write!(f, "{}", path)?;
+        }
+        if let Some(ref query) = self.query {
+            write!(f, "?{}", query)?;
+        }
+        Ok(())
+    }
+}
+
 /// needed for #[serde(try_from = "String")]
 impl TryFrom<String> for DIDURL {
     type Error = Error;
@@ -600,6 +657,32 @@ impl TryFrom<String> for DIDURL {
 impl From<DIDURL> for String {
     fn from(didurl: DIDURL) -> String {
         format!("{}", didurl)
+    }
+}
+
+impl From<PrimaryDIDURL> for DIDURL {
+    fn from(primary: PrimaryDIDURL) -> DIDURL {
+        DIDURL {
+            did: primary.did,
+            path_abempty: primary.path.unwrap_or_default(),
+            query: primary.query,
+            fragment: None,
+        }
+    }
+}
+
+/// needed for #[serde(into = "String")]
+impl From<PrimaryDIDURL> for String {
+    fn from(didurl: PrimaryDIDURL) -> String {
+        format!("{}", didurl)
+    }
+}
+
+/// needed for #[serde(try_from = "String")]
+impl TryFrom<String> for PrimaryDIDURL {
+    type Error = Error;
+    fn try_from(didurl: String) -> Result<Self, Self::Error> {
+        PrimaryDIDURL::from_str(&didurl)
     }
 }
 
