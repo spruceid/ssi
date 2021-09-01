@@ -6,70 +6,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- Implement JcsTezosSignature2021.
-- Add PrimaryDIDURL for dereference trait method.
-- Add EthereumEip712Signature2021 v1 context.
-- Add VerificationMethodMap::get_id.
+- Add `PrimaryDIDURL` type.
+- Add `EthereumEip712Signature2021` v1 context.
+- Add `VerificationMethodMap::get_id` function.
 - Implement converting JWK to Tezos format.
-- Add did-pkh-poly.
-- Pass resolver option in issue/prepare.
-- Use vc-test-suite example keys and DIDs.
-- Update blockchainAccountId for new CAIP-10.
-- Add Revocation List 2020 context.
-- Validate key and algorithm for JsonWebSignature2020.
-- Work-in-progress implementation of detached JWS decoding.
-- Default to PS256 for RSA.
-- Implement PS256.
+- Add `did:pkh:poly:`.
+- Use `vc-test-suite` example keys and DIDs.
+- Add Revocation List 2020 JSON-LD context file.
+- Implement `PS256` JWS algorithm.
 - Work-in-progress ZCap invocation methods
-- Implement FromStr for URI.
-- Support publicKeyJwk for EthereumEip712Signature.
+- Implement `FromStr` for `URI`.
+- Support `publicKeyJwk` in `EthereumEip712Signature2021`.
 - Add DID Test Suite implementation generator.
-- Implement EthereumPersonalSignature2021.
-- Implement EthereumEip712Signature2021.
-- Disallow untyped properties in eip712.
-- Enable Eip712Signature2021 in did:pkh.
-- Allow using Eip712 proof with normal VM types.
-- Add did-webkey and SSH key parsing.
+- Implement `JcsTezosSignature2021`.
+- Implement `EthereumPersonalSignature2021`.
+- Implement `EthereumEip712Signature2021`.
+- Enable `Eip712Signature2021` with `did:pkh`.
+- Allow using `Eip712Signature2021` with normal VM types.
+- Implement `did:webkey:`
+- Implement SSH key parsing.
 - Implement JWK Thumbprint.
-- Use compressed P-256 did:key.
-- Add UserAgent header in requests.
-- Add ES256K to alg mistmatch handling.
-- Use custom-made JWK algorithms for Tezos.
-- Canonicalize negative zero.
+- Add `User-Agent` header in requests.
+- Add `ES256K` to algorithm mistmatch handling.
+- Use custom internal JWK algorithms for Tezos signing.
+- Allow returning warnings from proof verification.
+- Use `MissingFeatures` error in proof type selection.
+- Add `Proof::with_options` for proof params.
+
+### Changed
+- Use PrimaryDIDURL in dereference trait method.
+- Pass resolver option in issue/prepare functions.
+- Update `blockchainAccountId` for new CAIP-10.
+- Default to `PS256` for RSA signing.
+- Use compressed `P-256` in `did:key`.
+- Disallow untyped properties in EIP-712 messages.
+- Update picking proof suite for tz.
+- Update DID resolution error handling and content-type handling.
+- Add arbitrary property set in LDP options to be included in Proof.
+
+### Deprecated
+- Deprecate using `key_ops` to select proof type.
+
+### Removed
+- Remove timestamp from generative DID methods.
 
 ### Fixed
 - Catch double fragment in service endpoint URL.
 - Improve JWK/VM comparison.
-- Update picking proof suite for tz.
-- Allow returning warnings from proof verification.
 - Fix Tezos CAIP-2 chain IDs.
 - Fix converting RSA JWK to public.
-- Fix did:example:foo and did:example:bar.
+- Fix `did:example:foo` and `did:example:bar`.
 - Update W3C Software and Document Short Notice.
-- ZCap attribute-check hotfix
-- Add test vectors for linked data proof alignment.
 - Handle eth signatures with recovery ID starting at 0.
-- Deprecate using key_ops to select proof type.
 - Only match VM URI for specific DID methods.
-- Use MissingFeatures error in proof type selection.
-- Consolidate proof type selection.
-- Add helper function to get proof suite by type.
 - Allow time zone offsets other than "Z" in VCs.
-- Improve did:pkh documentation and chain id handling.
-- Set contentType when returning URL in dereference.
-- Remove timestamp from generative DID methods.
-- Update DID resolution error handling and content-type handling.
+- Improve `did:pkh` documentation and chain id handling.
+- Set `contentType` when returning URL in dereference.
 - Fix WASM tests.
-- Add Proof::with_options for proof params.
-- Fix on-chain resolution in did-tezos.
+- Fix on-chain resolution in `did-tezos`.
 - Fix WASM async trait compilation.
-- Add arbitrary property set in ldp options to be included in Proof.
 - Improve JWT support.
-- Fix use of p256 in did-key.
+- Canonicalize negative zero.
 
 ### Security
-- Validate proof object RDF consistency.
+- Validate linked data proof object RDF consistency.
 - Check key size for RSA JWS
+- Validate key and algorithm for `JsonWebSignature2020`.
 
 ## [0.2.2] - 2021-05-26
 ### Added
