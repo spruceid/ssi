@@ -2,6 +2,58 @@ use crate::error::Error;
 use crate::jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
 use core::convert::TryFrom;
 
+const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
+const SPPK_PREFIX: [u8; 4] = [3, 254, 226, 86];
+const P2PK_PREFIX: [u8; 4] = [3, 178, 139, 127];
+
+pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
+    let mut tzkey_prefixed = Vec::new();
+    #[cfg(any(feature = "k256", feature = "p256"))]
+    let bytes;
+    let (prefix, bytes) = match &jwk.params {
+        Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
+            if let Some(ref _sk) = okp_params.private_key {
+                // TODO: edsk
+                return Err(Error::UnsupportedAlgorithm);
+            }
+            (EDPK_PREFIX, &okp_params.public_key.0)
+        }
+        Params::EC(ec_params) if ec_params.curve == Some("secp256k1".to_string()) => {
+            if let Some(ref _sk) = ec_params.ecc_private_key {
+                // TODO: spsk
+                return Err(Error::UnsupportedAlgorithm);
+            }
+            #[cfg(not(feature = "k256"))]
+            return Err(Error::MissingFeatures("k256"));
+            #[cfg(feature = "k256")]
+            {
+                // TODO: p2sk
+                bytes = crate::blakesig::serialize_secp256k1(ec_params)?;
+                (SPPK_PREFIX, &bytes)
+            }
+        }
+        Params::EC(ec_params) if ec_params.curve == Some("P-256".to_string()) => {
+            if let Some(ref _sk) = ec_params.ecc_private_key {
+                return Err(Error::UnsupportedAlgorithm);
+            }
+            #[cfg(not(feature = "p256"))]
+            return Err(Error::MissingFeatures("p256"));
+            #[cfg(feature = "p256")]
+            {
+                bytes = crate::blakesig::serialize_p256(ec_params)?;
+                (P2PK_PREFIX, &bytes)
+            }
+        }
+        _ => {
+            return Err(Error::UnsupportedAlgorithm);
+        }
+    };
+    tzkey_prefixed.extend_from_slice(&prefix);
+    tzkey_prefixed.extend_from_slice(&bytes);
+    let tzkey = bs58::encode(tzkey_prefixed).with_check().into_string();
+    Ok(tzkey)
+}
+
 /// Parse a Tezos key string into a JWK.
 pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
     if tz_pk.len() < 4 {
@@ -172,8 +224,9 @@ mod tests {
 
     #[test]
     fn edpk_jwk_tz_edsig() {
-        let jwk =
-            jwk_from_tezos_key("edpkuxZ5AQVCeEJ9inUG3w6VFhio5KBwC22ekPLBzcvub3QY2DvJ7n").unwrap();
+        let tzpk = "edpkuxZ5AQVCeEJ9inUG3w6VFhio5KBwC22ekPLBzcvub3QY2DvJ7n";
+        let jwk = jwk_from_tezos_key(tzpk).unwrap();
+        assert_eq!(jwk_to_tezos_key(&jwk).unwrap(), tzpk);
         let jwk_expected: JWK = serde_json::from_value(json!(
             {"alg":"EdBlake2b","kty":"OKP","crv":"Ed25519","x":"rVEB0Icbomw1Ir-ck52iCZl1SICc5lCg2pxI8AmydDw"}
         )).unwrap();
@@ -199,8 +252,9 @@ mod tests {
     #[test]
     #[cfg(feature = "secp256k1")]
     fn sppk_jwk_tz_spsig() {
-        let jwk =
-            jwk_from_tezos_key("sppk7bYNanLcEPRpvLc231GBC8i6YfLBbQjiQMbz8kriz9qxASf5wHw").unwrap();
+        let tzpk = "sppk7bYNanLcEPRpvLc231GBC8i6YfLBbQjiQMbz8kriz9qxASf5wHw";
+        let jwk = jwk_from_tezos_key(tzpk).unwrap();
+        assert_eq!(jwk_to_tezos_key(&jwk).unwrap(), tzpk);
         let jwk_expected: JWK = serde_json::from_value(json!(
             {"alg":"ESBlake2bK","kty":"EC","crv":"secp256k1","x":"JpVAlV0nDVVmPnSNdZTqes8YXoQqzyBq9R1VHWhBdgY","y":"G2jCkm3F3uu-TqtgrqCji13-MR-tlND2Tqt8rh7ZPN8"}
         )).unwrap();
@@ -218,6 +272,19 @@ mod tests {
         crate::jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap();
         tsm[1] ^= 1;
         crate::jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap_err();
+    }
+
+    #[test]
+    #[cfg(feature = "p256")]
+    fn p2pk_jwk() {
+        let tzpk = "p2pk679D18uQNkdjpRxuBXL5CqcDKTKzsiXVtc9oCUT6xb82zQmgUks";
+        let jwk = jwk_from_tezos_key(tzpk).unwrap();
+        let jwk_expected: JWK = serde_json::from_value(json!(
+            {"alg":"ESBlake2b","kty":"EC","crv":"P-256","x":"UmzXjEZzlGmpaM_CmFEJtOO5JBntW8yl_fM1LEQlWQ4","y":"OmoZmcbUadg7dEC8bg5kXryN968CJqv2UFMUKRERZ6s"}
+        )).unwrap();
+        assert_eq!(jwk, jwk_expected);
+        assert_eq!(jwk_to_tezos_key(&jwk).unwrap(), tzpk);
+        // TODO: verify signature made by another implementation
     }
 
     #[test]

@@ -6,7 +6,6 @@ use std::str::FromStr;
 use async_trait::async_trait;
 use chrono::prelude::*;
 
-const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
 const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
 const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
@@ -20,11 +19,11 @@ use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jwk::Base64urlUInt;
-use crate::jwk::{Algorithm, OctetParams as JWKOctetParams, Params as JWKParams, JWK};
+use crate::jwk::{Algorithm, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
-use crate::vc::{LinkedDataProofOptions, Proof};
+use crate::vc::{LinkedDataProofOptions, Proof, URI};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -39,6 +38,10 @@ lazy_static! {
         let context_str = ssi_contexts::TZVM_V1;
         serde_json::from_str(&context_str).unwrap()
     };
+    pub static ref TZJCSVM_CONTEXT: Value = {
+        let context_str = ssi_contexts::TZJCSVM_V1;
+        serde_json::from_str(&context_str).unwrap()
+    };
     pub static ref EIP712VM_CONTEXT: Value = {
         let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(&context_str).unwrap()
@@ -51,6 +54,125 @@ lazy_static! {
         let context_str = ssi_contexts::SOLVM;
         serde_json::from_str(&context_str).unwrap()
     };
+}
+
+pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Error> {
+    Ok(match proof_type {
+        "RsaSignature2018" => &RsaSignature2018,
+        "Ed25519Signature2018" => &Ed25519Signature2018,
+        "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+            &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        }
+        "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
+            &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        }
+        "EcdsaSecp256k1Signature2019" => &EcdsaSecp256k1Signature2019,
+        "EcdsaSecp256k1RecoverySignature2020" => &EcdsaSecp256k1RecoverySignature2020,
+        "Eip712Signature2021" => {
+            #[cfg(not(feature = "keccak-hash"))]
+            return Err(Error::MissingFeatures("keccak-hash"));
+            #[cfg(feature = "keccak-hash")]
+            &Eip712Signature2021
+        }
+        "EthereumPersonalSignature2021" => {
+            #[cfg(not(feature = "keccak-hash"))]
+            return Err(Error::MissingFeatures("keccak-hash"));
+            #[cfg(feature = "keccak-hash")]
+            &EthereumPersonalSignature2021
+        }
+        "EthereumEip712Signature2021" => {
+            #[cfg(not(feature = "keccak-hash"))]
+            return Err(Error::MissingFeatures("keccak-hash"));
+            #[cfg(feature = "keccak-hash")]
+            &EthereumEip712Signature2021
+        }
+        "TezosSignature2021" => &TezosSignature2021,
+        "TezosJcsSignature2021" => &TezosJcsSignature2021,
+        "SolanaSignature2021" => &SolanaSignature2021,
+        "JsonWebSignature2020" => &JsonWebSignature2020,
+        "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
+        _ => return Err(Error::ProofTypeNotImplemented),
+    })
+}
+
+fn pick_proof_suite<'a, 'b>(
+    jwk: &JWK,
+    verification_method: Option<&'a URI>,
+) -> Result<&'b (dyn ProofSuite + Sync), Error> {
+    let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+    Ok(match algorithm {
+        Algorithm::RS256 => &RsaSignature2018,
+        Algorithm::PS256 => &JsonWebSignature2020,
+        Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
+            Some(URI::String(ref vm))
+                if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
+                    && vm.ends_with("#SolanaMethod2021") =>
+            {
+                &SolanaSignature2021
+            }
+            Some(URI::String(ref vm))
+                if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
+            {
+                if vm.ends_with("#TezosMethod2021") {
+                    &TezosSignature2021
+                } else {
+                    &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                }
+            }
+            _ => &Ed25519Signature2018,
+        },
+        Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
+            Some(URI::String(ref vm))
+                if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
+            {
+                if vm.ends_with("#TezosMethod2021") {
+                    &TezosSignature2021
+                } else {
+                    &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                }
+            }
+            _ => &EcdsaSecp256r1Signature2019,
+        },
+        Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
+            Some(URI::String(ref vm))
+                if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
+            {
+                if vm.ends_with("#TezosMethod2021") {
+                    &TezosSignature2021
+                } else {
+                    &EcdsaSecp256k1RecoverySignature2020
+                }
+            }
+            _ => &EcdsaSecp256k1Signature2019,
+        },
+        Algorithm::ES256KR => {
+            if use_eip712sig(jwk) {
+                #[cfg(not(feature = "keccak-hash"))]
+                return Err(Error::MissingFeatures("keccak-hash"));
+                #[cfg(feature = "keccak-hash")]
+                &EthereumEip712Signature2021
+            } else if use_epsig(jwk) {
+                #[cfg(not(feature = "keccak-hash"))]
+                return Err(Error::MissingFeatures("keccak-hash"));
+                #[cfg(feature = "keccak-hash")]
+                &EthereumPersonalSignature2021
+            } else {
+                match verification_method {
+                    Some(URI::String(ref vm))
+                        if (vm.starts_with("did:ethr:") || vm.starts_with("did:pkh:eth:"))
+                            && vm.ends_with("#Eip712Method2021") =>
+                    {
+                        #[cfg(not(feature = "keccak-hash"))]
+                        return Err(Error::MissingFeatures("keccak-hash"));
+                        #[cfg(feature = "keccak-hash")]
+                        &Eip712Signature2021
+                    }
+                    _ => &EcdsaSecp256k1RecoverySignature2020,
+                }
+            }
+        }
+        _ => return Err(Error::ProofTypeNotImplemented),
+    })
 }
 
 // Get current time to millisecond precision if possible
@@ -79,6 +201,7 @@ pub trait ProofSuite {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error>;
@@ -87,6 +210,7 @@ pub trait ProofSuite {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error>;
@@ -102,13 +226,10 @@ pub trait ProofSuite {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error>
-    where
-        Self: Sized,
-    {
-        verify(proof, document, resolver).await
-    }
+    ) -> Result<VerificationWarnings, Error>;
 }
+
+pub type VerificationWarnings = Vec<String>;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -136,52 +257,14 @@ pub enum SigningInput {
 
 impl ProofPreparation {
     pub async fn complete(self, signature: &str) -> Result<Proof, Error> {
-        match self.proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018.complete(self, signature).await,
-            "Ed25519Signature2018" => Ed25519Signature2018.complete(self, signature).await,
-            "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .complete(self, signature)
-                    .await
-            }
-            "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .complete(self, signature)
-                    .await
-            }
-            "EcdsaSecp256k1Signature2019" => {
-                EcdsaSecp256k1Signature2019.complete(self, signature).await
-            }
-            "EcdsaSecp256k1RecoverySignature2020" => {
-                EcdsaSecp256k1RecoverySignature2020
-                    .complete(self, signature)
-                    .await
-            }
-            "EcdsaSecp256r1Signature2019" => {
-                EcdsaSecp256r1Signature2019.complete(self, signature).await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "Eip712Signature2021" => Eip712Signature2021.complete(self, signature).await,
-            #[cfg(feature = "keccak-hash")]
-            "EthereumPersonalSignature2021" => {
-                EthereumPersonalSignature2021
-                    .complete(self, signature)
-                    .await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "EthereumEip712Signature2021" => {
-                EthereumEip712Signature2021.complete(self, signature).await
-            }
-            "TezosSignature2021" => TezosSignature2021.complete(self, signature).await,
-            "SolanaSignature2021" => SolanaSignature2021.complete(self, signature).await,
-            "JsonWebSignature2020" => JsonWebSignature2020.complete(self, signature).await,
-            _ => Err(Error::ProofTypeNotImplemented),
-        }
+        let proof_type = self.proof.type_.clone();
+        let suite = get_proof_suite(&proof_type)?;
+        suite.complete(self, signature).await
     }
 }
 
 fn use_eip712sig(key: &JWK) -> bool {
-    // Use unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021, until
+    // deprecated: allow using unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021
     if let Some(ref key_ops) = key.key_operations {
         if key_ops.contains(&"signTypedData".to_string()) {
             return true;
@@ -190,18 +273,8 @@ fn use_eip712sig(key: &JWK) -> bool {
     return false;
 }
 
-fn use_eip712vm(options: &LinkedDataProofOptions) -> bool {
-    if let Some(ref vm) = options.verification_method {
-        if vm.ends_with("#Eip712Method2021") {
-            return true;
-        }
-    }
-    return false;
-}
-
 fn use_epsig(key: &JWK) -> bool {
-    // Use unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021, until
-    // LinkedDataProofOptions has type property
+    // deprecated: allow using unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021
     if let Some(ref key_ops) = key.key_operations {
         if key_ops.contains(&"signPersonalMessage".to_string()) {
             return true;
@@ -216,148 +289,21 @@ impl LinkedDataProofs {
     pub async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        // TODO: select proof type by resolving DID instead of matching on the key.
-        match key {
-            JWK {
-                params: JWKParams::RSA(_),
-                public_key_use: _,
-                key_operations: _,
-                algorithm: _,
-                key_id: _,
-                x509_url: _,
-                x509_certificate_chain: _,
-                x509_thumbprint_sha1: _,
-                x509_thumbprint_sha256: _,
-            } => {
-                return RsaSignature2018
-                    .sign(document, options, &key, extra_proof_properties)
-                    .await
-            }
-            JWK {
-                params:
-                    JWKParams::OKP(JWKOctetParams {
-                        curve,
-                        public_key: _,
-                        private_key: _,
-                    }),
-                public_key_use: _,
-                key_operations: _,
-                algorithm: _,
-                key_id: _,
-                x509_url: _,
-                x509_certificate_chain: _,
-                x509_thumbprint_sha1: _,
-                x509_thumbprint_sha256: _,
-            } => match &curve[..] {
-                "Ed25519" => {
-                    if let Some(ref vm) = options.verification_method {
-                        if vm.ends_with("#TezosMethod2021") {
-                            return TezosSignature2021
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                        if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                            return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                        if vm.ends_with("#SolanaMethod2021") {
-                            return SolanaSignature2021
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                    }
-                    return Ed25519Signature2018
-                        .sign(document, options, &key, extra_proof_properties)
-                        .await;
-                }
-                _ => {
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-            },
-            JWK {
-                params: JWKParams::EC(ec_params),
-                public_key_use: _,
-                key_operations: _,
-                algorithm,
-                key_id: _,
-                x509_url: _,
-                x509_certificate_chain: _,
-                x509_thumbprint_sha1: _,
-                x509_thumbprint_sha256: _,
-            } => {
-                let curve = ec_params.curve.as_ref().ok_or(Error::MissingCurve)?;
-                match &curve[..] {
-                    "secp256k1" => {
-                        if algorithm.as_ref() == Some(&Algorithm::ES256KR) {
-                            if use_eip712sig(key) {
-                                #[cfg(feature = "keccak-hash")]
-                                return EthereumEip712Signature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                                #[cfg(not(feature = "keccak-hash"))]
-                                return Err(Error::ProofTypeNotImplemented);
-                            }
-                            if use_eip712vm(options) {
-                                #[cfg(feature = "keccak-hash")]
-                                return Eip712Signature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                                #[cfg(not(feature = "keccak-hash"))]
-                                return Err(Error::ProofTypeNotImplemented);
-                            }
-                            if use_epsig(key) {
-                                #[cfg(feature = "keccak-hash")]
-                                return EthereumPersonalSignature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                                #[cfg(not(feature = "keccak-hash"))]
-                                return Err(Error::ProofTypeNotImplemented);
-                            }
-                            return EcdsaSecp256k1RecoverySignature2020
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        } else {
-                            if let Some(ref vm) = options.verification_method {
-                                if vm.ends_with("#TezosMethod2021") {
-                                    return TezosSignature2021
-                                        .sign(document, options, &key, extra_proof_properties)
-                                        .await;
-                                }
-                            }
-                            return EcdsaSecp256k1Signature2019
-                                .sign(document, options, &key, extra_proof_properties)
-                                .await;
-                        }
-                    }
-                    "P-256" => {
-                        if let Some(ref vm) = options.verification_method {
-                            if vm.ends_with("#TezosMethod2021") {
-                                return TezosSignature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                            }
-                            if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:") {
-                                return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                                    .sign(document, options, &key, extra_proof_properties)
-                                    .await;
-                            }
-                        }
-                        return EcdsaSecp256r1Signature2019
-                            .sign(document, options, &key, extra_proof_properties)
-                            .await;
-                    }
-                    _ => {
-                        return Err(Error::CurveNotImplemented(curve.to_string()));
-                    }
-                }
-            }
-            _ => {}
+        // Use type property if present
+        let suite = if let Some(ref type_) = options.type_ {
+            get_proof_suite(type_)?
+        }
+        // Otherwise pick proof type based on key and options.
+        else {
+            pick_proof_suite(key, options.verification_method.as_ref())?
         };
-        Err(Error::ProofTypeNotImplemented)
+        suite
+            .sign(document, options, resolver, &key, extra_proof_properties)
+            .await
     }
 
     /// Prepare to create a linked data proof. Given a linked data document, proof options, and JWS
@@ -365,114 +311,27 @@ impl LinkedDataProofs {
     pub async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
-        match public_key.get_algorithm().ok_or(Error::MissingAlgorithm)? {
-            Algorithm::RS256 => {
-                return RsaSignature2018
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await
-            }
-            Algorithm::EdDSA => {
-                if let Some(ref vm) = options.verification_method {
-                    if vm.ends_with("#SolanaMethod2021") {
-                        return SolanaSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-                return Ed25519Signature2018
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            Algorithm::EdBlake2b => {
-                if let Some(ref vm) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                    if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                        return Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-            }
-            Algorithm::ES256 => {
-                return EcdsaSecp256r1Signature2019
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            Algorithm::ESBlake2b => {
-                if let Some(ref vm) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                    if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") {
-                        return P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-            }
-            Algorithm::ES256K => {
-                return EcdsaSecp256k1Signature2019
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            Algorithm::ESBlake2bK => {
-                if let Some(ref vm) = options.verification_method {
-                    if vm.ends_with("#TezosMethod2021") {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                    // TODO: resolve the VM to get type, rather than comparing the string directly
-                    if (vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:"))
-                        && vm.ends_with("#TezosMethod2021")
-                    {
-                        return TezosSignature2021
-                            .prepare(document, options, public_key, extra_proof_properties)
-                            .await;
-                    }
-                }
-            }
-            Algorithm::ES256KR => {
-                if use_eip712sig(public_key) {
-                    #[cfg(feature = "keccak-hash")]
-                    return EthereumEip712Signature2021
-                        .prepare(document, options, public_key, extra_proof_properties)
-                        .await;
-                    #[cfg(not(feature = "keccak-hash"))]
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-                if use_eip712vm(options) {
-                    #[cfg(feature = "keccak-hash")]
-                    return Eip712Signature2021
-                        .prepare(document, options, public_key, extra_proof_properties)
-                        .await;
-                    #[cfg(not(feature = "keccak-hash"))]
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-                if use_epsig(public_key) {
-                    #[cfg(feature = "keccak-hash")]
-                    return EthereumPersonalSignature2021
-                        .prepare(document, options, public_key, extra_proof_properties)
-                        .await;
-                    #[cfg(not(feature = "keccak-hash"))]
-                    return Err(Error::ProofTypeNotImplemented);
-                }
-                return EcdsaSecp256k1RecoverySignature2020
-                    .prepare(document, options, public_key, extra_proof_properties)
-                    .await;
-            }
-            _ => {}
+        // Use type property if present
+        let suite = if let Some(ref type_) = options.type_ {
+            get_proof_suite(type_)?
+        }
+        // Otherwise pick proof type based on key and options.
+        else {
+            pick_proof_suite(public_key, options.verification_method.as_ref())?
         };
-        Err(Error::ProofTypeNotImplemented)
+        suite
+            .prepare(
+                document,
+                options,
+                resolver,
+                public_key,
+                extra_proof_properties,
+            )
+            .await
     }
 
     // https://w3c-ccg.github.io/ld-proofs/#proof-verification-algorithm
@@ -480,54 +339,9 @@ impl LinkedDataProofs {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
-        match proof.type_.as_str() {
-            "RsaSignature2018" => RsaSignature2018.verify(proof, document, resolver).await,
-            "Ed25519Signature2018" => Ed25519Signature2018.verify(proof, document, resolver).await,
-            "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "EcdsaSecp256k1Signature2019" => {
-                EcdsaSecp256k1Signature2019
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "EcdsaSecp256k1RecoverySignature2020" => {
-                EcdsaSecp256k1RecoverySignature2020
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "Eip712Signature2021" => Eip712Signature2021.verify(proof, document, resolver).await,
-            #[cfg(feature = "keccak-hash")]
-            "EthereumPersonalSignature2021" => {
-                EthereumPersonalSignature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            #[cfg(feature = "keccak-hash")]
-            "EthereumEip712Signature2021" => {
-                EthereumEip712Signature2021
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            "TezosSignature2021" => TezosSignature2021.verify(proof, document, resolver).await,
-            "SolanaSignature2021" => SolanaSignature2021.verify(proof, document, resolver).await,
-            "JsonWebSignature2020" => JsonWebSignature2020.verify(proof, document, resolver).await,
-            "EcdsaSecp256r1Signature2019" => {
-                EcdsaSecp256r1Signature2019
-                    .verify(proof, document, resolver)
-                    .await
-            }
-            _ => Err(Error::ProofTypeNotImplemented),
-        }
+    ) -> Result<VerificationWarnings, Error> {
+        let suite = get_proof_suite(proof.type_.as_str())?;
+        suite.verify(proof, document, resolver).await
     }
 }
 
@@ -536,43 +350,8 @@ pub async fn resolve_key(
     verification_method: &str,
     resolver: &dyn DIDResolver,
 ) -> Result<JWK, Error> {
-    let vm = resolve_vm(verification_method, resolver).await?;
-    if let Some(pk_jwk) = vm.public_key_jwk {
-        if vm.public_key_base58.is_some() {
-            // https://w3c.github.io/did-core/#verification-material
-            // "expressing key material in a verification method using both publicKeyJwk and
-            // publicKeyBase58 at the same time is prohibited."
-            return Err(Error::MultipleKeyMaterial);
-        }
-        return Ok(pk_jwk);
-    }
-    if let Some(pk_bs58) = vm.public_key_base58 {
-        return jwk_from_public_key_base58(&pk_bs58, &vm.type_);
-    }
-    Err(Error::MissingKey)
-}
-
-fn jwk_from_public_key_base58(pk_bs58: &str, vm_type: &str) -> Result<JWK, Error> {
-    let pk_bytes = bs58::decode(&pk_bs58).into_vec()?;
-    let params = match vm_type {
-        "Ed25519VerificationKey2018" => JWKParams::OKP(JWKOctetParams {
-            curve: "Ed25519".to_string(),
-            public_key: Base64urlUInt(pk_bytes),
-            private_key: None,
-        }),
-        _ => return Err(Error::UnsupportedKeyType),
-    };
-    let jwk = JWK {
-        params,
-        public_key_use: None,
-        key_operations: None,
-        algorithm: None,
-        key_id: None,
-        x509_url: None,
-        x509_certificate_chain: None,
-        x509_thumbprint_sha1: None,
-        x509_thumbprint_sha256: None,
-    };
+    let vmm = resolve_vm(verification_method, resolver).await?;
+    let jwk = vmm.get_jwk()?;
     Ok(jwk)
 }
 
@@ -602,10 +381,10 @@ async fn to_jws_payload(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let sigopts_digest = sha256(sigopts_normalized.as_bytes())?;
@@ -621,6 +400,7 @@ async fn to_jws_payload(
 async fn sign(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
+    _resolver: &dyn DIDResolver,
     key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -652,6 +432,7 @@ async fn sign_proof(
 async fn prepare(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
+    _resolver: &dyn DIDResolver,
     public_key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -699,7 +480,7 @@ async fn verify(
     proof: &Proof,
     document: &(dyn LinkedDataDocument + Sync),
     resolver: &dyn DIDResolver,
-) -> Result<(), Error> {
+) -> Result<VerificationWarnings, Error> {
     let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let verification_method = proof
         .verification_method
@@ -708,7 +489,7 @@ async fn verify(
     let key = resolve_key(&verification_method, resolver).await?;
     let message = to_jws_payload(document, proof).await?;
     crate::jws::detached_verify(&jws, &message, &key)?;
-    Ok(())
+    Ok(Default::default())
 }
 
 pub struct RsaSignature2018;
@@ -719,12 +500,14 @@ impl ProofSuite for RsaSignature2018 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         sign(
             document,
             options,
+            resolver,
             key,
             "RsaSignature2018",
             Algorithm::RS256,
@@ -736,18 +519,28 @@ impl ProofSuite for RsaSignature2018 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         prepare(
             document,
             options,
+            resolver,
             public_key,
             "RsaSignature2018",
             Algorithm::RS256,
             extra_proof_properties,
         )
         .await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        verify(proof, document, resolver).await
     }
     async fn complete(
         &self,
@@ -766,12 +559,14 @@ impl ProofSuite for Ed25519Signature2018 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         sign(
             document,
             options,
+            resolver,
             key,
             "Ed25519Signature2018",
             Algorithm::EdDSA,
@@ -783,18 +578,28 @@ impl ProofSuite for Ed25519Signature2018 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         prepare(
             document,
             options,
+            resolver,
             public_key,
             "Ed25519Signature2018",
             Algorithm::EdDSA,
             extra_proof_properties,
         )
         .await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        verify(proof, document, resolver).await
     }
     async fn complete(
         &self,
@@ -813,12 +618,14 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         sign(
             document,
             options,
+            resolver,
             key,
             "EcdsaSecp256k1Signature2019",
             Algorithm::ES256K,
@@ -830,18 +637,28 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         prepare(
             document,
             options,
+            resolver,
             public_key,
             "EcdsaSecp256k1Signature2019",
             Algorithm::ES256K,
             extra_proof_properties,
         )
         .await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        verify(proof, document, resolver).await
     }
     async fn complete(
         &self,
@@ -860,6 +677,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -884,6 +702,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -912,7 +731,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let verification_method = proof
             .verification_method
@@ -924,10 +743,8 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         }
         let message = to_jws_payload(document, proof).await?;
         let (_header, jwk) = crate::jws::detached_recover(&jws, &message)?;
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
-        Ok(())
+        vm.match_jwk(&jwk)?;
+        Ok(Default::default())
     }
 }
 
@@ -940,6 +757,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -970,6 +788,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1003,7 +822,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
@@ -1018,14 +837,10 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(&verification_method, resolver).await?;
-        let account_id: BlockchainAccountId = vm
-            .blockchain_account_id
-            .ok_or(Error::MissingAccountId)?
-            .parse()?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1038,6 +853,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1067,6 +883,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1100,7 +917,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
             Some(ref props) => {
@@ -1115,14 +932,10 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(&verification_method, resolver).await?;
-        let account_id: BlockchainAccountId = vm
-            .blockchain_account_id
-            .ok_or(Error::MissingAccountId)?
-            .parse()?;
-        account_id.verify(&jwk)?;
+        vm.match_jwk(&jwk)?;
         let message = to_jws_payload(document, proof).await?;
         crate::jws::detached_verify(&jws, &message, &jwk)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1136,6 +949,7 @@ impl ProofSuite for Eip712Signature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1167,6 +981,7 @@ impl ProofSuite for Eip712Signature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1199,7 +1014,7 @@ impl ProofSuite for Eip712Signature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1222,7 +1037,7 @@ impl ProofSuite for Eip712Signature2021 {
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         // TODO this step needs keccak-hash, may need better features management
         let recovered_key = sig.recover_verify_key(&bytes)?;
@@ -1240,10 +1055,8 @@ impl ProofSuite for Eip712Signature2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
-        Ok(())
+        vm.match_jwk(&jwk)?;
+        Ok(Default::default())
     }
 }
 
@@ -1257,6 +1070,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1270,7 +1084,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
                 .insert("eip712Domain".to_string(), info);
         }
         let mut proof = Proof {
-            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V1_CONTEXT),
             ..Proof::new("EthereumEip712Signature2021")
                 .with_options(options)
                 .with_properties(props)
@@ -1296,6 +1110,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1307,7 +1122,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
                 .insert("eip712Domain".to_string(), info);
         }
         let proof = Proof {
-            context: serde_json::json!(crate::jsonld::EIP712SIG_V0_1_CONTEXT),
+            context: serde_json::json!(crate::jsonld::EIP712SIG_V1_CONTEXT),
             ..Proof::new("EthereumEip712Signature2021")
                 .with_options(options)
                 .with_properties(props)
@@ -1335,7 +1150,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1354,7 +1169,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let typed_data = TypedData::from_document_and_options_json(document, &proof).await?;
@@ -1374,10 +1189,18 @@ impl ProofSuite for EthereumEip712Signature2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
-        Ok(())
+        // Verify using eiher publicKeyJwk or blockchainAccountId.
+        if let Some(vm_jwk) = vm.public_key_jwk {
+            // If VM has publicKey, use that to veify the signature.
+            let mut dec_sig = dec_sig;
+            dec_sig[64] -= 27;
+            crate::jws::verify_bytes(Algorithm::ES256KR, &bytes, &vm_jwk, &dec_sig)?;
+        } else {
+            let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
+            let account_id = BlockchainAccountId::from_str(&account_id_str)?;
+            account_id.verify(&jwk)?;
+        }
+        Ok(Default::default())
     }
 }
 
@@ -1391,6 +1214,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1424,6 +1248,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1458,7 +1283,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
             .as_ref()
@@ -1477,7 +1302,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] - 27)?;
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let signing_string = string_from_document_and_options(document, &proof).await?;
@@ -1498,10 +1323,8 @@ impl ProofSuite for EthereumPersonalSignature2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-        let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-        account_id.verify(&jwk)?;
-        Ok(())
+        vm.match_jwk(&jwk)?;
+        Ok(Default::default())
     }
 }
 
@@ -1509,13 +1332,28 @@ async fn micheline_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let msg = ["", &sigopts_normalized, &doc_normalized].join("\n");
+    let data = crate::tzkey::encode_tezos_signed_message(&msg)?;
+    Ok(data)
+}
+
+async fn micheline_from_document_and_options_jcs(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: &Proof,
+) -> Result<Vec<u8>, Error> {
+    let mut doc_value = document.to_value()?;
+    let doc_obj = doc_value.as_object_mut().ok_or(Error::ExpectedObject)?;
+    let mut proof_value = serde_json::to_value(proof)?;
+    let proof_obj = proof_value.as_object_mut().ok_or(Error::ExpectedObject)?;
+    proof_obj.remove("proofValue");
+    doc_obj.insert("proof".to_string(), proof_value);
+    let msg = serde_jcs::to_string(&doc_value)?;
     let data = crate::tzkey::encode_tezos_signed_message(&msg)?;
     Ok(data)
 }
@@ -1524,10 +1362,10 @@ async fn string_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
 ) -> Result<String, Error> {
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let doc_dataset = document.to_dataset_for_signing(None).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
     let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
     let msg = sigopts_normalized + "\n" + &doc_normalized;
@@ -1542,6 +1380,7 @@ impl ProofSuite for TezosSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1577,6 +1416,7 @@ impl ProofSuite for TezosSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1619,7 +1459,7 @@ impl ProofSuite for TezosSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_bs58 = proof
             .proof_value
             .as_ref()
@@ -1668,7 +1508,162 @@ impl ProofSuite for TezosSignature2021 {
                 return Err(Error::MissingKey);
             }
         };
-        Ok(())
+        Ok(Default::default())
+    }
+}
+
+pub struct TezosJcsSignature2021;
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl ProofSuite for TezosJcsSignature2021 {
+    async fn sign(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
+        key: &JWK,
+        extra_proof_properties: Option<Map<String, Value>>,
+    ) -> Result<Proof, Error> {
+        let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
+        let tzpk = crate::tzkey::jwk_to_tezos_key(&key.to_public())?;
+        let pkmb = "z".to_string() + &tzpk;
+        let mut props = extra_proof_properties.clone();
+        props
+            .get_or_insert(Map::new())
+            .insert("publicKeyMultibase".to_string(), Value::String(pkmb));
+        let mut proof = Proof {
+            context: TZJCSVM_CONTEXT.clone(),
+            ..Proof::new("TezosJcsSignature2021")
+                .with_options(options)
+                .with_properties(props)
+        };
+        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
+        let mut sig_prefixed = Vec::new();
+        let prefix: &[u8] = match algorithm {
+            Algorithm::EdBlake2b => &EDSIG_PREFIX,
+            Algorithm::ESBlake2bK => &SPSIG_PREFIX,
+            Algorithm::ESBlake2b => &P2SIG_PREFIX,
+            _ => return Err(Error::UnsupportedAlgorithm),
+        };
+        sig_prefixed.extend_from_slice(&prefix);
+        sig_prefixed.extend_from_slice(&sig);
+        let sig_bs58 = bs58::encode(sig_prefixed).with_check().into_string();
+        proof.proof_value = Some(sig_bs58);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
+        public_key: &JWK,
+        extra_proof_properties: Option<Map<String, Value>>,
+    ) -> Result<ProofPreparation, Error> {
+        // TODO: dereference VM URL to check if VM already contains public key.
+        // "z" is multibase for base58. Usually publicKeyMultibase is used with multicodec, but
+        // here we use it for Tezos-style base58 key representation.
+        let pkmb = "z".to_string() + &crate::tzkey::jwk_to_tezos_key(&public_key.to_public())?;
+        let mut props = extra_proof_properties.clone();
+        props
+            .get_or_insert(Map::new())
+            .insert("publicKeyMultibase".to_string(), Value::String(pkmb));
+
+        let proof = Proof {
+            context: TZJCSVM_CONTEXT.clone(),
+            ..Proof::new("TezosJcsSignature2021")
+                .with_options(options)
+                .with_properties(props)
+        };
+        let micheline = micheline_from_document_and_options_jcs(document, &proof).await?;
+        let micheline_string = hex::encode(micheline);
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::Micheline {
+                micheline: micheline_string,
+            },
+        })
+    }
+
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        let sig_bs58 = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let mut proof_jwk_opt: Option<JWK> = None;
+        let mut proof_pkmb_opt: Option<&str> = None;
+        if let Some(ref props) = proof.property_set {
+            if let Some(jwk_value) = props.get("publicKeyJwk") {
+                proof_jwk_opt = Some(serde_json::from_value(jwk_value.clone())?);
+            }
+            if let Some(ref pkmb_value) = props.get("publicKeyMultibase") {
+                if proof_jwk_opt.is_some() {
+                    return Err(Error::MultipleKeyMaterial);
+                }
+                proof_pkmb_opt = pkmb_value.as_str();
+            }
+        }
+
+        let (algorithm, sig) = crate::tzkey::decode_tzsig(sig_bs58)?;
+        let vm = resolve_vm(&verification_method, resolver).await?;
+        if vm.type_ != "TezosMethod2021" {
+            return Err(Error::VerificationMethodMismatch);
+        }
+
+        let micheline = micheline_from_document_and_options_jcs(document, &proof).await?;
+        let account_id_opt: Option<BlockchainAccountId> = match vm.blockchain_account_id {
+            Some(account_id_string) => Some(account_id_string.parse()?),
+            None => None,
+        };
+
+        // VM must have either publicKeyJwk or blockchainAccountId.
+        if let Some(vm_jwk) = vm.public_key_jwk {
+            // If VM has publicKey, use that to veify the signature.
+            crate::jws::verify_bytes(algorithm, &micheline, &vm_jwk, &sig)?;
+            // Note: VM blockchainAccountId is ignored in this case.
+        } else {
+            if let Some(account_id) = account_id_opt {
+                // VM does not have publicKeyJwk: proof must have public key
+                if let Some(proof_pkmb) = proof_pkmb_opt {
+                    if !proof_pkmb.starts_with("z") {
+                        return Err(Error::ExpectedMultibaseZ);
+                    }
+                    proof_jwk_opt = Some(crate::tzkey::jwk_from_tezos_key(&proof_pkmb[1..])?);
+                }
+                if let Some(proof_jwk) = proof_jwk_opt {
+                    // Proof has public key: verify it with blockchainAccountId,
+                    account_id.verify(&proof_jwk)?;
+                    // and verify the signature.
+                    crate::jws::verify_bytes(algorithm, &micheline, &proof_jwk, &sig)?;
+                } else {
+                    return Err(Error::MissingKey);
+                }
+            } else {
+                return Err(Error::MissingKey);
+            }
+        };
+        Ok(vec!["TezosJcsSignature2021 is experimental.".to_string()])
     }
 }
 
@@ -1680,6 +1675,7 @@ impl ProofSuite for SolanaSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1702,6 +1698,7 @@ impl ProofSuite for SolanaSignature2021 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1736,7 +1733,7 @@ impl ProofSuite for SolanaSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-    ) -> Result<(), Error> {
+    ) -> Result<VerificationWarnings, Error> {
         let sig_b58 = proof
             .proof_value
             .as_ref()
@@ -1755,7 +1752,7 @@ impl ProofSuite for SolanaSignature2021 {
         let bytes = tx.to_bytes();
         let sig = bs58::decode(&sig_b58).into_vec()?;
         crate::jws::verify_bytes(Algorithm::EdDSA, &bytes, &key, &sig)?;
-        Ok(())
+        Ok(Default::default())
     }
 }
 
@@ -1767,12 +1764,14 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         sign(
             document,
             options,
+            resolver,
             key,
             "EcdsaSecp256r1Signature2019",
             Algorithm::ES256,
@@ -1784,18 +1783,28 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         prepare(
             document,
             options,
+            resolver,
             public_key,
             "EcdsaSecp256r1Signature2019",
             Algorithm::ES256,
             extra_proof_properties,
         )
         .await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        verify(proof, document, resolver).await
     }
     async fn complete(
         &self,
@@ -1815,14 +1824,12 @@ impl ProofSuite for JsonWebSignature2020 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-        if algorithm != Algorithm::ES256 {
-            // TODO: support JsonWebSignature2020 more generally
-            return Err(Error::UnsupportedAlgorithm)?;
-        }
+        self.validate_key_and_algorithm(key, algorithm)?;
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
             ..Proof::new("JsonWebSignature2020")
@@ -1835,13 +1842,12 @@ impl ProofSuite for JsonWebSignature2020 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-        if algorithm != Algorithm::ES256 {
-            return Err(Error::UnsupportedAlgorithm)?;
-        }
+        self.validate_key_and_algorithm(public_key, algorithm)?;
         let proof = Proof {
             context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT.clone()]),
             ..Proof::new("JsonWebSignature2020")
@@ -1849,6 +1855,32 @@ impl ProofSuite for JsonWebSignature2020 {
                 .with_properties(extra_proof_properties)
         };
         prepare_proof(document, proof, algorithm).await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+        let message = to_jws_payload(document, proof).await?;
+        let crate::jws::DecodedJWS {
+            header,
+            signing_input,
+            payload: _,
+            signature,
+        } = crate::jws::decode_jws_parts(header_b64, &message, signature_b64)?;
+        // Redundant early algorithm check before expensive key lookup and signature verification.
+        self.validate_algorithm(header.algorithm)?;
+        let key = resolve_key(&verification_method, resolver).await?;
+        self.validate_key_and_algorithm(&key, header.algorithm)?;
+        crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature)?;
+        Ok(Default::default())
     }
     async fn complete(
         &self,
@@ -1859,9 +1891,76 @@ impl ProofSuite for JsonWebSignature2020 {
     }
 }
 
+impl JsonWebSignature2020 {
+    fn validate_algorithm(&self, algorithm: Algorithm) -> Result<(), Error> {
+        Ok(match algorithm {
+            Algorithm::EdDSA => (),
+            Algorithm::ES256K => (),
+            Algorithm::ES256 => (),
+            // Algorithm::ES384 => (), TODO
+            Algorithm::PS256 => (),
+            _ => return Err(Error::UnsupportedAlgorithm),
+        })
+    }
+    // https://w3c-ccg.github.io/lds-jws2020/#jose-conformance
+    fn validate_key_and_algorithm(&self, key: &JWK, algorithm: Algorithm) -> Result<(), Error> {
+        if let Some(key_algorithm) = key.algorithm {
+            if key_algorithm != algorithm {
+                return Err(Error::AlgorithmMismatch);
+            }
+        }
+        match &key.params {
+            JWKParams::RSA(rsa_params) => {
+                let ref public_modulus =
+                    rsa_params.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
+                // Ensure 2048-bit key. Note it may have an extra byte:
+                // https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.1
+                match public_modulus.len() {
+                    256 | 257 => (),
+                    _ => {
+                        return Err(Error::InvalidKeyLength);
+                    }
+                }
+                match algorithm {
+                    Algorithm::PS256 => (),
+                    _ => return Err(Error::UnsupportedAlgorithm),
+                }
+            }
+            JWKParams::EC(ec_params) => {
+                match &ec_params.curve.as_ref().ok_or(Error::MissingCurve)?[..] {
+                    "secp256k1" => match algorithm {
+                        Algorithm::ES256K => (),
+                        _ => return Err(Error::UnsupportedAlgorithm),
+                    },
+                    "P-256" => match algorithm {
+                        Algorithm::ES256 => (),
+                        // Algorithm::ES384 => (), TODO
+                        _ => return Err(Error::UnsupportedAlgorithm),
+                    },
+                    _ => {
+                        return Err(Error::UnsupportedCurve);
+                    }
+                }
+            }
+            JWKParams::OKP(okp_params) => match &okp_params.curve[..] {
+                "Ed25519" => match algorithm {
+                    Algorithm::EdDSA => (),
+                    _ => return Err(Error::UnsupportedAlgorithm),
+                },
+                _ => {
+                    return Err(Error::UnsupportedCurve);
+                }
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::did::example::DIDExample;
     use crate::jsonld::CREDENTIALS_V1_CONTEXT;
 
     struct ExampleDocument;
@@ -1903,11 +2002,12 @@ mod tests {
         key.algorithm = Some(Algorithm::ES256KR);
         let vm = format!("{}#Recovery2020", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(vm),
+            verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
+        let resolver = DIDExample;
         let doc = ExampleDocument;
-        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &key, None)
+        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
             .await
             .unwrap();
     }
@@ -1918,11 +2018,13 @@ mod tests {
         key.algorithm = Some(Algorithm::EdBlake2b);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(vm),
+            type_: Some(String::from("TezosSignature2021")),
+            verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
         let doc = ExampleDocument;
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &key, None)
+        let resolver = DIDExample;
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
@@ -1936,11 +2038,32 @@ mod tests {
         key.algorithm = Some(Algorithm::ESBlake2bK);
         let vm = format!("{}#TezosMethod2021", "did:example:foo");
         let issue_options = LinkedDataProofOptions {
-            verification_method: Some(vm),
+            type_: Some(String::from("TezosSignature2021")),
+            verification_method: Some(URI::String(vm)),
             ..Default::default()
         };
         let doc = ExampleDocument;
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &key, None)
+        let resolver = DIDExample;
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&proof).unwrap());
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "secp256k1")]
+    async fn tezos_jcs_vm_tz2() {
+        let mut key = JWK::generate_secp256k1().unwrap();
+        key.algorithm = Some(Algorithm::ESBlake2bK);
+        let vm = format!("{}#TezosMethod2021", "did:example:foo");
+        let issue_options = LinkedDataProofOptions {
+            type_: Some(String::from("TezosJcsSignature2021")),
+            verification_method: Some(URI::String(vm)),
+            ..Default::default()
+        };
+        let doc = ExampleDocument;
+        let resolver = DIDExample;
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
@@ -1957,7 +2080,8 @@ mod tests {
             ..Default::default()
         };
         let doc = ExampleDocument;
-        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &key)
+        let resolver = DIDExample;
+        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key)
             .await
             .unwrap();
     }

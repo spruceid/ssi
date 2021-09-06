@@ -72,9 +72,11 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
     let signature = match &key.params {
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
-            let padding_alg = match algorithm {
+            let padding_alg: &dyn ring::signature::RsaEncoding = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_SHA256,
+                Algorithm::PS256 => &ring::signature::RSA_PSS_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented),
             };
             let mut sig = vec![0u8; key_pair.public_modulus_len()];
@@ -84,6 +86,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         }
         #[cfg(feature = "rsa")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             let private_key = rsa::RSAPrivateKey::try_from(rsa_params)?;
             let padding;
             let hashed;
@@ -91,6 +94,13 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                Algorithm::PS256 => {
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    let rng = rand_old::rngs::OsRng {};
+                    padding =
+                        rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
                     hashed = crate::hash::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
@@ -236,16 +246,19 @@ pub fn verify_bytes(
     match &key.params {
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             use ring::signature::RsaPublicKeyComponents;
             let public_key = RsaPublicKeyComponents::try_from(rsa_params)?;
             let parameters = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
+                Algorithm::PS256 => &ring::signature::RSA_PSS_2048_8192_SHA256,
                 _ => return Err(Error::AlgorithmNotImplemented),
             };
             public_key.verify(parameters, data, signature)?
         }
         #[cfg(feature = "rsa")]
         JWKParams::RSA(rsa_params) => {
+            rsa_params.validate_key_size()?;
             use rsa::PublicKey;
             let public_key = rsa::RSAPublicKey::try_from(rsa_params)?;
             let padding;
@@ -254,6 +267,12 @@ pub fn verify_bytes(
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
+                    hashed = crate::hash::sha256(data)?;
+                }
+                Algorithm::PS256 => {
+                    let hash = rsa::hash::Hash::SHA2_256;
+                    let rng = rand_old::rngs::OsRng {};
+                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = crate::hash::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
@@ -490,6 +509,14 @@ pub fn split_jws(jws: &str) -> Result<(&str, &str, &str), Error> {
     )
 }
 
+pub fn split_detached_jws(jws: &str) -> Result<(&str, &str), Error> {
+    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
+    if !omitted_payload.is_empty() {
+        return Err(Error::InvalidJWS);
+    }
+    Ok((header_b64, signature_b64))
+}
+
 pub struct DecodedJWS {
     pub header: Header,
     pub signing_input: Vec<u8>,
@@ -534,10 +561,7 @@ pub fn decode_jws_parts(
 
 /// Verify a JWS with detached payload. Returns the JWS header on success.
 pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Header, Error> {
-    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
-    if !omitted_payload.is_empty() {
-        return Err(Error::InvalidJWS);
-    }
+    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
     let DecodedJWS {
         header,
         signing_input,
@@ -550,10 +574,7 @@ pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Heade
 
 /// Recover a JWK from a JWS and payload, if the algorithm supports that (such as [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r)).
 pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), Error> {
-    let (header_b64, omitted_payload, signature_b64) = split_jws(jws)?;
-    if !omitted_payload.is_empty() {
-        return Err(Error::InvalidJWS);
-    }
+    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
     let DecodedJWS {
         header,
         signing_input,

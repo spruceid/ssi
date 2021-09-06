@@ -43,7 +43,7 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
 }
 
 #[cfg(feature = "p256")]
-fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+pub fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
     let x = FieldBytes::<p256::NistP256>::from_slice(
         &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
@@ -58,7 +58,7 @@ fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
 }
 
 #[cfg(feature = "k256")]
-fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+pub fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use std::convert::TryFrom;
     let pk = k256::PublicKey::try_from(params)?;

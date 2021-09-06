@@ -286,7 +286,7 @@ impl JWK {
         }
         match &self.params {
             Params::RSA(_) => {
-                return Some(Algorithm::RS256);
+                return Some(Algorithm::PS256);
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
@@ -317,6 +317,51 @@ impl JWK {
         let mut key = self.clone();
         key.params = key.params.to_public();
         key
+    }
+
+    /// Compare JWK equality by public key properties.
+    /// Equivalent to comparing by [JWK Thumbprint][thumbprint].
+    pub fn equals_public(&self, other: &JWK) -> bool {
+        match (&self.params, &other.params) {
+            (
+                Params::RSA(RSAParams {
+                    modulus: Some(n1),
+                    exponent: Some(e1),
+                    ..
+                }),
+                Params::RSA(RSAParams {
+                    modulus: Some(n2),
+                    exponent: Some(e2),
+                    ..
+                }),
+            ) => n1 == n2 && e1 == e2,
+            (Params::OKP(okp1), Params::OKP(okp2)) => {
+                okp1.curve == okp2.curve && okp1.public_key == okp2.public_key
+            }
+            (
+                Params::EC(ECParams {
+                    curve: Some(crv1),
+                    x_coordinate: Some(x1),
+                    y_coordinate: Some(y1),
+                    ..
+                }),
+                Params::EC(ECParams {
+                    curve: Some(crv2),
+                    x_coordinate: Some(x2),
+                    y_coordinate: Some(y2),
+                    ..
+                }),
+            ) => crv1 == crv2 && x1 == x2 && y1 == y2,
+            (
+                Params::Symmetric(SymmetricParams {
+                    key_value: Some(kv1),
+                }),
+                Params::Symmetric(SymmetricParams {
+                    key_value: Some(kv2),
+                }),
+            ) => kv1 == kv2,
+            _ => false,
+        }
     }
 
     pub fn thumbprint(&self) -> Result<String, Error> {
@@ -423,9 +468,18 @@ impl RSAParams {
     pub fn to_public(&self) -> Self {
         Self {
             modulus: self.modulus.clone(),
-            exponent: self.modulus.clone(),
+            exponent: self.exponent.clone(),
             ..Default::default()
         }
+    }
+
+    /// Validate key size is at least 2048 bits, per [RFC 7518 section 3.3](https://www.rfc-editor.org/rfc/rfc7518#section-3.3).
+    pub fn validate_key_size(&self) -> Result<(), Error> {
+        let ref n = self.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
+        if n.len() < 256 {
+            return Err(Error::InvalidKeyLength);
+        }
+        Ok(())
     }
 }
 

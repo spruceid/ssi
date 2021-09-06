@@ -1067,11 +1067,88 @@ mod tests {
         );
     }
 
+    pub struct DIDExample;
+    use crate::did::{DIDMethod, Document};
+    use crate::did_resolve::{
+        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+        ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+    };
+    use async_trait::async_trait;
+    const DOC_JSON: &'static str = r#"
+{
+  "@context": "https://www.w3.org/ns/did/v1",
+  "id": "did:example:aaaabbbb",
+  "verificationMethod": [
+    {
+      "id": "did:example:aaaabbbb#issuerKey-1",
+      "type": "EcdsaSecp256k1VerificationKey2019",
+      "controller": "did:example:aaaabbbb",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "cmbYyDC6cbm807_OmFNYP4CLEL0aB2F1UG683SxFkXM",
+        "y": "zBw5HAh0cJM4YimSQvtYM1HFhzUXVUgrDhxJ70aajt0"
+      }
+    }
+  ],
+  "assertionMethod": [
+    "did:example:aaaabbbb#issuerKey-1"
+  ],
+  "authentication": [
+    "did:example:aaaabbbb#issuerKey-1"
+  ]
+}
+    "#;
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl DIDMethod for DIDExample {
+        fn name(&self) -> &'static str {
+            return "example";
+        }
+        fn to_resolver(&self) -> &dyn DIDResolver {
+            self
+        }
+    }
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl DIDResolver for DIDExample {
+        async fn resolve(
+            &self,
+            did: &str,
+            _input_metadata: &ResolutionInputMetadata,
+        ) -> (
+            ResolutionMetadata,
+            Option<Document>,
+            Option<DocumentMetadata>,
+        ) {
+            if did != "did:example:aaaabbbb" {
+                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
+            }
+            let doc: Document = match serde_json::from_str(DOC_JSON) {
+                Ok(doc) => doc,
+                Err(err) => {
+                    return (ResolutionMetadata::from_error(&err.to_string()), None, None);
+                }
+            };
+            (
+                // ResolutionMetadata::default(),
+                // Note: remove content type when https://github.com/spruceid/ssi/pull/224 is
+                // merged
+                ResolutionMetadata {
+                    content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                    ..Default::default()
+                },
+                Some(doc),
+                Some(DocumentMetadata::default()),
+            )
+        }
+    }
+
     #[async_std::test]
-    async fn convert_typed_data() {
+    async fn verify_typed_data() {
         let proof: Proof = serde_json::from_value(json!({
           "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
-          "created": "2010-01-01T19:23:24Z",
+          "created": "2021-07-09T19:47:41Z",
           "proofPurpose": "assertionMethod",
           "type": "EthereumEip712Signature2021",
           "eip712Domain": {
@@ -1103,6 +1180,7 @@ mod tests {
                 { "name": "child", "type": "Person" }
               ],
               "Person": [
+                { "name": "type", "type": "string" },
                 { "name": "name", "type": "string" }
               ],
               "Proof": [
@@ -1117,7 +1195,7 @@ mod tests {
               "name": "https://example.com",
               "version": "2",
               "chainId": 4,
-              "salt": "0xaaaabbbbccccdddd"
+              "salt": "0x000000000000000000000000000000000000000000000000aaaabbbbccccdddd"
             }
           }
         }))
@@ -1181,6 +1259,7 @@ mod tests {
               { "name": "child", "type": "Person" }
             ],
             "Person": [
+              { "name": "type", "type": "string" },
               { "name": "name", "type": "string" }
             ],
             "Proof": [
@@ -1194,7 +1273,7 @@ mod tests {
             "name": "https://example.com",
             "version": "2",
             "chainId": 4,
-            "salt": "0xaaaabbbbccccdddd"
+            "salt": "0x000000000000000000000000000000000000000000000000aaaabbbbccccdddd"
           },
           "primaryType": "VerifiableCredential",
           "message": {
@@ -1223,15 +1302,73 @@ mod tests {
             },
             "proof": {
               "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
-              "created": "2010-01-01T19:23:24Z",
+              "created": "2021-07-09T19:47:41Z",
               "proofPurpose": "assertionMethod",
               "type": "EthereumEip712Signature2021"
             }
           }
         });
         assert_eq!(
-            serde_json::to_value(typed_data).unwrap(),
+            serde_json::to_value(&typed_data).unwrap(),
             expected_typed_data
         );
+
+        let jwk: crate::jwk::JWK = serde_json::from_value(json!({
+            "kty": "EC",
+            "crv": "secp256k1",
+            "x": "cmbYyDC6cbm807_OmFNYP4CLEL0aB2F1UG683SxFkXM",
+            "y": "zBw5HAh0cJM4YimSQvtYM1HFhzUXVUgrDhxJ70aajt0",
+            "d": "u7QuEl6W0XNppEY0iMVjATT99tC9acwV3Z2keEqvKGo"
+        }))
+        .unwrap();
+        eprintln!("jwk {}", serde_json::to_string(&jwk).unwrap());
+
+        let td_jcs = serde_jcs::to_string(&typed_data).unwrap();
+        // Wrap string with line breaks
+        // https://stackoverflow.com/a/57032118
+        let jcs_lines = td_jcs
+            .chars()
+            .enumerate()
+            .flat_map(|(i, c)| {
+                if i != 0 && i % 90 == 0 {
+                    Some('\n')
+                } else {
+                    None
+                }
+                .into_iter()
+                .chain(std::iter::once(c))
+            })
+            .collect::<String>();
+        eprintln!("JCS: [\n{}\n]", jcs_lines);
+
+        // Sign proof
+        use crate::ldp::ProofSuite;
+        let bytes = typed_data.bytes().unwrap();
+        let ec_params = match &jwk.params {
+            crate::jwk::Params::EC(ec) => ec,
+            _ => unreachable!(),
+        };
+        use k256::ecdsa::signature::Signer;
+        let secret_key = k256::SecretKey::try_from(ec_params).unwrap();
+        let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&bytes).unwrap();
+        let sig_bytes = &mut sig.as_ref().to_vec();
+        // Recovery ID starts at 27 instead of 0.
+        sig_bytes[64] = sig_bytes[64] + 27;
+        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(sig_bytes);
+        let mut proof = proof.clone();
+        proof.proof_value = Some(sig_hex.clone());
+        eprintln!("proof {}", serde_json::to_string(&proof).unwrap());
+
+        // Verify the VC/proof
+        let mut vc = vc.clone();
+        vc.add_proof(proof.clone());
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        assert_eq!(sig_hex, "0x5fb8f18f21f54c2df8a2720d0afcee7dbbb18e4b7a22ce6e8183633d63b076d329122584db769cd78b6cd5a7094ede5ceaa43317907539187f1f0d8875f99e051b");
+        // todo!();
     }
 }

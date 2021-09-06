@@ -1,6 +1,8 @@
 {
   "@context": {
     "@version": 1.1,
+    "id": "@id",
+    "type": "@type",
     "name": "https://schema.org/name",
     "description": "https://schema.org/description",
     "identifier": "https://schema.org/identifier",
@@ -8,8 +10,9 @@
       "@id": "https://schema.org/image",
       "@type": "@id"
     },
-    "id": "@id",
-    "type": "@type",
+    "relatedLink": {
+      "@id": "https://w3id.org/traceability#LinkRole"
+    },
     "AgActivity": {
       "@id": "https://w3id.org/traceability#AgActivity",
       "@context": {
@@ -174,11 +177,7 @@
     },
     "BillOfLadingCertificate": {
       "@id": "https://w3id.org/traceability#BillOfLadingCertificate",
-      "@context": {
-        "relatedLink": {
-          "@id": "https://w3id.org/traceability#LinkRole"
-        }
-      }
+      "@context": {}
     },
     "Brand": {
       "@id": "https://schema.org/Brand",
@@ -265,11 +264,7 @@
     },
     "CommercialInvoiceCertificate": {
       "@id": "https://w3id.org/traceability#CommercialInvoiceCertificate",
-      "@context": {
-        "relatedLink": {
-          "@id": "https://w3id.org/traceability#LinkRole"
-        }
-      }
+      "@context": {}
     },
     "ContactPoint": {
       "@id": "https://schema.org/ContactPoint",
@@ -325,6 +320,23 @@
         },
         "email": {
           "@id": "https://schema.org/email"
+        }
+      }
+    },
+    "DocumentVerificationEvidence": {
+      "@id": "https://w3id.org/traceability#DocumentVerificationEvidence",
+      "@context": {
+        "verifier": {
+          "@id": "https://schema.org/Organization"
+        },
+        "evidenceDocument": {
+          "@id": "https://schema.org/DigitalDocument"
+        },
+        "subjectPresence": {
+          "@id": "https://schema.org/Person"
+        },
+        "documentPresence": {
+          "@id": "https://schema.org/PresentationDigitalDocument"
         }
       }
     },
@@ -751,6 +763,29 @@
       "@id": "https://w3id.org/traceability#Entity",
       "@context": {}
     },
+    "Event": {
+      "@id": "https://schema.org/Event",
+      "@context": {
+        "eventType": {
+          "@id": "https://schema.org/value"
+        },
+        "eventId": {
+          "@id": "https://schema.org/identifier"
+        },
+        "actor": {
+          "@id": "https://w3id.org/traceability#Organization"
+        },
+        "place": {
+          "@id": "https://w3id.org/traceability#place"
+        },
+        "eventTime": {
+          "@id": "https://schema.org/DateTime#v2"
+        },
+        "products": {
+          "@id": "https://schema.org/Product"
+        }
+      }
+    },
     "GeoCoordinates": {
       "@id": "https://schema.org/GeoCoordinates",
       "@context": {
@@ -1165,11 +1200,7 @@
     },
     "MillTestReportCertificate": {
       "@id": "https://w3id.org/traceability#MillTestReportCertificate",
-      "@context": {
-        "relatedLink": {
-          "@id": "https://w3id.org/traceability#LinkRole"
-        }
-      }
+      "@context": {}
     },
     "NaturalGasProduct": {
       "@id": "https://w3id.org/traceability#NaturalGasProduct",
@@ -1230,13 +1261,16 @@
       }
     },
     "Observation": {
-      "@id": "https://w3id.org/traceability#Observation",
+      "@id": "https://schema.org/Observation",
       "@context": {
         "property": {
           "@id": "https://schema.org/measuredProperty"
         },
         "measurement": {
           "@id": "https://w3id.org/traceability#MeasuredValue"
+        },
+        "date": {
+          "@id": "https://schema.org/observationDate"
         }
       }
     },
@@ -1634,6 +1668,17 @@
         },
         "value": {
           "@id": "https://schema.org/value"
+        }
+      }
+    },
+    "RevocationList2020Status": {
+      "@id": "https://w3id.org/traceability#RevocationList2020Status",
+      "@context": {
+        "revocationListIndex": {
+          "@id": "https://schema.org/itemListElement"
+        },
+        "revocationListCredential": {
+          "@id": "https://schema.org/LinkRole"
         }
       }
     },

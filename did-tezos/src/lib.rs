@@ -53,12 +53,25 @@ impl DIDResolver for DIDTz {
         Option<DocumentMetadata>,
     ) {
         let (network, address) = match did.split(':').collect::<Vec<&str>>().as_slice() {
-            ["did", "tz", address] if address.len() == 36 => {
-                ("mainnet".to_string(), address.to_string())
-            }
+            ["did", "tz", address] if address.len() == 36 => ("mainnet", address.to_string()),
             ["did", "tz", network, address] if address.len() == 36 => {
-                (network.to_string(), address.to_string())
+                (*network, address.to_string())
             }
+            _ => {
+                return (
+                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    None,
+                    None,
+                )
+            }
+        };
+        // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
+        let genesis_block_hash = match network {
+            "mainnet" => "NetXdQprcVkpaWU",
+            "delphinet" => "NetXm8tYqnMWky1",
+            "granadanet" => "NetXz969SFaFn8k",
+            "edonet" => "NetXSgo1ZT2DRUG",
+            "florencenet" => "NetXxkAx4woPLyu",
             _ => {
                 return (
                     ResolutionMetadata::from_error(&ERROR_INVALID_DID),
@@ -112,7 +125,7 @@ impl DIDResolver for DIDTz {
             proof_type,
             proof_type_iri,
             &address,
-            &network,
+            &genesis_block_hash,
             public_key,
         );
 
@@ -323,7 +336,7 @@ impl DIDTz {
         proof_type: &str,
         proof_type_iri: &str,
         address: &str,
-        network: &str,
+        genesis_block_hash: &str,
         public_key: Option<String>,
     ) -> Document {
         let mut context = BTreeMap::new();
@@ -352,7 +365,11 @@ impl DIDTz {
                 id: String::from(vm_didurl.clone()),
                 type_: proof_type.to_string(),
                 controller: did.to_string(),
-                blockchain_account_id: Some(format!("{}@tezos:{}", address.to_string(), network)),
+                blockchain_account_id: Some(format!(
+                    "tezos:{}:{}",
+                    genesis_block_hash,
+                    address.to_string()
+                )),
                 ..Default::default()
             })]),
             authentication: match public_key {
@@ -514,7 +531,7 @@ mod tests {
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
     const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
-    const LIVE_NETWORK: &str = "mainnet";
+    const LIVE_NETWORK: &str = "NetXdQprcVkpaWU";
     const JSON_PATCH: &str = r#"{"ietf-json-patch": [
                                     {
                                         "op": "add",
@@ -580,7 +597,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
                 "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
-                "blockchainAccountId": "tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8@tezos:mainnet"
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
               }],
               "authentication": [
                 "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
@@ -618,7 +635,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",
                 "type": "EcdsaSecp256k1RecoveryMethod2020",
                 "controller": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
-                "blockchainAccountId": "tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq@tezos:mainnet"
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
               }],
               "authentication": [
                 "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
@@ -670,10 +687,11 @@ mod tests {
         // };
         let did = "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq".to_string();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        // let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        // let proof = vc.generate_proof(&key, &issue_options, &DIDTZ).await.unwrap();
         let proof_str = r###"
 {
   "@context": {
@@ -756,7 +774,7 @@ mod tests {
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &DIDTZ, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -782,10 +800,11 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        // let vp_proof = vp.generate_proof(&key, &vp_issue_options, &DIDTZ).await.unwrap();
         let vp_proof_str = r###"
 {
   "@context": {
@@ -902,10 +921,14 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDTZ)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -923,7 +946,7 @@ mod tests {
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &DIDTZ, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -949,10 +972,14 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDTZ)
+            .await
+            .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
@@ -1008,7 +1035,7 @@ mod tests {
                 "id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId",
                 "type": "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
                 "controller": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-                "blockchainAccountId": "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX@tezos:mainnet"
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"
               }],
               "authentication": [
                 "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"
@@ -1033,7 +1060,7 @@ mod tests {
             "id": format!("{}#blockchainAccountId", did),
             "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
             "controller": did,
-            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "blockchainAccountId": format!("tezos:sandbox:{}", address),
             "publicKeyBase58": pk
           }],
           "service": [{
@@ -1080,7 +1107,7 @@ mod tests {
             "id": format!("{}#blockchainAccountId", did),
             "type": "EcdsaSecp256k1RecoveryMethod2020",
             "controller": did,
-            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "blockchainAccountId": format!("tezos:sandbox:{}", address),
             "publicKeyBase58": pk
           }],
           "service": [{
@@ -1142,7 +1169,7 @@ mod tests {
             "id": format!("{}#blockchainAccountId", did),
             "type": "JsonWebKey2020",
             "controller": did,
-            "blockchainAccountId": format!("{}@tezos:{}", address, "sandbox"),
+            "blockchainAccountId": format!("tezos:sandbox:{}", address),
             "publicKeyBase58": pk
           }],
           "service": [{
@@ -1236,7 +1263,7 @@ mod tests {
                 VerificationMethod::Map(VerificationMethodMap {
                     id: format!("{}#blockchainAccountId", live_did),
                     type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
-                    blockchain_account_id: Some(format!("{}@tezos:{}", LIVE_TZ1, LIVE_NETWORK)),
+                    blockchain_account_id: Some(format!("tezos:{}:{}", LIVE_NETWORK, LIVE_TZ1)),
                     controller: live_did.clone(),
                     property_set: Some(Map::new()), // TODO should be None
                     ..Default::default()
@@ -1296,10 +1323,14 @@ mod tests {
         .unwrap();
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDTZ)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -1317,7 +1348,7 @@ mod tests {
         let other_key = JWK::generate_p256().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &DIDTZ, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -1343,10 +1374,14 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#blockchainAccountId");
+        vp_issue_options.verification_method =
+            Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDTZ)
+            .await
+            .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();

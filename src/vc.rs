@@ -7,7 +7,9 @@ use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
 use crate::jws::Header;
-use crate::ldp::{now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation};
+use crate::ldp::{
+    now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation, VerificationWarnings,
+};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 
@@ -50,14 +52,14 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub issuer: Option<Issuer>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuance_date: Option<DateTime<Utc>>, // must be RFC3339
+    pub issuance_date: Option<VCDateTime>,
     // This field is populated only when using
     // embedded proofs such as LD-PROOF
     //   https://w3c-ccg.github.io/ld-proofs/
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<OneOrMany<Proof>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiration_date: Option<DateTime<Utc>>, // must be RFC3339
+    pub expiration_date: Option<VCDateTime>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub credential_status: Option<Status>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -71,6 +73,20 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
+}
+
+/// RFC3339 date-time as used in VC Data Model
+/// <https://www.w3.org/TR/vc-data-model/#issuance-date>
+/// <https://www.w3.org/TR/vc-data-model/#expiration>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(try_from = "String")]
+#[serde(into = "String")]
+pub struct VCDateTime {
+    /// The date-time
+    date_time: DateTime<FixedOffset>,
+    /// Whether to use "Z" or "+00:00" when formatting the date-time in UTC
+    use_z: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -301,9 +317,13 @@ pub struct JWTClaims {
 /// Reference: vc-http-api
 pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "type")]
+    /// The type of the proof. Default is an appropriate proof type corresponding to the verification method.
+    pub type_: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// The URI of the verificationMethod used for the proof. If omitted a default
     /// assertionMethod will be used.
-    pub verification_method: Option<String>,
+    pub verification_method: Option<URI>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The purpose of the proof. If omitted "assertionMethod" will be used.
     pub proof_purpose: Option<ProofPurpose>,
@@ -367,6 +387,7 @@ impl Default for LinkedDataProofOptions {
             domain: None,
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
+            type_: None,
         }
     }
 }
@@ -395,14 +416,18 @@ impl VerificationResult {
     }
 }
 
-impl From<Result<(), Error>> for VerificationResult {
-    fn from(res: Result<(), Error>) -> Self {
-        Self {
-            checks: vec![],
-            warnings: vec![],
-            errors: match res {
-                Ok(_) => vec![],
-                Err(error) => vec![error.to_string()],
+impl From<Result<VerificationWarnings, Error>> for VerificationResult {
+    fn from(res: Result<VerificationWarnings, Error>) -> Self {
+        match res {
+            Ok(warnings) => Self {
+                checks: vec![],
+                warnings,
+                errors: vec![],
+            },
+            Err(error) => Self {
+                checks: vec![],
+                warnings: vec![],
+                errors: vec![error.to_string()],
             },
         }
     }
@@ -446,10 +471,25 @@ impl TryFrom<String> for URI {
     }
 }
 
+impl FromStr for URI {
+    type Err = Error;
+    fn from_str(uri: &str) -> Result<Self, Self::Err> {
+        URI::try_from(String::from(uri))
+    }
+}
+
 impl From<URI> for String {
     fn from(uri: URI) -> String {
         let URI::String(string) = uri;
         string
+    }
+}
+
+impl std::fmt::Display for URI {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::String(ref string) => write!(f, "{}", string),
+        }
     }
 }
 
@@ -476,6 +516,41 @@ impl StringOrURI {
         match self {
             StringOrURI::URI(URI::String(string)) => string.as_str(),
             StringOrURI::String(string) => string.as_str(),
+        }
+    }
+}
+
+impl FromStr for VCDateTime {
+    type Err = chrono::format::ParseError;
+    fn from_str(date_time: &str) -> Result<Self, Self::Err> {
+        let use_z = date_time.ends_with("Z");
+        let date_time = DateTime::parse_from_rfc3339(&date_time)?.into();
+        Ok(VCDateTime { date_time, use_z })
+    }
+}
+
+impl TryFrom<String> for VCDateTime {
+    type Error = chrono::format::ParseError;
+    fn try_from(date_time: String) -> Result<Self, Self::Error> {
+        Self::from_str(&date_time)
+    }
+}
+
+impl From<VCDateTime> for String {
+    fn from(z_date_time: VCDateTime) -> String {
+        let VCDateTime { date_time, use_z } = z_date_time;
+        date_time.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, use_z)
+    }
+}
+
+impl<Tz: chrono::TimeZone> From<DateTime<Tz>> for VCDateTime
+where
+    chrono::DateTime<chrono::FixedOffset>: From<chrono::DateTime<Tz>>,
+{
+    fn from(date_time: DateTime<Tz>) -> Self {
+        Self {
+            date_time: date_time.into(),
+            use_z: true,
         }
     }
 }
@@ -548,7 +623,10 @@ impl Credential {
             None => return Err(Error::MissingCredential),
         };
         if let Some(exp) = claims.expiration_time {
-            vc.expiration_date = Utc.timestamp_opt(exp, 0).latest();
+            vc.expiration_date = Utc.timestamp_opt(exp, 0).latest().map(|time| VCDateTime {
+                date_time: time.into(),
+                use_z: true,
+            });
         }
         if let Some(iss) = claims.issuer {
             if let StringOrURI::URI(issuer_uri) = iss {
@@ -559,7 +637,10 @@ impl Credential {
         }
         if let Some(nbf) = claims.not_before {
             if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
-                vc.issuance_date = Some(time);
+                vc.issuance_date = Some(VCDateTime {
+                    date_time: time.into(),
+                    use_z: true,
+                });
             } else {
                 return Err(Error::TimeError);
             }
@@ -597,13 +678,19 @@ impl Credential {
         // Remove fields from vc that are duplicated into the claims,
         // except for timestamps (in case of conversion discrepencies).
         Ok(JWTClaims {
-            expiration_time: vc.expiration_date.map(|date| date.timestamp()),
+            expiration_time: vc
+                .expiration_date
+                .as_ref()
+                .map(|date| date.date_time.timestamp()),
             issuer: match vc.issuer.take() {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
                 Some(_) => return Err(Error::InvalidIssuer),
                 None => None,
             },
-            not_before: vc.issuance_date.map(|date| date.timestamp()),
+            not_before: vc
+                .issuance_date
+                .as_ref()
+                .map(|date| date.date_time.timestamp()),
             jwt_id: vc.id.take().map(|id| id.into()),
             subject: Some(StringOrURI::String(subject_id)),
             verifiable_credential: Some(vc),
@@ -635,6 +722,7 @@ impl Credential {
         &self,
         jwk: Option<&JWK>,
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
     ) -> Result<String, Error> {
         let LinkedDataProofOptions {
             verification_method,
@@ -644,6 +732,7 @@ impl Credential {
             domain,
             checks,
             eip712_domain,
+            type_,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -653,6 +742,9 @@ impl Credential {
         }
         if eip712_domain.is_some() {
             return Err(Error::UnencodableOptionClaim("eip712Domain".to_string()));
+        }
+        if type_.is_some() {
+            return Err(Error::UnencodableOptionClaim("type".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -677,11 +769,14 @@ impl Credential {
             verification_method.to_owned(),
         ) {
             (Some(jwk_kid), None) => Some(jwk_kid),
-            (None, Some(vm_id)) => Some(vm_id),
+            (None, Some(vm_id)) => Some(vm_id.to_string()),
             (None, None) => None,
-            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id => Some(vm_id),
-            (Some(jwk_kid), Some(vm_id)) => return Err(Error::KeyIdVMMismatch(vm_id, jwk_kid)),
+            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id.to_string() => Some(vm_id.to_string()),
+            (Some(jwk_kid), Some(vm_id)) => {
+                return Err(Error::KeyIdVMMismatch(vm_id.to_string(), jwk_kid))
+            }
         };
+        // TODO: use resolver to pick a default key id
         let header = Header {
             algorithm,
             key_id,
@@ -881,7 +976,7 @@ impl Credential {
         // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
         let allowed_vms = match options.verification_method.take() {
-            Some(vm) => vec![vm],
+            Some(vm) => vec![vm.to_string()],
             None => {
                 if let Some(ref issuer) = self.issuer {
                     let issuer_uri = match issuer.clone() {
@@ -958,8 +1053,9 @@ impl Credential {
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk, None).await
+        LinkedDataProofs::sign(self, options, resolver, jwk, None).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -968,8 +1064,9 @@ impl Credential {
         &self,
         public_key: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, public_key, None).await
+        LinkedDataProofs::prepare(self, options, resolver, public_key, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1070,6 +1167,7 @@ impl Presentation {
         &self,
         jwk: Option<&JWK>,
         options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
     ) -> Result<String, Error> {
         let LinkedDataProofOptions {
             verification_method,
@@ -1079,6 +1177,7 @@ impl Presentation {
             domain,
             checks,
             eip712_domain,
+            type_,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1088,6 +1187,9 @@ impl Presentation {
         }
         if eip712_domain.is_some() {
             return Err(Error::UnencodableOptionClaim("eip712Domain".to_string()));
+        }
+        if type_.is_some() {
+            return Err(Error::UnencodableOptionClaim("type".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -1112,11 +1214,14 @@ impl Presentation {
             verification_method.to_owned(),
         ) {
             (Some(jwk_kid), None) => Some(jwk_kid),
-            (None, Some(vm_id)) => Some(vm_id),
+            (None, Some(vm_id)) => Some(vm_id.to_string()),
             (None, None) => None,
-            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id => Some(vm_id),
-            (Some(jwk_kid), Some(vm_id)) => return Err(Error::KeyIdVMMismatch(vm_id, jwk_kid)),
+            (Some(jwk_kid), Some(vm_id)) if jwk_kid == vm_id.to_string() => Some(vm_id.to_string()),
+            (Some(jwk_kid), Some(vm_id)) => {
+                return Err(Error::KeyIdVMMismatch(vm_id.to_string(), jwk_kid))
+            }
         };
+        // TODO: use resolver to pick a default key id
         let header = Header {
             algorithm,
             key_id,
@@ -1296,8 +1401,9 @@ impl Presentation {
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, jwk, None).await
+        LinkedDataProofs::sign(self, options, resolver, jwk, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1325,7 +1431,7 @@ impl Presentation {
             ..Default::default()
         });
         let allowed_vms = match options.verification_method.take() {
-            Some(vm) => vec![vm],
+            Some(vm) => vec![vm.to_string()],
             None => {
                 if let Some(URI::String(ref holder)) = self.holder {
                     let proof_purpose = options
@@ -1508,7 +1614,10 @@ impl Proof {
     pub fn with_options(self, options: &LinkedDataProofOptions) -> Self {
         Self {
             proof_purpose: options.proof_purpose.clone(),
-            verification_method: options.verification_method.clone(),
+            verification_method: options
+                .verification_method
+                .clone()
+                .map(|uri| uri.to_string()),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
             created: Some(options.created.unwrap_or_else(now_ms)),
@@ -1525,7 +1634,9 @@ impl Proof {
 
     pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
         if let Some(ref verification_method) = options.verification_method {
-            assert_local!(self.verification_method.as_ref() == Some(verification_method));
+            assert_local!(
+                self.verification_method.as_ref() == Some(&verification_method.to_string())
+            );
         }
         if let Some(vm) = self.verification_method.as_ref() {
             assert_local!(allowed_vms.contains(vm));
@@ -1575,7 +1686,7 @@ fn jwt_matches(
         ..
     } = options;
     if let Some(ref vm) = verification_method {
-        assert_local!(header.key_id.as_ref() == Some(vm));
+        assert_local!(header.key_id.as_ref() == Some(&vm.to_string()));
     }
     if let Some(kid) = header.key_id.as_ref() {
         assert_local!(allowed_vms.contains(kid));
@@ -1644,12 +1755,120 @@ impl LinkedDataDocument for Proof {
             None => None,
         };
         let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+        let dataset =
+            json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await?;
+        verify_proof_consistency(self, &dataset)?;
+        Ok(dataset)
     }
 
     fn to_value(&self) -> Result<Value, Error> {
         Ok(serde_json::to_value(&self)?)
     }
+}
+
+/// Verify alignment of proof options in JSON with RDF terms
+fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Error> {
+    use crate::rdf;
+    let mut graph_ref = dataset.default_graph.as_ref();
+
+    let type_triple = graph_ref
+        .take(
+            None,
+            Some(&rdf::Predicate::IRIRef(rdf::IRIRef(
+                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
+            ))),
+            None,
+        )
+        .ok_or(Error::MissingType)?;
+    let type_iri = match type_triple.object {
+        rdf::Object::IRIRef(rdf::IRIRef(ref iri)) => iri,
+        _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
+    };
+    match (proof.type_.as_str(), type_iri.as_str()) {
+        ("RsaSignature2018", "https://w3id.org/security#RsaSignature2018") => (),
+        ("Ed25519Signature2018", "https://w3id.org/security#Ed25519Signature2018") => (),
+        ("EcdsaSecp256k1Signature2019", "https://w3id.org/security#EcdsaSecp256k1Signature2019") => (),
+        ("EcdsaSecp256r1Signature2019", "https://w3id.org/security#EcdsaSecp256r1Signature2019") => (),
+        ("EcdsaSecp256k1RecoverySignature2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020") => (),
+        ("EcdsaSecp256k1RecoverySignature2020", "https://w3id.org/security#EcdsaSecp256k1RecoverySignature2020") => (),
+        ("JsonWebSignature2020", "https://w3id.org/security#JsonWebSignature2020") => (),
+        ("EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021") => (),
+        ("EthereumPersonalSignature2021", "https://w3id.org/security#EthereumPersonalSignature2021") => (),
+        ("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
+        ("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
+        ("Eip712Signature2021", "https://w3id.org/security#Eip712Signature2021") => (),
+        ("TezosSignature2021", "https://w3id.org/security#TezosSignature2021") => (),
+        ("TezosJcsSignature2021", "https://w3id.org/security#TezosJcsSignature2021") => (),
+        ("SolanaSignature2021", "https://w3id.org/security#SolanaSignature2021") => (),
+        _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
+    };
+    let proof_id = &type_triple.subject;
+
+    graph_ref.match_iri_property(
+        proof_id,
+        "https://w3id.org/security#proofPurpose",
+        proof.proof_purpose.as_ref().map(|pp| pp.to_iri()),
+    )?;
+    graph_ref.match_iri_property(
+        proof_id,
+        "https://w3id.org/security#verificationMethod",
+        proof.verification_method.as_ref().map(|vm| vm.as_str()),
+    )?;
+    graph_ref.match_iri_or_string_property(
+        proof_id,
+        "https://w3id.org/security#challenge",
+        proof.challenge.as_ref().map(|challenge| challenge.as_str()),
+    )?;
+    graph_ref.match_iri_or_string_property(
+        proof_id,
+        "https://w3id.org/security#domain",
+        proof.domain.as_ref().map(|domain| domain.as_str()),
+    )?;
+    graph_ref.match_date_property(
+        proof_id,
+        "http://purl.org/dc/terms/created",
+        proof.created.as_ref(),
+    )?;
+    graph_ref.match_json_property(
+        proof_id,
+        "https://w3id.org/security#publicKeyJwk",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("publicKeyJwk")),
+    )?;
+    graph_ref.match_multibase_property(
+        proof_id,
+        "https://w3id.org/security#publicKeyMultibase",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("publicKeyMultibase")),
+    )?;
+    graph_ref.match_iri_property(
+        proof_id,
+        "https://w3id.org/security#capability",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("capability"))
+            .and_then(|cap| cap.as_str()),
+    )?;
+    graph_ref.match_list_property(
+        proof_id,
+        "https://w3id.org/security#capabilityChain",
+        proof
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("capabilityChain")),
+    )?;
+
+    // Disallow additional unexpected statements
+    for triple in graph_ref.triples.into_iter() {
+        return Err(Error::UnexpectedTriple(triple.clone()));
+    }
+
+    Ok(())
 }
 
 impl FromStr for ProofPurpose {
@@ -1683,6 +1902,23 @@ impl From<ProofPurpose> for String {
             ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
             ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
             ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
+        }
+    }
+}
+
+impl ProofPurpose {
+    pub fn to_iri(&self) -> &'static str {
+        match self {
+            ProofPurpose::Authentication => "https://w3id.org/security#authenticationMethod",
+            ProofPurpose::AssertionMethod => "https://w3id.org/security#assertionMethod",
+            ProofPurpose::KeyAgreement => "https://w3id.org/security#keyAgreementMethod",
+            ProofPurpose::ContractAgreement => "https://w3id.org/security#contractAgreementMethod",
+            ProofPurpose::CapabilityInvocation => {
+                "https://w3id.org/security#capabilityInvocationMethod"
+            }
+            ProofPurpose::CapabilityDelegation => {
+                "https://w3id.org/security#capabilityDelegationMethod"
+            }
         }
     }
 }
@@ -1809,7 +2045,11 @@ mod tests {
             created: None,
             ..Default::default()
         };
-        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let resolver = &DIDExample;
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, resolver)
+            .await
+            .unwrap();
         println!("{:?}", signed_jwt);
     }
 
@@ -1833,7 +2073,7 @@ mod tests {
         }"###;
 
         let vc = Credential {
-            expiration_date: Some(Utc::now() + chrono::Duration::weeks(1)),
+            expiration_date: Some(VCDateTime::from(Utc::now() + chrono::Duration::weeks(1))),
             ..serde_json::from_str(vc_str).unwrap()
         };
         let aud = "did:example:90336644520443d28ba78beb949".to_string();
@@ -1841,10 +2081,13 @@ mod tests {
             domain: Some(aud),
             checks: None,
             created: None,
-            verification_method: Some("did:example:foo#key1".to_string()),
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
             ..Default::default()
         };
-        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, &DIDExample)
+            .await
+            .unwrap();
         println!("{:?}", signed_jwt);
 
         let (vc1_opt, verification_result) =
@@ -1856,10 +2099,13 @@ mod tests {
 
         // Test expiration date
         let vc = Credential {
-            expiration_date: Some(Utc::now() - chrono::Duration::weeks(1)),
+            expiration_date: Some(VCDateTime::from(Utc::now() - chrono::Duration::weeks(1))),
             ..vc
         };
-        let signed_jwt = vc.generate_jwt(Some(&key), &options).await.unwrap();
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, &DIDExample)
+            .await
+            .unwrap();
         let (_vc_opt, verification_result) =
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
         println!("{:#?}", verification_result);
@@ -1883,8 +2129,11 @@ mod tests {
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key1".to_string());
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -1927,8 +2176,11 @@ mod tests {
         let key: JWK = serde_json::from_str(key_str).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key3".to_string());
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        issue_options.verification_method = Some(URI::String("did:example:foo#key3".to_string()));
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -1954,6 +2206,36 @@ mod tests {
     }
 
     #[async_std::test]
+    async fn credential_issue_verify_no_z() {
+        let vc_str = r###"{
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:foo",
+            "issuanceDate": "2020-08-19T21:41:50+00:00",
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        }"###;
+        let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
+
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+
+        let mut issue_options = LinkedDataProofOptions::default();
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
+        vc.add_proof(proof);
+        vc.validate().unwrap();
+        let verification_result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+    }
+
+    #[async_std::test]
     async fn credential_proof_preparation() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -1970,10 +2252,13 @@ mod tests {
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some("did:example:foo#key1".to_string());
-        let algorithm = key.algorithm.unwrap();
+        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
-        let preparation = vc.prepare_proof(&public_key, &issue_options).await.unwrap();
+        let preparation = vc
+            .prepare_proof(&public_key, &issue_options, &DIDExample)
+            .await
+            .unwrap();
         let signing_input = match preparation.signing_input {
             crate::ldp::SigningInput::Bytes(ref bytes) => &bytes.0,
             #[allow(unreachable_patterns)]
@@ -2012,13 +2297,13 @@ mod tests {
         let proof_str = r###"{
             "type": "RsaSignature2018",
             "created": "2020-09-03T15:15:39Z",
-            "creator": "https://example.org/foo/1",
+            "verificationMethod": "https://example.org/foo/1",
             "proofPurpose": "assertionMethod"
         }"###;
         let urdna2015_expected = r###"_:c14n0 <http://purl.org/dc/terms/created> "2020-09-03T15:15:39Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
-_:c14n0 <http://purl.org/dc/terms/creator> <https://example.org/foo/1> .
 _:c14n0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://w3id.org/security#RsaSignature2018> .
 _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#assertionMethod> .
+_:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/1> .
 "###;
         let proof: Proof = serde_json::from_str(proof_str).unwrap();
         struct ProofContexts(Value);
@@ -2081,12 +2366,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 
     #[async_std::test]
     async fn credential_verify() {
-        let vc_str = include_str!("../examples/vc.jsonld");
-        let vc = Credential::from_json(vc_str).unwrap();
-        let result = vc.verify(None, &DIDExample).await;
-        println!("{:#?}", result);
-        assert!(result.errors.is_empty());
-        assert!(result.warnings.is_empty());
+        good_vc(include_str!("../examples/vc.jsonld")).await;
 
         let vc_jwt = include_str!("../examples/vc.jwt");
         let (vc_opt, result) = Credential::decode_verify_jwt(vc_jwt, None, &DIDExample).await;
@@ -2095,6 +2375,41 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         println!("{:#?}", vc);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
+    }
+
+    async fn good_vc(vc_str: &str) {
+        let vc = Credential::from_json(vc_str).unwrap();
+        let result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    async fn bad_vc(vc_str: &str) {
+        let vc = Credential::from_json(vc_str).unwrap();
+        let result = vc.verify(None, &DIDExample).await;
+        println!("{:#?}", result);
+        assert!(result.errors.len() > 0);
+    }
+
+    #[async_std::test]
+    async fn credential_verify_proof_consistency() {
+        // These test vectors were generated using examples/issue.rs with the verify part disabled,
+        // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
+        // object into the VC.
+        good_vc(include_str!("../examples/vc-jws2020-inline-context.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-type.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-purpose.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-method.jsonld")).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-type-json.jsonld")).await;
+        bad_vc(include_str!(
+            "../examples/vc-jws2020-bad-purpose-json.jsonld"
+        ))
+        .await;
+        bad_vc(include_str!(
+            "../examples/vc-jws2020-bad-method-json.jsonld"
+        ))
+        .await;
     }
 
     #[async_std::test]
@@ -2199,9 +2514,12 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let vc_issuer_key = "did:example:foo".to_string();
         let vc_issuer_vm = "did:example:foo#key1".to_string();
         vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
-        vc_issue_options.verification_method = Some(vc_issuer_vm);
+        vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
         vc_issue_options.checks = None;
-        let vc_proof = vc.generate_proof(&key, &vc_issue_options).await.unwrap();
+        let vc_proof = vc
+            .generate_proof(&key, &vc_issue_options, &DIDExample)
+            .await
+            .unwrap();
         vc.add_proof(vc_proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         vc.validate().unwrap();
@@ -2212,7 +2530,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         // Issue JWT credential
         vc_issue_options.created = None;
         let vc_jwt = vc
-            .generate_jwt(Some(&key), &vc_issue_options)
+            .generate_jwt(Some(&key), &vc_issue_options, &DIDExample)
             .await
             .unwrap();
         let vc_verification_result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
@@ -2234,10 +2552,13 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
         let vp_without_proof = vp.clone();
         let mut vp_issue_options = LinkedDataProofOptions::default();
         let vp_issuer_key = "did:example:foo#key1".to_string();
-        vp_issue_options.verification_method = Some(vp_issuer_key);
+        vp_issue_options.verification_method = Some(URI::String(vp_issuer_key));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDExample)
+            .await
+            .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
@@ -2273,7 +2594,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
             ..vp_issue_options.clone()
         };
         let vp_jwt = vp_without_proof
-            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone())
+            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone(), &DIDExample)
             .await
             .unwrap();
         let vp_jwt_verify_options = LinkedDataProofOptions {
@@ -2306,7 +2627,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 
         // LDP VP
         let proof = vp_jwtvc
-            .generate_proof(&key, &vp_issue_options.clone())
+            .generate_proof(&key, &vp_issue_options.clone(), &DIDExample)
             .await
             .unwrap();
         let mut vp_jwtvc_ldp = vp_jwtvc.clone();
@@ -2320,7 +2641,7 @@ _:c14n0 <https://w3id.org/security#proofPurpose> <https://w3id.org/security#asse
 
         // JWT VP
         let vp_vc_jwt = vp_jwtvc
-            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone())
+            .generate_jwt(Some(&key), &vp_jwt_issue_options.clone(), &DIDExample)
             .await
             .unwrap();
         let verification_result =

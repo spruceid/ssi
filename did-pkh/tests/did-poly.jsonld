@@ -1,0 +1,24 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+      "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"
+    }
+  ],
+  "id": "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
+  "verificationMethod": [
+    {
+      "id": "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5#Recovery2020",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
+      "blockchainAccountId": "eip155:137:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5"
+    }
+  ],
+  "authentication": [
+    "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5#Recovery2020"
+  ],
+  "assertionMethod": [
+    "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5#Recovery2020"
+  ]
+}

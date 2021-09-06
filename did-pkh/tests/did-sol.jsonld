@@ -17,7 +17,7 @@
       "id": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#controller",
       "type": "Ed25519VerificationKey2018",
       "controller": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
-      "blockchainAccountId": "CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev@solana",
+      "blockchainAccountId": "solana:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
       "publicKeyJwk": {
         "kty": "OKP",
         "crv": "Ed25519",
@@ -28,7 +28,7 @@
       "id": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#SolanaMethod2021",
       "type": "SolanaMethod2021",
       "controller": "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
-      "blockchainAccountId": "CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev@solana",
+      "blockchainAccountId": "solana:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
       "publicKeyJwk": {
         "kty": "OKP",
         "crv": "Ed25519",

@@ -9,25 +9,28 @@
     ],
     "type": "VerifiableCredential",
     "credentialSubject": {
-      "id": "urn:uuid:2015e34c-9194-41a0-8b4e-ccc684255ba5"
+      "id": "urn:uuid:04dd096f-18cc-4c12-ae97-4f954cce4f0c"
     },
     "issuer": "did:example:foo",
-    "issuanceDate": "2021-01-22T21:02:14.669Z",
+    "issuanceDate": "2021-08-04T20:11:12.806Z",
     "proof": {
-      "type": "RsaSignature2018",
+      "@context": [
+        "https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json"
+      ],
+      "type": "JsonWebSignature2020",
       "proofPurpose": "assertionMethod",
       "verificationMethod": "did:example:foo#key1",
-      "created": "2021-01-22T21:02:14.669Z",
-      "jws": "eyJhbGciOiJSUzI1NiIsImtpZCI6InJzYTIwNDgtMjAyMC0wOC0yNSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..LhcGRaPpiM3Ls4BDOoWm5OuNrfpD1VWT2H6Q6z0LckxXgV2vk7YojHHkvcxesou6kBuy6kPZVfBPUIOVNU0KyrVcwV7jAhcXVumJGToiF3YbIm2D5k_mlT0pbaeaT81bMsPaar9qUwbdf8ZdCQ93e2c9LHqKTKJoB48TkBsKinCz3oJV815sUhEBN_OUj0EZa0l8_fopVWmwcxyp3nLW7YtxbqDoIbEGWH71QSu9_RVeFRuXl_0tfX0y7iqVYQTTl4E8ibuvBSp-eVqg6wrPgNd6lYUHefgNYiUtUe3X9J6zcOCCrTwXpAgx5yJP3REBDT2dPiQQKAR6eRreVoq0IQ"
+      "created": "2021-08-04T20:11:12.807Z",
+      "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..Whwod7RkvFll1Uw8xvEIwgmzkRhtX0bUBow6BMDeiofl76mEA3rrc88tzhk2DEGpZ1TiPA9tqK5MunY8fgV4gq4rMtQTP8mMTMZ5hye0_aaY33f6J-WuPnlHFQ-fdWMxBIUpLPv97n6StNYAvQRA5TYxAAHTJKPNTFX8ywqtCNcr7eWbA5hYo6I01JzX3iAYSUu-BXIAWhJ2xpUr9o9XO9v4kLYCyLhIwIb0O8f9ZUqBwiPOBZAo8Ni5j51bHvx2OH7dtQc_9iA8Lg_94ZmBxk7CK6KCUbV-buXm634t9c64IKOPA1wKj_JQG_g58gA1F2DAqT5WK25OTRFzsmdltg"
     }
   },
   "proof": {
-    "type": "RsaSignature2018",
+    "type": "Ed25519Signature2018",
     "proofPurpose": "authentication",
     "challenge": "example",
-    "verificationMethod": "did:example:foo#key1",
-    "created": "2021-01-22T21:06:03.252Z",
-    "jws": "eyJhbGciOiJSUzI1NiIsImtpZCI6InJzYTIwNDgtMjAyMC0wOC0yNSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..YQDHPaur_bqZT-rGiW4QzgG8T8d72iR9Xu_gdrjLNh-w0w-C9KqKlzak-yG3qhJA5Gn43eYbV26YDef5vMZ8ZhYQl3yqtHj47k4OvoteN0XtjLR7lpYDb9UnHNQhduc9KRYVTN3eR7TaPenUiYdzu53iGhhz6EGXgGuR4w0fwsMr8FepYpXBt5bqk5W7efPPC6F2LSgyxRzKOkio9j6pbT33KLL5L5HYeSIbZIOa-VF4_BD7gAL9HHs38DCLhKoj5bpzgbCprVaQa5FbWv_sHJ8-rR0UXgYnfPFw6UoaMXCp_y1_0y3pqvsCcGzwYiZOtvH246QpC1LCqZSD3EqH7g"
+    "verificationMethod": "did:example:foo#key2",
+    "created": "2021-08-04T20:11:12.979Z",
+    "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..Pp2jX_7ML-aAmo_Um9TrqvwmSNVYpQASVCh20Zw6wrvl2FVGyKX2QdcAHIig24NFvnV-lxebjtOU0wQE_BJ9Bg"
   },
   "holder": "did:example:foo"
 }

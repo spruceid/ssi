@@ -392,8 +392,11 @@ mod tests {
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         vc.issuer = Some(Issuer::URI(URI::String(did.clone())));
-        issue_options.verification_method = Some(verification_method);
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        issue_options.verification_method = Some(URI::String(verification_method));
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDKey)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -427,8 +430,11 @@ mod tests {
 
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(verification_method);
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        issue_options.verification_method = Some(URI::String(verification_method));
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDKey)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -462,8 +468,11 @@ mod tests {
 
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(verification_method);
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        issue_options.verification_method = Some(URI::String(verification_method));
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDKey)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();

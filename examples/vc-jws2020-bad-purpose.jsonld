@@ -1,0 +1,65 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    {
+      "JsonWebKey2020": "https://w3id.org/security#JsonWebKey2020",
+      "JsonWebSignature2020": {
+        "@id": "https://w3id.org/security#JsonWebSignature2020",
+        "@context": {
+          "@protected": true,
+          "id": "@id",
+          "type": "@type",
+          "challenge": "https://w3id.org/security#challenge",
+          "created": {
+            "@id": "http://purl.org/dc/terms/created",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "domain": "https://w3id.org/security#domain",
+          "expires": {
+            "@id": "https://w3id.org/security#expiration",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "jws": "https://w3id.org/security#jws",
+          "nonce": "https://w3id.org/security#nonce",
+          "proofPurpose": {
+            "@id": "https://example.org/NotProofPurpose",
+            "@type": "@vocab",
+            "@context": {
+              "@protected": true,
+              "id": "@id",
+              "type": "@type",
+              "assertionMethod": {
+                "@id": "https://w3id.org/security#assertionMethod",
+                "@type": "@id",
+                "@container": "@set"
+              },
+              "authentication": {
+                "@id": "https://w3id.org/security#authenticationMethod",
+                "@type": "@id",
+                "@container": "@set"
+              }
+            }
+          },
+          "proofValue": "https://w3id.org/security#proofValue",
+          "verificationMethod": {
+            "@id": "https://w3id.org/security#verificationMethod",
+            "@type": "@id"
+          }
+        }
+      }
+    }
+  ],
+  "type": "VerifiableCredential",
+  "credentialSubject": {
+    "id": "urn:uuid:233ad42b-2268-4acd-a776-e559a58d28fc"
+  },
+  "issuer": "did:example:foo",
+  "issuanceDate": "2021-07-30T18:56:54.868Z",
+  "proof": {
+    "type": "JsonWebSignature2020",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "did:example:foo#key1",
+    "created": "2021-07-30T18:56:54.869Z",
+    "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..gkayjWUlJXTvvNha6l54rrvN7PRCak45lf353BgzYxNRWsbHMR42bgKkNPx6RU3OPhCRs1sTMr8wTRHBH_bngWxkTz6sKpFDpaFjYq2HFhOswyT2g0CTtNTiDn8_7WfD5rwJp3G-zzXkNslvjLrxFeLsGGXcAkXNMoKi5ffdC7V8hEkBZ1xatLnfaq4num8J3zu5vCffda83WB3pS3hFtxOivJ7ELbPyJdk8o4jMekMwSEb1UOZwTXfD4cBaF7OQMSedwqqabT8CpLPY4P85J2ELm8sca7M8PbuKxYzx9ZkzMogPyICR-Y6jSbDG1xZG98E8yQiqE000Y_IOmzFqWQ"
+  }
+}

@@ -70,10 +70,10 @@ impl<C, S> Delegation<C, S> {
     }
 }
 
-impl<C, S> Delegation<C, S>
+impl<C, P> Delegation<C, P>
 where
     C: Serialize + Send + Sync + Clone,
-    S: Serialize + Send + Sync + Clone,
+    P: Serialize + Send + Sync + Clone,
 {
     pub async fn verify(
         &self,
@@ -95,11 +95,61 @@ where
         }
     }
 
+    pub fn validate_invocation<S>(&self, invocation: &Invocation<S>) -> VerificationResult
+    where
+        S: Serialize + Send + Sync + Clone,
+    {
+        match &invocation.proof {
+            None => VerificationResult::error("No applicable proof"),
+            Some(proof) => {
+                let mut result = VerificationResult::new();
+                match (
+                    // get cap id from proof extra properties
+                    proof
+                        .property_set
+                        .as_ref()
+                        .and_then(|ps| ps.get("capability").map(|s| s.clone()))
+                        .and_then(|v| match v {
+                            Value::String(id) => Some(id),
+                            _ => None,
+                        }),
+                    &self.id,
+                ) {
+                    (Some(ref id), URI::String(ref t_id)) => {
+                        // ensure proof target cap ID and given
+                        if id != t_id {
+                            result
+                                .errors
+                                .push("Target Capability IDs dont match".into())
+                        };
+                    }
+                    _ => result
+                        .errors
+                        .push("Missing proof target capability ID".into()),
+                };
+                match (&self.invoker, &proof.verification_method) {
+                    // Ensure the proof's verification method is authorized as an invoker. TODO: also allow target_capability's capabilityDelegation verification methods.
+                    (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
+                        if invoker != delegatee {
+                            result.errors.push("Incorrect Invoker".into());
+                        }
+                    }
+                    (_, None) => result
+                        .errors
+                        .push("Missing Proof Verification Method".into()),
+                    _ => {}
+                };
+                result
+            }
+        }
+    }
+
     // https://w3c-ccg.github.io/ld-proofs/
     pub async fn generate_proof(
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         capability_chain: &[&str],
     ) -> Result<Proof, Error> {
         let mut ps = Map::<String, Value>::new();
@@ -107,7 +157,7 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::sign(self, options, jwk, Some(ps)).await
+        LinkedDataProofs::sign(self, options, resolver, jwk, Some(ps)).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -116,6 +166,7 @@ where
         &self,
         public_key: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         capability_chain: &[&str],
     ) -> Result<ProofPreparation, Error> {
         let mut ps = Map::<String, Value>::new();
@@ -123,7 +174,7 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::prepare(self, options, public_key, Some(ps)).await
+        LinkedDataProofs::prepare(self, options, resolver, public_key, Some(ps)).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -192,22 +243,13 @@ impl<S> Invocation<S> {
     }
 }
 
-pub trait VerifyAttributes<I> {
-    type Err: std::string::ToString;
-    // Fn to be implemented for invocations to be verified against delegations
-    // If the property set contains e.g. Actions or Caveat-related fields, they should be checked here
-    fn verify_attributes(&self, _invocation: &I) -> Result<(), Self::Err> {
-        Ok(())
-    }
-}
-
 impl<S> Invocation<S>
 where
     S: Serialize + Send + Sync + Clone,
 {
     pub async fn verify<C, P>(
         &self,
-        _options: Option<LinkedDataProofOptions>,
+        options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, P>,
@@ -215,53 +257,24 @@ where
     where
         C: Serialize + Send + Sync + Clone,
         P: Serialize + Send + Sync + Clone,
-        Delegation<C, P>: VerifyAttributes<Self>,
     {
+        let mut result = target_capability.validate_invocation(self);
+        let mut r2 = self.verify_signature(options, resolver).await;
+        result.append(&mut r2);
+        result
+    }
+
+    pub async fn verify_signature(
+        &self,
+        _options: Option<LinkedDataProofOptions>,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
                 let mut result = proof.verify(self, resolver).await;
-                match (
-                    // get cap id from proof extra properties
-                    proof
-                        .property_set
-                        .as_ref()
-                        .and_then(|ps| ps.get("capability").map(|s| s.clone()))
-                        .and_then(|v| match v {
-                            Value::String(id) => Some(id),
-                            _ => None,
-                        }),
-                    &target_capability.id,
-                ) {
-                    (Some(ref id), URI::String(ref t_id)) => {
-                        // ensure proof target cap ID and given
-                        if id != t_id {
-                            result
-                                .errors
-                                .push("Target Capability IDs dont match".into())
-                        };
-                    }
-                    _ => result
-                        .errors
-                        .push("Missing proof target capability ID".into()),
-                };
-                match (&target_capability.invoker, &proof.verification_method) {
-                    // Ensure the proof's verification method is authorized as an invoker. TODO: also allow target_capability's capabilityDelegation verification methods.
-                    (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
-                        if invoker != delegatee {
-                            result.errors.push("Incorrect Invoker".into());
-                        }
-                    }
-                    (_, None) => result
-                        .errors
-                        .push("Missing Proof Verification Method".into()),
-                    _ => {}
-                };
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
                     result.errors.push("Incorrect Proof Purpose".into());
-                };
-                if let Result::Err(e) = target_capability.verify_attributes(self) {
-                    result.errors.push(e.to_string());
                 };
                 if result.errors.is_empty() {
                     result.checks.push(Check::Proof);
@@ -276,11 +289,12 @@ where
         &self,
         jwk: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         target: &URI,
     ) -> Result<Proof, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::sign(self, options, jwk, Some(ps)).await
+        LinkedDataProofs::sign(self, options, resolver, jwk, Some(ps)).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -289,11 +303,12 @@ where
         &self,
         public_key: &JWK,
         options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
         target: &URI,
     ) -> Result<ProofPreparation, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::prepare(self, options, public_key, Some(ps)).await
+        LinkedDataProofs::prepare(self, options, resolver, public_key, Some(ps)).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -451,7 +466,7 @@ mod tests {
         let alice_did = "did:example:foo";
         let alice_vm = format!("{}#key2", alice_did);
         let alice: JWK = JWK {
-            key_id: Some(alice_vm),
+            key_id: Some(alice_vm.clone()),
             ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
         };
 
@@ -463,7 +478,7 @@ mod tests {
         };
 
         let del: Delegation<(), DefaultProps<Actions>> = Delegation {
-            invoker: Some(URI::String(bob_vm)),
+            invoker: Some(URI::String(bob_vm.clone())),
             ..Delegation::new(
                 URI::String("urn:a_urn".into()),
                 URI::String("kepler://alices_orbit".into()),
@@ -475,37 +490,26 @@ mod tests {
             DefaultProps::new(Some(Actions::Read)),
         );
 
-        impl VerifyAttributes<Invocation<DefaultProps<Actions>>> for Delegation<(), DefaultProps<Actions>> {
-            type Err = &'static str;
-            fn verify_attributes(
-                &self,
-                invocation: &Invocation<DefaultProps<Actions>>,
-            ) -> Result<(), Self::Err> {
-                if self.property_set.capability_action == invocation.property_set.capability_action
-                {
-                    Ok(())
-                } else {
-                    Err("Actions do not match")
-                }
-            }
-        }
-
         let ldpo_alice = LinkedDataProofOptions {
-            verification_method: alice.key_id.clone(),
+            verification_method: Some(URI::String(alice_vm.clone())),
             proof_purpose: Some(ProofPurpose::CapabilityDelegation),
             ..Default::default()
         };
         let ldpo_bob = LinkedDataProofOptions {
-            verification_method: bob.key_id.clone(),
+            verification_method: Some(URI::String(bob_vm.clone())),
             proof_purpose: Some(ProofPurpose::CapabilityInvocation),
             ..Default::default()
         };
-        let signed_del = del
-            .clone()
-            .set_proof(del.generate_proof(&alice, &ldpo_alice, &[]).await.unwrap());
-        let signed_inv = inv
-            .clone()
-            .set_proof(inv.generate_proof(&bob, &ldpo_bob, &del.id).await.unwrap());
+        let signed_del = del.clone().set_proof(
+            del.generate_proof(&alice, &ldpo_alice, &dk, &[])
+                .await
+                .unwrap(),
+        );
+        let signed_inv = inv.clone().set_proof(
+            inv.generate_proof(&bob, &ldpo_bob, &dk, &del.id)
+                .await
+                .unwrap(),
+        );
 
         // happy path
         let s_d_v = signed_del.verify(None, &dk).await;
@@ -539,28 +543,12 @@ mod tests {
             ..del.clone()
         };
         let proof = wrong_del
-            .generate_proof(&alice, &ldpo_alice, &[])
+            .generate_proof(&alice, &ldpo_alice, &dk, &[])
             .await
             .unwrap();
         let signed_wrong_del = wrong_del.set_proof(proof);
         assert!(!signed_inv
             .verify(None, &dk, &signed_wrong_del)
-            .await
-            .errors
-            .is_empty());
-
-        // invalid cap attrs, actions not matching
-        let wrong_inv = Invocation {
-            property_set: DefaultProps::new(Some(Actions::Write)),
-            ..inv.clone()
-        };
-        let proof = wrong_inv
-            .generate_proof(&bob, &ldpo_bob, &del.id)
-            .await
-            .unwrap();
-        let signed_wrong_inv = wrong_inv.set_proof(proof);
-        assert!(!signed_wrong_inv
-            .verify(None, &dk, &signed_del)
             .await
             .errors
             .is_empty());

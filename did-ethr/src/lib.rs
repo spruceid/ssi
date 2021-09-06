@@ -227,12 +227,12 @@ mod tests {
                 "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
                 "type": "EcdsaSecp256k1RecoveryMethod2020",
                 "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
-                "blockchainAccountId": "0xb9c5714089478a327f09197987f16f9e5d936e8a@eip155:1"
+                "blockchainAccountId": "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
               }, {
                 "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021",
                 "type": "Eip712Method2021",
                 "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
-                "blockchainAccountId": "0xb9c5714089478a327f09197987f16f9e5d936e8a@eip155:1"
+                "blockchainAccountId": "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
               }],
               "authentication": [
                 "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
@@ -281,13 +281,17 @@ mod tests {
         vc.validate_unsigned().unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         if eip712 {
-            issue_options.verification_method = Some(did.to_string() + "#Eip712Method2021");
+            issue_options.verification_method =
+                Some(URI::String(did.to_string() + "#Eip712Method2021"));
         } else {
-            issue_options.verification_method = Some(did.to_string() + "#controller");
+            issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         }
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = vc.clone();
-        let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
+        let proof = vc
+            .generate_proof(&key, &issue_options, &DIDEthr)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -305,7 +309,7 @@ mod tests {
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &DIDEthr, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
@@ -331,9 +335,12 @@ mod tests {
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(did.to_string() + "#controller");
+        vp_issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDEthr)
+            .await
+            .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();

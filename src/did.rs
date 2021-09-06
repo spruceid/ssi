@@ -1,3 +1,4 @@
+use crate::caip10::BlockchainAccountId;
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -71,6 +72,17 @@ pub struct RelativeDIDURL {
     pub path: RelativeDIDURLPath,
     pub query: Option<String>,
     pub fragment: Option<String>,
+}
+
+/// A [DID URL][DIDURL] without a fragment. Used for [Dereferencing the Primary
+/// Resource][dereference_primary_resource] in DID URL Dereferencing.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[serde(try_from = "String")]
+#[serde(into = "String")]
+pub struct PrimaryDIDURL {
+    pub did: String,
+    pub path: Option<String>,
+    pub query: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
@@ -354,7 +366,7 @@ impl<'a> DIDResolver for DIDMethods<'a> {
 
     async fn dereference(
         &self,
-        did_url: &DIDURL,
+        did_url: &PrimaryDIDURL,
         input_metadata: &DereferencingInputMetadata,
     ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
         let method = match self.get_method(&did_url.did) {
@@ -389,6 +401,22 @@ impl DIDURL {
             fragment: self.fragment.as_ref().map(|x| x.clone()),
         })
     }
+
+    /// Convert to a fragment-less DID URL and return the removed fragment.
+    pub fn remove_fragment(self) -> (PrimaryDIDURL, Option<String>) {
+        (
+            PrimaryDIDURL {
+                did: self.did,
+                path: if self.path_abempty.len() > 0 {
+                    Some(self.path_abempty)
+                } else {
+                    None
+                },
+                query: self.query,
+            },
+            self.fragment,
+        )
+    }
 }
 
 impl RelativeDIDURL {
@@ -406,50 +434,118 @@ impl RelativeDIDURL {
     }
 }
 
+impl PrimaryDIDURL {
+    pub fn with_fragment(self, fragment: String) -> DIDURL {
+        DIDURL {
+            fragment: Some(fragment),
+            ..DIDURL::from(self)
+        }
+    }
+}
+
 impl VerificationMethod {
     /// Return a DID URL for this verification method, given a DID as base URI
     pub fn get_id(&self, did: &str) -> String {
         match self {
             Self::DIDURL(didurl) => didurl.to_string(),
             Self::RelativeDIDURL(relative_did_url) => relative_did_url.to_absolute(did).to_string(),
-            Self::Map(map) => {
-                if let Ok(rel_did_url) = RelativeDIDURL::from_str(&map.id) {
-                    rel_did_url.to_absolute(did).to_string()
-                } else {
-                    map.id.to_string()
-                }
+            Self::Map(map) => map.get_id(did),
+        }
+    }
+}
+
+impl VerificationMethodMap {
+    /// Return a DID URL for this verification method, given a DID as base URI
+    pub fn get_id(&self, did: &str) -> String {
+        if let Ok(rel_did_url) = RelativeDIDURL::from_str(&self.id) {
+            rel_did_url.to_absolute(did).to_string()
+        } else {
+            self.id.to_string()
+        }
+    }
+
+    /// Get the verification material as a JWK, from the publicKeyJwk property, or converting from other
+    /// public key properties as needed.
+    pub fn get_jwk(&self) -> Result<JWK, Error> {
+        match (
+            self.public_key_jwk.as_ref(),
+            self.public_key_base58.as_ref(),
+        ) {
+            (Some(pk_jwk), None) => Ok(pk_jwk.clone()),
+            (None, Some(pk_bs58)) => {
+                let pk_bytes = bs58::decode(&pk_bs58).into_vec()?;
+                let params = match &self.type_[..] {
+                    "Ed25519VerificationKey2018" => {
+                        crate::jwk::Params::OKP(crate::jwk::OctetParams {
+                            curve: "Ed25519".to_string(),
+                            public_key: crate::jwk::Base64urlUInt(pk_bytes),
+                            private_key: None,
+                        })
+                    }
+                    _ => return Err(Error::UnsupportedKeyType),
+                };
+                Ok(JWK::from(params))
+            }
+            (None, None) => Err(Error::MissingKey),
+            _ => {
+                // https://w3c.github.io/did-core/#verification-material
+                // "expressing key material in a verification method using both publicKeyJwk and
+                // publicKeyBase58 at the same time is prohibited."
+                return Err(Error::MultipleKeyMaterial);
             }
         }
+    }
+
+    /// Verify that a given JWK can be used to satisfy this verification method.
+    pub fn match_jwk(&self, jwk: &JWK) -> Result<(), Error> {
+        if let Some(ref account_id) = self.blockchain_account_id {
+            let account_id = BlockchainAccountId::from_str(&account_id)?;
+            account_id.verify(&jwk)?;
+        } else {
+            let resolved_jwk = self.get_jwk()?;
+            if !resolved_jwk.equals_public(&jwk) {
+                Err(Error::KeyMismatch)?;
+            }
+        }
+        Ok(())
     }
 }
 
 impl FromStr for DIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
-        if !didurl.starts_with("did:") {
-            return Err(Error::DIDURL);
-        }
         let mut parts = didurl.splitn(2, '#');
         let before_fragment = parts.next().unwrap().to_string();
         let fragment = parts.next().map(|x| x.to_owned());
-        let mut parts = before_fragment.splitn(2, '?');
-        let before_query = parts.next().unwrap().to_string();
-        let query = parts.next().map(|x| x.to_owned());
-        let (did, path_abempty) = match before_query.find('/') {
-            Some(i) => match before_query.split_at(i) {
-                (did, path_abempty) => (did.to_string(), path_abempty.to_string()),
-            },
-            None => (before_query, "".to_string()),
-        };
+        let primary_did_url = PrimaryDIDURL::try_from(before_fragment)?;
         Ok(Self {
-            did,
-            path_abempty,
-            query,
             fragment,
+            ..DIDURL::from(primary_did_url)
         })
     }
 }
 
+impl FromStr for PrimaryDIDURL {
+    type Err = Error;
+    fn from_str(didurl: &str) -> Result<Self, Self::Err> {
+        if !didurl.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
+        if didurl.contains('#') {
+            return Err(Error::UnexpectedDIDFragment);
+        }
+        let mut parts = didurl.splitn(2, '?');
+        let before_query = parts.next().unwrap();
+        let query = parts.next().map(|x| x.to_owned());
+        let (did, path) = match before_query.find('/') {
+            Some(i) => match before_query.split_at(i) {
+                (did, path) => (did.to_string(), Some(path.to_string())),
+            },
+            None => (before_query.to_string(), None),
+        };
+        Ok(Self { did, path, query })
+    }
+}
 impl FromStr for RelativeDIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
@@ -536,6 +632,19 @@ impl fmt::Display for RelativeDIDURLPath {
     }
 }
 
+impl fmt::Display for PrimaryDIDURL {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.did)?;
+        if let Some(ref path) = self.path {
+            write!(f, "{}", path)?;
+        }
+        if let Some(ref query) = self.query {
+            write!(f, "?{}", query)?;
+        }
+        Ok(())
+    }
+}
+
 /// needed for #[serde(try_from = "String")]
 impl TryFrom<String> for DIDURL {
     type Error = Error;
@@ -548,6 +657,32 @@ impl TryFrom<String> for DIDURL {
 impl From<DIDURL> for String {
     fn from(didurl: DIDURL) -> String {
         format!("{}", didurl)
+    }
+}
+
+impl From<PrimaryDIDURL> for DIDURL {
+    fn from(primary: PrimaryDIDURL) -> DIDURL {
+        DIDURL {
+            did: primary.did,
+            path_abempty: primary.path.unwrap_or_default(),
+            query: primary.query,
+            fragment: None,
+        }
+    }
+}
+
+/// needed for #[serde(into = "String")]
+impl From<PrimaryDIDURL> for String {
+    fn from(didurl: PrimaryDIDURL) -> String {
+        format!("{}", didurl)
+    }
+}
+
+/// needed for #[serde(try_from = "String")]
+impl TryFrom<String> for PrimaryDIDURL {
+    type Error = Error;
+    fn try_from(didurl: String) -> Result<Self, Self::Error> {
+        PrimaryDIDURL::from_str(&didurl)
     }
 }
 
@@ -783,6 +918,12 @@ pub mod example {
     const DOC_JSON_FOO: &'static str = include_str!("../tests/did-example-foo.json");
     const DOC_JSON_BAR: &'static str = include_str!("../tests/did-example-bar.json");
 
+    // For vc-test-suite
+    const DOC_JSON_TEST_ISSUER: &'static str =
+        include_str!("../tests/did-example-test-issuer.json");
+    const DOC_JSON_TEST_HOLDER: &'static str =
+        include_str!("../tests/did-example-test-holder.json");
+
     pub struct DIDExample;
 
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -812,6 +953,8 @@ pub mod example {
             let doc_str = match did {
                 "did:example:foo" => DOC_JSON_FOO,
                 "did:example:bar" => DOC_JSON_BAR,
+                "did:example:0xab" => DOC_JSON_TEST_ISSUER,
+                "did:example:ebfeb1f712ebc6f1c276e12ec21" => DOC_JSON_TEST_HOLDER,
                 _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
             };
             let doc: Document = match serde_json::from_str(doc_str) {
