@@ -14,67 +14,67 @@ use serde::{
 use zeroize::Zeroize;
 use std::fmt::Formatter;
 
-// This shows how the generators are created with nothing up my sleeve values
-// ```
-// const PREHASH: &'static [u8] = b"To be, or not to be- that is the question:
-// Whether 'tis nobler in the mind to suffer
-// The slings and arrows of outrageous fortune
-// Or to take arms against a sea of troubles,
-// And by opposing end them. To die- to sleep-
-// No more; and by a sleep to say we end
-// The heartache, and the thousand natural shocks
-// That flesh is heir to. 'Tis a consummation
-// Devoutly to be wish'd. To die- to sleep.
-// To sleep- perchance to dream: ay, there's the rub!
-// For in that sleep of death what dreams may come
-// When we have shuffled off this mortal coil,
-// Must give us pause. There's the respect
-// That makes calamity of so long life.
-// For who would bear the whips and scorns of time,
-// Th' oppressor's wrong, the proud man's contumely,
-// The pangs of despis'd love, the law's delay,
-// The insolence of office, and the spurns
-// That patient merit of th' unworthy takes,
-// When he himself might his quietus make
-// With a bare bodkin? Who would these fardels bear,
-// To grunt and sweat under a weary life,
-// But that the dread of something after death-
-// The undiscover'd country, from whose bourn
-// No traveller returns- puzzles the will,
-// And makes us rather bear those ills we have
-// Than fly to others that we know not of?
-// Thus conscience does make cowards of us all,
-// And thus the native hue of resolution
-// Is sicklied o'er with the pale cast of thought,
-// And enterprises of great pith and moment
-// With this regard their currents turn awry
-// And lose the name of action.- Soft you now!
-// The fair Ophelia!- Nymph, in thy orisons
-// Be all my sins rememb'red.";
-// const DST_G1: &'static [u8] = b"BLS12381G1_XMD:BLAKE2B_SSWU_RO_BLS_SIGNATURES:1_0_0";
-// const DST_G2: &'static [u8] = b"BLS12381G2_XMD:BLAKE2B_SSWU_RO_BLS_SIGNATURES:1_0_0";
-//
-// use pairing_plus::{
-//     bls12_381::{G1, G2},
-//     hash_to_field::{BaseFromRO, ExpandMsgXmd},
-//     hash_to_curve::HashToCurve,
-//     serdes::SerDes,
-//     CurveProjective,
-// };
-// fn main() {
-//     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
-//     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
-//
-//     let mut g1_bytes = Vec::new();
-//     let mut g2_bytes = Vec::new();
-//
-//     g1.serialize(&mut g1_bytes, true).unwrap();
-//     g2.serialize(&mut g2_bytes, true).unwrap();
-//
-//     assert_eq!(hex::encode(g1_bytes.as_slice()), "b9c9058e8a44b87014f98be4e1818db718f8b2d5101fc89e6983625f321f14b84d7cf6e155004987a215ee426df173c9");
-//     assert_eq!(hex::encode(g2_bytes.as_slice()), "a963de2adfb1163cf4bed24d708ce47432742d2080b2573ebe2e19a8698f60c541cec000fcb19783e9be73341356df5f1191cddec7c476d7742bcc421afc5d505e63373c627ea01fda04f0e40159d25bdd12f45a010d8580a78f6a7d262272f3");
-// }
-// ```
+/// This shows how the generators are created with nothing up my sleeve values
+/// ```
+/// const PREHASH: &'static [u8] = b"To be, or not to be- that is the question:
+/// Whether 'tis nobler in the mind to suffer
+/// The slings and arrows of outrageous fortune
+/// Or to take arms against a sea of troubles,
+/// And by opposing end them. To die- to sleep-
+/// No more; and by a sleep to say we end
+/// The heartache, and the thousand natural shocks
+/// That flesh is heir to. 'Tis a consummation
+/// Devoutly to be wish'd. To die- to sleep.
+/// To sleep- perchance to dream: ay, there's the rub!
+/// For in that sleep of death what dreams may come
+/// When we have shuffled off this mortal coil,
+/// Must give us pause. There's the respect
+/// That makes calamity of so long life.
+/// For who would bear the whips and scorns of time,
+/// Th' oppressor's wrong, the proud man's contumely,
+/// The pangs of despis'd love, the law's delay,
+/// The insolence of office, and the spurns
+/// That patient merit of th' unworthy takes,
+/// When he himself might his quietus make
+/// With a bare bodkin? Who would these fardels bear,
+/// To grunt and sweat under a weary life,
+/// But that the dread of something after death-
+/// The undiscover'd country, from whose bourn
+/// No traveller returns- puzzles the will,
+/// And makes us rather bear those ills we have
+/// Than fly to others that we know not of?
+/// Thus conscience does make cowards of us all,
+/// And thus the native hue of resolution
+/// Is sicklied o'er with the pale cast of thought,
+/// And enterprises of great pith and moment
+/// With this regard their currents turn awry
+/// And lose the name of action.- Soft you now!
+/// The fair Ophelia!- Nymph, in thy orisons
+/// Be all my sins rememb'red.";
+/// const DST_G1: &'static [u8] = b"BLS12381G1_XMD:BLAKE2B_SSWU_RO_BLS_SIGNATURES:1_0_0";
+/// const DST_G2: &'static [u8] = b"BLS12381G2_XMD:BLAKE2B_SSWU_RO_BLS_SIGNATURES:1_0_0";
+///
+/// use pairing_plus::{
+///     bls12_381::{G1, G2},
+///     hash_to_field::{BaseFromRO, ExpandMsgXmd},
+///     hash_to_curve::HashToCurve,
+///     serdes::SerDes,
+///     CurveProjective,
+/// };
+/// fn main() {
+///     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
+///     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
+///
+///     let mut g1_bytes = Vec::new();
+///     let mut g2_bytes = Vec::new();
+///
+///     g1.serialize(&mut g1_bytes, true).unwrap();
+///     g2.serialize(&mut g2_bytes, true).unwrap();
+///
+///     assert_eq!(hex::encode(g1_bytes.as_slice()), "b9c9058e8a44b87014f98be4e1818db718f8b2d5101fc89e6983625f321f14b84d7cf6e155004987a215ee426df173c9");
+///     assert_eq!(hex::encode(g2_bytes.as_slice()), "a963de2adfb1163cf4bed24d708ce47432742d2080b2573ebe2e19a8698f60c541cec000fcb19783e9be73341356df5f1191cddec7c476d7742bcc421afc5d505e63373c627ea01fda04f0e40159d25bdd12f45a010d8580a78f6a7d262272f3");
+/// }
+/// ```
 
 const BLINDING_G1: &'static [u8] = &[
     185, 201, 5, 142, 138, 68, 184, 112, 20, 249, 139, 228, 225, 129, 141, 183, 24, 248, 178, 213,
