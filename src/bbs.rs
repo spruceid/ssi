@@ -71,17 +71,17 @@ use std::fmt::Formatter;
 ///     g1.serialize(&mut g1_bytes, true).unwrap();
 ///     g2.serialize(&mut g2_bytes, true).unwrap();
 ///
-///     assert_eq!(hex::encode(g1_bytes.as_slice()), "b9c9058e8a44b87014f98be4e1818db718f8b2d5101fc89e6983625f321f14b84d7cf6e155004987a215ee426df173c9");
-///     assert_eq!(hex::encode(g2_bytes.as_slice()), "a963de2adfb1163cf4bed24d708ce47432742d2080b2573ebe2e19a8698f60c541cec000fcb19783e9be73341356df5f1191cddec7c476d7742bcc421afc5d505e63373c627ea01fda04f0e40159d25bdd12f45a010d8580a78f6a7d262272f3");
+///     assert_eq!(g1_bytes.as_slice(), ssi::bbs::BLINDING_G1);
+///     assert_eq!(g2_bytes.as_slice(), ssi::bbs::BLINDING_G2);
 /// }
 /// ```
 
-const BLINDING_G1: &'static [u8] = &[
+pub const BLINDING_G1: &'static [u8] = &[
     185, 201, 5, 142, 138, 68, 184, 112, 20, 249, 139, 228, 225, 129, 141, 183, 24, 248, 178, 213,
     16, 31, 200, 158, 105, 131, 98, 95, 50, 31, 20, 184, 77, 124, 246, 225, 85, 0, 73, 135, 162,
     21, 238, 66, 109, 241, 115, 201,
 ];
-const BLINDING_G2: &'static [u8] = &[
+pub const BLINDING_G2: &'static [u8] = &[
     169, 99, 222, 42, 223, 177, 22, 60, 244, 190, 210, 77, 112, 140, 228, 116, 50, 116, 45, 32,
     128, 178, 87, 62, 190, 46, 25, 168, 105, 143, 96, 197, 65, 206, 192, 0, 252, 177, 151, 131,
     233, 190, 115, 52, 19, 86, 223, 95, 17, 145, 205, 222, 199, 196, 118, 215, 116, 43, 204, 66,
