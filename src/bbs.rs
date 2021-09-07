@@ -15,6 +15,7 @@ use zeroize::Zeroize;
 use std::fmt::Formatter;
 
 // This shows how the generators are created with nothing up my sleeve values
+// ```
 // const PREHASH: &'static [u8] = b"To be, or not to be- that is the question:
 // Whether 'tis nobler in the mind to suffer
 // The slings and arrows of outrageous fortune
@@ -53,6 +54,13 @@ use std::fmt::Formatter;
 // const DST_G1: &'static [u8] = b"BLS12381G1_XMD:BLAKE2B_SSWU_RO_BLS_SIGNATURES:1_0_0";
 // const DST_G2: &'static [u8] = b"BLS12381G2_XMD:BLAKE2B_SSWU_RO_BLS_SIGNATURES:1_0_0";
 //
+// use pairing_plus::{
+//     bls12_381::{G1, G2},
+//     hash_to_field::{BaseFromRO, ExpandMsgXmd},
+//     hash_to_curve::HashToCurve,
+//     serdes::SerDes,
+//     CurveProjective,
+// };
 // fn main() {
 //     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
 //     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
@@ -63,11 +71,10 @@ use std::fmt::Formatter;
 //     g1.serialize(&mut g1_bytes, true).unwrap();
 //     g2.serialize(&mut g2_bytes, true).unwrap();
 //
-//     println!("g1 = {}", hex::encode(g1_bytes.as_slice()));
-//     println!("g2 = {}", hex::encode(g2_bytes.as_slice()));
+//     assert_eq!(hex::encode(g1_bytes.as_slice()), "b9c9058e8a44b87014f98be4e1818db718f8b2d5101fc89e6983625f321f14b84d7cf6e155004987a215ee426df173c9");
+//     assert_eq!(hex::encode(g2_bytes.as_slice()), "a963de2adfb1163cf4bed24d708ce47432742d2080b2573ebe2e19a8698f60c541cec000fcb19783e9be73341356df5f1191cddec7c476d7742bcc421afc5d505e63373c627ea01fda04f0e40159d25bdd12f45a010d8580a78f6a7d262272f3");
 // }
-// g1 = b9c9058e8a44b87014f98be4e1818db718f8b2d5101fc89e6983625f321f14b84d7cf6e155004987a215ee426df173c9
-// g2 = a963de2adfb1163cf4bed24d708ce47432742d2080b2573ebe2e19a8698f60c541cec000fcb19783e9be73341356df5f1191cddec7c476d7742bcc421afc5d505e63373c627ea01fda04f0e40159d25bdd12f45a010d8580a78f6a7d262272f3
+// ```
 
 const BLINDING_G1: &'static [u8] = &[
     185, 201, 5, 142, 138, 68, 184, 112, 20, 249, 139, 228, 225, 129, 141, 183, 24, 248, 178, 213,
