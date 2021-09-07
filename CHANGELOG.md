@@ -5,6 +5,73 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Add `PrimaryDIDURL` type.
+- Add `EthereumEip712Signature2021` v1 context.
+- Add `VerificationMethodMap::get_id` function.
+- Implement converting JWK to Tezos format.
+- Add `did:pkh:poly:`.
+- Use `vc-test-suite` example keys and DIDs.
+- Add Revocation List 2020 JSON-LD context file.
+- Implement `PS256` JWS algorithm.
+- Work-in-progress ZCap invocation methods
+- Implement `FromStr` for `URI`.
+- Support `publicKeyJwk` in `EthereumEip712Signature2021`.
+- Add DID Test Suite implementation generator.
+- Implement `JcsTezosSignature2021`.
+- Implement `EthereumPersonalSignature2021`.
+- Implement `EthereumEip712Signature2021`.
+- Enable `Eip712Signature2021` with `did:pkh`.
+- Allow using `Eip712Signature2021` with normal VM types.
+- Implement `did:webkey:`
+- Implement SSH key parsing.
+- Implement JWK Thumbprint.
+- Add `User-Agent` header in requests.
+- Add `ES256K` to algorithm mistmatch handling.
+- Use custom internal JWK algorithms for Tezos signing.
+- Allow returning warnings from proof verification.
+- Use `MissingFeatures` error in proof type selection.
+- Add `Proof::with_options` for proof params.
+
+### Changed
+- Use PrimaryDIDURL in dereference trait method.
+- Pass resolver option in issue/prepare functions.
+- Update `blockchainAccountId` for new CAIP-10.
+- Default to `PS256` for RSA signing.
+- Use compressed `P-256` in `did:key`.
+- Disallow untyped properties in EIP-712 messages.
+- Update picking proof suite for tz.
+- Update DID resolution error handling and content-type handling.
+- Add arbitrary property set in LDP options to be included in Proof.
+
+### Deprecated
+- Deprecate using `key_ops` to select proof type.
+
+### Removed
+- Remove timestamp from generative DID methods.
+
+### Fixed
+- Catch double fragment in service endpoint URL.
+- Improve JWK/VM comparison.
+- Fix Tezos CAIP-2 chain IDs.
+- Fix converting RSA JWK to public.
+- Fix `did:example:foo` and `did:example:bar`.
+- Update W3C Software and Document Short Notice.
+- Handle eth signatures with recovery ID starting at 0.
+- Only match VM URI for specific DID methods.
+- Allow time zone offsets other than "Z" in VCs.
+- Improve `did:pkh` documentation and chain id handling.
+- Set `contentType` when returning URL in dereference.
+- Fix WASM tests.
+- Fix on-chain resolution in `did-tezos`.
+- Fix WASM async trait compilation.
+- Improve JWT support.
+- Canonicalize negative zero.
+
+### Security
+- Validate linked data proof object RDF consistency.
+- Check key size for RSA JWS
+- Validate key and algorithm for `JsonWebSignature2020`.
 
 ## [0.2.2] - 2021-05-26
 ### Added
