@@ -6,13 +6,13 @@ use pairing_plus::{
     CurveProjective,
 };
 use rand_old::prelude::*;
-use serde::de::Error;
 use serde::{
-    de::{Error as DError, SeqAccess, Unexpected, Visitor},
+    de::{SeqAccess, Visitor},
     ser::SerializeTuple,
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use zeroize::Zeroize;
+use std::fmt::Formatter;
 
 // This shows how the generators are created with nothing up my sleeve values
 // const PREHASH: &'static [u8] = b"To be, or not to be- that is the question:
@@ -120,11 +120,33 @@ impl Serialize for BlsSecretKey {
 }
 
 impl<'de> Deserialize<'de> for BlsSecretKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, dyn DError>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
+        struct SecretKeyVisitor;
+
+        impl<'de> Visitor<'de> for SecretKeyVisitor {
+            type Value = BlsSecretKey;
+
+            fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+                write!(formatter, "a byte sequence")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                let mut arr = [0u8; 32];
+                for i in 0..arr.len() {
+                    arr[i] = seq.next_element()?.ok_or_else(|| serde::de::Error::invalid_length(i, &self))?;
+                }
+                let mut cursor = std::io::Cursor::new(arr);
+                let value = Fr::deserialize(&mut cursor, true).map_err(|_| serde::de::Error::invalid_value(serde::de::Unexpected::Bytes(&arr), &self))?;
+                Ok(BlsSecretKey(value))
+            }
+        }
+
+        deserializer.deserialize_tuple(32, SecretKeyVisitor)
     }
+
 }
 
 /// Generate a blinded BLS key pair where secret key `x` and blinding factor `r` in Fr
@@ -191,7 +213,7 @@ impl From<BlsSecretKey> for SecretKey {
 impl BlsSecretKey {
     pub fn to_bbs_public_key(&self, message_count: usize) -> PublicKey {
         let mut g2 = G2::one();
-        g2.mul_assign(&sk.0);
+        g2.mul_assign(self.0);
         let dpk = DeterministicPublicKey::from(g2);
         dpk.to_public_key(message_count).unwrap()
     }
