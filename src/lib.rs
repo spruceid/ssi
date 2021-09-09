@@ -1,6 +1,7 @@
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;
+pub mod caip2;
 pub mod der;
 pub mod did;
 pub mod did_resolve;

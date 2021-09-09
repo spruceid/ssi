@@ -1,4 +1,5 @@
 use crate::blakesig;
+use crate::caip2::{ChainId, ChainIdParseError};
 use crate::jwk::{Params, JWK};
 use std::fmt;
 use std::str::FromStr;
@@ -9,7 +10,7 @@ use thiserror::Error;
 #[derive(Clone, PartialEq, Hash, Debug)]
 pub struct BlockchainAccountId {
     pub account_address: String,
-    pub chain_id: String,
+    pub chain_id: ChainId,
 }
 
 #[derive(Error, Debug)]
@@ -41,28 +42,31 @@ fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
 impl BlockchainAccountId {
     /// Check that a given JWK corresponds to this account id
     pub fn verify(&self, jwk: &JWK) -> Result<(), BlockchainAccountIdVerifyError> {
-        let hash = match self.chain_id.split(':').collect::<Vec<&str>>().as_slice() {
-            ["tezos", _net] => blakesig::hash_public_key(&jwk)
+        let hash = match (
+            self.chain_id.namespace.as_str(),
+            self.chain_id.reference.as_str(),
+        ) {
+            ("tezos", _net) => blakesig::hash_public_key(&jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             #[cfg(feature = "keccak-hash")]
-            ["eip155", _net] => crate::keccak_hash::hash_public_key(&jwk)
+            ("eip155", _net) => crate::keccak_hash::hash_public_key(&jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
-            ["solana"] => encode_ed25519(&jwk)
+            ("solana", _net) => encode_ed25519(&jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             // Bitcoin
             #[cfg(feature = "ripemd160")]
-            ["bip122", "000000000019d6689c085ae165831e93"] => {
+            ("bip122", "000000000019d6689c085ae165831e93") => {
                 crate::ripemd::hash_public_key(&jwk, 0x00)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             // Dogecoin
             #[cfg(feature = "ripemd160")]
-            ["bip122", "1a91e3dace36e2be3bf030a65679fe82"] => {
+            ("bip122", "1a91e3dace36e2be3bf030a65679fe82") => {
                 crate::ripemd::hash_public_key(&jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
-                self.chain_id.clone(),
+                self.chain_id.to_string(),
             )),
         }?;
         if hash != self.account_address {
@@ -87,6 +91,8 @@ pub enum BlockchainAccountIdParseError {
     ChainLength(usize),
     #[error("Missing separator between chain id and account address")]
     MissingSeparator,
+    #[error("Chain id: {0}")]
+    ChainId(#[from] ChainIdParseError),
 }
 
 impl FromStr for BlockchainAccountId {
@@ -117,6 +123,7 @@ impl FromStr for BlockchainAccountId {
         if chain_len < CHAIN_ID_MIN_LENGTH || chain_len > CHAIN_ID_MAX_LENGTH {
             return Err(BlockchainAccountIdParseError::ChainLength(chain_len));
         }
+        let chain_id = ChainId::from_str(&chain_id)?;
         let address_len = account_address.len();
         if address_len < ACCOUNT_ADDRESS_MIN_LENGTH || address_len > ACCOUNT_ADDRESS_MAX_LENGTH {
             return Err(BlockchainAccountIdParseError::AddressLength(address_len));
@@ -130,18 +137,6 @@ impl FromStr for BlockchainAccountId {
                 | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {}
                 c => {
                     return Err(BlockchainAccountIdParseError::AddressChar(c));
-                }
-            }
-        }
-        for c in chain_id.chars() {
-            match c {
-                'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm'
-                | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z'
-                | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M'
-                | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
-                | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | ':' | '-' => {}
-                c => {
-                    return Err(BlockchainAccountIdParseError::ChainChar(c));
                 }
             }
         }

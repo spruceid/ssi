@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use ssi::caip10::BlockchainAccountId;
+use ssi::caip2::ChainId;
 use ssi::did::{
     Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
@@ -86,7 +87,10 @@ impl DIDResolver for DIDEthr {
 
         let blockchain_account_id = BlockchainAccountId {
             account_address: address,
-            chain_id: format!("eip155:{}", chain_id),
+            chain_id: ChainId {
+                namespace: "eip155".to_string(),
+                reference: chain_id.to_string(),
+            },
         };
         let vm_didurl = DIDURL {
             did: did.to_string(),

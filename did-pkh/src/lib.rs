@@ -4,6 +4,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 
 use ssi::caip10::BlockchainAccountId;
+use ssi::caip2::ChainId;
 use ssi::did::{
     Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
@@ -14,11 +15,11 @@ use ssi::did_resolve::{
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-4.md
-const CHAIN_ID_BITCOIN_MAINNET: &str = "bip122:000000000019d6689c085ae165831e93";
-const CHAIN_ID_DOGECOIN_MAINNET: &str = "bip122:1a91e3dace36e2be3bf030a65679fe82";
+const MAINNET_BITCOIN: &str = "000000000019d6689c085ae165831e93";
+const MAINNET_DOGECOIN: &str = "1a91e3dace36e2be3bf030a65679fe82";
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
-const CHAIN_ID_TEZOS_MAINNET: &str = "tezos:NetXdQprcVkpaWU";
+const MAINNET_TEZOS: &str = "NetXdQprcVkpaWU";
 
 /// did:pkh DID Method
 pub struct DIDPKH;
@@ -55,7 +56,10 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
     };
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: CHAIN_ID_TEZOS_MAINNET.to_string(),
+        chain_id: ChainId {
+            namespace: "tezos".to_string(),
+            reference: MAINNET_TEZOS.to_string(),
+        },
     };
     let mut context = BTreeMap::new();
     context.insert(
@@ -129,7 +133,10 @@ async fn resolve_eth(did: &str, account_address: String) -> ResolutionResult {
     );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: "eip155:1".to_string(),
+        chain_id: ChainId {
+            namespace: "eip155".to_string(),
+            reference: "1".to_string(),
+        },
     };
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -196,7 +203,10 @@ async fn resolve_celo(did: &str, account_address: String) -> ResolutionResult {
     );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: "eip155:42220".to_string(),
+        chain_id: ChainId {
+            namespace: "eip155".to_string(),
+            reference: "42220".to_string(),
+        },
     };
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -239,7 +249,10 @@ async fn resolve_poly(did: &str, account_address: String) -> ResolutionResult {
     );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: "eip155:137".to_string(),
+        chain_id: ChainId {
+            namespace: "eip155".to_string(),
+            reference: "137".to_string(),
+        },
     };
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -312,7 +325,10 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
     };
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: "solana".to_string(),
+        chain_id: ChainId {
+            namespace: "solana".to_string(),
+            reference: "".to_string(), // TODO: use CAIP-30
+        },
     };
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -366,7 +382,10 @@ async fn resolve_btc(did: &str, account_address: String) -> ResolutionResult {
     };
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: CHAIN_ID_BITCOIN_MAINNET.to_string(),
+        chain_id: ChainId {
+            namespace: "bip122".to_string(),
+            reference: MAINNET_BITCOIN.to_string(),
+        },
     };
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -418,7 +437,10 @@ async fn resolve_doge(did: &str, account_address: String) -> ResolutionResult {
     );
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: CHAIN_ID_DOGECOIN_MAINNET.to_string(),
+        chain_id: ChainId {
+            namespace: "bip122".to_string(),
+            reference: MAINNET_DOGECOIN.to_string(),
+        },
     };
     let vm_url = DIDURL {
         did: did.to_string(),
