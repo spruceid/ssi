@@ -4,7 +4,11 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 use async_trait::async_trait;
+use cached::{proc_macro::cached, TimedSizedCache};
 use chrono::prelude::*;
+
+const CACHE_SIZE: usize = 100; // number of items
+const CACHE_TTL: u64 = 60; // in seconds
 
 const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
@@ -356,6 +360,12 @@ pub async fn resolve_key(
 }
 
 /// Resolve a verificationMethod
+#[cached(
+    type = "TimedSizedCache<String, VerificationMethodMap>",
+    create = "{ TimedSizedCache::with_size_and_lifespan(CACHE_SIZE, CACHE_TTL) }",
+    convert = r#"{ format!("{}", verification_method) }"#,
+    result = true
+)]
 pub async fn resolve_vm(
     verification_method: &str,
     resolver: &dyn DIDResolver,
