@@ -217,12 +217,8 @@ async fn resolve_celo(did: &str, account_address: String) -> ResolutionResult {
         ]),
         id: did.to_string(),
         verification_method: Some(vec![vm]),
-        authentication: Some(vec![
-            VerificationMethod::DIDURL(vm_url.clone()),
-        ]),
-        assertion_method: Some(vec![
-            VerificationMethod::DIDURL(vm_url),
-        ]),
+        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
+        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
         ..Default::default()
     };
     resolution_result(doc)
@@ -264,12 +260,8 @@ async fn resolve_poly(did: &str, account_address: String) -> ResolutionResult {
         ]),
         id: did.to_string(),
         verification_method: Some(vec![vm]),
-        authentication: Some(vec![
-            VerificationMethod::DIDURL(vm_url.clone()),
-        ]),
-        assertion_method: Some(vec![
-            VerificationMethod::DIDURL(vm_url),
-        ]),
+        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
+        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
         ..Default::default()
     };
     resolution_result(doc)
