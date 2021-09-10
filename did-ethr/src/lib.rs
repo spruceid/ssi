@@ -20,15 +20,13 @@ use ssi::did_resolve::{
 pub struct DIDEthr;
 
 fn parse_did(did: &str) -> Option<(i64, String)> {
-    let (network, address) = match did.split(':').collect::<Vec<&str>>().as_slice() {
-        ["did", "ethr", address] => ("mainnet".to_string(), address.to_string()),
-        ["did", "ethr", network, address] => (network.to_string(), address.to_string()),
+    // https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#method-specific-identifier
+    let (network, addr_or_pk) = match did.split(':').collect::<Vec<&str>>().as_slice() {
+        ["did", "ethr", addr_or_pk] => ("mainnet".to_string(), addr_or_pk.to_string()),
+        ["did", "ethr", network, addr_or_pk] => (network.to_string(), addr_or_pk.to_string()),
         _ => return None,
     };
-    if address.len() != 42 {
-        return None;
-    }
-    let chain_id = match &network[..] {
+    let network_chain_id = match &network[..] {
         "mainnet" => 1,
         "morden" => 2,
         "ropsten" => 3,
@@ -45,7 +43,135 @@ fn parse_did(did: &str) -> Option<(i64, String)> {
             return None;
         }
     };
-    Some((chain_id, address))
+    Some((network_chain_id, addr_or_pk))
+}
+
+/// Resolve an Ethr DID that uses a public key hex string instead of an account address
+fn resolve_pk(
+    did: &str,
+    chain_id: i64,
+    public_key_hex: &str,
+) -> (
+    ResolutionMetadata,
+    Option<Document>,
+    Option<DocumentMetadata>,
+) {
+    let mut context = BTreeMap::new();
+    context.insert(
+        "blockchainAccountId".to_string(),
+        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
+    );
+    context.insert(
+        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+    );
+    context.insert(
+        "EcdsaSecp256k1VerificationKey2019".to_string(),
+        Value::String("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019".to_string()),
+    );
+    context.insert(
+        "publicKeyJwk".to_string(),
+        serde_json::json!({
+            "@id": "https://w3id.org/security#publicKeyJwk",
+            "@type": "@json"
+        }),
+    );
+    if !public_key_hex.starts_with("0x") {
+        return (
+            ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+            None,
+            None,
+        );
+    };
+    let pk_bytes = match hex::decode(&public_key_hex[2..]) {
+        Ok(pk_bytes) => pk_bytes,
+        Err(_) => {
+            return (
+                ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                None,
+                None,
+            )
+        }
+    };
+
+    let pk_jwk = match ssi::jwk::secp256k1_parse(&pk_bytes) {
+        Ok(pk_bytes) => pk_bytes,
+        Err(e) => {
+            return (
+                ResolutionMetadata::from_error(&format!("Unable to parse key: {}", e)),
+                None,
+                None,
+            );
+        }
+    };
+    let account_address = match ssi::keccak_hash::hash_public_key(&pk_jwk) {
+        Ok(hash) => hash,
+        Err(e) => {
+            return (
+                ResolutionMetadata::from_error(&format!("Unable to hash account address: {}", e)),
+                None,
+                None,
+            )
+        }
+    };
+    let blockchain_account_id = BlockchainAccountId {
+        account_address,
+        chain_id: ChainId {
+            namespace: "eip155".to_string(),
+            reference: chain_id.to_string(),
+        },
+    };
+    let vm_didurl = DIDURL {
+        did: did.to_string(),
+        fragment: Some("controller".to_string()),
+        ..Default::default()
+    };
+    let key_vm_didurl = DIDURL {
+        did: did.to_string(),
+        fragment: Some("controllerKey".to_string()),
+        ..Default::default()
+    };
+    let vm = VerificationMethod::Map(VerificationMethodMap {
+        id: vm_didurl.to_string(),
+        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        controller: did.to_string(),
+        blockchain_account_id: Some(blockchain_account_id.to_string()),
+        ..Default::default()
+    });
+    let key_vm = VerificationMethod::Map(VerificationMethodMap {
+        id: key_vm_didurl.to_string(),
+        type_: "EcdsaSecp256k1VerificationKey2019".to_string(),
+        controller: did.to_string(),
+        public_key_jwk: Some(pk_jwk),
+        ..Default::default()
+    });
+
+    let doc = Document {
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::Object(context),
+        ]),
+        id: did.to_string(),
+        authentication: Some(vec![
+            VerificationMethod::DIDURL(vm_didurl.clone()),
+            VerificationMethod::DIDURL(key_vm_didurl.clone()),
+        ]),
+        assertion_method: Some(vec![
+            VerificationMethod::DIDURL(vm_didurl.clone()),
+            VerificationMethod::DIDURL(key_vm_didurl.clone()),
+        ]),
+        verification_method: Some(vec![vm, key_vm]),
+        ..Default::default()
+    };
+
+    let res_meta = ResolutionMetadata {
+        content_type: Some(TYPE_DID_LD_JSON.to_string()),
+        ..Default::default()
+    };
+    let doc_meta = DocumentMetadata {
+        ..Default::default()
+    };
+    (res_meta, Some(doc), Some(doc_meta))
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -60,9 +186,20 @@ impl DIDResolver for DIDEthr {
         Option<Document>,
         Option<DocumentMetadata>,
     ) {
-        let (chain_id, address) = match parse_did(did) {
+        let (chain_id, addr_or_pk) = match parse_did(did) {
             Some(parsed) => parsed,
             None => {
+                return (
+                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    None,
+                    None,
+                )
+            }
+        };
+        let account_address = match addr_or_pk.len() {
+            42 => addr_or_pk,
+            68 => return resolve_pk(did, chain_id, &addr_or_pk),
+            _ => {
                 return (
                     ResolutionMetadata::from_error(&ERROR_INVALID_DID),
                     None,
@@ -86,7 +223,7 @@ impl DIDResolver for DIDEthr {
         );
 
         let blockchain_account_id = BlockchainAccountId {
-            account_address: address,
+            account_address,
             chain_id: ChainId {
                 namespace: "eip155".to_string(),
                 reference: chain_id.to_string(),
@@ -247,6 +384,25 @@ mod tests {
                 "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021"
               ]
             })
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_did_ethr_pk() {
+        let (res_meta, doc_opt, _meta_opt) = DIDEthr
+            .resolve(
+                "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479",
+                &ResolutionInputMetadata::default(),
+            )
+            .await;
+        assert_eq!(res_meta.error, None);
+        let doc = doc_opt.unwrap();
+        eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
+        let doc_expected: Value =
+            serde_json::from_str(include_str!("../tests/did-pk.jsonld")).unwrap();
+        assert_eq!(
+            serde_json::to_value(doc).unwrap(),
+            serde_json::to_value(doc_expected).unwrap()
         );
     }
 

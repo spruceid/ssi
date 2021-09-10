@@ -1,0 +1,42 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
+      "EcdsaSecp256k1VerificationKey2019": "https://w3id.org/security#EcdsaSecp256k1VerificationKey2019",
+      "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479",
+  "verificationMethod": [
+    {
+      "id": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controller",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "controller": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479",
+      "blockchainAccountId": "eip155:1:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+    },
+    {
+      "id": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controllerKey",
+      "type": "EcdsaSecp256k1VerificationKey2019",
+      "controller": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479",
+      "publicKeyJwk": {
+        "kty": "EC",
+        "crv": "secp256k1",
+        "x": "_dV63sPUOOojf-RrM-4eAW7aa1hcPifqZmhsLqU1hHk",
+        "y": "Rjk_gUUlLupor-Z-KHs-2bMWhbpsOwAGCnO5sSQtaPc"
+      }
+    }
+  ],
+  "authentication": [
+    "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controller",
+    "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controllerKey"
+  ],
+  "assertionMethod": [
+    "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controller",
+    "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controllerKey"
+  ]
+}
