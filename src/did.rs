@@ -475,12 +475,20 @@ impl VerificationMethodMap {
             (None, Some(pk_bs58)) => {
                 let pk_bytes = bs58::decode(&pk_bs58).into_vec()?;
                 let params = match &self.type_[..] {
+                    // TODO: check against IRIs when in JSON-LD
                     "Ed25519VerificationKey2018" => {
                         crate::jwk::Params::OKP(crate::jwk::OctetParams {
                             curve: "Ed25519".to_string(),
                             public_key: crate::jwk::Base64urlUInt(pk_bytes),
                             private_key: None,
                         })
+                    }
+                    #[cfg(feature = "k256")]
+                    "EcdsaSecp256k1VerificationKey2019" => {
+                        use crate::jwk::secp256k1_parse;
+                        return Ok(
+                            secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?
+                        );
                     }
                     _ => return Err(Error::UnsupportedKeyType),
                 };
