@@ -1,4 +1,3 @@
-![didkit-core-components-645bb0992bdef492c3bdae3e540166a7](https://user-images.githubusercontent.com/37127325/132885344-2134730f-1207-4d30-a8f7-5c5922c3f25c.png)
 [![](https://img.shields.io/github/workflow/status/spruceid/ssi/ci)](https://github.com/spruceid/ssi/actions?query=workflow%3Aci+branch%3Amain) [![](https://img.shields.io/badge/Rust-v1.51.0-orange)](https://www.rust-lang.org/) [![](https://img.shields.io/badge/License-Apache--2.0-green)](https://github.com/spruceid/didkit/blob/main/LICENSE) [![](https://img.shields.io/twitter/follow/sprucesystems?label=Follow&style=social)](https://twitter.com/sprucesystems) 
 
 SSI's documentation is currently packaged with the DIDKit documentation
