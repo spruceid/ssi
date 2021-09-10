@@ -467,41 +467,52 @@ impl VerificationMethodMap {
     /// Get the verification material as a JWK, from the publicKeyJwk property, or converting from other
     /// public key properties as needed.
     pub fn get_jwk(&self) -> Result<JWK, Error> {
-        match (
+        let pk_hex_value = self
+            .property_set
+            .as_ref()
+            .and_then(|cc| cc.get("publicKeyHex"));
+        let pk_bytes = match (
             self.public_key_jwk.as_ref(),
             self.public_key_base58.as_ref(),
+            pk_hex_value,
         ) {
-            (Some(pk_jwk), None) => Ok(pk_jwk.clone()),
-            (None, Some(pk_bs58)) => {
-                let pk_bytes = bs58::decode(&pk_bs58).into_vec()?;
-                let params = match &self.type_[..] {
-                    // TODO: check against IRIs when in JSON-LD
-                    "Ed25519VerificationKey2018" => {
-                        crate::jwk::Params::OKP(crate::jwk::OctetParams {
-                            curve: "Ed25519".to_string(),
-                            public_key: crate::jwk::Base64urlUInt(pk_bytes),
-                            private_key: None,
-                        })
-                    }
-                    #[cfg(feature = "k256")]
-                    "EcdsaSecp256k1VerificationKey2019" => {
-                        use crate::jwk::secp256k1_parse;
-                        return Ok(
-                            secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?
-                        );
-                    }
-                    _ => return Err(Error::UnsupportedKeyType),
+            (Some(pk_jwk), None, None) => return Ok(pk_jwk.clone()),
+            (None, Some(pk_bs58), None) => bs58::decode(&pk_bs58).into_vec()?,
+            (None, None, Some(pk_hex)) => {
+                let pk_hex = match pk_hex {
+                    Value::String(string) => string,
+                    _ => Err(Error::HexString)?,
                 };
-                Ok(JWK::from(params))
+                let pk_hex = if pk_hex.starts_with("0x") {
+                    &pk_hex[2..]
+                } else {
+                    &pk_hex
+                };
+                hex::decode(pk_hex)?
             }
-            (None, None) => Err(Error::MissingKey),
+            (None, None, None) => Err(Error::MissingKey)?,
             _ => {
                 // https://w3c.github.io/did-core/#verification-material
                 // "expressing key material in a verification method using both publicKeyJwk and
                 // publicKeyBase58 at the same time is prohibited."
                 return Err(Error::MultipleKeyMaterial);
             }
-        }
+        };
+        let params = match &self.type_[..] {
+            // TODO: check against IRIs when in JSON-LD
+            "Ed25519VerificationKey2018" => crate::jwk::Params::OKP(crate::jwk::OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: crate::jwk::Base64urlUInt(pk_bytes),
+                private_key: None,
+            }),
+            #[cfg(feature = "k256")]
+            "EcdsaSecp256k1VerificationKey2019" => {
+                use crate::jwk::secp256k1_parse;
+                return Ok(secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?);
+            }
+            _ => return Err(Error::UnsupportedKeyType),
+        };
+        Ok(JWK::from(params))
     }
 
     /// Verify that a given JWK can be used to satisfy this verification method.
@@ -1114,6 +1125,23 @@ mod tests {
             type_: String::from("Ed25519VerificationKey2018"),
             controller: String::from("did:example:foo"),
             public_key_base58: Some("2sXRz2VfrpySNEL6xmXJWQg6iY94qwNp1qrJJFBuPWmH".to_string()),
+            ..Default::default()
+        };
+        let jwk = vmm_ed.get_jwk().unwrap();
+        assert_eq!(jwk, pk_jwk);
+    }
+
+    #[cfg(feature = "k256")]
+    fn vmm_hex_to_jwk() {
+        // publicKeyHex (deprecated) -> JWK
+        const JWK: &'static str = include_str!("../tests/secp256k1-2021-02-17.json");
+        let jwk: JWK = serde_json::from_str(JWK).unwrap();
+        let pk_jwk = jwk.to_public();
+        let vmm_ed = VerificationMethodMap {
+            id: String::from("did:example:deprecated#lds-ecdsa-secp256k1-2019-pkhex"),
+            type_: String::from("EcdsaSecp256k1VerificationKey2019"),
+            controller: String::from("did:example:deprecated"),
+            public_key_jwk: Some(pk_jwk.clone()),
             ..Default::default()
         };
         let jwk = vmm_ed.get_jwk().unwrap();
