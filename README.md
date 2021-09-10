@@ -1,3 +1,4 @@
+![didkit-core-components-645bb0992bdef492c3bdae3e540166a7](https://user-images.githubusercontent.com/37127325/132885344-2134730f-1207-4d30-a8f7-5c5922c3f25c.png)
 [![](https://img.shields.io/github/workflow/status/spruceid/ssi/ci)](https://github.com/spruceid/ssi/actions?query=workflow%3Aci+branch%3Amain) [![](https://img.shields.io/badge/Rust-v1.51.0-orange)](https://www.rust-lang.org/) [![](https://img.shields.io/badge/License-Apache--2.0-green)](https://github.com/spruceid/didkit/blob/main/LICENSE) [![](https://img.shields.io/twitter/follow/sprucesystems?label=Follow&style=social)](https://twitter.com/sprucesystems) 
 
 SSI's documentation is currently packaged with the DIDKit documentation
@@ -11,7 +12,7 @@ safety, simple dependency web, and suitability across different platforms
 including embedded systems. This library is embedded in the the cross-platform
 [`didkit`](https://github.com/spruceid/didkit) library as a core dependency.
 
-![DIDKit core components](https://spruceid.dev/assets/images/didkit-core-components-7abba2778ffe8dde24997f305e706bd8.png)
+![DIDKit core components](https://user-images.githubusercontent.com/37127325/132885372-9cdf586e-ba6f-44c8-8b83-f72f16d86107.png)
 
 ## Maturity Disclaimer
 In the v0.1 release on January 27th, 2021, SSI has not yet undergone a
