@@ -1077,4 +1077,38 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(doc.id, id);
     }
+
+    #[test]
+    fn vmm_to_jwk() {
+        // Identity: publicKeyJWK -> JWK
+        const JWK: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
+        let jwk: JWK = serde_json::from_str(JWK).unwrap();
+        let pk_jwk = jwk.to_public();
+        let vmm_ed = VerificationMethodMap {
+            id: String::from("did:example:foo#key2"),
+            type_: String::from("Ed25519VerificationKey2018"),
+            controller: String::from("did:example:foo"),
+            public_key_jwk: Some(pk_jwk.clone()),
+            ..Default::default()
+        };
+        let jwk = vmm_ed.get_jwk().unwrap();
+        assert_eq!(jwk, pk_jwk);
+    }
+
+    #[test]
+    fn vmm_bs58_to_jwk() {
+        // publicKeyBase58 (deprecated) -> JWK
+        const JWK: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
+        let jwk: JWK = serde_json::from_str(JWK).unwrap();
+        let pk_jwk = jwk.to_public();
+        let vmm_ed = VerificationMethodMap {
+            id: String::from("did:example:foo#key3"),
+            type_: String::from("Ed25519VerificationKey2018"),
+            controller: String::from("did:example:foo"),
+            public_key_base58: Some("2sXRz2VfrpySNEL6xmXJWQg6iY94qwNp1qrJJFBuPWmH".to_string()),
+            ..Default::default()
+        };
+        let jwk = vmm_ed.get_jwk().unwrap();
+        assert_eq!(jwk, pk_jwk);
+    }
 }
