@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement converting JWK to Tezos format.
 - Add `did:pkh:poly:`.
 - Use `vc-test-suite` example keys and DIDs.
-- Add Revocation List 2020 JSON-LD context file.
+- Implement Revocation List 2020 credential status checking.
 - Implement `PS256` JWS algorithm.
 - Work-in-progress ZCap invocation methods
 - Implement `FromStr` for `URI`.
@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow returning warnings from proof verification.
 - Use `MissingFeatures` error in proof type selection.
 - Add `Proof::with_options` for proof params.
+- Support `publicKeyHex` for `EcdsaSecp256k1VerificationKey2019`.
+- Resolve `did:key:zUC7` DIDs (`Bls12381G2`)
+- Add BBS+ types and functions.
 
 ### Changed
 - Use PrimaryDIDURL in dereference trait method.
@@ -53,7 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Catch double fragment in service endpoint URL.
 - Improve JWK/VM comparison.
-- Fix Tezos CAIP-2 chain IDs.
+- Use CAIP-26 for Tezos chain IDs.
+- Use CAIP-30 for Solana chain ids.
 - Fix converting RSA JWK to public.
 - Fix `did:example:foo` and `did:example:bar`.
 - Update W3C Software and Document Short Notice.
@@ -67,6 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix WASM async trait compilation.
 - Improve JWT support.
 - Canonicalize negative zero.
+- Support public key values in `did:ethr`.
 
 ### Security
 - Validate linked data proof object RDF consistency.
