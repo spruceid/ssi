@@ -15,6 +15,9 @@ use ssi::did_resolve::{
 };
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
+// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-30.md
+const REFERENCE_SOLANA_MAINNET: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
+
 /// did:sol DID Method
 pub struct DIDSol;
 
@@ -79,7 +82,7 @@ impl DIDResolver for DIDSol {
             account_address: address,
             chain_id: ChainId {
                 namespace: "solana".to_string(),
-                reference: "".to_string(), // TODO: use CAIP-30
+                reference: REFERENCE_SOLANA_MAINNET.to_string(),
             },
         };
         let vm_didurl = DIDURL {

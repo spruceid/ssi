@@ -63,10 +63,7 @@ impl FromStr for ChainId {
             return Err(ChainIdParseError::NamespaceTooShort);
         }
         if !separated {
-            // Allow use of deprecated/invalid pre-CAIP-30 Solana
-            if namespace != "solana" {
-                return Err(ChainIdParseError::MissingSeparator);
-            }
+            return Err(ChainIdParseError::MissingSeparator);
         }
 
         for c in chars {
@@ -97,10 +94,6 @@ impl FromStr for ChainId {
 
 impl fmt::Display for ChainId {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.namespace == "solana" && self.reference == "" {
-            // Special case for backwards-compatibility
-            return write!(f, "{}", self.namespace);
-        }
         write!(f, "{}:{}", self.namespace, self.reference)
     }
 }

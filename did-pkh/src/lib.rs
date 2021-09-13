@@ -21,6 +21,9 @@ const MAINNET_DOGECOIN: &str = "1a91e3dace36e2be3bf030a65679fe82";
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
 const MAINNET_TEZOS: &str = "NetXdQprcVkpaWU";
 
+// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-30.md
+const MAINNET_SOLANA: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
+
 /// did:pkh DID Method
 pub struct DIDPKH;
 
@@ -327,7 +330,7 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
         account_address,
         chain_id: ChainId {
             namespace: "solana".to_string(),
-            reference: "".to_string(), // TODO: use CAIP-30
+            reference: MAINNET_SOLANA.to_string(),
         },
     };
     let vm_url = DIDURL {
