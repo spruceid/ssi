@@ -1518,6 +1518,26 @@ where
         None => None,
     };
     let mut context: JsonContext = JsonContext::new(base);
+    let strict_prefix_opt = if !lax {
+        // Emulate strict mode: use a random vocab
+        // and then error if it appears in result.
+        use crate::json_ld::context::ContextMut;
+        use json_ld::syntax::Term;
+        use json_ld::Reference;
+        use rand_old::distributions::Alphanumeric;
+        use rand_old::Rng;
+        let rstr: String = rand_old::thread_rng()
+            .sample_iter(&Alphanumeric)
+            .take(32)
+            .collect();
+        let url = format!("https://{}.ssi.invalid/", &rstr);
+        let iri = IriBuf::new(&url).unwrap();
+        let id = Reference::Id(iri);
+        context.set_vocabulary(Some(Term::Ref(id)));
+        Some(url)
+    } else {
+        None
+    };
     if let Some(ref url) = options.expand_context {
         use json_ld::context::Loader;
         use json_ld::context::Local;
@@ -1551,7 +1571,6 @@ where
         doc_object.insert(AT_CONTEXT, JsonValue::Array(contexts_merged));
     }
     let mut expansion_options = json_ld::expansion::Options::from(options);
-    expansion_options.strict = !lax;
     expansion_options.ordered = false;
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = expanding.await?;
@@ -1577,6 +1596,25 @@ where
         Some(options),
         &mut blank_node_id_generator,
     )?;
+    if let Some(ref strict_prefix) = strict_prefix_opt {
+        // Error if random default prefix appears in output
+        for statement in dataset.statements().iter() {
+            let mut terms = vec![
+                String::from(&statement.subject),
+                String::from(&statement.predicate),
+                String::from(&statement.object),
+            ];
+            if let Some(ref graph_label) = statement.graph_label {
+                terms.push(String::from(graph_label));
+            };
+            for term in terms {
+                if term.contains(strict_prefix) {
+                    let term = term.replace(strict_prefix, "");
+                    return Err(Error::UnmappedTerm(term));
+                }
+            }
+        }
+    }
     Ok(dataset)
 }
 
