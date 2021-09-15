@@ -25,6 +25,7 @@ keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
 sha = ["sha2", "k256/sha256"]
 
 [dependencies]
+json-ld = "0.4"
 bbs = "0.4.1"
 pairing-plus = "0.19"
 ff = { version = "0.6", package = "ff-zeroize" }
@@ -49,7 +50,7 @@ async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
 json = "^0.12"
 futures = "0.3"
-iref = "1.4"
+iref = "^2.0.3"
 lazy_static = "1.4"
 combination = "0.1"
 sha2 = { version = "0.9", optional = true }
@@ -77,15 +78,6 @@ reqwest = { version = "0.11", features = ["json"] }
 flate2 = "1.0"
 bitvec = "0.20"
 
-# dependencies for json-ld
-log = "^0.4"
-mown = "^0.2"
-# json = "^0.12"
-#iref = "^1.4.3"
-#futures = "^0.3"
-once_cell = "^1.4"
-langtag = "^0.2"
-
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -112,9 +104,4 @@ members = [
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
 did-method-key = { path = "./did-key" }
-
-# dev-dependencies for json-ld
-static-iref = "^1.0"
-iref-enum = "^1.2"
-stderrlog = "^0.5"
 tokio = { version = "1.0", features = ["macros"] }

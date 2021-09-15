@@ -6,7 +6,6 @@ use crate::eip712::TypedDataConstructionError;
 use crate::eip712::TypedDataConstructionJSONError;
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedDataHashError;
-use crate::json_ld;
 use crate::tzkey::{DecodeTezosSignatureError, EncodeTezosSignedMessageError};
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ed25519-dalek")]

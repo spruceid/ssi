@@ -33,9 +33,6 @@ pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_P
 #[cfg(any(feature = "k256", feature = "p256"))]
 pub mod passthrough_digest;
 
-#[path = "../json-ld/src/lib.rs"]
-mod json_ld;
-
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
@@ -45,10 +42,6 @@ extern crate derive_builder;
 extern crate lazy_static;
 #[macro_use]
 extern crate json;
-
-// for json-ld:
-#[macro_use]
-extern crate log;
 
 #[derive(Parser)]
 #[grammar = "did.pest"]

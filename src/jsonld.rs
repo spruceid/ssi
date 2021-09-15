@@ -8,7 +8,6 @@ use crate::rdf::{
     Object, Predicate, StringLiteral, Subject, Triple, LANG_STRING_IRI_STR,
 };
 
-use crate::json_ld;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
@@ -1551,7 +1550,16 @@ where
         doc_object.insert(AT_CONTEXT, JsonValue::Array(contexts_merged));
     }
     let mut expansion_options = json_ld::expansion::Options::from(options);
-    expansion_options.strict = !lax;
+    use json_ld::expansion::Policy;
+    expansion_options.policy = if lax {
+        // RDF Deserialization tests expect standard behavior of dropping
+        // properties
+        Policy::Standard
+    } else {
+        // VC HTTP API Test Suite expect properties to not be silently dropped.
+        // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
+        Policy::Strict
+    };
     expansion_options.ordered = false;
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = expanding.await?;
@@ -1677,33 +1685,17 @@ mod tests {
                     continue;
                 }
             }
+            // Explanation of skipped tests:
+            // https://github.com/timothee-haudebourg/json-ld/issues/8#issuecomment-916490211
             let skip = match id {
                 "#tli12" => {
                     // "Tests list elements expanded to IRIs with a bad @base.",
-                    // But the JSON-LD Context Processing Algorithm says to error and aborts processing if @base is invalid. See step 5.7.5:
-                    // https://w3c.github.io/json-ld-api/#algorithm
-                    // Implemented in json-ld crate:
-                    // https://github.com/timothee-haudebourg/json-ld/blob/3d084e5d616eb350918948b3c551f5177b973e9b/src/context/processing.rs#L339
-                    true
-                }
-                "#te111" | "#te112" => {
-                    // Why is "#fragment-works": "#fragment-works" not allowed
-                    // but "?query=works": "?query=works" is?
+                    // Relevant issue: https://github.com/w3c/json-ld-api/issues/533
                     true
                 }
                 "#te122" => {
                     // "Processors SHOULD generate a warning and MUST ignore IRIs having the form of a keyword."
-                    // This test applies to expansion
-                    true
-                }
-                "#tc037" | "#tc038" => {
-                    // "Nesting terms may have property-scoped contexts defined."
-                    // Applies to expansion
-                    true
-                }
-                "#t0122" | "#t0123" | "#t0124" | "#t0125" => {
-                    // "IRI resolution according to RFC3986."
-                    // Applies to expansion and IRI resolution
+                    // Relevant issue: https://github.com/w3c/json-ld-api/issues/480
                     true
                 }
                 _ => false,

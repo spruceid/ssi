@@ -4,6 +4,3 @@
 [submodule "json-ld-normalization"]
 	path = json-ld-normalization
 	url = https://github.com/json-ld/rdf-dataset-canonicalization/
-[submodule "json-ld"]
-	path = json-ld
-	url = https://github.com/spruceid/json-ld
