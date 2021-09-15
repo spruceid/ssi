@@ -8,7 +8,7 @@ description = "did-test-suite test vector generator"
 publish = false
 
 [dependencies]
-ssi = { version = "0.2", path = "../" }
+ssi = { version = "0.3", path = "../" }
 did-method-key = { version = "0.1", path = "../../ssi/did-key", features = ["secp256k1", "secp256r1"] }
 did-tz = { version = "0.1", path = "../../ssi/did-tezos", default-features = false, features = ["secp256k1", "secp256r1"] }
 did-pkh = { version = "0.0.1", path = "../../ssi/did-pkh" }
