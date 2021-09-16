@@ -11,7 +11,7 @@ publish = false
 ssi = { version = "0.3", path = "../" }
 did-method-key = { version = "0.1", path = "../../ssi/did-key", features = ["secp256k1", "secp256r1"] }
 did-tz = { version = "0.1", path = "../../ssi/did-tezos", default-features = false, features = ["secp256k1", "secp256r1"] }
-did-pkh = { version = "0.0.1", path = "../../ssi/did-pkh" }
+did-pkh = { version = "0.1", path = "../../ssi/did-pkh" }
 did-sol = { version = "0.0.1", path = "../../ssi/did-sol" }
 did-web = { version = "0.1", path = "../../ssi/did-web" }
 did-webkey = { version = "0.1", path = "../../ssi/did-webkey", features = ["p256"] }
