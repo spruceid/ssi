@@ -1,0 +1,39 @@
+[package]
+authors = ["Michael Lodder <redmike7@gmail.com>"]
+categories = ["cryptography", "rsa"]
+description = "A Universal Cryptographic RSA Accumulator"
+documentation = "https://docs.rs/accumulator-rs"
+edition = "2018"
+license = "Apache-2.0"
+name = "rsa"
+readme = "README.md"
+repository = "https://github.com/spruceid/ssi"
+version = "0.1.0"
+
+[badges]
+maintenance = { status = "experimental" }
+
+[features]
+default = ["bi-ossl"]
+bi-rust = ["common/bi-rust"]
+bi-ossl = ["common/bi-ossl"]
+bi-gmp = ["common/bi-gmp"]
+
+[dependencies]
+common = { version = "0.1", package = "accumulator-common", path = "../accumulator-common", default-features = false  }
+arrayref = "0.3"
+blake2 = "0.9"
+failure = "0.1"
+hex = "0.4"
+hkdf = "0.9"
+rand = "0.8"
+rayon = "1.3"
+serde = { version = "1", features = ["serde_derive"] }
+zeroize = { version = "1", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+rust-gmp = "0.5"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

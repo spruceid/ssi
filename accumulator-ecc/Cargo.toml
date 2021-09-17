@@ -1,0 +1,17 @@
+[package]
+name = "accumulator-ecc"
+version = "0.1.0"
+authors = ["Mike Lodder <redmike7@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+blake2 = "0.9"
+ff-zeroize = "0.6"
+hex = "0.4"
+hkdf = "0.9"
+rand = "0.7"
+rayon = "1.4.0"
+pairings = { version = "0.20", path = "../pairings" }
+serde = { version = "1", features = ["derive"] }
+serde-big-array = "0.3"
+zeroize = { version = "1", features = ["zeroize_derive"] }

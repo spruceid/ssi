@@ -98,6 +98,10 @@ members = [
   "did-webkey",
   "vc-test",
   "did-test",
+  "accumulator-common",
+  "accumulator-rsa",
+  "accumulator-ecc",
+  "pairings",
 ]
 
 [dev-dependencies]
