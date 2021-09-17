@@ -340,7 +340,7 @@ pub fn is_blank_node_identifier(value: &JsonValue) -> bool {
         Some(value_str) => value_str,
         None => return false,
     };
-    value_str.get(..2) == Some("_:")
+    value_str.starts_with("_:")
 }
 
 #[derive(Debug, Clone, Default)]

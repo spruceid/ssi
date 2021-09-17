@@ -81,7 +81,16 @@ impl DIDResolver for DIDTz {
             }
         };
 
-        let prefix = &address[0..3];
+        let prefix = match address.get(0..3) {
+            Some(prefix) => prefix,
+            None => {
+                return (
+                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    None,
+                    None,
+                )
+            }
+        };
         let (_curve, proof_type, proof_type_iri) = match prefix_to_curve_type(prefix) {
             Some(addr) => addr,
             None => {
