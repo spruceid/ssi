@@ -642,6 +642,17 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_glyph_split() {
+        // Subslicing this expected Tezos address by byte range 0..3 would break a char boundary.
+        // https://doc.rust-lang.org/std/ops/struct.Range.html#impl-SliceIndex%3Cstr%3E
+        let bad_did = "did:pkh:tz:💣️";
+        let (res_meta, _doc_opt, _meta_opt) = DIDPKH
+            .resolve(bad_did, &ResolutionInputMetadata::default())
+            .await;
+        assert_ne!(res_meta.error, None);
+    }
+
     async fn test_resolve_error(did: &str, error_expected: &str) {
         let (res_meta, doc_opt, _meta_opt) = DIDPKH
             .resolve(did, &ResolutionInputMetadata::default())

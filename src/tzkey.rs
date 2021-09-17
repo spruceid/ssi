@@ -223,6 +223,14 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn test_jwk_from_tezos_key_glyph_split() {
+        // Attempt to decode tzsig that would involve subslicing
+        // through a char boundary.
+        let bad_tzk = "xx💣️";
+        jwk_from_tezos_key(&bad_tzk).unwrap_err();
+    }
+
+    #[test]
     fn edpk_jwk_tz_edsig() {
         let tzpk = "edpkuxZ5AQVCeEJ9inUG3w6VFhio5KBwC22ekPLBzcvub3QY2DvJ7n";
         let jwk = jwk_from_tezos_key(tzpk).unwrap();
