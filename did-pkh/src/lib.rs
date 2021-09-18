@@ -51,10 +51,10 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
     if account_address.len() < 3 {
         return resolution_error(&ERROR_INVALID_DID);
     }
-    let (vm_type, vm_type_iri) = match &account_address[0..3] {
-        "tz1" => ("Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
-        "tz2" => ("EcdsaSecp256k1RecoveryMethod2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
-        "tz3" => ("P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
+    let (vm_type, vm_type_iri) = match account_address.get(0..3) {
+        Some("tz1") => ("Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
+        Some("tz2") => ("EcdsaSecp256k1RecoveryMethod2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
+        Some("tz3") => ("P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
         _ => return resolution_error(&ERROR_INVALID_DID),
     };
     let blockchain_account_id = BlockchainAccountId {
@@ -640,6 +640,17 @@ mod tests {
             serde_json::to_value(doc).unwrap(),
             serde_json::to_value(doc_expected).unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn test_glyph_split() {
+        // Subslicing this expected Tezos address by byte range 0..3 would break a char boundary.
+        // https://doc.rust-lang.org/std/ops/struct.Range.html#impl-SliceIndex%3Cstr%3E
+        let bad_did = "did:pkh:tz:💣️";
+        let (res_meta, _doc_opt, _meta_opt) = DIDPKH
+            .resolve(bad_did, &ResolutionInputMetadata::default())
+            .await;
+        assert_ne!(res_meta.error, None);
     }
 
     async fn test_resolve_error(did: &str, error_expected: &str) {

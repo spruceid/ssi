@@ -59,8 +59,8 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
     if tz_pk.len() < 4 {
         return Err(Error::KeyPrefix);
     }
-    let (alg, params) = match &tz_pk[..4] {
-        "edpk" => (
+    let (alg, params) = match tz_pk.get(..4) {
+        Some("edpk") => (
             Algorithm::EdBlake2b,
             Params::OKP(OctetParams {
                 curve: "Ed25519".into(),
@@ -70,7 +70,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
                 private_key: None,
             }),
         ),
-        "edsk" => {
+        Some("edsk") => {
             let sk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let pk_bytes;
             #[cfg(feature = "ring")]
@@ -107,14 +107,14 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
             )
         }
         #[cfg(feature = "secp256k1")]
-        "sppk" => {
+        Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let jwk =
                 crate::jwk::secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
         #[cfg(feature = "p256")]
-        "p2pk" => {
+        Some("p2pk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let jwk = crate::jwk::p256_parse(&pk_bytes)?;
             (Algorithm::ESBlake2b, jwk.params)
@@ -200,13 +200,15 @@ pub fn decode_tzsig(sig_bs58: &str) -> Result<(Algorithm, Vec<u8>), DecodeTezosS
             sig_bs58.to_string(),
         ));
     }
-    let (algorithm, sig) = match &sig_bs58[0..5] {
-        "edsig" => (Algorithm::EdBlake2b, tzsig[5..].to_vec()),
-        "spsig" => (Algorithm::ESBlake2bK, tzsig[5..].to_vec()),
-        "p2sig" => (Algorithm::ESBlake2b, tzsig[4..].to_vec()),
-        prefix => {
+    // sig_bs58 has been checked as base58. But use the non-panicking get function anyway, for good
+    // measure.
+    let (algorithm, sig) = match sig_bs58.get(0..5) {
+        Some("edsig") => (Algorithm::EdBlake2b, tzsig[5..].to_vec()),
+        Some("spsig") => (Algorithm::ESBlake2bK, tzsig[5..].to_vec()),
+        Some("p2sig") => (Algorithm::ESBlake2b, tzsig[4..].to_vec()),
+        _ => {
             return Err(DecodeTezosSignatureError::SignaturePrefix(
-                prefix.to_string(),
+                sig_bs58.to_string(),
             ))
         }
     };
@@ -221,6 +223,14 @@ mod tests {
     use super::*;
     use crate::blakesig::hash_public_key;
     use serde_json::json;
+
+    #[test]
+    fn test_jwk_from_tezos_key_glyph_split() {
+        // Attempt to decode tzsig that would involve subslicing
+        // through a char boundary.
+        let bad_tzk = "xx💣️";
+        jwk_from_tezos_key(&bad_tzk).unwrap_err();
+    }
 
     #[test]
     fn edpk_jwk_tz_edsig() {

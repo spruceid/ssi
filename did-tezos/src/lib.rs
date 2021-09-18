@@ -81,7 +81,16 @@ impl DIDResolver for DIDTz {
             }
         };
 
-        let prefix = &address[0..3];
+        let prefix = match address.get(0..3) {
+            Some(prefix) => prefix,
+            None => {
+                return (
+                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    None,
+                    None,
+                )
+            }
+        };
         let (_curve, proof_type, proof_type_iri) = match prefix_to_curve_type(prefix) {
             Some(addr) => addr,
             None => {
@@ -569,6 +578,17 @@ mod tests {
         let did = DIDTZ.generate(&Source::Key(&jwk)).unwrap();
         // https://github.com/murbard/pytezos/blob/a228a67fbc94b11dd7dbc7ff0df9e996d0ff5f01tests/test_crypto.py#L34
         assert_eq!(did, "did:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX");
+    }
+
+    #[tokio::test]
+    async fn test_glyph_split() {
+        // Subslicing this method-specific id by byte range 0..3 would break a char boundary.
+        // https://doc.rust-lang.org/std/ops/struct.Range.html#impl-SliceIndex%3Cstr%3E
+        let bad_did = "did:tz:💣️00000000000000000000000000000";
+        let (res_meta, _doc_opt, _meta_opt) = DIDTZ
+            .resolve(bad_did, &ResolutionInputMetadata::default())
+            .await;
+        assert_ne!(res_meta.error, None);
     }
 
     #[tokio::test]
