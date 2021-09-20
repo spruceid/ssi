@@ -19,6 +19,8 @@ static EMPTY_32: [u8; 32] = [0; 32];
 pub enum TypedDataParseError {
     #[error("Unexpected null value")]
     UnexpectedNull,
+    #[error("Unmatched bracket")]
+    UnmatchedBracket,
     #[error("Unexpected number: {0:?}")]
     Number(Number),
     #[error("Unable to parse data type size: {0}")]
@@ -40,7 +42,7 @@ pub struct MemberVariable {
 }
 
 /// EIP-712 types
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 #[serde(try_from = "String", into = "String")]
 pub enum EIP712Type {
@@ -272,7 +274,8 @@ impl TryFrom<String> for EIP712Type {
         if string.ends_with("]") {
             let mut parts = string.rsplitn(2, "[");
             let amount_str = parts.next().unwrap().split("]").next().unwrap();
-            let base = EIP712Type::try_from(parts.next().unwrap().to_string())?;
+            let inner = parts.next().ok_or(TypedDataParseError::UnmatchedBracket)?;
+            let base = EIP712Type::try_from(inner.to_string())?;
             if amount_str.len() == 0 {
                 return Ok(EIP712Type::Array(Box::new(base)));
             } else {
@@ -844,6 +847,18 @@ impl TypedData {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn test_parse_type() {
+        let string_type = EIP712Type::try_from(String::from("string")).unwrap();
+        assert_eq!(string_type, EIP712Type::String);
+
+        let string_array_type = EIP712Type::try_from(String::from("string[]")).unwrap();
+        let string_array_type_expected = EIP712Type::Array(Box::new(EIP712Type::String));
+        assert_eq!(string_array_type, string_array_type_expected);
+
+        EIP712Type::try_from(String::from("string]")).unwrap_err();
+    }
 
     #[test]
     fn test_encode_type() {
