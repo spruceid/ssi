@@ -223,13 +223,14 @@ fn bls_generate_keypair<G: CurveProjective<Engine = Bls12, Scalar = Fr> + SerDes
     seed: Option<&[u8]>,
     blinder: Option<&[u8]>,
 ) -> BlsKeyPair<G> {
-    let mut passed_seed = seed.is_some();
+    let passed_seed;
     let seed = match seed {
         Some(arg) => {
             passed_seed = true;
             arg.to_vec()
         }
         None => {
+            passed_seed = false;
             let mut rng = thread_rng();
             let mut seed_data = vec![0u8, 32];
             rng.fill_bytes(seed_data.as_mut_slice());
