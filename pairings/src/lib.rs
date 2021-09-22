@@ -20,7 +20,6 @@ extern crate zeroize;
 pub mod tests;
 
 pub mod bls12_381;
-pub mod bn256;
 pub mod hash_to_curve;
 pub mod hash_to_field;
 pub mod serdes;

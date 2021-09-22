@@ -1,4 +1,4 @@
-use crate::{bls12_381, bn256, CurveAffine, CurveProjective, EncodedPoint};
+use crate::{bls12_381, CurveAffine, CurveProjective, EncodedPoint};
 use ff::{PrimeField, PrimeFieldRepr};
 use std::io::{Error, ErrorKind, Read, Result, Write};
 type Compressed = bool;
@@ -35,7 +35,6 @@ macro_rules! serdes_fr {
 }
 
 serdes_fr!(bls12_381);
-serdes_fr!(bn256);
 
 // impl SerDes for bls12_381::Fr {
 //     /// The compressed parameter has no effect since Fr element will always be compressed.
