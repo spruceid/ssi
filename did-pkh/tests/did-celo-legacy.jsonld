@@ -6,19 +6,19 @@
       "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"
     }
   ],
-  "id": "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+  "id": "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
   "verificationMethod": [
     {
-      "id": "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#blockchainAccountId",
+      "id": "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#Recovery2020",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
-      "controller": "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+      "controller": "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
       "blockchainAccountId": "eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011"
     }
   ],
   "authentication": [
-    "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#blockchainAccountId"
+    "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#Recovery2020"
   ],
   "assertionMethod": [
-    "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#blockchainAccountId"
+    "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011#Recovery2020"
   ]
 }

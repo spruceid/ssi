@@ -6,19 +6,19 @@
       "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"
     }
   ],
-  "id": "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
+  "id": "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
   "verificationMethod": [
     {
-      "id": "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId",
+      "id": "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
-      "controller": "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
+      "controller": "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
       "blockchainAccountId": "bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"
     }
   ],
   "authentication": [
-    "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId"
+    "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId"
   ],
   "assertionMethod": [
-    "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId"
+    "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId"
   ]
 }

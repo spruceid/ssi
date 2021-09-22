@@ -663,49 +663,50 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_did_pkh() {
+        // non-CAIP-10 (deprecated)
         test_resolve(
             "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
-            include_str!("../tests/did-tz1.jsonld"),
+            include_str!("../tests/did-tz1-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
-            include_str!("../tests/did-tz2.jsonld"),
+            include_str!("../tests/did-tz2-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-            include_str!("../tests/did-tz3.jsonld"),
+            include_str!("../tests/did-tz3-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a",
-            include_str!("../tests/did-eth.jsonld"),
+            include_str!("../tests/did-eth-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
-            include_str!("../tests/did-celo.jsonld"),
+            include_str!("../tests/did-celo-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
-            include_str!("../tests/did-poly.jsonld"),
+            include_str!("../tests/did-poly-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
-            include_str!("../tests/did-sol.jsonld"),
+            include_str!("../tests/did-sol-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
-            include_str!("../tests/did-btc.jsonld"),
+            include_str!("../tests/did-btc-legacy.jsonld"),
         )
         .await;
         test_resolve(
             "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
-            include_str!("../tests/did-doge.jsonld"),
+            include_str!("../tests/did-doge-legacy.jsonld"),
         )
         .await;
         test_resolve_error("did:pkh:tz:foo", ERROR_INVALID_DID).await;

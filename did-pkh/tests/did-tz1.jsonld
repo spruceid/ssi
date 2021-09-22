@@ -7,27 +7,27 @@
       "TezosMethod2021": "https://w3id.org/security#TezosMethod2021"
     }
   ],
-  "id": "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+  "id": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
   "verificationMethod": [
     {
-      "id": "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
+      "id": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
       "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
-      "controller": "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+      "controller": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
       "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
     },
     {
-      "id": "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#TezosMethod2021",
+      "id": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#TezosMethod2021",
       "type": "TezosMethod2021",
-      "controller": "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+      "controller": "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
       "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
     }
   ],
   "authentication": [
-    "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
-    "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#TezosMethod2021"
+    "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
+    "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#TezosMethod2021"
   ],
   "assertionMethod": [
-    "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
-    "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#TezosMethod2021"
+    "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
+    "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#TezosMethod2021"
   ]
 }
