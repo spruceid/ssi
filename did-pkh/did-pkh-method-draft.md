@@ -85,7 +85,7 @@ address    = account_address according to [CAIP-10]
 Here is an example from each currently supported network, linked to a sample
 JSON-LD DID document derived from each:
 
-| prefix | example (linked to sample DID document) |
+| Network (key type) | example (linked to sample DID document) |
 |:---:|:---:|
 | btc | [did:pkh:bip122:000000000019d6689c085ae165831e93:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-btc.jsonld) |
 | doge | [did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-doge.jsonld) |
@@ -104,26 +104,23 @@ generating.
 
 ### Networks
 
-*Note: Unlike
-[DID:Ethr](https://github.com/decentralized-identity/ethr-did-resolver/blob/master/doc/did-method-spec.md#method-specific-identifier)
-which defaults to mainnet but can accept an additional prefix for other
-networks, or [DID:BTCR](https://w3c-ccg.github.io/didm-btcr/#txref) which does
-not specify a network and leaves network selection/discovery to implementations,
-did:pkh currently defaults to mainnet (or equivalent) on every supported
-blockchain without a mechanism to override and select alternatives.*
+Note that networks (i.e., EVMs) and specific chains (i.e., ledgers, including
+private DLTs and test-nets) have to be specified separately and explicitly for
+all did-pkh addresses; in blockchain systems where accounts are controlled by
+multiple keytypes, like Tezos, the network and chain subdomains will not be
+enough to identify keytype, which must be detected from the address itself.
 
-
-|network id|CAIP-2 chain id|verification method type|URL for context definition|
+|account type|network id (CAIP-2) + chain id (CAIP-10)|verification method type|URL for context definition|
 |---|---|---|---|
-|`tz` (tz1)|`tezos:NetXdQprcVkpaWU`|Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|
-|`tz` (tz2)|`tezos:NetXdQprcVkpaWU`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
-|`tz` (tz3)|`tezos:NetXdQprcVkpaWU`|P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|
-|`eth`|`eip155:1`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
-|`celo`|`eip155:42220`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
-|`poly`|`eip155:137`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
-|`sol`|`solana`|Ed25519VerificationKey2018|https://w3id.org/security#Ed25519VerificationKey2018|
-|`btc`|`bip122:000000000019d6689c085ae165831e93`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
-|`doge`|`bip122:1a91e3dace36e2be3bf030a65679fe82`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|`tz1`|`tezos:NetXdQprcVkpaWU`|Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|
+|`tz`|`tezos:NetXdQprcVkpaWU`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|`tz`|`tezos:NetXdQprcVkpaWU`|P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021|
+|ethereum mainnet|`eip155:1`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|celo mainnet|`eip155:42220`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|polygon mainnet|`eip155:137`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|solana|`solana`|Ed25519VerificationKey2018|https://w3id.org/security#Ed25519VerificationKey2018|
+|bitcoin mainnet|`bip122:000000000019d6689c085ae165831e93`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|dogecoin mainnet|`bip122:1a91e3dace36e2be3bf030a65679fe82`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
 
 ### Context
 
@@ -230,10 +227,13 @@ Since there is no support for update and deactivate for the did:pkh method, it i
 
 An earlier version of this specification used more human-readable submethod
 namespacing rather than referring mapping directly to the CAIP naming
-convention. As the scope has grown of this project, and with forward
-compatibility in mind, this has been removed.  The legacy aliases that Spruce's
-implementation also supports for backwards-compatibility with credentials
-already issued is as follows:
+convention. It also defaulted to main-net for `did:pkh:eth` in the absence of an
+explicit chainID.  As the scope has grown of this project, and with forward
+compatibility in mind, both of these patterns have been removed, required
+explicitly naming the EVM by its registered [CAIP-2][] code and explicitly
+naming the `chain_id` (as specified in [CAIP-10][]) as well.  The legacy aliases
+that Spruce's implementation also supports for backwards-compatibility with
+credentials already issued look like this:
 
 | prefix | example (linked to sample DID document) |
 |:---:|:---:|
