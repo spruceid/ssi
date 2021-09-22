@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 use serde_json::Value;
 use std::collections::BTreeMap;
+use std::str::FromStr;
 
 use ssi::caip10::BlockchainAccountId;
 use ssi::caip2::ChainId;
@@ -14,15 +15,22 @@ use ssi::did_resolve::{
 };
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
+// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-3.md
+const REFERENCE_EIP155_ETHEREUM_MAINNET: &str = "1";
+
+const REFERENCE_EIP155_CELO_MAINNET: &str = "42220";
+const REFERENCE_EIP155_POLYGON_MAINNET: &str = "137";
+
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-4.md
-const MAINNET_BITCOIN: &str = "000000000019d6689c085ae165831e93";
-const MAINNET_DOGECOIN: &str = "1a91e3dace36e2be3bf030a65679fe82";
+const REFERENCE_BIP122_BITCOIN_MAINNET: &str = "000000000019d6689c085ae165831e93";
+
+const REFERENCE_BIP122_DOGECOIN_MAINNET: &str = "1a91e3dace36e2be3bf030a65679fe82";
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
-const MAINNET_TEZOS: &str = "NetXdQprcVkpaWU";
+const REFERENCE_TEZOS_MAINNET: &str = "NetXdQprcVkpaWU";
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-30.md
-const MAINNET_SOLANA: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
+const REFERENCE_SOLANA_MAINNET: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
 
 /// did:pkh DID Method
 pub struct DIDPKH;
@@ -47,7 +55,7 @@ fn resolution_error(err: &str) -> ResolutionResult {
     (ResolutionMetadata::from_error(err), None, None)
 }
 
-async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
+async fn resolve_tezos(did: &str, account_address: String, reference: &str) -> ResolutionResult {
     if account_address.len() < 3 {
         return resolution_error(&ERROR_INVALID_DID);
     }
@@ -61,7 +69,7 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
         account_address,
         chain_id: ChainId {
             namespace: "tezos".to_string(),
-            reference: MAINNET_TEZOS.to_string(),
+            reference: reference.to_string(),
         },
     };
     let mut context = BTreeMap::new();
@@ -121,7 +129,12 @@ async fn resolve_tz(did: &str, account_address: String) -> ResolutionResult {
     resolution_result(doc)
 }
 
-async fn resolve_eth(did: &str, account_address: String) -> ResolutionResult {
+async fn resolve_eip155(
+    did: &str,
+    account_address: String,
+    reference: &str,
+    legacy: bool,
+) -> ResolutionResult {
     if !account_address.starts_with("0x") {
         return resolution_error(&ERROR_INVALID_DID);
     }
@@ -138,12 +151,19 @@ async fn resolve_eth(did: &str, account_address: String) -> ResolutionResult {
         account_address,
         chain_id: ChainId {
             namespace: "eip155".to_string(),
-            reference: "1".to_string(),
+            reference: reference.to_string(),
         },
+    };
+    let vm_fragment = if legacy {
+        // Explanation of fragment differences:
+        //   https://github.com/spruceid/ssi/issues/297
+        "Recovery2020"
+    } else {
+        "blockchainAccountId"
     };
     let vm_url = DIDURL {
         did: did.to_string(),
-        fragment: Some("Recovery2020".to_string()),
+        fragment: Some(vm_fragment.to_string()),
         ..Default::default()
     };
     let vm = VerificationMethod::Map(VerificationMethodMap {
@@ -191,99 +211,7 @@ async fn resolve_eth(did: &str, account_address: String) -> ResolutionResult {
     resolution_result(doc)
 }
 
-async fn resolve_celo(did: &str, account_address: String) -> ResolutionResult {
-    if !account_address.starts_with("0x") {
-        return resolution_error(&ERROR_INVALID_DID);
-    }
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
-    let blockchain_account_id = BlockchainAccountId {
-        account_address,
-        chain_id: ChainId {
-            namespace: "eip155".to_string(),
-            reference: "42220".to_string(),
-        },
-    };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("Recovery2020".to_string()),
-        ..Default::default()
-    };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: vm_url.to_string(),
-        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm]),
-        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
-        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
-        ..Default::default()
-    };
-    resolution_result(doc)
-}
-
-async fn resolve_poly(did: &str, account_address: String) -> ResolutionResult {
-    if !account_address.starts_with("0x") {
-        return resolution_error(&ERROR_INVALID_DID);
-    }
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
-    let blockchain_account_id = BlockchainAccountId {
-        account_address,
-        chain_id: ChainId {
-            namespace: "eip155".to_string(),
-            reference: "137".to_string(),
-        },
-    };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("Recovery2020".to_string()),
-        ..Default::default()
-    };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: vm_url.to_string(),
-        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm]),
-        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
-        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
-        ..Default::default()
-    };
-    resolution_result(doc)
-}
-
-async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
+async fn resolve_solana(did: &str, account_address: String, reference: &str) -> ResolutionResult {
     let public_key_bytes = match bs58::decode(&account_address).into_vec() {
         Ok(bytes) => bytes,
         Err(_) => return resolution_error(&ERROR_INVALID_DID),
@@ -291,6 +219,10 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
     if public_key_bytes.len() != 32 {
         return resolution_error(&ERROR_INVALID_DID);
     }
+    let chain_id = ChainId {
+        namespace: "solana".to_string(),
+        reference: reference.to_string(),
+    };
     let mut context = BTreeMap::new();
     context.insert(
         "blockchainAccountId".to_string(),
@@ -328,10 +260,7 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
     };
     let blockchain_account_id = BlockchainAccountId {
         account_address,
-        chain_id: ChainId {
-            namespace: "solana".to_string(),
-            reference: MAINNET_SOLANA.to_string(),
-        },
+        chain_id,
     };
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -379,15 +308,27 @@ async fn resolve_sol(did: &str, account_address: String) -> ResolutionResult {
     resolution_result(doc)
 }
 
-async fn resolve_btc(did: &str, account_address: String) -> ResolutionResult {
-    if !account_address.starts_with("1") {
-        return resolution_error(&ERROR_INVALID_DID);
-    };
+async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+    match reference {
+        REFERENCE_BIP122_BITCOIN_MAINNET => {
+            if !account_address.starts_with("1") {
+                return resolution_error(&ERROR_INVALID_DID);
+            }
+        }
+        REFERENCE_BIP122_DOGECOIN_MAINNET => {
+            if !account_address.starts_with("D") {
+                return resolution_error(&ERROR_INVALID_DID);
+            }
+        }
+        _ => {
+            // Unknown network address: no prefix hash check
+        }
+    }
     let blockchain_account_id = BlockchainAccountId {
         account_address,
         chain_id: ChainId {
             namespace: "bip122".to_string(),
-            reference: MAINNET_BITCOIN.to_string(),
+            reference: reference.to_string(),
         },
     };
     let vm_url = DIDURL {
@@ -425,50 +366,20 @@ async fn resolve_btc(did: &str, account_address: String) -> ResolutionResult {
     resolution_result(doc)
 }
 
-async fn resolve_doge(did: &str, account_address: String) -> ResolutionResult {
-    if !account_address.starts_with("D") {
-        return resolution_error(&ERROR_INVALID_DID);
+async fn resolve_caip10(did: &str, account_id: String) -> ResolutionResult {
+    let account_id = match BlockchainAccountId::from_str(&account_id) {
+        Ok(account_id) => account_id,
+        Err(_) => return resolution_error(&ERROR_INVALID_DID),
+    };
+    let namespace = account_id.chain_id.namespace;
+    let reference = account_id.chain_id.reference;
+    match &namespace[..] {
+        "tezos" => resolve_tezos(did, account_id.account_address, &reference).await,
+        "eip155" => resolve_eip155(did, account_id.account_address, &reference, false).await,
+        "bip122" => resolve_bip122(did, account_id.account_address, &reference).await,
+        "solana" => resolve_solana(did, account_id.account_address, &reference).await,
+        _ => return resolution_error(&ERROR_INVALID_DID),
     }
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
-    let blockchain_account_id = BlockchainAccountId {
-        account_address,
-        chain_id: ChainId {
-            namespace: "bip122".to_string(),
-            reference: MAINNET_DOGECOIN.to_string(),
-        },
-    };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("blockchainAccountId".to_string()),
-        ..Default::default()
-    };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: String::from(vm_url.clone()),
-        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm]),
-        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
-        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
-        ..Default::default()
-    };
-    resolution_result(doc)
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -485,14 +396,16 @@ impl DIDResolver for DIDPKH {
         };
 
         match &type_[..] {
-            "tz" => resolve_tz(did, data).await,
-            "eth" => resolve_eth(did, data).await,
-            "celo" => resolve_celo(did, data).await,
-            "poly" => resolve_poly(did, data).await,
-            "sol" => resolve_sol(did, data).await,
-            "btc" => resolve_btc(did, data).await,
-            "doge" => resolve_doge(did, data).await,
-            _ => resolution_error(&ERROR_INVALID_DID),
+            // Non-CAIP-10 (deprecated)
+            "tz" => resolve_tezos(did, data, REFERENCE_TEZOS_MAINNET).await,
+            "eth" => resolve_eip155(did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
+            "celo" => resolve_eip155(did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
+            "poly" => resolve_eip155(did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
+            "sol" => resolve_solana(did, data, REFERENCE_SOLANA_MAINNET).await,
+            "btc" => resolve_bip122(did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
+            "doge" => resolve_bip122(did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
+            // CAIP-10
+            _ => resolve_caip10(did, type_ + ":" + &data).await,
         }
     }
 
@@ -528,6 +441,112 @@ fn generate_doge(key: &JWK) -> Result<String, String> {
     Ok(addr)
 }
 
+fn generate_caip10_tezos(
+    key: &JWK,
+    ref_opt: Option<String>,
+) -> Result<BlockchainAccountId, String> {
+    let hash = ssi::blakesig::hash_public_key(key)?;
+    let reference = ref_opt.unwrap_or_else(|| REFERENCE_TEZOS_MAINNET.to_string());
+    Ok(BlockchainAccountId {
+        account_address: hash,
+        chain_id: ChainId {
+            namespace: "tezos".to_string(),
+            reference: reference.to_string(),
+        },
+    })
+}
+
+fn generate_caip10_eip155(
+    key: &JWK,
+    ref_opt: Option<String>,
+) -> Result<BlockchainAccountId, String> {
+    let hash = ssi::keccak_hash::hash_public_key(key)?;
+    let reference = ref_opt.unwrap_or_else(|| REFERENCE_EIP155_ETHEREUM_MAINNET.to_string());
+    Ok(BlockchainAccountId {
+        account_address: hash,
+        chain_id: ChainId {
+            namespace: "eip155".to_string(),
+            reference: reference.to_string(),
+        },
+    })
+}
+
+fn generate_caip10_bip122(
+    key: &JWK,
+    ref_opt: Option<String>,
+) -> Result<BlockchainAccountId, String> {
+    let reference = ref_opt.unwrap_or_else(|| REFERENCE_BIP122_BITCOIN_MAINNET.to_string());
+    let addr;
+    match &reference[..] {
+        REFERENCE_BIP122_BITCOIN_MAINNET => {
+            addr = ssi::ripemd::hash_public_key(key, 0x00)?;
+            if !addr.starts_with("1") {
+                return Err("Expected Bitcoin address".to_string());
+            }
+        }
+        REFERENCE_BIP122_DOGECOIN_MAINNET => {
+            addr = ssi::ripemd::hash_public_key(key, 0x1e)?;
+            if !addr.starts_with("D") {
+                return Err("Expected Dogecoin address".to_string());
+            }
+        }
+        _ => {
+            return Err("Expected Bitcoin address type".to_string());
+        }
+    }
+
+    Ok(BlockchainAccountId {
+        account_address: addr,
+        chain_id: ChainId {
+            namespace: "bip122".to_string(),
+            reference: reference.to_string(),
+        },
+    })
+}
+
+fn generate_caip10_solana(
+    key: &JWK,
+    ref_opt: Option<String>,
+) -> Result<BlockchainAccountId, String> {
+    let reference = ref_opt.unwrap_or_else(|| "".to_string());
+    let chain_id = ChainId {
+        namespace: "solana".to_string(),
+        reference,
+    };
+    let pk_bs58 = match key.params {
+        Params::OKP(ref params) if params.curve == "Ed25519" => {
+            bs58::encode(&params.public_key.0).into_string()
+        }
+        _ => return Err("Invalid public key type for Solana".to_string()),
+    };
+    Ok(BlockchainAccountId {
+        account_address: pk_bs58,
+        chain_id,
+    })
+}
+
+fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
+    // Require name to be a either CAIP-2 namespace or a
+    // full CAIP-2 string - namespace and reference (e.g. internal
+    // chain id or genesis hash).
+    // If reference is not provided, default to a known mainnet.
+    // If a reference is provided, pass it through.
+    // Return a CAIP-10 string, appended to "did:pkh:".
+    let (namespace, reference_opt) = match name.splitn(2, ':').collect::<Vec<&str>>().as_slice() {
+        [namespace] => (namespace.to_string(), None),
+        [namespace, reference] => (namespace.to_string(), Some(reference.to_string())),
+        _ => return Err("Unable to parse chain id or namespace".to_string()),
+    };
+    let account_id = match &namespace[..] {
+        "tezos" => generate_caip10_tezos(key, reference_opt)?,
+        "eip155" => generate_caip10_eip155(key, reference_opt)?,
+        "bip122" => generate_caip10_bip122(key, reference_opt)?,
+        "solana" => generate_caip10_solana(key, reference_opt)?,
+        _ => return Err("Namespace not supported".to_string()),
+    };
+    Ok(format!("did:pkh:{}", account_id))
+}
+
 impl DIDMethod for DIDPKH {
     fn name(&self) -> &'static str {
         return "pkh";
@@ -539,6 +558,7 @@ impl DIDMethod for DIDPKH {
             _ => return None,
         };
         let addr = match match &pkh_name[..] {
+            // Aliases for did:pkh pre-CAIP-10. Deprecate?
             "tz" => ssi::blakesig::hash_public_key(key).ok(),
             "eth" => ssi::keccak_hash::hash_public_key(key).ok(),
             "celo" => ssi::keccak_hash::hash_public_key(key).ok(),
@@ -546,7 +566,8 @@ impl DIDMethod for DIDPKH {
             "sol" => generate_sol(key),
             "btc" => generate_btc(key).ok(),
             "doge" => generate_doge(key).ok(),
-            _ => None,
+            // CAIP-10/CAIP-2 chain id
+            name => return generate_caip10_did(key, name).ok(),
         } {
             Some(addr) => addr,
             None => return None,
@@ -663,6 +684,53 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_did_pkh() {
+        // CAIP-10-based
+        test_resolve(
+            "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+            include_str!("../tests/did-tz1.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+            include_str!("../tests/did-tz2.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
+            include_str!("../tests/did-tz3.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+            include_str!("../tests/did-eth.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+            include_str!("../tests/did-celo.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:eip155:137:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
+            include_str!("../tests/did-poly.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
+            include_str!("../tests/did-sol.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:bip122:000000000019d6689c085ae165831e93:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
+            include_str!("../tests/did-btc.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
+            include_str!("../tests/did-doge.jsonld"),
+        )
+        .await;
+
         // non-CAIP-10 (deprecated)
         test_resolve(
             "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
@@ -709,6 +777,7 @@ mod tests {
             include_str!("../tests/did-doge-legacy.jsonld"),
         )
         .await;
+
         test_resolve_error("did:pkh:tz:foo", ERROR_INVALID_DID).await;
         test_resolve_error("did:pkh:eth:bar", ERROR_INVALID_DID).await;
     }
@@ -1003,8 +1072,8 @@ mod tests {
         credential_prove_verify_did_pkh(
             key_secp256k1_recovery.clone(),
             other_key_secp256k1.clone(),
-            "eth",
-            "#Recovery2020",
+            "eip155",
+            "#blockchainAccountId",
             &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
@@ -1015,8 +1084,8 @@ mod tests {
         credential_prove_verify_did_pkh(
             key_secp256k1_eip712sig.clone(),
             other_key_secp256k1.clone(),
-            "eth",
-            "#Recovery2020",
+            "eip155",
+            "#blockchainAccountId",
             &ssi::ldp::Eip712Signature2021,
             None,
             None,
@@ -1111,8 +1180,8 @@ mod tests {
         credential_prove_verify_did_pkh(
             key_secp256k1_eip712sig.clone(),
             other_key_secp256k1.clone(),
-            "eth",
-            "#Recovery2020",
+            "eip155",
+            "#blockchainAccountId",
             &ssi::ldp::EthereumEip712Signature2021,
             Some(eip712_domain),
             Some(vp_eip712_domain),
@@ -1123,8 +1192,8 @@ mod tests {
         credential_prove_verify_did_pkh(
             key_secp256k1_epsig.clone(),
             other_key_secp256k1.clone(),
-            "eth",
-            "#Recovery2020",
+            "eip155",
+            "#blockchainAccountId",
             &ssi::ldp::Eip712Signature2021,
             None,
             None,
@@ -1284,6 +1353,7 @@ mod tests {
 
     #[tokio::test]
     async fn verify_vc() {
+        // TODO: update these to use CAIP-10 did:pkh issuers
         test_verify_vc(include_str!("../tests/vc-tz1.jsonld"), 0).await;
         test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
         test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld"), 0).await;
