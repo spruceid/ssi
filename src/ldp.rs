@@ -1893,7 +1893,7 @@ impl ProofSuite for JsonWebSignature2020 {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         self.validate_key_and_algorithm(key, algorithm)?;
         let proof = Proof {
-            context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT]),
+            context: serde_json::json!([crate::jsonld::W3ID_JWS2020_V1_CONTEXT]),
             ..Proof::new("JsonWebSignature2020")
                 .with_options(options)
                 .with_properties(extra_proof_properties)
@@ -1911,7 +1911,7 @@ impl ProofSuite for JsonWebSignature2020 {
         let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         self.validate_key_and_algorithm(public_key, algorithm)?;
         let proof = Proof {
-            context: serde_json::json!([crate::jsonld::LDS_JWS2020_V1_CONTEXT]),
+            context: serde_json::json!([crate::jsonld::W3ID_JWS2020_V1_CONTEXT]),
             ..Proof::new("JsonWebSignature2020")
                 .with_options(options)
                 .with_properties(extra_proof_properties)

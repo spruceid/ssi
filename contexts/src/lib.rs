@@ -19,6 +19,8 @@ pub const DID_RESOLUTION_V1: &str = include_str!("../w3c-did-resolution-v1.jsonl
 pub const DIF_ESRS2020: &str = include_str!("../dif-lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
 /// <https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json>
 pub const LDS_JWS2020_V1: &str = include_str!("../lds-jws2020-v1.jsonld");
+/// <https://w3id.org/security/suites/jws-2020/v1>
+pub const W3ID_JWS2020_V1: &str = include_str!("../w3id-jws2020-v1.jsonld");
 /// <https://w3id.org/citizenship/v1>
 pub const CITIZENSHIP_V1: &str = include_str!("../w3c-ccg-citizenship-v1.jsonld");
 /// <https://w3id.org/vaccination/v1>
