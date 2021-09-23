@@ -7,7 +7,7 @@
 // https://tools.ietf.org/html/rfc8410
 
 use num_bigint::{BigInt, Sign};
-use simple_asn1::{der_encode, ASN1Block, ASN1Class, ToASN1};
+use simple_asn1::{der_encode, ASN1Block, ASN1Class, ASN1DecodeErr, FromASN1, ToASN1};
 
 use crate::error::Error;
 
@@ -25,6 +25,7 @@ pub struct RSAPrivateKey {
 }
 
 #[derive(Debug, Clone)]
+// https://datatracker.ietf.org/doc/html/rfc3447#appendix-A.1.1
 pub struct RSAPublicKey {
     pub modulus: Integer,
     pub public_exponent: Integer,
@@ -102,6 +103,35 @@ impl ToASN1 for RSAPublicKey {
             ]
             .concat(),
         )])
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum RSAPublicKeyFromASN1Error {
+    #[error("Expected single sequence")]
+    ExpectedSingleSequence,
+    #[error("Expected two integers")]
+    ExpectedTwoIntegers,
+    #[error("ASN1 decoding error: {0:?}")]
+    ASN1Decode(#[from] ASN1DecodeErr),
+}
+
+impl FromASN1 for RSAPublicKey {
+    type Error = RSAPublicKeyFromASN1Error;
+    fn from_asn1(v: &[ASN1Block]) -> Result<(Self, &[ASN1Block]), Self::Error> {
+        let vec = match v {
+            [ASN1Block::Sequence(_, vec)] => vec,
+            _ => return Err(RSAPublicKeyFromASN1Error::ExpectedSingleSequence),
+        };
+        let (n, e) = match vec.as_slice() {
+            [ASN1Block::Integer(_, n), ASN1Block::Integer(_, e)] => (n, e),
+            _ => return Err(RSAPublicKeyFromASN1Error::ExpectedTwoIntegers),
+        };
+        let pk = Self {
+            modulus: Integer(n.clone()),
+            public_exponent: Integer(e.clone()),
+        };
+        Ok((pk, &[]))
     }
 }
 
