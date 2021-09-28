@@ -312,13 +312,13 @@ pub enum StringOrURI {
 pub struct JWTClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "exp")]
-    pub expiration_time: Option<i64>,
+    pub expiration_time: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "iss")]
     pub issuer: Option<StringOrURI>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "nbf")]
-    pub not_before: Option<i64>,
+    pub not_before: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "jti")]
     pub jwt_id: Option<String>,
@@ -733,7 +733,8 @@ impl Credential {
             None => return Err(Error::MissingCredential),
         };
         if let Some(exp) = claims.expiration_time {
-            vc.expiration_date = Utc.timestamp_opt(exp, 0).latest().map(|time| VCDateTime {
+            let (exp_units, exp_micros) = seconds_into_units_and_micros(exp);
+            vc.expiration_date = Utc.timestamp_opt(exp_units, exp_micros*1000).latest().map(|time| VCDateTime {
                 date_time: time.into(),
                 use_z: true,
             });
@@ -746,7 +747,8 @@ impl Credential {
             }
         }
         if let Some(nbf) = claims.not_before {
-            if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
+            let (nbf_units, nbf_micros) = seconds_into_units_and_micros(nbf);
+            if let Some(time) = Utc.timestamp_opt(nbf_units, nbf_micros*1000).latest() {
                 vc.issuance_date = Some(VCDateTime {
                     date_time: time.into(),
                     use_z: true,
@@ -792,7 +794,7 @@ impl Credential {
             expiration_time: vc
                 .expiration_date
                 .as_ref()
-                .map(|date| date.date_time.timestamp()),
+                .map(|date| date.date_time.timestamp_nanos() as f64 / 1.0e9),
             issuer: match issuer {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
                 Some(_) => return Err(Error::InvalidIssuer),
@@ -801,7 +803,7 @@ impl Credential {
             not_before: vc
                 .issuance_date
                 .as_ref()
-                .map(|date| date.date_time.timestamp()),
+                .map(|date| date.date_time.timestamp_nanos() as f64 / 1.0e9),
             jwt_id: id.map(|id| id.into()),
             subject,
             verifiable_credential: Some(vc),
@@ -1892,14 +1894,16 @@ fn jwt_matches(
         assert_local!(allowed_vms.contains(kid));
     }
     if let Some(nbf) = claims.not_before {
-        if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
+        let (nbf_units, nbf_micros) = seconds_into_units_and_micros(nbf);
+        if let Some(time) = Utc.timestamp_opt(nbf_units, nbf_micros*1000).latest() {
             assert_local!(created.unwrap_or_else(Utc::now) >= time);
         } else {
             return false;
         }
     }
     if let Some(exp) = claims.expiration_time {
-        if let Some(time) = Utc.timestamp_opt(exp, 0).earliest() {
+        let (exp_units, exp_micros) = seconds_into_units_and_micros(exp);
+        if let Some(time) = Utc.timestamp_opt(exp_units, exp_micros*1000).earliest() {
             assert_local!(Utc::now() < time);
         } else {
             return false;
@@ -2151,6 +2155,16 @@ impl From<Check> for String {
             Check::CredentialStatus => "credentialStatus".to_string(),
         }
     }
+}
+
+// Microsecond precision with f64 will be possible until about the year 2255. The calculation
+// is 53 bits of mantissa in f64 gives 2^53 = 9007199254740992.0, then dividing by the number
+// of microseconds in a year (approx 60.0*60.0*24*365.25*1000000) gives approx 285. Add that
+// to 1970 (the beginning of the Unix epoch) and the result is 2255.
+pub(crate) fn seconds_into_units_and_micros(secs: f64) -> (i64, u32) {
+    let units = secs.floor() as i64;
+    let micros = ((secs - secs.floor()) * 1.0e6).round() as u32;
+    (units, micros)
 }
 
 #[cfg(test)]
