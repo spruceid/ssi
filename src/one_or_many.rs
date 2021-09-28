@@ -67,6 +67,19 @@ impl<T> OneOrMany<T> {
             }
         }
     }
+
+    pub fn to_single_mut(&mut self) -> Option<&mut T> {
+        match self {
+            Self::One(value) => Some(value),
+            Self::Many(values) => {
+                if values.len() == 1 {
+                    Some(&mut values[0])
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 // consuming iterator

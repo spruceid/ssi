@@ -761,7 +761,7 @@ impl Credential {
         }
         if let Some(sub) = claims.subject {
             if let StringOrURI::URI(sub_uri) = sub {
-                if let OneOrMany::One(ref mut subject) = vc.credential_subject {
+                if let Some(ref mut subject) = vc.credential_subject.to_single_mut() {
                     subject.id = Some(sub_uri);
                 } else {
                     return Err(Error::InvalidSubject);
@@ -2332,6 +2332,48 @@ pub(crate) mod tests {
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() > 0);
+    }
+
+    #[async_std::test]
+    async fn decode_verify_jwt_single_array_subject() {
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+
+        let vc_str = r###"{
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                "https://www.w3.org/2018/credentials/examples/v1"
+            ],
+            "type": "VerifiableCredential",
+            "issuer": "did:example:foo",
+            "issuanceDate": "2021-09-28T19:58:30Z",
+            "credentialSubject": [{
+                "id": "did:example:a6c78986cc36418b95a22d7f736",
+                "spouse": "Example Person"
+            }]
+        }"###;
+
+        let vc = Credential {
+            expiration_date: Some(VCDateTime::from(Utc::now() + chrono::Duration::weeks(1))),
+            ..serde_json::from_str(vc_str).unwrap()
+        };
+        let aud = "did:example:90336644520443d28ba78beb949".to_string();
+        let options = LinkedDataProofOptions {
+            domain: Some(aud),
+            checks: None,
+            created: None,
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
+            ..Default::default()
+        };
+        let signed_jwt = vc
+            .generate_jwt(Some(&key), &options, &DIDExample)
+            .await
+            .unwrap();
+        println!("{:?}", signed_jwt);
+
+        let (vc1_opt, verification_result) =
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
     }
 
     #[async_std::test]
