@@ -9,13 +9,7 @@ pub struct PassthroughDigest {
 impl Update for PassthroughDigest {
     fn update(&mut self, data: impl AsRef<[u8]>) {
         let d = data.as_ref();
-        if d.len() == 32 {
-            self.value = d.try_into().unwrap();
-        } else if !d.is_empty() {
-            self.value = [d[0]; 32];
-        } else {
-            self.value = [0; 32];
-        }
+        self.value = d.try_into().unwrap();
     }
 }
 
