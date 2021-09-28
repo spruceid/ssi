@@ -321,7 +321,10 @@ impl CredentialStatus for RevocationList2020Status {
         };
         let revoked = match bitstring.get(credential_index) {
             Some(bitref) => *bitref,
-            None => false,
+            None => {
+                return result
+                    .with_error("Credential index in revocation list is invalid.".to_string());
+            }
         };
         if revoked {
             return result.with_error("Credential is revoked.".to_string());
