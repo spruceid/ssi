@@ -318,6 +318,7 @@ pub(crate) async fn ensure_or_pick_verification_relationship(
         // Unable to verify verification relationship for non-DID issuers.
         // Allow some for testing purposes only.
         match &issuer[..] {
+            #[cfg(feature = "example-http-issuer")]
             "https://example.edu/issuers/14" => {
                 // https://github.com/w3c/vc-test-suite/blob/cdc7835/test/vc-data-model-1.0/input/example-016-jwt.jsonld#L8
                 // We don't have a way to actually resolve this to anything. Just allow it for

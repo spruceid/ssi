@@ -23,6 +23,7 @@ ripemd-160 = ["ripemd160", "secp256k1"]
 # TODO handle better keccak and sha
 keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
 sha = ["sha2", "k256/sha256"]
+example-http-issuer = []
 
 [dependencies]
 json-ld = "0.4"
