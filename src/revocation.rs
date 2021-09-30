@@ -355,7 +355,7 @@ pub enum LoadCredentialError {
     Parse(#[from] serde_json::Error),
 }
 
-async fn load_resource(url: &str) -> Result<Vec<u8>, LoadCredentialError> {
+async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
     #[cfg(test)]
     match url {
         crate::vc::tests::EXAMPLE_REVOCATION_2020_LIST_URL => {
