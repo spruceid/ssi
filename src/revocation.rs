@@ -238,6 +238,16 @@ impl CredentialStatus for RevocationList2020Status {
                 self.id
             ));
         }
+        // Check the revocation list URL before attempting to load it.
+        // Revocation List 2020 does not specify an expected URL scheme (URI scheme), but
+        // examples and test vectors use https.
+        match self.revocation_list_credential.split_once(':') {
+            Some(("https", _)) => (),
+            // TODO: an option to allow HTTP?
+            // TODO: load from DID URLs?
+            Some((scheme, _)) => return result.with_error(format!("Invalid schema: {}", self.id)),
+            _ => return result.with_error(format!("Invalid rsrc: {}", self.id)),
+        }
         let revocation_list_credential =
             match load_credential(&self.revocation_list_credential).await {
                 Ok(credential) => credential,
