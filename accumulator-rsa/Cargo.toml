@@ -14,7 +14,7 @@ version = "0.1.0"
 maintenance = { status = "experimental" }
 
 [features]
-default = ["bi-ossl"]
+default = ["bi-rust"]
 bi-rust = ["common/bi-rust"]
 bi-ossl = ["common/bi-ossl"]
 bi-gmp = ["common/bi-gmp"]
