@@ -212,6 +212,7 @@ pub enum Error {
     #[cfg(feature = "p256")]
     P256EC(p256::elliptic_curve::Error),
     MissingFeatures(&'static str),
+    NumericDateOutOfMicrosecondPrecisionRange,
 }
 
 impl fmt::Display for Error {
@@ -394,6 +395,7 @@ impl fmt::Display for Error {
             Error::ECEncodingError => write!(f, "Unable to encode EC key"),
             Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
             Error::MissingFeatures(features) => write!(f, "Missing features: {}", features),
+            Error::NumericDateOutOfMicrosecondPrecisionRange => write!(f, "Out of valid microsecond-precision range of NumericDate"),
         }
     }
 }
