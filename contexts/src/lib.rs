@@ -31,6 +31,8 @@ pub const TRACEABILITY_V1: &str = include_str!("../w3c-ccg-traceability-v1.jsonl
 pub const REVOCATION_LIST_2020_V1: &str = include_str!("../w3id-vc-revocation-list-2020-v1.jsonld");
 /// <https://demo.spruceid.com/EcdsaSecp256k1RecoverySignature2020/esrs2020-extra-0.0.jsonld>
 pub const ESRS2020_EXTRA: &str = include_str!("../esrs2020-extra-0.0.jsonld");
+/// <https://w3id.org/security/bbs/v1>
+pub const BBS_V1: &str = include_str!("../bbs-v1.jsonld");
 pub const EIP712SIG_V0_1: &str = include_str!("../eip712sig-v0.1.jsonld");
 pub const EIP712SIG_V1: &str = include_str!("../eip712sig-v1.jsonld");
 
