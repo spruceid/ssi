@@ -35,6 +35,8 @@ pub const ESRS2020_EXTRA: &str = include_str!("../esrs2020-extra-0.0.jsonld");
 pub const BBS_V1: &str = include_str!("../bbs-v1.jsonld");
 pub const EIP712SIG_V0_1: &str = include_str!("../eip712sig-v0.1.jsonld");
 pub const EIP712SIG_V1: &str = include_str!("../eip712sig-v1.jsonld");
+/// <https://identity.foundation/presentation-exchange/submission/v1>
+pub const PRESENTATION_SUBMISSION_V1: &str = include_str!("../presentation-submission.jsonld");
 
 pub const TZ_V2: &str = include_str!("../tz-2021-v2.jsonld");
 pub const TZVM_V1: &str = include_str!("../tzvm-2021-v1.jsonld");

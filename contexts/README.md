@@ -15,4 +15,4 @@ Files|License
 -|-
 W3C context files|[W3C Software and Document Notice and License](https://www.w3.org/Consortium/Legal/2015/copyright-software-and-document).
 Schema.org context files|[Creative Commons Attribution-ShareAlike 3.0 Unported (CC BY-SA 3.0)](https://creativecommons.org/licenses/by-sa/3.0/)
-[EcdsaSecp256k1RecoverySignature2020](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020/) context file|[Apache License, Version 2.0](http://www.apache.org/licenses/)
+[DIF](https://identity.foundation/) context files|[Apache License, Version 2.0](http://www.apache.org/licenses/)

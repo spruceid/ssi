@@ -24,6 +24,7 @@ Copyright © 2018-2021 World Wide Web Consortium, (Massachusetts Institute of Te
 
 Copyright in the schema by the sponsors of schema.org (Google, Inc., Yahoo, Inc., Microsoft Corporation and Yandex) are licensed to website publishers and other third parties under the Creative Commons Attribution-ShareAlike License (version 3.0) according to their Terms of Service, please visit https://schema.org/docs/terms.html. To view a copy of this license, please visit http://creativecommons.org/licenses/by-sa/3.0/.
 
-## Other context files
+## DIF context files
 
 - [EcdsaSecp256k1RecoverySignature2020](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020/) - [Apache License, Version 2.0](http://www.apache.org/licenses/)
+- [Presentation Exchange](https://github.com/decentralized-identity/presentation-exchange/)
