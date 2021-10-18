@@ -1877,6 +1877,16 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
     }
 }
 
+// Check if a linked data document has a given URI in its @context array.
+fn document_has_context(
+    document: &(dyn LinkedDataDocument + Sync),
+    context_uri: &str,
+) -> Result<bool, Error> {
+    let contexts_string = document.get_contexts()?.ok_or(Error::MissingContext)?;
+    let contexts: crate::vc::Contexts = serde_json::from_str(&contexts_string)?;
+    Ok(contexts.contains_uri(context_uri))
+}
+
 /// <https://w3c-ccg.github.io/lds-jws2020/>
 pub struct JsonWebSignature2020;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -1892,8 +1902,13 @@ impl ProofSuite for JsonWebSignature2020 {
     ) -> Result<Proof, Error> {
         let algorithm = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         self.validate_key_and_algorithm(key, algorithm)?;
+        let has_context = document_has_context(document, crate::jsonld::W3ID_JWS2020_V1_CONTEXT)?;
         let proof = Proof {
-            context: serde_json::json!([crate::jsonld::W3ID_JWS2020_V1_CONTEXT]),
+            context: if has_context {
+                Value::Null
+            } else {
+                serde_json::json!([crate::jsonld::W3ID_JWS2020_V1_CONTEXT])
+            },
             ..Proof::new("JsonWebSignature2020")
                 .with_options(options)
                 .with_properties(extra_proof_properties)
@@ -1910,8 +1925,13 @@ impl ProofSuite for JsonWebSignature2020 {
     ) -> Result<ProofPreparation, Error> {
         let algorithm = public_key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
         self.validate_key_and_algorithm(public_key, algorithm)?;
+        let has_context = document_has_context(document, crate::jsonld::W3ID_JWS2020_V1_CONTEXT)?;
         let proof = Proof {
-            context: serde_json::json!([crate::jsonld::W3ID_JWS2020_V1_CONTEXT]),
+            context: if has_context {
+                Value::Null
+            } else {
+                serde_json::json!([crate::jsonld::W3ID_JWS2020_V1_CONTEXT])
+            },
             ..Proof::new("JsonWebSignature2020")
                 .with_options(options)
                 .with_properties(extra_proof_properties)
