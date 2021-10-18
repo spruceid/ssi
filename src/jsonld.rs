@@ -1526,14 +1526,13 @@ pub fn list_to_rdf(
     Ok(first)
 }
 
-/// <https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf>
-pub async fn json_to_dataset<T>(
+pub async fn expand_json<T>(
     json: &str,
     more_contexts_json: Option<&String>,
     lax: bool,
     options: Option<&JsonLdOptions>,
     loader: &mut T,
-) -> Result<DataSet, Error>
+) -> Result<Vec<JsonValue>, Error>
 where
     T: Loader<Document = JsonValue> + std::marker::Send + Sync,
 {
@@ -1589,13 +1588,31 @@ where
     expansion_options.ordered = false;
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = expanding.await?;
+
+    let documents = expanded_doc.iter().map(|item| item.as_json()).collect();
+
+    Ok(documents)
+}
+
+/// <https://w3c.github.io/json-ld-api/#dom-jsonldprocessor-tordf>
+pub async fn json_to_dataset<T>(
+    json: &str,
+    more_contexts_json: Option<&String>,
+    lax: bool,
+    options: Option<&JsonLdOptions>,
+    loader: &mut T,
+) -> Result<DataSet, Error>
+where
+    T: Loader<Document = JsonValue> + std::marker::Send + Sync,
+{
+    let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
+    let expanded_doc = expand_json(json, more_contexts_json, lax, Some(&options), loader).await?;
     let mut node_map = Map::new();
     node_map.insert(AT_DEFAULT.to_string(), Map::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();
     for object in expanded_doc {
-        let object_json = object.as_json();
         generate_node_map(
-            object_json,
+            object,
             &mut node_map,
             None,
             None,
