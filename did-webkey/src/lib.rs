@@ -23,17 +23,17 @@ pub struct DIDWebKey;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 enum DIDWebKeyType {
-    SSH,
-    GPG,
+    Ssh,
+    Gpg,
 }
 
 impl FromStr for DIDWebKeyType {
     type Err = ResolutionMetadata;
     fn from_str(type_: &str) -> Result<Self, Self::Err> {
         match type_ {
-            "ssh" => Ok(DIDWebKeyType::SSH),
-            "gpg" => Ok(DIDWebKeyType::GPG),
-            _ => Err(ResolutionMetadata::from_error(&ERROR_INVALID_DID)),
+            "ssh" => Ok(DIDWebKeyType::Ssh),
+            "gpg" => Ok(DIDWebKeyType::Gpg),
+            _ => Err(ResolutionMetadata::from_error(ERROR_INVALID_DID)),
         }
     }
 }
@@ -66,7 +66,7 @@ fn pk_to_vm_ed25519(
     let vm_map = VerificationMethodMap {
         id: vm_url.to_string(),
         type_: "Ed25519VerificationKey2018".to_string(),
-        public_key_jwk: Some(jwk.clone()),
+        public_key_jwk: Some(jwk),
         controller: did.to_string(),
         ..Default::default()
     };
@@ -93,7 +93,7 @@ fn pk_to_vm_ecdsa(
     let vm_map = VerificationMethodMap {
         id: vm_url.to_string(),
         type_: "EcdsaSecp256r1VerificationKey2019".to_string(),
-        public_key_jwk: Some(jwk.clone()),
+        public_key_jwk: Some(jwk),
         controller: did.to_string(),
         ..Default::default()
     };
@@ -120,7 +120,7 @@ fn pk_to_vm_rsa(
     let vm_map = VerificationMethodMap {
         id: vm_url.to_string(),
         type_: "RsaVerificationKey2018".to_string(),
-        public_key_jwk: Some(jwk.clone()),
+        public_key_jwk: Some(jwk),
         controller: did.to_string(),
         ..Default::default()
     };
@@ -153,7 +153,7 @@ fn parse_pubkeys_ssh(
     };
     let mut did_urls = Vec::new();
     let mut vm_maps = Vec::new();
-    let lines = lines.trim().split("\n");
+    let lines = lines.trim().split('\n');
     for line in lines {
         let pk = match sshkeys::PublicKey::from_string(line) {
             Ok(pk) => pk,
@@ -180,13 +180,13 @@ fn parse_pubkeys(
     bytes: Vec<u8>,
 ) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
     match type_ {
-        DIDWebKeyType::GPG => parse_pubkeys_gpg(did, bytes),
-        DIDWebKeyType::SSH => parse_pubkeys_ssh(did, bytes),
+        DIDWebKeyType::Gpg => parse_pubkeys_gpg(did, bytes),
+        DIDWebKeyType::Ssh => parse_pubkeys_ssh(did, bytes),
     }
 }
 
 fn parse_did_webkey_url(did: &str) -> Result<(DIDWebKeyType, String), ResolutionMetadata> {
-    let mut parts = did.split(":").peekable();
+    let mut parts = did.split(':').peekable();
     let (type_, domain_name) = match (parts.next(), parts.next(), parts.next(), parts.next()) {
         (Some("did"), Some("webkey"), Some(type_), Some(domain_name)) => {
             (type_.parse()?, domain_name)
@@ -290,9 +290,7 @@ impl DIDResolver for DIDWebKey {
                 ),
                 Err(err) => {
                     return (
-                        ResolutionMetadata::from_error(
-                            &("Error parsing keys: ".to_string() + &err.to_string()),
-                        ),
+                        ResolutionMetadata::from_error(&format!("Error parsing keys: {}", err)),
                         None,
                         None,
                     )
@@ -319,7 +317,7 @@ impl DIDResolver for DIDWebKey {
 
 impl DIDMethod for DIDWebKey {
     fn name(&self) -> &'static str {
-        return "webkey";
+        "webkey"
     }
 
     fn to_resolver(&self) -> &dyn DIDResolver {
@@ -337,14 +335,14 @@ mod tests {
         assert_eq!(
             parse_did_webkey_url("did:webkey:ssh:example.org:user.keys").unwrap(),
             (
-                DIDWebKeyType::SSH,
+                DIDWebKeyType::Ssh,
                 "https://example.org/user.keys".to_string()
             )
         );
         assert_eq!(
             parse_did_webkey_url("did:webkey:gpg:example.org:user.gpg").unwrap(),
             (
-                DIDWebKeyType::GPG,
+                DIDWebKeyType::Gpg,
                 "https://example.org/user.gpg".to_string()
             )
         );

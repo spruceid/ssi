@@ -109,7 +109,7 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
                 .blank_node_to_quads
                 .entry(&blank_node_identifier.0)
                 .or_insert_with(Vec::new)
-                .push(&quad);
+                .push(quad);
         }
     }
     // 3
@@ -150,7 +150,7 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
                 None => continue,
             };
             // note: canonical issuer is not passed
-            issue_identifier(&mut normalization_state.canonical_issuer, &identifier)?;
+            issue_identifier(&mut normalization_state.canonical_issuer, identifier)?;
             // 5.4.3
             non_normalized_identifiers.remove(identifier);
             // 5.4.4
@@ -284,7 +284,7 @@ pub fn hash_n_degree_quads(
                     hash_to_related_blank_nodes
                         .entry(hash)
                         .or_insert_with(Vec::new)
-                        .push(&component);
+                        .push(component);
                 }
             }
         }

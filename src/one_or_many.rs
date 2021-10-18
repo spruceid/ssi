@@ -44,7 +44,7 @@ impl<T> OneOrMany<T> {
 
     pub fn first(&self) -> Option<&T> {
         match self {
-            Self::One(value) => Some(&value),
+            Self::One(value) => Some(value),
             Self::Many(values) => {
                 if !values.is_empty() {
                     Some(&values[0])
@@ -57,7 +57,7 @@ impl<T> OneOrMany<T> {
 
     pub fn to_single(&self) -> Option<&T> {
         match self {
-            Self::One(value) => Some(&value),
+            Self::One(value) => Some(value),
             Self::Many(values) => {
                 if values.len() == 1 {
                     Some(&values[0])

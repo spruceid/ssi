@@ -38,8 +38,7 @@ pub fn hash_personal_message(msg: &str) -> Vec<u8> {
     let msg_bytes = msg.as_bytes();
     let prefix = format!("\x19Ethereum Signed Message:\n{}", msg_bytes.len());
     let data = [prefix.as_bytes().to_vec(), msg_bytes.to_vec()].concat();
-    let hash = keccak(data).to_fixed_bytes().to_vec();
-    hash
+    keccak(data).to_fixed_bytes().to_vec()
 }
 
 #[cfg(test)]

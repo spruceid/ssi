@@ -5,7 +5,6 @@ use crate::passthrough_digest::PassthroughDigest;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
-use std::panic;
 
 // RFC 7515 - JSON Web Signature (JWS)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
@@ -118,7 +117,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             let hash = match algorithm {
                 Algorithm::EdBlake2b => blake2b_simd::Params::new()
                     .hash_length(32)
-                    .hash(&data)
+                    .hash(data)
                     .as_bytes()
                     .to_vec(),
                 _ => data.to_vec(),
@@ -147,7 +146,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = p256::SecretKey::try_from(ec)?;
                 let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                let sig: p256::ecdsa::Signature = signing_key.try_sign(&data)?;
+                let sig: p256::ecdsa::Signature = signing_key.try_sign(data)?;
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "k256")]
@@ -159,7 +158,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::Signature = signing_key.try_sign(&data)?;
+                let sig: k256::ecdsa::Signature = signing_key.try_sign(data)?;
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "k256")]
@@ -171,7 +170,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&data)?;
+                let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(data)?;
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "p256")]
@@ -179,7 +178,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 // We will be able to use the blake2 crate directly once it allow 32B output
                 let hash = blake2b_simd::Params::new()
                     .hash_length(32)
-                    .hash(&data)
+                    .hash(data)
                     .as_bytes()
                     .to_vec();
                 use p256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
@@ -198,7 +197,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 // We will be able to use the blake2 crate directly once it allow 32B output
                 let hash = blake2b_simd::Params::new()
                     .hash_length(32)
-                    .hash(&data)
+                    .hash(data)
                     .as_bytes()
                     .to_vec();
                 use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
@@ -288,7 +287,7 @@ pub fn verify_bytes(
             let hash = match algorithm {
                 Algorithm::EdBlake2b => blake2b_simd::Params::new()
                     .hash_length(32)
-                    .hash(&data)
+                    .hash(data)
                     .as_bytes()
                     .to_vec(),
                 _ => data.to_vec(),
@@ -314,6 +313,7 @@ pub fn verify_bytes(
             #[cfg(feature = "p256")]
             Algorithm::ES256 => {
                 use p256::ecdsa::signature::Verifier;
+                use std::panic;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "P-256" {
                     return Err(Error::CurveNotImplemented(curve.to_string()));
@@ -322,11 +322,12 @@ pub fn verify_bytes(
                 let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
                 let sig = panic::catch_unwind(|| p256::ecdsa::Signature::try_from(signature))
                     .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
-                verifying_key.verify(&data, &sig)?;
+                verifying_key.verify(data, &sig)?;
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256K => {
                 use k256::ecdsa::signature::Verifier;
+                use std::panic;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(Error::CurveNotImplemented(curve.to_string()));
@@ -335,11 +336,12 @@ pub fn verify_bytes(
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig = panic::catch_unwind(|| k256::ecdsa::Signature::try_from(signature))
                     .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
-                verifying_key.verify(&data, &sig)?;
+                verifying_key.verify(data, &sig)?;
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256KR => {
                 use k256::ecdsa::signature::Verifier;
+                use std::panic;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(Error::CurveNotImplemented(curve.to_string()));
@@ -350,14 +352,14 @@ pub fn verify_bytes(
                     k256::ecdsa::recoverable::Signature::try_from(signature)
                 })
                 .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
-                verifying_key.verify(&data, &sig)?;
+                verifying_key.verify(data, &sig)?;
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
                 // We will be able to use the blake2 crate directly once it allow 32B output
                 let hash = blake2b_simd::Params::new()
                     .hash_length(32)
-                    .hash(&data)
+                    .hash(data)
                     .as_bytes()
                     .to_vec();
                 use p256::ecdsa::signature::{digest::Digest, DigestVerifier, Signature};
@@ -378,7 +380,7 @@ pub fn verify_bytes(
                 // We will be able to use the blake2 crate directly once it allow 32B output
                 let hash = blake2b_simd::Params::new()
                     .hash_length(32)
-                    .hash(&data)
+                    .hash(data)
                     .as_bytes()
                     .to_vec();
                 use k256::ecdsa::signature::{digest::Digest, DigestVerifier};
@@ -410,7 +412,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         #[cfg(feature = "k256")]
         Algorithm::ES256KR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
-            let recovered_key = sig.recover_verify_key(data.into())?;
+            let recovered_key = sig.recover_verify_key(data)?;
             use crate::jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
@@ -425,12 +427,12 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 x509_thumbprint_sha1: None,
                 x509_thumbprint_sha256: None,
             };
-            return Ok(jwk);
+            Ok(jwk)
         }
         _ => {
             let _ = data;
             let _ = signature;
-            return Err(Error::UnsupportedAlgorithm);
+            Err(Error::UnsupportedAlgorithm)
         }
     }
 }

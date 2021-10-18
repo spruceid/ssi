@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use thiserror::Error;
 
+#[allow(clippy::upper_case_acronyms)]
 type URL = String;
 
 /// Minimum length of a revocation list bitstring
@@ -245,7 +246,7 @@ impl CredentialStatus for RevocationList2020Status {
             Some(("https", _)) => (),
             // TODO: an option to allow HTTP?
             // TODO: load from DID URLs?
-            Some((scheme, _)) => return result.with_error(format!("Invalid schema: {}", self.id)),
+            Some((_scheme, _)) => return result.with_error(format!("Invalid schema: {}", self.id)),
             _ => return result.with_error(format!("Invalid rsrc: {}", self.id)),
         }
         let revocation_list_credential =
@@ -261,7 +262,8 @@ impl CredentialStatus for RevocationList2020Status {
         let list_issuer_id = match &revocation_list_credential.issuer {
             Some(issuer) => issuer.get_id().clone(),
             None => {
-                return result.with_error(format!("Revocation list credential is missing issuer"));
+                return result
+                    .with_error("Revocation list credential is missing issuer".to_string());
             }
         };
         if issuer_id != list_issuer_id {
@@ -285,6 +287,8 @@ impl CredentialStatus for RevocationList2020Status {
         }
         for error in vc_result.errors {
             result.errors.push(format!("Revocation list: {}", error));
+        }
+        if !result.errors.is_empty() {
             return result;
         }
         // Note: vc_result.checks is not checked here. It is assumed that default checks passed.
@@ -357,14 +361,6 @@ pub enum LoadResourceError {
     HTTP(String),
 }
 
-#[derive(Error, Debug)]
-pub enum LoadCredentialError {
-    #[error("Unable to load resource: {0}")]
-    Load(#[from] LoadResourceError),
-    #[error("Error reading HTTP response: {0}")]
-    Parse(#[from] serde_json::Error),
-}
-
 async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
     #[cfg(test)]
     match url {
@@ -381,19 +377,19 @@ async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()
-        .map_err(|e| LoadResourceError::Build(e))?;
+        .map_err(LoadResourceError::Build)?;
     let accept = "application/json".to_string();
     let resp = client
         .get(url)
         .header("Accept", accept)
         .send()
         .await
-        .map_err(|e| LoadResourceError::Request(e))?;
+        .map_err(LoadResourceError::Request)?;
     if let Err(err) = resp.error_for_status_ref() {
         if err.status() == Some(reqwest::StatusCode::NOT_FOUND) {
-            Err(LoadResourceError::NotFound)?;
+            return Err(LoadResourceError::NotFound);
         }
-        Err(LoadResourceError::HTTP(err.to_string()))?;
+        return Err(LoadResourceError::HTTP(err.to_string()));
     }
     let bytes = resp
         .bytes()
@@ -401,6 +397,14 @@ async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
         .map_err(|e| LoadResourceError::Response(e.to_string()))?
         .to_vec();
     Ok(bytes)
+}
+
+#[derive(Error, Debug)]
+pub enum LoadCredentialError {
+    #[error("Unable to load resource: {0}")]
+    Load(#[from] LoadResourceError),
+    #[error("Error reading HTTP response: {0}")]
+    Parse(#[from] serde_json::Error),
 }
 
 /// Fetch a credential from a HTTP(S) URL.
@@ -449,9 +453,9 @@ impl TryFrom<Credential> for RevocationList2020Credential {
             ));
         }
         let credential =
-            serde_json::to_value(credential).map_err(|e| CredentialConversionError::ToValue(e))?;
-        let credential = serde_json::from_value(credential)
-            .map_err(|e| CredentialConversionError::FromValue(e))?;
+            serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
+        let credential =
+            serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
         Ok(credential)
     }
 }
@@ -460,13 +464,13 @@ impl TryFrom<RevocationList2020Credential> for Credential {
     type Error = CredentialConversionError;
     fn try_from(credential: RevocationList2020Credential) -> Result<Self, Self::Error> {
         let mut credential =
-            serde_json::to_value(credential).map_err(|e| CredentialConversionError::ToValue(e))?;
+            serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
         use crate::vc::DEFAULT_CONTEXT;
         use serde_json::json;
         credential["@context"] = json!([DEFAULT_CONTEXT, REVOCATION_LIST_2020_V1_CONTEXT]);
         credential["type"] = json!(["VerifiableCredential", "RevocationList2020Credential"]);
-        let credential = serde_json::from_value(credential)
-            .map_err(|e| CredentialConversionError::FromValue(e))?;
+        let credential =
+            serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
         Ok(credential)
     }
 }

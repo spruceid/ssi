@@ -209,14 +209,14 @@ impl DIDResolver for DIDKey {
             ]),
             id: did.to_string(),
             verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
-                id: did.to_string() + &"#" + method_specific_id,
+                id: format!("{}#{}", did, method_specific_id),
                 type_: vm_type,
                 controller: did.to_string(),
                 public_key_jwk: Some(jwk),
                 ..Default::default()
             })]),
             authentication: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
-            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+            assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl)]),
             ..Default::default()
         };
         (
@@ -229,7 +229,7 @@ impl DIDResolver for DIDKey {
 
 impl DIDMethod for DIDKey {
     fn name(&self) -> &'static str {
-        return "key";
+        "key"
     }
 
     fn generate(&self, source: &Source) -> Option<String> {

@@ -108,7 +108,7 @@ where
                     proof
                         .property_set
                         .as_ref()
-                        .and_then(|ps| ps.get("capability").map(|s| s.clone()))
+                        .and_then(|ps| ps.get("capability").cloned())
                         .and_then(|v| match v {
                             Value::String(id) => Some(id),
                             _ => None,
@@ -475,10 +475,6 @@ mod tests {
 
     #[async_std::test]
     async fn round_trip() {
-        use crate::did::{DIDMethod, Source};
-        use crate::did_resolve::DIDResolver;
-        use std::collections::HashMap as Map;
-
         let dk = DIDExample;
 
         let alice_did = "did:example:foo";

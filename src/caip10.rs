@@ -46,23 +46,23 @@ impl BlockchainAccountId {
             self.chain_id.namespace.as_str(),
             self.chain_id.reference.as_str(),
         ) {
-            ("tezos", _net) => blakesig::hash_public_key(&jwk)
+            ("tezos", _net) => blakesig::hash_public_key(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             #[cfg(feature = "keccak-hash")]
-            ("eip155", _net) => crate::keccak_hash::hash_public_key(&jwk)
+            ("eip155", _net) => crate::keccak_hash::hash_public_key(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
-            ("solana", _net) => encode_ed25519(&jwk)
+            ("solana", _net) => encode_ed25519(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             // Bitcoin
             #[cfg(feature = "ripemd160")]
             ("bip122", "000000000019d6689c085ae165831e93") => {
-                crate::ripemd::hash_public_key(&jwk, 0x00)
+                crate::ripemd::hash_public_key(jwk, 0x00)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             // Dogecoin
             #[cfg(feature = "ripemd160")]
             ("bip122", "1a91e3dace36e2be3bf030a65679fe82") => {
-                crate::ripemd::hash_public_key(&jwk, 0x1e)
+                crate::ripemd::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
@@ -120,12 +120,12 @@ impl FromStr for BlockchainAccountId {
             _ => return Err(BlockchainAccountIdParseError::MissingSeparator),
         };
         let chain_len = chain_id.len();
-        if chain_len < CHAIN_ID_MIN_LENGTH || chain_len > CHAIN_ID_MAX_LENGTH {
+        if !(CHAIN_ID_MIN_LENGTH..=CHAIN_ID_MAX_LENGTH).contains(&chain_len) {
             return Err(BlockchainAccountIdParseError::ChainLength(chain_len));
         }
         let chain_id = ChainId::from_str(&chain_id)?;
         let address_len = account_address.len();
-        if address_len < ACCOUNT_ADDRESS_MIN_LENGTH || address_len > ACCOUNT_ADDRESS_MAX_LENGTH {
+        if !(ACCOUNT_ADDRESS_MIN_LENGTH..=ACCOUNT_ADDRESS_MAX_LENGTH).contains(&address_len) {
             return Err(BlockchainAccountIdParseError::AddressLength(address_len));
         }
         for c in account_address.chars() {
@@ -166,7 +166,7 @@ mod tests {
 
         // Support old format, for backwards compatibility
         let old = "6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7@chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
-        let account_id_old = BlockchainAccountId::from_str(&dummy_max_length).unwrap();
+        let account_id_old = BlockchainAccountId::from_str(&old).unwrap();
         assert_eq!(account_id_old.to_string(), dummy_max_length);
     }
 

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use chrono::prelude::*;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -78,7 +77,7 @@ fn resolve_pk(
     );
     if !public_key_hex.starts_with("0x") {
         return (
-            ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+            ResolutionMetadata::from_error(ERROR_INVALID_DID),
             None,
             None,
         );
@@ -87,7 +86,7 @@ fn resolve_pk(
         Ok(pk_bytes) => pk_bytes,
         Err(_) => {
             return (
-                ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                ResolutionMetadata::from_error(ERROR_INVALID_DID),
                 None,
                 None,
             )
@@ -157,8 +156,8 @@ fn resolve_pk(
             VerificationMethod::DIDURL(key_vm_didurl.clone()),
         ]),
         assertion_method: Some(vec![
-            VerificationMethod::DIDURL(vm_didurl.clone()),
-            VerificationMethod::DIDURL(key_vm_didurl.clone()),
+            VerificationMethod::DIDURL(vm_didurl),
+            VerificationMethod::DIDURL(key_vm_didurl),
         ]),
         verification_method: Some(vec![vm, key_vm]),
         ..Default::default()
@@ -190,7 +189,7 @@ impl DIDResolver for DIDEthr {
             Some(parsed) => parsed,
             None => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -201,7 +200,7 @@ impl DIDResolver for DIDEthr {
             68 => return resolve_pk(did, chain_id, &addr_or_pk),
             _ => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -265,8 +264,8 @@ impl DIDResolver for DIDEthr {
                 VerificationMethod::DIDURL(eip712vm_didurl.clone()),
             ]),
             assertion_method: Some(vec![
-                VerificationMethod::DIDURL(vm_didurl.clone()),
-                VerificationMethod::DIDURL(eip712vm_didurl.clone()),
+                VerificationMethod::DIDURL(vm_didurl),
+                VerificationMethod::DIDURL(eip712vm_didurl),
             ]),
             verification_method: Some(vec![vm, eip712vm]),
             ..Default::default()
@@ -291,7 +290,7 @@ impl DIDResolver for DIDEthr {
 
 impl DIDMethod for DIDEthr {
     fn name(&self) -> &'static str {
-        return "ethr";
+        "ethr"
     }
 
     fn generate(&self, source: &Source) -> Option<String> {

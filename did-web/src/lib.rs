@@ -21,7 +21,7 @@ thread_local! {
 pub struct DIDWeb;
 
 fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
-    let mut parts = did.split(":").peekable();
+    let mut parts = did.split(':').peekable();
     let domain_name = match (parts.next(), parts.next(), parts.next()) {
         (Some("did"), Some("web"), Some(domain_name)) => domain_name,
         _ => {
@@ -174,7 +174,7 @@ impl DIDResolver for DIDWeb {
 
 impl DIDMethod for DIDWeb {
     fn name(&self) -> &'static str {
-        return "web";
+        "web"
     }
 
     fn to_resolver(&self) -> &dyn DIDResolver {

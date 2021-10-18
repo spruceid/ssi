@@ -17,7 +17,7 @@ pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
     if pk_bytes.len() != 33 {
         return Err(Error::UnsupportedKeyType);
     }
-    let pk_sha256 = sha256(&pk_bytes.as_bytes())?;
+    let pk_sha256 = sha256(pk_bytes.as_bytes())?;
     let pk_ripemd160 = Ripemd160::digest(&pk_sha256);
     let mut extended_ripemd160 = Vec::with_capacity(21);
     extended_ripemd160.extend_from_slice(&[version]);

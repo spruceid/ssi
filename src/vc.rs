@@ -2,7 +2,7 @@ use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
-use crate::did_resolve::{DIDResolver, ResolutionInputMetadata};
+use crate::did_resolve::DIDResolver;
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, StaticLoader};
 use crate::jwk::{JWTKeys, JWK};
@@ -391,7 +391,7 @@ pub enum Check {
 }
 
 // https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 /// Object summarizing a verification
 /// Reference: vc-http-api
@@ -427,11 +427,7 @@ impl Default for LinkedDataProofOptions {
 
 impl VerificationResult {
     pub fn new() -> Self {
-        Self {
-            checks: vec![],
-            warnings: vec![],
-            errors: vec![],
-        }
+        Self::default()
     }
 
     pub fn error(err: &str) -> Self {
@@ -535,7 +531,7 @@ impl TryFrom<String> for URI {
 }
 
 impl URI {
-    fn as_str(self: &Self) -> &str {
+    fn as_str(&self) -> &str {
         match self {
             URI::String(string) => string.as_str(),
         }
@@ -583,7 +579,7 @@ impl From<URI> for StringOrURI {
 }
 
 impl StringOrURI {
-    fn as_str(self: &Self) -> &str {
+    fn as_str(&self) -> &str {
         match self {
             StringOrURI::URI(URI::String(string)) => string.as_str(),
             StringOrURI::String(string) => string.as_str(),
@@ -594,8 +590,8 @@ impl StringOrURI {
 impl FromStr for VCDateTime {
     type Err = chrono::format::ParseError;
     fn from_str(date_time: &str) -> Result<Self, Self::Err> {
-        let use_z = date_time.ends_with("Z");
-        let date_time = DateTime::parse_from_rfc3339(&date_time)?.into();
+        let use_z = date_time.ends_with('Z');
+        let date_time = DateTime::parse_from_rfc3339(date_time)?;
         Ok(VCDateTime { date_time, use_z })
     }
 }
@@ -641,7 +637,7 @@ fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
         return Err(Error::MissingKey);
     };
     let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-    Ok(crate::jwt::encode_sign(algorithm, claims, &jwk)?)
+    crate::jwt::encode_sign(algorithm, claims, jwk)
 }
 
 // Ensure a verification relationship exists between a given issuer and verification method for a
@@ -659,7 +655,7 @@ pub(crate) async fn ensure_verification_relationship(
     let vmm = vmms.get(vm).ok_or_else(|| {
         Error::MissingVerificationRelationship(issuer.to_string(), proof_purpose, vm.to_string())
     })?;
-    vmm.match_jwk(&jwk)?;
+    vmm.match_jwk(jwk)?;
     Ok(())
 }
 
@@ -675,10 +671,10 @@ pub(crate) async fn pick_default_vm(
     let mut err = Error::MissingKey;
     for (vm_id, vmm) in vm_ids {
         // Try to find a VM that matches this JWK and controller.
-        match vmm.match_jwk(&jwk) {
+        match vmm.match_jwk(jwk) {
             Ok(()) => {
                 // Found appropriate VM.
-                return Ok(vm_id.to_string());
+                return Ok(vm_id);
             }
             Err(e) => err = e,
         }
@@ -709,11 +705,11 @@ impl Credential {
         } else {
             return Err(Error::MissingKey);
         };
-        Credential::from_jwt(jwt, &jwk)
+        Credential::from_jwt(jwt, jwk)
     }
 
     pub fn from_jwt(jwt: &str, key: &JWK) -> Result<Self, Error> {
-        let token_data: JWTClaims = crate::jwt::decode_verify(jwt, &key)?;
+        let token_data: JWTClaims = crate::jwt::decode_verify(jwt, key)?;
         Self::from_jwt_claims(token_data)
     }
 
@@ -818,7 +814,7 @@ impl Credential {
             audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
             ..self.to_jwt_claims()?
         };
-        Ok(crate::jwt::encode_unsigned(&claims)?)
+        crate::jwt::encode_unsigned(&claims)
     }
 
     #[deprecated(note = "Use generate_jwt")]
@@ -827,7 +823,7 @@ impl Credential {
             audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
             ..self.to_jwt_claims()?
         };
-        jwt_encode(&claims, &keys)
+        jwt_encode(&claims, keys)
     }
 
     /// Encode the Verifiable Credential as JWT. If JWK is passed, sign it, otherwise it is
@@ -872,9 +868,9 @@ impl Credential {
             Some(_) => return Err(Error::UnencodableOptionClaim("proofPurpose".to_string())),
         }
         let claims = JWTClaims {
-            nonce: challenge.clone(),
+            nonce: challenge,
             audience: match domain {
-                Some(domain) => Some(OneOrMany::One(StringOrURI::try_from(domain.to_string())?)),
+                Some(domain) => Some(OneOrMany::One(StringOrURI::try_from(domain)?)),
                 None => None,
             },
             ..self.to_jwt_claims()?
@@ -885,10 +881,7 @@ impl Credential {
             crate::jwk::Algorithm::None
         };
         // Ensure consistency between key ID and verification method URI.
-        let key_id = match (
-            jwk.and_then(|jwk| jwk.key_id.clone()),
-            verification_method.to_owned(),
-        ) {
+        let key_id = match (jwk.and_then(|jwk| jwk.key_id.clone()), verification_method) {
             (Some(jwk_kid), None) => Some(jwk_kid),
             (None, Some(vm_id)) => Some(vm_id.to_string()),
             (None, None) => None,
@@ -1000,10 +993,7 @@ impl Credential {
         let verification_method = match header.key_id {
             Some(kid) => kid,
             None => {
-                return (
-                    None,
-                    VerificationResult::error(&format!("JWT header missing key id")),
-                );
+                return (None, VerificationResult::error("JWT header missing key id"));
             }
         };
         let key = match crate::ldp::resolve_key(&verification_method, resolver).await {
@@ -1113,7 +1103,7 @@ impl Credential {
                     let proof_purpose = options
                         .proof_purpose
                         .clone()
-                        .unwrap_or_else(|| ProofPurpose::AssertionMethod);
+                        .unwrap_or(ProofPurpose::AssertionMethod);
                     get_verification_methods_for_purpose(&issuer_did, resolver, proof_purpose)
                         .await?
                 } else {
@@ -1129,8 +1119,8 @@ impl Credential {
             .collect();
         let matched_jwt = match jwt_params {
             Some((header, claims)) => jwt_matches(
-                &header,
-                &claims,
+                header,
+                claims,
                 &options,
                 &allowed_vms,
                 &ProofPurpose::AssertionMethod,
@@ -1237,7 +1227,7 @@ impl Credential {
             }
         };
         let mut result = checkable_status.check(self, resolver).await;
-        if result.errors.len() > 0 {
+        if !result.errors.is_empty() {
             return result;
         }
         result.checks.push(Check::CredentialStatus);
@@ -1343,7 +1333,7 @@ impl Presentation {
             audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
             ..self.to_jwt_claims()?
         };
-        jwt_encode(&claims, &keys)
+        jwt_encode(&claims, keys)
     }
 
     /// Encode the Verifiable Presentation as JWT. If JWK is passed, sign it, otherwise it is
@@ -1388,9 +1378,9 @@ impl Presentation {
             Some(_) => return Err(Error::UnencodableOptionClaim("proofPurpose".to_string())),
         }
         let claims = JWTClaims {
-            nonce: challenge.clone(),
+            nonce: challenge,
             audience: match domain {
-                Some(domain) => Some(OneOrMany::One(StringOrURI::try_from(domain.to_string())?)),
+                Some(domain) => Some(OneOrMany::One(StringOrURI::try_from(domain)?)),
                 None => None,
             },
             ..self.to_jwt_claims()?
@@ -1400,10 +1390,7 @@ impl Presentation {
         } else {
             crate::jwk::Algorithm::None
         };
-        let key_id = match (
-            jwk.and_then(|jwk| jwk.key_id.clone()),
-            verification_method.to_owned(),
-        ) {
+        let key_id = match (jwk.and_then(|jwk| jwk.key_id.clone()), verification_method) {
             (Some(jwk_kid), None) => Some(jwk_kid),
             (None, Some(vm_id)) => Some(vm_id.to_string()),
             (None, None) => None,
@@ -1518,10 +1505,7 @@ impl Presentation {
         let verification_method = match header.key_id {
             Some(kid) => kid,
             None => {
-                return (
-                    None,
-                    VerificationResult::error(&format!("JWT header missing key id")),
-                );
+                return (None, VerificationResult::error("JWT header missing key id"));
             }
         };
         let key = match crate::ldp::resolve_key(&verification_method, resolver).await {
@@ -1583,7 +1567,7 @@ impl Presentation {
                 }
                 CredentialOrJWT::JWT(jwt) => {
                     // https://w3c.github.io/vc-data-model/#example-31-jwt-payload-of-a-jwt-based-verifiable-presentation-non-normative
-                    Credential::from_jwt_unsigned_embedded(&jwt)?;
+                    Credential::from_jwt_unsigned_embedded(jwt)?;
                 }
             };
         }
@@ -1640,8 +1624,8 @@ impl Presentation {
                     let proof_purpose = options
                         .proof_purpose
                         .clone()
-                        .unwrap_or_else(|| ProofPurpose::Authentication);
-                    get_verification_methods_for_purpose(&holder, resolver, proof_purpose).await?
+                        .unwrap_or(ProofPurpose::Authentication);
+                    get_verification_methods_for_purpose(holder, resolver, proof_purpose).await?
                 } else {
                     Vec::new()
                 }
@@ -1655,8 +1639,8 @@ impl Presentation {
             .collect();
         let matched_jwt = match jwt_params {
             Some((header, claims)) => jwt_matches(
-                &header,
-                &claims,
+                header,
+                claims,
                 &options,
                 &allowed_vms,
                 &ProofPurpose::Authentication,
@@ -1842,6 +1826,7 @@ impl Proof {
         }
     }
 
+    #[allow(clippy::ptr_arg)]
     pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
         if let Some(ref verification_method) = options.verification_method {
             assert_local!(
@@ -1884,7 +1869,7 @@ fn jwt_matches(
     header: &Header,
     claims: &JWTClaims,
     options: &LinkedDataProofOptions,
-    allowed_vms: &Vec<String>,
+    allowed_vms: &[String],
     expected_proof_purpose: &ProofPurpose,
 ) -> bool {
     let LinkedDataProofOptions {
@@ -1928,7 +1913,7 @@ fn jwt_matches(
         //   verify the verifiable presentation).
         if let Some(domain) = domain {
             // Use domain for audience, and require a match.
-            if aud.into_iter().find(|aud| aud.as_str() == domain).is_none() {
+            if !aud.into_iter().any(|aud| aud.as_str() == domain) {
                 return false;
             }
         } else {
@@ -2022,17 +2007,17 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
     graph_ref.match_iri_property(
         proof_id,
         "https://w3id.org/security#verificationMethod",
-        proof.verification_method.as_ref().map(|vm| vm.as_str()),
+        proof.verification_method.as_deref(),
     )?;
     graph_ref.match_iri_or_string_property(
         proof_id,
         "https://w3id.org/security#challenge",
-        proof.challenge.as_ref().map(|challenge| challenge.as_str()),
+        proof.challenge.as_deref(),
     )?;
     graph_ref.match_iri_or_string_property(
         proof_id,
         "https://w3id.org/security#domain",
-        proof.domain.as_ref().map(|domain| domain.as_str()),
+        proof.domain.as_deref(),
     )?;
     graph_ref.match_date_property(
         proof_id,
@@ -2074,7 +2059,7 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
     )?;
 
     // Disallow additional unexpected statements
-    for triple in graph_ref.triples.into_iter() {
+    if let Some(triple) = graph_ref.triples.into_iter().next() {
         return Err(Error::UnexpectedTriple(triple.clone()));
     }
 
@@ -2271,7 +2256,7 @@ pub(crate) mod tests {
         let (vc_opt, verification_result) =
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
         println!("{:#?}", verification_result);
-        let vc = vc_opt.unwrap();
+        let _vc = vc_opt.unwrap();
         assert_eq!(verification_result.errors.len(), 0);
     }
 

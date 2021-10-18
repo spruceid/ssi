@@ -33,11 +33,11 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
     };
     let mut hasher = blake2b_simd::Params::new();
     hasher.hash_length(20);
-    let blake2b = hasher.hash(&public_key_bytes);
+    let blake2b = hasher.hash(public_key_bytes);
     let blake2b = blake2b.as_bytes();
     let mut outer = Vec::with_capacity(20);
     outer.extend_from_slice(outer_prefix);
-    outer.extend_from_slice(&blake2b);
+    outer.extend_from_slice(blake2b);
     let encoded = bs58::encode(&outer).with_check().into_string();
     Ok(encoded)
 }

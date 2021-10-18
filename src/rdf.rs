@@ -425,10 +425,9 @@ impl<'a> Iterator for DataSetGraphIter<'a> {
     type Item = (Option<&'a GraphLabel>, &'a Graph);
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(ref mut named_graphs_iter) = self.named_graphs_iter {
-            match named_graphs_iter.next() {
-                None => None,
-                Some((graph_label, graph)) => Some((Some(graph_label), graph)),
-            }
+            named_graphs_iter
+                .next()
+                .map(|(graph_label, graph)| (Some(graph_label), graph))
         } else {
             self.named_graphs_iter = Some(self.dataset.named_graphs.iter());
             Some((None, &self.dataset.default_graph))
@@ -649,7 +648,7 @@ impl<'a> GraphRef<'a> {
                         string: StringLiteral(string_literal),
                         type_: IRIRef(type_iri),
                     }) if type_iri == "http://www.w3.org/2001/XMLSchema#dateTime" => {
-                        DateTime::parse_from_rfc3339(&string_literal)
+                        DateTime::parse_from_rfc3339(string_literal)
                             .map_err(|_| Error::UnexpectedTriple(triple.clone()))?
                     }
                     _ => return Err(Error::UnexpectedTriple(triple.clone())),
@@ -728,7 +727,7 @@ impl<'a> GraphRef<'a> {
                         string: StringLiteral(string_literal),
                         type_: IRIRef(type_iri),
                     }) if type_iri == "http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON" => {
-                        serde_json::from_str(&string_literal)?
+                        serde_json::from_str(string_literal)?
                     }
                     _ => return Err(Error::UnexpectedTriple(triple.clone())),
                 };
@@ -766,7 +765,7 @@ impl<'a> GraphRef<'a> {
             }
             (Some(value), Some(mut triple)) => {
                 let array_vec = value.as_array().ok_or(Error::ExpectedArray)?;
-                let mut array_iter = array_vec.into_iter();
+                let mut array_iter = array_vec.iter();
                 // Iterate through list and match it with array values.
                 // More info about lists in JSON-LD/RDF: https://www.w3.org/TR/json-ld11/#lists
                 while triple.object

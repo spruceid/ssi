@@ -17,7 +17,6 @@ use ssi::jws::{decode_unverified, decode_verify};
 mod explorer;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use chrono::prelude::*;
 use json_patch::patch;
 use serde::Deserialize;
 use serde_json::Value;
@@ -59,7 +58,7 @@ impl DIDResolver for DIDTz {
             }
             _ => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -74,7 +73,7 @@ impl DIDResolver for DIDTz {
             "florencenet" => "NetXxkAx4woPLyu",
             _ => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -85,7 +84,7 @@ impl DIDResolver for DIDTz {
             Some(prefix) => prefix,
             None => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -95,7 +94,7 @@ impl DIDResolver for DIDTz {
             Some(addr) => addr,
             None => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -134,7 +133,7 @@ impl DIDResolver for DIDTz {
             proof_type,
             proof_type_iri,
             &address,
-            &genesis_block_hash,
+            genesis_block_hash,
             public_key,
         );
 
@@ -278,6 +277,7 @@ fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str, &'s
 fn get_public_key_from_doc(doc: &Document, auth_vm_id: &str) -> Option<String> {
     if let Some(vms) = &doc.authentication {
         for vm in vms {
+            #[allow(clippy::single_match)]
             match vm {
                 VerificationMethod::Map(vmm) => {
                     if vmm.id == auth_vm_id {
@@ -296,7 +296,7 @@ fn get_public_key_from_doc(doc: &Document, auth_vm_id: &str) -> Option<String> {
 
 impl DIDMethod for DIDTz {
     fn name(&self) -> &'static str {
-        return "tz";
+        "tz"
     }
 
     // TODO need to handle different networks
@@ -422,7 +422,7 @@ impl DIDTz {
                     let mut doc_json = serde_json::to_value(&mut *doc)?;
                     let (patch_metadata, _) = decode_unverified(&jws)?;
                     let curve = prefix_to_curve_type(prefix)
-                        .ok_or(anyhow!("Unsupported curve."))?
+                        .ok_or_else(|| anyhow!("Unsupported curve."))?
                         .0
                         .to_string();
                     let kid = match patch_metadata.key_id {
@@ -454,9 +454,8 @@ impl DIDTz {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
                                     .into_vec()
-                                    .or_else(|e| {
-                                        Err(anyhow!("Couldn't decode public key: {}", e))
-                                    })?[4..]
+                                    .map_err(|e| anyhow!("Couldn't decode public key: {}", e))?
+                                    [4..]
                                     .to_vec();
                                 JWK {
                                     params: Params::OKP(OctetParams {
@@ -479,15 +478,11 @@ impl DIDTz {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
                                     .into_vec()
-                                    .or_else(|e| {
-                                        Err(anyhow!("Couldn't decode public key: {}", e))
-                                    })?[4..]
+                                    .map_err(|e| anyhow!("Couldn't decode public key: {}", e))?
+                                    [4..]
                                     .to_vec();
-                                secp256k1_parse(&pk).or_else(|e| {
-                                    Err(anyhow!(
-                                        "Couldn't create JWK from secp256k1 public key: {}",
-                                        e
-                                    ))
+                                secp256k1_parse(&pk).map_err(|e| {
+                                    anyhow!("Couldn't create JWK from secp256k1 public key: {}", e)
                                 })?
                             }
                             #[cfg(feature = "secp256r1")]
@@ -495,12 +490,11 @@ impl DIDTz {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
                                     .into_vec()
-                                    .or_else(|e| {
-                                        Err(anyhow!("Couldn't decode public key: {}", e))
-                                    })?[4..]
+                                    .map_err(|e| anyhow!("Couldn't decode public key: {}", e))?
+                                    [4..]
                                     .to_vec();
-                                p256_parse(&pk).or_else(|e| {
-                                    Err(anyhow!("Couldn't create JWK from P-256 public key: {}", e))
+                                p256_parse(&pk).map_err(|e| {
+                                    anyhow!("Couldn't create JWK from P-256 public key: {}", e)
                                 })?
                             }
                             p => return Err(anyhow!("{} not supported yet.", p)),
@@ -509,7 +503,7 @@ impl DIDTz {
                         patch(
                             &mut doc_json,
                             &serde_json::from_slice(
-                                &serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)?
+                                serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)?
                                     .ietf_json_patch
                                     .to_string()
                                     .as_bytes(),

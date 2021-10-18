@@ -42,7 +42,7 @@ impl FromStr for ChainId {
         let mut reference = String::with_capacity(REFERENCE_MAX_LENGTH);
         let mut chars = chain_id.chars();
         let mut separated = false;
-        while let Some(c) = chars.next() {
+        for c in &mut chars {
             match c {
                 '-' | 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l'
                 | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y'

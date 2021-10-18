@@ -33,7 +33,7 @@ impl Default for DIDOnion {
 }
 
 fn did_onion_url(did: &str) -> Result<String, ResolutionMetadata> {
-    let mut parts = did.split(":").peekable();
+    let mut parts = did.split(':').peekable();
     let onion_address = match (parts.next(), parts.next(), parts.next()) {
         (Some("did"), Some("onion"), Some(domain_name)) => domain_name,
         _ => {
@@ -190,7 +190,7 @@ impl DIDResolver for DIDOnion {
 
 impl DIDMethod for DIDOnion {
     fn name(&self) -> &'static str {
-        return "onion";
+        "onion"
     }
 
     fn to_resolver(&self) -> &dyn DIDResolver {
@@ -201,7 +201,6 @@ impl DIDMethod for DIDOnion {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::SocketAddr;
 
     #[async_std::test]
     async fn parse_did_onion() {
@@ -241,6 +240,7 @@ mod tests {
 
     // localhost web server for serving did:onion DID documents.
     // Based on the one in did-web's tests.
+    use std::net::SocketAddr;
     fn web_server() -> Result<(String, impl FnOnce() -> Result<(), ()>), hyper::Error> {
         use http::header::{HeaderValue, CONTENT_TYPE};
         use hyper::service::{make_service_fn, service_fn};

@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use chrono::prelude::*;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -52,7 +51,7 @@ impl DIDResolver for DIDSol {
             Some(parsed) => parsed,
             None => {
                 return (
-                    ResolutionMetadata::from_error(&ERROR_INVALID_DID),
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
                     None,
                     None,
                 )
@@ -121,7 +120,7 @@ impl DIDResolver for DIDSol {
         let solvm = VerificationMethod::Map(VerificationMethodMap {
             id: solvm_didurl.to_string(),
             type_: "SolanaMethod2021".to_string(),
-            public_key_jwk: Some(pk_jwk.clone()),
+            public_key_jwk: Some(pk_jwk),
             controller: did.to_string(),
             blockchain_account_id: Some(blockchain_account_id.to_string()),
             ..Default::default()
@@ -138,8 +137,8 @@ impl DIDResolver for DIDSol {
                 VerificationMethod::DIDURL(solvm_didurl.clone()),
             ]),
             assertion_method: Some(vec![
-                VerificationMethod::DIDURL(vm_didurl.clone()),
-                VerificationMethod::DIDURL(solvm_didurl.clone()),
+                VerificationMethod::DIDURL(vm_didurl),
+                VerificationMethod::DIDURL(solvm_didurl),
             ]),
             // TODO: authentication/assertion_method?
             verification_method: Some(vec![vm, solvm]),
@@ -165,7 +164,7 @@ impl DIDResolver for DIDSol {
 
 impl DIDMethod for DIDSol {
     fn name(&self) -> &'static str {
-        return "sol";
+        "sol"
     }
 
     fn generate(&self, source: &Source) -> Option<String> {

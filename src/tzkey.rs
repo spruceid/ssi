@@ -3,7 +3,9 @@ use crate::jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
 use core::convert::TryFrom;
 
 const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
+#[cfg(feature = "k256")]
 const SPPK_PREFIX: [u8; 4] = [3, 254, 226, 86];
+#[cfg(feature = "p256")]
 const P2PK_PREFIX: [u8; 4] = [3, 178, 139, 127];
 
 pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
@@ -49,7 +51,7 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
         }
     };
     tzkey_prefixed.extend_from_slice(&prefix);
-    tzkey_prefixed.extend_from_slice(&bytes);
+    tzkey_prefixed.extend_from_slice(bytes);
     let tzkey = bs58::encode(tzkey_prefixed).with_check().into_string();
     Ok(tzkey)
 }
@@ -109,8 +111,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
         #[cfg(feature = "secp256k1")]
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk =
-                crate::jwk::secp256k1_parse(&pk_bytes).map_err(|e| Error::Secp256k1Parse(e))?;
+            let jwk = crate::jwk::secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse)?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
         #[cfg(feature = "p256")]
@@ -144,7 +145,7 @@ pub enum SignTezosError {
 }
 
 pub fn sign_tezos(data: &[u8], algorithm: Algorithm, key: &JWK) -> Result<String, SignTezosError> {
-    let sig = crate::jws::sign_bytes(algorithm, &data, key)
+    let sig = crate::jws::sign_bytes(algorithm, data, key)
         .map_err(|e| SignTezosError::Sign(e.to_string()))?;
     let mut sig_prefixed = Vec::new();
     const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
@@ -156,7 +157,7 @@ pub fn sign_tezos(data: &[u8], algorithm: Algorithm, key: &JWK) -> Result<String
         Algorithm::ESBlake2b => &P2SIG_PREFIX,
         alg => return Err(SignTezosError::UnsupportedAlgorithm(alg)),
     };
-    sig_prefixed.extend_from_slice(&prefix);
+    sig_prefixed.extend_from_slice(prefix);
     sig_prefixed.extend_from_slice(&sig);
     let sig_bs58 = bs58::encode(sig_prefixed).with_check().into_string();
     Ok(sig_bs58)
@@ -169,13 +170,13 @@ pub enum EncodeTezosSignedMessageError {
 }
 
 pub fn encode_tezos_signed_message(msg: &str) -> Result<Vec<u8>, EncodeTezosSignedMessageError> {
-    const BYTES_PREFIX: [u8; 2] = [05, 01];
+    const BYTES_PREFIX: [u8; 2] = [0x05, 0x01];
     let msg_bytes = msg.as_bytes();
     let mut bytes = Vec::with_capacity(msg_bytes.len());
     let prefix = b"Tezos Signed Message: ";
     let msg_len = prefix.len() + msg_bytes.len();
 
-    let len_u32 = u32::try_from(msg_len).map_err(|e| EncodeTezosSignedMessageError::Length(e))?;
+    let len_u32 = u32::try_from(msg_len).map_err(EncodeTezosSignedMessageError::Length)?;
     bytes.extend_from_slice(&BYTES_PREFIX);
     bytes.extend_from_slice(&len_u32.to_be_bytes());
     bytes.extend_from_slice(prefix);

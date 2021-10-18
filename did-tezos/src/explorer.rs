@@ -1,5 +1,4 @@
 use anyhow::Result;
-use reqwest;
 use serde::Deserialize;
 use ssi::did::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
 use ssi::one_or_many::OneOrMany;
@@ -24,7 +23,7 @@ pub async fn retrieve_did_manager(bcd_url: &str, address: &str) -> Result<Option
         .json()
         .await?;
 
-    if contracts.len() > 0 {
+    if !contracts.is_empty() {
         Ok(Some(contracts[0].clone()))
     } else {
         Ok(None)
@@ -63,7 +62,7 @@ pub async fn execute_service_view(tzkt_url: &str, did: &str, contract: &str) -> 
         id: format!("{}{}", did, "#discovery"),
         type_: OneOrMany::One(service_result.service.type_.clone()),
         service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
-            service_result.service.endpoint.clone(),
+            service_result.service.endpoint,
         ))),
         property_set: None,
     })

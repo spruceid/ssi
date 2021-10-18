@@ -12,6 +12,7 @@ use ssi::did_resolve::{
     TYPE_DID_LD_JSON,
 };
 
+#[allow(clippy::upper_case_acronyms)]
 type DID = String;
 type ContentType = String;
 
@@ -181,11 +182,10 @@ async fn did_method_vector(resolver: &dyn DIDResolver, did: &str) -> DIDVector {
         did_resolution_metadata: res_repr_meta,
     };
     did_data.insert(content_type, resolution_result);
-    let did_vector = DIDVector {
+    DIDVector {
         did_document_data_model: DIDDocumentDataModel { properties },
         did_data,
-    };
-    did_vector
+    }
 }
 
 async fn report_method_key() {
@@ -193,7 +193,7 @@ async fn report_method_key() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in vec![
+    for did in &[
         "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH", // Ed25519
         "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme", // Secp256k1
         "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169", // Secp256r1
@@ -251,7 +251,7 @@ async fn report_method_tz() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in vec![
+    for did in &[
         "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x",
         "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq",
         "did:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
@@ -281,7 +281,7 @@ async fn report_method_onion() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in vec!["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
+    for did in &["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
         let did_vector = did_method_vector(&resolver, did).await;
         did_vectors.insert(did.to_string(), did_vector);
     }
@@ -306,7 +306,7 @@ async fn report_method_pkh() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in vec![
+    for did in &[
         "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
         "did:pkh:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x",
         "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a",
@@ -338,7 +338,7 @@ async fn report_method_webkey() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in vec!["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
+    for did in &["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
         let did_vector = did_method_vector(&resolver, did).await;
         did_vectors.insert(did.to_string(), did_vector);
     }
@@ -373,7 +373,7 @@ impl ResolverOutcome {
         if deactivated == Some(true) {
             return Self::DeactivatedOutcome;
         }
-        return Self::DefaultOutcome;
+        Self::DefaultOutcome
     }
 }
 
@@ -391,7 +391,7 @@ impl DIDResolverImplementation {
         };
         let error_opt = res_meta.error.clone();
         let doc_meta = doc_meta_opt.unwrap_or_default();
-        let deactivated_opt = doc_meta.deactivated.clone();
+        let deactivated_opt = doc_meta.deactivated;
         let output = ExecutionOutput::Resolve {
             did_document: doc_opt,
             did_resolution_metadata: res_meta,
@@ -420,7 +420,7 @@ impl DIDResolverImplementation {
         };
         let error_opt = res_meta.error.clone();
         let doc_meta = doc_meta_opt.unwrap_or_default();
-        let deactivated_opt = doc_meta.deactivated.clone();
+        let deactivated_opt = doc_meta.deactivated;
         let output = ExecutionOutput::ResolveRepresentation {
             did_document_stream: representation,
             did_resolution_metadata: res_meta,
@@ -453,7 +453,7 @@ impl DIDResolverImplementation {
         };
         let content_stream = match content {
             Content::DIDDocument(doc) => serde_json::to_string(&doc).unwrap(),
-            Content::URL(url) => String::from(url),
+            Content::URL(url) => url,
             Content::Object(resource) => serde_json::to_string(&resource).unwrap(),
             Content::Data(vec) => String::from_utf8(vec).unwrap(),
             Content::Null => "".to_string(),
@@ -493,7 +493,7 @@ async fn report_resolver_key() {
         executions: Vec::new(),
     };
 
-    for did in vec![
+    for did in &[
         "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH", // Ed25519
         "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme", // Secp256k1
         "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169", // Secp256r1
@@ -508,7 +508,7 @@ async fn report_resolver_key() {
             .await;
     }
 
-    for did in vec!["did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"] {
+    for did in &["did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"] {
         report
             .resolve_representation(
                 &did_method_key::DIDKey,
@@ -531,7 +531,7 @@ async fn report_resolver_web() {
         executions: Vec::new(),
     };
 
-    for did in vec![
+    for did in &[
         "did:web:identity.foundation",
         "did:web:did.actor:nonexistent",
     ] {
@@ -540,7 +540,7 @@ async fn report_resolver_web() {
             .await;
     }
 
-    for did in vec!["did:web:identity.foundation"] {
+    for did in &["did:web:identity.foundation"] {
         report
             .resolve_representation(&did_web::DIDWeb, did, &ResolutionInputMetadata::default())
             .await;
@@ -560,7 +560,7 @@ async fn report_resolver_tz() {
         executions: Vec::new(),
     };
 
-    for did in vec![
+    for did in &[
         "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x",
         "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq",
         "did:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
@@ -571,7 +571,7 @@ async fn report_resolver_tz() {
             .await;
     }
 
-    for did in vec!["did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x"] {
+    for did in &["did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x"] {
         report
             .resolve_representation(&did_tz, did, &ResolutionInputMetadata::default())
             .await;
@@ -591,13 +591,13 @@ async fn report_resolver_onion() {
         executions: Vec::new(),
     };
 
-    for did in vec!["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
+    for did in &["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
         report
             .resolve(&resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
-    for did in vec!["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
+    for did in &["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
         report
             .resolve_representation(&resolver, did, &ResolutionInputMetadata::default())
             .await;
@@ -617,13 +617,13 @@ async fn report_resolver_pkh() {
         executions: Vec::new(),
     };
 
-    for did in vec!["did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"] {
+    for did in &["did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"] {
         report
             .resolve(&resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
-    for did in vec!["did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"] {
+    for did in &["did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"] {
         report
             .resolve_representation(&resolver, did, &ResolutionInputMetadata::default())
             .await;
@@ -643,13 +643,13 @@ async fn report_resolver_webkey() {
         executions: Vec::new(),
     };
 
-    for did in vec!["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
+    for did in &["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
         report
             .resolve(&resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
-    for did in vec!["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
+    for did in &["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
         report
             .resolve_representation(&resolver, did, &ResolutionInputMetadata::default())
             .await;
@@ -668,7 +668,7 @@ async fn report_dereferencer_key() {
         executions: Vec::new(),
     };
 
-    for did_url in vec![
+    for did_url in &[
         "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
         "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
         "bad:invalid",
@@ -695,7 +695,7 @@ async fn report_dereferencer_web() {
         executions: Vec::new(),
     };
 
-    for did_url in vec![
+    for did_url in &[
         "did:web:did.actor:nonexistent",
         "did:web:demo.spruceid.com:2021:07:14:service-example",
         "did:web:demo.spruceid.com:2021:07:14:service-example?service=hello",
@@ -722,7 +722,7 @@ async fn report_dereferencer_tz() {
         expected_outcomes: HashMap::new(),
         executions: Vec::new(),
     };
-    for did_url in vec![
+    for did_url in &[
         "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x",
         "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x#blockchainAccountId",
     ] {
@@ -745,7 +745,7 @@ async fn report_dereferencer_onion() {
         executions: Vec::new(),
     };
 
-    for did_url in vec![
+    for did_url in &[
         "did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid",
         "did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid#g7r2t9G8dBBnG7yZkD8sly3ImDlrntB25s2pGuaD97E"
     ] {
@@ -768,7 +768,7 @@ async fn report_dereferencer_pkh() {
         executions: Vec::new(),
     };
 
-    for did_url in vec![
+    for did_url in &[
         "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
         "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L#blockchainAccountId",
     ] {
@@ -791,7 +791,7 @@ async fn report_dereferencer_webkey() {
         executions: Vec::new(),
     };
 
-    for did_url in vec![
+    for did_url in &[
         "did:webkey:ssh:demo.spruceid.com:2021:07:14:keys",
         "did:webkey:ssh:demo.spruceid.com:2021:07:14:keys#b2sb-RCkrCm9c569tNc76JBbirQiR9WCL6kf8GlqbvQ"
     ] {

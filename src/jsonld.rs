@@ -711,7 +711,7 @@ pub fn generate_node_map(
                         node_map,
                         Some(active_graph),
                         Some(&referenced_node),
-                        Some(&property),
+                        Some(property),
                         None,
                         blank_node_id_generator,
                     )?;
@@ -1247,10 +1247,9 @@ pub fn object_to_rdf(
         None => return Err(Error::ExpectedString),
     };
     let language = match item.language {
-        Some(language) => match language.as_str() {
-            Some(language_str) => Some(language_str.to_string()),
-            None => None,
-        },
+        Some(language) => language
+            .as_str()
+            .map(|language_str| language_str.to_string()),
         None => None,
     };
     let literal;
@@ -1354,7 +1353,7 @@ pub fn canonicalize_json(value: &JsonValue) -> String {
         JsonValue::Boolean(true) => "true".to_string(),
         JsonValue::Boolean(false) => "false".to_string(),
         JsonValue::Short(short) => canonicalize_json_string(short.as_str()),
-        JsonValue::String(string) => canonicalize_json_string(&string),
+        JsonValue::String(string) => canonicalize_json_string(string),
         JsonValue::Number(_) => canonicalize_json_number(value),
         JsonValue::Array(array) => {
             let mut string = "[".to_string();
@@ -1380,7 +1379,7 @@ pub fn canonicalize_json(value: &JsonValue) -> String {
                 } else {
                     string.push(',');
                 }
-                string.push_str(&canonicalize_json_string(&key));
+                string.push_str(&canonicalize_json_string(key));
                 string.push(':');
                 string.push_str(&canonicalize_json(value));
             }
@@ -1529,7 +1528,7 @@ where
     }
     let mut doc = json::parse(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
-        let more_contexts = json::parse(&more_contexts_json)?;
+        let more_contexts = json::parse(more_contexts_json)?;
         // Merge additional contexts into document. This is needed for serializing proofs, since
         // they typically inherit the context of the parent credential/presentation rather than
         // including their own.

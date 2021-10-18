@@ -25,7 +25,7 @@ fn take_key(keys: &JWTKeys) -> &JWK {
     }
 }
 
-async fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -> String {
+async fn generate_jwt(data: &str, keys: &JWTKeys, aud: &str, sign: bool) -> String {
     let resolver = DIDExample;
     let vc = Credential::from_json_unsigned(data).unwrap();
     let options = LinkedDataProofOptions {
@@ -38,18 +38,18 @@ async fn generate_jwt(data: &String, keys: &JWTKeys, aud: &String, sign: bool) -
     vc.generate_jwt(jwk_opt, &options, &resolver).await.unwrap()
 }
 
-fn decode_jwt_unsigned(data: &String) -> String {
+fn decode_jwt_unsigned(data: &str) -> String {
     let vc = Credential::from_jwt_unsigned(data).unwrap();
     serde_json::to_string_pretty(&vc).unwrap()
 }
 
-fn generate_presentation(data: &String) -> String {
+fn generate_presentation(data: &str) -> String {
     let vp = Presentation::from_json(data).unwrap();
 
     serde_json::to_string_pretty(&vp).unwrap()
 }
 
-async fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) -> String {
+async fn generate_jwt_presentation(data: &str, keys: &JWTKeys, aud: &str) -> String {
     let resolver = DIDExample;
     let vp = Presentation::from_json_unsigned(data).unwrap();
     let options = LinkedDataProofOptions {
@@ -65,7 +65,7 @@ async fn generate_jwt_presentation(data: &String, keys: &JWTKeys, aud: &String) 
         .unwrap()
 }
 
-fn read_file(filename: &String) -> String {
+fn read_file(filename: &str) -> String {
     let mut file = std::fs::File::open(filename).unwrap();
     let mut data = String::new();
     use std::io::Read;
@@ -89,34 +89,30 @@ async fn main() {
     let mut jwt_no_jws = false;
     let mut jwt_presentation = false;
     let mut jwt_decode = false;
-    let mut args_iter = args.into_iter();
+    let mut args_iter = args;
     let _bin = args_iter.next().unwrap();
-    loop {
-        match args_iter.next() {
-            Some(arg) => match (arg.starts_with("--"), arg.as_ref()) {
-                (true, "--jwt") => match args_iter.next() {
-                    Some(jwt_b64) => {
-                        let jwt_json = base64::decode(jwt_b64).unwrap();
-                        jwt_keys = Option::Some(serde_json::from_slice(&jwt_json).unwrap());
-                    }
-                    None => {}
-                },
-                (true, "--jwt-aud") => jwt_aud = args_iter.next(),
-                (true, "--jwt-no-jws") => jwt_no_jws = true,
-                (true, "--jwt-presentation") => jwt_presentation = true,
-                (true, "--jwt-decode") => jwt_decode = true,
-                (true, _) => panic!("Unexpected option '{}'", arg),
-                (false, _) => {
-                    if cmd == None {
-                        cmd = Option::Some(arg);
-                    } else if filename == None {
-                        filename = Option::Some(arg);
-                    } else {
-                        panic!("Unexpected argument '{}'", arg);
-                    }
+    while let Some(arg) = args_iter.next() {
+        match (arg.starts_with("--"), arg.as_ref()) {
+            (true, "--jwt") => {
+                if let Some(jwt_b64) = args_iter.next() {
+                    let jwt_json = base64::decode(jwt_b64).unwrap();
+                    jwt_keys = Option::Some(serde_json::from_slice(&jwt_json).unwrap());
                 }
-            },
-            None => break,
+            }
+            (true, "--jwt-aud") => jwt_aud = args_iter.next(),
+            (true, "--jwt-no-jws") => jwt_no_jws = true,
+            (true, "--jwt-presentation") => jwt_presentation = true,
+            (true, "--jwt-decode") => jwt_decode = true,
+            (true, _) => panic!("Unexpected option '{}'", arg),
+            (false, _) => {
+                if cmd == None {
+                    cmd = Option::Some(arg);
+                } else if filename == None {
+                    filename = Option::Some(arg);
+                } else {
+                    panic!("Unexpected argument '{}'", arg);
+                }
+            }
         }
     }
     if cmd == None || filename == None {

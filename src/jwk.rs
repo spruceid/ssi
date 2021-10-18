@@ -475,7 +475,7 @@ impl RSAParams {
 
     /// Validate key size is at least 2048 bits, per [RFC 7518 section 3.3](https://www.rfc-editor.org/rfc/rfc7518#section-3.3).
     pub fn validate_key_size(&self) -> Result<(), Error> {
-        let ref n = self.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
+        let n = &self.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
         if n.len() < 256 {
             return Err(Error::InvalidKeyLength);
         }
@@ -557,10 +557,11 @@ impl ToASN1 for OctetParams {
             return Err(Error::CurveNotImplemented(self.curve.to_string()));
         }
         let public_key = BitString(self.public_key.0.clone());
-        if let Some(private_key) = match &self.private_key {
-            Some(private_key) => Some(OctetString(private_key.0.clone())),
-            None => None,
-        } {
+        if let Some(private_key) = self
+            .private_key
+            .as_ref()
+            .map(|private_key| OctetString(private_key.0.clone()))
+        {
             let key = Ed25519PrivateKey {
                 public_key,
                 private_key,
