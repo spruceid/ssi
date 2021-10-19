@@ -2,6 +2,7 @@ use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use std::convert::TryFrom;
 use std::result::Result;
+use zeroize::Zeroize;
 
 use crate::der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
@@ -60,7 +61,7 @@ pub struct JWK {
     pub params: Params,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 #[serde(tag = "kty")]
 pub enum Params {
     EC(ECParams),
@@ -70,7 +71,7 @@ pub enum Params {
     OKP(OctetParams),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 pub struct ECParams {
     // Parameters for Elliptic Curve Public Keys
     #[serde(rename = "crv")]
@@ -86,7 +87,7 @@ pub struct ECParams {
     pub ecc_private_key: Option<Base64urlUInt>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default, Hash, Eq, Zeroize)]
 pub struct RSAParams {
     // Parameters for RSA Public Keys
     #[serde(rename = "n")]
@@ -118,14 +119,14 @@ pub struct RSAParams {
     pub other_primes_info: Option<Vec<Prime>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 pub struct SymmetricParams {
     // Parameters for Symmetric Keys
     #[serde(rename = "k")]
     pub key_value: Option<Base64urlUInt>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 pub struct OctetParams {
     // Parameters for Octet Key Pair Public Keys
     #[serde(rename = "crv")]
@@ -139,7 +140,7 @@ pub struct OctetParams {
     pub private_key: Option<Base64urlUInt>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 pub struct Prime {
     #[serde(rename = "r")]
     pub prime_factor: Base64urlUInt,
@@ -149,7 +150,7 @@ pub struct Prime {
     pub factor_crt_coefficient: Base64urlUInt,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 #[serde(try_from = "String")]
 #[serde(into = "Base64urlUIntString")]
 pub struct Base64urlUInt(pub Vec<u8>);
