@@ -17,11 +17,9 @@ pub enum SSHKeyToJWKError {
 }
 
 fn pk_to_jwk_rsa(pk: &sshkeys::RsaPublicKey) -> JWK {
-    JWK::from(JWKParams::RSA(crate::jwk::RSAParams {
-        exponent: Some(Base64urlUInt(pk.e.clone())),
-        modulus: Some(Base64urlUInt(pk.n.clone())),
-        ..Default::default()
-    }))
+    JWK::from(JWKParams::RSA(crate::jwk::RSAParams::new_public(
+        &pk.e, &pk.n,
+    )))
 }
 
 fn pk_to_jwk_ecdsa(pk: &sshkeys::EcdsaPublicKey) -> Result<JWK, SSHKeyToJWKError> {

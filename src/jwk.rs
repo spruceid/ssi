@@ -473,6 +473,21 @@ impl RSAParams {
         }
     }
 
+    /// Construct a RSA public key
+    pub fn new_public(exponent: &[u8], modulus: &[u8]) -> Self {
+        Self {
+            modulus: Some(Base64urlUInt(modulus.to_vec())),
+            exponent: Some(Base64urlUInt(exponent.to_vec())),
+            private_exponent: None,
+            first_prime_factor: None,
+            second_prime_factor: None,
+            first_prime_factor_crt_exponent: None,
+            second_prime_factor_crt_exponent: None,
+            first_crt_coefficient: None,
+            other_primes_info: None,
+        }
+    }
+
     /// Validate key size is at least 2048 bits, per [RFC 7518 section 3.3](https://www.rfc-editor.org/rfc/rfc7518#section-3.3).
     pub fn validate_key_size(&self) -> Result<(), Error> {
         let n = &self.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
