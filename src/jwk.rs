@@ -71,6 +71,62 @@ pub enum Params {
     OKP(OctetParams),
 }
 
+impl Drop for ECParams {
+    fn drop(&mut self) {
+        // Zeroize private key
+        if let Some(ref mut d) = self.ecc_private_key {
+            d.zeroize();
+        }
+    }
+}
+
+impl Drop for RSAParams {
+    fn drop(&mut self) {
+        // Zeroize private key fields
+        if let Some(ref mut d) = self.private_exponent {
+            d.zeroize();
+        }
+        if let Some(ref mut p) = self.first_prime_factor {
+            p.zeroize();
+        }
+        if let Some(ref mut q) = self.second_prime_factor {
+            q.zeroize();
+        }
+        if let Some(ref mut dp) = self.first_prime_factor_crt_exponent {
+            dp.zeroize();
+        }
+        if let Some(ref mut dq) = self.second_prime_factor_crt_exponent {
+            dq.zeroize();
+        }
+        if let Some(ref mut qi) = self.first_crt_coefficient {
+            qi.zeroize();
+        }
+        if let Some(ref mut primes) = self.other_primes_info {
+            for prime in primes {
+                prime.zeroize();
+            }
+        }
+    }
+}
+
+impl Drop for SymmetricParams {
+    fn drop(&mut self) {
+        // Zeroize private/symmetric key
+        if let Some(ref mut k) = self.key_value {
+            k.zeroize();
+        }
+    }
+}
+
+impl Drop for OctetParams {
+    fn drop(&mut self) {
+        // Zeroize private key
+        if let Some(ref mut d) = self.private_key {
+            d.zeroize();
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 pub struct ECParams {
     // Parameters for Elliptic Curve Public Keys
@@ -242,20 +298,9 @@ impl JWK {
         let secret_key = k256::SecretKey::random(&mut rng);
         let sk_bytes = secret_key.to_bytes();
         let public_key = secret_key.public_key();
-        Ok(JWK {
-            params: Params::EC(ECParams {
-                ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
-                ..ECParams::try_from(&public_key)?
-            }),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        })
+        let mut ec_params = ECParams::try_from(&public_key)?;
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
+        Ok(JWK::from(Params::EC(ec_params)))
     }
 
     #[cfg(feature = "p256")]
@@ -265,20 +310,9 @@ impl JWK {
         use p256::elliptic_curve::ff::PrimeField;
         let sk_bytes = secret_key.secret_scalar().to_repr();
         let public_key: p256::PublicKey = secret_key.public_key();
-        Ok(JWK {
-            params: Params::EC(ECParams {
-                ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
-                ..ECParams::try_from(&public_key)?
-            }),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        })
+        let mut ec_params = ECParams::try_from(&public_key)?;
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
+        Ok(JWK::from(Params::EC(ec_params)))
     }
 
     pub fn get_algorithm(&self) -> Option<Algorithm> {
@@ -470,7 +504,13 @@ impl RSAParams {
         Self {
             modulus: self.modulus.clone(),
             exponent: self.exponent.clone(),
-            ..Default::default()
+            private_exponent: None,
+            first_prime_factor: None,
+            second_prime_factor: None,
+            first_prime_factor_crt_exponent: None,
+            second_prime_factor_crt_exponent: None,
+            first_crt_coefficient: None,
+            other_primes_info: None,
         }
     }
 
