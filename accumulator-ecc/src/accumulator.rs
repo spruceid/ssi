@@ -235,6 +235,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn one_year_updates() {
         use crate::proof::MembershipProofCommitting;
         use crate::witness::MembershipWitness;
