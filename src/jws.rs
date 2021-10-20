@@ -217,6 +217,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         },
         _ => return Err(Error::KeyTypeNotImplemented),
     };
+    clear_on_drop::clear_stack(1);
     Ok(signature)
 }
 
