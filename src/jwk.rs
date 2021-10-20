@@ -244,19 +244,19 @@ impl Default for Algorithm {
 impl JWK {
     #[cfg(feature = "ring")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
-        use ring::signature::KeyPair;
         let rng = ring::rand::SystemRandom::new();
-        let doc = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?;
-        let key_pkcs8 = doc.as_ref();
-        let keypair = ring::signature::Ed25519KeyPair::from_pkcs8(key_pkcs8)?;
-        let public_key = keypair.public_key().as_ref();
+        let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
+            .as_ref()
+            .to_vec();
         // reference: ring/src/ec/curve25519/ed25519/signing.rs
-        let private_key = &key_pkcs8[0x10..0x30];
+        let private_key = key_pkcs8[0x10..0x30].to_vec();
+        let public_key = key_pkcs8[0x35..0x55].to_vec();
+        key_pkcs8.zeroize();
         Ok(JWK {
             params: Params::OKP(OctetParams {
                 curve: "Ed25519".to_string(),
-                public_key: Base64urlUInt(public_key.to_vec()),
-                private_key: Some(Base64urlUInt(private_key.to_vec())),
+                public_key: Base64urlUInt(public_key),
+                private_key: Some(Base64urlUInt(private_key)),
             }),
             public_key_use: None,
             key_operations: None,
