@@ -252,21 +252,11 @@ impl JWK {
         let private_key = key_pkcs8[0x10..0x30].to_vec();
         let public_key = key_pkcs8[0x35..0x55].to_vec();
         key_pkcs8.zeroize();
-        Ok(JWK {
-            params: Params::OKP(OctetParams {
-                curve: "Ed25519".to_string(),
-                public_key: Base64urlUInt(public_key),
-                private_key: Some(Base64urlUInt(private_key)),
-            }),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        })
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(public_key),
+            private_key: Some(Base64urlUInt(private_key)),
+        })))
     }
 
     #[cfg(feature = "ed25519-dalek")]
@@ -275,21 +265,11 @@ impl JWK {
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
         let sk_bytes = keypair.secret.to_bytes();
         let pk_bytes = keypair.public.to_bytes();
-        Ok(JWK {
-            params: Params::OKP(OctetParams {
-                curve: "Ed25519".to_string(),
-                public_key: Base64urlUInt(pk_bytes.to_vec()),
-                private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
-            }),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        })
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(pk_bytes.to_vec()),
+            private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+        })))
     }
 
     #[cfg(feature = "k256")]
