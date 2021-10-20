@@ -276,10 +276,11 @@ impl JWK {
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = k256::SecretKey::random(&mut rng);
-        let sk_bytes = secret_key.to_bytes();
+        // SecretKey zeroizes on drop
+        let sk_bytes = secret_key.to_bytes().to_vec();
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
-        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes));
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
@@ -287,11 +288,11 @@ impl JWK {
     pub fn generate_p256() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = p256::SecretKey::random(&mut rng);
-        use p256::elliptic_curve::ff::PrimeField;
-        let sk_bytes = secret_key.secret_scalar().to_repr();
+        // SecretKey zeroizes on drop
+        let sk_bytes = secret_key.to_bytes().to_vec();
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
-        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes));
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
