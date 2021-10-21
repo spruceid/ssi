@@ -1,3 +1,4 @@
+//! Error types for `ssi` crate
 use crate::caip10::BlockchainAccountIdParseError;
 use crate::caip10::BlockchainAccountIdVerifyError;
 #[cfg(feature = "keccak-hash")]
@@ -35,182 +36,345 @@ use std::num::ParseIntError;
 use std::string::FromUtf8Error;
 use thiserror::Error;
 
+/// Error type for `ssi`.
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Invalid subject for JWT VC
     InvalidSubject,
+    /// Invalid `crit` property in JWT header
     InvalidCriticalHeader,
+    /// Unknown `crit` header name in JWT header
     UnknownCriticalHeader,
+    /// Invalid issuer for JWT
     InvalidIssuer,
+    /// Functionality not implemented
     NotImplemented,
+    /// JWA algorithm not implemented
     AlgorithmNotImplemented,
+    /// Linked Data Proof type not implemented
     ProofTypeNotImplemented,
+    /// Missing algorithm in JWT
     MissingAlgorithm,
+    /// Missing curve in JWK
     MissingCurve,
+    /// Missing elliptic curve point in JWK
     MissingPoint,
+    /// Missing key value for symmetric key
     MissingKeyValue,
+    /// Missing identifier
     MissingIdentifier,
+    /// Missing chosen issuer
     MissingChosenIssuer,
+    /// Expected RDF term
     ExpectedTerm,
+    /// Expected RDF N-Quad
     ExpectedNQuad,
+    /// Expected RDF Literal
     ExpectedLiteral,
+    /// Expected RDF blank node label
     ExpectedBlankNodeLabel,
+    /// Expected RDF IRI reference
     ExpectedIRIRef,
+    /// Expected RDF language tag
     ExpectedLang,
+    /// Algorithm in JWS header does not match JWK
     AlgorithmMismatch,
+    /// Verification method id does not match JWK id
     KeyIdVMMismatch(String, String),
+    /// RDF statement object does not match value
     ObjectMismatch(String, String, String),
+    /// Missing RDF statement object
     ExpectedObjectForPredicate(String, String),
+    /// Unexpected RDF statement object
     UnexpectedObjectForPredicate(String, String),
+    /// Missing type
     MissingType,
+    /// Missing RDF statement
     MissingStatement,
+    /// Unexpected end of list
     UnexpectedEndOfList,
+    /// List item mismatch
     ListItemMismatch(String, String),
+    /// Expected end of list
     ExpectedEndOfList,
+    /// Expected rest of list
     ExpectedRestOfList,
+    /// Expected list value
     ExpectedListValue,
+    /// Unexpected triple
     UnexpectedTriple(crate::rdf::Triple),
+    /// Key mismatch
     KeyMismatch,
+    /// Verification method mismatch
     VerificationMethodMismatch,
+    /// Unsupported algorithm
     UnsupportedAlgorithm,
+    /// Unsupported curve
     UnsupportedCurve,
+    /// Unsupported multiple verification methods
     UnsupportedMultipleVMs,
+    /// Key type not implemented
     KeyTypeNotImplemented,
+    /// Unsupported non-DID issuer
     UnsupportedNonDIDIssuer(String),
+    /// Curve not implemented
     CurveNotImplemented(String),
+    /// JWT key not found
     MissingKey,
+    /// Missing private key parametern JWK
     MissingPrivateKey,
+    /// Missing modulus in RSA key
     MissingModulus,
+    /// Missing modulus in RSA key
     MissingExponent,
+    /// Missing prime factor in RSA key
     MissingPrime,
+    /// Verifiable credential not found in JWT
     MissingCredential,
+    /// Verifiable presentation not found in JWT
     MissingPresentation,
+    /// JWT key parameters not found
     MissingKeyParameters,
+    /// Missing proof property
     MissingProof,
+    /// Missing issuance date
     MissingIssuanceDate,
+    /// Missing type VerifiableCredential
     MissingTypeVerifiableCredential,
+    /// Missing type VerifiablePresentation
     MissingTypeVerifiablePresentation,
+    /// Missing issuer property
     MissingIssuer,
+    /// Missing account id
     MissingAccountId,
+    /// Missing verificationMethod
     MissingVerificationMethod,
+    /// Missing verification relationship
     MissingVerificationRelationship(String, crate::vc::ProofPurpose, String),
+    /// Problem with JWT key
     Key,
+    /// Problem parsing Secp256k1 key
     Secp256k1Parse(String),
+    /// Problem parsing Secp256r1 key
     Secp256r1Parse(String),
+    /// A verification method MUST NOT contain multiple verification material properties for the same material. (DID Core)
     MultipleKeyMaterial,
+    /// Unable to convert date/time
     TimeError,
+    /// Invalid URI
     URI,
+    /// Invalid DID URL
     DIDURL,
+    /// Unable to dereference DID URL
     DIDURLDereference(String),
+    /// Unexpected DID fragment
     UnexpectedDIDFragment,
+    /// Invalid context
     InvalidContext,
+    /// DID controller limit exceeded
     ControllerLimit,
+    /// Missing context
     MissingContext,
+    /// Missing document ID
     MissingDocumentId,
+    /// Missing JWS in proof
     MissingProofSignature,
+    /// Expired proof
     ExpiredProof,
+    /// Proof creation time is in the future
     FutureProof,
+    /// Invalid proof domain
     InvalidProofPurpose,
+    /// Missing proof purpose
     MissingProofPurpose,
+    /// Invalid proof purpose
     InvalidProofDomain,
+    /// Invalid Signature
     InvalidSignature,
+    /// Signature length did not match expected length.
     UnexpectedSignatureLength(usize, usize),
+    /// Invalid JWS
     InvalidJWS,
+    /// Missing JWS Header
     MissingJWSHeader,
+    /// Missing credential schema for ZKP
     MissingCredentialSchema,
+    /// Unsupported property for linked data proof
     UnsupportedProperty,
+    /// Unsupported key type
     UnsupportedKeyType,
+    /// Unsupported type for linked data proof
     UnsupportedType,
+    /// Unsupported proof purpose
     UnsupportedProofPurpose,
+    /// Unsupported check
     UnsupportedCheck,
+    /// Blank node identifier in predicate is unsupported
     UnsupportedBlankPredicate,
+    /// Unsupported JWT VC in VP
     JWTCredentialInPresentation,
+    /// Linked data proof option unencodable as JWT claim
     UnencodableOptionClaim(String),
+    /// Expected unencoded JWT header
     ExpectedUnencodedHeader,
+    /// Resource not found
     ResourceNotFound(String),
+    /// Invalid ProofType type
     InvalidProofTypeType,
+    /// Invalid key length
     InvalidKeyLength,
+    /// Inconsistent DID Key
     InconsistentDIDKey,
+    /// Crypto error from `ring` crate
     RingError,
+    /// Expected object
     ExpectedObject,
+    /// Expected array
     ExpectedArray,
+    /// Expected string
     ExpectedString,
+    /// Expected string for publicKeyMultibase
     ExpectedStringPublicKeyMultibase,
+    /// Unexpected length for publicKeyMultibase
     MultibaseKeyLength(usize, usize),
+    /// Unexpected multibase (multicodec) key prefix multicodec
     MultibaseKeyPrefix,
+    /// Expected object with @list key
     ExpectedList,
+    /// Expected array in @list
     ExpectedArrayList,
+    /// Expected object with @value key
     ExpectedValue,
+    /// Missing graph
     MissingGraph,
+    /// Missing active property
     MissingActiveProperty,
+    /// Missing active property entry
     MissingActivePropertyEntry,
-    // https://w3c.github.io/json-ld-api/#dom-jsonlderrorcode-conflicting-indexes
+    /// [Multiple conflicting for the same node](https://w3c.github.io/json-ld-api/#dom-jsonlderrorcode-conflicting-indexes)
     ConflictingIndexes,
+    /// Value object with @type must not contain @language or @direction
     ValueObjectLanguageType,
+    /// Unexpected keyword in object
     UnexpectedKeyword,
+    /// Unexpected IRI in object
     UnexpectedIRI,
+    /// Value object expected @json @type for array or object value
     ExpectedValueTypeJson,
+    /// Unrecognized @direction value
     UnrecognizedDirection,
+    /// Expected string value for @index key of value object
     ExpectedStringIndex,
+    /// Unexpected nested array
     UnexpectedNestedArray,
+    /// Unexpected @value key
     UnexpectedValue,
+    /// Unexpected @list key
     UnexpectedList,
+    /// Unexpected @set key
     UnexpectedSet,
+    /// [`representationNotSupported`](https://www.w3.org/TR/did-spec-registries/#representationnotsupported) DID resolution error
     RepresentationNotSupported,
+    /// Expected rdf:langString type with language-tagged string literal
     ExpectedLangStringType,
+    /// IRI reference not well-formed
     IRIRefNotWellFormed,
+    /// Unable to serialize double
     SerializeDouble,
+    /// Expected failure
     ExpectedFailure,
+    /// Expected multibase Z prefix (base58)
     ExpectedMultibaseZ,
+    /// Unable to encode Signed Tezos Message
     EncodeTezosSignedMessage(EncodeTezosSignedMessageError),
+    /// Unable to decode Tezos Signature
     DecodeTezosSignature(DecodeTezosSignatureError),
+    /// Output did not match expected value.
     ExpectedOutput(String, String),
+    /// Unknown JSON-LD processing mode
     UnknownProcessingMode(String),
+    /// Unknown RDF direction
     UnknownRdfDirection(String),
     #[cfg(feature = "ring")]
+    /// Error parsing a key with `ring`
     KeyRejected(KeyRejectedError),
+    /// Error parsing a UTF-8 string
     FromUtf8(FromUtf8Error),
+    /// Error from `rsa` crate
     #[cfg(feature = "rsa")]
     Rsa(RsaError),
+    /// Error from `ed25519-dalek` crate
     #[cfg(feature = "ed25519-dalek")]
     ED25519(ED25519Error),
+    /// Error from `k256` crate
     #[cfg(feature = "k256")]
     Secp256k1(Secp256k1Error),
+    /// Error from `p256` crate
     #[cfg(feature = "p256")]
     Secp256r1(Secp256r1Error),
+    /// Error encoding ASN.1 data structure.
     ASN1Encode(ASN1EncodeError),
+    /// Error decoding Base64
     Base64(Base64Error),
+    /// Error parsing or producing multibase
     Multibase(MultibaseError),
+    /// Error from `json` crate
     JSON(JSONError),
+    /// Error from `serde_json` crate
     SerdeJSON(SerdeJSONError),
+    /// Error from `serde_urlencoded` crate
     SerdeUrlEncoded(SerdeUrlEncodedError),
+    /// Error from `json-ld` crate
     JSONLD(JSONLDErrorCode),
+    /// Error from `iref` crate
     IRI(IRIError),
+    /// Error parsing integer
     ParseInt(ParseIntError),
+    /// Error parsing a char
     CharTryFrom(CharTryFromError),
+    /// Error converting slice to array
     TryFromSlice(TryFromSliceError),
+    /// Error parsing CAIP-10 blockchain account id
     BlockchainAccountIdParse(BlockchainAccountIdParseError),
+    /// Error verifying CAIP-10 blockchain account id against a public key
     BlockchainAccountIdVerify(BlockchainAccountIdVerifyError),
+    /// Error constructing EIP-712 TypedData from a linked data document using JSON-LD/RDF
     #[cfg(feature = "keccak-hash")]
     TypedDataConstruction(TypedDataConstructionError),
+    /// Error constructing EIP-712 TypedData from a linked data document using JSON
     #[cfg(feature = "keccak-hash")]
     TypedDataConstructionJSON(TypedDataConstructionJSONError),
+    /// Error hashing EIP-712 data
     #[cfg(feature = "keccak-hash")]
     TypedDataHash(TypedDataHashError),
+    /// Error decoding hex data
     FromHex(hex::FromHexError),
+    /// Error decoding Base58 data
     Base58(bs58::decode::Error),
+    /// Expected string beginning with '0x'
     HexString,
+    /// Expected string to contain only lowercase
     ExpectedLowercase,
+    /// Unknown signature prefix
     SignaturePrefix,
+    /// Unknown key prefix
     KeyPrefix,
+    /// Unable to resolve DID
     UnableToResolve(String),
+    /// Expected 64 byte uncompressed key or 33 bytes compressed key
     P256KeyLength(usize),
+    /// Unable to encode elliptic curve key
     ECEncodingError,
+    /// Unable to decompress elliptic curve
     ECDecompress,
+    /// Error from `k256` crate
     #[cfg(feature = "k256")]
     K256EC(k256::elliptic_curve::Error),
+    /// Error from `p256` crate
     #[cfg(feature = "p256")]
     P256EC(p256::elliptic_curve::Error),
+    /// Missing crate features
     MissingFeatures(&'static str),
     NumericDateOutOfMicrosecondPrecisionRange,
 }

@@ -1,3 +1,7 @@
+//! [BBS curves][] and [BBS+][] keypairs
+//!
+//! [BBS curves]: https://datatracker.ietf.org/doc/html/draft-yonezawa-pairing-friendly-curves#section-4.2.2
+//! [BBS+]: https://mattrglobal.github.io/bbs-signatures-spec/
 use bbs::prelude::*;
 use pairing_plus::{
     bls12_381::{Bls12, Fr, G1, G2},

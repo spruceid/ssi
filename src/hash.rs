@@ -1,5 +1,10 @@
+//! Cryptographic hash functions
+//!
+//! The [`sha256`] function requires feature `sha2` or `ring`.
+
 use crate::error::Error;
 
+/// SHA-256 hash
 #[cfg(any(feature = "sha2", feature = "ring"))]
 pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
     #[cfg(feature = "sha2")]

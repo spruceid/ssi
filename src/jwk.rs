@@ -227,7 +227,7 @@ pub enum Algorithm {
     EdBlake2b,
     ES256,
     ES256K,
-    /// https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r
+    /// <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
     #[serde(rename = "ES256K-R")]
     ES256KR,
     /// like ES256K-R but using Keccak-256 instead of SHA-256
@@ -339,7 +339,7 @@ impl JWK {
     }
 
     /// Compare JWK equality by public key properties.
-    /// Equivalent to comparing by [JWK Thumbprint][thumbprint].
+    /// Equivalent to comparing by [JWK Thumbprint][Self::thumbprint].
     pub fn equals_public(&self, other: &JWK) -> bool {
         match (&self.params, &other.params) {
             (

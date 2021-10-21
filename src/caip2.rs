@@ -1,12 +1,36 @@
+//! [CAIP-2] Blockchain IDs
+//!
+//! This module provides a struct [ChainId] to represent a CAIP-2 blockchain id, that can be
+//! converted to and from a string.
+//!
+//! ## Example
+//! Round-trip parse and serialize a CAIP-2 string.
+//! ```
+//! use ssi::caip2::ChainId;
+//! use std::str::FromStr;
+//!
+//! let chain_id_str = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
+//! let chain_id = ChainId::from_str(&chain_id_str)?;
+//! assert_eq!(chain_id.to_string(), chain_id_str);
+//! # Ok::<(), ssi::caip2::ChainIdParseError>(())
+//! ```
+//! More test cases may be found in the [CAIP-2 specification][test cases].
+//!
+//! [test cases]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md#test-cases
+//! [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 use std::fmt;
 use std::str::FromStr;
 
 use thiserror::Error;
 
-/// <https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md>
+/// A parsed [CAIP-2] chain id.
+///
+/// [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 #[derive(Clone, PartialEq, Hash, Debug)]
 pub struct ChainId {
+    /// The `namespace` part of a CAIP-2 string.
     pub namespace: String,
+    /// The `reference` part of a CAIP-2 string.
     pub reference: String,
 }
 
@@ -15,26 +39,35 @@ const NAMESPACE_MAX_LENGTH: usize = 8;
 const REFERENCE_MIN_LENGTH: usize = 1;
 const REFERENCE_MAX_LENGTH: usize = 32;
 
+/// An error resulting from [parsing a CAIP-2 chain id][`ChainId::from_str`].
 #[derive(Error, Debug)]
 pub enum ChainIdParseError {
-    #[error("Unexpected character in namesapce: {0}")]
+    /// The namespace part contained a character outside the expected range.
+    #[error("Unexpected character in namespace: {0}")]
     NamespaceChar(char),
+    /// The namespace part is above the maximum length allowed.
     #[error("Namespace too long")]
     NamespaceTooLong,
+    /// The namespace part is below the minimum length allowed.
     #[error("Namespace too long")]
     NamespaceTooShort,
+    /// The reference part contained a character outside the expected range.
     #[error("Unexpected character in reference: {0}")]
     ReferenceChar(char),
+    /// The reference part is above the maximum length allowed.
     #[error("Reference too long")]
     ReferenceTooLong,
+    /// The reference part is below the minimum length allowed.
     #[error("Reference too short")]
     ReferenceTooShort,
+    /// The colon (`:`) is missing to separate the namespace and reference part.
     #[error("Missing separator between namespace and reference")]
     MissingSeparator,
 }
 
 impl FromStr for ChainId {
     type Err = ChainIdParseError;
+    /// Parse a CAIP-2 string to construct a [ChainId].
     fn from_str(chain_id: &str) -> Result<Self, Self::Err> {
         // namespace:   [-a-z0-9]{3,8}
         let mut namespace = String::with_capacity(NAMESPACE_MAX_LENGTH);
@@ -93,6 +126,7 @@ impl FromStr for ChainId {
 }
 
 impl fmt::Display for ChainId {
+    /// Serialize a [ChainId] as a CAIP-2 string.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}", self.namespace, self.reference)
     }

@@ -1,3 +1,27 @@
+//! [CAIP-10] Blockchain Account IDs
+//!
+//! This module provides a struct [`BlockchainAccountId`] to represent a CAIP-10 blockchain account
+//! id, that can be converted to and from a string. `BlockchainAccountId` can also be
+//! [verified][BlockchainAccountId::verify] for correspondence with a public key, for some account
+//! id types.
+//!
+//! ## Example
+//! Round-trip parse and serialize a CAIP-10 string.
+//! ```
+//! use ssi::caip10::BlockchainAccountId;
+//! use std::str::FromStr;
+//!
+//! let account_id_str = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4:6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7";
+//! let account_id = BlockchainAccountId::from_str(&account_id_str)?;
+//! assert_eq!(account_id.to_string(), account_id_str);
+//! # Ok::<(), ssi::caip10::BlockchainAccountIdParseError>(())
+//! ```
+//!
+//! More test cases may be found in the [CAIP-10 specification][test cases].
+//!
+//! [CAIP-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
+//! [test cases]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
+
 use crate::blakesig;
 use crate::caip2::{ChainId, ChainIdParseError};
 use crate::jwk::{Params, JWK};
@@ -6,13 +30,22 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-/// https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
+/// A parsed [CAIP-10] blockchain account id.
+///
+/// Includes a [ChainId] for the `chain_id` ([CAIP-2]) part.
+///
+/// [CAIP-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
+/// [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 #[derive(Clone, PartialEq, Hash, Debug)]
 pub struct BlockchainAccountId {
+    /// The `account_address` part of a CAIP-10 string.
     pub account_address: String,
+    /// The `chain_id` part of a CAIP-10 string, parsed into a [ChainId] struct.
     pub chain_id: ChainId,
 }
 
+/// Error resulting from attempting to [verify][BlockchainAccountId::verify] a blockchain account
+/// ID against a public key.
 #[derive(Error, Debug)]
 pub enum BlockchainAccountIdVerifyError {
     #[error("Unknown chain id: {0}")]
@@ -40,7 +73,21 @@ fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
 }
 
 impl BlockchainAccountId {
-    /// Check that a given JWK corresponds to this account id
+    /// Check that a given public key corresponds to this account id.
+    ///
+    /// Many kinds of blockchain account ids are derivable from public keys, whether by encoding
+    /// a public key directly or by using the hash of the public key.
+    ///
+    /// # Supported account ids for public key verification
+    ///
+    /// This function supports the following patterns of account ids:
+    /// - `tezos:*:tz1*`
+    /// - `tezos:*:tz2*`
+    /// - `tezos:*:tz3*`
+    /// - `eip155:*` (requires `keccak-hash` crate feature)
+    /// - `solana:*`
+    /// - `bip122:000000000019d6689c085ae165831e93:1*` (requires `ripemd160` crate feature)
+    /// - `bip122:1a91e3dace36e2be3bf030a65679fe82:D*` (requires `ripemd160` crate feature)
     pub fn verify(&self, jwk: &JWK) -> Result<(), BlockchainAccountIdVerifyError> {
         let hash = match (
             self.chain_id.namespace.as_str(),
@@ -88,24 +135,47 @@ impl BlockchainAccountId {
     }
 }
 
+/// An error resulting from trying to [parse a CAIP-10 string][`BlockchainAccountId::from_str`].
 #[derive(Error, Debug)]
 pub enum BlockchainAccountIdParseError {
+    /// The `account_address` part contains a character outside the expected range.
     #[error("Unexpected character in account address: {0}")]
     AddressChar(char),
+    /// The `account_address` part is not a valid length.
     #[error("Account address bad length: {0}")]
     AddressLength(usize),
+    /// The `chain_id` part contains a character outside the expected range.
     #[error("Unexpected character in chain id: {0}")]
     ChainChar(char),
+    /// The `chain_id` part is not a valid length.
     #[error("Chain id bad length: {0}")]
     ChainLength(usize),
+    /// The separator between the `chain_id` and `account_address` part was not found.
+    ///
+    /// The separator is a colon (`:`) as of the [`2021-08-11` version of CAIP-10][modern]. In the
+    /// [previous ("legacy") version of CAIP-10][legacy], it was an at sign (`@`) (and the two
+    /// parts appeared in the reverse order).
+    ///
+    /// [modern]: https://github.com/ChainAgnostic/CAIPs/blob/9b72330f70f764d6f4435617867b7aec4e50c6db/CAIPs/caip-10.md
+    /// [legacy]: https://github.com/ChainAgnostic/CAIPs/blob/26af70a9598ae4f7274481ba0c25ee77f90a66a2/CAIPs/caip-10.md
     #[error("Missing separator between chain id and account address")]
     MissingSeparator,
+    /// The `chain_id` part could not be parsed.
     #[error("Chain id: {0}")]
     ChainId(#[from] ChainIdParseError),
 }
 
 impl FromStr for BlockchainAccountId {
     type Err = BlockchainAccountIdParseError;
+    /// Parse a CAIP-10 string into a [`BlockchainAccountId`].
+    ///
+    /// The [legacy CAIP-10 syntax][legacy] (`<account_address>@<chain_id>`) is allowed, as well
+    /// as the modern syntax (`<chain_id>:<account_address>`).
+    ///
+    /// The `chain_id` (CAIP-2) part is [parsed][ChainId::from_str] into a [`ChainId`] as part of
+    /// the [`BlockchainAccountId`].
+    ///
+    /// [legacy]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#backwards-compatibility
     fn from_str(account_id: &str) -> Result<Self, Self::Err> {
         let is_legacy = account_id.contains('@');
         let (chain_id, account_address) = match if is_legacy {

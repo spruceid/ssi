@@ -1,3 +1,7 @@
+//! # Decentralized Identifier Resolution (DID Resolution)
+//!
+//! As specified in [Decentralized Identifier Resolution (DID Resolution) v0.2](https://w3c-ccg.github.io/did-resolution/)
+
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
 #[cfg(feature = "http-did")]
@@ -20,108 +24,187 @@ use crate::error::Error;
 use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
 use crate::one_or_many::OneOrMany;
 
+/// Media type for JSON.
 pub const TYPE_JSON: &str = "application/json";
+/// Media type for JSON-LD.
 pub const TYPE_LD_JSON: &str = "application/ld+json";
+/// Media type for a [DID Document in JSON
+/// representation](https://www.w3.org/TR/did-core/#application-did-json).
 pub const TYPE_DID_JSON: &str = "application/did+json";
+/// Media type for a [DID Document in JSON-LD
+/// representation](https://www.w3.org/TR/did-core/#application-did-ld-json).
 pub const TYPE_DID_LD_JSON: &str = "application/did+ld+json";
+/// Pseudo-media-type used when returning a URL from [DID URL
+/// dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm).
 pub const TYPE_URL: &str = "text/url";
+/// [`invalidDid`](https://www.w3.org/TR/did-spec-registries/#invaliddid) error value for DID
+/// Resolution / DID URL Dereferencing.
 pub const ERROR_INVALID_DID: &str = "invalidDid";
+/// [`invalidDidUrl`](https://www.w3.org/TR/did-spec-registries/#invaliddidurl) error value for DID URL Dereferencing.
 pub const ERROR_INVALID_DID_URL: &str = "invalidDidUrl";
+/// `unauthorized` error for DID Resolution / DID URL Dereferencing.
 pub const ERROR_UNAUTHORIZED: &str = "unauthorized";
+/// [`notFound`](https://www.w3.org/TR/did-spec-registries/#notfound) error value for DID URL Dereferencing.
 pub const ERROR_NOT_FOUND: &str = "notFound";
+/// `methodNotSupported` error value for DID Resolution / DID URL Dereferencing.
 pub const ERROR_METHOD_NOT_SUPPORTED: &str = "methodNotSupported";
+/// [`representationNotSupported`](https://www.w3.org/TR/did-spec-registries/#representationnotsupported) error value for DID URL Dereferencing.
 pub const ERROR_REPRESENTATION_NOT_SUPPORTED: &str = "representationNotSupported";
+/// Media type expected for a [DID Resolution Result][ResolutionResult].
 pub const TYPE_DID_RESOLUTION: &str =
     "application/ld+json;profile=\"https://w3id.org/did-resolution\";charset=utf-8";
 
-// Maximum number of DID controllers to resolve at once
+/// Maximum level of recursion when following DID controller links.
 pub const MAX_CONTROLLERS: usize = 100;
 
+/// [Metadata structure](https://www.w3.org/TR/did-core/#metadata-structure) "for DID resolution,
+/// DID URL dereferencing, and other DID-related processes"
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Metadata {
+    /// [String](https://infra.spec.whatwg.org/#string)
     String(String),
+    /// A [map](https://infra.spec.whatwg.org/#maps) of properties for a metadata structure.
     Map(HashMap<String, Metadata>),
+    /// [List](https://infra.spec.whatwg.org/#list) (array)
     List(Vec<Metadata>),
+    /// [Boolean](https://infra.spec.whatwg.org/#boolean)
     Boolean(bool),
+    /// [Null](https://infra.spec.whatwg.org/#nulls)
     Null,
 }
 
+/// [DID Resolution Options](https://www.w3.org/TR/did-core/#did-resolution-options).
+///
+/// Formerly known as "DID resolution input metadata".
+///
+/// Used as input to [DID Resolution][DIDResolver::resolve].
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResolutionInputMetadata {
+    /// [`accept`](https://www.w3.org/TR/did-spec-registries/#accept) resolution option.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accept: Option<String>,
+    /// [`versionId`](https://www.w3.org/TR/did-spec-registries/#versionId-param) DID Parameter as
+    /// DID resolution option.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version_id: Option<String>,
+    /// [`versionTime`](https://www.w3.org/TR/did-spec-registries/#versionTime-param) DID Parameter as
+    /// DID resolution option.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version_time: Option<String>,
+    /// `no-cache` resolution option from [DID
+    /// Resolution](https://w3c-ccg.github.io/did-resolution/#caching).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub no_cache: Option<bool>,
+    /// Additional options.
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
+/// [DID Resolution Metadata](https://www.w3.org/TR/did-core/#did-resolution-metadata)
+///
+/// in [DID Resolution](https://w3c-ccg.github.io/did-resolution/#output-resolutionmetadata)
+///
+/// Returned from DID Resolution ([`resolve`][DIDResolver::resolve] / [`resolveRepresentation`][DIDResolver::resolve_representation]).
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-/// <https://w3c.github.io/did-core/#did-resolution-metadata-properties>
 pub struct ResolutionMetadata {
+    /// `error` metadata property. Values should be registered in [DID Specification
+    /// Registries](https://www.w3.org/TR/did-spec-registries/#error).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`contentType`](https://www.w3.org/TR/did-spec-registries/#contenttype) metadata property.
     pub content_type: Option<String>,
+    /// Additional metadata properties.
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
+/// [DID document metadata](https://www.w3.org/TR/did-core/#did-document-metadata).
+///
+/// A [Metadata] structure describing a [DID document][Document] in a [DID Resolution
+/// Result][ResolutionResult].
+///
+/// Specified:
+/// - in [DID Core](https://www.w3.org/TR/did-core/#dfn-diddocumentmetadata)
+/// - in [DID Resolution](https://w3c-ccg.github.io/did-resolution/#output-documentmetadata)
+/// - in [DID Specification
+/// Registries](https://www.w3.org/TR/did-spec-registries/#did-document-metadata)
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DocumentMetadata {
+    /// [`created`](https://www.w3.org/TR/did-core/#dfn-created) DID document metadata property.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<DateTime<Utc>>,
+    /// [`updated`](https://www.w3.org/TR/did-core/#dfn-updated) DID document metadata property.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub updated: Option<DateTime<Utc>>,
+    /// [`deactivated`](https://www.w3.org/TR/did-core/#dfn-deactivated) DID document metadata property.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deactivated: Option<bool>,
+    /// Additional options.
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
-/// <https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties>
-/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-input-metadata-properties>
+/// [DID URL Dereferencing Options](https://www.w3.org/TR/did-core/#did-url-dereferencing-options)
+///
+/// Formerly known as dereferencing input metadata.
+///
+/// Used as input to [DID URL dereferencing][dereference].
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct DereferencingInputMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`accept`](https://www.w3.org/TR/did-spec-registries/#accept) option.
     pub accept: Option<String>,
+    /// `service-type` DID parameter mentioned in [DID
+    /// Resolution](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_type: Option<String>,
+    /// `follow-redirect` resolution option, specified in [DID
+    /// Resolution](https://w3c-ccg.github.io/did-resolution/#redirect).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub follow_redirect: Option<bool>,
+    /// Additional options.
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
+/// [DID URL dereferencing
+/// metadata](https://www.w3.org/TR/did-core/#did-url-dereferencing-metadata).
+///
+/// Returned from [DID URL dereferencing][dereference].
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-/// <https://w3c.github.io/did-core/#did-url-dereferencing-metadata-properties>
 pub struct DereferencingMetadata {
+    /// `error` metadata property. Values should be registered in [DID Specification
+    /// Registries](https://www.w3.org/TR/did-spec-registries/#error).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`contentType`](https://www.w3.org/TR/did-spec-registries/#contenttype) metadata property.
     pub content_type: Option<String>,
+    /// Additional metadata properties.
     #[serde(flatten)]
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
 #[derive(Debug, Serialize, Clone, PartialEq)]
-/// A resource returned by DID URL dereferencing
+/// A resource returned by [DID URL dereferencing][dereference]
 #[serde(untagged)]
 pub enum Content {
+    /// A DID Document
     DIDDocument(Document),
+    /// A URL
     URL(String),
+    /// A resource (e.g. verification method map)
     Object(Resource),
+    /// Binary data (e.g. a DID document representation)
     Data(Vec<u8>),
+    /// Null (empty result)
     Null,
 }
 
@@ -135,6 +218,7 @@ fn get_first_context_uri(value: &Value) -> Option<&str> {
 }
 
 impl Content {
+    /// Serialize as a [Vec].
     pub fn into_vec(self) -> Result<Vec<u8>, Error> {
         if let Content::Data(data) = self {
             Ok(data)
@@ -144,6 +228,7 @@ impl Content {
     }
 }
 
+/// Wrap an Error in a Dereferencing Metadata atructure.
 impl From<Error> for DereferencingMetadata {
     fn from(err: Error) -> Self {
         DereferencingMetadata {
@@ -155,7 +240,9 @@ impl From<Error> for DereferencingMetadata {
 
 // needed for:
 // - https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary Step 2.1
-//   Returning a resolved DID document for DID URL dereferencing
+/// Convert DID Resolution Metadata to DID URL Dereferencing metadata.
+///
+/// Used when returning a resolved DID document for [DID URL dereferencing][dereference].
 impl From<ResolutionMetadata> for DereferencingMetadata {
     fn from(res_meta: ResolutionMetadata) -> Self {
         Self {
@@ -168,7 +255,9 @@ impl From<ResolutionMetadata> for DereferencingMetadata {
 
 // needed for:
 // - https://w3c-ccg.github.io/did-resolution/#bindings-https Step 1.10.2.1
-//   Producing DID resolution result after DID URL dereferencing.
+/// Convert DID URL Dereferencing metadata to DID Resolution Metadata.
+///
+/// Used when producing a DID resolution result after [DID URL dereferencing][dereference].
 impl From<DereferencingMetadata> for ResolutionMetadata {
     fn from(deref_meta: DereferencingMetadata) -> Self {
         Self {
@@ -179,6 +268,7 @@ impl From<DereferencingMetadata> for ResolutionMetadata {
     }
 }
 
+/// Construct DID URL Dereferencing Metadata from an error value.
 impl DereferencingMetadata {
     pub fn from_error(err: &str) -> Self {
         DereferencingMetadata {
@@ -188,6 +278,7 @@ impl DereferencingMetadata {
     }
 }
 
+/// Construct DID Resolution Metadata from an error value.
 impl ResolutionMetadata {
     pub fn from_error(err: &str) -> Self {
         ResolutionMetadata {
@@ -197,36 +288,56 @@ impl ResolutionMetadata {
     }
 }
 
+/// Metadata structure (`contentMetadata`) returned from [DID URL
+/// dereferencing](https://www.w3.org/TR/did-core/#did-url-dereferencing) ([`dereference`]).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ContentMetadata {
+    /// DID document metadata, for when the `contentStream` returned by DID URL
+    /// dereferencing is a DID document.
     DIDDocument(DocumentMetadata),
+    /// Metadata for non-DID-Document content.
     Other(HashMap<String, Metadata>),
 }
 
 impl Default for ContentMetadata {
+    /// Construct an empty content metadata structure.
     fn default() -> Self {
         ContentMetadata::Other(HashMap::new())
     }
 }
 
+/// [DID Resolution Result](https://w3c-ccg.github.io/did-resolution/#did-resolution-result) data
+/// structure.
+///
+/// Results from DID resolution and/or DID URL dereferencing.
+///
+/// Used in the [DID Resolution HTTP(S)
+/// Binding](https://w3c-ccg.github.io/did-resolution/#bindings-https).
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-/// <https://w3c-ccg.github.io/did-resolution/#did-resolution-result>
 pub struct ResolutionResult {
+    /// Value for a [`@context`](https://www.w3.org/TR/did-core/#dfn-context) property of a DID
+    /// Resolution Result.
     #[serde(rename = "@context")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<Value>,
+    /// [DID Document](https://www.w3.org/TR/did-core/#dfn-diddocument).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub did_document: Option<Document>,
+    /// [DID Resolution Metadata](https://www.w3.org/TR/did-core/#dfn-didresolutionmetadata).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub did_resolution_metadata: Option<ResolutionMetadata>,
+    /// [DID Document Metadata](https://www.w3.org/TR/did-core/#dfn-diddocumentmetadata).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub did_document_metadata: Option<DocumentMetadata>,
+    /// Additional properties.
     #[serde(flatten)]
     pub property_set: Option<BTreeMap<String, Value>>,
 }
 
+/// An empty DID Resolution Result, using the [DID Resolution v1 Context
+/// URI][DID_RESOLUTION_V1_CONTEXT]
 impl Default for ResolutionResult {
     fn default() -> Self {
         Self {
@@ -239,9 +350,71 @@ impl Default for ResolutionResult {
     }
 }
 
+/// A [DID resolver](https://www.w3.org/TR/did-core/#dfn-did-resolvers),
+/// implementing the [DID Resolution](https://www.w3.org/TR/did-core/#did-resolution)
+/// [algorithm](https://w3c-ccg.github.io/did-resolution/#resolving-algorithm) and
+/// optionally [DID URL Dereferencing](https://www.w3.org/TR/did-core/#did-url-dereferencing).
+///
+/// ## Example
+///
+/// An example of a DID resolver with a static DID document.
+///
+/// ```
+/// use async_trait::async_trait;
+/// use ssi::did::Document;
+/// use ssi::did_resolve::{
+///     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+///     ERROR_NOT_FOUND
+/// };
+///
+/// pub struct DIDExampleStatic;
+///
+/// #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+/// #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+/// impl DIDResolver for DIDExampleStatic {
+///     async fn resolve(
+///         &self,
+///         did: &str,
+///         _input_metadata: &ResolutionInputMetadata,
+///     ) -> (
+///         ResolutionMetadata,
+///         Option<Document>,
+///         Option<DocumentMetadata>,
+///     ) {
+///         match did {
+///             "did:example:foo" => {
+///                 let doc = match Document::from_json(include_str!("../tests/did-example-foo.json")) {
+///                     Ok(doc) => doc,
+///                     Err(e) => {
+///                         return (
+///                             ResolutionMetadata::from_error(&format!(
+///                                 "Unable to parse DID document: {:?}",
+///                                 e
+///                             )),
+///                             None,
+///                             None,
+///                         );
+///                     }
+///                 };
+///                 (
+///                     ResolutionMetadata::default(),
+///                     Some(doc),
+///                     Some(DocumentMetadata::default()),
+///                 )
+///             }
+///             _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
+///         }
+///     }
+/// }
+/// ```
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait DIDResolver: Sync {
+    /// [Resolve a DID](https://w3c-ccg.github.io/did-resolution/#resolving-algorithm)
+    ///
+    /// i.e. the `resolve` function from [DID
+    /// Core](https://www.w3.org/TR/did-core/#did-resolution) and [DID
+    /// Resolution](https://w3c-ccg.github.io/did-resolution/#resolving).
     async fn resolve(
         &self,
         did: &str,
@@ -252,6 +425,12 @@ pub trait DIDResolver: Sync {
         Option<DocumentMetadata>,
     );
 
+    /// [Resolve a DID](https://w3c-ccg.github.io/did-resolution/#resolving-algorithm) in a given
+    /// representation
+    ///
+    /// i.e. the `resolveRepresentation` function from [DID
+    /// Core](https://www.w3.org/TR/did-core/#did-resolution) and [DID
+    /// Resolution](https://w3c-ccg.github.io/did-resolution/#resolving).
     async fn resolve_representation(
         &self,
         did: &str,
@@ -277,10 +456,9 @@ pub trait DIDResolver: Sync {
 
     /// Dereference a DID URL.
     ///
-    /// DID methods implement this function to support dereferencing DID URLs with paths and query strings.
-    /// Callers should use [`dereference`] instead of this function.
-    ///
-    /// <https://w3c-ccg.github.io/did-resolution/#dereferencing>
+    /// DID methods implement this function to support
+    /// [dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing) DID URLs with
+    /// paths and query strings.  Callers should use [`dereference`] instead of this function.
     async fn dereference(
         &self,
         _primary_did_url: &PrimaryDIDURL,
@@ -295,10 +473,7 @@ pub trait DIDResolver: Sync {
     }
 }
 
-/// Dereference a DID URL
-///
-/// <https://w3c.github.io/did-core/#did-url-dereferencing>
-/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm>
+/// Dereference a DID URL, according to [DID Core](https://www.w3.org/TR/did-core/#did-url-dereferencing) and [DID Resolution](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm).
 pub async fn dereference(
     resolver: &dyn DIDResolver,
     did_url_str: &str,
@@ -379,7 +554,7 @@ pub async fn dereference(
     (deref_meta, content, content_meta)
 }
 
-/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary>
+/// [Dereferencing the Primary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) - a subalgorithm of [DID URL dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm)
 async fn dereference_primary_resource(
     resolver: &dyn DIDResolver,
     primary_did_url: &PrimaryDIDURL,
@@ -508,7 +683,7 @@ async fn dereference_primary_resource(
     null_result
 }
 
-/// <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary>
+/// [Dereferencing the Secondary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary) - a subalgorithm of [DID URL dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm)
 async fn dereference_secondary_resource(
     _resolver: &dyn DIDResolver,
     primary_did_url: PrimaryDIDURL,
@@ -667,14 +842,18 @@ fn construct_service_endpoint(
     Ok(output_url)
 }
 
+/// A DID Resolver implementing a client for the [DID Resolution HTTP(S)
+/// Binding](https://w3c-ccg.github.io/did-resolution/#bindings-https).
 #[cfg(feature = "http")]
 #[derive(Debug, Clone, Default)]
 pub struct HTTPDIDResolver {
+    /// HTTP(S) URL for DID resolver HTTP(S) endpoint.
     pub endpoint: String,
 }
 
 #[cfg(feature = "http")]
 impl HTTPDIDResolver {
+    /// Construct a new HTTP DID Resolver with a given [endpoint][HTTPDIDResolver::endpoint] URL.
     pub fn new(url: &str) -> Self {
         Self {
             endpoint: url.to_string(),
@@ -717,7 +896,7 @@ fn transform_resolution_result(
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for HTTPDIDResolver {
-    // https://w3c-ccg.github.io/did-resolution/#bindings-https
+    /// Resolve a DID over HTTP(S), using the [DID Resolution HTTP(S) Binding](https://w3c-ccg.github.io/did-resolution/#bindings-https).
     async fn resolve(
         &self,
         did: &str,
@@ -879,6 +1058,7 @@ impl DIDResolver for HTTPDIDResolver {
     // until resolveRepresentation has its own HTTP(S) binding:
     // https://github.com/w3c-ccg/did-resolution/issues/57
 
+    /// Dereference a DID URL over HTTP(S), using the [DID Resolution HTTP(S) Binding](https://w3c-ccg.github.io/did-resolution/#bindings-https).
     async fn dereference(
         &self,
         primary_did_url: &PrimaryDIDURL,
@@ -1053,16 +1233,23 @@ impl DIDResolver for HTTPDIDResolver {
     }
 }
 
-/// Compose multiple DID resolvers in series. They are tried in series until one supports the
+/// Compose multiple DID resolvers in series.
+///
+/// Each underlying DID resolver is tried in series until one supports the
 /// requested DID method.
 #[derive(Clone, Default)]
 pub struct SeriesResolver<'a> {
+    /// Underlying DID resolvers.
     pub resolvers: Vec<&'a (dyn DIDResolver)>,
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<'a> DIDResolver for SeriesResolver<'a> {
+    /// Resolve a DID using a series of DID resolvers.
+    ///
+    /// The first DID resolution result that is not a [`methodNotSupported`][ERROR_METHOD_NOT_SUPPORTED] error is returned as the
+    /// result.
     async fn resolve(
         &self,
         did: &str,
@@ -1089,6 +1276,7 @@ impl<'a> DIDResolver for SeriesResolver<'a> {
         )
     }
 
+    /// Resolve a DID in a representation using a series of DID resolvers.
     async fn resolve_representation(
         &self,
         did: &str,
@@ -1112,6 +1300,7 @@ impl<'a> DIDResolver for SeriesResolver<'a> {
         )
     }
 
+    /// Dereference a DID URL using a series of DID resolvers (DID URL dereferencers).
     async fn dereference(
         &self,
         primary_did_url: &PrimaryDIDURL,

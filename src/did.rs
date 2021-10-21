@@ -1,3 +1,9 @@
+//! # Decentralized Identifiers (DIDs)
+//!
+//! As specified by [Decentralized Identifiers (DIDs) v1.0 - Core architecture, data model, and representations][did-core].
+//!
+//! [did-core]: https://www.w3.org/TR/did-core/
+
 use crate::caip10::BlockchainAccountId;
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
@@ -14,7 +20,11 @@ use crate::error::Error;
 use crate::jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
-/// <https://w3c.github.io/did-core/#dfn-verification-relationship>
+/// A [verification relationship](https://w3c.github.io/did-core/#dfn-verification-relationship).
+///
+/// The relationship between a [verification method][VerificationMethod] and a DID
+/// Subject (as described by a [DID Document][Document]) is considered analogous to a [proof
+/// purpose](crate::vc::ProofPurpose).
 pub type VerificationRelationship = crate::vc::ProofPurpose;
 
 use async_trait::async_trait;
@@ -30,11 +40,15 @@ use serde_json::Value;
 // ***********************************************
 // @TODO `id` must be URI
 
+/// URI [required](https://www.w3.org/TR/did-core/#production-0) as the first value of the `@context` property for a DID Document in JSON-LD representation.
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+
+/// Aliases for the [default required DID document context URI][DEFAULT_CONTEXT]. Allowed for compatibility reasons. [DEFAULT_CONTEXT][] should be used instead.
 pub const DEFAULT_CONTEXT_NO_WWW: &str = crate::jsonld::DID_V1_CONTEXT_NO_WWW;
 pub const ALT_DEFAULT_CONTEXT: &str = crate::jsonld::W3ID_DID_V1_CONTEXT;
 
-// v0.11 context used by universal resolver
+/// DID Core v0.11 context URI. Allowed for legacy
+/// reasons. The [v1.0 context URI][DEFAULT_CONTEXT] should be used instead.
 pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 
 const MULTICODEC_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
@@ -43,52 +57,70 @@ const MULTICODEC_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 #[allow(clippy::upper_case_acronyms)]
 type DID = String;
 
-/// [DID URL](https://w3c.github.io/did-core/#did-url-syntax)
+/// A [DID URL](https://w3c.github.io/did-core/#did-url-syntax).
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct DIDURL {
+    /// [DID](https://www.w3.org/TR/did-core/#did-syntax).
     pub did: String,
+    /// [DID path](https://www.w3.org/TR/did-core/#path). `path-abempty` component from
+    /// [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-3.3).
     pub path_abempty: String,
+    /// [DID query](https://www.w3.org/TR/did-core/#query). `query` component from
+    /// [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-3.3).
     pub query: Option<String>,
+    /// [DID fragment](https://www.w3.org/TR/did-core/#fragment). `fragment` component from
+    /// [RFC 3986](https://www.rfc-editor.org/rfc/rfc3986#section-3.3).
     pub fragment: Option<String>,
 }
 
 /// Path component for a [Relative DID URL](https://w3c.github.io/did-core/#relative-did-urls).
-/// Based on [RFC 3886 - Path syntax](https://tools.ietf.org/html/rfc3986#section-3.3) and
-/// [Relative reference](https://tools.ietf.org/html/rfc3986#section-4.2)
-/// [rfc3986-3.3]: https://tools.ietf.org/html/rfc3986#section-3.3
+///
+/// `relative-part` from [RFC 3986 - 4.2 Relative
+/// Reference](https://www.rfc-editor.org/rfc/rfc3986#section-4.2), excluding network-path references.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum RelativeDIDURLPath {
-    /// `path-absolute` from [RFC 3986 - 3.3. Path][rfc3986-3.3]
+    /// Absolute-path reference. `path-absolute` from [RFC 3986](https://tools.ietf.org/html/rfc3986#section-3.3)
     Absolute(String),
-    /// `path-noscheme` from [RFC 3986 - 3.3. Path][rfc3986-3.3]
+    /// Relative-path reference. `path-noscheme` from [RFC 3986](https://tools.ietf.org/html/rfc3986#section-3.3)
     NoScheme(String),
-    /// `path-empty` from [RFC 3986 - 3.3. Path][rfc3986-3.3]
+    /// Empty path. `path-empty` from [RFC 3986](https://tools.ietf.org/html/rfc3986#section-3.3)
     Empty,
 }
 
-/// [Relative DID URL](https://w3c.github.io/did-core/#relative-did-urls)
+/// A [Relative DID URL](https://www.w3.org/TR/did-core/#relative-did-urls).
+///
+/// A kind of [relative reference (RFC 3986)](https://www.rfc-editor.org/rfc/rfc3986#section-4.2)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct RelativeDIDURL {
+    /// Path component of a Relative DID URL.
     pub path: RelativeDIDURLPath,
+    /// [DID query](https://www.w3.org/TR/did-core/#query) ([RFC 3986 - 3.4. Query](https://www.rfc-editor.org/rfc/rfc3986#section-3.4))
     pub query: Option<String>,
+    /// [DID fragment](https://www.w3.org/TR/did-core/#fragment) ([RFC 3986 - 3.5. Fragment](https://www.rfc-editor.org/rfc/rfc3986#section-3.5))
     pub fragment: Option<String>,
 }
 
 /// A [DID URL][DIDURL] without a fragment. Used for [Dereferencing the Primary
-/// Resource][dereference_primary_resource] in DID URL Dereferencing.
+/// Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) in [DID URL Dereferencing][crate::did_resolve::dereference].
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct PrimaryDIDURL {
+    /// [DID][DIDURL::did]
     pub did: String,
+    /// [DID Path][DIDURL::path_abempty]
     pub path: Option<String>,
+    /// [DID query][DIDURL::query]
     pub query: Option<String>,
 }
 
+/// A [DID document]
+///
+/// [DID document]: https://www.w3.org/TR/did-core/#dfn-did-documents
 #[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[builder(
@@ -97,87 +129,160 @@ pub struct PrimaryDIDURL {
     build_fn(validate = "Self::validate")
 )]
 pub struct Document {
+    /// [`@context`](https://www.w3.org/TR/did-core/#dfn-context) property of a DID document.
     #[serde(rename = "@context")]
     pub context: Contexts,
+    /// [DID Subject id](https://www.w3.org/TR/did-core/#did-subject)
     pub id: DID,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`alsoKnownAs`](https://www.w3.org/TR/did-core/#also-known-as) property of a DID document,
+    /// expressing other URIs for the DID subject.
     pub also_known_as: Option<Vec<String>>, // TODO: URI
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`controller`](https://www.w3.org/TR/did-core/#dfn-controller) property of a DID document,
+    /// expressing [DID controllers(s)](https://www.w3.org/TR/did-core/#did-controller).
     pub controller: Option<OneOrMany<DID>>,
+    /// [`verificationMethod`](https://www.w3.org/TR/did-core/#dfn-verificationmethod) property of a
+    /// DID document, expressing [verification
+    /// methods](https://www.w3.org/TR/did-core/#verification-methods).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub verification_method: Option<Vec<VerificationMethod>>,
+    /// [`authentication`](https://www.w3.org/TR/did-core/#dfn-authentication) property of a DID
+    /// document, expressing [verification
+    /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
+    /// [authentication](https://www.w3.org/TR/did-core/#authentication) purposes (e.g. generating [verifiable
+    /// presentations][crate::vc::Presentation]).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub authentication: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`assertionMethod`](https://www.w3.org/TR/did-core/#dfn-assertionmethod) property of a DID document, expressing [verification
+    /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
+    /// [assertion](https://www.w3.org/TR/did-core/#assertion) purposes (e.g. issuing [verifiable
+    /// credentials](crate::vc::Credential)).
     pub assertion_method: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`keyAgreement`](https://www.w3.org/TR/did-core/#dfn-keyagreement) property of a DID document, expressing [verification
+    /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
+    /// [key agreement](https://www.w3.org/TR/did-core/#key-agreement) purposes.
     pub key_agreement: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`capabilityInvocation`](https://www.w3.org/TR/did-core/#dfn-capabilityinvocation) property of a DID document, expressing [verification
+    /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
+    /// [invoking cryptographic capabilities](https://www.w3.org/TR/did-core/#capability-invocation).
     pub capability_invocation: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [`capabilityDelegation`](https://www.w3.org/TR/did-core/#dfn-capabilitydelegation) property of a DID document, expressing [verification
+    /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
+    /// [delegating cryptographic capabilities](https://www.w3.org/TR/did-core/#capability-delegation).
     pub capability_delegation: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    // publicKey is used by legacy DID documents
+    /// [`publicKey`](https://www.w3.org/TR/did-spec-registries/#publickey) property of a DID
+    /// document (deprecated in favor of `verificationMethod`).
     pub public_key: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// `service` property of a DID document, epressing
+    /// [services](https://www.w3.org/TR/did-core/#services).
     pub service: Option<Vec<Service>>,
+    /// [Linked data proof](https://w3c-ccg.github.io/ld-proofs/#linked-data-proof-overview) over a
+    /// DID document.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof: Option<OneOrMany<Proof>>,
+    /// Additional properties of a DID document. Some may be registered in [DID Specification
+    /// Registries](https://www.w3.org/TR/did-spec-registries/#did-document-properties).
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
 
+/// [JSON-LD Context](https://www.w3.org/TR/json-ld11/#the-context) URI or map, for use in the
+/// [`@context`](https://www.w3.org/TR/did-core/#dfn-context) property of a [DID
+/// document][Document] in JSON-LD representation.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Context {
+    /// Context referenced by a URL.
     URI(String),
+    /// [Embedded context](https://www.w3.org/TR/json-ld11/#dfn-embedded-context).
     Object(Map<String, Value>),
 }
 
+/// [JSON-LD Context](https://www.w3.org/TR/json-ld11/#the-context) value or array of context
+/// values, for use in the [`@context`](https://www.w3.org/TR/did-core/#dfn-context) property of a
+/// DID document in JSON-LD representation.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 #[serde(try_from = "OneOrMany<Context>")]
 pub enum Contexts {
+    /// A single context value.
     One(Context),
+    /// An array of context values.
     Many(Vec<Context>),
 }
 
+/// A [Verification method](https://www.w3.org/TR/did-core/#verification-methods) map (object) in a DID
+/// document.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationMethodMap {
+    /// [@context](https://www.w3.org/TR/did-core/#dfn-context) property of a verification method map. Used if the verification method map uses
+    /// some terms not defined in the containing DID document.
     #[serde(rename = "@context")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<Value>,
+    /// id property ([DID URL][DIDURL]) of a verification method map.
     pub id: String,
     #[serde(rename = "type")]
+    /// type [property](https://www.w3.org/TR/did-core/#dfn-did-urls) of a verification method map.
+    /// Should be registered in [DID Specification
+    /// registries - Verification method types](https://www.w3.org/TR/did-spec-registries/#verification-method-types).
     pub type_: String,
     // Note: different than when the DID Document is the subject:
     //    The value of the controller property, which identifies the
     //    controller of the corresponding private key, MUST be a valid DID.
+    /// [controller](https://w3c-ccg.github.io/ld-proofs/#controller) property of a verification
+    /// method map.
+    ///
+    /// Not to be confused with the [controller](https://www.w3.org/TR/did-core/#dfn-controller) property of a DID document.
     pub controller: DID,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [publicKeyJwk](https://www.w3.org/TR/did-core/#dfn-publickeyjwk) property of a verification
+    /// method map, representing a [JSON Web Key][JWK].
     // TODO: make sure this JWK does not have private key material
     pub public_key_jwk: Option<JWK>,
     #[serde(skip_serializing_if = "Option::is_none")]
     // TODO: make Base58 type like Base64urlUIntString
+    /// [publicKeyBase58](https://www.w3.org/TR/did-spec-registries/#publickeybase58) property
+    /// (deprecated; [Security Vocab definition](https://w3c-ccg.github.io/security-vocab/#publicKeyBase58)) - encodes public key material in Base58.
     pub public_key_base58: Option<String>,
     // TODO: ensure that not both key parameters are set
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// [blockchainAccountId](https://www.w3.org/TR/did-spec-registries/#blockchainaccountid)
+    /// property ([Security Vocab definition](https://w3c-ccg.github.io/security-vocab/#blockchainAccountId)), encoding a [CAIP-10 Blockchain account id](crate::caip10::BlockchainAccountId).
     pub blockchain_account_id: Option<String>,
+    /// Additional JSON properties.
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
 
+/// A [Verification method](https://www.w3.org/TR/did-core/#verification-methods) in a DID
+/// document, embedded or referenced.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub enum VerificationMethod {
+    /// Verification method URL [including a verification method by reference](https://www.w3.org/TR/did-core/#referring-to-verification-methods).
     DIDURL(DIDURL),
+    /// Verification method URL (relative reference), [including a verification method by reference](https://www.w3.org/TR/did-core/#referring-to-verification-methods).
     RelativeDIDURL(RelativeDIDURL),
+    /// Embedded verification method.
     Map(VerificationMethodMap),
 }
 
+/// Value for a [serviceEndpoint](https://www.w3.org/TR/did-core/#dfn-serviceendpoint) property of
+/// a [service](https://www.w3.org/TR/did-core/#services) map in a DID document.
+///
+/// "The value of the serviceEndpoint property MUST be a string \[URI], a map, or a set composed of one or
+/// more strings \[URIs] and/or maps."
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
@@ -187,12 +292,16 @@ pub enum ServiceEndpoint {
 }
 
 // <https://w3c.github.io/did-core/#service-properties>
+/// A [service](https://www.w3.org/TR/did-core/#services) map (object) in a DID document.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
+    /// id property (URI) of a service map.
     pub id: String,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>, // TODO: set
+    /// [serviceEndpoint](https://www.w3.org/TR/did-core/#dfn-serviceendpoint) property of a
+    /// service map
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_endpoint: Option<OneOrMany<ServiceEndpoint>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -200,64 +309,98 @@ pub struct Service {
     pub property_set: Option<Map<String, Value>>,
 }
 
+/// A [linked data proof](https://w3c-ccg.github.io/ld-proofs/#linked-data-proof-overview) ([proof
+/// object](https://www.w3.org/TR/vc-data-model/#proofs-signatures)) that may
+/// be on a [DID document][Document].
+///
+/// See also the Verifiable Credential [Proof][crate::vc::Proof] type.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Proof {
+    /// Proof type.
+    ///
+    /// May be registered in [Linked Data Cryptographic Suite
+    /// Registry](https://w3c-ccg.github.io/ld-cryptosuite-registry/).
     #[serde(rename = "type")]
     pub type_: String,
+    /// Additional properties.
+    ///
+    /// See [Linked Data Proof Overview](https://w3c-ccg.github.io/ld-proofs/#linked-data-proof-overview) for more info about expected properties.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
 
-/// An object from a DID Document returned by DID URL dereferencing
+/// An object from a [DID document][Document] returned by [DID URL
+/// dereferencing][crate::did_resolve::dereference].
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[non_exhaustive]
 #[serde(untagged)]
 pub enum Resource {
+    /// Verification method map.
+    ///
+    /// This results from dereferencing a [verification method DID
+    /// URL][VerificationMethod::DIDURL].
     VerificationMethod(VerificationMethodMap),
+    /// An arbitrary object (map).
     Object(Map<String, Value>),
 }
 
-/// Something that can be used to derive a DID
+/// Something that can be used to derive (generate) a DID.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Source<'a> {
-    /// Public key
+    /// A public key.
     Key(&'a JWK),
-    /// Public key and additional pattern
+    /// A public key and additional pattern.
     KeyAndPattern(&'a JWK, &'a str),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
-/// <https://w3c.github.io/did-core/#did-parameters>
+/// [DID Parameters](https://www.w3.org/TR/did-core/#did-parameters).
+///
+/// As specified in DID Core and/or in [DID Specification
+/// Registries](https://www.w3.org/TR/did-spec-registries/#parameters).
 pub struct DIDParameters {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service: Option<String>, // ASCII
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(alias = "relative-ref")]
+    /// [`relativeRef`](https://www.w3.org/TR/did-spec-registries/#relativeRef-param) parameter.
     pub relative_ref: Option<String>, // ASCII, percent-encoding
+    /// [`versionId`](https://www.w3.org/TR/did-spec-registries/#versionId-param) parameter.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version_id: Option<String>, // ASCII
+    /// [`versionTime`](https://www.w3.org/TR/did-spec-registries/#versionTime-param) parameter.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version_time: Option<DateTime<Utc>>, // ASCII
+    /// [`hl`](https://www.w3.org/TR/did-spec-registries/#hl-param) parameter.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "hl")]
     pub hashlink: Option<String>, // ASCII
+    /// Additional parameters.
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
 
+/// An implementation of a [DID method](https://www.w3.org/TR/did-core/#dfn-did-methods).
+///
+/// Depends on the [DIDResolver][] trait.
+/// Also includes functionality to [generate][DIDMethod::generate] DIDs.
+///
+/// Some DID Methods are registered in the [DID Specification
+/// Registries](https://www.w3.org/TR/did-spec-registries/#did-methods).
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 pub trait DIDMethod: DIDResolver {
-    /// Get the DID method name.
-    /// <https://w3c.github.io/did-core/#method-schemes>
+    /// Get the DID method's name.
+    ///
+    /// `method-name` in [DID Syntax](https://w3c.github.io/did-core/#did-syntax).
     fn name(&self) -> &'static str;
 
     // TODO: allow returning errors
-    /// Generate a DID from some source
+    /// Generate a DID from some source.
     fn generate(&self, _source: &Source) -> Option<String> {
         None
     }
@@ -270,9 +413,10 @@ pub trait DIDMethod: DIDResolver {
     fn to_resolver(&self) -> &dyn DIDResolver;
 }
 
-/// A collection of DID methods
+/// A collection of DID methods that can be used as a single [DID resolver][DIDResolver].
 #[derive(Clone, Default)]
 pub struct DIDMethods<'a> {
+    /// Collection of DID methods by method id.
     pub methods: HashMap<&'a str, &'a dyn DIDMethod>,
 }
 
@@ -288,11 +432,12 @@ impl<'a> DIDMethods<'a> {
         self.methods.get(method_name)
     }
 
+    /// Upcast the DID method to a [DID resolver instance][DIDResolver].
     pub fn to_resolver(&self) -> &dyn DIDResolver {
         self
     }
 
-    /// Get DID method to handle a given DID
+    /// Get DID method to handle a given DID.
     pub fn get_method(&self, did: &str) -> Result<&&'a dyn DIDMethod, &'static str> {
         let mut parts = did.split(':');
         if parts.next() != Some("did") {
@@ -313,7 +458,7 @@ impl<'a> DIDMethods<'a> {
         Ok(method)
     }
 
-    /// Generate a DID given some input
+    /// Generate a DID given some input.
     pub fn generate(&self, source: &Source) -> Option<String> {
         let (jwk, pattern) = match source {
             Source::Key(_) => {
@@ -341,6 +486,8 @@ impl<'a> DIDMethods<'a> {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl<'a> DIDResolver for DIDMethods<'a> {
+    /// Resolve a DID using the corresponding DID method, using the corresponding DID method in the
+    /// [DIDMethods][] instance.
     async fn resolve(
         &self,
         did: &str,
@@ -357,6 +504,8 @@ impl<'a> DIDResolver for DIDMethods<'a> {
         method.resolve(did, input_metadata).await
     }
 
+    /// Resolve a DID to a DID document representation, using the corresponding DID method in the
+    /// [DIDMethods][] instance.
     async fn resolve_representation(
         &self,
         did: &str,
@@ -369,6 +518,8 @@ impl<'a> DIDResolver for DIDMethods<'a> {
         method.resolve_representation(did, input_metadata).await
     }
 
+    /// Dereference a DID URL, using the corresponding DID method in the
+    /// [DIDMethods][] instance.
     async fn dereference(
         &self,
         did_url: &PrimaryDIDURL,
@@ -408,6 +559,8 @@ impl DIDURL {
     }
 
     /// Convert to a fragment-less DID URL and return the removed fragment.
+    ///
+    /// The DID URL can be reconstructed using [PrimaryDIDURL::with_fragment].
     pub fn remove_fragment(self) -> (PrimaryDIDURL, Option<String>) {
         (
             PrimaryDIDURL {
@@ -440,6 +593,9 @@ impl RelativeDIDURL {
 }
 
 impl PrimaryDIDURL {
+    /// Append a [fragment](https://www.w3.org/TR/did-core/#fragment) to construct a DID URL.
+    ///
+    /// The opposite of [DIDURL::remove_fragment].
     pub fn with_fragment(self, fragment: String) -> DIDURL {
         DIDURL {
             fragment: Some(fragment),
@@ -449,7 +605,7 @@ impl PrimaryDIDURL {
 }
 
 impl VerificationMethod {
-    /// Return a DID URL for this verification method, given a DID as base URI
+    /// Return a DID URL for this verification method, given a DID as base URI.
     pub fn get_id(&self, did: &str) -> String {
         match self {
             Self::DIDURL(didurl) => didurl.to_string(),
@@ -555,6 +711,7 @@ impl VerificationMethodMap {
     }
 }
 
+/// Parse a DID URL.
 impl FromStr for DIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
@@ -569,6 +726,7 @@ impl FromStr for DIDURL {
     }
 }
 
+/// Parse a primary DID URL.
 impl FromStr for PrimaryDIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
@@ -593,6 +751,8 @@ impl FromStr for PrimaryDIDURL {
         Ok(Self { did, path, query })
     }
 }
+
+/// Parse a relative DID URL.
 impl FromStr for RelativeDIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
@@ -611,6 +771,7 @@ impl FromStr for RelativeDIDURL {
     }
 }
 
+/// Parse a relative DID URL path.
 impl FromStr for RelativeDIDURLPath {
     type Err = Error;
     fn from_str(path: &str) -> Result<Self, Self::Err> {
@@ -641,6 +802,7 @@ impl FromStr for RelativeDIDURLPath {
     }
 }
 
+/// Serialize a DID URL.
 impl fmt::Display for DIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{}", self.did, self.path_abempty)?;
@@ -654,6 +816,7 @@ impl fmt::Display for DIDURL {
     }
 }
 
+/// Serialize a relative DID URL.
 impl fmt::Display for RelativeDIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.path.fmt(f)?;
@@ -667,6 +830,7 @@ impl fmt::Display for RelativeDIDURL {
     }
 }
 
+/// Serialize a relative DID URL path.
 impl fmt::Display for RelativeDIDURLPath {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -677,6 +841,7 @@ impl fmt::Display for RelativeDIDURLPath {
     }
 }
 
+/// Serialize a primary DID URL.
 impl fmt::Display for PrimaryDIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.did)?;
@@ -705,6 +870,7 @@ impl From<DIDURL> for String {
     }
 }
 
+/// Convert a primary DID URL into a DID URL.
 impl From<PrimaryDIDURL> for DIDURL {
     fn from(primary: PrimaryDIDURL) -> DIDURL {
         DIDURL {
@@ -747,17 +913,24 @@ impl From<RelativeDIDURL> for String {
 }
 
 impl Default for Document {
+    /// Create a new DID document with an empty string as the id. The empty string is not valid as
+    /// a DID, so this should be changed immediately.
     fn default() -> Self {
         Document::new("")
     }
 }
 
 impl Default for RelativeDIDURLPath {
+    /// The default relative DID URL path is an [empty path][Self::Empty].
     fn default() -> Self {
         Self::Empty
     }
 }
 
+/// Convert one or more context values to a [Contexts][] type.
+///
+/// Validates that the contexts contain the required [default DID document
+/// context][DEFAULT_CONTEXT] (or one of the allowed alternatives).
 impl TryFrom<OneOrMany<Context>> for Contexts {
     type Error = Error;
     fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
@@ -790,6 +963,7 @@ impl From<Contexts> for OneOrMany<Context> {
 }
 
 impl DocumentBuilder {
+    /// Validate that the DID document JSON-LD context contains the required [default context URI][DEFAULT_CONTEXT].
     fn validate(&self) -> Result<(), Error> {
         // validate is called before defaults are assigned.
         // None means default will be used.
@@ -855,6 +1029,8 @@ pub(crate) fn merge_context(dest_opt: &mut Option<Value>, source: &Contexts) {
 }
 
 impl Document {
+    /// Construct a new DID document with the given id (DID) and [default
+    /// `@context`][DEFAULT_CONTEXT].
     pub fn new(id: &str) -> Document {
         Document {
             context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
@@ -874,16 +1050,19 @@ impl Document {
         }
     }
 
+    /// Construct a DID document from JSON.
     pub fn from_json(json: &str) -> Result<Document, serde_json::Error> {
         serde_json::from_str(json)
     }
 
+    /// Construct a DID document from JSON bytes.
     pub fn from_json_bytes(json: &[u8]) -> Result<Document, serde_json::Error> {
         serde_json::from_slice(json)
     }
 
     /// Select an object in the DID document.
-    /// For the [DID URL dereferencing algorithm, Step 1.1](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary)
+    ///
+    /// Used in [DID URL dereferencing - Dereferencing the Secondary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-secondary), Step 1.1 "... select the JSON-LD object whose id property matches the input DID URL ..."
     pub fn select_object(&self, id: &DIDURL) -> Result<Resource, Error> {
         let id_string = String::from(id.clone());
         let id_relative_string_opt = id.to_relative(&self.id).map(|rel_url| rel_url.to_string());
@@ -912,8 +1091,11 @@ impl Document {
     }
 
     /// Select a service endpoint object in the DID document.
-    /// For the [DID URL Dereferencing - Dereferencing the Primary Resource, Step
-    /// 1.1](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary)
+    ///
+    /// Used in [DID URL Dereferencing - Dereferencing the Primary
+    /// Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary), Step
+    /// 1.1 "... select the service endpoint whose id property contains a fragment which matches
+    /// the value of the service DID parameter of the input DID URL"
     pub fn select_service(&self, fragment: &str) -> Option<&Service> {
         for service in self.service.iter().flatten() {
             if let [service_fragment, _] =
@@ -946,6 +1128,9 @@ impl Document {
         Ok(vm_ids)
     }
 
+    /// Serialize a DID document with a given
+    /// [representation](https://www.w3.org/TR/did-core/#representations) identified by a
+    /// content-type string.
     pub fn to_representation(&self, content_type: &str) -> Result<Vec<u8>, Error> {
         match content_type {
             TYPE_DID_LD_JSON => Ok(serde_json::to_vec(self)?),
@@ -954,6 +1139,7 @@ impl Document {
     }
 }
 
+/// Some example functionality.
 pub mod example {
     use crate::did::{DIDMethod, Document};
     use crate::did_resolve::{
@@ -969,6 +1155,9 @@ pub mod example {
     const DOC_JSON_TEST_ISSUER: &str = include_str!("../tests/did-example-test-issuer.json");
     const DOC_JSON_TEST_HOLDER: &str = include_str!("../tests/did-example-test-holder.json");
 
+    /// An implementation of `did:example`.
+    ///
+    /// For use with [VC Test Suite](https://github.com/w3c/vc-test-suite/) and in other places.
     pub struct DIDExample;
 
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

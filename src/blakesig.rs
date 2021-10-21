@@ -1,3 +1,11 @@
+//! Hashing public keys using [BLAKE2b][]
+//!
+//! BLAKE2b is used to hash public keys to produce [Tezos] blockchain account identifiers.
+//!
+//! Functionality is also provided for serializing public keys as needed for Tezos addresses.
+//!
+//! [BLAKE2b]: https://blake2.net/
+//! [Tezos]: https://tezos.com/
 use crate::error::Error;
 
 use crate::jwk::{Params, JWK};
@@ -8,6 +16,14 @@ const TZ2_HASH: [u8; 3] = [0x06, 0xa1, 0xa1];
 #[cfg(feature = "p256")]
 const TZ3_HASH: [u8; 3] = [0x06, 0xa1, 0xa4];
 
+/// Hash a public key to produce a Tezos address.
+///
+/// The address format is a Base58Check-encoded hash of the public key bytes, with a prefix for the
+/// type of key. This is as described in Tezos's [Base58 prefix] documentation. The prefixes in the
+/// resulting ASCII string are `tz1` for Ed25519, `tz2` for Secp256k1 (k256), and `tz3` for
+/// Secp256r1 (p256).
+///
+/// [Base58 prefix]: https://gitlab.com/tezos/tezos/blob/3ed1c460773466c565d43e1007f4b2d9348d90a7/scripts/b58_prefix/README.md
 pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
     #[allow(unused)]
     let bytes: Vec<u8>;
@@ -42,8 +58,11 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
     Ok(encoded)
 }
 
+// TODO: move this out of blakesig
+/// Serialize a P-256 public key as a 33-byte string with point compression.
 #[cfg(feature = "p256")]
 pub fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+    // TODO: check that curve is P-256
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
     let x = FieldBytes::<p256::NistP256>::from_slice(
         &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
@@ -57,6 +76,8 @@ pub fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
     Ok(pk_compressed_bytes.to_vec())
 }
 
+// TODO: move this out of blakesig
+/// Serialize a secp256k1 public key as a 33-byte string with point compression.
 #[cfg(feature = "k256")]
 pub fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
     use k256::elliptic_curve::sec1::ToEncodedPoint;

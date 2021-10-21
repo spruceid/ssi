@@ -1,3 +1,5 @@
+//! [JSON-LD](https://www.w3.org/TR/json-ld11/) functionality
+
 use std::collections::BTreeMap as Map;
 use std::convert::TryFrom;
 use std::str::FromStr;
