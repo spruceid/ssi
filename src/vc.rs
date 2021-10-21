@@ -1850,6 +1850,9 @@ impl Proof {
         if let Some(ref proof_purpose) = options.proof_purpose {
             assert_local!(self.proof_purpose.as_ref() == Some(proof_purpose));
         }
+        if let Some(ref type_) = options.type_ {
+            assert_local!(&self.type_ == type_);
+        }
         true
     }
 
