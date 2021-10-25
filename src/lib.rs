@@ -1,5 +1,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
-
+#![doc(
+    html_logo_url = "https://demo.didkit.dev/2021/10/21/rust-didkit.png",
+    html_favicon_url = "https://demo.didkit.dev/2021/10/21/rust-favicon.ico"
+)]
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;
