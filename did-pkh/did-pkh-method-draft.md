@@ -95,6 +95,7 @@ JSON-LD DID document derived from each:
 | tz (tz1) | [did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-tz1.jsonld) |
 | tz (tz2) | [did:pkh:tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-tz2.jsonld) |
 | tz (tz3) | [did:pkh:tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-tz3.jsonld) |
+| aleo | [did:pkh:aleo:1:aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348](https://github.com/spruceid/ssi/blob/main/did-pkh/tests/did-aleo.jsonld) |
 
 As you can see, the did:pkh address simply consists of a prefix to identify the
 namespace on which the address is valid (and could be published, but isn't
@@ -120,6 +121,7 @@ enough to identify keytype, which must be detected from the address itself.
 |solana|`solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ`|Ed25519VerificationKey2018|https://w3id.org/security#Ed25519VerificationKey2018|
 |bitcoin mainnet|`bip122:000000000019d6689c085ae165831e93`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
 |dogecoin mainnet|`bip122:1a91e3dace36e2be3bf030a65679fe82`|EcdsaSecp256k1RecoveryMethod2020|https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020|
+|Aleo Testnet I|`aleo:1`|BlockchainVerificationMethod2021|https://w3id.org/security#BlockchainVerificationMethod2021|
 
 ### Context
 
