@@ -130,7 +130,7 @@ fn pick_proof_suite<'a, 'b>(
                     &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                 }
             }
-            _ => &EcdsaSecp256r1Signature2019,
+            _ => &JsonWebSignature2020,
         },
         Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
             Some(URI::String(ref vm))
