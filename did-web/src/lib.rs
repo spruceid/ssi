@@ -37,8 +37,14 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
         Some(_) => parts.collect::<Vec<&str>>().join("/"),
         None => ".well-known".to_string(),
     };
+    // Use http for localhost, for testing purposes.
+    let proto = if domain_name == "localhost" {
+        "http"
+    } else {
+        "https"
+    };
     #[allow(unused_mut)]
-    let mut url = format!("https://{}/{}/did.json", domain_name, path);
+    let mut url = format!("{}://{}/{}/did.json", proto, domain_name, path);
     #[cfg(test)]
     PROXY.with(|proxy| {
         if let Some(ref proxy) = *proxy.borrow() {
@@ -205,7 +211,7 @@ mod tests {
         );
     }
 
-    const DID_URL: &str = "https://localhost/.well-known/did.json";
+    const DID_URL: &str = "http://localhost/.well-known/did.json";
     const DID_JSON: &str = r#"{
       "@context": "https://www.w3.org/ns/did/v1",
       "id": "did:web:localhost",
