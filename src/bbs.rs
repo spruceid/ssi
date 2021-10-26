@@ -96,6 +96,9 @@ pub struct BlsSecretKey(pub Fr);
 
 impl From<SecretKey> for BlsSecretKey {
     fn from(x: SecretKey) -> Self {
+        // SAFETY: These two types, bbs::keys::SecretKey and ssi::bbs::BlsSecretKey, both wrap
+        // pairing_plus::bls12_381::Fr, so transmute should be okay. The bls and pairing-plus
+        // crate versions should be checked to ensure this equivalence continues to hold.
         unsafe { std::mem::transmute(x) }
     }
 }
