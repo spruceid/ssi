@@ -2,6 +2,11 @@ use crate::error::Error;
 
 use crate::jwk::{Params, JWK};
 
+use blake2::{
+    digest::{Update, VariableOutput},
+    VarBlake2b,
+};
+
 const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
 #[cfg(feature = "secp256k1")]
 const TZ2_HASH: [u8; 3] = [0x06, 0xa1, 0xa1];
@@ -31,13 +36,12 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
         }
         _ => return Err(Error::KeyTypeNotImplemented),
     };
-    let mut hasher = blake2b_simd::Params::new();
-    hasher.hash_length(20);
-    let blake2b = hasher.hash(public_key_bytes);
-    let blake2b = blake2b.as_bytes();
+    let mut hasher = VarBlake2b::new(20).unwrap();
+    hasher.update(public_key_bytes);
+    let hash = hasher.finalize_boxed();
     let mut outer = Vec::with_capacity(20);
     outer.extend_from_slice(outer_prefix);
-    outer.extend_from_slice(blake2b);
+    outer.extend_from_slice(&hash);
     let encoded = bs58::encode(&outer).with_check().into_string();
     Ok(encoded)
 }

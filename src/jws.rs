@@ -1,7 +1,5 @@
 use crate::error::Error;
 use crate::jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
-#[cfg(any(feature = "k256", feature = "p256"))]
-use crate::passthrough_digest::PassthroughDigest;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -115,11 +113,15 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 return Err(Error::CurveNotImplemented(okp.curve.to_string()));
             }
             let hash = match algorithm {
-                Algorithm::EdBlake2b => blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec(),
+                Algorithm::EdBlake2b => {
+                    use blake2::{
+                        digest::{Update, VariableOutput},
+                        VarBlake2b,
+                    };
+                    let mut hasher = VarBlake2b::new(32).unwrap();
+                    hasher.update(data);
+                    hasher.finalize_boxed().into()
+                }
                 _ => data.to_vec(),
             };
             #[cfg(feature = "ring")]
@@ -175,12 +177,12 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
+                use blake2::{
+                    digest::{Update, VariableOutput},
+                    VarBlake2b,
+                };
+                let mut hasher = VarBlake2b::new(32).unwrap();
+                hasher.update(data);
                 use p256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "P-256" {
@@ -188,18 +190,17 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = p256::SecretKey::try_from(ec)?;
                 let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                let sig: p256::ecdsa::Signature = signing_key
-                    .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))?;
+                let sig: p256::ecdsa::Signature = signing_key.try_sign_digest(hasher)?;
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "k256")]
             Algorithm::ESBlake2bK => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
+                use blake2::{
+                    digest::{Update, VariableOutput},
+                    VarBlake2b,
+                };
+                let mut hasher = VarBlake2b::new(32).unwrap();
+                hasher.update(data);
                 use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
@@ -207,8 +208,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::Signature = signing_key
-                    .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))?;
+                let sig: k256::ecdsa::Signature = signing_key.try_sign_digest(hasher)?;
                 sig.as_bytes().to_vec()
             }
             _ => {
@@ -286,11 +286,15 @@ pub fn verify_bytes(
                 return Err(Error::CurveNotImplemented(okp.curve.to_string()));
             }
             let hash = match algorithm {
-                Algorithm::EdBlake2b => blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec(),
+                Algorithm::EdBlake2b => {
+                    use blake2::{
+                        digest::{Update, VariableOutput},
+                        VarBlake2b,
+                    };
+                    let mut hasher = VarBlake2b::new(32).unwrap();
+                    hasher.update(data);
+                    hasher.finalize_boxed().into()
+                }
                 _ => data.to_vec(),
             };
             #[cfg(feature = "ring")]
@@ -357,12 +361,12 @@ pub fn verify_bytes(
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
+                use blake2::{
+                    digest::{Update, VariableOutput},
+                    VarBlake2b,
+                };
+                let mut hasher = VarBlake2b::new(32).unwrap();
+                hasher.update(data);
                 use p256::ecdsa::signature::{digest::Digest, DigestVerifier, Signature};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "P-256" {
@@ -371,19 +375,16 @@ pub fn verify_bytes(
                 let public_key = p256::PublicKey::try_from(ec)?;
                 let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
                 let sig = p256::ecdsa::Signature::try_from(signature)?;
-                verifying_key.verify_digest(
-                    Digest::chain(<PassthroughDigest as Digest>::new(), &hash),
-                    &sig,
-                )?;
+                verifying_key.verify_digest(hasher, &sig)?;
             }
             #[cfg(feature = "k256")]
             Algorithm::ESBlake2bK => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
+                use blake2::{
+                    digest::{Update, VariableOutput},
+                    VarBlake2b,
+                };
+                let mut hasher = VarBlake2b::new(32).unwrap();
+                hasher.update(data);
                 use k256::ecdsa::signature::{digest::Digest, DigestVerifier};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
@@ -392,10 +393,7 @@ pub fn verify_bytes(
                 let public_key = k256::PublicKey::try_from(ec)?;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig = k256::ecdsa::Signature::try_from(signature)?;
-                verifying_key.verify_digest(
-                    Digest::chain(<PassthroughDigest as Digest>::new(), &hash),
-                    &sig,
-                )?;
+                verifying_key.verify_digest(hasher, &sig)?;
             }
             _ => {
                 return Err(Error::UnsupportedAlgorithm);

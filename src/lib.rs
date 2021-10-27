@@ -30,9 +30,6 @@ pub mod zcap;
 
 pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-#[cfg(any(feature = "k256", feature = "p256"))]
-pub mod passthrough_digest;
-
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
