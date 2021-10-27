@@ -34,10 +34,14 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
     Ok(hash_last20_hex)
 }
 
-pub fn hash_personal_message(msg: &str) -> Vec<u8> {
+pub fn prefix_personal_message(msg: &str) -> Vec<u8> {
     let msg_bytes = msg.as_bytes();
     let prefix = format!("\x19Ethereum Signed Message:\n{}", msg_bytes.len());
-    let data = [prefix.as_bytes().to_vec(), msg_bytes.to_vec()].concat();
+    [prefix.as_bytes().to_vec(), msg_bytes.to_vec()].concat()
+}
+
+pub fn hash_personal_message(msg: &str) -> Vec<u8> {
+    let data = prefix_personal_message(msg);
     keccak(data).to_fixed_bytes().to_vec()
 }
 

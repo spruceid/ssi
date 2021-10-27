@@ -1283,8 +1283,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        use crate::passthrough_digest::PassthroughDigest;
-        use k256::ecdsa::signature::{digest::Digest, DigestSigner};
+        use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EPSIG_CONTEXT.clone()]),
             ..Proof::new("EthereumPersonalSignature2021")
@@ -1292,15 +1291,14 @@ impl ProofSuite for EthereumPersonalSignature2021 {
                 .with_properties(extra_proof_properties)
         };
         let signing_string = string_from_document_and_options(document, &proof).await?;
-        let hash = crate::keccak_hash::hash_personal_message(&signing_string);
+        let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
             _ => return Err(Error::KeyTypeNotImplemented),
         };
         let secret_key = k256::SecretKey::try_from(ec_params)?;
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
-        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign_digest(digest)?;
+        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&hash)?;
         let sig_bytes = &mut sig.as_ref().to_vec();
         // Recovery ID starts at 27 instead of 0.
         sig_bytes[64] += 27;
@@ -1371,9 +1369,8 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         let signing_string = string_from_document_and_options(document, proof).await?;
-        let hash = crate::keccak_hash::hash_personal_message(&signing_string);
-        let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
-        let recovered_key = sig.recover_verify_key_from_digest_bytes(digest)?;
+        let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
+        let recovered_key = sig.recover_verify_key(&hash)?;
         use crate::jwk::ECParams;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
