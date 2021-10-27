@@ -1105,7 +1105,7 @@ mod tests {
 
         // eth/Eip712
         let eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
-          "messageSchema": {
+          "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
             ],
@@ -1135,7 +1135,7 @@ mod tests {
         }))
         .unwrap();
         let vp_eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
-          "messageSchema": {
+          "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
             ],
@@ -1169,7 +1169,7 @@ mod tests {
             "EIP712Info": [
               { "name": "domain", "type": "EIP712Domain" },
               { "name": "primaryType", "type": "string" },
-              { "name": "messageSchema", "type": "Types" },
+              { "name": "types", "type": "Types" },
             ],
             "Types": [
               { "name": "EIP712Domain", "type": "Type[]" },
