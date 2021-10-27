@@ -1091,6 +1091,18 @@ mod tests {
         )
         .await;
 
+        // eth/epsig
+        credential_prove_verify_did_pkh(
+            key_secp256k1_eip712sig.clone(),
+            other_key_secp256k1.clone(),
+            "eip155",
+            "#blockchainAccountId",
+            &ssi::ldp::EthereumPersonalSignature2021,
+            None,
+            None,
+        )
+        .await;
+
         // eth/Eip712
         let eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
           "messageSchema": {
