@@ -12,6 +12,7 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
 };
 use std::fmt::Formatter;
+use thiserror::Error;
 use zeroize::Zeroize;
 
 /// This shows how the generators are created with nothing up my sleeve values
@@ -112,6 +113,9 @@ impl Drop for BlsSecretKey {
 }
 
 impl Serialize for BlsSecretKey {
+    /// Serialize the secret key.
+    ///
+    /// This may panic if the internal `serialize` call fails.
     fn serialize<S>(&self, s: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -164,25 +168,25 @@ impl<'de> Deserialize<'de> for BlsSecretKey {
 
 /// Generate a blinded BLS key pair where secret key `x` and blinding factor `r` in Fr
 /// and public key `W` = `G2` * `x` * `Blinding_G2` * `r`
-pub fn bls_generate_blinded_g2_key() -> BlsKeyPair<G2> {
+pub fn bls_generate_blinded_g2_key() -> Result<BlsKeyPair<G2>, BlsGenerateKeyPairError> {
     bls_generate_keypair(None, Some(BLINDING_G2))
 }
 
 /// Generate a blinded BLS key pair where secret key `x` and blinding factor `r` in Fr
 /// and public key `W` = `G1` * `x` * `Blinding_G1` * `r`
-pub fn bls_generate_blinded_g1_key() -> BlsKeyPair<G1> {
+pub fn bls_generate_blinded_g1_key() -> Result<BlsKeyPair<G1>, BlsGenerateKeyPairError> {
     bls_generate_keypair(None, Some(BLINDING_G1))
 }
 
 /// Generate a BLS key pair where secret key `x` in Fr
 /// and public key `W` = `G1` * `x`
-pub fn bls_generate_g2_key() -> BlsKeyPair<G2> {
+pub fn bls_generate_g2_key() -> Result<BlsKeyPair<G2>, BlsGenerateKeyPairError> {
     bls_generate_keypair(None, None)
 }
 
 /// Generate a BLS key pair where secret key `x` in Fr
 /// and public key `W` = `G1` * `x`
-pub fn bls_generate_g1_key() -> BlsKeyPair<G1> {
+pub fn bls_generate_g1_key() -> Result<BlsKeyPair<G1>, BlsGenerateKeyPairError> {
     bls_generate_keypair(None, None)
 }
 
@@ -197,10 +201,24 @@ impl<G: CurveProjective<Engine = Bls12, Scalar = Fr>> Zeroize for BlsPublicKey<G
     }
 }
 
+/// Error resulting from attempting to convert a [BlsPublicKey] or [BlsSecretKey] to a BBS+ Public Key
+///
+/// Returned by [BlsPublicKey::to_bbs_public_key], [BlsSecretKey::to_bbs_public_key]
+#[derive(Error, Debug)]
+pub enum BlsToBbsPublicKeyError {
+    /// Unable to convert BLS key to BBS+ key.
+    #[error("Unable to convert BLS key to BBS+ key")]
+    Convert(BBSError),
+}
+
 impl BlsPublicKey<G2> {
-    pub fn to_bbs_public_key(&self, message_count: usize) -> PublicKey {
+    pub fn to_bbs_public_key(
+        &self,
+        message_count: usize,
+    ) -> Result<PublicKey, BlsToBbsPublicKeyError> {
         let dpk = DeterministicPublicKey::from(self.0);
-        dpk.to_public_key(message_count).unwrap()
+        dpk.to_public_key(message_count)
+            .map_err(BlsToBbsPublicKeyError::Convert)
     }
 }
 
@@ -212,7 +230,10 @@ pub struct BlsKeyPair<G: CurveProjective<Engine = Bls12, Scalar = Fr> + SerDes> 
 }
 
 impl<G: CurveProjective<Engine = Bls12, Scalar = Fr> + SerDes> BlsKeyPair<G> {
-    pub fn new(seed: Option<&[u8]>, blinder: Option<&[u8]>) -> Self {
+    pub fn new(
+        seed: Option<&[u8]>,
+        blinder: Option<&[u8]>,
+    ) -> Result<Self, BlsGenerateKeyPairError> {
         bls_generate_keypair(seed, blinder)
     }
 }
@@ -224,18 +245,32 @@ impl From<BlsSecretKey> for SecretKey {
 }
 
 impl BlsSecretKey {
-    pub fn to_bbs_public_key(&self, message_count: usize) -> PublicKey {
+    pub fn to_bbs_public_key(
+        &self,
+        message_count: usize,
+    ) -> Result<PublicKey, BlsToBbsPublicKeyError> {
         let mut g2 = G2::one();
         g2.mul_assign(self.0);
         let dpk = DeterministicPublicKey::from(g2);
-        dpk.to_public_key(message_count).unwrap()
+        dpk.to_public_key(message_count)
+            .map_err(BlsToBbsPublicKeyError::Convert)
     }
+}
+
+/// Error resulting from attempting to generate a BLS Keypair
+///
+/// Returned by [bls_generate_g1_key], [bls_generate_g2_key], [bls_generate_blinded_g1_key], [bls_generate_blinded_g2_key]
+#[derive(Error, Debug)]
+pub enum BlsGenerateKeyPairError {
+    /// Unable to deserialize blinder.
+    #[error("Unable to deserialize blinder")]
+    DeserializeBlinder(#[source] std::io::Error),
 }
 
 fn bls_generate_keypair<G: CurveProjective<Engine = Bls12, Scalar = Fr> + SerDes>(
     seed: Option<&[u8]>,
     blinder: Option<&[u8]>,
-) -> BlsKeyPair<G> {
+) -> Result<BlsKeyPair<G>, BlsGenerateKeyPairError> {
     let passed_seed;
     let seed = match seed {
         Some(arg) => {
@@ -267,7 +302,8 @@ fn bls_generate_keypair<G: CurveProjective<Engine = Bls12, Scalar = Fr> + SerDes
                 rng.fill_bytes(blinding_factor.as_mut_slice());
                 data.extend_from_slice(blinding_factor.as_slice());
             }
-            let mut blinding_g = G::deserialize(&mut gg, true).unwrap();
+            let mut blinding_g = G::deserialize(&mut gg, true)
+                .map_err(BlsGenerateKeyPairError::DeserializeBlinder)?;
             let r = gen_sk(data.as_slice());
             blinding_g.mul_assign(r);
             pk.add_assign(&blinding_g);
@@ -276,11 +312,11 @@ fn bls_generate_keypair<G: CurveProjective<Engine = Bls12, Scalar = Fr> + SerDes
         None => None,
     };
 
-    BlsKeyPair {
+    Ok(BlsKeyPair {
         secret_key: BlsSecretKey(sk),
         public_key: BlsPublicKey(pk),
         blinder: r,
-    }
+    })
 }
 
 fn gen_sk(msg: &[u8]) -> Fr {
