@@ -26,7 +26,7 @@ sha = ["sha2", "k256/sha256"]
 example-http-issuer = []
 
 [dependencies]
-json-ld = "0.4"
+json-ld = { path = "../json-ld" }
 bbs = "0.4.1"
 pairing-plus = "0.19"
 ff = { version = "0.6", package = "ff-zeroize" }

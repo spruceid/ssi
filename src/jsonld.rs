@@ -1,4 +1,4 @@
-use std::collections::BTreeMap as Map;
+use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 
@@ -10,8 +10,8 @@ use crate::rdf::{
 
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
-use json::JsonValue;
 use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
+use serde_json::{map::Map, Value};
 
 #[derive(Debug, Clone)]
 pub enum RdfDirection {
@@ -137,123 +137,123 @@ pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &str =
     "https://identity.foundation/presentation-exchange/submission/v1";
 
 lazy_static! {
-    pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CREDENTIALS_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(CREDENTIALS_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CREDENTIALS_EXAMPLES_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(CREDENTIALS_EXAMPLES_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref ODRL_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref ODRL_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::ODRL;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(ODRL_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref SCHEMA_ORG_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref SCHEMA_ORG_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SCHEMA_ORG;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(SCHEMA_ORG_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref SECURITY_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref SECURITY_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SECURITY_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(SECURITY_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref SECURITY_V2_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref SECURITY_V2_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SECURITY_V2;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(SECURITY_V2_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref DID_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref DID_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DID_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(DID_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DID_RESOLUTION_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DIF_ESRS2020;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(DIF_ESRS2020_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref ESRS2020_EXTRA_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref ESRS2020_EXTRA_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::ESRS2020_EXTRA;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(ESRS2020_EXTRA_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref LDS_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref LDS_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::LDS_JWS2020_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(LDS_JWS2020_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref W3ID_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref W3ID_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::W3ID_JWS2020_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(W3ID_JWS2020_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref CITIZENSHIP_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref CITIZENSHIP_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CITIZENSHIP_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(CITIZENSHIP_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref VACCINATION_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref VACCINATION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::VACCINATION_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(VACCINATION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref TRACEABILITY_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref TRACEABILITY_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::TRACEABILITY_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(TRACEABILITY_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::REVOCATION_LIST_2020_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(REVOCATION_LIST_2020_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::EIP712SIG_V0_1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(EIP712SIG_V0_1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref BBS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref BBS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::BBS_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(BBS_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref EIP712SIG_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref EIP712SIG_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::EIP712SIG_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(EIP712SIG_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
-    pub static ref PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+    pub static ref PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::PRESENTATION_SUBMISSION_V1;
-        let doc = json::parse(jsonld).unwrap();
+        let doc = serde_json::from_str(jsonld).unwrap();
         let iri = Iri::new(PRESENTATION_SUBMISSION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
@@ -261,7 +261,7 @@ lazy_static! {
 
 pub struct StaticLoader;
 impl Loader for StaticLoader {
-    type Document = JsonValue;
+    type Document = Value;
     fn load<'a>(
         &'a mut self,
         url: Iri<'_>,
@@ -335,13 +335,13 @@ impl From<&JsonLdOptions> for json_ld::context::ProcessingOptions {
     }
 }
 
-pub enum JsonValuesIter<'a> {
-    Multiple(std::slice::Iter<'a, JsonValue>),
-    Single(Option<&'a JsonValue>),
+pub enum ValuesIter<'a> {
+    Multiple(std::slice::Iter<'a, Value>),
+    Single(Option<&'a Value>),
 }
 
-impl<'a> Iterator for JsonValuesIter<'a> {
-    type Item = &'a JsonValue;
+impl<'a> Iterator for ValuesIter<'a> {
+    type Item = &'a Value;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Multiple(iter) => iter.next(),
@@ -350,19 +350,19 @@ impl<'a> Iterator for JsonValuesIter<'a> {
     }
 }
 
-impl<'a> From<&'a JsonValue> for JsonValuesIter<'a> {
-    fn from(value: &'a JsonValue) -> Self {
+impl<'a> From<&'a Value> for ValuesIter<'a> {
+    fn from(value: &'a Value) -> Self {
         match value {
-            JsonValue::Array(array) => Self::Multiple(array.iter()),
-            JsonValue::Null => Self::Single(None),
+            Value::Array(vec) => Self::Multiple(vec.iter()),
+            Value::Null => Self::Single(None),
             value => Self::Single(Some(value)),
         }
     }
 }
 
-type NodeMap = Map<String, Map<String, JsonValue>>;
+type NodeMap = BTreeMap<String, BTreeMap<String, Value>>;
 
-pub fn is_blank_node_identifier(value: &JsonValue) -> bool {
+pub fn is_blank_node_identifier(value: &Value) -> bool {
     let value_str = match value.as_str() {
         Some(value_str) => value_str,
         None => return false,
@@ -372,20 +372,17 @@ pub fn is_blank_node_identifier(value: &JsonValue) -> bool {
 
 #[derive(Debug, Clone, Default)]
 pub struct BlankNodeIdentifierGenerator {
-    pub identifier_map: Map<String, JsonValue>,
+    pub identifier_map: BTreeMap<String, Value>,
     pub counter: u64,
 }
 
 impl BlankNodeIdentifierGenerator {
     /// <https://w3c.github.io/json-ld-api/#generate-blank-node-identifier>
-    pub fn generate(&mut self, identifier: &JsonValue) -> Result<JsonValue, Error> {
+    pub fn generate(&mut self, identifier: &Value) -> Result<Value, Error> {
         let identifier_str = if identifier.is_null() {
             None
         } else {
-            match identifier.as_str() {
-                Some(id) => Some(id),
-                None => return Err(Error::ExpectedString),
-            }
+            Some(identifier.as_str().ok_or(Error::ExpectedString)?)
         };
         // 1
         if let Some(identifier_str) = identifier_str {
@@ -398,7 +395,7 @@ impl BlankNodeIdentifierGenerator {
         let blank_node_id_prefix = "_:b";
         let new_id = blank_node_id_prefix.to_string() + &self.counter.to_string();
         self.counter += 1;
-        let id = JsonValue::String(new_id);
+        let id = Value::String(new_id);
         // 3
         if let Some(old_id) = identifier_str {
             self.identifier_map.insert(old_id.to_string(), id.clone());
@@ -410,18 +407,18 @@ impl BlankNodeIdentifierGenerator {
 
 /// <https://w3c.github.io/json-ld-api/#node-map-generation>
 pub fn generate_node_map(
-    element: JsonValue,
+    element: Value,
     node_map: &mut NodeMap,
     active_graph: Option<&str>,
-    active_subject: Option<&JsonValue>,
+    active_subject: Option<&Value>,
     active_property: Option<&str>,
-    list: Option<&mut JsonValue>,
+    list: Option<&mut Value>,
     blank_node_id_generator: &mut BlankNodeIdentifierGenerator,
 ) -> Result<(), Error> {
-    let mut null: JsonValue = JsonValue::Null;
+    let mut null: Value = Value::Null;
     let list = list.unwrap_or(&mut null);
     let mut element_obj = match element {
-        JsonValue::Array(array) => {
+        Value::Array(array) => {
             // 1
             for item in array.into_iter() {
                 // 1.1
@@ -437,14 +434,14 @@ pub fn generate_node_map(
             }
             return Ok(());
         }
-        JsonValue::Object(object) => object,
+        Value::Object(object) => object,
         _ => return Err(Error::ExpectedObject),
     };
     let active_graph = active_graph.unwrap_or(AT_DEFAULT);
     // 2
     let graph = node_map
         .entry(active_graph.to_string())
-        .or_insert_with(Map::new);
+        .or_insert_with(BTreeMap::new);
     let subject_node = match active_subject {
         Some(active_subject) => match active_subject.as_str() {
             Some(subject) => graph.get_mut(subject),
@@ -457,7 +454,7 @@ pub fn generate_node_map(
     };
     // 3
     if let Some(types) = match element_obj.remove(AT_TYPE) {
-        Some(JsonValue::Array(items)) => Some(JsonValue::Array(
+        Some(Value::Array(items)) => Some(Value::Array(
             items
                 .into_iter()
                 .map(|item| {
@@ -468,7 +465,7 @@ pub fn generate_node_map(
                         Ok(item)
                     }
                 })
-                .collect::<Result<Vec<JsonValue>, Error>>()?,
+                .collect::<Result<Vec<Value>, Error>>()?,
         )),
         Some(item) => {
             // 3.1
@@ -480,27 +477,27 @@ pub fn generate_node_map(
         }
         None => None,
     } {
-        element_obj.insert(AT_TYPE, types);
+        element_obj.insert(AT_TYPE.to_string(), types);
     }
     // 4
     if element_obj.get(AT_VALUE).is_some() {
         // Reconstruct element since it was partially moved.
-        let element = JsonValue::Object(element_obj);
+        let element = Value::Object(element_obj);
         if let Some(ref mut list) = match list {
-            JsonValue::Object(list) => Some(list),
-            JsonValue::Null => None,
+            Value::Object(list) => Some(list),
+            Value::Null => None,
             _ => return Err(Error::ExpectedObject),
         } {
             // 4.2
             let array = match list.get_mut(AT_LIST) {
-                Some(JsonValue::Array(vec)) => vec,
+                Some(Value::Array(vec)) => vec,
                 _ => return Err(Error::ExpectedArrayList),
             };
             array.push(element);
         } else {
             // 4.1
             let subject_node = match subject_node {
-                Some(JsonValue::Object(object)) => object,
+                Some(Value::Object(object)) => object,
                 _ => return Err(Error::ExpectedObject),
             };
             let active_property = match active_property {
@@ -509,24 +506,22 @@ pub fn generate_node_map(
             };
             if let Some(entry) = subject_node.get_mut(active_property) {
                 // 4.1.2
-                let array = match entry {
-                    JsonValue::Array(array) => array,
-                    _ => return Err(Error::ExpectedArray),
-                };
+                let array = entry.as_array_mut().ok_or(Error::ExpectedArray)?;
                 if !array.contains(&element) {
                     array.push(element);
                 }
             } else {
                 // 4.1.1
-                let entry = array![element];
-                subject_node.insert(active_property, entry);
+                let entry = Value::Array(vec![element]);
+                subject_node.insert(active_property.to_string(), entry);
             }
         }
     // 5
     } else if let Some(element_list) = element_obj.remove(AT_LIST) {
         // 5.1
-        let mut result: JsonValue = JsonValue::new_object();
-        result.insert(AT_LIST, JsonValue::new_array())?;
+        let mut map = Map::new();
+        map.insert(AT_LIST.to_string(), Value::Array(Vec::new()));
+        let mut result: Value = Value::Object(map);
         // 5.2
         generate_node_map(
             element_list,
@@ -552,7 +547,7 @@ pub fn generate_node_map(
                 None => None,
             };
             let subject_node = match subject_node {
-                Some(JsonValue::Object(object)) => object,
+                Some(Value::Object(object)) => object,
                 _ => return Err(Error::ExpectedObject),
             };
             let active_property = match active_property {
@@ -560,19 +555,16 @@ pub fn generate_node_map(
                 None => return Err(Error::MissingActiveProperty),
             };
             let entry = match subject_node.get_mut(active_property) {
-                Some(JsonValue::Array(array)) => array,
+                Some(Value::Array(array)) => array,
                 None => return Err(Error::MissingActivePropertyEntry),
                 _ => return Err(Error::ExpectedArray),
             };
             entry.push(result);
         } else {
             // 5.4
-            let list = match list {
-                JsonValue::Object(list) => list,
-                _ => return Err(Error::ExpectedObject),
-            };
+            let list = list.as_object().ok_or(Error::ExpectedObject)?;
             let list_entry_of_list = match list.get_mut(AT_LIST) {
-                Some(JsonValue::Array(list)) => list,
+                Some(Value::Array(list)) => list,
                 _ => return Err(Error::ExpectedArrayList),
             };
             list_entry_of_list.push(result);
@@ -589,7 +581,7 @@ pub fn generate_node_map(
                 }
             }
             // 6.2
-            None => blank_node_id_generator.generate(&JsonValue::Null)?,
+            None => blank_node_id_generator.generate(&Value::Null)?,
         };
         let id_string = match id.as_str() {
             Some(id) => id,
@@ -597,18 +589,18 @@ pub fn generate_node_map(
         };
         // 6.3
         if !graph.contains_key(id_string) {
-            let mut object = json::object::Object::new();
-            object.insert(AT_ID, id.clone());
-            let entry = JsonValue::Object(object);
+            let mut object = Map::new();
+            object.insert(AT_ID.to_string(), id.clone());
+            let entry = Value::Object(object);
             graph.insert(id_string.to_string(), entry);
         };
         // 6.4
         let node = match graph.get_mut(id_string) {
-            Some(JsonValue::Object(node)) => node,
+            Some(Value::Object(node)) => node,
             _ => return Err(Error::ExpectedObject),
         };
         // 6.5
-        if let Some(JsonValue::Object(_)) = active_subject {
+        if let Some(Value::Object(_)) = active_subject {
             if let Some(active_subject) = active_subject {
                 let active_property = match active_property {
                     Some(active_property) => active_property,
@@ -616,26 +608,23 @@ pub fn generate_node_map(
                 };
                 if let Some(entry) = node.get_mut(active_property) {
                     // 6.5.2
-                    let array = match entry {
-                        JsonValue::Array(vec) => vec,
-                        _ => return Err(Error::ExpectedArray),
-                    };
+                    let array = entry.as_array_mut().ok_or(Error::ExpectedArray)?;
                     if !array.contains(active_subject) {
                         array.push(active_subject.clone());
                     }
                 } else {
                     // 6.5.1
-                    let entry = array![active_subject.clone()];
-                    node.insert(active_property, entry);
+                    let entry = Value::Array(vec![active_subject.clone()]);
+                    node.insert(active_property.to_string(), entry);
                 }
             }
         } else {
             // 6.6
             if let Some(active_property) = active_property {
                 // 6.6.1
-                let mut reference_object = json::object::Object::new();
-                reference_object.insert(AT_ID, id.clone());
-                let reference = JsonValue::Object(reference_object);
+                let mut reference_object = Map::new();
+                reference_object.insert(AT_ID.to_string(), id.clone());
+                let reference = Value::Object(reference_object);
                 if list.is_null() {
                     // 6.6.2
                     let subject_node = match active_subject {
@@ -646,31 +635,25 @@ pub fn generate_node_map(
                         None => None,
                     };
                     let subject_node = match subject_node {
-                        Some(JsonValue::Object(object)) => object,
+                        Some(Value::Object(object)) => object,
                         _ => return Err(Error::ExpectedObject),
                     };
                     if let Some(entry) = subject_node.get_mut(active_property) {
                         // 6.6.2.2
-                        let array = match entry {
-                            JsonValue::Array(array) => array,
-                            _ => return Err(Error::ExpectedArray),
-                        };
+                        let array = entry.as_array_mut().ok_or(Error::ExpectedArray)?;
                         if !array.contains(&reference) {
                             array.push(reference);
                         }
                     } else {
                         // 6.6.2.1
-                        let entry = array![reference];
-                        subject_node.insert(active_property, entry);
+                        let entry = Value::Array(vec![reference]);
+                        subject_node.insert(active_property.to_string(), entry);
                     }
                 } else {
                     // 6.6.3
-                    let list = match list {
-                        JsonValue::Object(list) => list,
-                        _ => return Err(Error::ExpectedObject),
-                    };
+                    let list = list.as_object_mut().ok_or(Error::ExpectedObject)?;
                     let list_entry_of_list = match list.get_mut(AT_LIST) {
-                        Some(JsonValue::Array(list)) => list,
+                        Some(Value::Array(list)) => list,
                         _ => return Err(Error::ExpectedArrayList),
                     };
                     list_entry_of_list.push(reference);
@@ -680,26 +663,23 @@ pub fn generate_node_map(
         // 6.7
         // Get graph/node again to avoid multiple mutable borrows
         let node = match graph.get_mut(id_string) {
-            Some(JsonValue::Object(node)) => node,
+            Some(Value::Object(node)) => node,
             _ => return Err(Error::ExpectedObject),
         };
         if let Some(element_type) = element_obj.remove(AT_TYPE) {
             let element_type_array = match element_type {
-                JsonValue::Array(array) => array,
+                Value::Array(array) => array,
                 _ => return Err(Error::ExpectedArray),
             };
             if let Some(node_type) = node.get_mut(AT_TYPE) {
-                let node_type_array = match node_type {
-                    JsonValue::Array(array) => array,
-                    _ => return Err(Error::ExpectedArray),
-                };
+                let node_type_array = node_type.as_array_mut().ok_or(Error::ExpectedArray)?;
                 for type_ in element_type_array.into_iter() {
                     if !node_type_array.contains(&type_) {
                         node_type_array.push(type_);
                     }
                 }
             } else {
-                node.insert("type", JsonValue::Array(element_type_array));
+                node.insert("type".to_string(), Value::Array(element_type_array));
             }
         }
         // 6.8
@@ -709,25 +689,22 @@ pub fn generate_node_map(
                     return Err(Error::ConflictingIndexes);
                 }
             } else {
-                node.insert("index", element_index);
+                node.insert("index".to_string(), element_index);
             }
         }
         // 6.9, 6.9.2, 6.9.4
         if let Some(reverse_map) = element_obj.remove(AT_REVERSE) {
             // 6.9.1
-            let mut object = json::object::Object::new();
-            object.insert(AT_ID, id.clone());
-            let referenced_node = JsonValue::Object(object);
+            let mut object = Map::new();
+            object.insert(AT_ID.to_string(), id.clone());
+            let referenced_node = Value::Object(object);
             // 6.9.3
-            let reverse_map_object = match reverse_map {
-                JsonValue::Object(object) => object,
-                _ => return Err(Error::ExpectedObject),
-            };
+            let reverse_map_object = reverse_map.as_object_mut().ok_or(Error::ExpectedObject)?;
             // Clone since Object does not have a consuming iterator.
             // https://github.com/maciejhirsz/json-rust/pull/190
             for (property, value) in reverse_map_object.iter() {
                 let values = match value {
-                    JsonValue::Array(array) => array.to_vec(),
+                    Value::Array(array) => array.clone(),
                     value => vec![value.clone()],
                 };
                 // 6.9.3.1
@@ -774,14 +751,14 @@ pub fn generate_node_map(
             )?;
         }
         // 6.12
-        let mut element_property_values: Vec<(String, JsonValue)> = element_obj
+        let mut element_property_values: Vec<(String, Value)> = element_obj
             .iter()
             .map(|(prop, value)| (prop.to_owned(), value.to_owned()))
             .collect();
         element_property_values.sort_by(|(property1, _), (property2, _)| property1.cmp(property2));
         for (property_str, value) in element_property_values {
             // 6.12.1
-            let mut property = JsonValue::String(property_str.to_string());
+            let mut property = Value::String(property_str.to_string());
             if is_blank_node_identifier(&property) {
                 property = blank_node_id_generator.generate(&property)?;
             }
@@ -796,11 +773,11 @@ pub fn generate_node_map(
                 None => return Err(Error::MissingGraph),
             };
             let node = match graph.get_mut(id_string) {
-                Some(JsonValue::Object(node)) => node,
+                Some(Value::Object(node)) => node,
                 _ => return Err(Error::ExpectedObject),
             };
             if node.get(property_str).is_none() {
-                node.insert(property_str, JsonValue::new_array());
+                node.insert(property_str.to_string(), Value::Array(Vec::new()));
             }
             // 6.12.3
             generate_node_map(
@@ -826,7 +803,7 @@ pub fn json_ld_to_rdf(
 ) -> Result<(), Error> {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     // 1
-    let mut graphs: Vec<(&String, &Map<String, JsonValue>)> = node_map.iter().collect();
+    let mut graphs: Vec<(&String, &BTreeMap<String, Value>)> = node_map.iter().collect();
     graphs.sort_by(|(name1, _), (name2, _)| name1.cmp(name2));
     for (graph_name, graph) in graphs {
         // 1.1
@@ -844,7 +821,7 @@ pub fn json_ld_to_rdf(
                 .or_insert_with(Graph::default)
         };
         // 1.3
-        let mut nodes: Vec<(&String, &JsonValue)> = graph.iter().collect();
+        let mut nodes: Vec<(&String, &Value)> = graph.iter().collect();
         nodes.sort_by(|(subject1, _), (subject2, _)| subject1.cmp(subject2));
         for (subject, node) in nodes {
             // 1.3.1
@@ -852,11 +829,8 @@ pub fn json_ld_to_rdf(
                 Ok(subject) => subject,
                 Err(_) => continue,
             };
-            let node_object = match node {
-                JsonValue::Object(object) => object,
-                _ => return Err(Error::ExpectedObject),
-            };
-            let mut property_values: Vec<(&str, &JsonValue)> = node_object.iter().collect();
+            let node_object = node.as_object().ok_or(Error::ExpectedObject)?;
+            let mut property_values: Vec<(&String, &Value)> = node_object.iter().collect();
             property_values.sort_by(|(property1, _), (property2, _)| property1.cmp(property2));
             // 1.3.2
             for (property, values) in property_values {
@@ -866,7 +840,7 @@ pub fn json_ld_to_rdf(
                 // TODO: find out why type is not getting turned into @type here
                 || property == "type"
                 {
-                    for type_ in JsonValuesIter::from(values) {
+                    for type_ in ValuesIter::from(values) {
                         let type_ = match Object::try_from(type_.to_string()) {
                             Ok(type_) => type_,
                             Err(_) => continue,
@@ -883,7 +857,7 @@ pub fn json_ld_to_rdf(
                 } else if is_keyword(property) {
                     // 1.3.2.2
                     continue;
-                } else if is_blank_node_identifier(&JsonValue::String(property.to_string()))
+                } else if is_blank_node_identifier(&Value::String(property.to_string()))
                     && options.produce_generalized_rdf != Some(true)
                 {
                     // 1.3.2.3
@@ -897,7 +871,7 @@ pub fn json_ld_to_rdf(
                     let predicate = Predicate::try_from(property)?;
                     // 1.3.2.5
                     // property is an IRI or blank node identifier
-                    for item in JsonValuesIter::from(values) {
+                    for item in ValuesIter::from(values) {
                         // 1.3.2.5.1
                         let mut list_triples = vec![];
                         // 1.3.2.5.2
@@ -936,41 +910,34 @@ pub enum ItemObject {
 #[derive(Debug, Clone)]
 pub struct NodeObject {
     pub id: Option<String>,
-    pub entries: json::object::Object,
+    pub entries: Map<String, Value>,
 }
 
 /// <https://www.w3.org/TR/json-ld11/#dfn-list-object>
 #[derive(Debug, Clone)]
 pub struct ListObject {
-    pub list: JsonValue,
-    pub index: Option<JsonValue>,
-    pub more_properties: json::object::Object,
+    pub list: Value,
+    pub index: Option<Value>,
+    pub more_properties: Map<String, Value>,
 }
 
 /// <https://www.w3.org/TR/json-ld11/#value-objects>
 #[derive(Debug, Clone)]
 pub struct ValueObject {
-    pub value: JsonValue,
-    pub type_: Option<JsonValue>,
-    pub language: Option<JsonValue>,
-    pub direction: Option<JsonValue>,
-    pub index: Option<JsonValue>,
-    pub context: Option<JsonValue>,
-    pub more_properties: json::object::Object,
+    pub value: Value,
+    pub type_: Option<Value>,
+    pub language: Option<Value>,
+    pub direction: Option<Value>,
+    pub index: Option<Value>,
+    pub context: Option<Value>,
+    pub more_properties: Map<String, Value>,
 }
 
-impl TryFrom<&JsonValue> for ValueObject {
+impl TryFrom<&Value> for ValueObject {
     type Error = Error;
-    fn try_from(object: &JsonValue) -> Result<Self, Self::Error> {
-        let mut object = match object {
-            JsonValue::Object(object) => object,
-            _ => return Err(Error::ExpectedObject),
-        }
-        .clone();
-        let value = match object.remove(AT_VALUE) {
-            Some(value) => value,
-            None => return Err(Error::ExpectedValue),
-        };
+    fn try_from(object: &Value) -> Result<Self, Self::Error> {
+        let mut object = object.as_object().ok_or(Error::ExpectedObject)?.clone();
+        let value = object.remove(AT_VALUE).ok_or(Error::ExpectedValue)?;
         let type_ = object.remove(AT_TYPE);
         let type_str = match type_ {
             Some(ref type_) => match type_.as_str() {
@@ -1026,20 +993,17 @@ impl TryFrom<&JsonValue> for ValueObject {
 }
 
 // https://www.w3.org/TR/json-ld11/#node-objects
-impl TryFrom<&JsonValue> for NodeObject {
+impl TryFrom<&Value> for NodeObject {
     type Error = Error;
-    fn try_from(object: &JsonValue) -> Result<Self, Self::Error> {
-        let object = match object {
-            JsonValue::Object(object) => object,
-            _ => return Err(Error::ExpectedObject),
-        };
-        if object.get(AT_VALUE).is_some() {
+    fn try_from(object: &Value) -> Result<Self, Self::Error> {
+        let object = object.as_object().ok_or(Error::ExpectedObject)?;
+        if object.contains_key(AT_VALUE) {
             return Err(Error::UnexpectedValue);
         }
-        if object.get(AT_LIST).is_some() {
+        if object.contains_key(AT_LIST) {
             return Err(Error::UnexpectedList);
         }
-        if object.get(AT_SET).is_some() {
+        if object.contains_key(AT_SET) {
             return Err(Error::UnexpectedSet);
         }
         let mut object = object.clone();
@@ -1054,10 +1018,7 @@ impl TryFrom<&JsonValue> for NodeObject {
         let id = match object.remove(AT_ID) {
             None => None,
             Some(value) => {
-                let id_str = match value.as_str() {
-                    Some(id_str) => id_str,
-                    None => return Err(Error::ExpectedString),
-                };
+                let id_str = value.as_str().ok_or(Error::ExpectedString)?;
                 // TODO: MUST be an IRI reference, or a compact IRI (including blank node identifiers
                 Some(id_str.to_owned())
             }
@@ -1091,18 +1052,11 @@ impl TryFrom<&JsonValue> for NodeObject {
 }
 
 // https://www.w3.org/TR/json-ld11/#lists-and-sets
-impl TryFrom<&JsonValue> for ListObject {
+impl TryFrom<&Value> for ListObject {
     type Error = Error;
-    fn try_from(object: &JsonValue) -> Result<Self, Self::Error> {
-        let mut object = match object {
-            JsonValue::Object(object) => object,
-            _ => return Err(Error::ExpectedObject),
-        }
-        .clone();
-        let list = match object.remove(AT_LIST) {
-            Some(value) => value,
-            None => return Err(Error::ExpectedList),
-        };
+    fn try_from(object: &Value) -> Result<Self, Self::Error> {
+        let mut object = object.as_object().ok_or(Error::ExpectedObject)?.clone();
+        let list = object.remove(AT_LIST).ok_or(Error::ExpectedList)?;
         let index = object.remove(AT_INDEX);
         for (key, _) in object.iter() {
             if is_keyword(key) {
@@ -1112,17 +1066,13 @@ impl TryFrom<&JsonValue> for ListObject {
                 return Err(Error::UnexpectedIRI);
             }
         }
-        for item in JsonValuesIter::from(&list) {
+        for item in ValuesIter::from(&list) {
             match item {
-                JsonValue::String(_)
-                | JsonValue::Number(_)
-                | JsonValue::Short(_)
-                | JsonValue::Boolean(_)
-                | JsonValue::Null => {}
-                JsonValue::Array(_) => {
+                Value::String(_) | Value::Number(_) | Value::Bool(_) | Value::Null => {}
+                Value::Array(_) => {
                     return Err(Error::UnexpectedNestedArray);
                 }
-                JsonValue::Object(_) => {
+                Value::Object(_) => {
                     ItemObject::try_from(item)?;
                 }
             }
@@ -1135,12 +1085,13 @@ impl TryFrom<&JsonValue> for ListObject {
     }
 }
 
-impl TryFrom<&JsonValue> for ItemObject {
+impl TryFrom<&Value> for ItemObject {
     type Error = Error;
-    fn try_from(value: &JsonValue) -> Result<Self, Self::Error> {
-        Ok(if value.has_key(AT_LIST) {
+    fn try_from(value: &Value) -> Result<Self, Self::Error> {
+        let map = value.as_object().ok_or(Error::ExpectedObject)?;
+        Ok(if map.contains_key(AT_LIST) {
             Self::List(ListObject::try_from(value)?)
-        } else if value.has_key(AT_VALUE) {
+        } else if map.contains_key(AT_VALUE) {
             Self::Value(ValueObject::try_from(value)?)
         } else {
             Self::Node(NodeObject::try_from(value)?)
@@ -1183,7 +1134,7 @@ pub fn object_to_rdf(
     // 4
     let mut value = item.value;
     // 5
-    let datatype = item.type_.unwrap_or(JsonValue::Null);
+    let datatype = item.type_.unwrap_or(Value::Null);
     // 6
     let mut datatype = if datatype.is_null() {
         None
@@ -1210,21 +1161,20 @@ pub fn object_to_rdf(
     }
     // 8
     if datatype == Some(AT_JSON) {
-        value = JsonValue::String(canonicalize_json(&value));
+        value = Value::String(canonicalize_json(&value));
         datatype = Some("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON");
     }
     // 9
     if let Some(value_bool) = match value {
-        JsonValue::Boolean(true) => Some("true"),
-        JsonValue::Boolean(false) => Some("false"),
+        Value::Bool(true) => Some("true"),
+        Value::Bool(false) => Some("false"),
         _ => None,
     } {
-        value = JsonValue::String(value_bool.to_string());
+        value = Value::String(value_bool.to_string());
         if datatype == None {
             datatype = Some("http://www.w3.org/2001/XMLSchema#boolean");
         }
-    } else if let Some(num) = value.as_number() {
-        let num_f64 = f64::from(num);
+    } else if let Some(num_f64) = value.as_f64() {
         if num_f64 % 1f64 != 0f64
             || num_f64 >= 1e21
             || datatype == Some("http://www.w3.org/2001/XMLSchema#double")
@@ -1245,7 +1195,7 @@ pub fn object_to_rdf(
                 i -= 1;
             }
             let num: String = num_vec.iter().collect();
-            value = JsonValue::String(num);
+            value = Value::String(num);
             if datatype == None {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#double");
             }
@@ -1256,7 +1206,7 @@ pub fn object_to_rdf(
             } else {
                 format!("{:.0}", num_f64)
             };
-            value = JsonValue::String(num);
+            value = Value::String(num);
             if datatype == None {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#integer");
             }
@@ -1301,7 +1251,7 @@ pub fn object_to_rdf(
             // 13.3
             RdfDirection::CompoundLiteral => {
                 // 13.3.1
-                let literal_value = blank_node_id_generator.generate(&JsonValue::Null)?;
+                let literal_value = blank_node_id_generator.generate(&Value::Null)?;
                 let literal_string = match literal_value.as_str() {
                     Some(value) => value.to_string(),
                     None => return Err(Error::ExpectedString),
@@ -1371,18 +1321,17 @@ pub fn object_to_rdf(
 }
 
 /// <https://w3c.github.io/json-ld-api/#dfn-canonical-lexical-form>
-pub fn canonicalize_json(value: &JsonValue) -> String {
+pub fn canonicalize_json(value: &Value) -> String {
     // TODO: make sure it follows RFC 8785 (JCS)
     // Converting to serde Value loses the order of keys, and serde_jcs does not provide from_str
     // functions. So we just use serde_jcs for the number serialization.
     match value {
-        JsonValue::Null => "null".to_string(),
-        JsonValue::Boolean(true) => "true".to_string(),
-        JsonValue::Boolean(false) => "false".to_string(),
-        JsonValue::Short(short) => canonicalize_json_string(short.as_str()),
-        JsonValue::String(string) => canonicalize_json_string(string),
-        JsonValue::Number(_) => canonicalize_json_number(value),
-        JsonValue::Array(array) => {
+        Value::Null => "null".to_string(),
+        Value::Bool(true) => "true".to_string(),
+        Value::Bool(false) => "false".to_string(),
+        Value::String(string) => canonicalize_json_string(string),
+        Value::Number(_) => canonicalize_json_number(value),
+        Value::Array(array) => {
             let mut string = "[".to_string();
             let mut first = true;
             for value in array {
@@ -1395,8 +1344,8 @@ pub fn canonicalize_json(value: &JsonValue) -> String {
             }
             string + "]"
         }
-        JsonValue::Object(object) => {
-            let mut entries = object.iter().collect::<Vec<(&str, &JsonValue)>>();
+        Value::Object(object) => {
+            let mut entries = object.iter().collect::<Vec<(&String, &Value)>>();
             entries.sort_by_cached_key(|(key, _)| key.encode_utf16().collect::<Vec<u16>>());
             let mut string = "{".to_string();
             let mut first = true;
@@ -1440,28 +1389,19 @@ pub fn canonicalize_json_string(string: &str) -> String {
     out
 }
 
-pub fn canonicalize_json_number(num: &JsonValue) -> String {
-    // This way seems to involve less of precision that converting to f64 first.
-    let num_str = num.dump();
-    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&num_str) {
-        if let Ok(out) = serde_jcs::to_string(&value) {
-            return out;
-        }
-    }
-    num_str
+pub fn canonicalize_json_number(num: &Value) -> String {
+    // TODO: use Result
+    serde_jcs::to_string(&num).expect("unable to canonicalize number")
 }
 
 /// <https://w3c.github.io/json-ld-api/#list-to-rdf-conversion>
 pub fn list_to_rdf(
-    list: JsonValue,
+    list: Value,
     list_triples: &mut Vec<Triple>,
     options: Option<&JsonLdOptions>,
     blank_node_id_generator: &mut BlankNodeIdentifierGenerator,
 ) -> Result<Object, Error> {
-    let list = match list {
-        JsonValue::Array(array) => array,
-        _ => return Err(Error::ExpectedArray),
-    };
+    let list = list.as_array().ok_or(Error::ExpectedArray)?;
     if list.is_empty() {
         // 1
         return Ok(Object::IRIRef(IRIRef(
@@ -1471,8 +1411,8 @@ pub fn list_to_rdf(
     // 2
     let bnodes = list
         .iter()
-        .map(|_| blank_node_id_generator.generate(&JsonValue::Null))
-        .collect::<Result<Vec<JsonValue>, Error>>()?;
+        .map(|_| blank_node_id_generator.generate(&Value::Null))
+        .collect::<Result<Vec<Value>, Error>>()?;
     // 3
     let mut bnodes_iter = bnodes.iter().peekable();
     let mut list_iter = list.iter();
@@ -1532,16 +1472,16 @@ pub async fn expand_json<T>(
     lax: bool,
     options: Option<&JsonLdOptions>,
     loader: &mut T,
-) -> Result<Vec<JsonValue>, Error>
+) -> Result<Vec<Value>, Error>
 where
-    T: Loader<Document = JsonValue> + std::marker::Send + Sync,
+    T: Loader<Document = Value> + std::marker::Send + Sync,
 {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     let base = match options.base {
         Some(ref iri) => Some(iref::Iri::new(iri)?),
         None => None,
     };
-    let mut context: JsonContext = JsonContext::new(base);
+    let mut context: dyn JsonContext = JsonContext::new(base);
     if let Some(ref url) = options.expand_context {
         use json_ld::context::Loader;
         use json_ld::context::Local;
@@ -1552,27 +1492,24 @@ where
             .await?
             .into_inner();
     }
-    let mut doc = json::parse(json)?;
+    let mut doc = serde_json::from_str(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
-        let more_contexts = json::parse(more_contexts_json)?;
+        let more_contexts = serde_json::from_str(more_contexts_json)?;
         // Merge additional contexts into document. This is needed for serializing proofs, since
         // they typically inherit the context of the parent credential/presentation rather than
         // including their own.
         // TODO: handle this with the expandContext option instead
-        let doc_object = match doc {
-            JsonValue::Object(ref mut object) => object,
-            _ => return Err(Error::ExpectedObject),
-        };
+        let doc_object = doc.as_object_mut().ok_or(Error::ExpectedObject)?;
         let mut contexts_merged = Vec::new();
         if let Some(doc_contexts) = doc_object.remove(AT_CONTEXT) {
-            for item in JsonValuesIter::from(&doc_contexts) {
+            for item in ValuesIter::from(&doc_contexts) {
                 contexts_merged.push(item.clone());
             }
         }
-        for item in JsonValuesIter::from(&more_contexts) {
+        for item in ValuesIter::from(&more_contexts) {
             contexts_merged.push(item.clone());
         }
-        doc_object.insert(AT_CONTEXT, JsonValue::Array(contexts_merged));
+        doc_object.insert(AT_CONTEXT, Value::Array(contexts_merged));
     }
     let mut expansion_options = json_ld::expansion::Options::from(options);
     use json_ld::expansion::Policy;
@@ -1603,12 +1540,12 @@ pub async fn json_to_dataset<T>(
     loader: &mut T,
 ) -> Result<DataSet, Error>
 where
-    T: Loader<Document = JsonValue> + std::marker::Send + Sync,
+    T: Loader<Document = Value> + std::marker::Send + Sync,
 {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     let expanded_doc = expand_json(json, more_contexts_json, lax, Some(&options), loader).await?;
-    let mut node_map = Map::new();
-    node_map.insert(AT_DEFAULT.to_string(), Map::new());
+    let mut node_map = BTreeMap::new();
+    node_map.insert(AT_DEFAULT.to_string(), BTreeMap::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();
     for object in expanded_doc {
         generate_node_map(
@@ -1636,7 +1573,7 @@ mod tests {
     use super::*;
     use json_ld::FsLoader;
 
-    async fn test_to_rdf(obj: &json::object::Object) -> Result<(), Error> {
+    async fn test_to_rdf(obj: &Map<String, Value>) -> Result<(), Error> {
         use crate::urdna2015;
         use std::fs;
         use std::path::PathBuf;
@@ -1653,7 +1590,7 @@ mod tests {
             "json-ld-api",
         );
         let mut ld_options = DEFAULT_JSON_LD_OPTIONS.clone();
-        if let Some(JsonValue::Object(options)) = obj.get("option") {
+        if let Some(Value::Object(options)) = obj.get("option") {
             if let Some(mode) = options.get("processingMode") {
                 let mode_str = match mode.as_str() {
                     Some(mode_str) => mode_str,
@@ -1707,21 +1644,14 @@ mod tests {
     /// <https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html>
     async fn to_rdf_test_suite() {
         let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
-        let manifest = json::parse(manifest_str).unwrap();
-        let manifest_obj = match manifest {
-            JsonValue::Object(obj) => Ok(obj),
-            _ => Err(Error::ExpectedObject),
-        }
-        .unwrap();
+        let manifest = serde_json::from_str(manifest_str).unwrap();
+        let manifest_obj = manifest.as_object().ok_or(Error::ExpectedObject).unwrap();
         let case = std::env::args().skip(2).next();
         let sequence = manifest_obj.get("sequence").unwrap();
         let mut passed = 0;
         let mut total = 0;
         for test in sequence.members() {
-            let obj = match test {
-                JsonValue::Object(obj) => obj,
-                _ => panic!("expected object"),
-            };
+            let obj = test.as_object().expect("expected object");
             let id = obj.get(AT_ID).unwrap().as_str().unwrap();
             if let Some(ref case) = case {
                 if case != id {
@@ -1753,8 +1683,8 @@ mod tests {
                     continue;
                 }
             }
-            if let Some(JsonValue::Object(options)) = obj.get("option") {
-                if options.get("normative") == Some(&JsonValue::Boolean(false)) {
+            if let Some(Value::Object(options)) = obj.get("option") {
+                if options.get("normative") == Some(&Value::Bool(false)) {
                     eprintln!("test {}: skipping: non-normative", id);
                     continue;
                 }
