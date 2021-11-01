@@ -1985,6 +1985,7 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
     match (proof.type_.as_str(), type_iri.as_str()) {
         ("RsaSignature2018", "https://w3id.org/security#RsaSignature2018") => (),
         ("Ed25519Signature2018", "https://w3id.org/security#Ed25519Signature2018") => (),
+        ("Ed25519Signature2020", "https://w3id.org/security#Ed25519Signature2020") => (),
         ("EcdsaSecp256k1Signature2019", "https://w3id.org/security#EcdsaSecp256k1Signature2019") => (),
         ("EcdsaSecp256r1Signature2019", "https://w3id.org/security#EcdsaSecp256r1Signature2019") => (),
         ("EcdsaSecp256k1RecoverySignature2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020") => (),

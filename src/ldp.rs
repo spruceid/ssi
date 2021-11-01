@@ -59,6 +59,7 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
     Ok(match proof_type {
         "RsaSignature2018" => &RsaSignature2018,
         "Ed25519Signature2018" => &Ed25519Signature2018,
+        "Ed25519Signature2020" => &Ed25519Signature2020,
         "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
             &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
         }
@@ -493,6 +494,34 @@ async fn sign_proof(
     Ok(proof)
 }
 
+async fn sign_nojws(
+    document: &(dyn LinkedDataDocument + Sync),
+    options: &LinkedDataProofOptions,
+    _resolver: &dyn DIDResolver,
+    key: &JWK,
+    type_: &str,
+    algorithm: Algorithm,
+    context_uri: &str,
+    extra_proof_properties: Option<Map<String, Value>>,
+) -> Result<Proof, Error> {
+    if let Some(key_algorithm) = key.algorithm {
+        if key_algorithm != algorithm {
+            return Err(Error::AlgorithmMismatch);
+        }
+    }
+    let mut proof = Proof::new(type_)
+        .with_options(options)
+        .with_properties(extra_proof_properties);
+    if !document_has_context(document, context_uri)? {
+        proof.context = serde_json::json!([context_uri]);
+    }
+    let message = to_jws_payload(document, &proof).await?;
+    let sig = crate::jws::sign_bytes(algorithm, &message, &key)?;
+    let sig_multibase = multibase::encode(multibase::Base::Base58Btc, sig);
+    proof.proof_value = Some(sig_multibase);
+    Ok(proof)
+}
+
 async fn prepare(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -528,6 +557,35 @@ async fn prepare_proof(
     })
 }
 
+async fn prepare_nojws(
+    document: &(dyn LinkedDataDocument + Sync),
+    options: &LinkedDataProofOptions,
+    _resolver: &dyn DIDResolver,
+    public_key: &JWK,
+    type_: &str,
+    algorithm: Algorithm,
+    context_uri: &str,
+    extra_proof_properties: Option<Map<String, Value>>,
+) -> Result<ProofPreparation, Error> {
+    if let Some(key_algorithm) = public_key.algorithm {
+        if key_algorithm != algorithm {
+            return Err(Error::AlgorithmMismatch);
+        }
+    }
+    let mut proof = Proof::new(type_)
+        .with_options(options)
+        .with_properties(extra_proof_properties);
+    if !document_has_context(document, context_uri)? {
+        proof.context = serde_json::json!([context_uri]);
+    }
+    let message = to_jws_payload(document, &proof).await?;
+    Ok(ProofPreparation {
+        proof,
+        jws_header: None,
+        signing_input: SigningInput::Bytes(Base64urlUInt(message)),
+    })
+}
+
 async fn complete(preparation: ProofPreparation, signature: &str) -> Result<Proof, Error> {
     complete_proof(preparation, signature).await
 }
@@ -553,6 +611,27 @@ async fn verify(
     let key = resolve_key(verification_method, resolver).await?;
     let message = to_jws_payload(document, proof).await?;
     crate::jws::detached_verify(jws, &message, &key)?;
+    Ok(Default::default())
+}
+
+async fn verify_nojws(
+    proof: &Proof,
+    document: &(dyn LinkedDataDocument + Sync),
+    resolver: &dyn DIDResolver,
+    algorithm: Algorithm,
+) -> Result<VerificationWarnings, Error> {
+    let proof_value = proof
+        .proof_value
+        .as_ref()
+        .ok_or(Error::MissingProofSignature)?;
+    let verification_method = proof
+        .verification_method
+        .as_ref()
+        .ok_or(Error::MissingVerificationMethod)?;
+    let key = resolve_key(&verification_method, resolver).await?;
+    let message = to_jws_payload(document, proof).await?;
+    let (_base, sig) = multibase::decode(proof_value)?;
+    crate::jws::verify_bytes(algorithm, &message, &key, &sig)?;
     Ok(Default::default())
 }
 
@@ -671,6 +750,69 @@ impl ProofSuite for Ed25519Signature2018 {
         signature: &str,
     ) -> Result<Proof, Error> {
         complete(preparation, signature).await
+    }
+}
+
+pub struct Ed25519Signature2020;
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl ProofSuite for Ed25519Signature2020 {
+    async fn sign(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
+        key: &JWK,
+        extra_proof_properties: Option<Map<String, Value>>,
+    ) -> Result<Proof, Error> {
+        sign_nojws(
+            document,
+            options,
+            resolver,
+            key,
+            "Ed25519Signature2020",
+            Algorithm::EdDSA,
+            crate::jsonld::W3ID_ED2020_V1_CONTEXT,
+            extra_proof_properties,
+        )
+        .await
+    }
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        verify_nojws(proof, document, resolver, Algorithm::EdDSA).await
+    }
+    async fn prepare(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
+        public_key: &JWK,
+        extra_proof_properties: Option<Map<String, Value>>,
+    ) -> Result<ProofPreparation, Error> {
+        prepare_nojws(
+            document,
+            options,
+            resolver,
+            public_key,
+            "Ed25519Signature2020",
+            Algorithm::EdDSA,
+            crate::jsonld::W3ID_ED2020_V1_CONTEXT,
+            extra_proof_properties,
+        )
+        .await
+    }
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
     }
 }
 
@@ -2165,4 +2307,186 @@ mod tests {
             .unwrap();
     }
     */
+
+    #[async_std::test]
+    async fn ed2020() {
+        use crate::vc::{Credential, Presentation};
+
+        // https://w3c-ccg.github.io/lds-ed25519-2020/#example-4
+        let vmm: VerificationMethodMap = serde_json::from_value(serde_json::json!({
+          "id": "https://example.com/issuer/123#key-0",
+          "type": "Ed25519KeyPair2020",
+          "controller": "https://example.com/issuer/123",
+          "publicKeyMultibase": "z6Mkf5rGMoatrSj1f4CyvuHBeXJELe9RPdzo2PKGNCKVtZxP",
+          "privateKeyMultibase": "zrv3kJcnBP1RpYmvNZ9jcYpKBZg41iSobWxSg3ix2U7Cp59kjwQFCT4SZTgLSL3HP8iGMdJs3nedjqYgNn6ZJmsmjRm"
+        }))
+        .unwrap();
+
+        let sk_hex = "9b937b81322d816cfab9d5a3baacc9b2a5febe4b149f126b3630f93a29527017095f9a1a595dde755d82786864ad03dfa5a4fbd68832566364e2b65e13cc9e44";
+        let sk_bytes = hex::decode(sk_hex).unwrap();
+        let sk_bytes_mc = [vec![0x80, 0x26], sk_bytes.clone()].concat();
+        let sk_mb = multibase::encode(multibase::Base::Base58Btc, &sk_bytes_mc);
+        let ref props = vmm.property_set.unwrap();
+        let sk_mb_expected = props
+            .get("privateKeyMultibase")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(&sk_mb, &sk_mb_expected);
+
+        let pk_hex = "095f9a1a595dde755d82786864ad03dfa5a4fbd68832566364e2b65e13cc9e44";
+        let pk_bytes = hex::decode(pk_hex).unwrap();
+        let pk_bytes_mc = [vec![0xed, 0x01], pk_bytes.clone()].concat();
+        let pk_mb = multibase::encode(multibase::Base::Base58Btc, &pk_bytes_mc);
+        let pk_mb_expected = props
+            .get("publicKeyMultibase")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(&pk_mb, &pk_mb_expected);
+
+        assert_eq!(&sk_bytes[32..64], &pk_bytes);
+
+        let issuer_document: Document =
+            serde_json::from_str(include_str!("../tests/lds-ed25519-2020-issuer0.jsonld")).unwrap();
+
+        let vc_str = include_str!("../tests/lds-ed25519-2020-vc0.jsonld");
+        let vc = Credential::from_json(vc_str).unwrap();
+        let vp_str = include_str!("../tests/lds-ed25519-2020-vp0.jsonld");
+        let vp = Presentation::from_json(vp_str).unwrap();
+
+        // "DID Resolver" for HTTPS issuer used in the test vectors.
+        struct ED2020ExampleResolver {
+            issuer_document: Document,
+        }
+        use crate::did::{Document, PrimaryDIDURL};
+        use crate::did_resolve::{
+            ContentMetadata, DereferencingMetadata, DocumentMetadata, ResolutionInputMetadata,
+            ResolutionMetadata, ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+        };
+        #[async_trait]
+        impl DIDResolver for ED2020ExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                // Return empty result here to allow DID URL dereferencing to proceed. The DID
+                // is resolved as part of DID URL dereferencing, but the DID document is not used.
+                if did == "https:" {
+                    let doc_meta = DocumentMetadata::default();
+                    let doc = Document::new(did);
+                    return (ResolutionMetadata::default(), Some(doc), Some(doc_meta));
+                }
+                (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
+            }
+
+            async fn dereference(
+                &self,
+                did_url: &PrimaryDIDURL,
+                _input_metadata: &DereferencingInputMetadata,
+            ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
+                match &did_url.to_string()[..] {
+                    "https://example.com/issuer/123" => Some((
+                        DereferencingMetadata {
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            ..Default::default()
+                        },
+                        Content::DIDDocument(self.issuer_document.clone()),
+                        ContentMetadata::default(),
+                    )),
+                    _ => None,
+                }
+            }
+        }
+
+        let sk_jwk = JWK::from(JWKParams::OKP(crate::jwk::OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(sk_bytes[32..64].to_vec()),
+            private_key: Some(Base64urlUInt(sk_bytes[0..32].to_vec())),
+        }));
+        assert_eq!(sk_bytes.len(), 64);
+        eprintln!("{}", serde_json::to_string(&sk_jwk).unwrap());
+
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(
+                "https://example.com/issuer/123#key-0".to_string(),
+            )),
+            proof_purpose: Some(ProofPurpose::AssertionMethod),
+            created: Some(Utc::now().with_nanosecond(0).unwrap()),
+            ..Default::default()
+        };
+
+        let resolver = ED2020ExampleResolver { issuer_document };
+
+        println!("{}", serde_json::to_string(&vc).unwrap());
+        // reissue VC
+        let new_proof = Ed25519Signature2020
+            .sign(&vc, &issue_options, &resolver, &sk_jwk, None)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&new_proof).unwrap());
+
+        // check new VC proof and original proof
+        Ed25519Signature2020
+            .verify(&new_proof, &vc, &resolver)
+            .await
+            .unwrap();
+        let orig_proof = vc.proof.iter().flatten().next().unwrap();
+        Ed25519Signature2020
+            .verify(orig_proof, &vc, &resolver)
+            .await
+            .unwrap();
+
+        // re-generate VP proof
+        let vp_issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(
+                "https://example.com/issuer/123#key-0".to_string(),
+            )),
+            proof_purpose: Some(ProofPurpose::Authentication),
+            created: Some(Utc::now().with_nanosecond(0).unwrap()),
+            challenge: Some("123".to_string()),
+            ..Default::default()
+        };
+        let new_proof = Ed25519Signature2020
+            .sign(&vp, &vp_issue_options, &resolver, &sk_jwk, None)
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&new_proof).unwrap());
+
+        // check new VP proof and original proof
+        Ed25519Signature2020
+            .verify(&new_proof, &vp, &resolver)
+            .await
+            .unwrap();
+        let orig_proof = vp.proof.iter().flatten().next().unwrap();
+        Ed25519Signature2020
+            .verify(orig_proof, &vp, &resolver)
+            .await
+            .unwrap();
+
+        // Try using prepare/complete
+        let pk_jwk = sk_jwk.to_public();
+        let prep = Ed25519Signature2020
+            .prepare(&vp, &vp_issue_options, &resolver, &pk_jwk, None)
+            .await
+            .unwrap();
+        let signing_input_bytes = match prep.signing_input {
+            SigningInput::Bytes(Base64urlUInt(ref bytes)) => bytes,
+            _ => panic!("expected SigningInput::Bytes for Ed25519Signature2020 preparation"),
+        };
+        let sig = crate::jws::sign_bytes(Algorithm::EdDSA, &signing_input_bytes, &sk_jwk).unwrap();
+        let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
+        let completed_proof = Ed25519Signature2020.complete(prep, &sig_mb).await.unwrap();
+        Ed25519Signature2020
+            .verify(&completed_proof, &vp, &resolver)
+            .await
+            .unwrap();
+    }
 }

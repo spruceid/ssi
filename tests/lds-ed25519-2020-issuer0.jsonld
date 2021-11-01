@@ -1,0 +1,20 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json",
+    {
+      "@base": "https://example.com/issuer/123"
+    }
+  ],
+  "id": "https://example.com/issuer/123",
+  "verificationMethod": [
+    {
+      "id": "https://example.com/issuer/123#key-0",
+      "type": "Ed25519VerificationKey2020",
+      "controller": "https://example.com/issuer/123",
+      "publicKeyMultibase": "z6Mkf5rGMoatrSj1f4CyvuHBeXJELe9RPdzo2PKGNCKVtZxP"
+    }
+  ],
+  "assertionMethod": ["https://example.com/issuer/123#key-0"],
+  "authentication": ["https://example.com/issuer/123#key-0"]
+}
