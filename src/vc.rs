@@ -1010,7 +1010,7 @@ impl Credential {
                 Ok(()) => results.checks.push(Check::JWS),
                 Err(err) => results
                     .errors
-                    .push(format!("Unable to filter proofs: {}", err)),
+                    .push(format!("Unable to verify JWS: {}", err)),
             }
             return (Some(vc), results);
         }
@@ -1522,7 +1522,7 @@ impl Presentation {
                 Ok(()) => results.checks.push(Check::JWS),
                 Err(err) => results
                     .errors
-                    .push(format!("Unable to filter proofs: {}", err)),
+                    .push(format!("Unable to verify JWS: {}", err)),
             }
             return (Some(vp), results);
         }
