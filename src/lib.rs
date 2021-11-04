@@ -40,8 +40,6 @@ extern crate pest_derive;
 extern crate derive_builder;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate json;
 
 #[derive(Parser)]
 #[grammar = "did.pest"]
