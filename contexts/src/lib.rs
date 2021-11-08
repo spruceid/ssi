@@ -23,6 +23,8 @@ pub const LDS_JWS2020_V1: &str = include_str!("../lds-jws2020-v1.jsonld");
 pub const W3ID_JWS2020_V1: &str = include_str!("../w3id-jws2020-v1.jsonld");
 /// <https://w3id.org/security/suites/ed25519-2020/v1>
 pub const W3ID_ED2020_V1: &str = include_str!("../w3id-ed25519-signature-2020-v1.jsonld");
+/// <https://w3id.org/security/suites/blockchain-2021/v1>
+pub const BLOCKCHAIN2021_V1: &str = include_str!("../w3id-blockchain-2021-v1.jsonld");
 /// <https://w3id.org/citizenship/v1>
 pub const CITIZENSHIP_V1: &str = include_str!("../w3c-ccg-citizenship-v1.jsonld");
 /// <https://w3id.org/vaccination/v1>

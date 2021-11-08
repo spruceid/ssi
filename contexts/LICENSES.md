@@ -28,3 +28,7 @@ Copyright in the schema by the sponsors of schema.org (Google, Inc., Yahoo, Inc.
 
 - [EcdsaSecp256k1RecoverySignature2020](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020/) - [Apache License, Version 2.0](http://www.apache.org/licenses/)
 - [Presentation Exchange](https://github.com/decentralized-identity/presentation-exchange/)
+
+## Other context files
+
+- [Blockchain Vocabulary](https://github.com/OR13/lds-blockchain2021/) - Orie Steele - [Apache License, Version 2.0](http://www.apache.org/licenses/)
