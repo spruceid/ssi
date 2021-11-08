@@ -377,12 +377,15 @@ async fn resolve_aleo(did: &str, account_address: String, reference: &str) -> Re
     if hrp != "aleo" {
         return resolution_error(ERROR_INVALID_DID);
     }
-    let _data = match Vec::<u8>::from_base32(&data) {
+    let data = match Vec::<u8>::from_base32(&data) {
         Err(_e) => return resolution_error(ERROR_INVALID_DID),
         Ok(data) => data,
     };
     // Address data is decoded for validation only.
     // The verification method object just uses the account address in blockchainAccountId.
+    if data.len() != 32 {
+        return resolution_error(ERROR_INVALID_DID);
+    }
     let chain_id = ChainId {
         namespace: "aleo".to_string(),
         reference: reference.to_string(),
