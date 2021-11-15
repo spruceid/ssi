@@ -28,14 +28,12 @@ use std::default::Default;
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
 pub struct DIDTz {
-    tzkt_url: &'static str,
+    tzkt_url: Option<String>,
 }
 
 impl Default for DIDTz {
     fn default() -> Self {
-        Self {
-            tzkt_url: "https://api.tzkt.io/",
-        }
+        Self { tzkt_url: None }
     }
 }
 
@@ -137,11 +135,15 @@ impl DIDResolver for DIDTz {
             public_key,
         );
 
-        let mut tzkt_url = self.tzkt_url;
+        let default_url = match &self.tzkt_url {
+            Some(u) => u.clone(),
+            None => format!("https://api.{}.tzkt.io", network),
+        };
+        let mut tzkt_url = &default_url;
         if let Some(s) = &input_metadata.property_set {
             if let Some(url) = s.get("tzkt_url") {
-                tzkt_url = match url {
-                    Metadata::String(u) => u,
+                match url {
+                    Metadata::String(u) => tzkt_url = u,
                     _ => {
                         return (
                             ResolutionMetadata {
@@ -152,9 +154,9 @@ impl DIDResolver for DIDTz {
                             None,
                         )
                     }
-                };
+                }
             }
-        }
+        };
 
         if let (Some(service), Some(vm)) =
             match DIDTz::tier2_resolution(tzkt_url, did, &address).await {
