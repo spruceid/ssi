@@ -944,7 +944,10 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(verification_method, resolver).await?;
-        if vm.type_ != "EcdsaSecp256k1RecoveryMethod2020" {
+        if vm.type_ != "EcdsaSecp256k1RecoveryMethod2020"
+            && vm.type_ != "EcdsaSecp256k1VerificationKey2019"
+            && vm.type_ != "JsonWebKey2020"
+        {
             return Err(Error::VerificationMethodMismatch);
         }
         let message = to_jws_payload(document, proof).await?;
