@@ -36,3 +36,4 @@ features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
+wiremock = "0.5"
