@@ -531,7 +531,7 @@ impl VerificationMethodMap {
                 })
             }
             #[cfg(feature = "k256")]
-            "EcdsaSecp256k1VerificationKey2019" => {
+            "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
                 use crate::jwk::secp256k1_parse;
                 return secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse);
             }

@@ -2302,6 +2302,97 @@ mod tests {
     */
 
     #[async_std::test]
+    #[cfg(all(feature = "secp256k1", feature = "keccak-hash"))]
+    async fn esrs2020() {
+        use crate::did::Document;
+        use crate::did_resolve::{
+            DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
+            TYPE_DID_LD_JSON,
+        };
+        use crate::vc::Credential;
+
+        struct ExampleResolver;
+
+        const EXAMPLE_123_ID: &str = "did:example:123";
+        const EXAMPLE_123_JSON: &'static str = include_str!("../tests/esrs2020-did.jsonld");
+
+        #[async_trait]
+        impl DIDResolver for ExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                if did == EXAMPLE_123_ID {
+                    let doc = match Document::from_json(EXAMPLE_123_JSON) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            return (
+                                ResolutionMetadata::from_error(&format!("JSON Error: {:?}", err)),
+                                None,
+                                None,
+                            );
+                        }
+                    };
+                    (
+                        ResolutionMetadata {
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            ..Default::default()
+                        },
+                        Some(doc),
+                        Some(DocumentMetadata::default()),
+                    )
+                } else {
+                    (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
+                }
+            }
+
+            async fn resolve_representation(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
+                if did == EXAMPLE_123_ID {
+                    let vec = EXAMPLE_123_JSON.as_bytes().to_vec();
+                    (
+                        ResolutionMetadata {
+                            error: None,
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            property_set: None,
+                        },
+                        vec,
+                        Some(DocumentMetadata::default()),
+                    )
+                } else {
+                    (
+                        ResolutionMetadata::from_error(ERROR_NOT_FOUND),
+                        Vec::new(),
+                        None,
+                    )
+                }
+            }
+        }
+
+        let vc_str = include_str!("../tests/esrs2020-vc.jsonld");
+        let vc = Credential::from_json(vc_str).unwrap();
+        let mut n_proofs = 0;
+        for proof in vc.proof.iter().flatten() {
+            n_proofs += 1;
+            let resolver = ExampleResolver;
+            let warnings = EcdsaSecp256k1RecoverySignature2020
+                .verify(&proof, &vc, &resolver)
+                .await
+                .unwrap();
+            assert!(warnings.is_empty());
+        }
+        assert_eq!(n_proofs, 3);
+    }
+
+    #[async_std::test]
     async fn ed2020() {
         use crate::vc::{Credential, Presentation};
 
