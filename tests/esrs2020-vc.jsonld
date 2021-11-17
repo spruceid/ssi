@@ -94,25 +94,25 @@
   },
   "proof": [
     {
-      "type": "@EcdsaSecp256k1RecoverySignature2020",
-      "created": "2020-04-11T21:07:05Z",
+      "type": "EcdsaSecp256k1RecoverySignature2020",
+      "created": "2021-11-16T22:28:28Z",
       "verificationMethod": "did:example:123#vm-1",
       "proofPurpose": "assertionMethod",
-      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..AU0rTaqs7AdpgipHdsosKqSZqh-3tajf2HQaRnZzQStP-vIVMYPps2lqWp5lCDVz07LQt6QQQaEWC1ALw7RWMwA"
+      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..1QW7BWzMMHZNCF1-Asv3ot05ewi_7syYLuyi4LzzhcIEDGjphuizLkB-14rgnlKK1vlfqhnglchZyvrCGfSTwQE"
     },
     {
-      "type": "@EcdsaSecp256k1RecoverySignature2020",
-      "created": "2020-04-11T21:07:06Z",
+      "type": "EcdsaSecp256k1RecoverySignature2020",
+      "created": "2021-11-16T22:28:28Z",
       "verificationMethod": "did:example:123#vm-2",
       "proofPurpose": "assertionMethod",
-      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..ri0hJffnyWUJ1Q41AI2IxS49rH1XEEpx-k0A6HsaQMV1DYwBL9cA5osI10rQmo9dD7iORlH3eEyFFGIJNiFnOgA"
+      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..U3SFhgj1G12FlWFDddkFdHZ8ktuVwGyOmhYDc2MccFgK9CtnN_9gsVPvNp-CV4X3vHWAUttgp1DUOt0ilRmiCgA"
     },
     {
-      "type": "@EcdsaSecp256k1RecoverySignature2020",
-      "created": "2020-04-11T21:07:06Z",
+      "type": "EcdsaSecp256k1RecoverySignature2020",
+      "created": "2021-11-16T22:28:28Z",
       "verificationMethod": "did:example:123#vm-3",
       "proofPurpose": "assertionMethod",
-      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..pp9eiLCMfN4EfSB3cbl3UxJ4TtgUaTfByDaaB6IZbXsnvIy5AUIFjbgaiFNtq9-3f8mP7foD_HXpjrdWZfzlwAE"
+      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..wt1hzqcSx654YaqdCx-6bp6_bkzMbjZc9-071-SRsJsQfUvG_U9ZBWUoCvEtv68Kas10AIvFU6siKw8XZi7knwE"
     }
   ]
 }

@@ -1969,11 +1969,6 @@ impl LinkedDataDocument for Proof {
 /// Verify alignment of proof options in JSON with RDF terms
 fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Error> {
     use crate::rdf;
-
-    // Skip this function to allow proof without type property to pass,
-    // for testing EcdsaSecp256k1RecoverySignature2020.
-    return Ok(());
-
     let mut graph_ref = dataset.default_graph.as_ref();
 
     let type_triple = graph_ref
