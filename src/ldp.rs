@@ -1399,17 +1399,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        // Verify using eiher publicKeyJwk or blockchainAccountId.
-        if let Some(vm_jwk) = vm.public_key_jwk {
-            // If VM has publicKey, use that to veify the signature.
-            let mut dec_sig = dec_sig;
-            dec_sig[64] -= 27;
-            crate::jws::verify_bytes(Algorithm::ES256KR, &bytes, &vm_jwk, &dec_sig)?;
-        } else {
-            let account_id_str = vm.blockchain_account_id.ok_or(Error::MissingAccountId)?;
-            let account_id = BlockchainAccountId::from_str(&account_id_str)?;
-            account_id.verify(&jwk)?;
-        }
+        vm.match_jwk(&jwk)?;
         Ok(Default::default())
     }
 }
