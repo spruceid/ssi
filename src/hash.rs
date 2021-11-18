@@ -1,6 +1,6 @@
 //! Cryptographic hash functions
 //!
-//! The [`sha256`] function requires feature `sha2` or `ring`.
+//! The [`sha256`] function requires feature either `sha2` or `ring` (not both).
 
 use crate::error::Error;
 

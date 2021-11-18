@@ -14,7 +14,7 @@
 //! assert_eq!(chain_id.to_string(), chain_id_str);
 //! # Ok::<(), ssi::caip2::ChainIdParseError>(())
 //! ```
-//! More test cases may be found in the [CAIP-2 specification][test cases].
+//! More test cases may be found in the [CAIP-2 specification] [test cases].
 //!
 //! [test cases]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md#test-cases
 //! [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
@@ -28,9 +28,9 @@ use thiserror::Error;
 /// [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
 #[derive(Clone, PartialEq, Hash, Debug)]
 pub struct ChainId {
-    /// The `namespace` part of a CAIP-2 string.
+    /// The `namespace` part of a CAIP-2 string, i.e. the "virtual machine" or type of chain.
     pub namespace: String,
-    /// The `reference` part of a CAIP-2 string.
+    /// The `reference` part of a CAIP-2 string, i.e. the chain identifier.
     pub reference: String,
 }
 
@@ -138,7 +138,7 @@ mod tests {
 
     #[async_std::test]
     async fn chain_id() {
-        // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md#test-cases
+        // See https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md#test-cases
         let dummy_max_length = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
         let chain_id = ChainId::from_str(&dummy_max_length).unwrap();
         assert_eq!(chain_id.to_string(), dummy_max_length);

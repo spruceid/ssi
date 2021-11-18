@@ -180,8 +180,8 @@ pub struct Document {
     /// document (deprecated in favor of `verificationMethod`).
     pub public_key: Option<Vec<VerificationMethod>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    /// `service` property of a DID document, epressing
-    /// [services](https://www.w3.org/TR/did-core/#services).
+    /// `service` property of a DID document, expressing
+    /// [services](https://www.w3.org/TR/did-core/#services), generally as endpoints.
     pub service: Option<Vec<Service>>,
     /// [Linked data proof](https://w3c-ccg.github.io/ld-proofs/#linked-data-proof-overview) over a
     /// DID document.
@@ -309,7 +309,7 @@ pub struct Service {
     pub property_set: Option<Map<String, Value>>,
 }
 
-/// A [linked data proof](https://w3c-ccg.github.io/ld-proofs/#linked-data-proof-overview) ([proof
+/// A [linked data proof](https://w3c-ccg.github.io/data-integrity-spec/#proofs) ([proof
 /// object](https://www.w3.org/TR/vc-data-model/#proofs-signatures)) that may
 /// be on a [DID document][Document].
 ///
@@ -325,7 +325,7 @@ pub struct Proof {
     pub type_: String,
     /// Additional properties.
     ///
-    /// See [Linked Data Proof Overview](https://w3c-ccg.github.io/ld-proofs/#linked-data-proof-overview) for more info about expected properties.
+    /// See [Linked Data Proof Overview](hhttps://w3c-ccg.github.io/data-integrity-spec/#proofs) for more info about expected properties.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,

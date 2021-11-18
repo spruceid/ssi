@@ -126,7 +126,7 @@ pub enum Error {
     MissingPrivateKey,
     /// Missing modulus in RSA key
     MissingModulus,
-    /// Missing modulus in RSA key
+    /// Missing exponent in RSA key
     MissingExponent,
     /// Missing prime factor in RSA key
     MissingPrime,
@@ -188,9 +188,9 @@ pub enum Error {
     InvalidProofPurpose,
     /// Missing proof purpose
     MissingProofPurpose,
-    /// Invalid proof purpose
+    /// Invalid proof domain
     InvalidProofDomain,
-    /// Invalid Signature
+    /// Invalid Signature (in proof)
     InvalidSignature,
     /// Signature length did not match expected length.
     UnexpectedSignatureLength(usize, usize),
@@ -389,7 +389,7 @@ impl fmt::Display for Error {
             Error::MissingKey => write!(f, "JWT key not found"),
             Error::MissingPrivateKey => write!(f, "Missing private key parametern JWK"),
             Error::MissingModulus => write!(f, "Missing modulus in RSA key"),
-            Error::MissingExponent => write!(f, "Missing modulus in RSA key"),
+            Error::MissingExponent => write!(f, "Missing exponent in RSA key"),
             Error::MissingPrime => write!(f, "Missing prime factor in RSA key"),
             Error::MissingKeyParameters => write!(f, "JWT key parameters not found"),
             Error::MissingProof => write!(f, "Missing proof property"),

@@ -30,9 +30,9 @@ use std::str::FromStr;
 
 use thiserror::Error;
 
-/// A parsed [CAIP-10] blockchain account id.
+/// A parsed [CAIP-10] blockchain account id as a string.
 ///
-/// Includes a [ChainId] for the `chain_id` ([CAIP-2]) part.
+/// It includes a [ChainId] struct representing the `chain_id` ([CAIP-2]) part of a composed [CAIP-10].
 ///
 /// [CAIP-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
 /// [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md

@@ -5,7 +5,7 @@
 //! Functionality is also provided for serializing public keys as needed for Tezos addresses.
 //!
 //! [BLAKE2b]: https://blake2.net/
-//! [Tezos]: https://tezos.com/
+//! [Tezos]: https://tezos.gitlab.io/
 use crate::error::Error;
 
 use crate::jwk::{Params, JWK};

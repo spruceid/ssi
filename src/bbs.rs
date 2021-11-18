@@ -1,5 +1,7 @@
 //! [BBS curves][] and [BBS+][] keypairs
 //!
+//! This trait exposes signature and keytype primitives based on BBS+ cryptography.
+//!
 //! [BBS curves]: https://datatracker.ietf.org/doc/html/draft-yonezawa-pairing-friendly-curves#section-4.2.2
 //! [BBS+]: https://mattrglobal.github.io/bbs-signatures-spec/
 use bbs::prelude::*;

@@ -7,15 +7,15 @@
 //!
 //! Feature               | Description
 //! ----------------------|-------------
-//! `ring`                | Use the [ring](https://crates.io/crates/ring) crate for RSA, Ed25519, and SHA-256 functionality. Conflicts with `rsa`, `ed25519-dalek`, and `sha` features.
-//! `rsa`                 | Use the [rsa](https://crates.io/crates/rsa) crate for RSA functionality. Conflicts with `ring` feature.
+//! `ring`                | Use the [ring](https://crates.io/crates/ring) crate for RSA, Ed25519, and SHA-256 functionality. **Conflicts with `rsa`, `ed25519-dalek`, and `sha` features.**
+//! `rsa`                 | Use the [rsa](https://crates.io/crates/rsa) crate for RSA functionality. **Conflicts with `ring` feature.**
 //! `http-did`            | Enable DID resolution tests using [hyper](https://crates.io/crates/hyper) and [tokio](https://crates.io/crates/tokio).
 //! `secp256k1`           | Enable Secp256k1 using the [k256](https://crates.io/crates/k256) crate.
 //! `secp256r1`           | Enable Secp256r1 using the [p256](https://crates.io/crates/p256) crate.
 //! `ripemd-160`          | Enable RIPEMD-160, for Bitcoin addresses, using the [ripemd160](https://crates.io/crates/ripemd160) crate.
 //! `keccak`              | Enable Keccak hash, for Ethereum addresses, using the [keccak-hash](https://crates.io/crates/keccak-hash) crate.
-//! `sha`                 | Enable SHA-256 using the [sha2](https://crates.io/crates/sha2) crate. Conflicts with `ring` feature.
-//! `ed25519-dalek`       | Enable Ed25519 using the [ed25519-dalek](https://crates.io/crates/ed25519-dalek) crate. Conflicts with `ring` feature.
+//! `sha`                 | Enable SHA-256 using the [sha2](https://crates.io/crates/sha2) crate. **Conflicts with `ring` feature.**
+//! `ed25519-dalek`       | Enable Ed25519 using the [ed25519-dalek](https://crates.io/crates/ed25519-dalek) crate. **Conflicts with `ring` feature.**
 //! `example-http-issuer` | Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 #![doc(
