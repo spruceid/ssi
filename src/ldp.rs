@@ -907,11 +907,13 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
                 return Err(Error::AlgorithmMismatch);
             }
         }
+        let has_context = document_has_context(document, crate::jsonld::W3ID_ESRS2020_V2_CONTEXT)?;
         let proof = Proof {
-            context: serde_json::json!([
-                crate::jsonld::DIF_ESRS2020_CONTEXT,
-                crate::jsonld::ESRS2020_EXTRA_CONTEXT,
-            ]),
+            context: if has_context {
+                Value::Null
+            } else {
+                serde_json::json!([crate::jsonld::W3ID_ESRS2020_V2_CONTEXT])
+            },
             ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
                 .with_options(options)
                 .with_properties(extra_proof_properties)
@@ -927,11 +929,13 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
+        let has_context = document_has_context(document, crate::jsonld::W3ID_ESRS2020_V2_CONTEXT)?;
         let proof = Proof {
-            context: serde_json::json!([
-                crate::jsonld::DIF_ESRS2020_CONTEXT,
-                crate::jsonld::ESRS2020_EXTRA_CONTEXT,
-            ]),
+            context: if has_context {
+                Value::Null
+            } else {
+                serde_json::json!([crate::jsonld::W3ID_ESRS2020_V2_CONTEXT])
+            },
             ..Proof::new("EcdsaSecp256k1RecoverySignature2020")
                 .with_options(options)
                 .with_properties(extra_proof_properties)
