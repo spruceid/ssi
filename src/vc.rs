@@ -783,15 +783,17 @@ impl Credential {
             None => None,
         };
 
-        let mut vc = self.clone();
-        // Remove fields from vc that are duplicated into the claims,
-        // except for timestamps (in case of conversion discrepencies).
+        let vc = self.clone();
+
+        // Copy fields from vc that are duplicated into the claims.
+        let (id, issuer) = (vc.id.clone(), vc.issuer.clone());
+
         Ok(JWTClaims {
             expiration_time: vc
                 .expiration_date
                 .as_ref()
                 .map(|date| date.date_time.timestamp()),
-            issuer: match vc.issuer.take() {
+            issuer: match issuer {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
                 Some(_) => return Err(Error::InvalidIssuer),
                 None => None,
@@ -800,7 +802,7 @@ impl Credential {
                 .issuance_date
                 .as_ref()
                 .map(|date| date.date_time.timestamp()),
-            jwt_id: vc.id.take().map(|id| id.into()),
+            jwt_id: id.map(|id| id.into()),
             subject,
             verifiable_credential: Some(vc),
             ..Default::default()
@@ -1317,10 +1319,11 @@ impl Presentation {
     }
 
     pub fn to_jwt_claims(&self) -> Result<JWTClaims, Error> {
-        let mut vp = self.clone();
+        let vp = self.clone();
+        let (id, holder) = (vp.id.clone(), vp.holder.clone());
         Ok(JWTClaims {
-            issuer: vp.holder.take().map(|id| id.into()),
-            jwt_id: vp.id.take().map(|id| id.into()),
+            issuer: holder.map(|id| id.into()),
+            jwt_id: id.map(|id| id.into()),
             verifiable_presentation: Some(vp),
             ..Default::default()
         })
