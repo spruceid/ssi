@@ -5,8 +5,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Use CAIP-10 in did:pkh ([#279](https://github.com/spruceid/ssi/pull/#279), [#286](https://github.com/spruceid/ssi/pull/#286), [#303](https://github.com/spruceid/ssi/pull/#303)).
+- Use updated JsonWebSignature2020 context file ([#322](https://github.com/spruceid/ssi/pull/#322)).
+- Add Presentation Submission context file ([#254](https://github.com/spruceid/ssi/pull/#254), [#325](https://github.com/spruceid/ssi/pull/#325)).
+- Expose JSON-LD expansion function ([#326](https://github.com/spruceid/ssi/pull/#326)).
+- Add `new_public` helper function for RSA JWK parameters ([#327](https://github.com/spruceid/ssi/pull/#327)).
+- Allow using `type` property as verify options ([#329](https://github.com/spruceid/ssi/pull/#329)).
+- Implement Ed25519Signature2020 ([#341](https://github.com/spruceid/ssi/pull/#341)).
+- Allow JWT VC without subject id ([#346](https://github.com/spruceid/ssi/pull/#346)).
+- Add Blockchain Vocabulary v1 2021 context ([#347](https://github.com/spruceid/ssi/pull/#347)).
+- Construct API URLs for known Tezos test networks ([#350](https://github.com/spruceid/ssi/pull/#350)).
 
-## [0.3.0]
+### Changed
+- Use Error types in bbs code ([#338](https://github.com/spruceid/ssi/pull/#338)).
+- Don't add JsonWebSignature2020 context URI to proof if already existing in credential/presentation ([#322](https://github.com/spruceid/ssi/pull/#322)).
+- Default to JsonWebSignature2020 for P-256
+- Update EthereumEip712Signature2021 for renamed properties ([#336](https://github.com/spruceid/ssi/pull/#336)).
+- Allow DID document base context without www ([#349](https://github.com/spruceid/ssi/pull/#349)).
+
+### Deprecated
+- EthereumEip712Signature2021 specification deprecated properties `messageSchema` and `eip712Domain`.
+- did:pkh deprecated non-CAIP-10 submethods (btc, celo, doge, eth, poly, sol, tz).
+
+### Fixed
+- Fixed panic in string prefix checking ([#299](https://github.com/spruceid/ssi/pull/#299)).
+- Fixed panic in EIP-712 type string parsing ([#302](https://github.com/spruceid/ssi/pull/#302)).
+- Allow JWT VC with single-element array subject ([#313](https://github.com/spruceid/ssi/pull/#313)).
+- Address clippy errors and warnings ([#305](https://github.com/spruceid/ssi/pull/#305), [#306](https://github.com/spruceid/ssi/pull/#306)).
+- Fix example RSA public key modulus representation ([#308](https://github.com/spruceid/ssi/pull/#308)).
+- Doctest BBS generator parameters ([#304](https://github.com/spruceid/ssi/pull/#304)).
+- Use BBS+ Signatures 2020 context file ([#324](https://github.com/spruceid/ssi/pull/#324)).
+
+## Security
+- Restrict revocation lists to HTTPS ([#317](https://github.com/spruceid/ssi/pull/#317)).
+- Disallow example non-DID VC issuer outside testing ([#316](https://github.com/spruceid/ssi/pull/#316)).
+- Disallow out-of-bounds revocation list index ([#314](https://github.com/spruceid/ssi/pull/#314)).
+- Zeroize JWKs on drop ([#327](https://github.com/spruceid/ssi/pull/#327)).
+- Reduce exposure of private key material during signing ([#328](https://github.com/spruceid/ssi/pull/#328)).
+
+## [0.3.0] 2021-09-16
 ### Added
 - Add `PrimaryDIDURL` type.
 - Add `EthereumEip712Signature2021` v1 context.
