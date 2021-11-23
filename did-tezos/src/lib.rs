@@ -40,6 +40,18 @@ impl Default for DIDTz {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDTz {
+    /// Resolve a did:tz DID.
+    ///
+    /// # Resolution options
+    ///
+    /// ## `tzkt_url`
+    /// Custom indexer endpoint URL.
+    ///
+    /// ## `updates`
+    /// [Off-Chain DID Document Updates](https://did-tezos.spruceid.com/#off-chain-did-document-updates), as specified in the Tezos DID Method Specification.
+    ///
+    /// ## `public_key`
+    /// Public key in Base58 format ([publicKeyBase58](https://w3c-ccg.github.io/security-vocab/#publicKeyBase58)) to add to a [derived DID document (implicit resolution)](https://did-tezos.spruceid.com/#deriving-did-documents).
     async fn resolve(
         &self,
         did: &str,
