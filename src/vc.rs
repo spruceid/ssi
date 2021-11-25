@@ -894,23 +894,24 @@ impl Credential {
 
         // Copy fields from vc that are duplicated into the claims.
         let (id, issuer) = (vc.id.clone(), vc.issuer.clone());
-
+        // Note that try_into can fail if the date_time overflows the range for NumericDate
+        // for expiration_time and not_before.
+        let expiration_time: Option<NumericDate> = match vc.expiration_date.as_ref() {
+            Some(date) => Some(date.date_time.try_into()?),
+            None => None,
+        };
+        let not_before: Option<NumericDate> = match vc.issuance_date.as_ref() {
+            Some(date) => Some(date.date_time.try_into()?),
+            None => None,
+        };
         Ok(JWTClaims {
-            expiration_time: vc
-                .expiration_date
-                .as_ref()
-                // TODO: Need to handle overflow here without panicking (DateTime can overflow NumericDate)
-                .map(|date| date.date_time.try_into().unwrap()),
+            expiration_time,
             issuer: match issuer {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
                 Some(_) => return Err(Error::InvalidIssuer),
                 None => None,
             },
-            not_before: vc
-                .issuance_date
-                .as_ref()
-                // TODO: Need to handle overflow here without panicking (DateTime can overflow NumericDate)
-                .map(|date| date.date_time.try_into().unwrap()),
+            not_before,
             jwt_id: id.map(|id| id.into()),
             subject,
             verifiable_credential: Some(vc),
