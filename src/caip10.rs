@@ -39,6 +39,27 @@ fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
     Ok(string)
 }
 
+// convert a JWK to a Aleo account address string if it looks like an Aleo key
+fn encode_aleo_address(jwk: &JWK, network_id: &str) -> Result<String, &'static str> {
+    if network_id != "1" {
+        return Err("Unexpected Aleo network id");
+    }
+    let params = match jwk.params {
+        Params::OKP(ref params) if params.curve == crate::aleo::OKP_CURVE => params,
+        _ => return Err("Invalid public key type for Aleo"),
+    };
+
+    use bech32::ToBase32;
+    let address = bech32::encode(
+        "aleo",
+        &params.public_key.0.to_base32(),
+        bech32::Variant::Bech32m,
+    )
+    .map_err(|_| "Unable to encode Aleo account address")?;
+
+    Ok(address)
+}
+
 impl BlockchainAccountId {
     /// Check that a given JWK corresponds to this account id
     pub fn verify(&self, jwk: &JWK) -> Result<(), BlockchainAccountIdVerifyError> {
@@ -65,6 +86,8 @@ impl BlockchainAccountId {
                 crate::ripemd::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
+            ("aleo", network_id) => encode_aleo_address(jwk, network_id)
+                .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
                 self.chain_id.to_string(),
             )),
