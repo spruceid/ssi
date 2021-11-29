@@ -233,7 +233,6 @@ pub enum Algorithm {
     ESBlake2b,
     ESBlake2bK,
     #[doc(hidden)]
-    #[cfg(feature = "aleosig")]
     AleoTestnet1Signature,
     None,
 }

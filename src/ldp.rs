@@ -93,7 +93,12 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
         "TezosSignature2021" => &TezosSignature2021,
         "TezosJcsSignature2021" => &TezosJcsSignature2021,
         "SolanaSignature2021" => &SolanaSignature2021,
-        "AleoSignature2021" => &AleoSignature2021,
+        "AleoSignature2021" => {
+            #[cfg(not(feature = "aleosig"))]
+            return Err(Error::MissingFeatures("aleosig"));
+            #[cfg(feature = "aleosig")]
+            &AleoSignature2021
+        }
         "JsonWebSignature2020" => &JsonWebSignature2020,
         "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
         _ => return Err(Error::ProofTypeNotImplemented),
@@ -108,8 +113,12 @@ fn pick_proof_suite<'a, 'b>(
     Ok(match algorithm {
         Algorithm::RS256 => &RsaSignature2018,
         Algorithm::PS256 => &JsonWebSignature2020,
-        #[cfg(feature = "aleosig")]
-        Algorithm::AleoTestnet1Signature => &AleoSignature2021,
+        Algorithm::AleoTestnet1Signature => {
+            #[cfg(not(feature = "aleosig"))]
+            return Err(Error::MissingFeatures("aleosig"));
+            #[cfg(feature = "aleosig")]
+            &AleoSignature2021
+        }
         Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
             Some(URI::String(ref vm))
                 if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
