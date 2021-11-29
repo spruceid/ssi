@@ -580,6 +580,28 @@ fn generate_caip10_solana(
     })
 }
 
+fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<BlockchainAccountId, String> {
+    let reference = ref_opt.unwrap_or_else(|| "1".to_string());
+    let chain_id = ChainId {
+        namespace: "aleo".to_string(),
+        reference,
+    };
+    use bech32::ToBase32;
+    let pk_bs58 = match key.params {
+        Params::OKP(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
+            "aleo",
+            &params.public_key.0.to_base32(),
+            bech32::Variant::Bech32m,
+        )
+        .unwrap(),
+        _ => return Err("Invalid public key type for Aleo".to_string()),
+    };
+    Ok(BlockchainAccountId {
+        account_address: pk_bs58,
+        chain_id,
+    })
+}
+
 fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
     // Require name to be a either CAIP-2 namespace or a
     // full CAIP-2 string - namespace and reference (e.g. internal
@@ -597,6 +619,7 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
         "eip155" => generate_caip10_eip155(key, reference_opt)?,
         "bip122" => generate_caip10_bip122(key, reference_opt)?,
         "solana" => generate_caip10_solana(key, reference_opt)?,
+        "aleo" => generate_caip10_aleo(key, reference_opt)?,
         _ => return Err("Namespace not supported".to_string()),
     };
     Ok(format!("did:pkh:{}", account_id))
