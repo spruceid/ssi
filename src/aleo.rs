@@ -152,8 +152,9 @@ lazy_static! {
 /// parameter that corresponds to the private key ("d") parameter,
 /// using [SIG_PARAMS], [COM_PARAMS] and [ENC_PARAMS].
 ///
-/// An Aleo public key JWK uscontains the public key ("x") parameter and no private key ("d")
-/// paramteer. An Aleo public key JWK is usable for verification of signatures using [ENC_PARAMS].
+/// An Aleo public key JWK contains the public key ("x") parameter and MUST not contain a private
+/// key ("d") parameter. An Aleo public key JWK is usable for verification of signatures using
+/// [ENC_PARAMS].
 pub const OKP_CURVE: &str = "AleoTestnet1Key";
 
 /// Generate an Aleo private key in [unofficial JWK format][OKP_CURVE]. **CPU-intensive (slow)**.
