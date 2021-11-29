@@ -22,6 +22,10 @@
     html_logo_url = "https://demo.didkit.dev/2021/10/21/rust-didkit.png",
     html_favicon_url = "https://demo.didkit.dev/2021/10/21/rust-favicon.ico"
 )]
+
+#[cfg(feature = "aleosig")]
+pub mod aleo;
+
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;

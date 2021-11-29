@@ -1,4 +1,6 @@
 //! Error types for `ssi` crate
+#[cfg(feature = "aleosig")]
+use crate::aleo::{AleoGeneratePrivateKeyError, AleoSignError, AleoVerifyError};
 use crate::caip10::BlockchainAccountIdParseError;
 use crate::caip10::BlockchainAccountIdVerifyError;
 #[cfg(feature = "keccak-hash")]
@@ -335,6 +337,19 @@ pub enum Error {
     CharTryFrom(CharTryFromError),
     /// Error converting slice to array
     TryFromSlice(TryFromSliceError),
+    /// Aleo signing error
+    #[cfg(feature = "aleosig")]
+    AleoSign(AleoSignError),
+    /// Aleo verification error
+    #[cfg(feature = "aleosig")]
+    AleoVerify(AleoVerifyError),
+    /// Unexpected CAIP-2 namespace
+    UnexpectedCAIP2Namepace(String, String),
+    /// Unexpected Aleo namespace
+    UnexpectedAleoNetwork(String, String),
+    #[cfg(feature = "aleosig")]
+    /// Error generating Aleo private key
+    AleoGeneratePrivateKey(AleoGeneratePrivateKeyError),
     /// Error parsing CAIP-10 blockchain account id
     BlockchainAccountIdParse(BlockchainAccountIdParseError),
     /// Error verifying CAIP-10 blockchain account id against a public key
@@ -512,6 +527,8 @@ impl fmt::Display for Error {
             Error::EncodeTezosSignedMessage(e) => write!(f, "Unable to encode Signed Tezos Message: {}", e),
             Error::DecodeTezosSignature(e) => write!(f, "Unable to decode Tezos Signature: {}", e),
             Error::ExpectedOutput(expected, found) => write!(f, "Expected output '{}', but found '{}'", expected, found),
+            Error::UnexpectedCAIP2Namepace(expected, found) => write!(f, "Expected CAIP-2 namespace '{}' but found '{}'", expected, found),
+            Error::UnexpectedAleoNetwork(expected, found) => write!(f, "Expected Aleo network '{}' but found '{}'", expected, found),
             Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
             Error::HexString => write!(f, "Expected string beginning with '0x'"),
@@ -543,6 +560,12 @@ impl fmt::Display for Error {
             Error::CharTryFrom(e) => e.fmt(f),
             Error::BlockchainAccountIdParse(e) => e.fmt(f),
             Error::BlockchainAccountIdVerify(e) => e.fmt(f),
+            #[cfg(feature = "aleosig")]
+            Error::AleoSign(e) => e.fmt(f),
+            #[cfg(feature = "aleosig")]
+            Error::AleoVerify(e) => e.fmt(f),
+            #[cfg(feature = "aleosig")]
+            Error::AleoGeneratePrivateKey(e) => e.fmt(f),
             #[cfg(feature = "keccak-hash")]
             Error::TypedDataConstruction(e) => e.fmt(f),
             #[cfg(feature = "keccak-hash")]
@@ -672,6 +695,20 @@ impl From<BlockchainAccountIdParseError> for Error {
 impl From<BlockchainAccountIdVerifyError> for Error {
     fn from(err: BlockchainAccountIdVerifyError) -> Error {
         Error::BlockchainAccountIdVerify(err)
+    }
+}
+
+#[cfg(feature = "aleosig")]
+impl From<AleoSignError> for Error {
+    fn from(err: AleoSignError) -> Error {
+        Error::AleoSign(err)
+    }
+}
+
+#[cfg(feature = "aleosig")]
+impl From<AleoVerifyError> for Error {
+    fn from(err: AleoVerifyError) -> Error {
+        Error::AleoVerify(err)
     }
 }
 

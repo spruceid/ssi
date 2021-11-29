@@ -69,8 +69,8 @@ use zeroize::Zeroize;
 ///     CurveProjective,
 /// };
 /// fn main() {
-///     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
-///     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
+///     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2_old::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
+///     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2_old::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
 ///
 ///     let mut g1_bytes = Vec::new();
 ///     let mut g2_bytes = Vec::new();

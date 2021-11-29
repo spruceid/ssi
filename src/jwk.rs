@@ -235,6 +235,8 @@ pub enum Algorithm {
     ESKeccakKR,
     ESBlake2b,
     ESBlake2bK,
+    #[doc(hidden)]
+    AleoTestnet1Signature,
     None,
 }
 
@@ -297,6 +299,11 @@ impl JWK {
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
+    #[cfg(feature = "aleosig")]
+    pub fn generate_aleo() -> Result<JWK, Error> {
+        crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
+    }
+
     pub fn get_algorithm(&self) -> Option<Algorithm> {
         if let Some(algorithm) = self.algorithm {
             return Some(algorithm);
@@ -307,6 +314,10 @@ impl JWK {
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
+            }
+            #[cfg(feature = "aleosig")]
+            Params::OKP(okp_params) if okp_params.curve == crate::aleo::OKP_CURVE => {
+                return Some(Algorithm::AleoTestnet1Signature);
             }
             Params::EC(ec_params) => {
                 let curve = match &ec_params.curve {
