@@ -1984,7 +1984,7 @@ impl ProofSuite for SolanaSignature2021 {
 /// |[signature algorithm]       |Schnorr signature with [Edwards BLS12] curve|[Aleo Documentation - Accounts][aleo-accounts]|
 ///
 /// The proof object must contain a [proofValue] property encoding the signature in
-/// [Multibase] formt.
+/// [Multibase] format.
 ///
 /// ## Verification method
 ///
