@@ -138,6 +138,7 @@ pub const EIP712SIG_V0_1_CONTEXT: &str = "https://demo.spruceid.com/ld/eip712sig
 pub const EIP712SIG_V1_CONTEXT: &str = "https://w3id.org/security/suites/eip712sig-2021/v1";
 pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &str =
     "https://identity.foundation/presentation-exchange/submission/v1";
+pub const VDL_V1_CONTEXT: &str = "https://w3id.org/vdl/v1";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -272,6 +273,12 @@ lazy_static! {
         let iri = Iri::new(PRESENTATION_SUBMISSION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref VDL_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::VDL_V1;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(VDL_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
 pub struct StaticLoader;
@@ -314,6 +321,7 @@ impl Loader for StaticLoader {
                 PRESENTATION_SUBMISSION_V1_CONTEXT => {
                     Ok(PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT.clone())
                 }
+                VDL_V1_CONTEXT => Ok(VDL_V1_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
