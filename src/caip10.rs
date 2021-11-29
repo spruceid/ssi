@@ -40,6 +40,7 @@ fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
 }
 
 // convert a JWK to a Aleo account address string if it looks like an Aleo key
+#[cfg(feature = "aleosig")]
 fn encode_aleo_address(jwk: &JWK, network_id: &str) -> Result<String, &'static str> {
     if network_id != "1" {
         return Err("Unexpected Aleo network id");
@@ -86,6 +87,7 @@ impl BlockchainAccountId {
                 crate::ripemd::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
+            #[cfg(feature = "aleosig")]
             ("aleo", network_id) => encode_aleo_address(jwk, network_id)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(
