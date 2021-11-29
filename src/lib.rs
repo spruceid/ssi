@@ -1,3 +1,5 @@
+#[cfg(feature = "aleosig")]
+pub mod aleo;
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;

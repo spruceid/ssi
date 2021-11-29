@@ -296,6 +296,11 @@ impl JWK {
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
+    #[cfg(feature = "aleosig")]
+    pub fn generate_aleo() -> Result<JWK, Error> {
+        crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
+    }
+
     pub fn get_algorithm(&self) -> Option<Algorithm> {
         if let Some(algorithm) = self.algorithm {
             return Some(algorithm);
