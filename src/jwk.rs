@@ -232,6 +232,9 @@ pub enum Algorithm {
     ES256KR,
     ESBlake2b,
     ESBlake2bK,
+    #[doc(hidden)]
+    #[cfg(feature = "aleosig")]
+    AleoTestnet1Signature,
     None,
 }
 
@@ -311,6 +314,10 @@ impl JWK {
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
+            }
+            #[cfg(feature = "aleosig")]
+            Params::OKP(okp_params) if okp_params.curve == crate::aleo::OKP_CURVE => {
+                return Some(Algorithm::AleoTestnet1Signature);
             }
             Params::EC(ec_params) => {
                 let curve = match &ec_params.curve {
