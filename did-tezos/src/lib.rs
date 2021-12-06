@@ -101,7 +101,7 @@ impl DIDResolver for DIDTz {
 
         let prefix: Prefix = match address.get(0..3) {
             Some(prefix) => {
-                match serde_json::from_str(&format!("\"{}\"", prefix.to_ascii_lowercase())) {
+                match serde_json::from_str(&format!("\"{}\"", prefix)) {
                     Ok(p) => p,
                     Err(_) => {
                         return (
