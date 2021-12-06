@@ -18,11 +18,13 @@ mod explorer;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use json_patch::patch;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::default::Default;
+use std::str::FromStr;
+use std::string::ToString;
 
 /// did:tz DID Method
 ///
@@ -37,13 +39,38 @@ impl Default for DIDTz {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Debug)]
 enum Prefix {
     TZ1,
     TZ2,
     TZ3,
     KT1,
+}
+
+impl FromStr for Prefix {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "tz1" => Prefix::TZ1,
+            "tz2" => Prefix::TZ2,
+            "tz3" => Prefix::TZ3,
+            "KT1" => Prefix::KT1,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl ToString for Prefix {
+    fn to_string(&self) -> String {
+        match self {
+            Prefix::TZ1 => "tz1",
+            Prefix::TZ2 => "tz2",
+            Prefix::TZ3 => "tz3",
+            Prefix::KT1 => "KT1",
+        }
+        .to_string()
+    }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -100,18 +127,16 @@ impl DIDResolver for DIDTz {
         };
 
         let prefix: Prefix = match address.get(0..3) {
-            Some(prefix) => {
-                match serde_json::from_str(&format!("\"{}\"", prefix)) {
-                    Ok(p) => p,
-                    Err(_) => {
-                        return (
-                            ResolutionMetadata::from_error(ERROR_INVALID_DID),
-                            None,
-                            None,
-                        )
-                    }
+            Some(prefix) => match Prefix::from_str(prefix) {
+                Ok(p) => p,
+                Err(_) => {
+                    return (
+                        ResolutionMetadata::from_error(ERROR_INVALID_DID),
+                        None,
+                        None,
+                    )
                 }
-            }
+            },
             None => {
                 return (
                     ResolutionMetadata::from_error(ERROR_INVALID_DID),
@@ -521,12 +546,7 @@ impl DIDTz {
                                     anyhow!("Couldn't create JWK from P-256 public key: {}", e)
                                 })?
                             }
-                            p => {
-                                return Err(anyhow!(
-                                    "{} support not enabled.",
-                                    serde_json::to_string(&p)?
-                                ))
-                            }
+                            p => return Err(anyhow!("{} support not enabled.", p.to_string())),
                         };
                         let (_, patch_) = decode_verify(&jws, &jwk)?;
                         patch(
