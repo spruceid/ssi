@@ -546,6 +546,7 @@ impl DIDTz {
                                     anyhow!("Couldn't create JWK from P-256 public key: {}", e)
                                 })?
                             }
+                            #[allow(unreachable_patterns)]
                             p => return Err(anyhow!("{} support not enabled.", p.to_string())),
                         };
                         let (_, patch_) = decode_verify(&jws, &jwk)?;
