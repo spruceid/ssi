@@ -1008,8 +1008,16 @@ impl Credential {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
-                Ok(()) => results.checks.push(Check::JWS),
+            match crate::jws::verify_bytes_warnable(
+                header.algorithm,
+                &signing_input,
+                &key,
+                &signature,
+            ) {
+                Ok(mut warnings) => {
+                    results.checks.push(Check::JWS);
+                    results.warnings.append(&mut warnings);
+                }
                 Err(err) => results
                     .errors
                     .push(format!("Unable to filter proofs: {}", err)),
@@ -1521,8 +1529,16 @@ impl Presentation {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
-                Ok(()) => results.checks.push(Check::JWS),
+            match crate::jws::verify_bytes_warnable(
+                header.algorithm,
+                &signing_input,
+                &key,
+                &signature,
+            ) {
+                Ok(mut warnings) => {
+                    results.checks.push(Check::JWS);
+                    results.warnings.append(&mut warnings);
+                }
                 Err(err) => results
                     .errors
                     .push(format!("Unable to filter proofs: {}", err)),
