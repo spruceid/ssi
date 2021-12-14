@@ -230,6 +230,9 @@ pub enum Algorithm {
     /// https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r
     #[serde(rename = "ES256K-R")]
     ES256KR,
+    /// like ES256K-R but using Keccak-256 instead of SHA-256
+    #[serde(rename = "ES256K-R")]
+    ESKeccakKR,
     ESBlake2b,
     ESBlake2bK,
     None,

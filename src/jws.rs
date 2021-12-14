@@ -178,6 +178,18 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     signing_key.try_sign_digest(digest)?;
                 sig.as_bytes().to_vec()
             }
+            #[cfg(feature = "k256")]
+            Algorithm::ESKeccakKR => {
+                use k256::ecdsa::signature::{Signature, Signer};
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "secp256k1" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(data)?;
+                sig.as_bytes().to_vec()
+            }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
                 // We will be able to use the blake2 crate directly once it allow 32B output
@@ -363,6 +375,22 @@ pub fn verify_bytes_warnable(
                 let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
                 verifying_key.verify_digest(digest, &sig)?;
             }
+            #[cfg(feature = "k256")]
+            Algorithm::ESKeccakKR => {
+                use k256::ecdsa::signature::Verifier;
+                use std::panic;
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "secp256k1" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let public_key = k256::PublicKey::try_from(ec)?;
+                let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
+                let sig = panic::catch_unwind(|| {
+                    k256::ecdsa::recoverable::Signature::try_from(signature)
+                })
+                .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
+                verifying_key.verify(data, &sig)?;
+            }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
                 // We will be able to use the blake2 crate directly once it allow 32B output
@@ -448,6 +476,16 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 x509_thumbprint_sha1: None,
                 x509_thumbprint_sha256: None,
             };
+            Ok(jwk)
+        }
+        #[cfg(feature = "k256")]
+        Algorithm::ESKeccakKR => {
+            let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
+            let recovered_key = sig.recover_verify_key(data)?;
+            use crate::jwk::ECParams;
+            let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())?,
+            )?));
             Ok(jwk)
         }
         _ => {
@@ -687,6 +725,22 @@ mod tests {
         verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
         let other_key = JWK::generate_secp256k1().unwrap();
         verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
+
+        // ESKeccakK-R
+        let key = JWK {
+            algorithm: Some(Algorithm::ESKeccakKR),
+            ..key
+        };
+        verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap_err();
+        verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
+
+        // Test recovery (ESKeccakK-R)
+        let sig = sign_bytes(Algorithm::ESKeccakKR, data, &key).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
+        let recovered_key = recover(Algorithm::ESKeccakKR, data, &sig).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, data, &recovered_key, &sig).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, data, &other_key, &sig).unwrap_err();
     }
 
     #[test]
