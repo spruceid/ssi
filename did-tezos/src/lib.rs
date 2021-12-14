@@ -32,6 +32,7 @@ use std::string::ToString;
 pub struct DIDTz {
     tzkt_url: Option<String>,
 }
+
 impl Default for DIDTz {
     fn default() -> Self {
         Self { tzkt_url: None }
@@ -147,7 +148,7 @@ impl DIDResolver for DIDTz {
         let (_curve, proof_type, proof_type_iri) = prefix_to_curve_type(prefix.clone());
 
         let vm_didurl = DIDURL {
-            did: format!("did:pkh:tezos:{}:{}", genesis_block_hash, address),
+            did: did.to_string(),
             fragment: Some("blockchainAccountId".to_string()),
             ..Default::default()
         };
@@ -221,15 +222,10 @@ impl DIDResolver for DIDTz {
             }
         {
             doc.service = Some(vec![service]);
-            if let Some(ref mut vms) = doc.authentication {
-                vms.push(vm.clone());
-            } else {
-                doc.authentication = Some(vec![vm.clone()]);
-            }
-            if let Some(ref mut vms) = doc.assertion_method {
+            if let Some(ref mut vms) = doc.verification_method {
                 vms.push(vm);
             } else {
-                doc.assertion_method = Some(vec![vm]);
+                doc.verification_method = Some(vec![vm]);
             }
         }
 
@@ -422,6 +418,17 @@ impl DIDTz {
             ]),
             id: did.to_string(),
             assertion_method: Some(vec![VerificationMethod::DIDURL(vm_didurl.clone())]),
+            verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
+                id: String::from(vm_didurl.clone()),
+                type_: proof_type.to_string(),
+                controller: did.to_string(),
+                blockchain_account_id: Some(format!(
+                    "tezos:{}:{}",
+                    genesis_block_hash,
+                    address.to_string()
+                )),
+                ..Default::default()
+            })]),
             authentication: match public_key {
                 Some(_) => Some(vec![VerificationMethod::Map(VerificationMethodMap {
                     id: vm_didurl.to_string(),
@@ -649,11 +656,17 @@ mod tests {
                 }
               ],
               "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+              "verificationMethod": [{
+                "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
+                "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+                "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
+              }],
               "authentication": [
-                "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
+                "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
               ],
               "assertionMethod": [
-                "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
+                "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
               ]
             })
         );
@@ -681,11 +694,17 @@ mod tests {
                 }
               ],
               "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+              "verificationMethod": [{
+                "id": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId",
+                "type": "EcdsaSecp256k1RecoveryMethod2020",
+                "controller": "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"
+              }],
               "authentication": [
-                "did:pkh:tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
+                "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
               ],
               "assertionMethod": [
-                "did:pkh:tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
+                "did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq#blockchainAccountId"
               ]
             })
         );
@@ -1388,27 +1407,14 @@ mod tests {
         let d = res_doc.unwrap();
         let expected = Document {
             id: live_did_manager.clone(),
-            verification_method: None,
-            authentication: Some(vec![
-                VerificationMethod::DIDURL(DIDURL {
-                    did: format!("did:pkh:tezos:NetXdQprcVkpaWU:{}", LIVE_KT1),
-                    path_abempty: "".to_string(),
-                    query: None,
-                    fragment: Some("blockchainAccountId".to_string()),
-                }),
-                VerificationMethod::DIDURL(DIDURL {
-                    did: format!("did:pkh:tz:{}", LIVE_TZ1),
-                    path_abempty: "".to_string(),
-                    query: None,
-                    fragment: Some("TezosMethod2021".to_string()),
-                }),
-            ]),
-            assertion_method: Some(vec![
-                VerificationMethod::DIDURL(DIDURL {
-                    did: format!("did:pkh:tezos:NetXdQprcVkpaWU:{}", LIVE_KT1),
-                    path_abempty: "".to_string(),
-                    query: None,
-                    fragment: Some("blockchainAccountId".to_string()),
+            verification_method: Some(vec![
+                VerificationMethod::Map(VerificationMethodMap {
+                    id: format!("{}#blockchainAccountId", live_did_manager),
+                    type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
+                    blockchain_account_id: Some(format!("tezos:{}:{}", LIVE_NETWORK, LIVE_KT1)),
+                    controller: live_did_manager.clone(),
+                    property_set: None,
+                    ..Default::default()
                 }),
                 VerificationMethod::DIDURL(DIDURL {
                     did: format!("did:pkh:tz:{}", LIVE_TZ1),
@@ -1431,8 +1437,6 @@ mod tests {
         assert_eq!(d.controller, expected.controller);
         assert_eq!(d.verification_method, expected.verification_method);
         assert_eq!(d.service, expected.service);
-        assert_eq!(d.authentication, expected.authentication);
-        assert_eq!(d.assertion_method, expected.assertion_method);
     }
 
     #[tokio::test]
