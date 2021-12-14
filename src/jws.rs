@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
+pub type VerificationWarnings = Vec<String>;
+
 // RFC 7515 - JSON Web Signature (JWS)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
 
@@ -230,12 +232,13 @@ pub fn sign_bytes_b64(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<St
     Ok(sig_b64)
 }
 
-pub fn verify_bytes(
+pub fn verify_bytes_warnable(
     algorithm: Algorithm,
     data: &[u8],
     key: &JWK,
     signature: &[u8],
-) -> Result<(), Error> {
+) -> Result<VerificationWarnings, Error> {
+    let mut warnings = VerificationWarnings::default();
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm
             && !(key_algorithm == Algorithm::EdDSA && algorithm == Algorithm::EdBlake2b)
@@ -408,6 +411,16 @@ pub fn verify_bytes(
         },
         _ => return Err(Error::KeyTypeNotImplemented),
     }
+    Ok(warnings)
+}
+
+pub fn verify_bytes(
+    algorithm: Algorithm,
+    data: &[u8],
+    key: &JWK,
+    signature: &[u8],
+) -> Result<(), Error> {
+    verify_bytes_warnable(algorithm, data, key, signature)?;
     Ok(())
 }
 
