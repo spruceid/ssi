@@ -373,7 +373,12 @@ pub fn verify_bytes_warnable(
                 .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
                 let hash = crate::hash::sha256(data)?;
                 let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
-                verifying_key.verify_digest(digest, &sig)?;
+                if let Err(_e) = verifying_key.verify_digest(digest, &sig) {
+                    // Legacy mode: allow using Keccak-256 instead of SHA-256
+                    verify_bytes(Algorithm::ESKeccakKR, data, key, signature)?;
+                    warnings
+                        .push("Signature uses legacy mode ES256K-R with Keccak-256".to_string());
+                }
             }
             #[cfg(feature = "k256")]
             Algorithm::ESKeccakKR => {
@@ -642,6 +647,26 @@ pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), 
         payload: _,
         signature,
     } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    let key = recover(header.algorithm, &signing_input, &signature)?;
+    Ok((header, key))
+}
+
+pub(crate) fn detached_recover_legacy_keccak_es256kr(
+    jws: &str,
+    payload_enc: &[u8],
+) -> Result<(Header, JWK), Error> {
+    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+    let DecodedJWS {
+        mut header,
+        signing_input,
+        payload: _,
+        signature,
+    } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    // Allow ESKeccakK-R misimplementation of ES256K-R, for legacy reasons.
+    if header.algorithm != Algorithm::ES256KR {
+        return Err(Error::AlgorithmMismatch);
+    }
+    header.algorithm = Algorithm::ESKeccakKR;
     let key = recover(header.algorithm, &signing_input, &signature)?;
     Ok((header, key))
 }
