@@ -74,7 +74,7 @@ ecdsa = "0.11.1"
 digest = "0.9"
 k256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
 p256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
-ssi-contexts = { version = "0.1.0", path = "contexts/" }
+ssi-contexts = { version = "0.1.2", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
 sshkeys = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
