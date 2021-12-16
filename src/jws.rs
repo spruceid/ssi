@@ -163,17 +163,14 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256KR => {
-                use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
+                use k256::ecdsa::signature::{Signature, Signer};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(Error::CurveNotImplemented(curve.to_string()));
                 }
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let hash = crate::hash::sha256(&data)?;
-                let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
-                let sig: k256::ecdsa::recoverable::Signature =
-                    signing_key.try_sign_digest(digest)?;
+                let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(data)?;
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "p256")]
@@ -344,7 +341,7 @@ pub fn verify_bytes(
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256KR => {
-                use k256::ecdsa::signature::{digest::Digest, DigestVerifier, Verifier};
+                use k256::ecdsa::signature::Verifier;
                 use std::panic;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
@@ -356,9 +353,7 @@ pub fn verify_bytes(
                     k256::ecdsa::recoverable::Signature::try_from(signature)
                 })
                 .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
-                let hash = crate::hash::sha256(data)?;
-                let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
-                verifying_key.verify_digest(digest, &sig)?;
+                verifying_key.verify(data, &sig)?;
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
@@ -418,9 +413,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         #[cfg(feature = "k256")]
         Algorithm::ES256KR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
-            let hash = crate::hash::sha256(data)?;
-            let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
-            let recovered_key = sig.recover_verify_key_from_digest_bytes(digest)?;
+            let recovered_key = sig.recover_verify_key(data)?;
             use crate::jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
