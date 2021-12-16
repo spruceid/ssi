@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.3.1] 2021-12-21
 ### Added
 - Use CAIP-10 in did:pkh ([#279](https://github.com/spruceid/ssi/pull/#279), [#286](https://github.com/spruceid/ssi/pull/#286), [#303](https://github.com/spruceid/ssi/pull/#303)).
 - Use updated JsonWebSignature2020 context file ([#322](https://github.com/spruceid/ssi/pull/#322)).
@@ -16,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow JWT VC without subject id ([#346](https://github.com/spruceid/ssi/pull/#346)).
 - Add Blockchain Vocabulary v1 2021 context ([#347](https://github.com/spruceid/ssi/pull/#347)).
 - Construct API URLs for known Tezos test networks ([#350](https://github.com/spruceid/ssi/pull/#350)).
+- Add Verifiable Driver's License Vocabulary context file ([#361](https://github.com/spruceid/ssi/pull/361)).
+- Document did:tz resolution options ([#357](https://github.com/spruceid/ssi/pull/357)).
+- Add support for did:tz:KT1 ([#363](https://github.com/spruceid/ssi/pull/363)).
+- Support fractional timestamps in JWT ([#315](https://github.com/spruceid/ssi/pull/315)).
 
 ### Changed
 - Use Error types in bbs code ([#338](https://github.com/spruceid/ssi/pull/#338)).
@@ -23,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default to JsonWebSignature2020 for P-256
 - Update EthereumEip712Signature2021 for renamed properties ([#336](https://github.com/spruceid/ssi/pull/#336)).
 - Allow DID document base context without www ([#349](https://github.com/spruceid/ssi/pull/#349)).
+- Use http for did:web:localhost ([#333](https://github.com/spruceid/ssi/pull/333)).
+- Depend on specific versions of bbs and pairing-plus crates ([#334](https://github.com/spruceid/ssi/pull/334)).
+- Allow additional verification method types for use with EcdsaSecp256k1RecoverySignature2020 ([#351](23ef6b16a1c1d007c4b90f4484ad3e2f6f0c6495)).
+- JWT timestamp type and range changed ([#315](https://github.com/spruceid/ssi/pull/315)).
 
 ### Deprecated
 - EthereumEip712Signature2021 specification deprecated properties `messageSchema` and `eip712Domain`.
@@ -36,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix example RSA public key modulus representation ([#308](https://github.com/spruceid/ssi/pull/#308)).
 - Doctest BBS generator parameters ([#304](https://github.com/spruceid/ssi/pull/#304)).
 - Use BBS+ Signatures 2020 context file ([#324](https://github.com/spruceid/ssi/pull/#324)).
+- Fix url dependency ([#365](https://github.com/spruceid/ssi/pull/365)).
+- Fix EcdsaSecp256k1RecoverySignature2020/ES256K-R hashing ([#351](https://github.com/spruceid/ssi/pull/351)).
+- Don't use ES256K-R for EthereumEip712Signature2021 ([#351](https://github.com/spruceid/ssi/pull/351)).
+- Preserve VC/VP properties in JWT format ([#353](https://github.com/spruceid/ssi/pull/353)).
 
 ## Security
 - Restrict revocation lists to HTTPS ([#317](https://github.com/spruceid/ssi/pull/#317)).
@@ -284,7 +298,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
 [verification relationship]: https://www.w3.org/TR/did-core/#dfn-verification-relationship
 
-[Unreleased]: https://github.com/spruceid/ssi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/spruceid/ssi/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/spruceid/ssi/releases/tag/v0.3.1
 [0.3.0]: https://github.com/spruceid/ssi/releases/tag/v0.3.0
 [0.2.2]: https://github.com/spruceid/ssi/releases/tag/v0.2.2
 [0.2.1]: https://github.com/spruceid/ssi/releases/tag/v0.2.1
