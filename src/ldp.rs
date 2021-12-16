@@ -951,8 +951,13 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         }
         let message = to_jws_payload(document, proof).await?;
         let (_header, jwk) = crate::jws::detached_recover(jws, &message)?;
+        let mut warnings = VerificationWarnings::default();
         vm.match_jwk(&jwk)?;
-        Ok(Default::default())
+        warnings.push(
+            "Signature uses legacy mode EcdsaSecp256k1RecoveryMethod2020 with Keccak-256"
+                .to_string(),
+        );
+        Ok(warnings)
     }
 }
 

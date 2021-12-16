@@ -173,6 +173,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
                 let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(data)?;
+                eprintln!("ssi: signing with legacy mode ES256K-R with Keccak-256".to_string());
                 sig.as_bytes().to_vec()
             }
             #[cfg(feature = "p256")]
@@ -357,6 +358,7 @@ pub fn verify_bytes_warnable(
                 })
                 .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
                 verifying_key.verify(data, &sig)?;
+                warnings.push("Signature uses legacy mode ES256K-R with Keccak-256".to_string());
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
