@@ -17,7 +17,7 @@
       "id": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controller",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
       "controller": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479",
-      "blockchainAccountId": "eip155:1:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+      "blockchainAccountId": "eip155:1:0xF3beAC30C498D9E26865F34fCAa57dBB935b0D74"
     },
     {
       "id": "did:ethr:0x03fdd57adec3d438ea237fe46b33ee1e016eda6b585c3e27ea66686c2ea5358479#controllerKey",
