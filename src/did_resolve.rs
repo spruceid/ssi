@@ -790,59 +790,50 @@ impl DIDResolver for HTTPDIDResolver {
             })),
         }
         .unwrap_or_else(|| "".to_string());
-        let mut res_meta = ResolutionMetadata::default();
-        let doc_opt;
-        let doc_meta_opt;
-        match &content_type[..] {
-            TYPE_DID_RESOLUTION => {
-                let result: ResolutionResult =
-                    match serde_json::from_slice(&res_result_representation) {
-                        Ok(result) => result,
-                        Err(err) => {
-                            return (
-                                ResolutionMetadata::from_error(&format!(
-                                    "Error parsing resolution result: {}",
-                                    err
-                                )),
-                                None,
-                                None,
-                            )
-                        }
-                    };
-                if let Some(meta) = result.did_resolution_metadata {
-                    res_meta = meta;
-                    // https://www.w3.org/TR/did-core/#did-resolution-metadata
-                    // contentType - "MUST NOT be present if the resolve function was called"
-                    res_meta.content_type = None;
-                };
-                doc_opt = result.did_document;
-                doc_meta_opt = result.did_document_metadata;
-            }
-            _ => {
-                if resp.status() == StatusCode::NOT_FOUND {
-                    res_meta.error = Some(ERROR_NOT_FOUND.to_string());
-                    doc_opt = None;
-                } else {
-                    // Assume the response is a JSON-LD DID Document by default.
-                    let doc: Document = match serde_json::from_slice(&res_result_representation) {
-                        Ok(doc) => doc,
-                        Err(err) => {
-                            return (
-                                ResolutionMetadata::from_error(&format!(
-                                    "Error parsing DID document: {}",
-                                    err
-                                )),
-                                None,
-                                None,
-                            )
-                        }
-                    };
-                    doc_opt = Some(doc);
+
+        if content_type == TYPE_DID_RESOLUTION {
+            // Handle result using DID Resolution Result media type (JSON-LD)
+            let result: ResolutionResult = match serde_json::from_slice(&res_result_representation)
+            {
+                Ok(result) => result,
+                Err(err) => {
+                    return (
+                        ResolutionMetadata::from_error(&format!(
+                            "Error parsing resolution result: {}",
+                            err
+                        )),
+                        None,
+                        None,
+                    )
                 }
-                doc_meta_opt = None;
-            }
+            };
+            let res_meta = if let Some(mut meta) = result.did_resolution_metadata {
+                // https://www.w3.org/TR/did-core/#did-resolution-metadata
+                // contentType - "MUST NOT be present if the resolve function was called"
+                meta.content_type = None;
+                meta
+            } else {
+                ResolutionMetadata::default()
+            };
+            return (res_meta, result.did_document, result.did_document_metadata);
         }
-        (res_meta, doc_opt, doc_meta_opt)
+
+        if resp.status() == StatusCode::NOT_FOUND {
+            return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
+        }
+
+        // Assume the response is a JSON(-LD) DID Document by default.
+        let doc: Document = match serde_json::from_slice(&res_result_representation) {
+            Ok(doc) => doc,
+            Err(err) => {
+                return (
+                    ResolutionMetadata::from_error(&format!("Error parsing DID document: {}", err)),
+                    None,
+                    None,
+                )
+            }
+        };
+        return (ResolutionMetadata::default(), Some(doc), None);
     }
 
     // Use default resolveRepresentation implementation in terms of resolve,
