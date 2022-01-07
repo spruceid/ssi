@@ -10,9 +10,10 @@ use crate::rdf::{
 
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
-use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
-// use serde_json::{map::Map, Value};
-use ijson::{IArray, IObject, IValue};
+use json_ld::{
+    context::Json, loader::Id, Document, JsonContext, Loader, ProcessingMode, RemoteDocument,
+};
+use serde_json::{map::Map, Value};
 
 #[derive(Debug, Clone)]
 pub enum RdfDirection {
@@ -141,150 +142,257 @@ pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &str =
     "https://identity.foundation/presentation-exchange/submission/v1";
 pub const VDL_V1_CONTEXT: &str = "https://w3id.org/vdl/v1";
 
+const CREDENTIALS_V1_ID: usize = 0;
+const CREDENTIALS_EXAMPLES_V1_ID: usize = 1;
+const ODRL_ID: usize = 2;
+const SCHEMA_ORG_ID: usize = 3;
+const SECURITY_V1_ID: usize = 4;
+const SECURITY_V2_ID: usize = 5;
+const DID_V1_ID: usize = 6;
+const DID_RESOLUTION_V1_ID: usize = 7;
+const DIF_ESRS2020_ID: usize = 8;
+const ESRS2020_EXTRA_ID: usize = 9;
+const LDS_JWS2020_V1_ID: usize = 10;
+const W3ID_JWS2020_V1_ID: usize = 11;
+const W3ID_ED2020_V1_ID: usize = 12;
+const BLOCKCHAIN2021_V1_ID: usize = 13;
+const CITIZENSHIP_V1_ID: usize = 14;
+const VACCINATION_V1_ID: usize = 15;
+const TRACEABILITY_ID: usize = 16;
+const REVOCATION_LIST_2020_V1_ID: usize = 17;
+const EIP712SIG_V0_1_ID: usize = 18;
+const BBS_V1_ID: usize = 19;
+const EIP712SIG_V1_ID: usize = 20;
+const PRESENTATION_SUBMISSION_V1_ID: usize = 21;
+const VDL_V1_ID: usize = 22;
+
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CREDENTIALS_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(CREDENTIALS_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(CREDENTIALS_V1_CONTEXT).unwrap();
+        let id = Id::new(CREDENTIALS_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CREDENTIALS_EXAMPLES_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(CREDENTIALS_EXAMPLES_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(CREDENTIALS_EXAMPLES_V1_CONTEXT).unwrap();
+        let id = Id::new(CREDENTIALS_EXAMPLES_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref ODRL_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::ODRL;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(ODRL_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(ODRL_CONTEXT).unwrap();
+        let id = Id::new(ODRL_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref SCHEMA_ORG_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SCHEMA_ORG;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(SCHEMA_ORG_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(SCHEMA_ORG_CONTEXT).unwrap();
+        let id = Id::new(SCHEMA_ORG_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref SECURITY_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SECURITY_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(SECURITY_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(SECURITY_V1_CONTEXT).unwrap();
+        let id = Id::new(SECURITY_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref SECURITY_V2_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SECURITY_V2;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(SECURITY_V2_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(SECURITY_V2_CONTEXT).unwrap();
+        let id = Id::new(SECURITY_V2_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref DID_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DID_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(DID_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(DID_V1_CONTEXT).unwrap();
+        let id = Id::new(DID_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DID_RESOLUTION_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
+        let id = Id::new(DID_RESOLUTION_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DIF_ESRS2020;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(DIF_ESRS2020_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(DIF_ESRS2020_CONTEXT).unwrap();
+        let id = Id::new(DIF_ESRS2020_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref ESRS2020_EXTRA_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::ESRS2020_EXTRA;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(ESRS2020_EXTRA_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(ESRS2020_EXTRA_CONTEXT).unwrap();
+        let id = Id::new(ESRS2020_EXTRA_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref LDS_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::LDS_JWS2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(LDS_JWS2020_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(LDS_JWS2020_V1_CONTEXT).unwrap();
+        let id = Id::new(LDS_JWS2020_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref W3ID_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::W3ID_JWS2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(W3ID_JWS2020_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(W3ID_JWS2020_V1_CONTEXT).unwrap();
+        let id = Id::new(W3ID_JWS2020_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref W3ID_ED2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::W3ID_ED2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(W3ID_ED2020_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(W3ID_ED2020_V1_CONTEXT).unwrap();
+        let id = Id::new(W3ID_ED2020_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::BLOCKCHAIN2021_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(BLOCKCHAIN2021_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(BLOCKCHAIN2021_V1_CONTEXT).unwrap();
+        let id = Id::new(BLOCKCHAIN2021_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref CITIZENSHIP_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CITIZENSHIP_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(CITIZENSHIP_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(CITIZENSHIP_V1_CONTEXT).unwrap();
+        let id = Id::new(CITIZENSHIP_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref VACCINATION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::VACCINATION_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(VACCINATION_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(VACCINATION_V1_CONTEXT).unwrap();
+        let id = Id::new(VACCINATION_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref TRACEABILITY_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::TRACEABILITY_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(TRACEABILITY_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(TRACEABILITY_CONTEXT).unwrap();
+        let id = Id::new(TRACEABILITY_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::REVOCATION_LIST_2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(REVOCATION_LIST_2020_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(REVOCATION_LIST_2020_V1_CONTEXT).unwrap();
+        let id = Id::new(REVOCATION_LIST_2020_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::EIP712SIG_V0_1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(EIP712SIG_V0_1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(EIP712SIG_V0_1_CONTEXT).unwrap();
+        let id = Id::new(EIP712SIG_V0_1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref BBS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::BBS_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(BBS_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(BBS_V1_CONTEXT).unwrap();
+        let id = Id::new(BBS_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref EIP712SIG_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::EIP712SIG_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(EIP712SIG_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(EIP712SIG_V1_CONTEXT).unwrap();
+        let id = Id::new(EIP712SIG_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::PRESENTATION_SUBMISSION_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(PRESENTATION_SUBMISSION_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(PRESENTATION_SUBMISSION_V1_CONTEXT).unwrap();
+        let id = Id::new(PRESENTATION_SUBMISSION_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
     pub static ref VDL_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::VDL_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
-        let iri = Iri::new(VDL_V1_CONTEXT).unwrap();
-        RemoteDocument::new(doc, iri)
+        let iri = IriBuf::new(VDL_V1_CONTEXT).unwrap();
+        let id = Id::new(VDL_V1_ID);
+        RemoteDocument::new(doc, iri, id)
     };
 }
 
 pub struct StaticLoader;
 impl Loader for StaticLoader {
     type Document = Value;
+
+    fn id(&self, iri: Iri<'_>) -> Option<Id> {
+        Some(Id::new(match iri.as_str() {
+            CREDENTIALS_V1_CONTEXT => CREDENTIALS_V1_ID,
+            CREDENTIALS_EXAMPLES_V1_CONTEXT => CREDENTIALS_EXAMPLES_V1_ID,
+            ODRL_CONTEXT => ODRL_ID,
+            SCHEMA_ORG_CONTEXT => SCHEMA_ORG_ID,
+            SECURITY_V1_CONTEXT => SECURITY_V1_ID,
+            SECURITY_V2_CONTEXT => SECURITY_V2_ID,
+            DID_V1_CONTEXT => DID_V1_ID,
+            DID_RESOLUTION_V1_CONTEXT => DID_RESOLUTION_V1_ID,
+            DIF_ESRS2020_CONTEXT => DIF_ESRS2020_ID,
+            ESRS2020_EXTRA_CONTEXT => ESRS2020_EXTRA_ID,
+            LDS_JWS2020_V1_CONTEXT => LDS_JWS2020_V1_ID,
+            W3ID_JWS2020_V1_CONTEXT => W3ID_JWS2020_V1_ID,
+            W3ID_ED2020_V1_CONTEXT => W3ID_ED2020_V1_ID,
+            BLOCKCHAIN2021_V1_CONTEXT => BLOCKCHAIN2021_V1_ID,
+            CITIZENSHIP_V1_CONTEXT => CITIZENSHIP_V1_ID,
+            VACCINATION_V1_CONTEXT => VACCINATION_V1_ID,
+            TRACEABILITY_CONTEXT => TRACEABILITY_ID,
+            REVOCATION_LIST_2020_V1_CONTEXT => REVOCATION_LIST_2020_V1_ID,
+            EIP712SIG_V0_1_CONTEXT => EIP712SIG_V0_1_ID,
+            BBS_V1_CONTEXT => BBS_V1_ID,
+            EIP712SIG_V1_CONTEXT => EIP712SIG_V1_ID,
+            PRESENTATION_SUBMISSION_V1_CONTEXT => PRESENTATION_SUBMISSION_V1_ID,
+            VDL_V1_CONTEXT => VDL_V1_ID,
+            _ => return None,
+        }))
+    }
+
+    fn iri(&self, id: Id) -> Option<Iri<'static>> {
+        Iri::from_str(match id.unwrap() {
+            CREDENTIALS_V1_ID => CREDENTIALS_V1_CONTEXT,
+            CREDENTIALS_EXAMPLES_V1_ID => CREDENTIALS_EXAMPLES_V1_CONTEXT,
+            ODRL_ID => ODRL_CONTEXT,
+            SCHEMA_ORG_ID => SCHEMA_ORG_CONTEXT,
+            SECURITY_V1_ID => SECURITY_V1_CONTEXT,
+            SECURITY_V2_ID => SECURITY_V2_CONTEXT,
+            DID_V1_ID => DID_V1_CONTEXT,
+            DID_RESOLUTION_V1_ID => DID_RESOLUTION_V1_CONTEXT,
+            DIF_ESRS2020_ID => DIF_ESRS2020_CONTEXT,
+            ESRS2020_EXTRA_ID => ESRS2020_EXTRA_CONTEXT,
+            LDS_JWS2020_V1_ID => LDS_JWS2020_V1_CONTEXT,
+            W3ID_JWS2020_V1_ID => W3ID_JWS2020_V1_CONTEXT,
+            W3ID_ED2020_V1_ID => W3ID_ED2020_V1_CONTEXT,
+            BLOCKCHAIN2021_V1_ID => BLOCKCHAIN2021_V1_CONTEXT,
+            CITIZENSHIP_V1_ID => CITIZENSHIP_V1_CONTEXT,
+            VACCINATION_V1_ID => VACCINATION_V1_CONTEXT,
+            TRACEABILITY_ID => TRACEABILITY_CONTEXT,
+            REVOCATION_LIST_2020_V1_ID => REVOCATION_LIST_2020_V1_CONTEXT,
+            EIP712SIG_V0_1_ID => EIP712SIG_V0_1_CONTEXT,
+            BBS_V1_ID => BBS_V1_CONTEXT,
+            EIP712SIG_V1_ID => EIP712SIG_V1_CONTEXT,
+            PRESENTATION_SUBMISSION_V1_ID => PRESENTATION_SUBMISSION_V1_CONTEXT,
+            VDL_V1_ID => VDL_V1_CONTEXT,
+            _ => return None,
+        })
+        .ok()
+    }
+
     fn load<'a>(
         &'a mut self,
         url: Iri<'_>,
@@ -1509,7 +1617,7 @@ where
         Some(ref iri) => Some(iref::Iri::new(iri)?),
         None => None,
     };
-    let mut context: dyn JsonContext = JsonContext::new(base);
+    let mut context = Json::new(base);
     if let Some(ref url) = options.expand_context {
         use json_ld::context::Loader;
         use json_ld::context::Local;
@@ -1520,7 +1628,7 @@ where
             .await?
             .into_inner();
     }
-    let mut doc = serde_json::from_str(json)?;
+    let mut doc: Value = serde_json::from_str(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
         let more_contexts = serde_json::from_str(more_contexts_json)?;
         // Merge additional contexts into document. This is needed for serializing proofs, since
@@ -1537,7 +1645,7 @@ where
         for item in ValuesIter::from(&more_contexts) {
             contexts_merged.push(item.clone());
         }
-        doc_object.insert(AT_CONTEXT, Value::Array(contexts_merged));
+        doc_object.insert(AT_CONTEXT.to_string(), Value::Array(contexts_merged));
     }
     let mut expansion_options = json_ld::expansion::Options::from(options);
     use json_ld::expansion::Policy;

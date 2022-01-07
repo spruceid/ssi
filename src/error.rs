@@ -186,6 +186,7 @@ pub enum Error {
     SerdeJSON(SerdeJSONError),
     SerdeUrlEncoded(SerdeUrlEncodedError),
     JSONLD(JSONLDErrorCode),
+    JsonLdLoc(json_ld::Loc<json_ld::Error, ()>),
     IRI(IRIError),
     ParseInt(ParseIntError),
     CharTryFrom(CharTryFromError),
@@ -376,6 +377,7 @@ impl fmt::Display for Error {
             Error::SerdeJSON(e) => e.fmt(f),
             Error::SerdeUrlEncoded(e) => e.fmt(f),
             Error::JSONLD(e) => e.fmt(f),
+            Error::JsonLdLoc(e) => write!(f, "JSON-LD error: {:?}", e),
             Error::IRI(e) => e.fmt(f),
             Error::ParseInt(e) => e.fmt(f),
             Error::CharTryFrom(e) => e.fmt(f),
@@ -441,6 +443,12 @@ impl From<SerdeUrlEncodedError> for Error {
 impl From<JSONLDError> for Error {
     fn from(err: JSONLDError) -> Error {
         Error::JSONLD(err.code())
+    }
+}
+
+impl From<json_ld::Loc<json_ld::Error, ()>> for Error {
+    fn from(err: json_ld::Loc<json_ld::Error, ()>) -> Error {
+        Error::JsonLdLoc(err)
     }
 }
 
