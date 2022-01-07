@@ -14,7 +14,7 @@ use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 
 use async_trait::async_trait;
-use chrono::{Duration, LocalResult, prelude::*};
+use chrono::{prelude::*, Duration, LocalResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -400,14 +400,16 @@ impl std::convert::TryFrom<DateTime<FixedOffset>> for NumericDate {
 
 impl std::convert::Into<DateTime<Utc>> for NumericDate {
     fn into(self) -> DateTime<Utc> {
-        let (whole_seconds, fractional_nanoseconds) = self.into_whole_seconds_and_fractional_nanoseconds();
+        let (whole_seconds, fractional_nanoseconds) =
+            self.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp(whole_seconds, fractional_nanoseconds)
     }
 }
 
 impl std::convert::Into<LocalResult<DateTime<Utc>>> for NumericDate {
     fn into(self) -> LocalResult<DateTime<Utc>> {
-        let (whole_seconds, fractional_nanoseconds) = self.into_whole_seconds_and_fractional_nanoseconds();
+        let (whole_seconds, fractional_nanoseconds) =
+            self.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp_opt(whole_seconds, fractional_nanoseconds)
     }
 }
@@ -1118,8 +1120,16 @@ impl Credential {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
-                Ok(()) => results.checks.push(Check::JWS),
+            match crate::jws::verify_bytes_warnable(
+                header.algorithm,
+                &signing_input,
+                &key,
+                &signature,
+            ) {
+                Ok(mut warnings) => {
+                    results.checks.push(Check::JWS);
+                    results.warnings.append(&mut warnings);
+                }
                 Err(err) => results
                     .errors
                     .push(format!("Unable to filter proofs: {}", err)),
@@ -1631,8 +1641,16 @@ impl Presentation {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
-                Ok(()) => results.checks.push(Check::JWS),
+            match crate::jws::verify_bytes_warnable(
+                header.algorithm,
+                &signing_input,
+                &key,
+                &signature,
+            ) {
+                Ok(mut warnings) => {
+                    results.checks.push(Check::JWS);
+                    results.warnings.append(&mut warnings);
+                }
                 Err(err) => results
                     .errors
                     .push(format!("Unable to filter proofs: {}", err)),
@@ -2274,22 +2292,58 @@ pub(crate) mod tests {
 
     #[test]
     fn numeric_date() {
-        assert_eq!(NumericDate::try_from_seconds(NumericDate::MIN.as_seconds()).unwrap(), NumericDate::MIN, "NumericDate::MIN value did not survive round trip");
-        assert_eq!(NumericDate::try_from_seconds(NumericDate::MAX.as_seconds()).unwrap(), NumericDate::MAX, "NumericDate::MAX value did not survive round trip");
+        assert_eq!(
+            NumericDate::try_from_seconds(NumericDate::MIN.as_seconds()).unwrap(),
+            NumericDate::MIN,
+            "NumericDate::MIN value did not survive round trip"
+        );
+        assert_eq!(
+            NumericDate::try_from_seconds(NumericDate::MAX.as_seconds()).unwrap(),
+            NumericDate::MAX,
+            "NumericDate::MAX value did not survive round trip"
+        );
 
-        assert!(NumericDate::try_from_seconds(NumericDate::MIN.as_seconds() - 1.0e-6).is_err(), "NumericDate::MIN-1.0e-6 value did not hit out-of-range error");
-        assert!(NumericDate::try_from_seconds(NumericDate::MAX.as_seconds() + 1.0e-6).is_err(), "NumericDate::MAX+1.0e-6 value did not hit out-of-range error");
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MIN.as_seconds() - 1.0e-6).is_err(),
+            "NumericDate::MIN-1.0e-6 value did not hit out-of-range error"
+        );
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MAX.as_seconds() + 1.0e-6).is_err(),
+            "NumericDate::MAX+1.0e-6 value did not hit out-of-range error"
+        );
 
-        assert!(NumericDate::try_from_seconds(NumericDate::MIN.as_seconds() + 1.0e-6).is_ok(), "NumericDate::MIN-1.0e-6 value did not hit out-of-range error");
-        assert!(NumericDate::try_from_seconds(NumericDate::MAX.as_seconds() - 1.0e-6).is_ok(), "NumericDate::MAX+1.0e-6 value did not hit out-of-range error");
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MIN.as_seconds() + 1.0e-6).is_ok(),
+            "NumericDate::MIN-1.0e-6 value did not hit out-of-range error"
+        );
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MAX.as_seconds() - 1.0e-6).is_ok(),
+            "NumericDate::MAX+1.0e-6 value did not hit out-of-range error"
+        );
 
         let one_microsecond = Duration::microseconds(1);
-        assert_eq!((NumericDate::MIN + one_microsecond) - one_microsecond, NumericDate::MIN, "NumericDate::MIN+1.0e-6 wasn't correctly represented");
-        assert_eq!((NumericDate::MAX - one_microsecond) + one_microsecond, NumericDate::MAX, "NumericDate::MAX-1.0e-6 wasn't correctly represented");
+        assert_eq!(
+            (NumericDate::MIN + one_microsecond) - one_microsecond,
+            NumericDate::MIN,
+            "NumericDate::MIN+1.0e-6 wasn't correctly represented"
+        );
+        assert_eq!(
+            (NumericDate::MAX - one_microsecond) + one_microsecond,
+            NumericDate::MAX,
+            "NumericDate::MAX-1.0e-6 wasn't correctly represented"
+        );
 
         // At the MIN and MAX, increasing by half a microsecond shouldn't alter MIN or MAX.
-        assert_eq!(NumericDate::MIN - Duration::nanoseconds(500), NumericDate::MIN, "NumericDate::MIN isn't the true min");
-        assert_eq!(NumericDate::MAX + Duration::nanoseconds(500), NumericDate::MAX, "NumericDate::MAX isn't the true max");
+        assert_eq!(
+            NumericDate::MIN - Duration::nanoseconds(500),
+            NumericDate::MIN,
+            "NumericDate::MIN isn't the true min"
+        );
+        assert_eq!(
+            NumericDate::MAX + Duration::nanoseconds(500),
+            NumericDate::MAX,
+            "NumericDate::MAX isn't the true max"
+        );
     }
 
     #[test]

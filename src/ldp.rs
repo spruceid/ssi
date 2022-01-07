@@ -253,7 +253,7 @@ pub trait ProofSuite {
     ) -> Result<VerificationWarnings, Error>;
 }
 
-pub type VerificationWarnings = Vec<String>;
+pub use crate::jws::VerificationWarnings;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -647,8 +647,7 @@ async fn verify_nojws(
     let key = resolve_key(&verification_method, resolver).await?;
     let message = to_jws_payload(document, proof).await?;
     let (_base, sig) = multibase::decode(proof_value)?;
-    crate::jws::verify_bytes(algorithm, &message, &key, &sig)?;
-    Ok(Default::default())
+    crate::jws::verify_bytes_warnable(algorithm, &message, &key, &sig)
 }
 
 pub struct RsaSignature2018;
@@ -968,8 +967,17 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         }
         let message = to_jws_payload(document, proof).await?;
         let (_header, jwk) = crate::jws::detached_recover(jws, &message)?;
-        vm.match_jwk(&jwk)?;
-        Ok(Default::default())
+        let mut warnings = VerificationWarnings::default();
+        if let Err(_e) = vm.match_jwk(&jwk) {
+            // Legacy mode: allow using Keccak-256 instead of SHA-256
+            let (_header, jwk) = crate::jws::detached_recover_legacy_keccak_es256kr(jws, &message)?;
+            vm.match_jwk(&jwk)?;
+            warnings.push(
+                "Signature uses legacy mode EcdsaSecp256k1RecoveryMethod2020 with Keccak-256"
+                    .to_string(),
+            );
+        }
+        Ok(warnings)
     }
 }
 
@@ -1703,9 +1711,9 @@ impl ProofSuite for TezosSignature2021 {
         };
 
         // VM must have either publicKeyJwk or blockchainAccountId.
-        if let Some(vm_jwk) = vm.public_key_jwk {
-            // If VM has publicKey, use that to veify the signature.
-            crate::jws::verify_bytes(algorithm, &micheline, &vm_jwk, &sig)?;
+        let warnings = if let Some(vm_jwk) = vm.public_key_jwk {
+            // If VM has publicKey, use that to verify the signature.
+            crate::jws::verify_bytes_warnable(algorithm, &micheline, &vm_jwk, &sig)?
             // Note: VM blockchainAccountId is ignored in this case.
         } else if let Some(account_id) = account_id_opt {
             // VM does not have publicKeyJwk: proof must have public key
@@ -1713,14 +1721,14 @@ impl ProofSuite for TezosSignature2021 {
                 // Proof has public key: verify it with blockchainAccountId,
                 account_id.verify(&proof_jwk)?;
                 // and verify the signature.
-                crate::jws::verify_bytes(algorithm, &micheline, &proof_jwk, &sig)?;
+                crate::jws::verify_bytes_warnable(algorithm, &micheline, &proof_jwk, &sig)?
             } else {
                 return Err(Error::MissingKey);
             }
         } else {
             return Err(Error::MissingKey);
         };
-        Ok(Default::default())
+        Ok(warnings)
     }
 }
 
@@ -1850,9 +1858,9 @@ impl ProofSuite for TezosJcsSignature2021 {
         };
 
         // VM must have either publicKeyJwk or blockchainAccountId.
-        if let Some(vm_jwk) = vm.public_key_jwk {
-            // If VM has publicKey, use that to veify the signature.
-            crate::jws::verify_bytes(algorithm, &micheline, &vm_jwk, &sig)?;
+        let mut warnings = if let Some(vm_jwk) = vm.public_key_jwk {
+            // If VM has publicKey, use that to verify the signature.
+            crate::jws::verify_bytes_warnable(algorithm, &micheline, &vm_jwk, &sig)?
             // Note: VM blockchainAccountId is ignored in this case.
         } else if let Some(account_id) = account_id_opt {
             // VM does not have publicKeyJwk: proof must have public key
@@ -1866,14 +1874,15 @@ impl ProofSuite for TezosJcsSignature2021 {
                 // Proof has public key: verify it with blockchainAccountId,
                 account_id.verify(&proof_jwk)?;
                 // and verify the signature.
-                crate::jws::verify_bytes(algorithm, &micheline, &proof_jwk, &sig)?;
+                crate::jws::verify_bytes_warnable(algorithm, &micheline, &proof_jwk, &sig)?
             } else {
                 return Err(Error::MissingKey);
             }
         } else {
             return Err(Error::MissingKey);
         };
-        Ok(vec!["TezosJcsSignature2021 is experimental.".to_string()])
+        warnings.push("TezosJcsSignature2021 is experimental.".to_string());
+        Ok(warnings)
     }
 }
 
@@ -1961,8 +1970,7 @@ impl ProofSuite for SolanaSignature2021 {
         let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
         let bytes = tx.to_bytes();
         let sig = bs58::decode(&sig_b58).into_vec()?;
-        crate::jws::verify_bytes(Algorithm::EdDSA, &bytes, &key, &sig)?;
-        Ok(Default::default())
+        crate::jws::verify_bytes_warnable(Algorithm::EdDSA, &bytes, &key, &sig)
     }
 }
 
@@ -2266,8 +2274,7 @@ impl ProofSuite for JsonWebSignature2020 {
         self.validate_algorithm(header.algorithm)?;
         let key = resolve_key(verification_method, resolver).await?;
         self.validate_key_and_algorithm(&key, header.algorithm)?;
-        crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature)?;
-        Ok(Default::default())
+        crate::jws::verify_bytes_warnable(header.algorithm, &signing_input, &key, &signature)
     }
     async fn complete(
         &self,

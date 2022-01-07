@@ -459,7 +459,7 @@ fn generate_caip10_eip155(
     key: &JWK,
     ref_opt: Option<String>,
 ) -> Result<BlockchainAccountId, String> {
-    let hash = ssi::keccak_hash::hash_public_key(key)?;
+    let hash = ssi::keccak_hash::hash_public_key_eip55(key)?;
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_EIP155_ETHEREUM_MAINNET.to_string());
     Ok(BlockchainAccountId {
         account_address: hash,
