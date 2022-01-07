@@ -26,7 +26,8 @@ sha = ["sha2", "k256/sha256"]
 example-http-issuer = []
 
 [dependencies]
-json-ld = { path = "../json-ld" } # 0b44aa736b681893e75ce282c67511480c992901
+json-ld = { git = "https://github.com/spruceid/json-ld", rev = "8631d6117b0eac63022553f0cd68c2a3dbde6c04" }
+
 # SAFETY: bbs and pairing-plus are set to specific versions due to a
 # dependency on internal struct representations using transmute in src/bbs.rs.
 bbs = "=0.4.1"

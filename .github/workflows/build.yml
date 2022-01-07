@@ -28,6 +28,13 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-ssi2-cargo-
 
+    - name: Install Rust nightly
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly
+        profile: minimal
+        default: true
+
     - name: Build
       run: cargo build --verbose --workspace
 

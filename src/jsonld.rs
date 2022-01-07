@@ -11,7 +11,7 @@ use crate::rdf::{
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json_ld::{
-    context::Json, loader::Id, Document, JsonContext, Loader, ProcessingMode, RemoteDocument,
+    context::Json, Document, JsonContext, Loader, LoaderId as Id, ProcessingMode, RemoteDocument,
 };
 use serde_json::{map::Map, Value};
 
