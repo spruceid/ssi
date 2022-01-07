@@ -125,6 +125,15 @@ pub enum Content {
     Null,
 }
 
+#[cfg(feature = "http")]
+fn get_first_context_uri(value: &Value) -> Option<&str> {
+    match value.get("@context")? {
+        Value::Array(ref vec) => vec.get(0)?.as_str(),
+        Value::String(ref string) => Some(string.as_str()),
+        _ => None,
+    }
+}
+
 impl Content {
     pub fn into_vec(self) -> Result<Vec<u8>, Error> {
         if let Content::Data(data) = self {
@@ -822,8 +831,50 @@ impl DIDResolver for HTTPDIDResolver {
             return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
         }
 
+        // Assume the response is JSON(-LD) (DID Document or DID Resolution result)
+        let value: Value = match serde_json::from_slice(&res_result_representation) {
+            Ok(result) => result,
+            Err(err) => {
+                return (
+                    ResolutionMetadata::from_error(&format!(
+                        "Error parsing resolution response: {}",
+                        err
+                    )),
+                    None,
+                    None,
+                )
+            }
+        };
+
+        let first_context_uri = get_first_context_uri(&value);
+        if first_context_uri == Some(crate::jsonld::DID_RESOLUTION_V1_CONTEXT) {
+            // Detect DID Resolution Result that didn't have specific media type.
+            let result: ResolutionResult = match serde_json::from_value(value) {
+                Ok(result) => result,
+                Err(err) => {
+                    return (
+                        ResolutionMetadata::from_error(&format!(
+                            "Error parsing resolution result: {}",
+                            err
+                        )),
+                        None,
+                        None,
+                    )
+                }
+            };
+            let res_meta = if let Some(mut meta) = result.did_resolution_metadata {
+                // https://www.w3.org/TR/did-core/#did-resolution-metadata
+                // contentType - "MUST NOT be present if the resolve function was called"
+                meta.content_type = None;
+                meta
+            } else {
+                ResolutionMetadata::default()
+            };
+            return (res_meta, result.did_document, result.did_document_metadata);
+        }
+
         // Assume the response is a JSON(-LD) DID Document by default.
-        let doc: Document = match serde_json::from_slice(&res_result_representation) {
+        let doc: Document = match serde_json::from_value(value) {
             Ok(doc) => doc,
             Err(err) => {
                 return (
