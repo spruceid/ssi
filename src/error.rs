@@ -201,6 +201,7 @@ pub enum Error {
     FromHex(hex::FromHexError),
     Base58(bs58::decode::Error),
     HexString,
+    ExpectedLowercase,
     SignaturePrefix,
     KeyPrefix,
     UnableToResolve(String),
@@ -212,6 +213,7 @@ pub enum Error {
     #[cfg(feature = "p256")]
     P256EC(p256::elliptic_curve::Error),
     MissingFeatures(&'static str),
+    NumericDateOutOfMicrosecondPrecisionRange,
 }
 
 impl fmt::Display for Error {
@@ -351,6 +353,7 @@ impl fmt::Display for Error {
             Error::UnknownProcessingMode(mode) => write!(f, "Unknown processing mode '{}'", mode),
             Error::UnknownRdfDirection(direction) => write!(f, "Unknown RDF direction '{}'", direction),
             Error::HexString => write!(f, "Expected string beginning with '0x'"),
+            Error::ExpectedLowercase => write!(f, "Expected string to contain only lowercase"),
             Error::SignaturePrefix => write!(f, "Unknown signature prefix"),
             Error::KeyPrefix => write!(f, "Unknown key prefix"),
             Error::UnableToResolve(error) => write!(f, "Unable to resolve: {}", error),
@@ -394,6 +397,7 @@ impl fmt::Display for Error {
             Error::ECEncodingError => write!(f, "Unable to encode EC key"),
             Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
             Error::MissingFeatures(features) => write!(f, "Missing features: {}", features),
+            Error::NumericDateOutOfMicrosecondPrecisionRange => write!(f, "Out of valid microsecond-precision range of NumericDate"),
         }
     }
 }

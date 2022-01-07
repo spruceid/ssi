@@ -29,7 +29,22 @@ process is in place.
 We are also in the process of creating crates.io entries for the DIDKit and SSI
 packages.
 
+## Dependencies
+
+```
+clang
+openssl-devel
+```
+
 ## Install
+
+### Crates.io
+
+```
+ssi = "0.3"
+```
+
+### From Source
 
 ```sh
 $ git clone https://github.com/spruceid/ssi

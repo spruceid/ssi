@@ -6,9 +6,9 @@ use ssi::USER_AGENT;
 use std::convert::TryFrom;
 use url::Url;
 
-pub async fn retrieve_did_manager(bcd_url: &str, address: &str) -> Result<Option<String>> {
+pub async fn retrieve_did_manager(tzkt_url: &str, address: &str) -> Result<Option<String>> {
     let client = reqwest::Client::builder().build()?;
-    let url = Url::parse(bcd_url)?;
+    let url = Url::parse(tzkt_url)?;
     let contracts: Vec<String> = client
         .get(url.join("/v1/contracts")?)
         .query(&[

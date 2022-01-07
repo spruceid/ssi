@@ -515,7 +515,7 @@ fn generate_caip10_eip155(
     key: &JWK,
     ref_opt: Option<String>,
 ) -> Result<BlockchainAccountId, String> {
-    let hash = ssi::keccak_hash::hash_public_key(key)?;
+    let hash = ssi::keccak_hash::hash_public_key_eip55(key)?;
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_EIP155_ETHEREUM_MAINNET.to_string());
     Ok(BlockchainAccountId {
         account_address: hash,
@@ -1166,7 +1166,7 @@ mod tests {
 
         // eth/Eip712
         let eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
-          "messageSchema": {
+          "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
             ],
@@ -1196,7 +1196,7 @@ mod tests {
         }))
         .unwrap();
         let vp_eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
-          "messageSchema": {
+          "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
             ],
@@ -1230,7 +1230,7 @@ mod tests {
             "EIP712Info": [
               { "name": "domain", "type": "EIP712Domain" },
               { "name": "primaryType", "type": "string" },
-              { "name": "messageSchema", "type": "Types" },
+              { "name": "types", "type": "Types" },
             ],
             "Types": [
               { "name": "EIP712Domain", "type": "Type[]" },

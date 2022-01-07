@@ -103,7 +103,7 @@ fn resolve_pk(
             );
         }
     };
-    let account_address = match ssi::keccak_hash::hash_public_key(&pk_jwk) {
+    let account_address = match ssi::keccak_hash::hash_public_key_eip55(&pk_jwk) {
         Ok(hash) => hash,
         Err(e) => {
             return (

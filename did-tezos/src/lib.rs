@@ -23,25 +23,71 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 use std::default::Default;
+use std::str::FromStr;
+use std::string::ToString;
 
 /// did:tz DID Method
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
 pub struct DIDTz {
-    tzkt_url: &'static str,
+    tzkt_url: Option<String>,
 }
 
 impl Default for DIDTz {
     fn default() -> Self {
-        Self {
-            tzkt_url: "https://api.tzkt.io/",
+        Self { tzkt_url: None }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum Prefix {
+    TZ1,
+    TZ2,
+    TZ3,
+    KT1,
+}
+
+impl FromStr for Prefix {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "tz1" => Prefix::TZ1,
+            "tz2" => Prefix::TZ2,
+            "tz3" => Prefix::TZ3,
+            "KT1" => Prefix::KT1,
+            _ => return Err(()),
+        })
+    }
+}
+
+impl ToString for Prefix {
+    fn to_string(&self) -> String {
+        match self {
+            Prefix::TZ1 => "tz1",
+            Prefix::TZ2 => "tz2",
+            Prefix::TZ3 => "tz3",
+            Prefix::KT1 => "KT1",
         }
+        .to_string()
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDResolver for DIDTz {
+    /// Resolve a did:tz DID.
+    ///
+    /// # Resolution options
+    ///
+    /// ## `tzkt_url`
+    /// Custom indexer endpoint URL.
+    ///
+    /// ## `updates`
+    /// [Off-Chain DID Document Updates](https://did-tezos.spruceid.com/#off-chain-did-document-updates), as specified in the Tezos DID Method Specification.
+    ///
+    /// ## `public_key`
+    /// Public key in Base58 format ([publicKeyBase58](https://w3c-ccg.github.io/security-vocab/#publicKeyBase58)) to add to a [derived DID document (implicit resolution)](https://did-tezos.spruceid.com/#deriving-did-documents).
     async fn resolve(
         &self,
         did: &str,
@@ -80,8 +126,17 @@ impl DIDResolver for DIDTz {
             }
         };
 
-        let prefix = match address.get(0..3) {
-            Some(prefix) => prefix,
+        let prefix: Prefix = match address.get(0..3) {
+            Some(prefix) => match Prefix::from_str(prefix) {
+                Ok(p) => p,
+                Err(_) => {
+                    return (
+                        ResolutionMetadata::from_error(ERROR_INVALID_DID),
+                        None,
+                        None,
+                    )
+                }
+            },
             None => {
                 return (
                     ResolutionMetadata::from_error(ERROR_INVALID_DID),
@@ -90,16 +145,7 @@ impl DIDResolver for DIDTz {
                 )
             }
         };
-        let (_curve, proof_type, proof_type_iri) = match prefix_to_curve_type(prefix) {
-            Some(addr) => addr,
-            None => {
-                return (
-                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
-                    None,
-                    None,
-                )
-            }
-        };
+        let (_curve, proof_type, proof_type_iri) = prefix_to_curve_type(prefix.clone());
 
         let vm_didurl = DIDURL {
             did: did.to_string(),
@@ -137,11 +183,15 @@ impl DIDResolver for DIDTz {
             public_key,
         );
 
-        let mut tzkt_url = self.tzkt_url;
+        let default_url = match &self.tzkt_url {
+            Some(u) => u.clone(),
+            None => format!("https://api.{}.tzkt.io", network),
+        };
+        let mut tzkt_url = &default_url;
         if let Some(s) = &input_metadata.property_set {
             if let Some(url) = s.get("tzkt_url") {
-                tzkt_url = match url {
-                    Metadata::String(u) => u,
+                match url {
+                    Metadata::String(u) => tzkt_url = u,
                     _ => {
                         return (
                             ResolutionMetadata {
@@ -152,12 +202,12 @@ impl DIDResolver for DIDTz {
                             None,
                         )
                     }
-                };
+                }
             }
-        }
+        };
 
         if let (Some(service), Some(vm)) =
-            match DIDTz::tier2_resolution(tzkt_url, did, &address).await {
+            match DIDTz::tier2_resolution(prefix.clone(), tzkt_url, did, &address).await {
                 Ok(res) => res,
                 Err(e) => {
                     return (
@@ -252,26 +302,24 @@ impl DIDResolver for DIDTz {
 }
 
 // addr must be at least 4 bytes
-fn prefix_to_curve_type(prefix: &str) -> Option<(&'static str, &'static str, &'static str)> {
-    let curve_type = match prefix {
-        "tz1" => (
+fn prefix_to_curve_type(prefix: Prefix) -> (&'static str, &'static str, &'static str) {
+    match prefix {
+        Prefix::TZ1 | Prefix::KT1 => (
             "Ed25519",
             "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
             "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
         ),
-        "tz2" => (
+        Prefix::TZ2 => (
             "secp256k1",
             "EcdsaSecp256k1RecoveryMethod2020",
             "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
         ),
-        "tz3" => (
+        Prefix::TZ3 => (
             "P-256",
             "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
             "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
         ),
-        _ => return None,
-    };
-    Some(curve_type)
+    }
 }
 
 fn get_public_key_from_doc(doc: &Document, auth_vm_id: &str) -> Option<String> {
@@ -396,11 +444,15 @@ impl DIDTz {
     }
 
     async fn tier2_resolution(
+        prefix: Prefix,
         tzkt_url: &str,
         did: &str,
         address: &str,
     ) -> Result<(Option<Service>, Option<VerificationMethod>)> {
-        if let Some(did_manager) = explorer::retrieve_did_manager(tzkt_url, address).await? {
+        if let Some(did_manager) = match prefix {
+            Prefix::KT1 => Some(address.to_string()),
+            _ => explorer::retrieve_did_manager(tzkt_url, address).await?,
+        } {
             Ok((
                 Some(explorer::execute_service_view(tzkt_url, did, &did_manager).await?),
                 Some(explorer::execute_auth_view(tzkt_url, &did_manager).await?),
@@ -412,7 +464,7 @@ impl DIDTz {
 
     async fn tier3_updates(
         &self,
-        prefix: &str,
+        prefix: Prefix,
         doc: &mut Document,
         updates: Updates,
     ) -> Result<()> {
@@ -421,10 +473,7 @@ impl DIDTz {
                 for jws in patches {
                     let mut doc_json = serde_json::to_value(&mut *doc)?;
                     let (patch_metadata, _) = decode_unverified(&jws)?;
-                    let curve = prefix_to_curve_type(prefix)
-                        .ok_or_else(|| anyhow!("Unsupported curve."))?
-                        .0
-                        .to_string();
+                    let curve = prefix_to_curve_type(prefix.clone()).0.to_string();
                     let kid = match patch_metadata.key_id {
                         Some(k) => k,
                         None => return Err(anyhow!("No kid in JWS JSON patch.")),
@@ -450,7 +499,7 @@ impl DIDTz {
                     };
                     if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
                         let jwk = match prefix {
-                            "tz1" => {
+                            Prefix::TZ1 | Prefix::KT1 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
                                     .into_vec()
@@ -474,7 +523,7 @@ impl DIDTz {
                                 }
                             }
                             #[cfg(feature = "secp256k1")]
-                            "tz2" => {
+                            Prefix::TZ2 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
                                     .into_vec()
@@ -486,7 +535,7 @@ impl DIDTz {
                                 })?
                             }
                             #[cfg(feature = "secp256r1")]
-                            "tz3" => {
+                            Prefix::TZ3 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
                                     .into_vec()
@@ -497,7 +546,8 @@ impl DIDTz {
                                     anyhow!("Couldn't create JWK from P-256 public key: {}", e)
                                 })?
                             }
-                            p => return Err(anyhow!("{} not supported yet.", p)),
+                            #[allow(unreachable_patterns)]
+                            p => return Err(anyhow!("{} support not enabled.", p.to_string())),
                         };
                         let (_, patch_) = decode_verify(&jws, &jwk)?;
                         patch(
@@ -534,6 +584,7 @@ mod tests {
     const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
     const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
+    const LIVE_KT1: &str = "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi";
     const LIVE_NETWORK: &str = "NetXdQprcVkpaWU";
     const JSON_PATCH: &str = r#"{"ietf-json-patch": [
                                     {
@@ -547,9 +598,7 @@ mod tests {
                                     }
                                 ]}"#;
 
-    const DIDTZ: DIDTz = DIDTz {
-        tzkt_url: "https://api.tzkt.io/",
-    };
+    const DIDTZ: DIDTz = DIDTz { tzkt_url: None };
 
     #[test]
     fn jwk_to_did_tezos() {
@@ -664,6 +713,37 @@ mod tests {
     #[tokio::test]
     async fn credential_prove_verify_did_tz1() {
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use wiremock::matchers::{method, path, query_param};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("v1/contracts"))
+            .and(query_param(
+                "creator",
+                "tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq",
+            ))
+            .and(query_param("codeHash", "1222545108"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(json!(["KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi"])),
+            )
+            .mount(&mock_server)
+            .await;
+        Mock::given(method("GET"))
+          .and(path(&format!("v1/contracts/{}/storage", "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi")))
+          .respond_with(
+            ResponseTemplate::new(200)
+            .set_body_json(json!({"verification_method": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
+              "service": {"type_": "TezosDiscoveryService", "endpoint": "http://example.com"}})),
+            )
+          .mount(&mock_server)
+          .await;
+
+        let didtz = DIDTz {
+            tzkt_url: Some(mock_server.uri()),
+        };
 
         let vc_str = r###"{
             "@context": [
@@ -774,26 +854,26 @@ mod tests {
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDTZ).await;
+        let verification_result = vc.verify(None, &didtz).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDTZ).await.errors.len() > 0);
+        assert!(vc_bad_issuer.verify(None, &didtz).await.errors.len() > 0);
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &DIDTZ, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &didtz, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDTZ).await.errors.len() > 0);
+        assert!(vc_wrong_key.verify(None, &didtz).await.errors.len() > 0);
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -888,7 +968,7 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTZ).await;
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &didtz).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -903,14 +983,14 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTZ).await;
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &didtz).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDTZ).await.errors.len() > 0);
+        assert!(vp2.verify(None, &didtz).await.errors.len() > 0);
     }
 
     #[tokio::test]
@@ -1091,7 +1171,7 @@ mod tests {
         let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
-            .tier3_updates("tz1", &mut doc, json_update)
+            .tier3_updates(Prefix::TZ1, &mut doc, json_update)
             .await
             .unwrap();
         assert_eq!(
@@ -1153,7 +1233,7 @@ mod tests {
         let jws = encode_sign(ssi::jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
-            .tier3_updates("tz2", &mut doc, json_update)
+            .tier3_updates(Prefix::TZ2, &mut doc, json_update)
             .await
             .unwrap();
         assert_eq!(
@@ -1214,7 +1294,7 @@ mod tests {
         let jws = encode_sign(ssi::jwk::Algorithm::ES256, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
-            .tier3_updates("tz3", &mut doc, json_update)
+            .tier3_updates(Prefix::TZ3, &mut doc, json_update)
             .await
             .unwrap();
         assert_eq!(
@@ -1314,6 +1394,49 @@ mod tests {
         assert_eq!(d.verification_method, expected.verification_method);
         assert_eq!(d.service, expected.service);
         // assert_eq!(d, expected);
+    }
+
+    #[tokio::test]
+    async fn test_full_resolution_kt1() {
+        let live_did_manager = format!("did:tz:{}", LIVE_KT1);
+
+        let (res_meta, res_doc, _res_doc_meta) = DIDTZ
+            .resolve(&live_did_manager, &ResolutionInputMetadata::default())
+            .await;
+        assert_eq!(res_meta.error, None);
+        let d = res_doc.unwrap();
+        let expected = Document {
+            id: live_did_manager.clone(),
+            verification_method: Some(vec![
+                VerificationMethod::Map(VerificationMethodMap {
+                    id: format!("{}#blockchainAccountId", live_did_manager),
+                    type_: "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021".to_string(),
+                    blockchain_account_id: Some(format!("tezos:{}:{}", LIVE_NETWORK, LIVE_KT1)),
+                    controller: live_did_manager.clone(),
+                    property_set: None,
+                    ..Default::default()
+                }),
+                VerificationMethod::DIDURL(DIDURL {
+                    did: format!("did:pkh:tz:{}", LIVE_TZ1),
+                    path_abempty: "".to_string(),
+                    query: None,
+                    fragment: Some("TezosMethod2021".to_string()),
+                }),
+            ]),
+            service: Some(vec![Service {
+                id: format!("{}#discovery", live_did_manager),
+                type_: OneOrMany::One("TezosDiscoveryService".to_string()),
+                service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+                    "http://example.com".to_string(),
+                ))),
+                property_set: None,
+            }]),
+            ..Default::default()
+        };
+        assert_eq!(d.id, expected.id);
+        assert_eq!(d.controller, expected.controller);
+        assert_eq!(d.verification_method, expected.verification_method);
+        assert_eq!(d.service, expected.service);
     }
 
     #[tokio::test]
