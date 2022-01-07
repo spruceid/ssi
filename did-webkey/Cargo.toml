@@ -15,10 +15,15 @@ documentation = "https://docs.rs/did-webkey/"
 p256 = ["ssi/p256"]
 
 [dependencies]
-ssi = { version = "0.3", path = "../", default-features = false }
+ssi = { version = "0.3", path = "../", features = [
+    "rand",
+    "ring",
+    "p256",
+], default-features = false }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json"] }
 http = "0.2"
+sequoia-openpgp = "1.7"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 sshkeys = "0.3"

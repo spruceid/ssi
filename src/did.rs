@@ -159,6 +159,8 @@ pub struct VerificationMethodMap {
     // TODO: make sure this JWK does not have private key material
     pub public_key_jwk: Option<JWK>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_pgp: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     // TODO: make Base58 type like Base64urlUIntString
     pub public_key_base58: Option<String>,
     // TODO: ensure that not both key parameters are set
