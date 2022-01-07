@@ -31,6 +31,7 @@ use serde_json::Value;
 // @TODO `id` must be URI
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+pub const DEFAULT_CONTEXT_NO_WWW: &str = crate::jsonld::DID_V1_CONTEXT_NO_WWW;
 pub const ALT_DEFAULT_CONTEXT: &str = crate::jsonld::W3ID_DID_V1_CONTEXT;
 
 // v0.11 context used by universal resolver
@@ -530,7 +531,7 @@ impl VerificationMethodMap {
                 })
             }
             #[cfg(feature = "k256")]
-            "EcdsaSecp256k1VerificationKey2019" => {
+            "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
                 use crate::jwk::secp256k1_parse;
                 return secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse);
             }
@@ -768,6 +769,7 @@ impl TryFrom<OneOrMany<Context>> for Contexts {
         if first_uri != DEFAULT_CONTEXT
             && first_uri != V0_11_CONTEXT
             && first_uri != ALT_DEFAULT_CONTEXT
+            && first_uri != DEFAULT_CONTEXT_NO_WWW
         {
             return Err(Error::InvalidContext);
         }
@@ -812,6 +814,7 @@ impl DocumentBuilder {
             if first_uri != DEFAULT_CONTEXT
                 && first_uri != V0_11_CONTEXT
                 && first_uri != ALT_DEFAULT_CONTEXT
+                && first_uri != DEFAULT_CONTEXT_NO_WWW
             {
                 return Err(Error::InvalidContext);
             }

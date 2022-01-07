@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
+pub type VerificationWarnings = Vec<String>;
+
 // RFC 7515 - JSON Web Signature (JWS)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
 
@@ -163,6 +165,21 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256KR => {
+                use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "secp256k1" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let hash = crate::hash::sha256(&data)?;
+                let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
+                let sig: k256::ecdsa::recoverable::Signature =
+                    signing_key.try_sign_digest(digest)?;
+                sig.as_bytes().to_vec()
+            }
+            #[cfg(feature = "k256")]
+            Algorithm::ESKeccakKR => {
                 use k256::ecdsa::signature::{Signature, Signer};
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 if curve != "secp256k1" {
@@ -227,12 +244,13 @@ pub fn sign_bytes_b64(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<St
     Ok(sig_b64)
 }
 
-pub fn verify_bytes(
+pub fn verify_bytes_warnable(
     algorithm: Algorithm,
     data: &[u8],
     key: &JWK,
     signature: &[u8],
-) -> Result<(), Error> {
+) -> Result<VerificationWarnings, Error> {
+    let mut warnings = VerificationWarnings::default();
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm
             && !(key_algorithm == Algorithm::EdDSA && algorithm == Algorithm::EdBlake2b)
@@ -341,6 +359,29 @@ pub fn verify_bytes(
             }
             #[cfg(feature = "k256")]
             Algorithm::ES256KR => {
+                use k256::ecdsa::signature::{digest::Digest, DigestVerifier, Verifier};
+                use std::panic;
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "secp256k1" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                let public_key = k256::PublicKey::try_from(ec)?;
+                let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
+                let sig = panic::catch_unwind(|| {
+                    k256::ecdsa::recoverable::Signature::try_from(signature)
+                })
+                .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
+                let hash = crate::hash::sha256(data)?;
+                let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
+                if let Err(_e) = verifying_key.verify_digest(digest, &sig) {
+                    // Legacy mode: allow using Keccak-256 instead of SHA-256
+                    verify_bytes(Algorithm::ESKeccakKR, data, key, signature)?;
+                    warnings
+                        .push("Signature uses legacy mode ES256K-R with Keccak-256".to_string());
+                }
+            }
+            #[cfg(feature = "k256")]
+            Algorithm::ESKeccakKR => {
                 use k256::ecdsa::signature::Verifier;
                 use std::panic;
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
@@ -403,6 +444,16 @@ pub fn verify_bytes(
         },
         _ => return Err(Error::KeyTypeNotImplemented),
     }
+    Ok(warnings)
+}
+
+pub fn verify_bytes(
+    algorithm: Algorithm,
+    data: &[u8],
+    key: &JWK,
+    signature: &[u8],
+) -> Result<(), Error> {
+    verify_bytes_warnable(algorithm, data, key, signature)?;
     Ok(())
 }
 
@@ -413,7 +464,9 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         #[cfg(feature = "k256")]
         Algorithm::ES256KR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
-            let recovered_key = sig.recover_verify_key(data)?;
+            let hash = crate::hash::sha256(data)?;
+            let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
+            let recovered_key = sig.recover_verify_key_from_digest_bytes(digest)?;
             use crate::jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
@@ -428,6 +481,16 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 x509_thumbprint_sha1: None,
                 x509_thumbprint_sha256: None,
             };
+            Ok(jwk)
+        }
+        #[cfg(feature = "k256")]
+        Algorithm::ESKeccakKR => {
+            let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
+            let recovered_key = sig.recover_verify_key(data)?;
+            use crate::jwk::ECParams;
+            let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())?,
+            )?));
             Ok(jwk)
         }
         _ => {
@@ -588,6 +651,26 @@ pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), 
     Ok((header, key))
 }
 
+pub(crate) fn detached_recover_legacy_keccak_es256kr(
+    jws: &str,
+    payload_enc: &[u8],
+) -> Result<(Header, JWK), Error> {
+    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+    let DecodedJWS {
+        mut header,
+        signing_input,
+        payload: _,
+        signature,
+    } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    // Allow ESKeccakK-R misimplementation of ES256K-R, for legacy reasons.
+    if header.algorithm != Algorithm::ES256KR {
+        return Err(Error::AlgorithmMismatch);
+    }
+    header.algorithm = Algorithm::ESKeccakKR;
+    let key = recover(header.algorithm, &signing_input, &signature)?;
+    Ok((header, key))
+}
+
 pub fn decode_verify(jws: &str, key: &JWK) -> Result<(Header, Vec<u8>), Error> {
     let (header_b64, payload_enc, signature_b64) = split_jws(jws)?;
     let DecodedJWS {
@@ -667,6 +750,22 @@ mod tests {
         verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
         let other_key = JWK::generate_secp256k1().unwrap();
         verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
+
+        // ESKeccakK-R
+        let key = JWK {
+            algorithm: Some(Algorithm::ESKeccakKR),
+            ..key
+        };
+        verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap_err();
+        verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
+
+        // Test recovery (ESKeccakK-R)
+        let sig = sign_bytes(Algorithm::ESKeccakKR, data, &key).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
+        let recovered_key = recover(Algorithm::ESKeccakKR, data, &sig).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, data, &recovered_key, &sig).unwrap();
+        verify_bytes(Algorithm::ESKeccakKR, data, &other_key, &sig).unwrap_err();
     }
 
     #[test]

@@ -95,12 +95,14 @@ pub enum TypesOrURI {
     Object(Types),
 }
 
-/// Object at eip712Domain property of [Ethereum EIP712 Signature 2021](https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021) proof object
+/// Object at eip712 (formerly eip712Domain) property of [Ethereum EIP712 Signature 2021](https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021) proof object
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
 pub struct ProofInfo {
-    #[serde(rename = "messageSchema")]
+    // Allow messageSchema for backwards-compatibility since
+    // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
+    #[serde(rename = "types", alias = "messageSchema")]
     pub types_or_uri: TypesOrURI,
     pub primary_type: StructName,
     pub domain: EIP712Value,
@@ -130,11 +132,11 @@ pub enum TypedDataConstructionJSONError {
     ExpectedDocumentObject,
     #[error("Expected proof to be a JSON object")]
     ExpectedProofObject,
-    #[error("Expected eip712Domain in proof object")]
-    ExpectedEip712Domain,
-    #[error("Expected types (messageSchema) in proof.eip712Domain")]
+    #[error("Expected eip712 in proof object")]
+    ExpectedEip712,
+    #[error("Expected types in proof.eip712")]
     ExpectedTypes,
-    #[error("Unable to parse eip712Domain: {0}")]
+    #[error("Unable to parse eip712: {0}")]
     ParseInfo(serde_json::Error),
     #[error("Unable to convert document to EIP-712 message: {0}")]
     ConvertMessage(TypedDataParseError),
@@ -792,8 +794,11 @@ impl TypedData {
             .ok_or(TypedDataConstructionJSONError::ExpectedProofObject)?;
         proof_obj.remove("proofValue");
         let info = proof_obj
-            .remove("eip712Domain")
-            .ok_or(TypedDataConstructionJSONError::ExpectedEip712Domain)?;
+            .remove("eip712")
+            // Allow eip712Domain for backwards-compatibility since
+            // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
+            .or_else(|| proof_obj.remove("eip712Domain"))
+            .ok_or(TypedDataConstructionJSONError::ExpectedEip712)?;
         let ProofInfo {
             types_or_uri,
             primary_type,
@@ -1161,8 +1166,8 @@ mod tests {
           "created": "2021-07-09T19:47:41Z",
           "proofPurpose": "assertionMethod",
           "type": "EthereumEip712Signature2021",
-          "eip712Domain": {
-            "messageSchema": {
+          "eip712": {
+            "types": {
               "EIP712Domain": [
                 { "name": "name", "type": "string" },
                 { "name": "version", "type": "string" },

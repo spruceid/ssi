@@ -1,5 +1,5 @@
 use std::collections::HashMap as Map;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
 use crate::did_resolve::DIDResolver;
@@ -14,7 +14,7 @@ use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 
 use async_trait::async_trait;
-use chrono::prelude::*;
+use chrono::{prelude::*, Duration, LocalResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -307,18 +307,125 @@ pub enum StringOrURI {
     URI(URI),
 }
 
+/// Represents NumericDate (see https://datatracker.ietf.org/doc/html/rfc7519#section-2)
+/// where the range is restricted to those in which microseconds can be exactly represented,
+/// which is approximately between the years 1685 and 2255, which was considered to be sufficient
+/// for the purposes of this crate.  Note that leap seconds are ignored by this type, just as
+/// they're ignored by NumericDate in the JWT standard.
+///
+/// An f64 value has 52 explicit mantissa bits, meaning that the biggest contiguous range
+/// of integer values is from -2^53 to 2^53 (52 zeros after the mantissa's implicit 1).
+/// Using this value to represent exact microseconds gives a maximum range of
+///     +-2^53 / (1000000 * 60 * 60 * 24 * 365.25) ~= +-285,
+/// which is centered around the Unix epoch start date Jan 1, 1970, 00:00:00 UTC, giving
+/// the years 1685 to 2255.
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, PartialOrd)]
+pub struct NumericDate(f64);
+
+impl NumericDate {
+    /// This is -2^53 / 1_000_000, which is the smallest NumericDate that faithfully
+    /// represents full microsecond precision.
+    pub const MIN: NumericDate = NumericDate(-9_007_199_254.740_992);
+    /// This is 2^53 / 1_000_000, which is the largest NumericDate that faithfully
+    /// represents full microsecond precision.
+    pub const MAX: NumericDate = NumericDate(9_007_199_254.740_992);
+
+    /// Return the f64-valued number of seconds represented by this NumericDate.
+    pub fn as_seconds(self) -> f64 {
+        self.0
+    }
+    /// Try to create NumericDate from a f64 value, returning error upon out-of-range.
+    pub fn try_from_seconds(seconds: f64) -> Result<Self, Error> {
+        if seconds.abs() > Self::MAX.0 {
+            Err(Error::NumericDateOutOfMicrosecondPrecisionRange)
+        } else {
+            Ok(NumericDate(seconds))
+        }
+    }
+    /// Decompose NumericDate for use in Utc.timestamp and Utc.timestamp_opt
+    fn into_whole_seconds_and_fractional_nanoseconds(self) -> (i64, u32) {
+        let whole_seconds = self.0.floor() as i64;
+        let fractional_nanoseconds = ((self.0 - self.0.floor()) * 1_000_000_000.0).floor() as u32;
+        assert!(fractional_nanoseconds < 1_000_000_000);
+        (whole_seconds, fractional_nanoseconds)
+    }
+}
+
+/// Note that this will panic if the addition goes out-of-range.
+impl std::ops::Add<Duration> for NumericDate {
+    type Output = NumericDate;
+    fn add(self, rhs: Duration) -> Self::Output {
+        let self_dtu: DateTime<Utc> = self.into();
+        Self::Output::try_from(self_dtu + rhs).unwrap()
+    }
+}
+
+/// Note that this will panic if the addition goes out-of-range.
+impl std::ops::Sub<NumericDate> for NumericDate {
+    type Output = Duration;
+    fn sub(self, rhs: NumericDate) -> Self::Output {
+        let self_dtu: DateTime<Utc> = self.into();
+        let rhs_dtu: DateTime<Utc> = rhs.into();
+        Self::Output::try_from(self_dtu - rhs_dtu).unwrap()
+    }
+}
+
+/// Note that this will panic if the addition goes out-of-range.
+impl std::ops::Sub<Duration> for NumericDate {
+    type Output = NumericDate;
+    fn sub(self, rhs: Duration) -> Self::Output {
+        let self_dtu: DateTime<Utc> = self.into();
+        Self::Output::try_from(self_dtu - rhs).unwrap()
+    }
+}
+
+impl std::convert::TryFrom<DateTime<Utc>> for NumericDate {
+    type Error = Error;
+    fn try_from(dtu: DateTime<Utc>) -> Result<Self, Self::Error> {
+        // Have to take seconds and nanoseconds separately in order to get the full allowable
+        // range of microsecond-precision values as described above.
+        let whole_seconds = dtu.timestamp() as f64;
+        let fractional_seconds = dtu.timestamp_nanos().rem_euclid(1_000_000_000) as f64 * 1.0e-9;
+        Ok(Self::try_from_seconds(whole_seconds + fractional_seconds)?)
+    }
+}
+
+impl std::convert::TryFrom<DateTime<FixedOffset>> for NumericDate {
+    type Error = Error;
+    fn try_from(dtfo: DateTime<FixedOffset>) -> Result<Self, Self::Error> {
+        let dtu = DateTime::<Utc>::from(dtfo);
+        Ok(NumericDate::try_from(dtu)?)
+    }
+}
+
+impl std::convert::Into<DateTime<Utc>> for NumericDate {
+    fn into(self) -> DateTime<Utc> {
+        let (whole_seconds, fractional_nanoseconds) =
+            self.into_whole_seconds_and_fractional_nanoseconds();
+        Utc.timestamp(whole_seconds, fractional_nanoseconds)
+    }
+}
+
+impl std::convert::Into<LocalResult<DateTime<Utc>>> for NumericDate {
+    fn into(self) -> LocalResult<DateTime<Utc>> {
+        let (whole_seconds, fractional_nanoseconds) =
+            self.into_whole_seconds_and_fractional_nanoseconds();
+        Utc.timestamp_opt(whole_seconds, fractional_nanoseconds)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[non_exhaustive]
 pub struct JWTClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "exp")]
-    pub expiration_time: Option<i64>,
+    pub expiration_time: Option<NumericDate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "iss")]
     pub issuer: Option<StringOrURI>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "nbf")]
-    pub not_before: Option<i64>,
+    pub not_before: Option<NumericDate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "jti")]
     pub jwt_id: Option<String>,
@@ -733,7 +840,8 @@ impl Credential {
             None => return Err(Error::MissingCredential),
         };
         if let Some(exp) = claims.expiration_time {
-            vc.expiration_date = Utc.timestamp_opt(exp, 0).latest().map(|time| VCDateTime {
+            let exp_date_time: LocalResult<DateTime<Utc>> = exp.into();
+            vc.expiration_date = exp_date_time.latest().map(|time| VCDateTime {
                 date_time: time.into(),
                 use_z: true,
             });
@@ -746,7 +854,8 @@ impl Credential {
             }
         }
         if let Some(nbf) = claims.not_before {
-            if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
+            let nbf_date_time: LocalResult<DateTime<Utc>> = nbf.into();
+            if let Some(time) = nbf_date_time.latest() {
                 vc.issuance_date = Some(VCDateTime {
                     date_time: time.into(),
                     use_z: true,
@@ -774,35 +883,39 @@ impl Credential {
     }
 
     pub fn to_jwt_claims(&self) -> Result<JWTClaims, Error> {
-        let subject = match self.credential_subject.to_single() {
-            Some(subject) => subject,
-            None => return Err(Error::InvalidSubject),
-        };
-        let subject_id: String = match subject.id.clone() {
-            Some(id) => id.into(),
-            // Credential subject must have id for JWT
-            None => return Err(Error::InvalidSubject),
+        let subject_opt = self.credential_subject.to_single().clone();
+        let subject = match subject_opt {
+            Some(subject) => match subject.id.as_ref() {
+                Some(id) => Some(StringOrURI::String(id.to_string())),
+                None => None,
+            },
+            None => None,
         };
 
-        let mut vc = self.clone();
-        // Remove fields from vc that are duplicated into the claims,
-        // except for timestamps (in case of conversion discrepencies).
+        let vc = self.clone();
+
+        // Copy fields from vc that are duplicated into the claims.
+        let (id, issuer) = (vc.id.clone(), vc.issuer.clone());
+        // Note that try_into can fail if the date_time overflows the range for NumericDate
+        // for expiration_time and not_before.
+        let expiration_time: Option<NumericDate> = match vc.expiration_date.as_ref() {
+            Some(date) => Some(date.date_time.try_into()?),
+            None => None,
+        };
+        let not_before: Option<NumericDate> = match vc.issuance_date.as_ref() {
+            Some(date) => Some(date.date_time.try_into()?),
+            None => None,
+        };
         Ok(JWTClaims {
-            expiration_time: vc
-                .expiration_date
-                .as_ref()
-                .map(|date| date.date_time.timestamp()),
-            issuer: match vc.issuer.take() {
+            expiration_time,
+            issuer: match issuer {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
                 Some(_) => return Err(Error::InvalidIssuer),
                 None => None,
             },
-            not_before: vc
-                .issuance_date
-                .as_ref()
-                .map(|date| date.date_time.timestamp()),
-            jwt_id: vc.id.take().map(|id| id.into()),
-            subject: Some(StringOrURI::String(subject_id)),
+            not_before,
+            jwt_id: id.map(|id| id.into()),
+            subject,
             verifiable_credential: Some(vc),
             ..Default::default()
         })
@@ -1007,8 +1120,16 @@ impl Credential {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
-                Ok(()) => results.checks.push(Check::JWS),
+            match crate::jws::verify_bytes_warnable(
+                header.algorithm,
+                &signing_input,
+                &key,
+                &signature,
+            ) {
+                Ok(mut warnings) => {
+                    results.checks.push(Check::JWS);
+                    results.warnings.append(&mut warnings);
+                }
                 Err(err) => results
                     .errors
                     .push(format!("Unable to filter proofs: {}", err)),
@@ -1318,10 +1439,11 @@ impl Presentation {
     }
 
     pub fn to_jwt_claims(&self) -> Result<JWTClaims, Error> {
-        let mut vp = self.clone();
+        let vp = self.clone();
+        let (id, holder) = (vp.id.clone(), vp.holder.clone());
         Ok(JWTClaims {
-            issuer: vp.holder.take().map(|id| id.into()),
-            jwt_id: vp.id.take().map(|id| id.into()),
+            issuer: holder.map(|id| id.into()),
+            jwt_id: id.map(|id| id.into()),
             verifiable_presentation: Some(vp),
             ..Default::default()
         })
@@ -1519,8 +1641,16 @@ impl Presentation {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes(header.algorithm, &signing_input, &key, &signature) {
-                Ok(()) => results.checks.push(Check::JWS),
+            match crate::jws::verify_bytes_warnable(
+                header.algorithm,
+                &signing_input,
+                &key,
+                &signature,
+            ) {
+                Ok(mut warnings) => {
+                    results.checks.push(Check::JWS);
+                    results.warnings.append(&mut warnings);
+                }
                 Err(err) => results
                     .errors
                     .push(format!("Unable to filter proofs: {}", err)),
@@ -1890,14 +2020,16 @@ fn jwt_matches(
         assert_local!(allowed_vms.contains(kid));
     }
     if let Some(nbf) = claims.not_before {
-        if let Some(time) = Utc.timestamp_opt(nbf, 0).latest() {
+        let nbf_date_time: LocalResult<DateTime<Utc>> = nbf.into();
+        if let Some(time) = nbf_date_time.latest() {
             assert_local!(created.unwrap_or_else(Utc::now) >= time);
         } else {
             return false;
         }
     }
     if let Some(exp) = claims.expiration_time {
-        if let Some(time) = Utc.timestamp_opt(exp, 0).earliest() {
+        let exp_date_time: LocalResult<DateTime<Utc>> = exp.into();
+        if let Some(time) = exp_date_time.earliest() {
             assert_local!(Utc::now() < time);
         } else {
             return false;
@@ -2156,6 +2288,76 @@ pub(crate) mod tests {
     use super::*;
     use crate::did::example::DIDExample;
     use crate::urdna2015;
+
+    #[test]
+    fn numeric_date() {
+        assert_eq!(
+            NumericDate::try_from_seconds(NumericDate::MIN.as_seconds()).unwrap(),
+            NumericDate::MIN,
+            "NumericDate::MIN value did not survive round trip"
+        );
+        assert_eq!(
+            NumericDate::try_from_seconds(NumericDate::MAX.as_seconds()).unwrap(),
+            NumericDate::MAX,
+            "NumericDate::MAX value did not survive round trip"
+        );
+
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MIN.as_seconds() - 1.0e-6).is_err(),
+            "NumericDate::MIN-1.0e-6 value did not hit out-of-range error"
+        );
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MAX.as_seconds() + 1.0e-6).is_err(),
+            "NumericDate::MAX+1.0e-6 value did not hit out-of-range error"
+        );
+
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MIN.as_seconds() + 1.0e-6).is_ok(),
+            "NumericDate::MIN-1.0e-6 value did not hit out-of-range error"
+        );
+        assert!(
+            NumericDate::try_from_seconds(NumericDate::MAX.as_seconds() - 1.0e-6).is_ok(),
+            "NumericDate::MAX+1.0e-6 value did not hit out-of-range error"
+        );
+
+        let one_microsecond = Duration::microseconds(1);
+        assert_eq!(
+            (NumericDate::MIN + one_microsecond) - one_microsecond,
+            NumericDate::MIN,
+            "NumericDate::MIN+1.0e-6 wasn't correctly represented"
+        );
+        assert_eq!(
+            (NumericDate::MAX - one_microsecond) + one_microsecond,
+            NumericDate::MAX,
+            "NumericDate::MAX-1.0e-6 wasn't correctly represented"
+        );
+
+        // At the MIN and MAX, increasing by half a microsecond shouldn't alter MIN or MAX.
+        assert_eq!(
+            NumericDate::MIN - Duration::nanoseconds(500),
+            NumericDate::MIN,
+            "NumericDate::MIN isn't the true min"
+        );
+        assert_eq!(
+            NumericDate::MAX + Duration::nanoseconds(500),
+            NumericDate::MAX,
+            "NumericDate::MAX isn't the true max"
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn numeric_date_out_of_range_panic_0() {
+        // At the MIN, subtracting a microsecond should put it just out of range.
+        let _ = NumericDate::MIN - Duration::microseconds(1);
+    }
+
+    #[test]
+    #[should_panic]
+    fn numeric_date_out_of_range_panic_1() {
+        // At the MAX, adding a microsecond should put it just out of range.
+        let _ = NumericDate::MAX + Duration::microseconds(1);
+    }
 
     pub const EXAMPLE_REVOCATION_2020_LIST_URL: &'static str =
         "https://example.test/revocationList.json";

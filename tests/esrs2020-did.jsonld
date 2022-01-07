@@ -1,0 +1,50 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld"
+  ],
+  "id": "did:example:123",
+  "verificationMethod": [
+    {
+      "id": "did:example:123#vm-1",
+      "controller": "did:example:123",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "publicKeyJwk": {
+        "crv": "secp256k1",
+        "kid": "JUvpllMEYUZ2joO59UNui_XYDqxVqiFLLAJ8klWuPBw",
+        "kty": "EC",
+        "x": "dWCvM4fTdeM0KmloF57zxtBPXTOythHPMm1HCLrdd3A",
+        "y": "36uMVGM7hnw-N6GnjFcihWE3SkrhMLzzLCdPMXPEXlA"
+      },
+      "privateKeyJwk": {
+        "crv": "secp256k1",
+        "kid": "JUvpllMEYUZ2joO59UNui_XYDqxVqiFLLAJ8klWuPBw",
+        "kty": "EC",
+        "x": "dWCvM4fTdeM0KmloF57zxtBPXTOythHPMm1HCLrdd3A",
+        "y": "36uMVGM7hnw-N6GnjFcihWE3SkrhMLzzLCdPMXPEXlA"
+      }
+    },
+    {
+      "id": "did:example:123#vm-2",
+      "controller": "did:example:123",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "publicKeyHex": "027560af3387d375e3342a6968179ef3c6d04f5d33b2b611cf326d4708badd7770"
+    },
+    {
+      "id": "did:example:123#vm-3",
+      "controller": "did:example:123",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "blockchainAccountId": "eip155:1:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+    }
+  ],
+  "authentication": [
+    "did:example:123#vm-1",
+    "did:example:123#vm-2",
+    "did:example:123#vm-3"
+  ],
+  "assertionMethod": [
+    "did:example:123#vm-1",
+    "did:example:123#vm-2",
+    "did:example:123#vm-3"
+  ]
+}
