@@ -1,3 +1,5 @@
+// Note: update ../update.sh when updating URLs/filenames in this file.
+
 /// <https://www.w3.org/2018/credentials/v1>
 pub const CREDENTIALS_V1: &str = include_str!("../w3c-2018-credentials-v1.jsonld");
 /// <https://www.w3.org/2018/credentials/examples/v1>

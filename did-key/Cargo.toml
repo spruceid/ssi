@@ -23,6 +23,7 @@ multibase = "0.8"
 k256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
 p256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
 serde_json = "1.0"
+simple_asn1 = "^0.5.2"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"] }

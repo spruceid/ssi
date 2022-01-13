@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;

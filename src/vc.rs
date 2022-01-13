@@ -848,7 +848,11 @@ impl Credential {
         }
         if let Some(iss) = claims.issuer {
             if let StringOrURI::URI(issuer_uri) = iss {
-                vc.issuer = Some(Issuer::URI(issuer_uri));
+                if let Some(Issuer::Object(ref mut issuer)) = vc.issuer {
+                    issuer.id = issuer_uri;
+                } else {
+                    vc.issuer = Some(Issuer::URI(issuer_uri));
+                }
             } else {
                 return Err(Error::InvalidIssuer);
             }
@@ -910,7 +914,7 @@ impl Credential {
             expiration_time,
             issuer: match issuer {
                 Some(Issuer::URI(uri)) => Some(StringOrURI::URI(uri)),
-                Some(_) => return Err(Error::InvalidIssuer),
+                Some(Issuer::Object(object_with_id)) => Some(StringOrURI::URI(object_with_id.id)),
                 None => None,
             },
             not_before,
