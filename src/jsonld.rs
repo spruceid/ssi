@@ -11,9 +11,9 @@ use crate::rdf::{
 use futures::future::{BoxFuture, FutureExt};
 use ijson::{IArray, IValue};
 use iref::{Iri, IriBuf};
-use json_ld::util::AsJson;
 use json_ld::{
-    context::Json, loader::Id, Document, JsonContext, Loader, ProcessingMode, RemoteDocument,
+    context::Json, loader::Id, util::AsJson, Document, JsonContext, Loader, ProcessingMode,
+    RemoteDocument,
 };
 use serde_json::{map::Map, Value};
 
@@ -725,9 +725,9 @@ pub fn generate_node_map(
             entry.push(result);
         } else {
             // 5.4
-            let list = list.as_object().ok_or(Error::ExpectedObject)?;
+            let list = list.as_object_mut().ok_or(Error::ExpectedObject)?;
             let list_entry_of_list = match list.get_mut(AT_LIST) {
-                Some(Value::Array(list)) => list,
+                Some(Value::Array(ref mut list)) => list,
                 _ => return Err(Error::ExpectedArrayList),
             };
             list_entry_of_list.push(result);
@@ -856,7 +856,7 @@ pub fn generate_node_map(
             }
         }
         // 6.9, 6.9.2, 6.9.4
-        if let Some(reverse_map) = element_obj.remove(AT_REVERSE) {
+        if let Some(mut reverse_map) = element_obj.remove(AT_REVERSE) {
             // 6.9.1
             let mut object = Map::new();
             object.insert(AT_ID.to_string(), id.clone());
@@ -1644,7 +1644,7 @@ where
         Some(ref iri) => Some(iref::Iri::new(iri)?),
         None => None,
     };
-    let mut context = Json::new(base);
+    let mut context = Json::<IValue>::new(base);
     if let Some(ref url) = options.expand_context {
         use json_ld::context::Loader;
         use json_ld::context::Local;
@@ -1689,7 +1689,11 @@ where
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = expanding.await?;
 
-    let documents = expanded_doc.iter().map(|item| item.as_json()).collect();
+    let documents = expanded_doc
+        .iter()
+        .map::<IValue, _>(AsJson::as_json)
+        .map(serde_json::to_value)
+        .collect::<Result<Vec<Value>, serde_json::Error>>()?;
 
     Ok(documents)
 }
