@@ -1738,9 +1738,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ijson::IObject;
     use json_ld::FsLoader;
 
-    async fn test_to_rdf(obj: &Map<String, Value>) -> Result<(), Error> {
+    async fn test_to_rdf(obj: &IObject) -> Result<(), Error> {
         use crate::urdna2015;
         use std::fs;
         use std::path::PathBuf;
@@ -1751,13 +1752,14 @@ mod tests {
         let mut base_iri = "https://w3c.github.io/".to_string() + &input;
         let input_path = PathBuf::from(input);
         let in_str = fs::read_to_string(&input_path).unwrap();
-        let mut loader = FsLoader::new();
+        let mut loader = FsLoader::<IValue>::new(|s| serde_json::from_str(s));
         loader.mount(
             Iri::new("https://w3c.github.io/json-ld-api").unwrap(),
             "json-ld-api",
         );
         let mut ld_options = DEFAULT_JSON_LD_OPTIONS.clone();
-        if let Some(Value::Object(options)) = obj.get("option") {
+        if let Some(options) = obj.get("option") {
+            let options = options.as_object().unwrap();
             if let Some(mode) = options.get("processingMode") {
                 let mode_str = match mode.as_str() {
                     Some(mode_str) => mode_str,
@@ -1811,13 +1813,13 @@ mod tests {
     /// <https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html>
     async fn to_rdf_test_suite() {
         let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
-        let manifest = serde_json::from_str(manifest_str).unwrap();
+        let manifest: IValue = serde_json::from_str(manifest_str).unwrap();
         let manifest_obj = manifest.as_object().ok_or(Error::ExpectedObject).unwrap();
         let case = std::env::args().skip(2).next();
-        let sequence = manifest_obj.get("sequence").unwrap();
+        let sequence = manifest_obj.get("sequence").unwrap().as_array().unwrap();
         let mut passed = 0;
         let mut total = 0;
-        for test in sequence.members() {
+        for test in sequence {
             let obj = test.as_object().expect("expected object");
             let id = obj.get(AT_ID).unwrap().as_str().unwrap();
             if let Some(ref case) = case {
@@ -1850,13 +1852,14 @@ mod tests {
                     continue;
                 }
             }
-            if let Some(Value::Object(options)) = obj.get("option") {
-                if options.get("normative") == Some(&Value::Bool(false)) {
+            if let Some(options) = obj.get("option") {
+                let options = options.as_object().unwrap();
+                if matches!(options.get("normative"), Some(b) if b.is_false()) {
                     eprintln!("test {}: skipping: non-normative", id);
                     continue;
                 }
                 if let Some(spec_version) = options.get("specVersion") {
-                    let spec_version = spec_version.as_str().unwrap();
+                    let spec_version = spec_version.as_string().unwrap().as_str();
                     if spec_version != "json-ld-1.1" {
                         eprintln!("test {}: skipping: spec version '{}'", id, spec_version);
                         continue;
