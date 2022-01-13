@@ -71,8 +71,6 @@ fn parse_pubkeys_gpg(
 fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL), String> {
     let vm_url = DIDURL {
         did: did.to_string(),
-        // NOTE: should this be key_id or fingerprint?
-        // https://docs.rs/sequoia-openpgp/1.7.0/sequoia_openpgp/struct.Cert.html#method.keyid
         fragment: Some(cert.fingerprint().to_string()),
         ..Default::default()
     };
