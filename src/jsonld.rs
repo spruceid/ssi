@@ -1324,7 +1324,7 @@ pub fn object_to_rdf(
     }
     // 8
     if datatype == Some(AT_JSON) {
-        value = Value::String(canonicalize_json(&value));
+        value = Value::String(canonicalize_json(&value)?);
         datatype = Some("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON");
     }
     // 9
@@ -1484,16 +1484,16 @@ pub fn object_to_rdf(
 }
 
 /// <https://w3c.github.io/json-ld-api/#dfn-canonical-lexical-form>
-pub fn canonicalize_json(value: &Value) -> String {
+pub fn canonicalize_json(value: &Value) -> Result<String, Error> {
     // TODO: make sure it follows RFC 8785 (JCS)
     // Converting to serde Value loses the order of keys, and serde_jcs does not provide from_str
     // functions. So we just use serde_jcs for the number serialization.
-    match value {
+    Ok(match value {
         Value::Null => "null".to_string(),
         Value::Bool(true) => "true".to_string(),
         Value::Bool(false) => "false".to_string(),
         Value::String(string) => canonicalize_json_string(string),
-        Value::Number(_) => canonicalize_json_number(value),
+        Value::Number(_) => canonicalize_json_number(value)?,
         Value::Array(array) => {
             let mut string = "[".to_string();
             let mut first = true;
@@ -1503,7 +1503,7 @@ pub fn canonicalize_json(value: &Value) -> String {
                 } else {
                     string.push(',');
                 }
-                string += &canonicalize_json(value);
+                string += &canonicalize_json(value)?;
             }
             string + "]"
         }
@@ -1520,12 +1520,12 @@ pub fn canonicalize_json(value: &Value) -> String {
                 }
                 string.push_str(&canonicalize_json_string(key));
                 string.push(':');
-                string.push_str(&canonicalize_json(value));
+                string.push_str(&canonicalize_json(value)?);
             }
             string.push('}');
             string
         }
-    }
+    })
 }
 
 /// <https://www.w3.org/TR/json-ld11/#the-rdf-json-datatype>
@@ -1552,9 +1552,8 @@ pub fn canonicalize_json_string(string: &str) -> String {
     out
 }
 
-pub fn canonicalize_json_number(num: &Value) -> String {
-    // TODO: use Result
-    serde_jcs::to_string(&num).expect("unable to canonicalize number")
+pub fn canonicalize_json_number(num: &Value) -> Result<String, Error> {
+    Ok(serde_jcs::to_string(&num)?)
 }
 
 /// <https://w3c.github.io/json-ld-api/#list-to-rdf-conversion>
