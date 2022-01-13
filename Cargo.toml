@@ -79,7 +79,6 @@ p256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
 ssi-contexts = { version = "0.1.2", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
 sshkeys = "0.3"
-sequoia-openpgp = "1.7"
 reqwest = { version = "0.11", features = ["json"] }
 flate2 = "1.0"
 bitvec = "0.20"
