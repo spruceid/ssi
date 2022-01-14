@@ -3,11 +3,19 @@ use core::str::FromStr;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
 use openpgp::{
     cert::prelude::*,
     parse::{PacketParser, Parse},
     serialize::SerializeInto,
 };
+#[cfg(any(target_arch = "wasm32", feature = "pgp"))]
+use pgp::{
+    composed::{PublicOrSecret, SignedPublicKey},
+    errors::Error as PgpError,
+    types::KeyTrait,
+};
+#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
 use sequoia_openpgp as openpgp;
 use sshkeys::PublicKeyKind;
 use ssi::did::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
@@ -15,6 +23,11 @@ use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
 };
 use ssi::ssh::ssh_pkk_to_jwk;
+
+#[cfg(all(feature = "sequoia-openpgp", feature = "pgp"))]
+compile_error!(
+    "Feature \"sequoia-openpgp\" and feature \"pgp\" cannot be enabled at the same time"
+);
 
 // For testing, enable handling requests at localhost.
 #[cfg(test)]
@@ -44,6 +57,7 @@ impl FromStr for DIDWebKeyType {
     }
 }
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
 fn parse_pubkeys_gpg(
     did: &str,
     bytes: Vec<u8>,
@@ -68,6 +82,7 @@ fn parse_pubkeys_gpg(
     Ok((vm_maps, did_urls))
 }
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
 fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL), String> {
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -81,6 +96,68 @@ fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL)
             .map_err(|e| format!("Failed to re-serialize cert: {}", e))?,
     )
     .map_err(|e| format!("Failed to read cert as utf8: {}", e))?;
+
+    let vm_map = VerificationMethodMap {
+        id: vm_url.to_string(),
+        type_: "PgpVerificationKey2021".to_string(),
+        public_key_pgp: Some(armored_pgp),
+        controller: did.to_string(),
+        ..Default::default()
+    };
+    Ok((vm_map, vm_url))
+}
+
+#[cfg(any(target_arch = "wasm32", feature = "pgp"))]
+fn parse_pubkeys_gpg(
+    did: &str,
+    bytes: Vec<u8>,
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
+    use std::io::Cursor;
+
+    let mut did_urls = Vec::new();
+    let mut vm_maps = Vec::new();
+
+    let c = Cursor::new(bytes);
+    // BUG: This seems to yield only one key.
+    let keys = pgp::composed::signed_key::parse::from_armor_many(c)
+        .map_err(|e| format!("Unable to parse GPG keyring: {}", e))?
+        .0
+        .collect::<Result<Vec<PublicOrSecret>, PgpError>>()
+        .map_err(|e| format!("Unable to parse GPG keyring: {}", e))?;
+
+    for key in keys {
+        // ignore if secret key (which shouldn't happen)
+        if let PublicOrSecret::Public(pk) = key {
+            let (vm_map, did_url) = gpg_pk_to_vm(did, pk).map_err(|e| {
+                format!(
+                    "Unable to convert GPG public key to verification method: {}",
+                    e
+                )
+            })?;
+            vm_maps.push(vm_map);
+            did_urls.push(did_url);
+        }
+    }
+
+    Ok((vm_maps, did_urls))
+}
+
+#[cfg(any(target_arch = "wasm32", feature = "pgp"))]
+fn gpg_pk_to_vm(
+    did: &str,
+    key: SignedPublicKey,
+) -> Result<(VerificationMethodMap, DIDURL), String> {
+    let fingerprint: String = hex::encode_upper(key.fingerprint());
+
+    let vm_url = DIDURL {
+        did: did.to_string(),
+        fragment: Some(fingerprint),
+        ..Default::default()
+    };
+
+    let armored_pgp = key
+        .to_armored_string(None)
+        .map_err(|e| format!("Failed to re-serialize cert: {}", e))?;
 
     let vm_map = VerificationMethodMap {
         id: vm_url.to_string(),
@@ -420,7 +497,7 @@ mod tests {
                 let (mut parts, body) = Response::<Body>::default().into_parts();
                 parts.status = hyper::StatusCode::NOT_FOUND;
                 let response = Response::from_parts(parts, body);
-                return Ok::<_, hyper::Error>(response);
+                Ok::<_, hyper::Error>(response)
             }))
         });
         let server = Server::try_bind(&addr)?.serve(make_svc);
@@ -526,6 +603,7 @@ mod tests {
             )
             .await;
         assert_eq!(res_meta.error, None);
+        // NOTE: sequoia-pgp and rpgp will likely produce slightly different output
         let value_expected = json!({
           "@context": "https://www.w3.org/ns/did/v1",
           "assertionMethod": [

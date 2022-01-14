@@ -7,6 +7,7 @@ license = "Apache-2.0"
 description = "Core library for Verifiable Credentials and Decentralized Identifiers."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
+resolver = "2"
 
 exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 
