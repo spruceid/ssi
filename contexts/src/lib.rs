@@ -45,6 +45,8 @@ pub const EIP712SIG_V1: &str = include_str!("../eip712sig-v1.jsonld");
 pub const PRESENTATION_SUBMISSION_V1: &str = include_str!("../presentation-submission.jsonld");
 /// <https://w3id.org/vdl/v1>
 pub const VDL_V1: &str = include_str!("../w3id-vdl-v1.jsonld");
+/// <https://w3id.org/wallet/v1>
+pub const WALLET_V1: &str = include_str!("../w3id-wallet-v1.jsonld");
 
 pub const TZ_V2: &str = include_str!("../tz-2021-v2.jsonld");
 pub const TZVM_V1: &str = include_str!("../tzvm-2021-v1.jsonld");
