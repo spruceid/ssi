@@ -5,9 +5,7 @@
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
 #[cfg(feature = "http-did")]
-use hyper::{header, Client, Request, StatusCode, Uri};
-#[cfg(feature = "http-did")]
-use hyper_tls::HttpsConnector;
+use reqwest::{header, Client, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use serde_json::Value;
@@ -930,8 +928,8 @@ impl DIDResolver for HTTPDIDResolver {
             url.push('?');
             url.push_str(&querystring);
         }
-        let uri: Uri = match url.parse() {
-            Ok(uri) => uri,
+        let url: Url = match url.parse() {
+            Ok(url) => url,
             Err(_) => {
                 return (
                     ResolutionMetadata {
@@ -944,54 +942,36 @@ impl DIDResolver for HTTPDIDResolver {
                 )
             }
         };
-        let https = HttpsConnector::new();
-        let client = Client::builder().build::<_, hyper::Body>(https);
-        let request = match Request::get(uri)
-            .header("Accept", TYPE_DID_RESOLUTION)
-            .header("User-Agent", crate::USER_AGENT)
-            .body(hyper::Body::default())
-        {
-            Ok(req) => req,
+        let client = match Client::builder().build() {
+            Ok(client) => client,
             Err(err) => {
                 return (
-                    ResolutionMetadata {
-                        error: Some("Error building HTTP request: ".to_string() + &err.to_string()),
-                        content_type: None,
-                        property_set: None,
-                    },
+                    ResolutionMetadata::from_error(&format!(
+                        "Error building HTTP client: {}",
+                        err.to_string()
+                    )),
                     None,
                     None,
-                )
+                );
             }
         };
-        let mut resp = match client.request(request).await {
+        let resp = match client
+            .get(url)
+            .header("Accept", TYPE_DID_RESOLUTION)
+            .header("User-Agent", crate::USER_AGENT)
+            .send()
+            .await
+        {
             Ok(resp) => resp,
             Err(err) => {
                 return (
-                    ResolutionMetadata {
-                        error: Some("HTTP Error: ".to_string() + &err.to_string()),
-                        content_type: None,
-                        property_set: None,
-                    },
+                    ResolutionMetadata::from_error(&format!("Error sending HTTP request: {}", err)),
                     None,
                     None,
                 )
             }
         };
-        let res_result_representation = match hyper::body::to_bytes(resp.body_mut()).await {
-            Ok(vec) => vec,
-            Err(err) => {
-                return (
-                    ResolutionMetadata {
-                        error: Some("Error reading HTTP response: ".to_string() + &err.to_string()),
-                        content_type: None,
-                        property_set: None,
-                    },
-                    None,
-                    None,
-                )
-            }
-        };
+        let status = resp.status();
         let content_type = match resp.headers().get(header::CONTENT_TYPE) {
             None => None,
             Some(content_type) => Some(String::from(match content_type.to_str() {
@@ -1009,13 +989,27 @@ impl DIDResolver for HTTPDIDResolver {
             })),
         }
         .unwrap_or_else(|| "".to_string());
+        let res_result_representation = match resp.bytes().await {
+            Ok(bytes) => bytes.to_vec(),
+            Err(err) => {
+                return (
+                    ResolutionMetadata {
+                        error: Some("Error reading HTTP response: ".to_string() + &err.to_string()),
+                        content_type: None,
+                        property_set: None,
+                    },
+                    None,
+                    None,
+                )
+            }
+        };
 
         if content_type == TYPE_DID_RESOLUTION {
             // Handle result using DID Resolution Result media type (JSON-LD)
             return transform_resolution_result(serde_json::from_slice(&res_result_representation));
         }
 
-        if resp.status() == StatusCode::NOT_FOUND {
+        if status == StatusCode::NOT_FOUND {
             return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
         }
 
@@ -1087,8 +1081,8 @@ impl DIDResolver for HTTPDIDResolver {
             url.push('?');
             url.push_str(&querystring);
         }
-        let uri: Uri = match url.parse() {
-            Ok(uri) => uri,
+        let url: Url = match url.parse() {
+            Ok(url) => url,
             Err(_) => {
                 return Some((
                     DereferencingMetadata::from_error(ERROR_INVALID_DID),
@@ -1097,29 +1091,33 @@ impl DIDResolver for HTTPDIDResolver {
                 ))
             }
         };
-        let https = HttpsConnector::new();
-        let client = Client::builder().build::<_, hyper::Body>(https);
-        let request = match Request::get(uri)
-            .header("Accept", TYPE_DID_RESOLUTION)
-            .body(hyper::Body::default())
-        {
-            Ok(req) => req,
+        let client = match Client::builder().build() {
+            Ok(client) => client,
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error building HTTP request: {}",
-                        err
+                        "Error building HTTP client: {}",
+                        err.to_string()
                     )),
                     Content::Null,
                     ContentMetadata::default(),
-                ))
+                ));
             }
         };
-        let mut resp = match client.request(request).await {
+        let resp = match client
+            .get(url)
+            .header("Accept", TYPE_DID_RESOLUTION)
+            .header("User-Agent", crate::USER_AGENT)
+            .send()
+            .await
+        {
             Ok(resp) => resp,
             Err(err) => {
                 return Some((
-                    DereferencingMetadata::from_error(&format!("HTTP Error: {}", err)),
+                    DereferencingMetadata::from_error(&format!(
+                        "Error sending HTTP request: {}",
+                        err
+                    )),
                     Content::Null,
                     ContentMetadata::default(),
                 ))
@@ -1133,19 +1131,6 @@ impl DIDResolver for HTTPDIDResolver {
             StatusCode::BAD_REQUEST => Some(ERROR_INVALID_DID.to_string()),
             StatusCode::NOT_ACCEPTABLE => Some(ERROR_REPRESENTATION_NOT_SUPPORTED.to_string()),
             _ => None,
-        };
-        let deref_result_bytes = match hyper::body::to_bytes(resp.body_mut()).await {
-            Ok(vec) => vec,
-            Err(err) => {
-                return Some((
-                    DereferencingMetadata::from_error(&format!(
-                        "Error reading HTTP response: {}",
-                        err
-                    )),
-                    Content::Null,
-                    ContentMetadata::default(),
-                ))
-            }
         };
         let content_type = match resp.headers().get(header::CONTENT_TYPE) {
             None => None,
@@ -1164,6 +1149,19 @@ impl DIDResolver for HTTPDIDResolver {
             })),
         }
         .unwrap_or_else(|| "".to_string());
+        let deref_result_bytes = match resp.bytes().await {
+            Ok(bytes) => bytes.to_vec(),
+            Err(err) => {
+                return Some((
+                    DereferencingMetadata::from_error(&format!(
+                        "Error reading HTTP response: {}",
+                        err
+                    )),
+                    Content::Null,
+                    ContentMetadata::default(),
+                ))
+            }
+        };
         match &content_type[..] {
             TYPE_DID_LD_JSON | TYPE_DID_JSON => {
                 let doc: Document = match serde_json::from_slice(&deref_result_bytes) {
