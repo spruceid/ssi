@@ -353,8 +353,18 @@ pub fn verify_bytes_warnable(
                 }
                 let public_key = k256::PublicKey::try_from(ec)?;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
-                let sig = panic::catch_unwind(|| k256::ecdsa::Signature::try_from(signature))
+                let mut sig = panic::catch_unwind(|| k256::ecdsa::Signature::try_from(signature))
                     .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
+                // Note: in newer ecdsa crate versions, normalize_s is non-mutating.
+                let was_non_normalized = sig.normalize_s()?;
+                if was_non_normalized {
+                    // For user convenience, output the normalized signature.
+                    let sig_normalized_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
+                    warnings.push(format!(
+                        "Non-normalized ES256K signature. Normalized: {}",
+                        sig_normalized_b64
+                    ));
+                }
                 verifying_key.verify(data, &sig)?;
             }
             #[cfg(feature = "k256")]
