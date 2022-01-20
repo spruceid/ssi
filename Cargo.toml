@@ -26,7 +26,7 @@ sha = ["sha2", "k256/sha256"]
 example-http-issuer = []
 
 [dependencies]
-json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "d52a96fc408f53ba7deed87c5481586fc9706f53" }
+json-ld = "0.6.0"
 
 # SAFETY: bbs and pairing-plus are set to specific versions due to a
 # dependency on internal struct representations using transmute in src/bbs.rs.
@@ -83,8 +83,6 @@ flate2 = "1.0"
 bitvec = "0.20"
 clear_on_drop = "0.2.4"
 url = { version = "2.2", features = ["serde"] }
-generic-json = { version = "0.5", features = ["serde_json-impl", "ijson-impl"] }
-ijson = "^0.1"
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 

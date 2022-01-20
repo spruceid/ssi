@@ -9,7 +9,6 @@ use crate::rdf::{
 };
 
 use futures::future::{BoxFuture, FutureExt};
-use ijson::{IArray, IValue};
 use iref::{Iri, IriBuf};
 use json_ld::{
     context::Json, loader::Id, util::AsJson, Document, JsonContext, Loader, ProcessingMode,
@@ -169,161 +168,161 @@ const PRESENTATION_SUBMISSION_V1_ID: usize = 21;
 const VDL_V1_ID: usize = 22;
 
 lazy_static! {
-    pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CREDENTIALS_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(CREDENTIALS_V1_CONTEXT).unwrap();
         let id = Id::new(CREDENTIALS_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CREDENTIALS_EXAMPLES_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(CREDENTIALS_EXAMPLES_V1_CONTEXT).unwrap();
         let id = Id::new(CREDENTIALS_EXAMPLES_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref ODRL_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref ODRL_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::ODRL;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(ODRL_CONTEXT).unwrap();
         let id = Id::new(ODRL_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref SCHEMA_ORG_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref SCHEMA_ORG_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SCHEMA_ORG;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(SCHEMA_ORG_CONTEXT).unwrap();
         let id = Id::new(SCHEMA_ORG_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref SECURITY_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref SECURITY_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SECURITY_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(SECURITY_V1_CONTEXT).unwrap();
         let id = Id::new(SECURITY_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref SECURITY_V2_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref SECURITY_V2_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::SECURITY_V2;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(SECURITY_V2_CONTEXT).unwrap();
         let id = Id::new(SECURITY_V2_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref DID_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref DID_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DID_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(DID_V1_CONTEXT).unwrap();
         let id = Id::new(DID_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref DID_RESOLUTION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DID_RESOLUTION_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
         let id = Id::new(DID_RESOLUTION_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::DIF_ESRS2020;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(DIF_ESRS2020_CONTEXT).unwrap();
         let id = Id::new(DIF_ESRS2020_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref ESRS2020_EXTRA_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref ESRS2020_EXTRA_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::ESRS2020_EXTRA;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(ESRS2020_EXTRA_CONTEXT).unwrap();
         let id = Id::new(ESRS2020_EXTRA_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref LDS_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref LDS_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::LDS_JWS2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(LDS_JWS2020_V1_CONTEXT).unwrap();
         let id = Id::new(LDS_JWS2020_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref W3ID_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref W3ID_JWS2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::W3ID_JWS2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(W3ID_JWS2020_V1_CONTEXT).unwrap();
         let id = Id::new(W3ID_JWS2020_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref W3ID_ED2020_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref W3ID_ED2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::W3ID_ED2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(W3ID_ED2020_V1_CONTEXT).unwrap();
         let id = Id::new(W3ID_ED2020_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::BLOCKCHAIN2021_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(BLOCKCHAIN2021_V1_CONTEXT).unwrap();
         let id = Id::new(BLOCKCHAIN2021_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref CITIZENSHIP_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref CITIZENSHIP_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::CITIZENSHIP_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(CITIZENSHIP_V1_CONTEXT).unwrap();
         let id = Id::new(CITIZENSHIP_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref VACCINATION_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref VACCINATION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::VACCINATION_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(VACCINATION_V1_CONTEXT).unwrap();
         let id = Id::new(VACCINATION_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref TRACEABILITY_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref TRACEABILITY_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::TRACEABILITY_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(TRACEABILITY_CONTEXT).unwrap();
         let id = Id::new(TRACEABILITY_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::REVOCATION_LIST_2020_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(REVOCATION_LIST_2020_V1_CONTEXT).unwrap();
         let id = Id::new(REVOCATION_LIST_2020_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref EIP712SIG_V0_1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::EIP712SIG_V0_1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(EIP712SIG_V0_1_CONTEXT).unwrap();
         let id = Id::new(EIP712SIG_V0_1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref BBS_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref BBS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::BBS_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(BBS_V1_CONTEXT).unwrap();
         let id = Id::new(BBS_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref EIP712SIG_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref EIP712SIG_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::EIP712SIG_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(EIP712SIG_V1_CONTEXT).unwrap();
         let id = Id::new(EIP712SIG_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::PRESENTATION_SUBMISSION_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(PRESENTATION_SUBMISSION_V1_CONTEXT).unwrap();
         let id = Id::new(PRESENTATION_SUBMISSION_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
-    pub static ref VDL_V1_CONTEXT_DOCUMENT: RemoteDocument<IValue> = {
+    pub static ref VDL_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
         let jsonld = ssi_contexts::VDL_V1;
         let doc = serde_json::from_str(jsonld).unwrap();
         let iri = IriBuf::new(VDL_V1_CONTEXT).unwrap();
@@ -334,7 +333,7 @@ lazy_static! {
 
 pub struct StaticLoader;
 impl Loader for StaticLoader {
-    type Document = IValue;
+    type Document = Value;
 
     fn id(&self, iri: Iri<'_>) -> Option<Id> {
         Some(Id::new(match iri.as_str() {
@@ -494,31 +493,6 @@ impl<'a> From<&'a Value> for ValuesIter<'a> {
             Value::Array(vec) => Self::Multiple(vec.iter()),
             Value::Null => Self::Single(None),
             value => Self::Single(Some(value)),
-        }
-    }
-}
-
-pub(crate) enum IValuesIter<'a> {
-    Multiple(std::slice::Iter<'a, IValue>),
-    Single(Option<&'a IValue>),
-}
-
-impl<'a> Iterator for IValuesIter<'a> {
-    type Item = &'a IValue;
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Self::Multiple(iter) => iter.next(),
-            Self::Single(option) => option.take(),
-        }
-    }
-}
-
-impl<'a> From<&'a IValue> for IValuesIter<'a> {
-    fn from(value: &'a IValue) -> Self {
-        match value.destructure_ref() {
-            ijson::DestructuredRef::Array(array) => Self::Multiple(array.into_iter()),
-            ijson::DestructuredRef::Null => Self::Single(None),
-            _ => Self::Single(Some(value)),
         }
     }
 }
@@ -1636,14 +1610,14 @@ pub async fn expand_json<T>(
     loader: &mut T,
 ) -> Result<Vec<Value>, Error>
 where
-    T: Loader<Document = IValue> + std::marker::Send + Sync,
+    T: Loader<Document = Value> + std::marker::Send + Sync,
 {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     let base = match options.base {
         Some(ref iri) => Some(iref::Iri::new(iri)?),
         None => None,
     };
-    let mut context = Json::<IValue>::new(base);
+    let mut context = Json::<Value>::new(base);
     if let Some(ref url) = options.expand_context {
         use json_ld::context::Loader;
         use json_ld::context::Local;
@@ -1654,7 +1628,7 @@ where
             .await?
             .into_inner();
     }
-    let mut doc: IValue = serde_json::from_str(json)?;
+    let mut doc: Value = serde_json::from_str(json)?;
     if let Some(more_contexts_json) = more_contexts_json {
         let more_contexts = serde_json::from_str(more_contexts_json)?;
         // Merge additional contexts into document. This is needed for serializing proofs, since
@@ -1662,16 +1636,16 @@ where
         // including their own.
         // TODO: handle this with the expandContext option instead
         let doc_object = doc.as_object_mut().ok_or(Error::ExpectedObject)?;
-        let mut contexts_merged = IArray::new();
+        let mut contexts_merged = Vec::new();
         if let Some(doc_contexts) = doc_object.remove(AT_CONTEXT) {
-            for item in IValuesIter::from(&doc_contexts) {
+            for item in ValuesIter::from(&doc_contexts) {
                 contexts_merged.push(item.clone());
             }
         }
-        for item in IValuesIter::from(&more_contexts) {
+        for item in ValuesIter::from(&more_contexts) {
             contexts_merged.push(item.clone());
         }
-        doc_object.insert(AT_CONTEXT.to_string(), IValue::from(contexts_merged));
+        doc_object.insert(AT_CONTEXT.to_string(), Value::Array(contexts_merged));
     }
     let mut expansion_options = json_ld::expansion::Options::from(options);
     use json_ld::expansion::Policy;
@@ -1688,11 +1662,7 @@ where
     let expanding = doc.expand_with(base, &context, loader, expansion_options);
     let expanded_doc = expanding.await?;
 
-    let documents = expanded_doc
-        .iter()
-        .map::<IValue, _>(AsJson::as_json)
-        .map(serde_json::to_value)
-        .collect::<Result<Vec<Value>, serde_json::Error>>()?;
+    let documents = expanded_doc.iter().map(|item| item.as_json()).collect();
 
     Ok(documents)
 }
@@ -1706,7 +1676,7 @@ pub async fn json_to_dataset<T>(
     loader: &mut T,
 ) -> Result<DataSet, Error>
 where
-    T: Loader<Document = IValue> + std::marker::Send + Sync,
+    T: Loader<Document = Value> + std::marker::Send + Sync,
 {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     let expanded_doc = expand_json(json, more_contexts_json, lax, Some(&options), loader).await?;
@@ -1737,10 +1707,9 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ijson::IObject;
     use json_ld::FsLoader;
 
-    async fn test_to_rdf(obj: &IObject) -> Result<(), Error> {
+    async fn test_to_rdf(obj: &Map<String, Value>) -> Result<(), Error> {
         use crate::urdna2015;
         use std::fs;
         use std::path::PathBuf;
@@ -1751,14 +1720,13 @@ mod tests {
         let mut base_iri = "https://w3c.github.io/".to_string() + &input;
         let input_path = PathBuf::from(input);
         let in_str = fs::read_to_string(&input_path).unwrap();
-        let mut loader = FsLoader::<IValue>::new(|s| serde_json::from_str(s));
+        let mut loader = FsLoader::<Value>::new(|s| serde_json::from_str(s));
         loader.mount(
             Iri::new("https://w3c.github.io/json-ld-api").unwrap(),
             "json-ld-api",
         );
         let mut ld_options = DEFAULT_JSON_LD_OPTIONS.clone();
-        if let Some(options) = obj.get("option") {
-            let options = options.as_object().unwrap();
+        if let Some(Value::Object(options)) = obj.get("option") {
             if let Some(mode) = options.get("processingMode") {
                 let mode_str = match mode.as_str() {
                     Some(mode_str) => mode_str,
@@ -1812,7 +1780,7 @@ mod tests {
     /// <https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html>
     async fn to_rdf_test_suite() {
         let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
-        let manifest: IValue = serde_json::from_str(manifest_str).unwrap();
+        let manifest: Value = serde_json::from_str(manifest_str).unwrap();
         let manifest_obj = manifest.as_object().ok_or(Error::ExpectedObject).unwrap();
         let case = std::env::args().skip(2).next();
         let sequence = manifest_obj.get("sequence").unwrap().as_array().unwrap();
@@ -1851,14 +1819,13 @@ mod tests {
                     continue;
                 }
             }
-            if let Some(options) = obj.get("option") {
-                let options = options.as_object().unwrap();
-                if matches!(options.get("normative"), Some(b) if b.is_false()) {
+            if let Some(Value::Object(options)) = obj.get("option") {
+                if options.get("normative") == Some(&Value::Bool(false)) {
                     eprintln!("test {}: skipping: non-normative", id);
                     continue;
                 }
                 if let Some(spec_version) = options.get("specVersion") {
-                    let spec_version = spec_version.as_string().unwrap().as_str();
+                    let spec_version = spec_version.as_str().unwrap();
                     if spec_version != "json-ld-1.1" {
                         eprintln!("test {}: skipping: spec version '{}'", id, spec_version);
                         continue;
