@@ -3,7 +3,7 @@ use core::str::FromStr;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
+#[cfg(feature = "sequoia-openpgp")]
 use openpgp::{
     cert::prelude::*,
     parse::{PacketParser, Parse},
@@ -15,7 +15,7 @@ use pgp::{
     errors::Error as PgpError,
     types::KeyTrait,
 };
-#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
+#[cfg(feature = "sequoia-openpgp")]
 use sequoia_openpgp as openpgp;
 use sshkeys::PublicKeyKind;
 use ssi::did::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
@@ -57,7 +57,7 @@ impl FromStr for DIDWebKeyType {
     }
 }
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
+#[cfg(feature = "sequoia-openpgp")]
 fn parse_pubkeys_gpg(
     did: &str,
     bytes: Vec<u8>,
@@ -82,7 +82,7 @@ fn parse_pubkeys_gpg(
     Ok((vm_maps, did_urls))
 }
 
-#[cfg(all(not(target_arch = "wasm32"), feature = "sequoia-openpgp"))]
+#[cfg(feature = "sequoia-openpgp")]
 fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL), String> {
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -603,7 +603,8 @@ mod tests {
             )
             .await;
         assert_eq!(res_meta.error, None);
-        // NOTE: sequoia-pgp and rpgp will likely produce slightly different output
+
+        #[cfg(feature = "sequoia-openpgp")]
         let value_expected = json!({
           "@context": "https://www.w3.org/ns/did/v1",
           "assertionMethod": [
@@ -638,6 +639,28 @@ mod tests {
             }
           ]
         });
+
+        #[cfg(feature = "pgp")]
+        // BUG: rpgp will only yield the first pubkey
+        let value_expected = json!({
+          "@context": "https://www.w3.org/ns/did/v1",
+          "assertionMethod": [
+            "did:webkey:gpg:localhost:user.gpg#0CEE8B84B25C0A3C554A9EC1F8FEE972E2A1D935"
+          ],
+          "authentication": [
+            "did:webkey:gpg:localhost:user.gpg#0CEE8B84B25C0A3C554A9EC1F8FEE972E2A1D935"
+          ],
+          "id": "did:webkey:gpg:localhost:user.gpg",
+          "verificationMethod": [
+            {
+              "controller": "did:webkey:gpg:localhost:user.gpg",
+              "id": "did:webkey:gpg:localhost:user.gpg#0CEE8B84B25C0A3C554A9EC1F8FEE972E2A1D935",
+              "publicKeyPgp": "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\n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\n2YdBRVOAnw==\n=A/sJ\n-----END PGP PUBLIC KEY BLOCK-----\n",
+              "type": "PgpVerificationKey2021"
+            }
+          ]
+        });
+
         let doc = doc_opt.unwrap();
         let doc_value = serde_json::to_value(doc).unwrap();
         eprintln!("doc {}", serde_json::to_string_pretty(&doc_value).unwrap());
