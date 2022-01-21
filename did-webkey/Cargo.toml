@@ -23,16 +23,17 @@ ssi = { version = "0.3", path = "../", features = [
     "ring",
     "p256",
 ], default-features = false }
-async-trait = "0.1"
-reqwest = { version = "0.11", features = ["json"] }
-hex = "0.4"
-http = "0.2"
-serde_json = "1.0"
-serde = { version = "1.0", features = ["derive"] }
-sshkeys = "0.3"
+anyhow = "1.0.52"
+async-trait = "0.1.52"
+reqwest = { version = "0.11.9", features = ["json"] }
+hex = "0.4.3"
+http = "0.2.6"
+serde_json = "1.0.75"
+serde = { version = "1.0.134", features = ["derive"] }
+sshkeys = "0.3.1"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-sequoia-openpgp = { version = "1.7", features = [
+sequoia-openpgp = { version = "1.7.0", features = [
     "compression-deflate",
 ], default-features = false, optional = true }
 # HACK: temp, point to crates once pgp publishes a version that doesn't require zeroize=1.3.0
@@ -45,11 +46,11 @@ pgp = { git = "https://github.com/rpgp/rpgp", rev = "21081b6aaaaa5750ab937cfef30
 ] }
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
-version = "0.11"
+version = "0.11.9"
 features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["macros"] }
-async-std = { version = "1.9", features = ["attributes"] }
-futures = "0.3"
-hyper = { version = "0.14", features = ["server", "client", "http1", "stream"] }
+tokio = { version = "1.15.0", features = ["macros"] }
+async-std = { version = "1.10.0", features = ["attributes"] }
+futures = "0.3.19"
+hyper = { version = "0.14.16", features = ["server", "client", "http1", "stream"] }

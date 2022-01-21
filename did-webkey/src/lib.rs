@@ -3,6 +3,7 @@ use core::str::FromStr;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+use anyhow::{anyhow, Result};
 #[cfg(feature = "sequoia-openpgp")]
 use openpgp::{
     cert::prelude::*,
@@ -61,20 +62,14 @@ impl FromStr for DIDWebKeyType {
 fn parse_pubkeys_gpg(
     did: &str,
     bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
     let mut did_urls = Vec::new();
     let mut vm_maps = Vec::new();
 
-    let ppr = PacketParser::from_bytes(&bytes)
-        .map_err(|e| format!("Unable to parse GPG keyring: {}", e))?;
+    let ppr = PacketParser::from_bytes(&bytes)?;
     for certo in CertParser::from(ppr) {
-        let cert = certo.map_err(|e| format!("Error reading keyring: {}", e))?;
-        let (vm_map, did_url) = gpg_pk_to_vm(did, cert).map_err(|e| {
-            format!(
-                "Unable to convert GPG public key to verification method: {}",
-                e
-            )
-        })?;
+        let cert = certo?;
+        let (vm_map, did_url) = gpg_pk_to_vm(did, cert)?;
         vm_maps.push(vm_map);
         did_urls.push(did_url);
     }
@@ -83,19 +78,14 @@ fn parse_pubkeys_gpg(
 }
 
 #[cfg(feature = "sequoia-openpgp")]
-fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL), String> {
+fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL)> {
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(cert.fingerprint().to_string()),
         ..Default::default()
     };
 
-    let armored_pgp = String::from_utf8(
-        cert.armored()
-            .to_vec()
-            .map_err(|e| format!("Failed to re-serialize cert: {}", e))?,
-    )
-    .map_err(|e| format!("Failed to read cert as utf8: {}", e))?;
+    let armored_pgp = String::from_utf8(cert.armored().to_vec()?)?;
 
     let vm_map = VerificationMethodMap {
         id: vm_url.to_string(),
@@ -111,7 +101,7 @@ fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL)
 fn parse_pubkeys_gpg(
     did: &str,
     bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
     use std::io::Cursor;
 
     let mut did_urls = Vec::new();
@@ -119,21 +109,14 @@ fn parse_pubkeys_gpg(
 
     let c = Cursor::new(bytes);
     // BUG: This seems to yield only one key.
-    let keys = pgp::composed::signed_key::parse::from_armor_many(c)
-        .map_err(|e| format!("Unable to parse GPG keyring: {}", e))?
+    let keys = pgp::composed::signed_key::parse::from_armor_many(c)?
         .0
-        .collect::<Result<Vec<PublicOrSecret>, PgpError>>()
-        .map_err(|e| format!("Unable to parse GPG keyring: {}", e))?;
+        .collect::<Result<Vec<PublicOrSecret>, PgpError>>()?;
 
     for key in keys {
         // ignore if secret key (which shouldn't happen)
         if let PublicOrSecret::Public(pk) = key {
-            let (vm_map, did_url) = gpg_pk_to_vm(did, pk).map_err(|e| {
-                format!(
-                    "Unable to convert GPG public key to verification method: {}",
-                    e
-                )
-            })?;
+            let (vm_map, did_url) = gpg_pk_to_vm(did, pk)?;
             vm_maps.push(vm_map);
             did_urls.push(did_url);
         }
@@ -143,10 +126,7 @@ fn parse_pubkeys_gpg(
 }
 
 #[cfg(any(target_arch = "wasm32", feature = "pgp"))]
-fn gpg_pk_to_vm(
-    did: &str,
-    key: SignedPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
+fn gpg_pk_to_vm(did: &str, key: SignedPublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
     let fingerprint: String = hex::encode_upper(key.fingerprint());
 
     let vm_url = DIDURL {
@@ -155,9 +135,7 @@ fn gpg_pk_to_vm(
         ..Default::default()
     };
 
-    let armored_pgp = key
-        .to_armored_string(None)
-        .map_err(|e| format!("Failed to re-serialize cert: {}", e))?;
+    let armored_pgp = key.to_armored_string(None)?;
 
     let vm_map = VerificationMethodMap {
         id: vm_url.to_string(),
@@ -172,15 +150,9 @@ fn gpg_pk_to_vm(
 fn pk_to_vm_ed25519(
     did: &str,
     pk: sshkeys::Ed25519PublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    let jwk = match ssh_pkk_to_jwk(&PublicKeyKind::Ed25519(pk)) {
-        Err(err) => return Err(format!("Unable to convert SSH key to JWK: {}", err)),
-        Ok(jwk) => jwk,
-    };
-    let thumbprint = match jwk.thumbprint() {
-        Err(err) => return Err(format!("Unable to calculate JWK thumbprint: {}", err)),
-        Ok(t) => t,
-    };
+) -> Result<(VerificationMethodMap, DIDURL)> {
+    let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Ed25519(pk))?;
+    let thumbprint = jwk.thumbprint()?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -199,15 +171,9 @@ fn pk_to_vm_ed25519(
 fn pk_to_vm_ecdsa(
     did: &str,
     pk: sshkeys::EcdsaPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    let jwk = match ssh_pkk_to_jwk(&PublicKeyKind::Ecdsa(pk)) {
-        Err(err) => return Err(format!("Unable to convert SSH key to JWK: {}", err)),
-        Ok(jwk) => jwk,
-    };
-    let thumbprint = match jwk.thumbprint() {
-        Err(err) => return Err(format!("Unable to calculate JWK thumbprint: {}", err)),
-        Ok(t) => t,
-    };
+) -> Result<(VerificationMethodMap, DIDURL)> {
+    let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Ecdsa(pk))?;
+    let thumbprint = jwk.thumbprint()?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -223,18 +189,9 @@ fn pk_to_vm_ecdsa(
     Ok((vm_map, vm_url))
 }
 
-fn pk_to_vm_rsa(
-    did: &str,
-    pk: sshkeys::RsaPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    let jwk = match ssh_pkk_to_jwk(&PublicKeyKind::Rsa(pk)) {
-        Err(err) => return Err(format!("Unable to convert SSH key to JWK: {}", err)),
-        Ok(jwk) => jwk,
-    };
-    let thumbprint = match jwk.thumbprint() {
-        Err(err) => return Err(format!("Unable to calculate JWK thumbprint: {}", err)),
-        Ok(t) => t,
-    };
+fn pk_to_vm_rsa(did: &str, pk: sshkeys::RsaPublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
+    let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Rsa(pk))?;
+    let thumbprint = jwk.thumbprint()?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -250,14 +207,11 @@ fn pk_to_vm_rsa(
     Ok((vm_map, vm_url))
 }
 
-fn pk_to_vm_dsa(
-    _did: &str,
-    _pk: sshkeys::DsaPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    Err(String::from("Unsupported DSA Key"))
+fn pk_to_vm_dsa(_did: &str, _pk: sshkeys::DsaPublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
+    Err(anyhow!("Unsupported DSA Key"))
 }
 
-fn pk_to_vm(did: &str, pk: sshkeys::PublicKey) -> Result<(VerificationMethodMap, DIDURL), String> {
+fn pk_to_vm(did: &str, pk: sshkeys::PublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
     match pk.kind {
         PublicKeyKind::Rsa(pk) => pk_to_vm_rsa(did, pk),
         PublicKeyKind::Dsa(pk) => pk_to_vm_dsa(did, pk),
@@ -269,28 +223,14 @@ fn pk_to_vm(did: &str, pk: sshkeys::PublicKey) -> Result<(VerificationMethodMap,
 fn parse_pubkeys_ssh(
     did: &str,
     bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
-    let lines = match String::from_utf8(bytes) {
-        Ok(string) => string,
-        Err(err) => return Err(format!("Unable to parse SSH keys: {}", err)),
-    };
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
+    let lines = String::from_utf8(bytes)?;
     let mut did_urls = Vec::new();
     let mut vm_maps = Vec::new();
     let lines = lines.trim().split('\n');
     for line in lines {
-        let pk = match sshkeys::PublicKey::from_string(line) {
-            Ok(pk) => pk,
-            Err(err) => return Err(format!("Unable to parse SSH key: {}", err)),
-        };
-        let (vm_map, did_url) = match pk_to_vm(did, pk) {
-            Ok(pk) => pk,
-            Err(err) => {
-                return Err(format!(
-                    "Unable to convert SSH public key to verification method: {}",
-                    err
-                ))
-            }
-        };
+        let pk = sshkeys::PublicKey::from_string(line)?;
+        let (vm_map, did_url) = pk_to_vm(did, pk)?;
         vm_maps.push(vm_map);
         did_urls.push(did_url);
     }
@@ -301,7 +241,7 @@ fn parse_pubkeys(
     did: &str,
     type_: DIDWebKeyType,
     bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
     match type_ {
         DIDWebKeyType::Gpg => parse_pubkeys_gpg(did, bytes),
         DIDWebKeyType::Ssh => parse_pubkeys_ssh(did, bytes),
