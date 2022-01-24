@@ -142,6 +142,7 @@ pub const EIP712SIG_V1_CONTEXT: &str = "https://w3id.org/security/suites/eip712s
 pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &str =
     "https://identity.foundation/presentation-exchange/submission/v1";
 pub const VDL_V1_CONTEXT: &str = "https://w3id.org/vdl/v1";
+pub const WALLET_V1_CONTEXT: &str = "https://w3id.org/wallet/v1";
 
 const CREDENTIALS_V1_ID: usize = 0;
 const CREDENTIALS_EXAMPLES_V1_ID: usize = 1;
@@ -166,6 +167,7 @@ const BBS_V1_ID: usize = 19;
 const EIP712SIG_V1_ID: usize = 20;
 const PRESENTATION_SUBMISSION_V1_ID: usize = 21;
 const VDL_V1_ID: usize = 22;
+const WALLET_V1_ID: usize = 23;
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
@@ -329,6 +331,13 @@ lazy_static! {
         let id = Id::new(VDL_V1_ID);
         RemoteDocument::new(doc, iri, id)
     };
+    pub static ref WALLET_V1_CONTEXT_DOCUMENT: RemoteDocument<Value> = {
+        let jsonld = ssi_contexts::WALLET_V1;
+        let doc = serde_json::from_str(jsonld).unwrap();
+        let iri = IriBuf::new(WALLET_V1_CONTEXT).unwrap();
+        let id = Id::new(WALLET_V1_ID);
+        RemoteDocument::new(doc, iri, id)
+    };
 }
 
 pub struct StaticLoader;
@@ -360,6 +369,7 @@ impl Loader for StaticLoader {
             EIP712SIG_V1_CONTEXT => EIP712SIG_V1_ID,
             PRESENTATION_SUBMISSION_V1_CONTEXT => PRESENTATION_SUBMISSION_V1_ID,
             VDL_V1_CONTEXT => VDL_V1_ID,
+            WALLET_V1_CONTEXT => WALLET_V1_ID,
             _ => return None,
         }))
     }
@@ -389,6 +399,7 @@ impl Loader for StaticLoader {
             EIP712SIG_V1_ID => EIP712SIG_V1_CONTEXT,
             PRESENTATION_SUBMISSION_V1_ID => PRESENTATION_SUBMISSION_V1_CONTEXT,
             VDL_V1_ID => VDL_V1_CONTEXT,
+            WALLET_V1_ID => WALLET_V1_CONTEXT,
             _ => return None,
         })
         .ok()
@@ -432,6 +443,7 @@ impl Loader for StaticLoader {
                     Ok(PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT.clone())
                 }
                 VDL_V1_CONTEXT => Ok(VDL_V1_CONTEXT_DOCUMENT.clone()),
+                WALLET_V1_CONTEXT => Ok(WALLET_V1_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())

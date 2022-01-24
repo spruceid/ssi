@@ -22,4 +22,5 @@ exec curl \
 	https://w3id.org/security/bbs/v1 -o bbs-v1.jsonld \
 	https://identity.foundation/presentation-exchange/submission/v1 -o presentation-submission.jsonld \
 	https://w3id.org/vdl/v1 -o w3id-vdl-v1.jsonld \
+	https://w3id.org/wallet/v1 -o w3id-wallet-v1.jsonld \
 	-L
