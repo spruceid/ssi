@@ -26,7 +26,8 @@ sha = ["sha2", "k256/sha256"]
 example-http-issuer = []
 
 [dependencies]
-json-ld = "0.6.0"
+json-ld = "0.6.1"
+generic-json = { version = "^0.7", features = ["serde_json-impl"] }
 
 # SAFETY: bbs and pairing-plus are set to specific versions due to a
 # dependency on internal struct representations using transmute in src/bbs.rs.
