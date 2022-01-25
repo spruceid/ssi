@@ -395,7 +395,7 @@ pub struct DIDParameters {
 /// Registries](https://www.w3.org/TR/did-spec-registries/#did-methods).
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait DIDMethod: DIDResolver {
+pub trait DIDMethod: Sync {
     /// Get the DID method's name.
     ///
     /// `method-name` in [DID Syntax](https://w3c.github.io/did-core/#did-syntax).
@@ -503,7 +503,7 @@ impl<'a> DIDResolver for DIDMethods<'a> {
             Ok(method) => method,
             Err(err) => return (ResolutionMetadata::from_error(err), None, None),
         };
-        method.resolve(did, input_metadata).await
+        method.to_resolver().resolve(did, input_metadata).await
     }
 
     /// Resolve a DID to a DID document representation, using the corresponding DID method in the
@@ -517,7 +517,10 @@ impl<'a> DIDResolver for DIDMethods<'a> {
             Ok(method) => method,
             Err(err) => return (ResolutionMetadata::from_error(err), Vec::new(), None),
         };
-        method.resolve_representation(did, input_metadata).await
+        method
+            .to_resolver()
+            .resolve_representation(did, input_metadata)
+            .await
     }
 
     /// Dereference a DID URL, using the corresponding DID method in the
@@ -537,7 +540,10 @@ impl<'a> DIDResolver for DIDMethods<'a> {
                 ))
             }
         };
-        method.dereference(did_url, input_metadata).await
+        method
+            .to_resolver()
+            .dereference(did_url, input_metadata)
+            .await
     }
 }
 
