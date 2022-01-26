@@ -16,6 +16,7 @@ Revocation List 2020: https://w3c-ccg.github.io/vc-status-rl-2020/
 BBS+ Signatures 2020: https://w3c-ccg.github.io/ldp-bbs2020/
 Ethereum EIP-712 Signature 2021: https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/
 Verifiable Driver's License Vocabulary: https://w3id.org/vdl
+Universal Wallet 2020: https://w3id.org/wallet/v1
 
 Copyright © 2018-2021 World Wide Web Consortium, (Massachusetts Institute of Technology, European Research Consortium for Informatics and Mathematics, Keio University, Beihang). All Rights Reserved. This work is distributed under the [W3C® Software and Document License][1] in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 

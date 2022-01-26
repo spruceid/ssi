@@ -1,0 +1,58 @@
+{
+  "@context": [
+    {
+      "@version": 1.1
+    },
+    {
+      "id": "@id",
+      "type": "@type",
+
+      "UniversalWallet2020": "https://w3id.org/wallet#UniversalWallet2020",
+      "encryptedWalletContents": {
+        "@id": "https://w3id.org/wallet#encryptedWalletContents",
+        "@type": "@json"
+      },
+
+      "Key": "https://w3id.org/wallet#Key",
+      "Secret": "https://w3id.org/wallet#Secret",
+      "Entropy": "https://w3id.org/wallet#Entropy",
+      "Profile": "https://w3id.org/wallet#Profile",
+      "Mnemonic": "https://w3id.org/wallet#Mnemonic",
+      "MetaData": "https://w3id.org/wallet#MetaData",
+
+      "correlation": "https://w3id.org/wallet#correlation",
+      "tags": "https://w3id.org/wallet#tags",
+      "note": "https://w3id.org/wallet#note",
+      "target": "https://w3id.org/wallet#target",
+      "quorum": "https://w3id.org/wallet#quorum",
+      "multibase": "https://w3id.org/wallet#multibase",
+      "hdPath": "https://w3id.org/wallet#hdPath",
+
+      "amount": "https://schema.org/amount",
+      "currency": "https://schema.org/currency",
+      "value": "https://schema.org/value",
+
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      },
+      "privateKeyJwk": {
+        "@id": "https://w3id.org/security#privateKeyJwk",
+        "@type": "@json"
+      },
+      "privateKeyBase58": "https://w3id.org/security#privateKeyBase58",
+      "privateKeyWebKms": "https://w3id.org/security#privateKeyWebKms",
+      "privateKeySecureEnclave": "https://w3id.org/security#privateKeySecureEnclave",
+
+      "Organization": "http://schema.org/Organization",
+      "Person": "http://schema.org/Person",
+      "name": "http://schema.org/name",
+      "description": "http://schema.org/description",
+      "identifier": "http://schema.org/identifier",
+      "image": {
+        "@id": "http://schema.org/image",
+        "@type": "@id"
+      }
+    }
+  ]
+}

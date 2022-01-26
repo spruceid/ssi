@@ -6,7 +6,7 @@ use zeroize::Zeroize;
 
 use crate::der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
-    RSAPublicKey,
+    RSAPublicKey, RSAPublicKeyFromASN1Error,
 };
 use crate::error::Error;
 
@@ -812,6 +812,54 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum RSAParamsFromPublicKeyError {
+    #[error("RSA Public Key from ASN1 error: {0:?}")]
+    RSAPublicKeyFromASN1(RSAPublicKeyFromASN1Error),
+    #[error("Expected positive integer in RSA key")]
+    ExpectedPlus,
+}
+
+impl TryFrom<&RSAPublicKey> for RSAParams {
+    type Error = RSAParamsFromPublicKeyError;
+    fn try_from(pk: &RSAPublicKey) -> Result<Self, Self::Error> {
+        let (sign, n) = pk.modulus.0.to_bytes_be();
+        if sign != Sign::Plus {
+            return Err(RSAParamsFromPublicKeyError::ExpectedPlus);
+        }
+        let (sign, e) = pk.public_exponent.0.to_bytes_be();
+        if sign != Sign::Plus {
+            return Err(RSAParamsFromPublicKeyError::ExpectedPlus);
+        }
+        Ok(RSAParams {
+            modulus: Some(Base64urlUInt(n)),
+            exponent: Some(Base64urlUInt(e)),
+            private_exponent: None,
+            first_prime_factor: None,
+            second_prime_factor: None,
+            first_prime_factor_crt_exponent: None,
+            second_prime_factor_crt_exponent: None,
+            first_crt_coefficient: None,
+            other_primes_info: None,
+        })
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum RsaX509PubParseError {
+    #[error("RSAPublicKey from ASN1: {0:?}")]
+    RSAPublicKeyFromASN1(#[from] RSAPublicKeyFromASN1Error),
+    #[error("RSA JWK params from RSAPublicKey: {0:?}")]
+    RSAParamsFromPublicKey(#[from] RSAParamsFromPublicKeyError),
+}
+
+/// Parse a "RSA public key (X.509 encoded)" (multicodec) into a JWK.
+pub fn rsa_x509_pub_parse(pk_bytes: &[u8]) -> Result<JWK, RsaX509PubParseError> {
+    let rsa_pk: RSAPublicKey = simple_asn1::der_decode(&pk_bytes)?;
+    let rsa_params = RSAParams::try_from(&rsa_pk)?;
+    Ok(JWK::from(Params::RSA(rsa_params)))
+}
+
 #[cfg(feature = "k256")]
 impl TryFrom<&ECParams> for k256::SecretKey {
     type Error = Error;
@@ -943,13 +991,17 @@ mod tests {
 
     const RSA_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
     const RSA_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
+    const RSA_PK_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25-pk.der");
     const ED25519_JSON: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
 
     #[test]
-    fn jwk_to_der_rsa() {
+    fn jwk_to_from_der_rsa() {
         let key: JWK = serde_json::from_str(RSA_JSON).unwrap();
         let der = simple_asn1::der_encode(&key).unwrap();
         assert_eq!(der, RSA_DER);
+        let rsa_pk: RSAPublicKey = simple_asn1::der_decode(RSA_PK_DER).unwrap();
+        let rsa_params = RSAParams::try_from(&rsa_pk).unwrap();
+        assert_eq!(key.to_public().params, Params::RSA(rsa_params));
     }
 
     #[test]

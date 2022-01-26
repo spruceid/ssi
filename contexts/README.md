@@ -7,6 +7,10 @@
 [Decentralized Identifiers]: https://www.w3.org/TR/did-core/
 [Linked Data Proofs]: https://w3c-ccg.github.io/ld-proofs/
 
+## Updating
+
+Sometimes context files change over time. This crate aims to keep up to date with upstream changes in the context files it contains. To manually re-fetch the context files, run the script [update.sh](./update.sh) in the source directory.
+
 ## Licenses
 
 The licenses of the context files are summarized in the following table. For more details, see the [LICENSES.md](./LICENSES.md) file.

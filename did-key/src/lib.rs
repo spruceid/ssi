@@ -13,6 +13,7 @@ use ssi::did_resolve::{
 };
 #[cfg(feature = "secp256r1")]
 use ssi::jwk::p256_parse;
+use ssi::jwk::rsa_x509_pub_parse;
 #[cfg(feature = "secp256k1")]
 use ssi::jwk::secp256k1_parse;
 use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
@@ -21,6 +22,7 @@ const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 const DID_KEY_SECP256K1_PREFIX: [u8; 2] = [0xe7, 0x01];
 const DID_KEY_BLS12381_G2_PREFIX: [u8; 2] = [0xeb, 0x01];
 const DID_KEY_P256_PREFIX: [u8; 2] = [0x80, 0x24];
+const DID_KEY_RSA_PREFIX: [u8; 2] = [0x85, 0x24];
 
 #[derive(Error, Debug)]
 pub enum DIDKeyError {
@@ -165,6 +167,15 @@ impl DIDResolver for DIDKey {
                 None,
                 None,
             );
+        } else if data[0] == DID_KEY_RSA_PREFIX[0] && data[1] == DID_KEY_RSA_PREFIX[1] {
+            match rsa_x509_pub_parse(&data[2..]) {
+                Ok(jwk) => {
+                    vm_type = "JsonWebKey2020".to_string();
+                    vm_type_iri = "https://w3id.org/security#JsonWebKey2020".to_string();
+                    jwk
+                }
+                Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
+            }
         } else if data[0] == DID_KEY_BLS12381_G2_PREFIX[0]
             && data[1] == DID_KEY_BLS12381_G2_PREFIX[1]
         {
@@ -316,6 +327,14 @@ impl DIDMethod for DIDKey {
                     _ => return None,
                 }
             }
+            Params::RSA(ref params) => {
+                let der = simple_asn1::der_encode(&params.to_public()).ok()?;
+                "did:key:".to_string()
+                    + &multibase::encode(
+                        multibase::Base::Base58Btc,
+                        [DID_KEY_RSA_PREFIX.to_vec(), der.to_vec()].concat(),
+                    )
+            }
             _ => return None, // _ => return Some(Err(DIDKeyError::UnsupportedKeyType)),
         };
         Some(did)
@@ -431,6 +450,37 @@ mod tests {
             "kty": "OKP",
             "crv": "Bls12381G2",
             "x": "tKWJu0SOY7onl4tEyOOH11XBriQN2JgzV-UmjgBMSsNkcAx3_l97SVYViSDBouTVBkBfrLh33C5icDD-4UEDxNO3Wn1ijMHvn2N63DU4pkezA3kGN81jGbwbrsMPpiOF"
+        }))
+        .unwrap();
+        assert_eq!(key, key_expected);
+
+        let did1 = DIDKey.generate(&Source::Key(&key)).unwrap();
+        assert_eq!(did1, did);
+    }
+
+    #[async_std::test]
+    async fn from_did_key_rsa() {
+        let did = "did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i";
+        let (res_meta, _doc, _doc_meta) = DIDKey
+            .resolve(did, &ResolutionInputMetadata::default())
+            .await;
+        assert_eq!(res_meta.error, None);
+
+        let vm = "did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i#z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i";
+        let (res_meta, object, _meta) =
+            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+        assert_eq!(res_meta.error, None);
+        let vm = match object {
+            Content::Object(Resource::VerificationMethod(vm)) => vm,
+            _ => unreachable!(),
+        };
+        let key = vm.public_key_jwk.unwrap();
+        eprintln!("key {}", serde_json::to_string_pretty(&key).unwrap());
+
+        let key_expected: JWK = serde_json::from_value(serde_json::json!({
+            "kty": "RSA",
+            "e": "AQAB",
+            "n": "sbX82NTV6IylxCh7MfV4hlyvaniCajuP97GyOqSvTmoEdBOflFvZ06kR_9D6ctt45Fk6hskfnag2GG69NALVH2o4RCR6tQiLRpKcMRtDYE_thEmfBvDzm_VVkOIYfxu-Ipuo9J_S5XDNDjczx2v-3oDh5-CIHkU46hvFeCvpUS-L8TJSbgX0kjVk_m4eIb9wh63rtmD6Uz_KBtCo5mmR4TEtcLZKYdqMp3wCjN-TlgHiz_4oVXWbHUefCEe8rFnX1iQnpDHU49_SaXQoud1jCaexFn25n-Aa8f8bc5Vm-5SeRwidHa6ErvEhTvf1dz6GoNPp2iRvm-wJ1gxwWJEYPQ"
         }))
         .unwrap();
         assert_eq!(key, key_expected);
