@@ -53,6 +53,10 @@ lazy_static! {
         let context_str = ssi_contexts::SOLVM;
         serde_json::from_str(context_str).unwrap()
     };
+    pub static ref ALEOVM_CONTEXT: Value = {
+        let context_str = ssi_contexts::ALEOVM;
+        serde_json::from_str(context_str).unwrap()
+    };
 }
 
 pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Error> {
@@ -89,6 +93,12 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
         "TezosSignature2021" => &TezosSignature2021,
         "TezosJcsSignature2021" => &TezosJcsSignature2021,
         "SolanaSignature2021" => &SolanaSignature2021,
+        "AleoSignature2021" => {
+            #[cfg(not(feature = "aleosig"))]
+            return Err(Error::MissingFeatures("aleosig"));
+            #[cfg(feature = "aleosig")]
+            &AleoSignature2021
+        }
         "JsonWebSignature2020" => &JsonWebSignature2020,
         "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
         _ => return Err(Error::ProofTypeNotImplemented),
@@ -103,6 +113,12 @@ fn pick_proof_suite<'a, 'b>(
     Ok(match algorithm {
         Algorithm::RS256 => &RsaSignature2018,
         Algorithm::PS256 => &JsonWebSignature2020,
+        Algorithm::AleoTestnet1Signature => {
+            #[cfg(not(feature = "aleosig"))]
+            return Err(Error::MissingFeatures("aleosig"));
+            #[cfg(feature = "aleosig")]
+            &AleoSignature2021
+        }
         Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
             Some(URI::String(ref vm))
                 if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
@@ -1958,6 +1974,163 @@ impl ProofSuite for SolanaSignature2021 {
     }
 }
 
+#[cfg(feature = "aleosig")]
+/// Aleo Signature 2021
+///
+/// Linked data signature suite using [Aleo](crate::aleo).
+///
+/// # Suite definition
+///
+/// Aleo Signature 2021 is a [Linked Data Proofs][ld-proofs] signature suite consisting of the
+/// following algorithms:
+///
+/// |         Parameter          |               Value               |        Specification       |
+/// |----------------------------|-----------------------------------|----------------------------|
+/// |id                          |https://w3id.org/security#AleoSignature2021|[this document](#)  |
+/// |[canonicalization algorithm]|https://w3id.org/security#URDNA2015|[RDF Dataset Normalization 1.0][URDNA2015]|
+/// |[message digest algorithm]  |[SHA-256]                          |[RFC4634]                   |
+/// |[signature algorithm]       |Schnorr signature with [Edwards BLS12] curve|[Aleo Documentation - Accounts][aleo-accounts]|
+///
+/// The proof object must contain a [proofValue] property encoding the signature in
+/// [Multibase] format.
+///
+/// ## Verification method
+///
+/// Aleo Signature 2021 may be used with the following verification method types:
+///
+/// |            Name            |                IRI                |        Specification       |
+/// |----------------------------|-----------------------------------|----------------------------|
+/// |       AleoMethod2021       |https://w3id.org/security#AleoMethod2021|   [this document](#)  |
+/// |BlockchainVerificationMethod2021|https://w3id.org/security#BlockchainVerificationMethod2021|[Blockchain Vocabulary v1][blockchainvm2021]
+///
+/// The verification method object must have a [blockchainAccountId] property, identifying the
+/// signer's Aleo
+/// account address and network id for verification purposes. The chain id part of the account address
+/// identifies an Aleo network as specified in the proposed [CAIP for Aleo Blockchain
+/// Reference][caip-aleo-chain-ref]. Signatures use parameters defined per network. Currently only
+/// network id "1" (CAIP-2 "aleo:1" / [Aleo Testnet I][testnet1]) is supported. The account
+/// address format is documented in [Aleo
+/// documentation](https://developer.aleo.org/aleo/concepts/accounts#account-address).
+///
+/// [message digest algorithm]: https://w3id.org/security#digestAlgorithm
+/// [signature algorithm]: https://w3id.org/security#signatureAlgorithm
+/// [canonicalization algorithm]: https://w3id.org/security#canonicalizationAlgorithm
+/// [ld-proofs]: https://w3c-ccg.github.io/ld-proofs/
+/// [proofValue]: https://w3id.org/security#proofValue
+/// [Multibase]: https://datatracker.ietf.org/doc/html/draft-multiformats-multibase
+/// [URDNA2015]: https://json-ld.github.io/rdf-dataset-canonicalization/spec/
+/// [RFC4634]: https://www.rfc-editor.org/rfc/rfc4634 "US Secure Hash Algorithms (SHA and HMAC-SHA)"
+/// [SHA-256]: http://www.w3.org/2001/04/xmlenc#sha256
+/// [Edwards BLS12]: https://developer.aleo.org/autogen/advanced/the_aleo_curves/edwards_bls12
+/// [aleo-accounts]: https://developer.aleo.org/aleo/concepts/accounts
+/// [blockchainvm2021]: https://w3id.org/security/suites/blockchain-2021#BlockchainVerificationMethod2021
+/// [blockchainAccountId]: https://w3c-ccg.github.io/security-vocab/#blockchainAccountId
+/// [caip-aleo-chain-ref]: https://github.com/ChainAgnostic/CAIPs/pull/84
+/// [testnet1]: https://developer.aleo.org/testnet/getting_started/overview/
+pub struct AleoSignature2021;
+#[cfg(feature = "aleosig")]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl ProofSuite for AleoSignature2021 {
+    async fn sign(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
+        key: &JWK,
+        extra_proof_properties: Option<Map<String, Value>>,
+    ) -> Result<Proof, Error> {
+        let has_context = document_has_context(document, "TODO:uploadAleoVMContextSomewhere")?;
+        let mut proof = Proof {
+            context: if has_context {
+                Value::Null
+            } else {
+                serde_json::json!([ALEOVM_CONTEXT.clone()])
+            },
+            ..Proof::new("AleoSignature2021")
+                .with_options(options)
+                .with_properties(extra_proof_properties)
+        };
+        let message = to_jws_payload(document, &proof).await?;
+        let sig = crate::aleo::sign(&message, &key)?;
+        let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
+        proof.proof_value = Some(sig_mb);
+        Ok(proof)
+    }
+
+    async fn prepare(
+        &self,
+        document: &(dyn LinkedDataDocument + Sync),
+        options: &LinkedDataProofOptions,
+        _resolver: &dyn DIDResolver,
+        _public_key: &JWK,
+        extra_proof_properties: Option<Map<String, Value>>,
+    ) -> Result<ProofPreparation, Error> {
+        let proof = Proof {
+            context: serde_json::json!([SOLVM_CONTEXT.clone()]),
+            ..Proof::new("AleoSignature2021")
+                .with_options(options)
+                .with_properties(extra_proof_properties)
+        };
+        let message = to_jws_payload(document, &proof).await?;
+        Ok(ProofPreparation {
+            proof,
+            jws_header: None,
+            signing_input: SigningInput::Bytes(Base64urlUInt(message)),
+        })
+    }
+
+    async fn complete(
+        &self,
+        preparation: ProofPreparation,
+        signature: &str,
+    ) -> Result<Proof, Error> {
+        let mut proof = preparation.proof;
+        proof.proof_value = Some(signature.to_string());
+        Ok(proof)
+    }
+
+    async fn verify(
+        &self,
+        proof: &Proof,
+        document: &(dyn LinkedDataDocument + Sync),
+        resolver: &dyn DIDResolver,
+    ) -> Result<VerificationWarnings, Error> {
+        const NETWORK_ID: &str = "1";
+        const NAMESPACE: &str = "aleo";
+        let sig_mb = proof
+            .proof_value
+            .as_ref()
+            .ok_or(Error::MissingProofSignature)?;
+        let (_base, sig) = multibase::decode(&sig_mb)?;
+        let verification_method = proof
+            .verification_method
+            .as_ref()
+            .ok_or(Error::MissingVerificationMethod)?;
+        let vm = resolve_vm(verification_method, resolver).await?;
+        if vm.type_ != "AleoMethod2021" && vm.type_ != "BlockchainVerificationMethod2021" {
+            return Err(Error::VerificationMethodMismatch);
+        }
+        let account_id: BlockchainAccountId =
+            vm.blockchain_account_id.ok_or(Error::MissingKey)?.parse()?;
+        if account_id.chain_id.namespace != NAMESPACE {
+            return Err(Error::UnexpectedCAIP2Namepace(
+                NAMESPACE.to_string(),
+                account_id.chain_id.namespace.to_string(),
+            ));
+        }
+        if account_id.chain_id.reference != NETWORK_ID {
+            return Err(Error::UnexpectedAleoNetwork(
+                NETWORK_ID.to_string(),
+                account_id.chain_id.namespace.to_string(),
+            ));
+        }
+        let message = to_jws_payload(document, proof).await?;
+        crate::aleo::verify(&message, &account_id.account_address, &sig)?;
+        Ok(Default::default())
+    }
+}
+
 pub struct EcdsaSecp256r1Signature2019;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
@@ -2579,5 +2752,93 @@ mod tests {
             .verify(&completed_proof, &vp, &resolver)
             .await
             .unwrap();
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "aleosig")]
+    async fn aleosig2021() {
+        use crate::did::Document;
+        use crate::did_resolve::{
+            DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
+            TYPE_DID_LD_JSON,
+        };
+        use crate::vc::Credential;
+
+        struct ExampleResolver;
+        const EXAMPLE_DID: &str = "did:example:aleovm2021";
+        const EXAMPLE_DOC: &'static str = include_str!("../tests/lds-aleo2021-issuer0.jsonld");
+        #[async_trait]
+        impl DIDResolver for ExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                if did == EXAMPLE_DID {
+                    let doc = match Document::from_json(EXAMPLE_DOC) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            return (
+                                ResolutionMetadata::from_error(&format!("JSON Error: {:?}", err)),
+                                None,
+                                None,
+                            );
+                        }
+                    };
+                    (
+                        ResolutionMetadata {
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            ..Default::default()
+                        },
+                        Some(doc),
+                        Some(DocumentMetadata::default()),
+                    )
+                } else {
+                    (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
+                }
+            }
+        }
+
+        let private_key: JWK =
+            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+
+        let vc_str = include_str!("../tests/lds-aleo2021-vc0.jsonld");
+        let mut vc = Credential::from_json_unsigned(vc_str).unwrap();
+        let resolver = ExampleResolver;
+
+        if vc.proof.iter().flatten().next().is_none() {
+            // Issue VC / Generate Test Vector
+            let mut credential = vc.clone();
+            let vc_issue_options = LinkedDataProofOptions {
+                verification_method: Some(URI::String("did:example:aleovm2021#id".to_string())),
+                proof_purpose: Some(ProofPurpose::AssertionMethod),
+                ..Default::default()
+            };
+            let proof = AleoSignature2021
+                .sign(&vc, &vc_issue_options, &resolver, &private_key, None)
+                .await
+                .unwrap();
+            credential.add_proof(proof.clone());
+            vc = credential;
+
+            use std::fs::File;
+            use std::io::{BufWriter, Write};
+            let outfile = File::create("tests/lds-aleo2021-vc0.jsonld").unwrap();
+            let mut output_writer = BufWriter::new(outfile);
+            serde_json::to_writer_pretty(&mut output_writer, &vc).unwrap();
+            output_writer.write(b"\n").unwrap();
+        }
+
+        // Verify VC
+        let proof = vc.proof.iter().flatten().next().unwrap();
+        let warnings = AleoSignature2021
+            .verify(&proof, &vc, &resolver)
+            .await
+            .unwrap();
+        assert!(warnings.is_empty());
     }
 }

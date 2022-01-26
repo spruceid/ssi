@@ -1,5 +1,8 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
+#[cfg(feature = "aleosig")]
+pub mod aleo;
+
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;
