@@ -340,7 +340,7 @@ pub fn verify_bytes_warnable(
                 let public_key = p256::PublicKey::try_from(ec)?;
                 let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
                 let sig = panic::catch_unwind(|| p256::ecdsa::Signature::try_from(signature))
-                    .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
+                    .map_err(|e| Error::Secp256r1Parse("Error parsing signature".to_string()))??;
                 verifying_key.verify(data, &sig)?;
             }
             #[cfg(feature = "k256")]
