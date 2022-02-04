@@ -3,6 +3,8 @@
 SSI's documentation is currently packaged with the DIDKit documentation
 [here](https://spruceid.dev/docs/didkit/).
 
+Development chat: [Matrix: #public-dev:spruceid.com](https://matrix.to/#/#public-dev:spruceid.com>), [IRC: #spruce-dev on Libera.chat](https://web.libera.chat/#spruce-dev)
+
 # SSI
 
 SSI provides core Verifiable Credential and Decentralized Identifier
