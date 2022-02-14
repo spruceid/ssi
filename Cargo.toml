@@ -80,6 +80,7 @@ flate2 = "1.0"
 bitvec = "0.20"
 clear_on_drop = "0.2.4"
 url = { version = "2.2", features = ["serde"] }
+anyhow = "1.0"
 rand_xorshift = "0.3"
 bech32 = "0.8"
 snarkvm-dpc = { version = "0.7.9", optional = true }

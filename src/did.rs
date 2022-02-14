@@ -5,6 +5,7 @@
 //! [did-core]: https://www.w3.org/TR/did-core/
 
 use crate::caip10::BlockchainAccountId;
+use anyhow::{bail, Result as AResult};
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -386,6 +387,90 @@ pub struct DIDParameters {
     pub property_set: Option<Map<String, Value>>,
 }
 
+/// DID Create Operation
+///
+/// <https://identity.foundation/did-registration/#create>
+pub struct DIDCreate {
+    pub update_key: Option<JWK>,
+    pub recovery_key: Option<JWK>,
+    pub verification_key: Option<JWK>,
+    pub options: Value,
+}
+
+/// DID Update Operation
+///
+/// <https://identity.foundation/did-registration/#update>
+pub struct DIDUpdate {
+    pub did: String,
+    pub update_key: Option<JWK>,
+    pub new_update_key: Option<JWK>,
+    pub operation: DIDDocumentOperation,
+    pub options: Value,
+}
+
+/// DID Recover Operation
+///
+/// <https://www.w3.org/TR/did-core/#did-recovery>
+pub struct DIDRecover {
+    pub did: String,
+    pub recovery_key: Option<JWK>,
+    pub new_update_key: Option<JWK>,
+    pub new_recovery_key: Option<JWK>,
+    pub new_verification_key: Option<JWK>,
+    pub options: Value,
+}
+
+/// DID Deactivate Operation
+///
+/// <https://identity.foundation/did-registration/#deactivate>
+pub struct DIDDeactivate {
+    pub did: String,
+    pub key: Option<JWK>,
+    pub options: Value,
+}
+
+/// DID Document Operation
+///
+/// This should represent [didDocument][dd] and [didDocumentOperation][ddo] specified by DID
+/// Registration.
+///
+/// [dd]: https://identity.foundation/did-registration/#diddocumentoperation
+/// [ddo]: https://identity.foundation/did-registration/#diddocument
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "didDocumentOperation", content = "didDocument")]
+#[serde(rename_all = "camelCase")]
+pub enum DIDDocumentOperation {
+    /// Set the contents of the DID document
+    ///
+    /// setDidDocument operation defined by DIF DID Registration
+    SetDidDocument(Document),
+
+    /// Add properties to the DID document
+    ///
+    /// addToDidDocument operation defined by DIF DID Registration
+    AddToDidDocument(HashMap<String, Value>),
+
+    /// Remove properties from the DID document
+    ///
+    /// removeFromDidDocument operation defined by DIF Registration
+    RemoveFromDidDocument(Vec<String>),
+
+    /// Add or update a verification method in the DID document
+    SetVerificationMethod {
+        vmm: VerificationMethodMap,
+        purposes: Vec<VerificationRelationship>,
+    },
+
+    /// Add or update a service map in the DID document
+    SetService(Service),
+
+    /// Remove a verification method in the DID document
+    RemoveVerificationMethod(DIDURL),
+
+    /// Add or update a service map in the DID document
+    RemoveService(DIDURL),
+}
+
 /// An implementation of a [DID method](https://www.w3.org/TR/did-core/#dfn-did-methods).
 ///
 /// Depends on the [DIDResolver][] trait.
@@ -405,6 +490,26 @@ pub trait DIDMethod: Sync {
     /// Generate a DID from some source.
     fn generate(&self, _source: &Source) -> Option<String> {
         None
+    }
+
+    /// Create a DID
+    fn create(&self, _create: DIDCreate) -> AResult<DIDMethodTransaction> {
+        bail!("Create operation not implemented for DID Method");
+    }
+
+    /// Update a DID
+    fn update(&self, _update: DIDUpdate) -> AResult<DIDMethodTransaction> {
+        bail!("Update operation not implemented for DID Method");
+    }
+
+    /// Recover a DID
+    fn recover(&self, _recover: DIDRecover) -> AResult<DIDMethodTransaction> {
+        bail!("Recover operation not implemented for DID Method");
+    }
+
+    /// Deactivate a DID
+    fn deactivate(&self, _deactivate: DIDDeactivate) -> AResult<DIDMethodTransaction> {
+        bail!("Deactivate operation not implemented for DID Method");
     }
 
     /// Upcast the DID method as a DID resolver.
