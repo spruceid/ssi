@@ -471,6 +471,18 @@ pub enum DIDDocumentOperation {
     RemoveService(DIDURL),
 }
 
+/// A transaction for a DID method
+#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DIDMethodTransaction {
+    /// DID method name
+    pub did_method: String,
+
+    /// Method-specific transaction data
+    #[serde(flatten)]
+    pub value: Value,
+}
+
 /// An implementation of a [DID method](https://www.w3.org/TR/did-core/#dfn-did-methods).
 ///
 /// Depends on the [DIDResolver][] trait.
@@ -490,6 +502,16 @@ pub trait DIDMethod: Sync {
     /// Generate a DID from some source.
     fn generate(&self, _source: &Source) -> Option<String> {
         None
+    }
+
+    /// Retrieve a DID from a DID method transaction
+    fn did_from_transaction(&self, _tx: DIDMethodTransaction) -> AResult<String> {
+        bail!("DID from transaction not implemented for DID Method");
+    }
+
+    /// Submit a DID transaction
+    async fn submit_transaction(&self, _tx: DIDMethodTransaction) -> AResult<Value> {
+        bail!("Transaction submission not implemented for DID Method");
     }
 
     /// Create a DID
