@@ -1019,39 +1019,58 @@ impl DIDResolver for HTTPDIDResolver {
             return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
         }
 
-        // Assume the response is JSON(-LD) (DID Document or DID Resolution result)
-        let value: Value = match serde_json::from_slice(&res_result_representation) {
-            Ok(result) => result,
-            Err(err) => {
-                return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error parsing resolution response: {}",
-                        err
-                    )),
-                    None,
-                    None,
-                )
+        let (res_meta, doc_opt, mut doc_meta_opt) = if content_type == TYPE_DID_RESOLUTION {
+            // Handle result using DID Resolution Result media type (JSON-LD)
+            transform_resolution_result(serde_json::from_slice(&res_result_representation))
+        } else {
+            // Assume the response is JSON(-LD) (DID Document or DID Resolution result)
+            let value: Value = match serde_json::from_slice(&res_result_representation) {
+                Ok(result) => result,
+                Err(err) => {
+                    return (
+                        ResolutionMetadata::from_error(&format!(
+                            "Error parsing resolution response: {}",
+                            err
+                        )),
+                        None,
+                        None,
+                    )
+                }
+            };
+            let first_context_uri = get_first_context_uri(&value);
+            if first_context_uri == Some(crate::jsonld::DID_RESOLUTION_V1_CONTEXT) {
+                // Detect DID Resolution Result that didn't have specific media type.
+                transform_resolution_result(serde_json::from_value(value))
+            } else {
+                // Assume the response is a JSON(-LD) DID Document by default.
+                let doc: Document = match serde_json::from_value(value) {
+                    Ok(doc) => doc,
+                    Err(err) => {
+                        return (
+                            ResolutionMetadata::from_error(&format!(
+                                "Error parsing DID document: {}",
+                                err
+                            )),
+                            None,
+                            None,
+                        )
+                    }
+                };
+                (ResolutionMetadata::default(), Some(doc), None)
             }
         };
 
-        let first_context_uri = get_first_context_uri(&value);
-        if first_context_uri == Some(crate::jsonld::DID_RESOLUTION_V1_CONTEXT) {
-            // Detect DID Resolution Result that didn't have specific media type.
-            return transform_resolution_result(serde_json::from_value(value));
+        if status == StatusCode::GONE {
+            // Sidetree reference implementation as of 2022-02-14
+            // returns 410 Gone but does not set deactivated property.
+            // Fix: https://github.com/decentralized-identity/sidetree/pull/1178
+            let doc_meta = doc_meta_opt.get_or_insert_with(DocumentMetadata::default);
+            if doc_meta.deactivated.is_none() {
+                doc_meta.deactivated = Some(true);
+            }
         }
 
-        // Assume the response is a JSON(-LD) DID Document by default.
-        let doc: Document = match serde_json::from_value(value) {
-            Ok(doc) => doc,
-            Err(err) => {
-                return (
-                    ResolutionMetadata::from_error(&format!("Error parsing DID document: {}", err)),
-                    None,
-                    None,
-                )
-            }
-        };
-        return (ResolutionMetadata::default(), Some(doc), None);
+        return (res_meta, doc_opt, doc_meta_opt);
     }
 
     // Use default resolveRepresentation implementation in terms of resolve,
