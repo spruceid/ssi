@@ -12,17 +12,15 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-webkey/"
 documentation = "https://docs.rs/did-webkey/"
 
 [features]
-default = ["sequoia-openpgp/crypto-nettle"]
+default = ["ssi/ring", "crypto-nettle"]
 crypto-cng = ["sequoia-openpgp/crypto-cng"]
 crypto-nettle = ["sequoia-openpgp/crypto-nettle"]
 p256 = ["ssi/p256"]
 
 [dependencies]
-ssi = { version = "0.3", path = "../", features = [
-    "rand",
-    "ring",
-    "p256",
-], default-features = false }
+ssi = { version = "0.3", path = "../", default-features = false, features = [
+    "secp256r1",
+] }
 anyhow = "1.0.52"
 async-trait = "0.1.52"
 reqwest = { version = "0.11.9", features = ["json"] }
@@ -36,14 +34,14 @@ sshkeys = "0.3.1"
 sequoia-openpgp = { version = "1.7.0", features = [
     "compression-deflate",
 ], default-features = false, optional = true }
-# HACK: temp, point to crates once pgp publishes a version that doesn't require zeroize=1.3.0
-pgp = { git = "https://github.com/rpgp/rpgp", rev = "21081b6aaaaa5750ab937cfef30bae879a740d23", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-# HACK: same thing as above
-pgp = { git = "https://github.com/rpgp/rpgp", rev = "21081b6aaaaa5750ab937cfef30bae879a740d23", features = [
-    "wasm",
+sequoia-openpgp = { version = "1.7.0", default-features = false, features = [
+    "crypto-rust",
+    "allow-experimental-crypto",
+    "allow-variable-time-crypto",
 ] }
+
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
 version = "0.11.9"
@@ -53,4 +51,9 @@ features = ["json", "native-tls-vendored"]
 tokio = { version = "1.15.0", features = ["macros"] }
 async-std = { version = "1.10.0", features = ["attributes"] }
 futures = "0.3.19"
-hyper = { version = "0.14.16", features = ["server", "client", "http1", "stream"] }
+hyper = { version = "0.14.16", features = [
+    "server",
+    "client",
+    "http1",
+    "stream",
+] }
