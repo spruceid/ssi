@@ -3,7 +3,7 @@ use core::str::FromStr;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 #[cfg(feature = "sequoia-openpgp")]
 use openpgp::{
     cert::prelude::*,
@@ -91,7 +91,9 @@ fn pk_to_vm_ed25519(
     pk: sshkeys::Ed25519PublicKey,
 ) -> Result<(VerificationMethodMap, DIDURL)> {
     let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Ed25519(pk))?;
-    let thumbprint = jwk.thumbprint()?;
+    let thumbprint = jwk
+        .thumbprint()
+        .context("Unable to calculate JWK thumbprint")?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -112,7 +114,9 @@ fn pk_to_vm_ecdsa(
     pk: sshkeys::EcdsaPublicKey,
 ) -> Result<(VerificationMethodMap, DIDURL)> {
     let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Ecdsa(pk))?;
-    let thumbprint = jwk.thumbprint()?;
+    let thumbprint = jwk
+        .thumbprint()
+        .context("Unable to calculate JWK thumbprint")?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -130,7 +134,9 @@ fn pk_to_vm_ecdsa(
 
 fn pk_to_vm_rsa(did: &str, pk: sshkeys::RsaPublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
     let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Rsa(pk))?;
-    let thumbprint = jwk.thumbprint()?;
+    let thumbprint = jwk
+        .thumbprint()
+        .context("Unable to calculate JWK thumbprint")?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
