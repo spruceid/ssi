@@ -266,12 +266,10 @@ impl JWK {
     pub fn generate_ed25519() -> Result<JWK, Error> {
         let mut csprng = rand_old::rngs::OsRng {};
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
-        let sk_bytes = keypair.secret.to_bytes();
-        let pk_bytes = keypair.public.to_bytes();
         Ok(JWK::from(Params::OKP(OctetParams {
             curve: "Ed25519".to_string(),
-            public_key: Base64urlUInt(pk_bytes.to_vec()),
-            private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+            public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
+            private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
         })))
     }
 
@@ -280,10 +278,10 @@ impl JWK {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = k256::SecretKey::random(&mut rng);
         // SecretKey zeroizes on drop
-        let sk_bytes = secret_key.to_bytes().to_vec();
+        let sk_bytes: &[u8] = secret_key.as_scalar_bytes().as_ref();
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
-        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes));
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
@@ -292,10 +290,10 @@ impl JWK {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = p256::SecretKey::random(&mut rng);
         // SecretKey zeroizes on drop
-        let sk_bytes = secret_key.to_bytes().to_vec();
+        let sk_bytes: &[u8] = secret_key.as_scalar_bytes().as_ref();
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
-        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes));
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
