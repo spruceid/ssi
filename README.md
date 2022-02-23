@@ -40,18 +40,6 @@ clang
 openssl-devel
 ```
 
-If using feature `did-webkey/sequoia-openpgp` for PGP support, the following
-dependencies are also needed:
-
-```
-nettle-dev
-capnproto
-```
-
-If using feature
-[`did-webkey/crypto-cng`](https://gitlab.com/sequoia-pgp/sequoia#cryptography),
-only `capnproto` is needed.
-
 ## Install
 
 ### Crates.io

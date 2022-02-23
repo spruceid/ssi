@@ -4,14 +4,11 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use anyhow::{anyhow, Context, Result};
-#[cfg(feature = "sequoia-openpgp")]
-use openpgp::{
+use sequoia_openpgp::{
     cert::prelude::*,
     parse::{PacketParser, Parse},
     serialize::SerializeInto,
 };
-#[cfg(feature = "sequoia-openpgp")]
-use sequoia_openpgp as openpgp;
 use sshkeys::PublicKeyKind;
 use ssi::did::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
 use ssi::did_resolve::{
@@ -47,7 +44,6 @@ impl FromStr for DIDWebKeyType {
     }
 }
 
-#[cfg(feature = "sequoia-openpgp")]
 fn parse_pubkeys_gpg(
     did: &str,
     bytes: Vec<u8>,
@@ -66,7 +62,6 @@ fn parse_pubkeys_gpg(
     Ok((vm_maps, did_urls))
 }
 
-#[cfg(feature = "sequoia-openpgp")]
 fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL)> {
     let vm_url = DIDURL {
         did: did.to_string(),
@@ -473,7 +468,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "sequoia-openpgp")]
     async fn from_did_webkey_gpg() {
         let did_url: &str = "https://localhost/user.gpg";
         let pubkeys: &str = include_str!("../tests/user.gpg");
