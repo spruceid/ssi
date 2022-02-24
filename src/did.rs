@@ -249,6 +249,8 @@ pub struct VerificationMethodMap {
     // TODO: make sure this JWK does not have private key material
     pub public_key_jwk: Option<JWK>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_pgp: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     // TODO: make Base58 type like Base64urlUIntString
     /// [publicKeyBase58](https://www.w3.org/TR/did-spec-registries/#publickeybase58) property
     /// (deprecated; [Security Vocab definition](https://w3c-ccg.github.io/security-vocab/#publicKeyBase58)) - encodes public key material in Base58.

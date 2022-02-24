@@ -3,6 +3,15 @@ use core::str::FromStr;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
+use anyhow::{anyhow, Context, Result};
+#[cfg(feature = "sequoia-openpgp")]
+use openpgp::{
+    cert::prelude::*,
+    parse::{PacketParser, Parse},
+    serialize::SerializeInto,
+};
+#[cfg(feature = "sequoia-openpgp")]
+use sequoia_openpgp as openpgp;
 use sshkeys::PublicKeyKind;
 use ssi::did::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
 use ssi::did_resolve::{
@@ -38,26 +47,53 @@ impl FromStr for DIDWebKeyType {
     }
 }
 
+#[cfg(feature = "sequoia-openpgp")]
 fn parse_pubkeys_gpg(
-    _did: &str,
-    _bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
-    // TODO
-    Err(String::from("GPG Key Type Not Implemented"))
+    did: &str,
+    bytes: Vec<u8>,
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
+    let mut did_urls = Vec::new();
+    let mut vm_maps = Vec::new();
+
+    let ppr = PacketParser::from_bytes(&bytes)?;
+    for certo in CertParser::from(ppr) {
+        let cert = certo?;
+        let (vm_map, did_url) = gpg_pk_to_vm(did, cert)?;
+        vm_maps.push(vm_map);
+        did_urls.push(did_url);
+    }
+
+    Ok((vm_maps, did_urls))
+}
+
+#[cfg(feature = "sequoia-openpgp")]
+fn gpg_pk_to_vm(did: &str, cert: Cert) -> Result<(VerificationMethodMap, DIDURL)> {
+    let vm_url = DIDURL {
+        did: did.to_string(),
+        fragment: Some(cert.fingerprint().to_string()),
+        ..Default::default()
+    };
+
+    let armored_pgp = String::from_utf8(cert.armored().to_vec()?)?;
+
+    let vm_map = VerificationMethodMap {
+        id: vm_url.to_string(),
+        type_: "PgpVerificationKey2021".to_string(),
+        public_key_pgp: Some(armored_pgp),
+        controller: did.to_string(),
+        ..Default::default()
+    };
+    Ok((vm_map, vm_url))
 }
 
 fn pk_to_vm_ed25519(
     did: &str,
     pk: sshkeys::Ed25519PublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    let jwk = match ssh_pkk_to_jwk(&PublicKeyKind::Ed25519(pk)) {
-        Err(err) => return Err(format!("Unable to convert SSH key to JWK: {}", err)),
-        Ok(jwk) => jwk,
-    };
-    let thumbprint = match jwk.thumbprint() {
-        Err(err) => return Err(format!("Unable to calculate JWK thumbprint: {}", err)),
-        Ok(t) => t,
-    };
+) -> Result<(VerificationMethodMap, DIDURL)> {
+    let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Ed25519(pk))?;
+    let thumbprint = jwk
+        .thumbprint()
+        .context("Unable to calculate JWK thumbprint")?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -76,15 +112,11 @@ fn pk_to_vm_ed25519(
 fn pk_to_vm_ecdsa(
     did: &str,
     pk: sshkeys::EcdsaPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    let jwk = match ssh_pkk_to_jwk(&PublicKeyKind::Ecdsa(pk)) {
-        Err(err) => return Err(format!("Unable to convert SSH key to JWK: {}", err)),
-        Ok(jwk) => jwk,
-    };
-    let thumbprint = match jwk.thumbprint() {
-        Err(err) => return Err(format!("Unable to calculate JWK thumbprint: {}", err)),
-        Ok(t) => t,
-    };
+) -> Result<(VerificationMethodMap, DIDURL)> {
+    let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Ecdsa(pk))?;
+    let thumbprint = jwk
+        .thumbprint()
+        .context("Unable to calculate JWK thumbprint")?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -100,18 +132,11 @@ fn pk_to_vm_ecdsa(
     Ok((vm_map, vm_url))
 }
 
-fn pk_to_vm_rsa(
-    did: &str,
-    pk: sshkeys::RsaPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    let jwk = match ssh_pkk_to_jwk(&PublicKeyKind::Rsa(pk)) {
-        Err(err) => return Err(format!("Unable to convert SSH key to JWK: {}", err)),
-        Ok(jwk) => jwk,
-    };
-    let thumbprint = match jwk.thumbprint() {
-        Err(err) => return Err(format!("Unable to calculate JWK thumbprint: {}", err)),
-        Ok(t) => t,
-    };
+fn pk_to_vm_rsa(did: &str, pk: sshkeys::RsaPublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
+    let jwk = ssh_pkk_to_jwk(&PublicKeyKind::Rsa(pk))?;
+    let thumbprint = jwk
+        .thumbprint()
+        .context("Unable to calculate JWK thumbprint")?;
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(thumbprint),
@@ -127,14 +152,11 @@ fn pk_to_vm_rsa(
     Ok((vm_map, vm_url))
 }
 
-fn pk_to_vm_dsa(
-    _did: &str,
-    _pk: sshkeys::DsaPublicKey,
-) -> Result<(VerificationMethodMap, DIDURL), String> {
-    Err(String::from("Unsupported DSA Key"))
+fn pk_to_vm_dsa(_did: &str, _pk: sshkeys::DsaPublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
+    Err(anyhow!("Unsupported DSA Key"))
 }
 
-fn pk_to_vm(did: &str, pk: sshkeys::PublicKey) -> Result<(VerificationMethodMap, DIDURL), String> {
+fn pk_to_vm(did: &str, pk: sshkeys::PublicKey) -> Result<(VerificationMethodMap, DIDURL)> {
     match pk.kind {
         PublicKeyKind::Rsa(pk) => pk_to_vm_rsa(did, pk),
         PublicKeyKind::Dsa(pk) => pk_to_vm_dsa(did, pk),
@@ -146,28 +168,14 @@ fn pk_to_vm(did: &str, pk: sshkeys::PublicKey) -> Result<(VerificationMethodMap,
 fn parse_pubkeys_ssh(
     did: &str,
     bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
-    let lines = match String::from_utf8(bytes) {
-        Ok(string) => string,
-        Err(err) => return Err(format!("Unable to parse SSH keys: {}", err)),
-    };
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
+    let lines = String::from_utf8(bytes)?;
     let mut did_urls = Vec::new();
     let mut vm_maps = Vec::new();
     let lines = lines.trim().split('\n');
     for line in lines {
-        let pk = match sshkeys::PublicKey::from_string(line) {
-            Ok(pk) => pk,
-            Err(err) => return Err(format!("Unable to parse SSH key: {}", err)),
-        };
-        let (vm_map, did_url) = match pk_to_vm(did, pk) {
-            Ok(pk) => pk,
-            Err(err) => {
-                return Err(format!(
-                    "Unable to convert SSH public key to verification method: {}",
-                    err
-                ))
-            }
-        };
+        let pk = sshkeys::PublicKey::from_string(line)?;
+        let (vm_map, did_url) = pk_to_vm(did, pk)?;
         vm_maps.push(vm_map);
         did_urls.push(did_url);
     }
@@ -178,7 +186,7 @@ fn parse_pubkeys(
     did: &str,
     type_: DIDWebKeyType,
     bytes: Vec<u8>,
-) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>), String> {
+) -> Result<(Vec<VerificationMethodMap>, Vec<DIDURL>)> {
     match type_ {
         DIDWebKeyType::Gpg => parse_pubkeys_gpg(did, bytes),
         DIDWebKeyType::Ssh => parse_pubkeys_ssh(did, bytes),
@@ -348,23 +356,22 @@ mod tests {
         );
     }
 
-    // TODO: use JWK fingerprint
-    const DID_URL: &str = "https://localhost/user.keys";
-    const PUBKEYS: &str = include_str!("../tests/ssh_keys");
     // localhost web server for serving did:web DID documents.
-    // TODO: pass arguments here instead of using const
-    fn web_server() -> Result<(String, impl FnOnce() -> Result<(), ()>), hyper::Error> {
+    fn web_server(
+        did_url: &'static str,
+        pubkeys: &'static str,
+    ) -> Result<(String, impl FnOnce() -> Result<(), ()>), hyper::Error> {
         use http::header::{HeaderValue, CONTENT_TYPE};
         use hyper::service::{make_service_fn, service_fn};
         use hyper::{Body, Response, Server};
         let addr = ([127, 0, 0, 1], 0).into();
-        let make_svc = make_service_fn(|_| async move {
-            Ok::<_, hyper::Error>(service_fn(|req| async move {
+        let make_svc = make_service_fn(move |_| async move {
+            Ok::<_, hyper::Error>(service_fn(move |req| async move {
                 let uri = req.uri();
                 // Skip leading slash
                 let proxied_url: String = uri.path().chars().skip(1).collect();
-                if proxied_url == DID_URL {
-                    let body = Body::from(PUBKEYS);
+                if proxied_url == did_url {
+                    let body = Body::from(pubkeys);
                     let mut response = Response::new(body);
                     response
                         .headers_mut()
@@ -375,7 +382,7 @@ mod tests {
                 let (mut parts, body) = Response::<Body>::default().into_parts();
                 parts.status = hyper::StatusCode::NOT_FOUND;
                 let response = Response::from_parts(parts, body);
-                return Ok::<_, hyper::Error>(response);
+                Ok::<_, hyper::Error>(response)
             }))
         });
         let server = Server::try_bind(&addr)?.serve(make_svc);
@@ -392,8 +399,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn from_did_webkey() {
-        let (url, shutdown) = web_server().unwrap();
+    async fn from_did_webkey_ssh() {
+        // TODO: use JWK fingerprint
+        let did_url: &str = "https://localhost/user.keys";
+        let pubkeys: &str = include_str!("../tests/ssh_keys");
+
+        let (url, shutdown) = web_server(did_url, pubkeys).unwrap();
         PROXY.with(|proxy| {
             proxy.replace(Some(url));
         });
@@ -451,6 +462,69 @@ mod tests {
             }
           ]
         });
+        let doc = doc_opt.unwrap();
+        let doc_value = serde_json::to_value(doc).unwrap();
+        eprintln!("doc {}", serde_json::to_string_pretty(&doc_value).unwrap());
+        assert_eq!(doc_value, value_expected);
+        PROXY.with(|proxy| {
+            proxy.replace(None);
+        });
+        shutdown().ok();
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "sequoia-openpgp")]
+    async fn from_did_webkey_gpg() {
+        let did_url: &str = "https://localhost/user.gpg";
+        let pubkeys: &str = include_str!("../tests/user.gpg");
+
+        let (url, shutdown) = web_server(did_url, pubkeys).unwrap();
+        PROXY.with(|proxy| {
+            proxy.replace(Some(url));
+        });
+        let (res_meta, doc_opt, _doc_meta) = DIDWebKey
+            .resolve(
+                "did:webkey:gpg:localhost:user.gpg",
+                &ResolutionInputMetadata::default(),
+            )
+            .await;
+        assert_eq!(res_meta.error, None);
+
+        let value_expected = json!({
+          "@context": "https://www.w3.org/ns/did/v1",
+          "assertionMethod": [
+            "did:webkey:gpg:localhost:user.gpg#0CEE8B84B25C0A3C554A9EC1F8FEE972E2A1D935",
+            "did:webkey:gpg:localhost:user.gpg#6BABBD68A84D5FE3CEEB986EB77927AE619B8EB6",
+            "did:webkey:gpg:localhost:user.gpg#DCB1FF1899328C0EBB5DF07BD41BBBD1FE58006E"
+          ],
+          "authentication": [
+            "did:webkey:gpg:localhost:user.gpg#0CEE8B84B25C0A3C554A9EC1F8FEE972E2A1D935",
+            "did:webkey:gpg:localhost:user.gpg#6BABBD68A84D5FE3CEEB986EB77927AE619B8EB6",
+            "did:webkey:gpg:localhost:user.gpg#DCB1FF1899328C0EBB5DF07BD41BBBD1FE58006E"
+          ],
+          "id": "did:webkey:gpg:localhost:user.gpg",
+          "verificationMethod": [
+            {
+              "controller": "did:webkey:gpg:localhost:user.gpg",
+              "id": "did:webkey:gpg:localhost:user.gpg#0CEE8B84B25C0A3C554A9EC1F8FEE972E2A1D935",
+              "publicKeyPgp": "-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: 0CEE 8B84 B25C 0A3C 554A  9EC1 F8FE E972 E2A1 D935\nComment: Foobar <foobar@example.org>\n\n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\n2YdBRVOAnw==\n=4Vh8\n-----END PGP PUBLIC KEY BLOCK-----\n",
+              "type": "PgpVerificationKey2021"
+            },
+            {
+              "controller": "did:webkey:gpg:localhost:user.gpg",
+              "id": "did:webkey:gpg:localhost:user.gpg#6BABBD68A84D5FE3CEEB986EB77927AE619B8EB6",
+              "publicKeyPgp": "-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: 6BAB BD68 A84D 5FE3 CEEB  986E B779 27AE 619B 8EB6\nComment: Foobar <foobar@example.org>\n\nxlIEYd3nnBMIKoZIzj0DAQcCAwRhnJmDiD35LzJXstn4zBMfpavUCSkYzyJKIYHe\nOwW4BFe+AF/ZdczzJnx8O1xndvYOFccVNAz7HMb7xPB7MDcEzRtGb29iYXIgPGZv\nb2JhckBleGFtcGxlLm9yZz7CkAQTEwgAOBYhBGurvWioTV/jzuuYbrd5J65hm462\nBQJh3eecAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJELd5J65hm462BNgB\nAKzxt0M3BpEGlAGjz4czrWX8zRdo6XiKeby5yeORfKDEAP4uOuIwE9ics9XICXUg\n1IZhOVNB2cUS6p7Q5ApaqwE3Wc5WBGHd55wSCCqGSM49AwEHAgMEN0OVHjy6Pwyp\nfTci+EKIc486T1EGeYBs/1FErq3bB44Vqr3EsOcdscSqyj3dcxXb47d0kOkiDPKm\nKTy/6ZPWsAMBCAfCeAQYEwgAIBYhBGurvWioTV/jzuuYbrd5J65hm462BQJh3eec\nAhsMAAoJELd5J65hm462KTsA/3vbivQARQMsZfGKptW/SVaKwszMQm2SE+jOESoH\ntk3MAQCjUD7O3CzMX2rCDgLBLh6hwgB3zjn8uaHM1zO9Z48HhQ==\n=Erc7\n-----END PGP PUBLIC KEY BLOCK-----\n",
+              "type": "PgpVerificationKey2021"
+            },
+            {
+              "controller": "did:webkey:gpg:localhost:user.gpg",
+              "id": "did:webkey:gpg:localhost:user.gpg#DCB1FF1899328C0EBB5DF07BD41BBBD1FE58006E",
+              "publicKeyPgp": "-----BEGIN PGP PUBLIC KEY BLOCK-----\nComment: DCB1 FF18 9932 8C0E BB5D  F07B D41B BBD1 FE58 006E\nComment: Foobar <foobar@example.org>\n\nxjMEYd3nyxYJKwYBBAHaRw8BAQdAp756gWZbZB66yTjjn52DyUvCxUgFG7aSKqYY\n7KG2KvDNG0Zvb2JhciA8Zm9vYmFyQGV4YW1wbGUub3JnPsKQBBMWCAA4FiEE3LH/\nGJkyjA67XfB71Bu70f5YAG4FAmHd58sCGwMFCwkIBwIGFQoJCAsCBBYCAwECHgEC\nF4AACgkQ1Bu70f5YAG7IMQD7BEg3vAqinv1wllBpXfQov7b4+haxcADWXgmc+06D\nx1QBAMWd6Oa71iKafJKKL3Vgk5q/Sns5+xDvMJmcGbMemckMzjgEYd3nyxIKKwYB\nBAGXVQEFAQEHQECEkuj4GJuUKC0nKvyXoEA1DxJPnASFt2GPC0trMcMoAwEIB8J4\nBBgWCAAgFiEE3LH/GJkyjA67XfB71Bu70f5YAG4FAmHd58sCGwwACgkQ1Bu70f5Y\nAG6eUAEA8vwHBMR4ownA069pQ2EqGhueMoU7YQX0IQBosDf7NrMBAJCoLmuc2dGQ\nT4/C2SFSd3mgOqJXpumOyBFj6hoYkyAI\n=LgN5\n-----END PGP PUBLIC KEY BLOCK-----\n",
+              "type": "PgpVerificationKey2021"
+            }
+          ]
+        });
+
         let doc = doc_opt.unwrap();
         let doc_value = serde_json::to_value(doc).unwrap();
         eprintln!("doc {}", serde_json::to_string_pretty(&doc_value).unwrap());
