@@ -6,8 +6,9 @@ use reqwest::{header, Client, StatusCode};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use ssi::did::{
-    DIDCreate, DIDDeactivate, DIDDocumentOperation, DIDMethod, DIDMethodTransaction, DIDRecover,
-    DIDUpdate, Document, Service, ServiceEndpoint, VerificationRelationship,
+    DIDCreate, DIDDeactivate, DIDDocumentOperation, DIDMethod, DIDMethodError,
+    DIDMethodTransaction, DIDRecover, DIDUpdate, Document, Service, ServiceEndpoint,
+    VerificationRelationship,
 };
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, HTTPDIDResolver, ResolutionInputMetadata, ResolutionMetadata,
@@ -1483,24 +1484,30 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         }
     }
 
-    fn create(&self, create: DIDCreate) -> Result<DIDMethodTransaction> {
+    fn create(&self, create: DIDCreate) -> Result<DIDMethodTransaction, DIDMethodError> {
         let DIDCreate {
             recovery_key,
             update_key,
             verification_key,
             options,
         } = create;
-        ensure!(is_empty(&options), "Create options not supported");
+        for opt in options.keys() {
+            return Err(DIDMethodError::OptionNotSupported {
+                operation: "create",
+                option: opt.clone(),
+            });
+        }
         let (update_pk, recovery_pk, patches) =
             new_did_state::<S>(update_key, recovery_key, verification_key)
                 .context("Prepare keys for DID creation")?;
         let operation = S::create_existing(&update_pk, &recovery_pk, patches)
             .context("Construct Create operation")?;
-        Self::op_to_transaction(operation).context("Construct create transaction")
+        let tx = Self::op_to_transaction(operation).context("Construct create transaction")?;
+        Ok(tx)
     }
 
     /// <https://identity.foundation/sidetree/api/#sidetree-operations>
-    async fn submit_transaction(&self, tx: DIDMethodTransaction) -> Result<Value> {
+    async fn submit_transaction(&self, tx: DIDMethodTransaction) -> Result<Value, DIDMethodError> {
         let op = Self::op_from_transaction(tx)
             .context("Convert DID method transaction to Sidetree operation")?;
         let endpoint = self
@@ -1522,7 +1529,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
                 .json()
                 .await
                 .context("Transaction submit failed. Unable to read HTTP response JSON")?;
-            bail!("Transaction submit failed: {}: {}", e, err);
+            return Err(anyhow!("Transaction submit failed: {}: {}", e, err).into());
         }
         if resp.content_length() == Some(0) {
             // Update operation may return empty body with 200 OK.
@@ -1536,7 +1543,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         Ok(resp_json)
     }
 
-    fn did_from_transaction(&self, tx: DIDMethodTransaction) -> Result<String> {
+    fn did_from_transaction(&self, tx: DIDMethodTransaction) -> Result<String, DIDMethodError> {
         let op = Self::op_from_transaction(tx)
             .context("Convert DID method transaction to Sidetree operation")?;
         let did = match op {
@@ -1555,7 +1562,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         Ok(did.to_string())
     }
 
-    fn update(&self, update: DIDUpdate) -> Result<DIDMethodTransaction> {
+    fn update(&self, update: DIDUpdate) -> Result<DIDMethodTransaction, DIDMethodError> {
         let DIDUpdate {
             did,
             update_key,
@@ -1564,7 +1571,12 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             options,
         } = update;
         let did = SidetreeDID::<S>::from_str(&did).context("Parse Sidetree DID")?;
-        ensure!(is_empty(&options), "Update options not supported");
+        for opt in options.keys() {
+            return Err(DIDMethodError::OptionNotSupported {
+                operation: "update",
+                option: opt.clone(),
+            });
+        }
         let update_key = update_key.ok_or(anyhow!("Missing required new update key"))?;
         let new_update_key = new_update_key.ok_or(anyhow!("Missing required new update key"))?;
         S::validate_key(&new_update_key).context("Validate update key")?;
@@ -1575,11 +1587,12 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         let did_suffix = DIDSuffix::from(did);
         let update_operation = S::update(did_suffix, &update_key, &new_update_pk, patches)
             .context("Construct Update operation")?;
-        Self::op_to_transaction(Operation::Update(update_operation))
-            .context("Construct update transaction")
+        let tx = Self::op_to_transaction(Operation::Update(update_operation))
+            .context("Construct update transaction")?;
+        Ok(tx)
     }
 
-    fn recover(&self, recover: DIDRecover) -> Result<DIDMethodTransaction> {
+    fn recover(&self, recover: DIDRecover) -> Result<DIDMethodTransaction, DIDMethodError> {
         let DIDRecover {
             did,
             recovery_key,
@@ -1590,7 +1603,12 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         } = recover;
         let did = SidetreeDID::<S>::from_str(&did).context("Parse Sidetree DID")?;
         let did_suffix = DIDSuffix::from(did);
-        ensure!(is_empty(&options), "Recover options not supported");
+        for opt in options.keys() {
+            return Err(DIDMethodError::OptionNotSupported {
+                operation: "recover",
+                option: opt.clone(),
+            });
+        }
         let recovery_key = recovery_key.ok_or(anyhow!("Missing required recovery key"))?;
         let (new_update_pk, new_recovery_pk, patches) =
             new_did_state::<S>(new_update_key, new_recovery_key, new_verification_key)
@@ -1603,21 +1621,31 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             patches,
         )
         .context("Construct Recover operation")?;
-        Self::op_to_transaction(operation).context("Construct recover transaction")
+        let tx = Self::op_to_transaction(operation).context("Construct recover transaction")?;
+        Ok(tx)
     }
 
-    fn deactivate(&self, deactivate: DIDDeactivate) -> Result<DIDMethodTransaction> {
+    fn deactivate(
+        &self,
+        deactivate: DIDDeactivate,
+    ) -> Result<DIDMethodTransaction, DIDMethodError> {
         let DIDDeactivate { did, key, options } = deactivate;
         let did = SidetreeDID::<S>::from_str(&did).context("Parse Sidetree DID")?;
         let recovery_key = key.ok_or(anyhow!(
             "Missing required recovery key for DID deactivation"
         ))?;
-        ensure!(is_empty(&options), "Deactivate options not supported");
+        for opt in options.keys() {
+            return Err(DIDMethodError::OptionNotSupported {
+                operation: "deactivate",
+                option: opt.clone(),
+            });
+        }
         let did_suffix = DIDSuffix::from(did);
         let deactivate_operation = <S as Sidetree>::deactivate(did_suffix, recovery_key)
             .context("Construct DID Deactivate operation")?;
-        Self::op_to_transaction(Operation::Deactivate(deactivate_operation))
-            .context("Construct DID deactivate transaction")
+        let tx = Self::op_to_transaction(Operation::Deactivate(deactivate_operation))
+            .context("Construct DID deactivate transaction")?;
+        Ok(tx)
     }
 }
 
@@ -1640,14 +1668,6 @@ impl<S: Sidetree> SidetreeClient<S> {
             serde_json::from_value(op_value).context("Convert value to operation")?;
         Ok(op)
     }
-}
-
-fn is_empty(options: &Value) -> bool {
-    options.is_null()
-        || match options.as_object() {
-            Some(obj) => obj.is_empty(),
-            None => false,
-        }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]

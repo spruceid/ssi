@@ -5,12 +5,12 @@
 //! [did-core]: https://www.w3.org/TR/did-core/
 
 use crate::caip10::BlockchainAccountId;
-use anyhow::{bail, Result as AResult};
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fmt;
 use std::str::FromStr;
+use thiserror::Error;
 
 use crate::did_resolve::{
     Content, ContentMetadata, DIDResolver, DereferencingInputMetadata, DereferencingMetadata,
@@ -394,7 +394,7 @@ pub struct DIDCreate {
     pub update_key: Option<JWK>,
     pub recovery_key: Option<JWK>,
     pub verification_key: Option<JWK>,
-    pub options: Value,
+    pub options: Map<String, Value>,
 }
 
 /// DID Update Operation
@@ -405,7 +405,7 @@ pub struct DIDUpdate {
     pub update_key: Option<JWK>,
     pub new_update_key: Option<JWK>,
     pub operation: DIDDocumentOperation,
-    pub options: Value,
+    pub options: Map<String, Value>,
 }
 
 /// DID Recover Operation
@@ -417,7 +417,7 @@ pub struct DIDRecover {
     pub new_update_key: Option<JWK>,
     pub new_recovery_key: Option<JWK>,
     pub new_verification_key: Option<JWK>,
-    pub options: Value,
+    pub options: Map<String, Value>,
 }
 
 /// DID Deactivate Operation
@@ -426,7 +426,7 @@ pub struct DIDRecover {
 pub struct DIDDeactivate {
     pub did: String,
     pub key: Option<JWK>,
-    pub options: Value,
+    pub options: Map<String, Value>,
 }
 
 /// DID Document Operation
@@ -483,6 +483,20 @@ pub struct DIDMethodTransaction {
     pub value: Value,
 }
 
+/// An error having to do with a [DIDMethod].
+#[derive(Error, Debug)]
+pub enum DIDMethodError {
+    #[error("Not implemented for DID method: {0}")]
+    NotImplemented(&'static str),
+    #[error("Option '{option}' not supported for DID operation '{operation}'")]
+    OptionNotSupported {
+        operation: &'static str,
+        option: String,
+    },
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
 /// An implementation of a [DID method](https://www.w3.org/TR/did-core/#dfn-did-methods).
 ///
 /// Depends on the [DIDResolver][] trait.
@@ -505,33 +519,36 @@ pub trait DIDMethod: Sync {
     }
 
     /// Retrieve a DID from a DID method transaction
-    fn did_from_transaction(&self, _tx: DIDMethodTransaction) -> AResult<String> {
-        bail!("DID from transaction not implemented for DID Method");
+    fn did_from_transaction(&self, _tx: DIDMethodTransaction) -> Result<String, DIDMethodError> {
+        Err(DIDMethodError::NotImplemented("DID from transaction"))
     }
 
     /// Submit a DID transaction
-    async fn submit_transaction(&self, _tx: DIDMethodTransaction) -> AResult<Value> {
-        bail!("Transaction submission not implemented for DID Method");
+    async fn submit_transaction(&self, _tx: DIDMethodTransaction) -> Result<Value, DIDMethodError> {
+        Err(DIDMethodError::NotImplemented("Transaction submission"))
     }
 
     /// Create a DID
-    fn create(&self, _create: DIDCreate) -> AResult<DIDMethodTransaction> {
-        bail!("Create operation not implemented for DID Method");
+    fn create(&self, _create: DIDCreate) -> Result<DIDMethodTransaction, DIDMethodError> {
+        Err(DIDMethodError::NotImplemented("Create operation"))
     }
 
     /// Update a DID
-    fn update(&self, _update: DIDUpdate) -> AResult<DIDMethodTransaction> {
-        bail!("Update operation not implemented for DID Method");
+    fn update(&self, _update: DIDUpdate) -> Result<DIDMethodTransaction, DIDMethodError> {
+        Err(DIDMethodError::NotImplemented("Update operation"))
     }
 
     /// Recover a DID
-    fn recover(&self, _recover: DIDRecover) -> AResult<DIDMethodTransaction> {
-        bail!("Recover operation not implemented for DID Method");
+    fn recover(&self, _recover: DIDRecover) -> Result<DIDMethodTransaction, DIDMethodError> {
+        Err(DIDMethodError::NotImplemented("Recover operation"))
     }
 
     /// Deactivate a DID
-    fn deactivate(&self, _deactivate: DIDDeactivate) -> AResult<DIDMethodTransaction> {
-        bail!("Deactivate operation not implemented for DID Method");
+    fn deactivate(
+        &self,
+        _deactivate: DIDDeactivate,
+    ) -> Result<DIDMethodTransaction, DIDMethodError> {
+        Err(DIDMethodError::NotImplemented("Deactivate operation"))
     }
 
     /// Upcast the DID method as a DID resolver.
