@@ -1249,14 +1249,32 @@ pub struct PublicKeyJwk {
     jwk: Value,
 }
 
+/// Error resulting from [converting JWK to PublicKeyJwk][PublicKeyJwk::try_from]
+#[derive(ThisError, Debug)]
+pub enum PublicKeyJwkFromJWKError {
+    /// Unable to convert JWK to [Value]
+    #[error("Unable to convert JWK to Value")]
+    ToValue(#[from] serde_json::Error),
+    /// Public Key JWK must not contain private key parameters (e.g. "d")
+    #[error("Public Key JWK must not contain private key parameters")]
+    PrivateKeyParameters,
+}
+
+/// Error resulting from attempting to convert [PublicKeyJwk] to JWK
+#[derive(ThisError, Debug)]
+pub enum JWKFromPublicKeyJwkError {
+    /// Unable to convert [Value] to JWK
+    #[error("Unable to convert Value to JWK")]
+    FromValue(#[from] serde_json::Error),
+}
+
 impl TryFrom<JWK> for PublicKeyJwk {
-    type Error = AError;
+    type Error = PublicKeyJwkFromJWKError;
     fn try_from(jwk: JWK) -> Result<Self, Self::Error> {
-        let jwk_value = serde_json::to_value(jwk).context("Convert JWK to Value")?;
-        ensure!(
-            jwk_value.get("d").is_none(),
-            "Public Key JWK must not contain private key parameters"
-        );
+        let jwk_value = serde_json::to_value(jwk).map_err(PublicKeyJwkFromJWKError::ToValue)?;
+        if jwk_value.get("d").is_some() {
+            return Err(PublicKeyJwkFromJWKError::PrivateKeyParameters);
+        };
         Ok(Self {
             jwk: jwk_value,
             nonce: None,
@@ -1268,9 +1286,9 @@ impl TryFrom<JWK> for PublicKeyJwk {
 ///
 /// Note: `nonce` property is dropped.
 impl TryFrom<PublicKeyJwk> for JWK {
-    type Error = AError;
+    type Error = JWKFromPublicKeyJwkError;
     fn try_from(pkjwk: PublicKeyJwk) -> Result<Self, Self::Error> {
-        let jwk = serde_json::from_value(pkjwk.jwk).context("Convert Value to JWK")?;
+        let jwk = serde_json::from_value(pkjwk.jwk).map_err(JWKFromPublicKeyJwkError::FromValue)?;
         Ok(jwk)
     }
 }
@@ -1794,7 +1812,7 @@ pub enum JWSDecodeVerifyError {
     DeserializeJWSPayload(#[source] serde_json::Error),
     /// Unable to convert PublicKeyJwk to JWK
     #[error("Unable to convert PublicKeyJwk to JWK")]
-    ConvertPublicKeyJwkToJWK(#[source] anyhow::Error),
+    JWKFromPublicKeyJwk(#[source] JWKFromPublicKeyJwkError),
     /// Unable to verify JWS
     #[error("Unable to verify JWS")]
     VerifyJWS(#[source] ssi::error::Error),
@@ -1831,7 +1849,7 @@ pub fn jws_decode_verify_inner<Claims: DeserializeOwned>(
     let claims: Claims =
         serde_json::from_slice(&payload).map_err(JWSDecodeVerifyError::DeserializeJWSPayload)?;
     let pk = get_key(&claims);
-    let pk = JWK::try_from(pk.clone()).map_err(JWSDecodeVerifyError::ConvertPublicKeyJwkToJWK)?;
+    let pk = JWK::try_from(pk.clone()).map_err(JWSDecodeVerifyError::JWKFromPublicKeyJwk)?;
     verify_bytes(header.algorithm, &signing_input, &pk, &signature)
         .map_err(JWSDecodeVerifyError::VerifyJWS)?;
     Ok((header, claims))
