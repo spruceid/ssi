@@ -492,6 +492,12 @@ pub trait Sidetree {
     }
 }
 
+/// Sidetree DID operation
+///
+/// ### References
+/// - <https://identity.foundation/sidetree/spec/v1.0.0/#did-operations>
+/// - <https://identity.foundation/sidetree/spec/v1.0.0/#sidetree-operations>
+/// - <https://identity.foundation/sidetree/api/#sidetree-operations>
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "camelCase")]
@@ -502,6 +508,9 @@ pub enum Operation {
     Deactivate(DeactivateOperation),
 }
 
+/// Partially verified DID Create operation
+///
+/// Converted from [CreateOperation].
 #[derive(Debug, Clone)]
 pub struct PartiallyVerifiedCreateOperation {
     did_suffix: DIDSuffix,
@@ -511,6 +520,9 @@ pub struct PartiallyVerifiedCreateOperation {
     hashed_delta: Delta,
 }
 
+/// Partially verified DID Create operation
+///
+/// Converted from [UpdateOperation].
 #[derive(Debug, Clone)]
 pub struct PartiallyVerifiedUpdateOperation {
     reveal_value: String,
@@ -518,6 +530,9 @@ pub struct PartiallyVerifiedUpdateOperation {
     signed_update_key: PublicKeyJwk,
 }
 
+/// Partially verified DID Recovery operation
+///
+/// Converted from [RecoverOperation].
 #[derive(Debug, Clone)]
 pub struct PartiallyVerifiedRecoverOperation {
     reveal_value: String,
@@ -527,6 +542,9 @@ pub struct PartiallyVerifiedRecoverOperation {
     signed_anchor_origin: Option<String>,
 }
 
+/// Partially verified DID Deactivate operation
+///
+/// Converted from [DeactivateOperation].
 #[derive(Debug, Clone)]
 pub struct PartiallyVerifiedDeactivateOperation {
     signed_did_suffix: DIDSuffix,
@@ -534,6 +552,13 @@ pub struct PartiallyVerifiedDeactivateOperation {
     signed_recovery_key: PublicKeyJwk,
 }
 
+/// Partially verified Sidetree DID operation
+///
+/// Converted from [Operation].
+///
+/// Operation verification is described in [Sidetree §10.2.1 Operation Verification][ov].
+///
+/// [ov]: https://identity.foundation/sidetree/spec/v1.0.0/#operation-verification
 #[derive(Debug, Clone)]
 pub enum PartiallyVerifiedOperation {
     Create(PartiallyVerifiedCreateOperation),
@@ -542,8 +567,25 @@ pub enum PartiallyVerifiedOperation {
     Deactivate(PartiallyVerifiedDeactivateOperation),
 }
 
-trait SidetreeOperation {
+/// A Sidetree operation
+///
+/// See also the enum [Operation] which implements this trait.
+pub trait SidetreeOperation {
+    /// The result of [partially verifying][Self::partial_verify] the operation.
     type PartiallyVerifiedForm;
+
+    /// Partially verify the operation.
+    ///
+    /// Operation verification is described in [Sidetree §10.2.1 Operation Verification][ov].
+    ///
+    /// This function verifies the internal consistency (including signatures and hashes) of the operation,
+    /// and returns the integrity-verified data.
+    /// Public key commitment values are not checked; that is, the signature is verified, but
+    /// whether the public key is the correct reveal value is not checked, since that depends on
+    /// what the previous operation was. The DID suffix is also not checked, except for a Create
+    /// operation, since it is otherwise in reference to an earlier (Create) opeation.
+    ///
+    /// [ov]: https://identity.foundation/sidetree/spec/v1.0.0/#operation-verification
     fn partial_verify<S: Sidetree>(self) -> AResult<Self::PartiallyVerifiedForm>;
 }
 
@@ -705,7 +747,7 @@ impl SidetreeOperation for UpdateOperation {
     /// - the operation's [delta object](UpdateOperation::delta) is verified against the
     ///   [delta hash](UpdateClaims::update_key) in the signed data payload.
     ///
-    /// The [DID Suffix](UpdateOperation::did_suffix), and the delta values, are **not** verified
+    /// The [DID Suffix](UpdateOperation::did_suffix) is **not** verified
     /// by this function. The correspondence of the reveal value's hash to the previous update
     /// commitment is not checked either, since that is not known from this function.
 
@@ -1066,11 +1108,11 @@ pub enum DIDStatePatch {
 /// ### References
 /// - [Sidetree §11.1 Create - Create Operation Delta Object][codo]
 /// - [Sidetree §11.2 Update - Update Operation Delta Object][uodo]
-/// - [Sidetree §11.3 Recover - Recover Operation Delta Object][uodo]
+/// - [Sidetree §11.3 Recover - Recover Operation Delta Object][rodo]
 ///
 /// [codo]: https://identity.foundation/sidetree/spec/v1.0.0/#create-delta-object
 /// [uodo]: https://identity.foundation/sidetree/spec/v1.0.0/#update-delta-object
-/// [rodo] https://identity.foundation/sidetree/spec/v1.0.0/#recover-delta-object
+/// [rodo]: https://identity.foundation/sidetree/spec/v1.0.0/#recover-delta-object
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Delta {
