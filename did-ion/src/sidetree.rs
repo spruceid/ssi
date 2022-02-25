@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail, ensure, Context, Error, Result};
+use anyhow::{anyhow, bail, ensure, Context, Error as AError, Result as AResult};
 use async_trait::async_trait;
 use core::fmt::Debug;
 use json_patch::Patch;
@@ -21,6 +21,7 @@ use std::convert::TryFrom;
 use std::fmt;
 use std::marker::PhantomData;
 use std::str::FromStr;
+use thiserror::Error as ThisError;
 
 const MULTIHASH_SHA2_256_PREFIX: &[u8] = &[0x12];
 const MULTIHASH_SHA2_256_SIZE: &[u8] = &[0x20];
@@ -34,6 +35,35 @@ const MULTIHASH_SHA2_256_SIZE: &[u8] = &[0x20];
 /// [apk]: https://identity.foundation/sidetree/spec/v1.0.0/#add-public-keys
 /// [vmm]: https://www.w3.org/TR/did-core/#verification-methods
 pub const VERIFICATION_METHOD_TYPE: &str = "JsonWebSignature2020";
+
+/// An error having to do with [Sidetree].
+#[derive(ThisError, Debug)]
+pub enum SidetreeError {
+    /// Some functionality was not implemented.
+    #[error("Not implemented: {0}")]
+    NotImplemented(&'static str),
+    /// Error from [serde_jcs::to_string]
+    #[error("Unable to execute JSON Canonicalization Scheme (JCS)")]
+    JCS(#[from] serde_json::Error),
+    /// A create operation following another operation is not valid.
+    #[error("Create operation cannot follow another operation")]
+    CreateCannotFollow,
+    /// Update commitment is missing
+    #[error("Missing update commitment")]
+    MissingUpdateCommitment,
+    /// Recovery commitment is missing
+    #[error("Missing recovery commitment")]
+    MissingRecoveryCommitment,
+    /// DID Suffix did not match expected value.
+    #[error("DID Suffix mismatch. Expected: '{expected}', but found '{actual}'")]
+    DIDSuffixMismatch {
+        expected: DIDSuffix,
+        actual: DIDSuffix,
+    },
+    /// Some error occurred.
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
 
 /// Parameters for a Sidetree client implementation
 ///
@@ -105,21 +135,23 @@ pub trait Sidetree {
     }
 
     /// [`JSON_CANONICALIZATION_SCHEME`](https://identity.foundation/sidetree/spec/v1.0.0/#json-canonicalization-scheme)
-    fn json_canonicalization_scheme<T: Serialize + ?Sized>(value: &T) -> Result<String> {
-        serde_jcs::to_string(value).context("JSON Canonicalization Scheme (JCS)")
+    fn json_canonicalization_scheme<T: Serialize + ?Sized>(
+        value: &T,
+    ) -> Result<String, SidetreeError> {
+        serde_jcs::to_string(value).map_err(SidetreeError::JCS)
     }
 
     /// Generate a new keypair ([KEY_ALGORITHM][ka])
     ///
     /// [ka]: https://identity.foundation/sidetree/spec/v1.0.0/#key-algorithm
-    fn generate_key() -> Result<JWK, Error>;
+    fn generate_key() -> Result<JWK, SidetreeError>;
 
     /// Ensure that a keypair is valid for this Sidetree DID Method
     ///
     /// Check that the key uses this Sidetree DID method's [KEY_ALGORITHM][ka].
     ///
     /// [ka]: https://identity.foundation/sidetree/spec/v1.0.0/#key-algorithm
-    fn validate_key(key: &JWK) -> Result<(), Error>;
+    fn validate_key(key: &JWK) -> Result<(), SidetreeError>;
 
     /// [`SIGNATURE_ALGORITHM`](https://identity.foundation/sidetree/spec/v1.0.0/#sig-algorithm) (JWS alg)
     const SIGNATURE_ALGORITHM: Algorithm;
@@ -179,7 +211,7 @@ pub trait Sidetree {
     /// [Public Key Commitment Scheme (Sidetree §6.2.1)][pkcs]
     ///
     /// [pkcs]: https://identity.foundation/sidetree/spec/v1.0.0/#public-key-commitment-scheme
-    fn commitment_scheme(pkjwk: &PublicKeyJwk) -> Result<String> {
+    fn commitment_scheme(pkjwk: &PublicKeyJwk) -> AResult<String> {
         let canonicalized_public_key =
             Self::json_canonicalization_scheme(&pkjwk).context("Canonicalize JWK")?;
         // Note: hash_algorithm called here instead of reveal_value, since the underlying hash is
@@ -209,7 +241,7 @@ pub trait Sidetree {
         update_pk: &PublicKeyJwk,
         recovery_pk: &PublicKeyJwk,
         patches: Vec<DIDStatePatch>,
-    ) -> Result<Operation> {
+    ) -> AResult<Operation> {
         ensure!(
             update_pk != recovery_pk,
             "Update and recovery public key JWK payload must be different."
@@ -249,8 +281,8 @@ pub trait Sidetree {
     /// Create][create]. Returns the private keys and the create operation.
     ///
     /// [create]: https://identity.foundation/sidetree/spec/v1.0.0/#create
-    fn create(patches: Vec<DIDStatePatch>) -> Result<(Operation, JWK, JWK)> {
-        let update_keypair = Self::generate_key().context("Generate Update Key Pair")?;
+    fn create(patches: Vec<DIDStatePatch>) -> AResult<(Operation, JWK, JWK)> {
+        let update_keypair = Self::generate_key().context("generate update key pair")?;
         let recovery_keypair = Self::generate_key().context("Generate Recovery Key Pair")?;
         let update_pk =
             PublicKeyJwk::try_from(update_keypair.to_public()).context("Update public key")?;
@@ -278,7 +310,7 @@ pub trait Sidetree {
         update_key: &JWK,
         new_update_pk: &PublicKeyJwk,
         patches: Vec<DIDStatePatch>,
-    ) -> Result<UpdateOperation> {
+    ) -> AResult<UpdateOperation> {
         let update_pk = PublicKeyJwk::try_from(update_key.to_public())
             .context("Convert update key to PublicKeyJwk for Update operation")?;
         let canonicalized_update_pk = Self::json_canonicalization_scheme(&update_pk)
@@ -331,7 +363,7 @@ pub trait Sidetree {
         new_update_pk: &PublicKeyJwk,
         new_recovery_pk: &PublicKeyJwk,
         patches: Vec<DIDStatePatch>,
-    ) -> Result<Operation> {
+    ) -> AResult<Operation> {
         let recovery_pk = PublicKeyJwk::try_from(recovery_key.to_public())
             .context("Convert recovery key to PublicKeyJwk for Recover operation")?;
         ensure!(
@@ -383,7 +415,7 @@ pub trait Sidetree {
         did_suffix: DIDSuffix,
         recovery_key: &JWK,
         patches: Vec<DIDStatePatch>,
-    ) -> Result<(Operation, JWK, JWK)> {
+    ) -> AResult<(Operation, JWK, JWK)> {
         let new_update_keypair = Self::generate_key().context("Generate New Update Key Pair")?;
         let new_update_pk = PublicKeyJwk::try_from(new_update_keypair.to_public())
             .context("Convert new update public key")?;
@@ -410,7 +442,7 @@ pub trait Sidetree {
     /// Deactivate][deactivate]. Returns the deactivate operation.
     ///
     /// [deactivate]: https://identity.foundation/sidetree/spec/v1.0.0/#deactivate
-    fn deactivate(did_suffix: DIDSuffix, recovery_key: JWK) -> Result<DeactivateOperation> {
+    fn deactivate(did_suffix: DIDSuffix, recovery_key: JWK) -> AResult<DeactivateOperation> {
         let recovery_pk = PublicKeyJwk::try_from(recovery_key.to_public())
             .context("Convert recovery key to PublicKeyJwk for Deactivate operation")?;
         let canonicalized_recovery_pk = Self::json_canonicalization_scheme(&recovery_pk).context(
@@ -436,7 +468,7 @@ pub trait Sidetree {
     /// DID][SidetreeDID::Short] ([`DIDSuffix`]).
     ///
     /// Reference: <https://identity.foundation/sidetree/spec/v1.0.0/#did-uri-composition>
-    fn serialize_suffix_data(suffix_data: &SuffixData) -> Result<DIDSuffix> {
+    fn serialize_suffix_data(suffix_data: &SuffixData) -> AResult<DIDSuffix> {
         let string =
             Self::json_canonicalization_scheme(suffix_data).context("Canonicalize Suffix Data")?;
         let hash = Self::hash(string.as_bytes());
@@ -444,7 +476,7 @@ pub trait Sidetree {
     }
 
     /// Check that a DID Suffix looks valid
-    fn validate_did_suffix(suffix: &DIDSuffix) -> Result<()> {
+    fn validate_did_suffix(suffix: &DIDSuffix) -> AResult<()> {
         let bytes =
             base64::decode_config(&suffix.0, base64::URL_SAFE_NO_PAD).context("Decode Base64")?;
         ensure!(
@@ -512,13 +544,13 @@ pub enum PartiallyVerifiedOperation {
 
 trait SidetreeOperation {
     type PartiallyVerifiedForm;
-    fn partial_verify<S: Sidetree>(self) -> Result<Self::PartiallyVerifiedForm>;
+    fn partial_verify<S: Sidetree>(self) -> AResult<Self::PartiallyVerifiedForm>;
 }
 
 impl SidetreeOperation for Operation {
     type PartiallyVerifiedForm = PartiallyVerifiedOperation;
 
-    fn partial_verify<S: Sidetree>(self) -> Result<Self::PartiallyVerifiedForm> {
+    fn partial_verify<S: Sidetree>(self) -> AResult<Self::PartiallyVerifiedForm> {
         Ok(match self {
             Operation::Create(op) => PartiallyVerifiedOperation::Create(
                 op.partial_verify::<S>()
@@ -544,7 +576,7 @@ fn ensure_reveal_commitment<S: Sidetree>(
     recovery_commitment: &str,
     reveal_value: &str,
     pk: &PublicKeyJwk,
-) -> Result<()> {
+) -> AResult<()> {
     let canonicalized_public_key =
         S::json_canonicalization_scheme(&pk).context("Canonicalize JWK")?;
     let commitment_value = canonicalized_public_key.as_bytes();
@@ -583,15 +615,18 @@ impl PartiallyVerifiedOperation {
         }
     }
 
-    pub fn follows<S: Sidetree>(&self, previous: &PartiallyVerifiedOperation) -> Result<()> {
+    pub fn follows<S: Sidetree>(
+        &self,
+        previous: &PartiallyVerifiedOperation,
+    ) -> Result<(), SidetreeError> {
         match self {
             PartiallyVerifiedOperation::Create(_) => {
-                bail!("Create operation cannot follow another operation");
+                return Err(SidetreeError::CreateCannotFollow);
             }
             PartiallyVerifiedOperation::Update(update) => {
                 let update_commitment = previous
                     .update_commitment()
-                    .ok_or(anyhow!("No update commitment"))?;
+                    .ok_or(SidetreeError::MissingUpdateCommitment)?;
                 ensure_reveal_commitment::<S>(
                     &update_commitment,
                     &update.reveal_value,
@@ -601,7 +636,7 @@ impl PartiallyVerifiedOperation {
             PartiallyVerifiedOperation::Recover(recover) => {
                 let recovery_commitment = previous
                     .recovery_commitment()
-                    .ok_or(anyhow!("No recovery commitment"))?;
+                    .ok_or(SidetreeError::MissingRecoveryCommitment)?;
                 ensure_reveal_commitment::<S>(
                     &recovery_commitment,
                     &recover.reveal_value,
@@ -610,10 +645,10 @@ impl PartiallyVerifiedOperation {
             }
             PartiallyVerifiedOperation::Deactivate(deactivate) => {
                 if let PartiallyVerifiedOperation::Create(create) = previous {
-                    ensure!(
-                        deactivate.signed_did_suffix == create.did_suffix,
-                        "DID Suffix mismatch"
-                    );
+                    return Err(SidetreeError::DIDSuffixMismatch {
+                        expected: create.did_suffix.clone(),
+                        actual: deactivate.signed_did_suffix.clone(),
+                    });
                 } else {
                     // Note: Recover operations do not sign over the DID suffix. If the deactivate
                     // operation follows a recover operation rather than a create operation, the
@@ -621,7 +656,7 @@ impl PartiallyVerifiedOperation {
                 }
                 let recovery_commitment = previous
                     .recovery_commitment()
-                    .ok_or(anyhow!("No recovery commitment"))?;
+                    .ok_or(SidetreeError::MissingRecoveryCommitment)?;
                 ensure_reveal_commitment::<S>(
                     &recovery_commitment,
                     &deactivate.reveal_value,
@@ -636,7 +671,7 @@ impl PartiallyVerifiedOperation {
 impl SidetreeOperation for CreateOperation {
     type PartiallyVerifiedForm = PartiallyVerifiedCreateOperation;
 
-    fn partial_verify<S: Sidetree>(self) -> Result<PartiallyVerifiedCreateOperation> {
+    fn partial_verify<S: Sidetree>(self) -> AResult<PartiallyVerifiedCreateOperation> {
         let did = SidetreeDID::<S>::from_create_operation(&self)
             .context("Unable to derive DID from create operation")?;
         let did_suffix = DIDSuffix::from(did);
@@ -674,7 +709,7 @@ impl SidetreeOperation for UpdateOperation {
     /// by this function. The correspondence of the reveal value's hash to the previous update
     /// commitment is not checked either, since that is not known from this function.
 
-    fn partial_verify<S: Sidetree>(self) -> Result<PartiallyVerifiedUpdateOperation> {
+    fn partial_verify<S: Sidetree>(self) -> AResult<PartiallyVerifiedUpdateOperation> {
         // Verify JWS against public key in payload.
         // Then check public key against its hash (reveal value).
         let (header, claims) =
@@ -712,7 +747,7 @@ impl SidetreeOperation for RecoverOperation {
     type PartiallyVerifiedForm = PartiallyVerifiedRecoverOperation;
 
     /// Partially verify a [RecoverOperation]
-    fn partial_verify<S: Sidetree>(self) -> Result<PartiallyVerifiedRecoverOperation> {
+    fn partial_verify<S: Sidetree>(self) -> AResult<PartiallyVerifiedRecoverOperation> {
         // Verify JWS against public key in payload.
         // Then check public key against its hash (reveal value).
         let (header, claims) =
@@ -752,7 +787,7 @@ impl SidetreeOperation for DeactivateOperation {
     type PartiallyVerifiedForm = PartiallyVerifiedDeactivateOperation;
 
     /// Partially verify a [DeactivateOperation]
-    fn partial_verify<S: Sidetree>(self) -> Result<PartiallyVerifiedDeactivateOperation> {
+    fn partial_verify<S: Sidetree>(self) -> AResult<PartiallyVerifiedDeactivateOperation> {
         // Verify JWS against public key in payload.
         // Then check public key against its hash (reveal value).
 
@@ -788,6 +823,13 @@ impl SidetreeOperation for DeactivateOperation {
 /// Unique identifier string within a Sidetree DID (short or long-form)
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct DIDSuffix(pub String);
+
+impl fmt::Display for DIDSuffix {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)?;
+        Ok(())
+    }
+}
 
 /// A Sidetree-based DID
 ///
@@ -898,7 +940,7 @@ pub struct PublicKeyEntry {
 }
 
 impl TryFrom<JWK> for PublicKeyEntry {
-    type Error = Error;
+    type Error = AError;
     fn try_from(jwk: JWK) -> Result<Self, Self::Error> {
         let id = jwk.thumbprint().context("Compute JWK thumbprint")?;
         let pkjwk = PublicKeyJwk::try_from(jwk.to_public()).context("Convert key")?;
@@ -1166,7 +1208,7 @@ pub struct PublicKeyJwk {
 }
 
 impl TryFrom<JWK> for PublicKeyJwk {
-    type Error = Error;
+    type Error = AError;
     fn try_from(jwk: JWK) -> Result<Self, Self::Error> {
         let jwk_value = serde_json::to_value(jwk).context("Convert JWK to Value")?;
         ensure!(
@@ -1184,7 +1226,7 @@ impl TryFrom<JWK> for PublicKeyJwk {
 ///
 /// Note: `nonce` property is dropped.
 impl TryFrom<PublicKeyJwk> for JWK {
-    type Error = Error;
+    type Error = AError;
     fn try_from(pkjwk: PublicKeyJwk) -> Result<Self, Self::Error> {
         let jwk = serde_json::from_value(pkjwk.jwk).context("Convert Value to JWK")?;
         Ok(jwk)
@@ -1192,7 +1234,7 @@ impl TryFrom<PublicKeyJwk> for JWK {
 }
 
 impl<S: Sidetree> FromStr for SidetreeDID<S> {
-    type Err = Error;
+    type Err = AError;
     fn from_str(did: &str) -> Result<Self, Self::Err> {
         let mut parts = did.split(':');
         ensure!(parts.next() == Some("did"), "Expected DID URI scheme");
@@ -1240,7 +1282,7 @@ impl<S: Sidetree> SidetreeDID<S> {
     /// Construct a [Long-Form Sidetree DID][lfdu] from a [Create Operation][CreateOperation]
     ///
     /// [lfdu]: https://identity.foundation/sidetree/spec/v1.0.0/#long-form-did-uris
-    pub fn from_create_operation(create_operation: &CreateOperation) -> Result<Self> {
+    pub fn from_create_operation(create_operation: &CreateOperation) -> AResult<Self> {
         let op_json = S::json_canonicalization_scheme(&create_operation)
             .context("Canonicalize Create Operation")?;
         let op_string = S::data_encoding_scheme(op_json.as_bytes());
@@ -1258,7 +1300,7 @@ impl<S: Sidetree> SidetreeDID<S> {
 /// Convert a DID URL to an object id given a DID
 ///
 /// Object id is an id of a [ServiceEndpointEntry] or [PublicKeyEntry].
-fn did_url_to_id<S: Sidetree>(did_url: &str, did: &SidetreeDID<S>) -> Result<String> {
+fn did_url_to_id<S: Sidetree>(did_url: &str, did: &SidetreeDID<S>) -> AResult<String> {
     let did_string = did.to_string();
     let unprefixed = match did_url.strip_prefix(&did_string) {
         Some(s) => s,
@@ -1346,7 +1388,7 @@ fn new_did_state<S: Sidetree>(
     update_key: Option<JWK>,
     recovery_key: Option<JWK>,
     verification_key: Option<JWK>,
-) -> Result<(PublicKeyJwk, PublicKeyJwk, Vec<DIDStatePatch>)> {
+) -> AResult<(PublicKeyJwk, PublicKeyJwk, Vec<DIDStatePatch>)> {
     let update_key = update_key.ok_or(anyhow!("Missing required update key"))?;
     S::validate_key(&update_key).context("Validate update key")?;
     let update_pk = PublicKeyJwk::try_from(update_key.to_public()).context("Convert update key")?;
@@ -1380,7 +1422,7 @@ impl DIDStatePatch {
     fn try_from_with_did<S: Sidetree>(
         did_doc_op: DIDDocumentOperation,
         did: &SidetreeDID<S>,
-    ) -> Result<Self> {
+    ) -> AResult<Self> {
         Ok(match did_doc_op {
             DIDDocumentOperation::SetDidDocument(_doc) => {
                 bail!("setDidDocument not implemented")
@@ -1454,13 +1496,13 @@ impl DIDStatePatch {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct SidetreeError {
+struct SidetreeAPIError {
     // List of error codes: https://github.com/decentralized-identity/sidetree/blob/v1.0.0/lib/core/versions/1.0/ErrorCode.ts
     pub code: String,
     pub message: Option<String>,
 }
 
-impl fmt::Display for SidetreeError {
+impl fmt::Display for SidetreeAPIError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Sidetree error {}", self.code)?;
         if let Some(ref message) = self.message {
@@ -1525,7 +1567,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             .await
             .context("Send HTTP request")?;
         if let Err(e) = resp.error_for_status_ref() {
-            let err: SidetreeError = resp
+            let err: SidetreeAPIError = resp
                 .json()
                 .await
                 .context("Transaction submit failed. Unable to read HTTP response JSON")?;
@@ -1650,7 +1692,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
 }
 
 impl<S: Sidetree> SidetreeClient<S> {
-    fn op_to_transaction(op: Operation) -> Result<DIDMethodTransaction> {
+    fn op_to_transaction(op: Operation) -> AResult<DIDMethodTransaction> {
         let value = serde_json::to_value(op).context("Convert operation to value")?;
         Ok(DIDMethodTransaction {
             did_method: S::METHOD.to_string(),
@@ -1658,7 +1700,7 @@ impl<S: Sidetree> SidetreeClient<S> {
         })
     }
 
-    fn op_from_transaction(tx: DIDMethodTransaction) -> Result<Operation> {
+    fn op_from_transaction(tx: DIDMethodTransaction) -> AResult<Operation> {
         let mut value = tx.value;
         let op_value = value
             .get_mut("sidetreeOperation")
@@ -1696,6 +1738,26 @@ impl<S: Sidetree + Send + Sync> DIDResolver for HTTPSidetreeDIDResolver<S> {
     }
 }
 
+/// An error resulting from [jws_decode_verify_inner]
+#[derive(ThisError, Debug)]
+pub enum JWSDecodeVerifyError {
+    /// Unable to split JWS
+    #[error("Unable to split JWS")]
+    SplitJWS(#[source] ssi::error::Error),
+    /// Unable to decode JWS parts
+    #[error("Unable to decode JWS parts")]
+    DecodeJWSParts(#[source] ssi::error::Error),
+    /// Deserialize JWS payload
+    #[error("Deserialize JWS payload")]
+    DeserializeJWSPayload(#[source] serde_json::Error),
+    /// Unable to convert PublicKeyJwk to JWK
+    #[error("Unable to convert PublicKeyJwk to JWK")]
+    ConvertPublicKeyJwkToJWK(#[source] anyhow::Error),
+    /// Unable to verify JWS
+    #[error("Unable to verify JWS")]
+    VerifyJWS(#[source] ssi::error::Error),
+}
+
 /// Decode and verify JWS with public key inside payload
 ///
 /// Similar to [ssi::jwt::decode_verify] or [ssi::jws::decode_verify], but for when the payload (claims) must be parsed to
@@ -1713,21 +1775,23 @@ impl<S: Sidetree + Send + Sync> DIDResolver for HTTPSidetreeDIDResolver<S> {
 pub fn jws_decode_verify_inner<Claims: DeserializeOwned>(
     jwt: &str,
     get_key: impl FnOnce(&Claims) -> &PublicKeyJwk,
-) -> Result<(Header, Claims), Error> {
+) -> Result<(Header, Claims), JWSDecodeVerifyError> {
     use ssi::jws::{decode_jws_parts, split_jws, verify_bytes, DecodedJWS};
-    let (header_b64, payload_enc, signature_b64) = split_jws(jwt).context("Split JWS")?;
+    let (header_b64, payload_enc, signature_b64) =
+        split_jws(jwt).map_err(JWSDecodeVerifyError::SplitJWS)?;
     let DecodedJWS {
         header,
         signing_input,
         payload,
         signature,
     } = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)
-        .context("Decode JWS parts")?;
-    let claims: Claims = serde_json::from_slice(&payload).context("Deserialize JWS payload")?;
+        .map_err(JWSDecodeVerifyError::DecodeJWSParts)?;
+    let claims: Claims =
+        serde_json::from_slice(&payload).map_err(JWSDecodeVerifyError::DeserializeJWSPayload)?;
     let pk = get_key(&claims);
-    let pk = JWK::try_from(pk.clone()).context("Convert PublicKeyJwk to JWK")?;
+    let pk = JWK::try_from(pk.clone()).map_err(JWSDecodeVerifyError::ConvertPublicKeyJwkToJWK)?;
     verify_bytes(header.algorithm, &signing_input, &pk, &signature)
-        .context("Verify Signed Deactivate Data")?;
+        .map_err(JWSDecodeVerifyError::VerifyJWS)?;
     Ok((header, claims))
 }
 
@@ -1739,11 +1803,14 @@ mod tests {
     struct Example;
 
     impl Sidetree for Example {
-        fn generate_key() -> Result<JWK, Error> {
-            JWK::generate_secp256k1().context("Generate secp256k1 key")
+        fn generate_key() -> Result<JWK, SidetreeError> {
+            let key = JWK::generate_secp256k1().context("Generate secp256k1 key")?;
+            Ok(key)
         }
-        fn validate_key(key: &JWK) -> Result<(), Error> {
-            ensure!(is_secp256k1(&key), "Key must be Secp256k1");
+        fn validate_key(key: &JWK) -> Result<(), SidetreeError> {
+            if !is_secp256k1(&key) {
+                return Err(anyhow!("Key must be Secp256k1").into());
+            }
             Ok(())
         }
         const SIGNATURE_ALGORITHM: Algorithm = Algorithm::ES256K;
