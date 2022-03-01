@@ -34,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement Sidetree client ([#379](https://github.com/spruceid/ssi/pull/379))
 - Add `did:ion` DID method implementation ([#379](https://github.com/spruceid/ssi/pull/379))
 - Added more rustdocs ([#311](https://github.com/spruceid/ssi/pull/311)).
+- Generate EIP-712 types for EthereumEIP712Signature2021 ([#301](https://github.com/spruceid/ssi/pull/301)).
 
 ### Changed
 - Use Error types in bbs code ([#338](https://github.com/spruceid/ssi/pull/338)).
