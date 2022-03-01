@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add Blockchain Vocabulary v1 2021 context ([#347](https://github.com/spruceid/ssi/pull/#347)).
 - Construct API URLs for known Tezos test networks ([#350](https://github.com/spruceid/ssi/pull/#350)).
 - Add Verifiable Driver's License Vocabulary context file ([#361](https://github.com/spruceid/ssi/pull/361)).
+- Add Universal Wallet 2020 context file ([#383](https://github.com/spruceid/ssi/pull/383)).
+- Update context files ([#375](https://github.com/spruceid/ssi/pull/375)).
+- Add script to update context files ([#376](https://github.com/spruceid/ssi/pull/376)).
 
 ### Changed
 - Use Error types in bbs code ([#338](https://github.com/spruceid/ssi/pull/#338)).
