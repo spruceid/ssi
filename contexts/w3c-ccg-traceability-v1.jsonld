@@ -218,8 +218,20 @@
     "CTPATCertificate": {
       "@id": "https://w3id.org/traceability#CTPATCertificate",
       "@context": {
-        "ctpatCertifiedEntity": {
-          "@id": "https://w3id.org/traceability#ctpatCertifiedEntity"
+        "sviNumber": {
+          "@id": "https://w3id.org/traceability#sviNumber"
+        },
+        "ctpatAccountNumber": {
+          "@id": "https://w3id.org/traceability#ctpatAccountNumber"
+        },
+        "tradeSector": {
+          "@id": "https://schema.org/industry"
+        },
+        "dateOfLastValidation": {
+          "@id": "https://schema.org/Date"
+        },
+        "issuingCountry": {
+          "@id": "https://schema.org/addressCountry"
         }
       }
     },
@@ -508,6 +520,10 @@
         }
       }
     },
+    "DCSAShippingInstructionCertificate": {
+      "@id": "https://w3id.org/traceability#DCSAShippingInstructionCertificate",
+      "@context": {}
+    },
     "DCSATransportDocument": {
       "@id": "https://api.swaggerhub.com/domains/dcsaorg/DCSA_DOMAIN/1.0.1#/components/schemas/transportDocument",
       "@context": {
@@ -566,6 +582,10 @@
           "@id": "https://api.swaggerhub.com/domains/dcsaorg/DCSA_DOMAIN/1.0.1#/components/schemas/transports"
         }
       }
+    },
+    "DCSATransportDocumentCertificate": {
+      "@id": "https://w3id.org/traceability#DCSATransportDocumentCertificate",
+      "@context": {}
     },
     "DocumentVerificationEvidence": {
       "@id": "https://w3id.org/traceability#DocumentVerificationEvidence",
@@ -894,6 +914,33 @@
         }
       }
     },
+    "FreightManifest": {
+      "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#manifestRelatedDocument",
+      "@context": {
+        "carrier": {
+          "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#carrierParty"
+        },
+        "carrierCode": {
+          "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncl1153/#Standard_Carrier_Alpha_Code_(SCAC)_number"
+        },
+        "transportMeans": {
+          "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#transportMeans"
+        },
+        "transportMeansId": {
+          "@id": "https://schema.org/identifier"
+        },
+        "voyage": {
+          "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#TransportMovement"
+        },
+        "relatedDocuments": {
+          "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#manifestRelatedDocument"
+        }
+      }
+    },
+    "FreightManifestCertificate": {
+      "@id": "https://w3id.org/traceability#FreightManifestCertificate",
+      "@context": {}
+    },
     "GeoCoordinates": {
       "@id": "https://schema.org/GeoCoordinates",
       "@context": {
@@ -960,10 +1007,7 @@
           "@id": "https://schema.org/Flight"
         },
         "requestedDate": {
-          "@id": "https://schema.org/Date"
-        },
-        "executedOn": {
-          "@id": "https://schema.org/Date"
+          "@id": "https://w3id.org/traceability#requestDate"
         },
         "accountingInformation": {
           "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#typeCode"
@@ -1030,6 +1074,9 @@
         },
         "shippersCertificationBox": {
           "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#Certification"
+        },
+        "executedOn": {
+          "@id": "https://w3id.org/traceability#executionTime"
         },
         "executedAt": {
           "@id": "https://schema.org/Place"
@@ -1969,6 +2016,14 @@
         }
       }
     },
+    "SIMASteelImportLicenseCertificate": {
+      "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#importLicenceDocument",
+      "@context": {
+        "expectedDateOfImport": {
+          "@id": "https://schema.org/validThrough"
+        }
+      }
+    },
     "Seal": {
       "@id": "https://service.unece.org/trade/uncefact/vocabulary/uncefact/#Seal",
       "@context": {
@@ -2021,6 +2076,12 @@
         "size": {
           "@id": "https://schema.org/size"
         },
+        "weight": {
+          "@id": "https://schema.org/weight"
+        },
+        "weightUnit": {
+          "@id": "http://qudt.org/schema/qudt/Unit"
+        },
         "originalCountryOfMeltAndPour": {
           "@id": "https://schema.org/addressCountry"
         },
@@ -2032,6 +2093,9 @@
         },
         "shipment": {
           "@id": "https://schema.org/ParcelDelivery"
+        },
+        "commodity": {
+          "@id": "https://w3id.org/traceability#Commodity"
         }
       }
     },
@@ -2104,9 +2168,6 @@
     "USMCACertificateOfOrigin": {
       "@id": "https://w3id.org/traceability#USMCACertificateOfOrigin",
       "@context": {
-        "importer": {
-          "@id": "https://w3id.org/traceability#certifier"
-        },
         "exporterDetails": {
           "@id": "https://w3id.org/traceability#importerUnknown"
         },
@@ -2116,14 +2177,36 @@
         "importerDetails": {
           "@id": "https://w3id.org/traceability#importerDetails"
         },
-        "goods": {
-          "@id": "https://schema.org/itemShipped"
-        },
         "blanketPeriodFrom": {
           "@id": "https://schema.org/validFrom"
         },
         "blanketPeriodTo": {
           "@id": "https://schema.org/validThrough"
+        }
+      }
+    },
+    "USMCACertifier": {
+      "@id": "https://w3id.org/traceability/USMCACertifier",
+      "@context": {
+        "certifierRole": {
+          "@id": "https://w3id.org/traceability#certifierRole"
+        },
+        "certifierDetails": {
+          "@id": "https://w3id.org/traceability#certifierDetails"
+        }
+      }
+    },
+    "USMCAProductSpecifier": {
+      "@id": "https://w3id.org/traceability/USMCAProductSpecifier",
+      "@context": {
+        "product": {
+          "@id": "https://schema.org/Product"
+        },
+        "originCriterion": {
+          "@id": "https://w3id.org/traceability#originCriterion"
+        },
+        "countryOfOrigin": {
+          "@id": "https://w3id.org/traceability#countryOfOrigin"
         }
       }
     },
@@ -2174,17 +2257,6 @@
         },
         "intendedUseCert": {
           "@id": "https://w3id.org/traceability#intendedUseCert"
-        }
-      }
-    },
-    "usmcaProductSpecifier": {
-      "@id": "https://w3id.org/traceability/UsmcaProductSpecifier",
-      "@context": {
-        "product": {
-          "@id": "https://schema.org/Product"
-        },
-        "importer": {
-          "@id": "https://w3id.org/traceability#countryOfOrigin"
         }
       }
     },
