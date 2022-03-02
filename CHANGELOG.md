@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.4.0] 2022-03-02
 ### Added
 - Use CAIP-10 in did:pkh ([#279](https://github.com/spruceid/ssi/pull/279), [#286](https://github.com/spruceid/ssi/pull/286), [#303](https://github.com/spruceid/ssi/pull/303)).
 - Use updated JsonWebSignature2020 context file ([#322](https://github.com/spruceid/ssi/pull/322)).
@@ -322,7 +324,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [vc-test-suite]: https://github.com/w3c/vc-test-suite
 [verification relationship]: https://www.w3.org/TR/did-core/#dfn-verification-relationship
 
-[Unreleased]: https://github.com/spruceid/ssi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/spruceid/ssi/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/spruceid/ssi/releases/tag/v0.4.0
 [0.3.0]: https://github.com/spruceid/ssi/releases/tag/v0.3.0
 [0.2.2]: https://github.com/spruceid/ssi/releases/tag/v0.2.2
 [0.2.1]: https://github.com/spruceid/ssi/releases/tag/v0.2.1

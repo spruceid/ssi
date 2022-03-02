@@ -45,7 +45,7 @@ openssl-devel
 ### Crates.io
 
 ```
-ssi = "0.3"
+ssi = "0.4"
 ```
 
 ### From Source
