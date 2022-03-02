@@ -116,7 +116,6 @@ members = [
 blake2_old = { package = "blake2", version = "0.8" } # for bbs doctest
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
-did-method-key = { path = "./did-key" }
 tokio = { version = "1.0", features = ["macros"] }
 hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 

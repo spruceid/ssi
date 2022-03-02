@@ -11,6 +11,7 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-onion/"
 documentation = "https://docs.rs/did-onion/"
 
 [features]
+default = ["ssi/ring"]
 tor-tests = []
 
 [dependencies]

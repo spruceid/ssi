@@ -12,6 +12,7 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-ion/"
 documentation = "https://docs.rs/did-ion/"
 
 [features]
+default = ["ssi/ring"]
 
 [dependencies]
 ssi = { version = "0.4", path = "../", default-features = false, features = ["http-did", "secp256k1"] }
