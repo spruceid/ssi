@@ -16,7 +16,7 @@ default = ["ssi/ring"]
 p256 = ["ssi/p256"]
 
 [dependencies]
-ssi = { version = "0.3", path = "../", default-features = false, features = [
+ssi = { version = "0.4", path = "../", default-features = false, features = [
     "secp256r1",
 ] }
 anyhow = "1.0.52"
