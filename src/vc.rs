@@ -2134,6 +2134,7 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
         ("Eip712Signature2021", "https://w3id.org/security#Eip712Signature2021") => (),
         ("TezosSignature2021", "https://w3id.org/security#TezosSignature2021") => (),
         ("TezosJcsSignature2021", "https://w3id.org/security#TezosJcsSignature2021") => (),
+        ("AleoSignature2021", "https://w3id.org/security#AleoSignature2021") => (),
         ("SolanaSignature2021", "https://w3id.org/security#SolanaSignature2021") => (),
         _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
     };

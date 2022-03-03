@@ -365,6 +365,61 @@ async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> 
     resolution_result(doc)
 }
 
+async fn resolve_aleo(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+    use bech32::FromBase32;
+    let (hrp, data, _variant) = match bech32::decode(&account_address) {
+        Err(_e) => return resolution_error(ERROR_INVALID_DID),
+        Ok(data) => data,
+    };
+    if data.is_empty() {
+        return resolution_error(ERROR_INVALID_DID);
+    }
+    if hrp != "aleo" {
+        return resolution_error(ERROR_INVALID_DID);
+    }
+    let data = match Vec::<u8>::from_base32(&data) {
+        Err(_e) => return resolution_error(ERROR_INVALID_DID),
+        Ok(data) => data,
+    };
+    // Address data is decoded for validation only.
+    // The verification method object just uses the account address in blockchainAccountId.
+    if data.len() != 32 {
+        return resolution_error(ERROR_INVALID_DID);
+    }
+    let chain_id = ChainId {
+        namespace: "aleo".to_string(),
+        reference: reference.to_string(),
+    };
+    let blockchain_account_id = BlockchainAccountId {
+        account_address,
+        chain_id,
+    };
+    let vm_url = DIDURL {
+        did: did.to_string(),
+        fragment: Some("blockchainAccountId".to_string()),
+        ..Default::default()
+    };
+    let vm = VerificationMethod::Map(VerificationMethodMap {
+        id: vm_url.to_string(),
+        type_: "BlockchainVerificationMethod2021".to_string(),
+        controller: did.to_string(),
+        blockchain_account_id: Some(blockchain_account_id.to_string()),
+        ..Default::default()
+    });
+    let doc = Document {
+        context: Contexts::Many(vec![
+            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::URI("https://w3id.org/security/suites/blockchain-2021/v1".to_string()),
+        ]),
+        id: did.to_string(),
+        verification_method: Some(vec![vm]),
+        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
+        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
+        ..Default::default()
+    };
+    resolution_result(doc)
+}
+
 async fn resolve_caip10(did: &str, account_id: String) -> ResolutionResult {
     let account_id = match BlockchainAccountId::from_str(&account_id) {
         Ok(account_id) => account_id,
@@ -377,6 +432,7 @@ async fn resolve_caip10(did: &str, account_id: String) -> ResolutionResult {
         "eip155" => resolve_eip155(did, account_id.account_address, &reference, false).await,
         "bip122" => resolve_bip122(did, account_id.account_address, &reference).await,
         "solana" => resolve_solana(did, account_id.account_address, &reference).await,
+        "aleo" => resolve_aleo(did, account_id.account_address, &reference).await,
         _ => resolution_error(ERROR_INVALID_DID),
     }
 }
@@ -524,6 +580,28 @@ fn generate_caip10_solana(
     })
 }
 
+fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<BlockchainAccountId, String> {
+    let reference = ref_opt.unwrap_or_else(|| "1".to_string());
+    let chain_id = ChainId {
+        namespace: "aleo".to_string(),
+        reference,
+    };
+    use bech32::ToBase32;
+    let pk_bs58 = match key.params {
+        Params::OKP(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
+            "aleo",
+            &params.public_key.0.to_base32(),
+            bech32::Variant::Bech32m,
+        )
+        .unwrap(),
+        _ => return Err("Invalid public key type for Aleo".to_string()),
+    };
+    Ok(BlockchainAccountId {
+        account_address: pk_bs58,
+        chain_id,
+    })
+}
+
 fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
     // Require name to be a either CAIP-2 namespace or a
     // full CAIP-2 string - namespace and reference (e.g. internal
@@ -541,6 +619,7 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
         "eip155" => generate_caip10_eip155(key, reference_opt)?,
         "bip122" => generate_caip10_bip122(key, reference_opt)?,
         "solana" => generate_caip10_solana(key, reference_opt)?,
+        "aleo" => generate_caip10_aleo(key, reference_opt)?,
         _ => return Err("Namespace not supported".to_string()),
     };
     Ok(format!("did:pkh:{}", account_id))
@@ -727,6 +806,11 @@ mod tests {
         test_resolve(
             "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
             include_str!("../tests/did-doge.jsonld"),
+        )
+        .await;
+        test_resolve(
+            "did:pkh:aleo:1:aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348",
+            include_str!("../tests/did-aleo.jsonld"),
         )
         .await;
 

@@ -31,7 +31,7 @@ pub type StructName = String;
 
 /// Structured typed data as described in
 /// [Definition of typed structured data 𝕊](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-typed-structured-data-%F0%9D%95%8A)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StructType(Vec<MemberVariable>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +73,8 @@ pub enum EIP712Value {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Types {
     #[serde(rename = "EIP712Domain")]
+    // Note: implicit EIP712Domain is not standard EIP-712
+    #[serde(default = "eip712sig_default_domain")]
     pub eip712_domain: StructType,
     #[serde(flatten)]
     pub types: HashMap<StructName, StructType>,
@@ -132,8 +134,6 @@ pub enum TypedDataConstructionJSONError {
     ExpectedDocumentObject,
     #[error("Expected proof to be a JSON object")]
     ExpectedProofObject,
-    #[error("Expected eip712 in proof object")]
-    ExpectedEip712,
     #[error("Expected types in proof.eip712")]
     ExpectedTypes,
     #[error("Unable to parse eip712: {0}")]
@@ -142,6 +142,8 @@ pub enum TypedDataConstructionJSONError {
     ConvertMessage(TypedDataParseError),
     #[error("Unable to dereference EIP-712 types: {0}")]
     DereferenceTypes(DereferenceTypesError),
+    #[error("Unable to generate EIP-712 types and proof info: {0}")]
+    GenerateProofInfo(#[from] ProofGenerationError),
 }
 
 #[derive(Error, Debug)]
@@ -224,6 +226,20 @@ impl EIP712Value {
                 1 => Some(true),
                 _ => None,
             },
+            _ => None,
+        }
+    }
+
+    fn as_struct(&self) -> Option<&HashMap<StructName, EIP712Value>> {
+        match self {
+            EIP712Value::Struct(map) => Some(map),
+            _ => None,
+        }
+    }
+
+    fn as_struct_mut(&mut self) -> Option<&mut HashMap<StructName, EIP712Value>> {
+        match self {
+            EIP712Value::Struct(map) => Some(map),
             _ => None,
         }
     }
@@ -360,6 +376,86 @@ impl Types {
     }
 }
 
+#[cfg(test)]
+lazy_static! {
+    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L917-L966
+    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26/files#r798853853
+    static ref EXAMPLE_TYPES: Value = {
+        serde_json::json!({
+          "Data": [
+            {
+              "name": "job",
+              "type": "Job"
+            },
+            {
+              "name": "name",
+              "type": "Name"
+            }
+          ],
+          "Job": [
+            {
+              "name": "employer",
+              "type": "string"
+            },
+            {
+              "name": "jobTitle",
+              "type": "string"
+            }
+          ],
+          "Name": [
+            {
+              "name": "firstName",
+              "type": "string"
+            },
+            {
+              "name": "lastName",
+              "type": "string"
+            }
+          ],
+          "Document": [
+            {
+              "name": "@context",
+              "type": "string[]"
+            },
+            {
+              "name": "@type",
+              "type": "string"
+            },
+            {
+              "name": "data",
+              "type": "Data"
+            },
+            {
+              "name": "proof",
+              "type": "Proof"
+            },
+            {
+              "name": "telephone",
+              "type": "string"
+            }
+          ],
+          "Proof": [
+            {
+              "name": "created",
+              "type": "string"
+            },
+            {
+              "name": "proofPurpose",
+              "type": "string"
+            },
+            {
+              "name": "type",
+              "type": "string"
+            },
+            {
+              "name": "verificationMethod",
+              "type": "string"
+            }
+          ]
+        })
+    };
+}
+
 impl TypesOrURI {
     #[allow(clippy::match_single_binding)]
     #[allow(unreachable_code)]
@@ -370,11 +466,20 @@ impl TypesOrURI {
             Self::Object(types) => return Ok(types),
         };
         let value = match &uri[..] {
+            #[cfg(test)]
+            "https://example.org/types.json" => EXAMPLE_TYPES.clone(),
             _ => return Err(DereferenceTypesError::RemoteLoadingNotImplemented),
         };
         let types: Types = serde_json::from_value(value).map_err(DereferenceTypesError::JSON)?;
         Ok(types)
     }
+}
+
+fn property_to_struct_name(property_name: &str) -> StructName {
+    // CamelCase
+    let mut chars = property_name.chars();
+    let first_char = chars.next().unwrap_or_default();
+    first_char.to_uppercase().chain(chars).collect()
 }
 
 /// Hash the result of [`encodeType`]
@@ -674,6 +779,13 @@ pub fn encode_data(
     Ok(bytes)
 }
 
+fn eip712sig_default_domain() -> StructType {
+    StructType(vec![MemberVariable {
+        name: String::from("name"),
+        type_: EIP712Type::String,
+    }])
+}
+
 impl TypedData {
     pub async fn from_document_and_options(
         document: &(dyn LinkedDataDocument + Sync),
@@ -776,7 +888,7 @@ impl TypedData {
     }
 
     /// Convert linked data document and proof to TypedData according to
-    /// [EthereumEip712Signature2021](https://uport-project.github.io/ethereum-eip712-signature-2021-spec/)
+    /// [EthereumEip712Signature2021](https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/)
     pub async fn from_document_and_options_json(
         document: &(dyn LinkedDataDocument + Sync),
         proof: &Proof,
@@ -797,16 +909,21 @@ impl TypedData {
             .remove("eip712")
             // Allow eip712Domain for backwards-compatibility since
             // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
-            .or_else(|| proof_obj.remove("eip712Domain"))
-            .ok_or(TypedDataConstructionJSONError::ExpectedEip712)?;
+            .or_else(|| proof_obj.remove("eip712Domain"));
+        doc_obj.insert("proof".to_string(), proof_value);
+        let mut message = EIP712Value::try_from(doc_value)
+            .map_err(TypedDataConstructionJSONError::ConvertMessage)?;
+        let proof_info: ProofInfo = match info {
+            Some(info) => {
+                serde_json::from_value(info).map_err(TypedDataConstructionJSONError::ParseInfo)?
+            }
+            None => generate_proof_info(&message)?,
+        };
         let ProofInfo {
             types_or_uri,
             primary_type,
             domain,
-        } = serde_json::from_value(info).map_err(TypedDataConstructionJSONError::ParseInfo)?;
-        doc_obj.insert("proof".to_string(), proof_value);
-        let message = EIP712Value::try_from(doc_value)
-            .map_err(TypedDataConstructionJSONError::ConvertMessage)?;
+        } = proof_info;
         let types = types_or_uri
             .dereference()
             .await
@@ -841,6 +958,237 @@ impl TypedData {
         .concat();
         Ok(bytes)
     }
+}
+
+#[derive(Error, Debug)]
+pub enum TypesGenerationError {
+    #[error("Expected object")]
+    ExpectedObject,
+    #[error("Found empty array under property: {0}")]
+    EmptyArray(String),
+    #[error("Array inconsistency: expected type {0} under property: {1}")]
+    ArrayInconsistency(&'static str, String),
+    #[error("Array value must be boolean, number or string. Property: {0}")]
+    ComplexArrayValue(String),
+    #[error("Value must be boolean, number, string, array or struct. Property: {0}")]
+    ComplexValue(String),
+    #[error("Missing primaryType in recursive output. primaryType: {0}")]
+    MissingPrimaryTypeInRecursiveOutput(String),
+    #[error("JCS: {0}")]
+    JCS(serde_json::Error),
+    #[error("Proof type already exists")]
+    ProofAlreadyExists,
+}
+
+/// Generate EIP-712 types for EthereumEip712Signature2021
+///
+/// <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#types-generation>
+/// from <https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/25>
+pub fn generate_types(
+    doc: &EIP712Value,
+    primary_type: Option<StructName>,
+) -> Result<HashMap<StructName, StructType>, TypesGenerationError> {
+    // 1
+    let mut output = HashMap::default();
+    // 2
+    // TypedDataField == MemberVariable
+    let mut types = StructType::default();
+    // 3
+    // Using JCS here probably has no effect:
+    // https://github.com/davidpdrsn/assert-json-diff
+    let doc_jcs = serde_jcs::to_string(doc).map_err(TypesGenerationError::JCS)?;
+    let doc: EIP712Value = serde_json::from_str(&doc_jcs).map_err(TypesGenerationError::JCS)?;
+    // 4
+    let primary_type = primary_type.unwrap_or_else(|| StructName::from("Document"));
+    // 5
+    let object = doc
+        .as_struct()
+        .ok_or(TypesGenerationError::ExpectedObject)?;
+    let mut props: Vec<(&String, &EIP712Value)> = object.iter().collect();
+    // Iterate through object properties in the order JCS would sort them.
+    // https://datatracker.ietf.org/doc/html/rfc8785#section-3.2.3
+    props.sort_by_cached_key(|(name, _value)| name.encode_utf16().collect::<Vec<u16>>());
+    for (property_name, value) in props {
+        match value {
+            // 6
+            EIP712Value::Bool(_) => {
+                // 6.1
+                types.0.push(MemberVariable {
+                    type_: EIP712Type::Bool,
+                    name: String::from(property_name),
+                });
+            }
+            EIP712Value::Integer(_) => {
+                // 6.2
+                types.0.push(MemberVariable {
+                    type_: EIP712Type::UintN(256),
+                    name: String::from(property_name),
+                });
+            }
+            EIP712Value::String(_) => {
+                // 6.3
+                types.0.push(MemberVariable {
+                    type_: EIP712Type::String,
+                    name: String::from(property_name),
+                });
+            }
+            // 7
+            EIP712Value::Array(array) => {
+                // Ensure values have same primitive type.
+                let mut values = array.into_iter();
+                let first_value = values
+                    .next()
+                    .ok_or_else(|| TypesGenerationError::EmptyArray(property_name.clone()))?;
+                match first_value {
+                    EIP712Value::Bool(_) => {
+                        // 7.1
+                        for value in values {
+                            if !matches!(value, EIP712Value::Bool(_)) {
+                                return Err(TypesGenerationError::ArrayInconsistency(
+                                    "boolean",
+                                    property_name.clone(),
+                                ));
+                            }
+                        }
+                        types.0.push(MemberVariable {
+                            type_: EIP712Type::Array(Box::new(EIP712Type::Bool)),
+                            name: String::from(property_name),
+                        });
+                    }
+                    EIP712Value::Integer(_) => {
+                        // 7.2
+                        for value in values {
+                            if !matches!(value, EIP712Value::Integer(_)) {
+                                return Err(TypesGenerationError::ArrayInconsistency(
+                                    "number",
+                                    property_name.clone(),
+                                ));
+                            }
+                        }
+                        types.0.push(MemberVariable {
+                            type_: EIP712Type::Array(Box::new(EIP712Type::UintN(256))),
+                            name: String::from(property_name),
+                        });
+                    }
+                    EIP712Value::String(_) => {
+                        // 7.3
+                        for value in values {
+                            if !matches!(value, EIP712Value::String(_)) {
+                                return Err(TypesGenerationError::ArrayInconsistency(
+                                    "string",
+                                    property_name.clone(),
+                                ));
+                            }
+                        }
+                        types.0.push(MemberVariable {
+                            type_: EIP712Type::Array(Box::new(EIP712Type::String)),
+                            name: String::from(property_name),
+                        });
+                    }
+                    _ => {
+                        return Err(TypesGenerationError::ComplexArrayValue(
+                            property_name.clone(),
+                        ));
+                    }
+                }
+            }
+            EIP712Value::Struct(object) => {
+                // 8
+                let mut recursive_output = generate_types(
+                    &EIP712Value::Struct(object.clone()),
+                    Some(primary_type.clone()),
+                )?;
+                // 8.1
+                let recursive_types = recursive_output.remove(&primary_type).ok_or_else(|| {
+                    TypesGenerationError::MissingPrimaryTypeInRecursiveOutput(primary_type.clone())
+                })?;
+                // 8.2
+                let property_type = property_to_struct_name(property_name);
+                types.0.push(MemberVariable {
+                    name: String::from(property_name),
+                    type_: EIP712Type::Struct(property_type.clone()),
+                });
+                // 8.3
+                output.insert(property_type, recursive_types);
+                // 8.4
+                for (prop, type_) in recursive_output.into_iter() {
+                    output.insert(prop, type_);
+                }
+            }
+            _ => {
+                return Err(TypesGenerationError::ComplexValue(property_name.clone()));
+            }
+        }
+    }
+    // 9
+    output.insert(primary_type, types);
+    Ok(output)
+}
+
+/// Generate types as in [generate_types], but with assumed proof properties.
+pub fn generate_types_with_proof(
+    doc: &EIP712Value,
+    primary_type: Option<StructName>,
+) -> Result<HashMap<StructName, StructType>, TypesGenerationError> {
+    let mut map = if let EIP712Value::Struct(ref map) = doc {
+        map.clone()
+    } else {
+        return Err(TypesGenerationError::ExpectedObject);
+    };
+    if map.get("proof").is_some() {
+        return Err(TypesGenerationError::ProofAlreadyExists);
+    }
+    // Put dummy data in proof object so that types for it can be generated.
+    // Note: @context is not added.
+    map.insert(
+        "proof".to_string(),
+        EIP712Value::Struct(
+            vec![
+                (
+                    "type".to_string(),
+                    EIP712Value::String("ExampleSignatureType".to_string()),
+                ),
+                (
+                    "created".to_string(),
+                    EIP712Value::String("2022-02-03T19:18:58Z".to_string()),
+                ),
+                (
+                    "proofPurpose".to_string(),
+                    EIP712Value::String("assertionMethod".to_string()),
+                ),
+                (
+                    "verificationMethod".to_string(),
+                    EIP712Value::String("did:example:eip712sig".to_string()),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        ),
+    );
+    generate_types(&EIP712Value::Struct(map), primary_type)
+}
+
+#[derive(Error, Debug)]
+pub enum ProofGenerationError {
+    #[error("Unable to generate types: {0}")]
+    TypesGeneration(#[from] TypesGenerationError),
+}
+
+// Generate eip712Domain proof property, using [generate_types].
+pub fn generate_proof_info(doc: &EIP712Value) -> Result<ProofInfo, ProofGenerationError> {
+    // Default primaryType to Document for consistency with generate_types.
+    let primary_type = StructName::from("Document");
+    let types = generate_types(doc, Some(primary_type.clone()))?;
+    let domain = EIP712Value::Struct(HashMap::default());
+    let eip712_domain = eip712sig_default_domain();
+    Ok(ProofInfo {
+        types_or_uri: TypesOrURI::Object(Types {
+            eip712_domain,
+            types,
+        }),
+        primary_type,
+        domain,
+    })
 }
 
 #[cfg(test)]
@@ -1082,6 +1430,182 @@ mod tests {
         );
     }
 
+    lazy_static! {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L637-L645
+        static ref TEST_BASIC_DOCUMENT: Value = {
+            json!({
+                "@context": ["https://schema.org", "https://w3id.org/security/v2"],
+                "@type": "Person",
+                "firstName": "Jane",
+                "lastName": "Does",
+                "jobTitle": "Professor",
+                "telephone": "(425) 123-4567",
+                "email": "jane.doe@example.com"
+            })
+        };
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L646-L660
+        static ref TEST_NESTED_DOCUMENT: Value = {
+            json!({
+                "@context": ["https://schema.org", "https://w3id.org/security/v2"],
+                "@type": "Person",
+                "data": {
+                  "name": {
+                    "firstName": "John",
+                    "lastName": "Doe"
+                  },
+                  "job": {
+                    "jobTitle": "Professor",
+                    "employer": "University of Waterloo"
+                  }
+                },
+                "telephone": "(425) 123-4567"
+            })
+        };
+
+        static ref MOCK_ETHR_DID_RESOLVER: MockEthrDIDResolver =
+            MockEthrDIDResolver {
+                doc: serde_json::from_value(json!({
+                  "@context": [
+                    "https://www.w3.org/ns/did/v1",
+                    {
+                      "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
+                      "blockchainAccountId": "https://w3id.org/security#blockchainAccountId"
+                    }
+                  ],
+                  "id": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443",
+                  "verificationMethod": [{
+                      "id": "#blockchainAccountId",
+                      "type": "EcdsaSecp256k1RecoveryMethod2020",
+                      "controller": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443",
+                      "blockchainAccountId": "eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443"
+                  }],
+                  "assertionMethod": [
+                      "#blockchainAccountId"
+                  ]
+                })).unwrap()
+            };
+    }
+
+    #[test]
+    fn test_property_sorting() {
+        // https://datatracker.ietf.org/doc/html/rfc8785#section-3.2.3
+        let object: EIP712Value = serde_json::from_str(
+            r#"{
+           "\u20ac": "Euro Sign",
+           "\r": "Carriage Return",
+           "\ufb33": "Hebrew Letter Dalet With Dagesh",
+           "1": "One",
+           "\ud83d\ude00": "Emoji: Grinning Face",
+           "\u0080": "Control",
+           "\u00f6": "Latin Small Letter O With Diaeresis"
+        }"#,
+        )
+        .unwrap();
+        let mut props: Vec<(&String, &EIP712Value)> = object.as_struct().unwrap().iter().collect();
+        props.sort_by_cached_key(|(name, _value)| name.encode_utf16().collect::<Vec<u16>>());
+        let expected_values = vec![
+            "Carriage Return",
+            "One",
+            "Control",
+            "Latin Small Letter O With Diaeresis",
+            "Euro Sign",
+            "Emoji: Grinning Face",
+            "Hebrew Letter Dalet With Dagesh",
+        ];
+        let values: Vec<String> = props
+            .iter()
+            .map(|(name_, value)| Value::from((*value).clone()).as_str().unwrap().to_string())
+            .collect();
+        assert_eq!(values, expected_values);
+    }
+
+    #[test]
+    fn test_types_generation() {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/25
+        // #example-1
+        let doc: EIP712Value = serde_json::from_value(json!({
+          "@context": ["https://schema.org", "https://w3id.org/security/v2"],
+          "@type": "Person",
+          "name": {
+            "first": "Jane",
+            "last": "Doe",
+          },
+          "otherData": {
+            "jobTitle": "Professor",
+            "school": "University of ExampleLand",
+          },
+          "telephone": "(425) 123-4567",
+          "email": "jane.doe@example.com",
+        }))
+        .unwrap();
+
+        // #example-2
+        let expected_types: HashMap<StructName, StructType> = serde_json::from_value(json!({
+            "Name": [
+              { "name": "first", "type": "string" },
+              { "name": "last", "type": "string" },
+            ],
+            "OtherData": [
+              { "name": "jobTitle", "type": "string" },
+              { "name": "school", "type": "string" },
+            ],
+            "Document": [
+              { "name": "@context", "type": "string[]" },
+              { "name": "@type", "type": "string" },
+              { "name": "email", "type": "string" },
+              { "name": "name", "type": "Name" },
+              { "name": "otherData", "type": "OtherData" },
+              { "name": "telephone", "type": "string" },
+            ]
+        }))
+        .unwrap();
+        let types = generate_types(&doc, None).unwrap();
+        eprintln!("types: {}", serde_json::to_string_pretty(&types).unwrap());
+        let types_value = serde_json::to_value(types).unwrap();
+        let expected_types_value = serde_json::to_value(expected_types).unwrap();
+        assert_eq!(types_value, expected_types_value);
+
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26
+        let test_basic_document: EIP712Value =
+            serde_json::from_value(TEST_BASIC_DOCUMENT.clone()).unwrap();
+        let types = generate_types(&test_basic_document, None).unwrap();
+        eprintln!("types: {}", serde_json::to_string_pretty(&types).unwrap());
+        let types_value = serde_json::to_value(types).unwrap();
+        let expected_types_value: Value = json!({
+              "Document": [
+                {
+                  "name": "@context",
+                  "type": "string[]"
+                },
+                {
+                  "name": "@type",
+                  "type": "string"
+                },
+                {
+                  "name": "email",
+                  "type": "string"
+                },
+                {
+                  "name": "firstName",
+                  "type": "string"
+                },
+                {
+                  "name": "jobTitle",
+                  "type": "string"
+                },
+                {
+                  "name": "lastName",
+                  "type": "string"
+                },
+                {
+                  "name": "telephone",
+                  "type": "string"
+                }
+              ]
+        });
+        assert_eq!(types_value, expected_types_value);
+    }
+
     pub struct DIDExample;
     use crate::did::{DIDMethod, Document};
     use crate::did_resolve::{
@@ -1244,7 +1768,7 @@ mod tests {
         let typed_data = TypedData::from_document_and_options_json(&vc, &proof)
             .await
             .unwrap();
-        // https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#example-4
+        // https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#example-5
         let expected_typed_data = json!({
           "types": {
             "EIP712Domain": [
@@ -1383,6 +1907,475 @@ mod tests {
         assert!(verification_result.errors.is_empty());
 
         assert_eq!(sig_hex, "0x5fb8f18f21f54c2df8a2720d0afcee7dbbb18e4b7a22ce6e8183633d63b076d329122584db769cd78b6cd5a7094ede5ceaa43317907539187f1f0d8875f99e051b");
-        // todo!();
+    }
+
+    use crate::ldp::resolve_vm;
+    use crate::vc::{LinkedDataProofOptions, ProofPurpose, URI};
+
+    #[async_std::test]
+    async fn eip712sig_keypair() {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/4f1a089c109c32e29725254accfc375588736c39/index.html#L480-L483
+        let addr = "0xaed7ea8035eec47e657b34ef5d020c7005487443";
+        let sk_hex = "0x149195a4059ac8cafe2d56fc612f613b6b18b9265a73143c9f6d7cfbbed76b7e";
+        let sk_bytes = bytes_from_hex(sk_hex).unwrap();
+        use crate::jwk::{Base64urlUInt, ECParams, Params, JWK};
+
+        let sk = k256::SecretKey::from_bytes(&sk_bytes).unwrap();
+        let pk = sk.public_key();
+        let mut ec_params = ECParams::try_from(&pk).unwrap();
+        ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
+        let jwk = JWK::from(Params::EC(ec_params));
+        let hash = crate::keccak_hash::hash_public_key(&jwk).unwrap();
+        assert_eq!(hash, addr);
+    }
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct InputOptions {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        types: Option<HashMap<StructName, StructType>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        domain: Option<EIP712Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        date: Option<chrono::DateTime<chrono::Utc>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        #[serde(rename = "embed")]
+        embed: Option<bool>,
+        #[serde(rename = "embedAsURI")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        embed_as_uri: Option<bool>,
+    }
+    impl From<InputOptions> for LinkedDataProofOptions {
+        fn from(input_options: InputOptions) -> LinkedDataProofOptions {
+            LinkedDataProofOptions {
+                created: input_options.date,
+                verification_method: Some(URI::String(
+                    "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443".to_string(),
+                )),
+                proof_purpose: Some(ProofPurpose::AssertionMethod),
+                ..Default::default()
+            }
+        }
+    }
+
+    struct ExampleDocument(Value);
+    #[async_trait]
+    impl LinkedDataDocument for ExampleDocument {
+        fn get_contexts(&self) -> Result<Option<String>, crate::error::Error> {
+            Ok(None)
+        }
+        async fn to_dataset_for_signing(
+            &self,
+            _parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        ) -> Result<crate::rdf::DataSet, crate::error::Error> {
+            todo!();
+        }
+
+        fn to_value(&self) -> Result<Value, crate::error::Error> {
+            Ok(self.0.clone())
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct MockEthrDIDResolver {
+        doc: Document,
+    }
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl DIDResolver for MockEthrDIDResolver {
+        async fn resolve(
+            &self,
+            did: &str,
+            _input_metadata: &ResolutionInputMetadata,
+        ) -> (
+            ResolutionMetadata,
+            Option<Document>,
+            Option<DocumentMetadata>,
+        ) {
+            let doc: Document = match did {
+                "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443" => self.doc.clone(),
+                _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
+            };
+            (
+                ResolutionMetadata::default(),
+                Some(doc),
+                Some(DocumentMetadata::default()),
+            )
+        }
+    }
+
+    // 3.6. Test Vectors
+    // https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#test-vectors
+    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26
+
+    /// 3.6.1. Basic Document - Types Generation - No Embedding
+    /// #basic-document-types-generation-no-embedding
+    #[async_std::test]
+    #[ignore] // FIXME
+    async fn eip712sig_types_generation_no_embedding() {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L673-L679
+        let input_options: InputOptions = serde_json::from_value(json!({
+          "date": "2021-08-30T13:28:02Z",
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+          "domain": {
+            "name": "Test"
+          }
+        }))
+        .unwrap();
+        let ldp_options = LinkedDataProofOptions::from(input_options);
+
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L685-L691
+        let proof: Proof = serde_json::from_value(json!({
+            "created": "2021-08-30T13:28:02Z",
+            "proofPurpose": "assertionMethod",
+            "proofValue": "0xbbdf2914c7572185bbc263e066dfb43f3136e4441fddb3fe3ea4541bbf7fd1f00d8e5af3ce4fbb1f2ebd5256f39b22cef7f285189df2976ea0c385c77f0a42791b",
+            "type": "EthereumEip712Signature2021",
+            "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+        }))
+        .unwrap();
+
+        let basic_doc = ExampleDocument(TEST_BASIC_DOCUMENT.clone());
+        let resolver = MOCK_ETHR_DID_RESOLVER.clone();
+        let verification_result = proof.verify(&basic_doc, &resolver).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+    }
+
+    #[async_std::test]
+    /// 3.6.2. Nested Document - TypedData Provided - Embedded EIP712 Properties
+    /// #nested-document-typeddata-provided-embedded-types
+    async fn eip712sig_typeddata_provided_embedded_eip712_properties() {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L703-L782
+        let input_options: InputOptions = serde_json::from_value(json!({
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+          "types": {
+            "Data": [
+              {
+                "name": "job",
+                "type": "Job"
+              },
+              {
+                "name": "name",
+                "type": "Name"
+              }
+            ],
+            "Document": [
+              {
+                "name": "@context",
+                "type": "string[]"
+              },
+              {
+                "name": "@type",
+                "type": "string"
+              },
+              {
+                "name": "data",
+                "type": "Data"
+              },
+              {
+                "name": "telephone",
+                "type": "string"
+              },
+              {
+                "name": "proof",
+                "type": "Proof"
+              }
+            ],
+            "Job": [
+              {
+                "name": "employer",
+                "type": "string"
+              },
+              {
+                "name": "jobTitle",
+                "type": "string"
+              }
+            ],
+            "Proof": [
+              {
+                "name": "created",
+                "type": "string"
+              },
+              {
+                "name": "proofPurpose",
+                "type": "string"
+              },
+              {
+                "name": "type",
+                "type": "string"
+              },
+              {
+                "name": "verificationMethod",
+                "type": "string"
+              }
+            ],
+            "Name": [
+              {
+                "name": "firstName",
+                "type": "string"
+              },
+              {
+                "name": "lastName",
+                "type": "string"
+              }
+            ]
+          },
+          "domain": {
+            "name": "Test"
+          },
+          "date": "2021-08-30T13:28:02Z",
+          "embed": true
+        }))
+        .unwrap();
+        let ldp_options = LinkedDataProofOptions::from(input_options);
+
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L788-L872
+        let proof: Proof = serde_json::from_value(json!({
+          "created": "2021-08-30T13:28:02Z",
+          "eip712": {
+            "domain": {
+              "name": "Test",
+            },
+            "primaryType": "Document",
+            "types": {
+              "Data": [
+                {
+                  "name": "job",
+                  "type": "Job",
+                },
+                {
+                  "name": "name",
+                  "type": "Name",
+                },
+              ],
+              "Document": [
+                {
+                  "name": "@context",
+                  "type": "string[]",
+                },
+                {
+                  "name": "@type",
+                  "type": "string",
+                },
+                {
+                  "name": "data",
+                  "type": "Data",
+                },
+                {
+                  "name": "telephone",
+                  "type": "string",
+                },
+                {
+                  "name": "proof",
+                  "type": "Proof",
+                },
+              ],
+              "Job": [
+                {
+                  "name": "employer",
+                  "type": "string",
+                },
+                {
+                  "name": "jobTitle",
+                  "type": "string",
+                },
+              ],
+              "Name": [
+                {
+                  "name": "firstName",
+                  "type": "string",
+                },
+                {
+                  "name": "lastName",
+                  "type": "string",
+                },
+              ],
+              "Proof": [
+                {
+                  "name": "created",
+                  "type": "string",
+                },
+                {
+                  "name": "proofPurpose",
+                  "type": "string",
+                },
+                {
+                  "name": "type",
+                  "type": "string",
+                },
+                {
+                  "name": "verificationMethod",
+                  "type": "string",
+                },
+              ],
+            },
+          },
+          "proofPurpose": "assertionMethod",
+          "proofValue": "0xcf5844be1f1a5c1a083565d492ab4bee93bd0e24a4573bd8ff47331ad225b9d11c4831aade8d071f4abb8c9e266aaaf30612c582c2bc8f082b8788448895fa4a1b",
+          "type": "EthereumEip712Signature2021",
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+        })).unwrap();
+
+        let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
+        let resolver = MOCK_ETHR_DID_RESOLVER.clone();
+        let verification_result = proof.verify(&nested_doc, &resolver).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+    }
+
+    #[async_std::test]
+    /// 3.6.3. Nested Document - Types Generation - TypedData Schema as URI
+    /// #nested-document-types-generation-typeddata-schema-as-uri
+    async fn eip712sig_typeddata_types_generation_typeddata_schema_as_uri() {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L885-L892
+        let input_options: InputOptions = serde_json::from_value(json!({
+          "embedAsURI": true,
+          "date": "2021-08-30T13:28:02Z",
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+          "domain": {
+            "name": "Test"
+          }
+        }))
+        .unwrap();
+        let ldp_options = LinkedDataProofOptions::from(input_options);
+
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L898-L911
+        let proof: Proof = serde_json::from_value(json!({
+          "created": "2021-08-30T13:28:02Z",
+          "proofPurpose": "assertionMethod",
+          "type": "EthereumEip712Signature2021",
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+          "proofValue": "0x8327ad5e4b2426eac7626400c75f000c3e04caf2a863b888988e4e85533880183d4b9cc6870183e55dabfa96b9486624f45ef849bb146257d123f297a2dbf3a11c",
+          "eip712": {
+            "domain": {
+              "name": "Test"
+            },
+            "types": "https://example.org/types.json",
+            "primaryType": "Document"
+          }
+        })).unwrap();
+
+        let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
+        let resolver = MOCK_ETHR_DID_RESOLVER.clone();
+        let verification_result = proof.verify(&nested_doc, &resolver).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
+
+        // Types generation
+        let test_nested_document: EIP712Value =
+            serde_json::from_value(TEST_NESTED_DOCUMENT.clone()).unwrap();
+        let types = generate_types_with_proof(&test_nested_document, None).unwrap();
+        eprintln!("types: {}", serde_json::to_string_pretty(&types).unwrap());
+        let types_value = serde_json::to_value(types).unwrap();
+        assert_eq!(types_value, *EXAMPLE_TYPES);
+    }
+
+    #[async_std::test]
+    /// 3.6.4. Nested Document - Types Generation - Types Embedded
+    /// #nested-document-types-generation-types-embedded
+    async fn eip712sig_typeddata_provided_embedded_types() {
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L983-L990
+        let input_options: InputOptions = serde_json::from_value(json!({
+          "date": "2021-08-30T13:28:02Z",
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+          "domain": {
+            "name": "Test"
+          },
+          "embed": true
+        }))
+        .unwrap();
+        let ldp_options = LinkedDataProofOptions::from(input_options);
+
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L996-L1080
+        let proof: Proof = serde_json::from_value(json!({
+          "created": "2021-08-30T13:28:02Z",
+          "eip712": {
+            "domain": {
+              "name": "EthereumEip712Signature2021",
+            },
+            "primaryType": "Document",
+            "types": {
+              "Data": [
+                {
+                  "name": "job",
+                  "type": "Job",
+                },
+                {
+                  "name": "name",
+                  "type": "Name",
+                },
+              ],
+              "Document": [
+                {
+                  "name": "@context",
+                  "type": "string[]",
+                },
+                {
+                  "name": "@type",
+                  "type": "string",
+                },
+                {
+                  "name": "data",
+                  "type": "Data",
+                },
+                {
+                  "name": "proof",
+                  "type": "Proof",
+                },
+                {
+                  "name": "telephone",
+                  "type": "string",
+                },
+              ],
+              "Job": [
+                {
+                  "name": "employer",
+                  "type": "string",
+                },
+                {
+                  "name": "jobTitle",
+                  "type": "string",
+                },
+              ],
+              "Name": [
+                {
+                  "name": "firstName",
+                  "type": "string",
+                },
+                {
+                  "name": "lastName",
+                  "type": "string",
+                },
+              ],
+              "Proof": [
+                {
+                  "name": "created",
+                  "type": "string",
+                },
+                {
+                  "name": "proofPurpose",
+                  "type": "string",
+                },
+                {
+                  "name": "type",
+                  "type": "string",
+                },
+                {
+                  "name": "verificationMethod",
+                  "type": "string",
+                },
+              ],
+            },
+          },
+          "proofPurpose": "assertionMethod",
+          "proofValue": "0x7d57ace2be9cc3944aac023f66130935e489bbb1c9b469a4a5b4f16e5c298b57291bc80d52c6f873b11f4bf45c97c6e2506419af7506eaac5374e9ed381fcc5b1b",
+          "type": "EthereumEip712Signature2021",
+          "verificationMethod": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443#blockchainAccountId",
+        })).unwrap();
+
+        let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
+        let resolver = MOCK_ETHR_DID_RESOLVER.clone();
+        let verification_result = proof.verify(&nested_doc, &resolver).await;
+        println!("{:#?}", verification_result);
+        assert!(verification_result.errors.is_empty());
     }
 }

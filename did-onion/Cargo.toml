@@ -14,7 +14,7 @@ documentation = "https://docs.rs/did-onion/"
 tor-tests = []
 
 [dependencies]
-ssi = { version = "0.3", path = "../", default-features = false }
+ssi = { version = "0.4", path = "../", default-features = false }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json", "socks"] }
 http = "0.2"

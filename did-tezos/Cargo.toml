@@ -19,7 +19,7 @@ secp256r1 = ["ssi/secp256r1"]
 p256 = ["secp256r1"]
 
 [dependencies]
-ssi = { version = "0.3", path = "../", default-features = false }
+ssi = { version = "0.4", path = "../", default-features = false }
 chrono = { version = "0.4" }
 reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }

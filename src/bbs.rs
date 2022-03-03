@@ -1,3 +1,9 @@
+//! [BBS curves][] and [BBS+][] keypairs
+//!
+//! This trait exposes signature and keytype primitives based on BBS+ cryptography.
+//!
+//! [BBS curves]: https://datatracker.ietf.org/doc/html/draft-yonezawa-pairing-friendly-curves#section-4.2.2
+//! [BBS+]: https://mattrglobal.github.io/bbs-signatures-spec/
 use bbs::prelude::*;
 use pairing_plus::{
     bls12_381::{Bls12, Fr, G1, G2},
@@ -63,8 +69,8 @@ use zeroize::Zeroize;
 ///     CurveProjective,
 /// };
 /// fn main() {
-///     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
-///     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
+///     let g1 = <G1 as HashToCurve<ExpandMsgXmd<blake2_old::Blake2b>>>::hash_to_curve(PREHASH, DST_G1);
+///     let g2 = <G2 as HashToCurve<ExpandMsgXmd<blake2_old::Blake2b>>>::hash_to_curve(PREHASH, DST_G2);
 ///
 ///     let mut g1_bytes = Vec::new();
 ///     let mut g2_bytes = Vec::new();

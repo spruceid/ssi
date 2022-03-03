@@ -1,24 +1,23 @@
 [package]
 name = "ssi"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Spruce Systems, Inc."]
 edition = "2018"
 license = "Apache-2.0"
 description = "Core library for Verifiable Credentials and Decentralized Identifiers."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
+resolver = "2"
 
-exclude = [
-  "json-ld-api/*",
-  "json-ld-normalization/*",
-]
+exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 
 [features]
 default = ["ring"]
-http-did = ["hyper", "hyper-tls", "http", "percent-encoding", "tokio"]
+http-did = ["http", "percent-encoding"]
 libsecp256k1 = ["secp256k1"] # backward compatibility
 secp256k1 = ["k256", "rand", "k256/keccak256"]
 secp256r1 = ["p256", "rand"]
+aleosig = ["rand", "blake2", "snarkvm-dpc", "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters"]
 ripemd-160 = ["ripemd160", "secp256k1"]
 # TODO handle better keccak and sha
 keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
@@ -60,23 +59,22 @@ lazy_static = "1.4"
 combination = "0.1"
 sha2 = { version = "0.9", optional = true }
 sha2_old = { package = "sha2", version = "0.8" }
-hyper = { version = "0.14", optional = true, features = ["server", "client", "http1", "stream"] }
-hyper-tls = { version = "0.5", optional = true }
 http = { version = "0.2", optional = true }
 hex = "0.4"
 serde_urlencoded = "0.7"
 percent-encoding = { version = "2.1", optional = true }
 tokio = { version = "1.0", optional = true, features = ["macros"] }
 blake2b_simd = "0.5"
+blake2 = { version = "0.9", optional = true }
 bs58 = { version = "0.4", features = ["check"] }
 thiserror = "1.0"
 keccak-hash = { version = "0.7", optional = true }
 # TODO make this optional, or remove it
 ecdsa = "0.11.1"
 digest = "0.9"
-k256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
-p256 = { version = "0.8", optional = true, features = ["zeroize", "ecdsa"] }
-ssi-contexts = { version = "0.1.2", path = "contexts/" }
+k256 = { version = "0.9.6", optional = true, features = ["zeroize", "ecdsa"] }
+p256 = { version = "0.9.0", optional = true, features = ["zeroize", "ecdsa"] }
+ssi-contexts = { version = "0.1.3", path = "contexts/" }
 ripemd160 = { version = "0.9", optional = true }
 sshkeys = "0.3"
 reqwest = { version = "0.11", features = ["json"] }
@@ -84,6 +82,15 @@ flate2 = "1.0"
 bitvec = "0.20"
 clear_on_drop = "0.2.4"
 url = { version = "2.2", features = ["serde"] }
+anyhow = "1.0"
+rand_xorshift = "0.3"
+bech32 = "0.8"
+snarkvm-dpc = { version = "0.7.9", optional = true }
+snarkvm-algorithms = { version= "0.7.9", optional = true }
+snarkvm-curves = { version= "0.7.9", optional = true }
+snarkvm-utilities = { version = "0.7.9", optional = true }
+snarkvm-parameters = { version = "0.7.9", optional = true }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 
@@ -101,17 +108,19 @@ members = [
   "did-sol",
   "did-pkh",
   "did-onion",
+  "did-ion",
   "did-webkey",
   "vc-test",
   "did-test",
 ]
 
 [dev-dependencies]
-blake2 = "0.8" # for bbs doctest
+blake2_old = { package = "blake2", version = "0.8" } # for bbs doctest
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
 did-method-key = { path = "./did-key" }
 tokio = { version = "1.0", features = ["macros"] }
+hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 
 [package.metadata.docs.rs]
 features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]
