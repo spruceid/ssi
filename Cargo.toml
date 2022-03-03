@@ -25,7 +25,7 @@ sha = ["sha2", "k256/sha256"]
 example-http-issuer = []
 
 [dependencies]
-json-ld = "0.6.1"
+json-ld = { git = "https://github.com/timothee-haudebourg/json-ld", rev = "69ef4d027f1329ff3dbb00b1fa74ae80657eabdd" }
 generic-json = { version = "^0.7", features = ["serde_json-impl"] }
 
 # SAFETY: bbs and pairing-plus are set to specific versions due to a
