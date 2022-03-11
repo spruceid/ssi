@@ -1727,6 +1727,17 @@ impl Presentation {
         LinkedDataProofs::sign(self, options, resolver, jwk, None).await
     }
 
+    /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
+    /// and then pass to [`ProofPreparation::complete`] to complete the proof.
+    pub async fn prepare_proof(
+        &self,
+        public_key: &JWK,
+        options: &LinkedDataProofOptions,
+        resolver: &dyn DIDResolver,
+    ) -> Result<ProofPreparation, Error> {
+        LinkedDataProofs::prepare(self, options, resolver, public_key, None).await
+    }
+
     pub fn add_proof(&mut self, proof: Proof) {
         self.proof = match self.proof.take() {
             None => Some(OneOrMany::One(proof)),
