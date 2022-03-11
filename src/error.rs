@@ -392,6 +392,9 @@ pub enum Error {
     /// Missing crate features
     MissingFeatures(&'static str),
     NumericDateOutOfMicrosecondPrecisionRange,
+    /// Some error occurred.
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 impl fmt::Display for Error {
@@ -583,6 +586,7 @@ impl fmt::Display for Error {
             Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
             Error::MissingFeatures(features) => write!(f, "Missing features: {}", features),
             Error::NumericDateOutOfMicrosecondPrecisionRange => write!(f, "Out of valid microsecond-precision range of NumericDate"),
+            Error::Other(e) => e.fmt(f)
         }
     }
 }
