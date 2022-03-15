@@ -1998,8 +1998,7 @@ impl Proof {
     }
 
     /// Check that a proof's verification method belongs to the given set.
-    #[allow(clippy::ptr_arg)]
-    pub fn matches_vms(&self, allowed_vms: &Vec<String>) -> bool {
+    pub fn matches_vms(&self, allowed_vms: &[String]) -> bool {
         if let Some(vm) = self.verification_method.as_ref() {
             assert_local!(allowed_vms.contains(vm));
         }
