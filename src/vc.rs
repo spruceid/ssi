@@ -1247,7 +1247,7 @@ impl Credential {
                 header,
                 claims,
                 &options,
-                &allowed_vms,
+                &Some(allowed_vms),
                 &ProofPurpose::AssertionMethod,
             ),
             None => false,
@@ -1431,8 +1431,6 @@ impl Presentation {
         if let Some(iss) = claims.issuer {
             if let StringOrURI::URI(issuer_uri) = iss {
                 vp.holder = Some(issuer_uri);
-            } else {
-                return Err(Error::InvalidIssuer);
             }
         }
         if let Some(id) = claims.jwt_id {
@@ -1762,17 +1760,20 @@ impl Presentation {
             proof_purpose: Some(ProofPurpose::Authentication),
             ..Default::default()
         });
-        let allowed_vms = match options.verification_method.take() {
-            Some(vm) => vec![vm.to_string()],
+        let restrict_allowed_vms = match options.verification_method.take() {
+            Some(vm) => Some(vec![vm.to_string()]),
             None => {
                 if let Some(URI::String(ref holder)) = self.holder {
                     let proof_purpose = options
                         .proof_purpose
                         .clone()
                         .unwrap_or(ProofPurpose::Authentication);
-                    get_verification_methods_for_purpose(holder, resolver, proof_purpose).await?
+                    Some(
+                        get_verification_methods_for_purpose(holder, resolver, proof_purpose)
+                            .await?,
+                    )
                 } else {
-                    Vec::new()
+                    None
                 }
             }
         };
@@ -1780,14 +1781,22 @@ impl Presentation {
             .proof
             .iter()
             .flatten()
-            .filter(|proof| proof.matches(&options, &allowed_vms))
+            .filter(|proof| {
+                proof.matches_options(&options)
+                    && if let Some(ref allowed_vms) = restrict_allowed_vms {
+                        proof.matches_vms(allowed_vms)
+                    } else {
+                        // No verificationMethod verify option or holder property: allow any VM.
+                        true
+                    }
+            })
             .collect();
         let matched_jwt = match jwt_params {
             Some((header, claims)) => jwt_matches(
                 header,
                 claims,
                 &options,
-                &allowed_vms,
+                &restrict_allowed_vms,
                 &ProofPurpose::Authentication,
             ),
             None => false,
@@ -1971,15 +1980,13 @@ impl Proof {
         }
     }
 
+    /// Check that a proof matches the given options.
     #[allow(clippy::ptr_arg)]
-    pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
+    pub fn matches_options(&self, options: &LinkedDataProofOptions) -> bool {
         if let Some(ref verification_method) = options.verification_method {
             assert_local!(
                 self.verification_method.as_ref() == Some(&verification_method.to_string())
             );
-        }
-        if let Some(vm) = self.verification_method.as_ref() {
-            assert_local!(allowed_vms.contains(vm));
         }
         if let Some(created) = self.created {
             assert_local!(options.created.unwrap_or_else(now_ms) >= created);
@@ -2001,6 +2008,22 @@ impl Proof {
         true
     }
 
+    /// Check that a proof's verification method belongs to the given set.
+    pub fn matches_vms(&self, allowed_vms: &[String]) -> bool {
+        if let Some(vm) = self.verification_method.as_ref() {
+            assert_local!(allowed_vms.contains(vm));
+        }
+        true
+    }
+
+    /// Check that a proof matches the given options and allowed verification methods.
+    ///
+    /// Equivalent to [Self::matches_options] and [Self::matches_vm].
+    #[allow(clippy::ptr_arg)]
+    pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
+        self.matches_options(options) && self.matches_vms(allowed_vms)
+    }
+
     pub async fn verify(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
@@ -2017,7 +2040,7 @@ fn jwt_matches(
     header: &Header,
     claims: &JWTClaims,
     options: &LinkedDataProofOptions,
-    allowed_vms: &[String],
+    restrict_allowed_vms: &Option<Vec<String>>,
     expected_proof_purpose: &ProofPurpose,
 ) -> bool {
     let LinkedDataProofOptions {
@@ -2032,7 +2055,9 @@ fn jwt_matches(
         assert_local!(header.key_id.as_ref() == Some(&vm.to_string()));
     }
     if let Some(kid) = header.key_id.as_ref() {
-        assert_local!(allowed_vms.contains(kid));
+        if let Some(allowed_vms) = restrict_allowed_vms {
+            assert_local!(allowed_vms.contains(kid));
+        }
     }
     if let Some(nbf) = claims.not_before {
         let nbf_date_time: LocalResult<DateTime<Utc>> = nbf.into();
