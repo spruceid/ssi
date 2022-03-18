@@ -16,22 +16,14 @@ including embedded systems. This library is embedded in the the cross-platform
 
 ![DIDKit core components](https://user-images.githubusercontent.com/37127325/132885372-9cdf586e-ba6f-44c8-8b83-f72f16d86107.png)
 
-## Maturity Disclaimer
+## Security Audits
 
-In the v0.1 release on January 27th, 2021, SSI has not yet undergone a formal
-security audit and to desired levels of confidence for suitable use in
-production systems. This implementation is currently suitable for exploratory
-work and experimentation only. We welcome feedback on the usability,
-architecture, and security of this implementation and are committed to a
-conducting a formal audit with a reputable security firm before the v1.0
-release.
+ssi has undergone the following security reviews:
+- [March 14th, 2022 - Trail of Bits](https://github.com/trailofbits/publications/blob/master/reviews/SpruceID.pdf) | [Summary of Findings](https://blog.spruceid.com/spruce-completes-first-security-audit-from-trail-of-bits/)
 
 We are setting up a process to accept contributions. Please feel free to open
 issues or PRs in the interim, but we cannot merge external changes until this
 process is in place.
-
-We are also in the process of creating crates.io entries for the DIDKit and SSI
-packages.
 
 ## Dependencies
 
