@@ -729,6 +729,15 @@ where
     }
 }
 
+impl<Tz: chrono::TimeZone> From<VCDateTime> for DateTime<Tz>
+where
+    chrono::DateTime<Tz>: From<chrono::DateTime<chrono::FixedOffset>>
+{
+    fn from(vc_date_time: VCDateTime) -> Self {
+        Self::from(vc_date_time.date_time)
+    }
+}
+
 pub fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
@@ -2465,6 +2474,14 @@ pub(crate) mod tests {
         }"###;
         let doc: Credential = serde_json::from_str(doc_str).unwrap();
         println!("{}", serde_json::to_string_pretty(&doc).unwrap());
+    }
+
+    #[test]
+    fn test_vc_date_time_roundtrip() {
+        let expected_utc_now = chrono::Utc::now();
+        let vc_date_time_now = VCDateTime::from(expected_utc_now);
+        let roundtripped_utc_now = chrono::DateTime::<chrono::Utc>::from(vc_date_time_now);
+        assert_eq!(roundtripped_utc_now, expected_utc_now);
     }
 
     #[async_std::test]
