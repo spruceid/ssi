@@ -114,6 +114,22 @@ pub struct CredentialSubject {
     pub property_set: Option<Map<String, Value>>,
 }
 
+impl CredentialSubject {
+    /// Check if the credential subject is empty
+    ///
+    /// An empty credential subject (containing no properties, not even an id property) is
+    /// considered invalid, as the VC Data Model defines the value of the
+    /// [credentialSubject](https://www.w3.org/TR/vc-data-model/#credential-subject) property as
+    /// "a set of objects that contain one or more properties [...]"
+    pub fn is_empty(&self) -> bool {
+        self.id.is_none()
+            && match self.property_set {
+                Some(ref ps) => ps.is_empty(),
+                None => true,
+            }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Issuer {
@@ -1177,6 +1193,18 @@ impl Credential {
         }
         if self.issuer.is_none() {
             return Err(Error::MissingIssuer);
+        }
+        if self.credential_subject.is_empty() {
+            // https://www.w3.org/TR/vc-data-model/#credential-subject
+            // VC-Data-Model "defines a credentialSubject property for the expression of claims
+            // about one or more subjects."
+            // Therefore, zero credentialSubject values is considered invalid.
+            return Err(Error::EmptyCredentialSubject);
+        }
+        for subject in &self.credential_subject {
+            if subject.is_empty() {
+                return Err(Error::EmptyCredentialSubject);
+            }
         }
         if self.issuance_date.is_none() {
             return Err(Error::MissingIssuanceDate);
@@ -3021,7 +3049,9 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             "type": ["VerifiableCredential"],
             "issuer": "did:example:foo",
             "issuanceDate": "2021-08-25T18:38:54Z",
-            "credentialSubject": {},
+            "credentialSubject": {
+              "id": "did:example:foo"
+            },
             "credentialStatus": {
                 "id": "_:1",
                 "type": "RevocationList2020Status",
@@ -3038,7 +3068,9 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             "type": ["VerifiableCredential"],
             "issuer": "did:example:foo",
             "issuanceDate": "2021-08-25T20:15:45Z",
-            "credentialSubject": {},
+            "credentialSubject": {
+              "id": "did:example:foo"
+            },
             "credentialStatus": {
                 "id": "_:1",
                 "type": "RevocationList2020Status",

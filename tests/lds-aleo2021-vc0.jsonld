@@ -5,7 +5,9 @@
   "type": [
     "VerifiableCredential"
   ],
-  "credentialSubject": {},
+  "credentialSubject": {
+    "id": "_:1"
+  },
   "issuer": "did:example:aleovm2021",
   "issuanceDate": "2021-11-23T20:08:36Z",
   "proof": [

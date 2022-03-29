@@ -2,7 +2,9 @@
   "@context": [
     "https://www.w3.org/2018/credentials/v1"
   ],
-  "credentialSubject": {},
+  "credentialSubject": {
+    "id": "_:1"
+  },
   "issuanceDate": "2021-06-15T19:10:36.479Z",
   "issuer": "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
   "proof": {

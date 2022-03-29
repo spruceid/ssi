@@ -142,6 +142,12 @@ pub enum Error {
     MissingProof,
     /// Missing issuance date
     MissingIssuanceDate,
+    /// Credential subject must be non-empty
+    ///
+    /// [Verifiable credential subject](crate::vc::CredentialSubject) arity must be positive
+    /// and value must be non-empty, per [VC
+    /// Data Model](https://www.w3.org/TR/vc-data-model/#credential-subject).
+    EmptyCredentialSubject,
     /// Missing type VerifiableCredential
     MissingTypeVerifiableCredential,
     /// Missing type VerifiablePresentation
@@ -411,6 +417,7 @@ impl fmt::Display for Error {
             Error::MissingPrime => write!(f, "Missing prime factor in RSA key"),
             Error::MissingKeyParameters => write!(f, "JWT key parameters not found"),
             Error::MissingProof => write!(f, "Missing proof property"),
+            Error::EmptyCredentialSubject => write!(f, "Credential subject must be non-empty"),
             Error::MissingIssuanceDate => write!(f, "Missing issuance date"),
             Error::MissingTypeVerifiableCredential => {
                 write!(f, "Missing type VerifiableCredential")
