@@ -2,6 +2,7 @@
 [![](https://img.shields.io/badge/Rust-v1.51.0-orange)](https://www.rust-lang.org/)
 [![](https://img.shields.io/badge/License-Apache--2.0-green)](https://github.com/spruceid/didkit/blob/main/LICENSE)
 [![](https://img.shields.io/twitter/follow/spruceid?label=Follow&style=social)](https://twitter.com/spruceid)
+[![](https://img.shields.io/badge/matrix-%23public--dev%3Aspruceid.com-blue.svg?style=social)](https://matrix.to/#/#public-dev:spruceid.com)
 
 SSI's documentation is currently packaged with the DIDKit documentation
 [here](https://spruceid.dev/docs/didkit/).
