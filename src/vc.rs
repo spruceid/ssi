@@ -654,7 +654,8 @@ impl TryFrom<String> for URI {
 }
 
 impl URI {
-    fn as_str(&self) -> &str {
+    /// Return the URI as a string slice
+    pub fn as_str(&self) -> &str {
         match self {
             URI::String(string) => string.as_str(),
         }
