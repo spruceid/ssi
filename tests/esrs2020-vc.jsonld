@@ -112,6 +112,13 @@
       "verificationMethod": "did:example:123#vm-3",
       "proofPurpose": "assertionMethod",
       "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..wt1hzqcSx654YaqdCx-6bp6_bkzMbjZc9-071-SRsJsQfUvG_U9ZBWUoCvEtv68Kas10AIvFU6siKw8XZi7knwE"
+    },
+    {
+      "type": "EcdsaSecp256k1RecoverySignature2020",
+      "created": "2021-12-17T22:36:55Z",
+      "verificationMethod": "did:example:123#vm-4",
+      "proofPurpose": "assertionMethod",
+      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..fWzq2GBZQBPPyZZfbDCVYz3TI0s0RivTuNakTDyJaAN77i3esHOvzXPSZsy45_zbW3ANSdck_d1bauA94CdQ3AE"
     }
   ]
 }

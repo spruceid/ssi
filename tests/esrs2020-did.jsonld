@@ -35,16 +35,37 @@
       "controller": "did:example:123",
       "type": "EcdsaSecp256k1RecoveryMethod2020",
       "blockchainAccountId": "eip155:1:0xf3beac30c498d9e26865f34fcaa57dbb935b0d74"
+    },
+    {
+      "id": "did:example:123#vm-4",
+      "controller": "did:example:123",
+      "type": "EcdsaSecp256k1RecoveryMethod2020",
+      "blockchainAccountId": "eip155:1:0xa136D6b820E41858b57b0136514e75f4174ceA5f",
+      "privateKeyHex": "0b622f72d0cb4f6d7eebfb9d97375aec891c9836fcf813310069cfffdc7811d6"
     }
   ],
   "authentication": [
     "did:example:123#vm-1",
     "did:example:123#vm-2",
-    "did:example:123#vm-3"
+    "did:example:123#vm-3",
+    "did:example:123#vm-4"
   ],
   "assertionMethod": [
     "did:example:123#vm-1",
     "did:example:123#vm-2",
-    "did:example:123#vm-3"
+    "did:example:123#vm-3",
+    "did:example:123#vm-4"
+  ],
+  "capabilityDelegation": [
+    "did:example:123#vm-1",
+    "did:example:123#vm-2",
+    "did:example:123#vm-3",
+    "did:example:123#vm-4"
+  ],
+  "capabilityInvocation": [
+    "did:example:123#vm-1",
+    "did:example:123#vm-2",
+    "did:example:123#vm-3",
+    "did:example:123#vm-4"
   ]
 }

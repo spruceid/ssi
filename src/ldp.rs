@@ -2573,7 +2573,7 @@ mod tests {
                 .unwrap();
             assert!(warnings.is_empty());
         }
-        assert_eq!(n_proofs, 3);
+        assert_eq!(n_proofs, 4);
     }
 
     #[async_std::test]
