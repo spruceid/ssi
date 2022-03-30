@@ -414,18 +414,18 @@ impl std::convert::TryFrom<DateTime<FixedOffset>> for NumericDate {
     }
 }
 
-impl std::convert::Into<DateTime<Utc>> for NumericDate {
-    fn into(self) -> DateTime<Utc> {
+impl From<NumericDate> for DateTime<Utc> {
+    fn from(nd: NumericDate) -> Self {
         let (whole_seconds, fractional_nanoseconds) =
-            self.into_whole_seconds_and_fractional_nanoseconds();
+            nd.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp(whole_seconds, fractional_nanoseconds)
     }
 }
 
-impl std::convert::Into<LocalResult<DateTime<Utc>>> for NumericDate {
-    fn into(self) -> LocalResult<DateTime<Utc>> {
+impl From<NumericDate> for LocalResult<DateTime<Utc>> {
+    fn from(nd: NumericDate) -> Self {
         let (whole_seconds, fractional_nanoseconds) =
-            self.into_whole_seconds_and_fractional_nanoseconds();
+            nd.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp_opt(whole_seconds, fractional_nanoseconds)
     }
 }
