@@ -250,7 +250,7 @@ pub fn verify_bytes_warnable(
     key: &JWK,
     signature: &[u8],
 ) -> Result<VerificationWarnings, Error> {
-    let mut warnings = VerificationWarnings::default();
+    let warnings = VerificationWarnings::default();
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm
             && !(key_algorithm == Algorithm::EdDSA && algorithm == Algorithm::EdBlake2b)

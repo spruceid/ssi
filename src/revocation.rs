@@ -256,10 +256,8 @@ impl CredentialStatus for RevocationList2020Status {
             match load_credential(&self.revocation_list_credential).await {
                 Ok(credential) => credential,
                 Err(e) => {
-                    return result.with_error(format!(
-                        "Unable to fetch revocation list credential: {}",
-                        e.to_string()
-                    ));
+                    return result
+                        .with_error(format!("Unable to fetch revocation list credential: {}", e));
                 }
             };
         let list_issuer_id = match &revocation_list_credential.issuer {
@@ -278,7 +276,7 @@ impl CredentialStatus for RevocationList2020Status {
 
         match revocation_list_credential.validate() {
             Err(e) => {
-                return result.with_error(format!("Invalid list credential: {}", e.to_string()));
+                return result.with_error(format!("Invalid list credential: {}", e));
             }
             Ok(()) => {}
         }
@@ -300,10 +298,8 @@ impl CredentialStatus for RevocationList2020Status {
             match RevocationList2020Credential::try_from(revocation_list_credential) {
                 Ok(credential) => credential,
                 Err(e) => {
-                    return result.with_error(format!(
-                        "Unable to parse revocation list credential: {}",
-                        e.to_string()
-                    ));
+                    return result
+                        .with_error(format!("Unable to parse revocation list credential: {}", e));
                 }
             };
         if revocation_list_credential.id != URI::String(self.revocation_list_credential.to_string())
@@ -318,12 +314,7 @@ impl CredentialStatus for RevocationList2020Status {
 
         let list = match List::try_from(&revocation_list.encoded_list) {
             Ok(list) => list,
-            Err(e) => {
-                return result.with_error(format!(
-                    "Unable to decode revocation list: {}",
-                    e.to_string()
-                ))
-            }
+            Err(e) => return result.with_error(format!("Unable to decode revocation list: {}", e)),
         };
         let credential_index = self.revocation_list_index.0;
         use bitvec::prelude::*;
