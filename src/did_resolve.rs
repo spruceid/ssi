@@ -193,6 +193,7 @@ pub struct DereferencingMetadata {
 #[derive(Debug, Serialize, Clone, PartialEq)]
 /// A resource returned by [DID URL dereferencing][dereference]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum Content {
     /// A DID Document
     DIDDocument(Document),
@@ -859,6 +860,7 @@ impl HTTPDIDResolver {
     }
 }
 
+#[cfg(feature = "http")]
 fn transform_resolution_result(
     result: Result<ResolutionResult, serde_json::Error>,
 ) -> (

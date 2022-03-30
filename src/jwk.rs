@@ -864,7 +864,7 @@ pub enum RsaX509PubParseError {
 
 /// Parse a "RSA public key (X.509 encoded)" (multicodec) into a JWK.
 pub fn rsa_x509_pub_parse(pk_bytes: &[u8]) -> Result<JWK, RsaX509PubParseError> {
-    let rsa_pk: RSAPublicKey = simple_asn1::der_decode(&pk_bytes)?;
+    let rsa_pk: RSAPublicKey = simple_asn1::der_decode(pk_bytes)?;
     let rsa_params = RSAParams::try_from(&rsa_pk)?;
     Ok(JWK::from(Params::RSA(rsa_params)))
 }

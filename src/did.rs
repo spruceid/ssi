@@ -339,6 +339,7 @@ pub struct Proof {
 #[derive(Debug, Serialize, Clone, PartialEq)]
 #[non_exhaustive]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum Resource {
     /// Verification method map.
     ///
@@ -439,6 +440,7 @@ pub struct DIDDeactivate {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "didDocumentOperation", content = "didDocument")]
 #[serde(rename_all = "camelCase")]
+#[allow(clippy::large_enum_variant)]
 pub enum DIDDocumentOperation {
     /// Set the contents of the DID document
     ///
@@ -829,7 +831,7 @@ impl VerificationMethodMap {
                 if pk_bytes.len() != 34 {
                     return Err(Error::MultibaseKeyLength(34, pk_bytes.len()));
                 }
-                if &pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
+                if pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
                     return Err(Error::MultibaseKeyPrefix);
                 }
                 crate::jwk::Params::OKP(crate::jwk::OctetParams {
@@ -943,7 +945,7 @@ impl FromStr for RelativeDIDURLPath {
         } else {
             // path-noscheme = segment-nz-nc *( "/" segment )
             // segment-nz-nc = 1*( unreserved / pct-encoded / sub-delims / "@" )
-            let first_segment = path.splitn(2, '/').next().unwrap().to_string();
+            let first_segment = path.split_once('/').map_or(path, |x| x.0).to_string();
             if first_segment.contains(':') {
                 // First path segment containing ":" would make an absolute URI.
                 return Err(Error::DIDURL);

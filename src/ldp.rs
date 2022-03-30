@@ -513,7 +513,6 @@ async fn sign_proof(
 async fn sign_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
-    _resolver: &dyn DIDResolver,
     key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -532,7 +531,7 @@ async fn sign_nojws(
         proof.context = serde_json::json!([context_uri]);
     }
     let message = to_jws_payload(document, &proof).await?;
-    let sig = crate::jws::sign_bytes(algorithm, &message, &key)?;
+    let sig = crate::jws::sign_bytes(algorithm, &message, key)?;
     let sig_multibase = multibase::encode(multibase::Base::Base58Btc, sig);
     proof.proof_value = Some(sig_multibase);
     Ok(proof)
@@ -576,7 +575,6 @@ async fn prepare_proof(
 async fn prepare_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
-    _resolver: &dyn DIDResolver,
     public_key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -644,7 +642,7 @@ async fn verify_nojws(
         .verification_method
         .as_ref()
         .ok_or(Error::MissingVerificationMethod)?;
-    let key = resolve_key(&verification_method, resolver).await?;
+    let key = resolve_key(verification_method, resolver).await?;
     let message = to_jws_payload(document, proof).await?;
     let (_base, sig) = multibase::decode(proof_value)?;
     crate::jws::verify_bytes_warnable(algorithm, &message, &key, &sig)
@@ -776,14 +774,13 @@ impl ProofSuite for Ed25519Signature2020 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        resolver: &dyn DIDResolver,
+        _resolver: &dyn DIDResolver,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         sign_nojws(
             document,
             options,
-            resolver,
             key,
             "Ed25519Signature2020",
             Algorithm::EdDSA,
@@ -804,14 +801,13 @@ impl ProofSuite for Ed25519Signature2020 {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        resolver: &dyn DIDResolver,
+        _resolver: &dyn DIDResolver,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         prepare_nojws(
             document,
             options,
-            resolver,
             public_key,
             "Ed25519Signature2020",
             Algorithm::EdDSA,
@@ -1384,7 +1380,6 @@ impl ProofSuite for EthereumEip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<VerificationWarnings, Error> {
-        use std::str::FromStr;
         let sig_hex = proof
             .proof_value
             .as_ref()

@@ -1643,7 +1643,7 @@ where
     T: Loader<Document = JsonValue> + std::marker::Send + Sync,
 {
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
-    let expanded_doc = expand_json(json, more_contexts_json, lax, Some(&options), loader).await?;
+    let expanded_doc = expand_json(json, more_contexts_json, lax, Some(options), loader).await?;
     let mut node_map = Map::new();
     node_map.insert(AT_DEFAULT.to_string(), Map::new());
     let mut blank_node_id_generator = BlankNodeIdentifierGenerator::default();

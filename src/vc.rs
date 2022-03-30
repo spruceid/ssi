@@ -310,6 +310,7 @@ pub struct Presentation {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
+#[allow(clippy::large_enum_variant)]
 pub enum CredentialOrJWT {
     Credential(Credential),
     JWT(String),
@@ -382,7 +383,7 @@ impl std::ops::Sub<NumericDate> for NumericDate {
     fn sub(self, rhs: NumericDate) -> Self::Output {
         let self_dtu: DateTime<Utc> = self.into();
         let rhs_dtu: DateTime<Utc> = rhs.into();
-        Self::Output::try_from(self_dtu - rhs_dtu).unwrap()
+        self_dtu - rhs_dtu
     }
 }
 
@@ -395,37 +396,37 @@ impl std::ops::Sub<Duration> for NumericDate {
     }
 }
 
-impl std::convert::TryFrom<DateTime<Utc>> for NumericDate {
+impl TryFrom<DateTime<Utc>> for NumericDate {
     type Error = Error;
     fn try_from(dtu: DateTime<Utc>) -> Result<Self, Self::Error> {
         // Have to take seconds and nanoseconds separately in order to get the full allowable
         // range of microsecond-precision values as described above.
         let whole_seconds = dtu.timestamp() as f64;
         let fractional_seconds = dtu.timestamp_nanos().rem_euclid(1_000_000_000) as f64 * 1.0e-9;
-        Ok(Self::try_from_seconds(whole_seconds + fractional_seconds)?)
+        Self::try_from_seconds(whole_seconds + fractional_seconds)
     }
 }
 
-impl std::convert::TryFrom<DateTime<FixedOffset>> for NumericDate {
+impl TryFrom<DateTime<FixedOffset>> for NumericDate {
     type Error = Error;
     fn try_from(dtfo: DateTime<FixedOffset>) -> Result<Self, Self::Error> {
         let dtu = DateTime::<Utc>::from(dtfo);
-        Ok(NumericDate::try_from(dtu)?)
+        NumericDate::try_from(dtu)
     }
 }
 
-impl std::convert::Into<DateTime<Utc>> for NumericDate {
-    fn into(self) -> DateTime<Utc> {
+impl From<NumericDate> for DateTime<Utc> {
+    fn from(nd: NumericDate) -> Self {
         let (whole_seconds, fractional_nanoseconds) =
-            self.into_whole_seconds_and_fractional_nanoseconds();
+            nd.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp(whole_seconds, fractional_nanoseconds)
     }
 }
 
-impl std::convert::Into<LocalResult<DateTime<Utc>>> for NumericDate {
-    fn into(self) -> LocalResult<DateTime<Utc>> {
+impl From<NumericDate> for LocalResult<DateTime<Utc>> {
+    fn from(nd: NumericDate) -> Self {
         let (whole_seconds, fractional_nanoseconds) =
-            self.into_whole_seconds_and_fractional_nanoseconds();
+            nd.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp_opt(whole_seconds, fractional_nanoseconds)
     }
 }
@@ -748,7 +749,7 @@ where
 
 impl<Tz: chrono::TimeZone> From<VCDateTime> for DateTime<Tz>
 where
-    chrono::DateTime<Tz>: From<chrono::DateTime<chrono::FixedOffset>>
+    chrono::DateTime<Tz>: From<chrono::DateTime<chrono::FixedOffset>>,
 {
     fn from(vc_date_time: VCDateTime) -> Self {
         Self::from(vc_date_time.date_time)
@@ -913,12 +914,13 @@ impl Credential {
     }
 
     pub fn to_jwt_claims(&self) -> Result<JWTClaims, Error> {
-        let subject_opt = self.credential_subject.to_single().clone();
+        let subject_opt = self.credential_subject.to_single();
+
         let subject = match subject_opt {
-            Some(subject) => match subject.id.as_ref() {
-                Some(id) => Some(StringOrURI::String(id.to_string())),
-                None => None,
-            },
+            Some(subject) => subject
+                .id
+                .as_ref()
+                .map(|id| StringOrURI::String(id.to_string())),
             None => None,
         };
 
@@ -1466,10 +1468,8 @@ impl Presentation {
             Some(vp) => vp,
             None => return Err(Error::MissingPresentation),
         };
-        if let Some(iss) = claims.issuer {
-            if let StringOrURI::URI(issuer_uri) = iss {
-                vp.holder = Some(issuer_uri);
-            }
+        if let Some(StringOrURI::URI(issuer_uri)) = claims.issuer {
+            vp.holder = Some(issuer_uri);
         }
         if let Some(id) = claims.jwt_id {
             let uri = URI::try_from(id)?;
