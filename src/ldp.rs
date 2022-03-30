@@ -1380,7 +1380,6 @@ impl ProofSuite for EthereumEip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
     ) -> Result<VerificationWarnings, Error> {
-        use std::str::FromStr;
         let sig_hex = proof
             .proof_value
             .as_ref()

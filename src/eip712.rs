@@ -911,7 +911,7 @@ impl TypedData {
             // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
             .or_else(|| proof_obj.remove("eip712Domain"));
         doc_obj.insert("proof".to_string(), proof_value);
-        let mut message = EIP712Value::try_from(doc_value)
+        let message = EIP712Value::try_from(doc_value)
             .map_err(TypedDataConstructionJSONError::ConvertMessage)?;
         let proof_info: ProofInfo = match info {
             Some(info) => {
