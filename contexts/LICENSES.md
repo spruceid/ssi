@@ -34,3 +34,4 @@ Copyright in the schema by the sponsors of schema.org (Google, Inc., Yahoo, Inc.
 ## Other context files
 
 - [Blockchain Vocabulary](https://github.com/OR13/lds-blockchain2021/) - Orie Steele - [Apache License, Version 2.0](http://www.apache.org/licenses/)
+- [Authorization Capabilities (zCap) Context](https://w3id.org/zcap) - Digital Bazaar - [BSD 3-Clause](https://digitalbazaar.github.io/zcap-context/LICENSE)

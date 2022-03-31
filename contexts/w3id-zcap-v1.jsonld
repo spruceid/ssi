@@ -1,0 +1,67 @@
+{
+  "@context": {
+    "id": "@id",
+    "type": "@type",
+    "@protected": true,
+    "allowedAction": "https://w3id.org/security#allowedAction",
+    "publicAlias": {
+      "@id": "https://w3id.org/security#publicAlias",
+      "@type": "@id"
+    },
+    "capability": {
+      "@id": "https://w3id.org/security#capability",
+      "@type": "@id"
+    },
+    "capabilityAction": "https://w3id.org/security#capabilityAction",
+    "capabilityChain": {
+      "@id": "https://w3id.org/security#capabilityChain",
+      "@type": "@id",
+      "@container": "@list"
+    },
+    "capabilityDelegation": {
+      "@id": "https://w3id.org/security#capabilityDelegationMethod",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "capabilityInvocation": {
+      "@id": "https://w3id.org/security#capabilityInvocationMethod",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "caveat": {
+      "@id": "https://w3id.org/security#caveat",
+      "@type": "@id",
+      "@container": "@set"
+    },
+    "controller": {
+      "@id": "https://w3id.org/security#controller",
+      "@type": "@id"
+    },
+    "delegator": {
+      "@id": "https://w3id.org/security#delegator",
+      "@type": "@id"
+    },
+    "expires": {
+      "@id": "https://w3id.org/security#expiration",
+      "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+    },
+    "invocationTarget": {
+      "@id": "https://w3id.org/security#invocationTarget",
+      "@type": "@id"
+    },
+    "invoker": {
+      "@id": "https://w3id.org/security#invoker",
+      "@type": "@id"
+    },
+    "parentCapability": {
+      "@id": "https://w3id.org/security#parentCapability",
+      "@type": "@id"
+    },
+    "proof": {
+      "@id": "https://w3id.org/security#proof",
+      "@type": "@id",
+      "@container": "@graph"
+    },
+    "referenceId": "https://w3id.org/security#referenceId"
+  }
+}

@@ -145,6 +145,7 @@ pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &str =
     "https://identity.foundation/presentation-exchange/submission/v1";
 pub const VDL_V1_CONTEXT: &str = "https://w3id.org/vdl/v1";
 pub const WALLET_V1_CONTEXT: &str = "https://w3id.org/wallet/v1";
+pub const ZCAP_V1_CONTEXT: &str = "https://w3id.org/zcap/v1";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -303,6 +304,12 @@ lazy_static! {
         let iri = Iri::new(WALLET_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref ZCAP_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::ZCAP_V1;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(ZCAP_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
 pub struct StaticLoader;
@@ -350,6 +357,7 @@ impl Loader for StaticLoader {
                 }
                 VDL_V1_CONTEXT => Ok(VDL_V1_CONTEXT_DOCUMENT.clone()),
                 WALLET_V1_CONTEXT => Ok(WALLET_V1_CONTEXT_DOCUMENT.clone()),
+                ZCAP_V1_CONTEXT => Ok(ZCAP_V1_CONTEXT_DOCUMENT.clone()),
                 _ => {
                     eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
