@@ -1,8 +1,7 @@
 {
   "@context": [
     "https://www.w3.org/2018/credentials/v1",
-    "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld",
-    "https://demo.spruceid.com/EcdsaSecp256k1RecoverySignature2020/esrs2020-extra-0.0.jsonld",
+    "https://w3id.org/security/suites/secp256k1recovery-2020/v2",
     {
       "@version": 1.1,
       "@protected": true,
@@ -113,6 +112,13 @@
       "verificationMethod": "did:example:123#vm-3",
       "proofPurpose": "assertionMethod",
       "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..wt1hzqcSx654YaqdCx-6bp6_bkzMbjZc9-071-SRsJsQfUvG_U9ZBWUoCvEtv68Kas10AIvFU6siKw8XZi7knwE"
+    },
+    {
+      "type": "EcdsaSecp256k1RecoverySignature2020",
+      "created": "2021-12-17T22:36:55Z",
+      "verificationMethod": "did:example:123#vm-4",
+      "proofPurpose": "assertionMethod",
+      "jws": "eyJhbGciOiJFUzI1NkstUiIsImI2NCI6ZmFsc2UsImNyaXQiOlsiYjY0Il19..fWzq2GBZQBPPyZZfbDCVYz3TI0s0RivTuNakTDyJaAN77i3esHOvzXPSZsy45_zbW3ANSdck_d1bauA94CdQ3AE"
     }
   ]
 }

@@ -17,8 +17,11 @@ pub const SECURITY_V2: &str = include_str!("../w3id-security-v2.jsonld");
 pub const DID_V1: &str = include_str!("../w3c-did-v1.jsonld");
 /// <https://w3id.org/did-resolution/v1>
 pub const DID_RESOLUTION_V1: &str = include_str!("../w3c-did-resolution-v1.jsonld");
+#[deprecated(note = "Use W3ID_ESRS2020_V2 instead")]
 /// <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld>
 pub const DIF_ESRS2020: &str = include_str!("../dif-lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
+/// <https://w3id.org/security/suites/secp256k1recovery-2020/v2>
+pub const W3ID_ESRS2020_V2: &str = include_str!("../w3id-secp256k1recovery2020-v2.jsonld");
 /// <https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json>
 pub const LDS_JWS2020_V1: &str = include_str!("../lds-jws2020-v1.jsonld");
 /// <https://w3id.org/security/suites/jws-2020/v1>
@@ -36,6 +39,7 @@ pub const TRACEABILITY_V1: &str = include_str!("../w3c-ccg-traceability-v1.jsonl
 /// <https://w3id.org/vc-revocation-list-2020/v1>
 pub const REVOCATION_LIST_2020_V1: &str = include_str!("../w3id-vc-revocation-list-2020-v1.jsonld");
 /// <https://demo.spruceid.com/EcdsaSecp256k1RecoverySignature2020/esrs2020-extra-0.0.jsonld>
+#[deprecated(note = "Use W3ID_ESRS2020_V2 instead")]
 pub const ESRS2020_EXTRA: &str = include_str!("../esrs2020-extra-0.0.jsonld");
 /// <https://w3id.org/security/bbs/v1>
 pub const BBS_V1: &str = include_str!("../bbs-v1.jsonld");

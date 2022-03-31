@@ -124,8 +124,11 @@ pub const DID_V1_CONTEXT_NO_WWW: &str = "https://w3.org/ns/did/v1";
 pub const W3ID_DID_V1_CONTEXT: &str = "https://w3id.org/did/v1";
 pub const DID_RESOLUTION_V1_CONTEXT: &str = "https://w3id.org/did-resolution/v1";
 pub const DIF_ESRS2020_CONTEXT: &str = "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld";
+#[deprecated(note = "Use W3ID_ESRS2020_V2_CONTEXT instead")]
 pub const ESRS2020_EXTRA_CONTEXT: &str =
     "https://demo.spruceid.com/EcdsaSecp256k1RecoverySignature2020/esrs2020-extra-0.0.jsonld";
+pub const W3ID_ESRS2020_V2_CONTEXT: &str =
+    "https://w3id.org/security/suites/secp256k1recovery-2020/v2";
 pub const LDS_JWS2020_V1_CONTEXT: &str =
     "https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json";
 pub const W3ID_JWS2020_V1_CONTEXT: &str = "https://w3id.org/security/suites/jws-2020/v1";
@@ -192,15 +195,27 @@ lazy_static! {
         let iri = Iri::new(DID_RESOLUTION_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    /// Deprecated in favor of W3ID_ESRS2020_V2_CONTEXT_DOCUMENT
     pub static ref DIF_ESRS2020_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        #[allow(deprecated)]
         let jsonld = ssi_contexts::DIF_ESRS2020;
         let doc = json::parse(jsonld).unwrap();
+        #[allow(deprecated)]
         let iri = Iri::new(DIF_ESRS2020_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref W3ID_ESRS2020_V2_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::W3ID_ESRS2020_V2;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(W3ID_ESRS2020_V2_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
+    /// Deprecated in favor of W3ID_ESRS2020_V2_CONTEXT_DOCUMENT
     pub static ref ESRS2020_EXTRA_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        #[allow(deprecated)]
         let jsonld = ssi_contexts::ESRS2020_EXTRA;
         let doc = json::parse(jsonld).unwrap();
+        #[allow(deprecated)]
         let iri = Iri::new(ESRS2020_EXTRA_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
@@ -312,7 +327,10 @@ impl Loader for StaticLoader {
                     Ok(DID_V1_CONTEXT_DOCUMENT.clone())
                 }
                 DID_RESOLUTION_V1_CONTEXT => Ok(DID_RESOLUTION_V1_CONTEXT_DOCUMENT.clone()),
+                #[allow(deprecated)]
                 DIF_ESRS2020_CONTEXT => Ok(DIF_ESRS2020_CONTEXT_DOCUMENT.clone()),
+                W3ID_ESRS2020_V2_CONTEXT => Ok(W3ID_ESRS2020_V2_CONTEXT_DOCUMENT.clone()),
+                #[allow(deprecated)]
                 ESRS2020_EXTRA_CONTEXT => Ok(ESRS2020_EXTRA_CONTEXT_DOCUMENT.clone()),
                 LDS_JWS2020_V1_CONTEXT => Ok(LDS_JWS2020_V1_CONTEXT_DOCUMENT.clone()),
                 W3ID_JWS2020_V1_CONTEXT => Ok(W3ID_JWS2020_V1_CONTEXT_DOCUMENT.clone()),
