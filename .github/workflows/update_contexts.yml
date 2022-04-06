@@ -1,0 +1,25 @@
+name: update_contexts
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout SSI library
+      uses: actions/checkout@v3
+
+    - name: Update context files
+      run: contexts/update.sh
+
+    - name: Create pull request
+      uses: peter-evans/create-pull-request@v4
+      with:
+        commit-message: Update context files
+        branch: fix/update-contexts
+        title: Update context files
+        labels: github_actions
+        body: 'Auto-generated: https://github.com/spruceid/ssi/actions/runs/${{ github.run_id }}'
