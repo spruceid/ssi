@@ -11,6 +11,7 @@ exec curl \
 	https://www.w3.org/ns/did/v1 -o w3c-did-v1.jsonld \
 	https://w3id.org/did-resolution/v1 -o w3c-did-resolution-v1.jsonld \
 	https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld -o dif-lds-ecdsa-secp256k1-recovery2020-0.0.jsonld \
+	https://w3id.org/security/suites/secp256k1recovery-2020/v2 -o w3id-secp256k1recovery2020-v2.jsonld \
 	https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json -o lds-jws2020-v1.jsonld \
 	https://w3id.org/security/suites/jws-2020/v1 -o w3id-jws2020-v1.jsonld \
 	https://w3id.org/security/suites/ed25519-2020/v1 -o w3id-ed25519-signature-2020-v1.jsonld \
@@ -23,4 +24,5 @@ exec curl \
 	https://identity.foundation/presentation-exchange/submission/v1 -o presentation-submission.jsonld \
 	https://w3id.org/vdl/v1 -o w3id-vdl-v1.jsonld \
 	https://w3id.org/wallet/v1 -o w3id-wallet-v1.jsonld \
+	https://w3id.org/zcap/v1 -o w3id-zcap-v1.jsonld \
 	-L
