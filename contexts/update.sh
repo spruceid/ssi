@@ -25,4 +25,5 @@ exec curl \
 	https://w3id.org/vdl/v1 -o w3id-vdl-v1.jsonld \
 	https://w3id.org/wallet/v1 -o w3id-wallet-v1.jsonld \
 	https://w3id.org/zcap/v1 -o w3id-zcap-v1.jsonld \
+	https://w3id.org/vc-revocation-list-2020/v1 -o w3id-vc-revocation-list-2020-v1.json \
 	-L
