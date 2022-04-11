@@ -2304,21 +2304,10 @@ impl JsonWebSignature2020 {
             }
         }
         match &key.params {
-            JWKParams::RSA(rsa_params) => {
-                let public_modulus = &rsa_params.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
-                // Ensure 2048-bit key. Note it may have an extra byte:
-                // https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.1
-                match public_modulus.len() {
-                    256 | 257 => (),
-                    l => {
-                        return Err(Error::InvalidKeyLength(l));
-                    }
-                }
-                match algorithm {
-                    Algorithm::PS256 => (),
-                    _ => return Err(Error::UnsupportedAlgorithm),
-                }
-            }
+            JWKParams::RSA(_) => match algorithm {
+                Algorithm::PS256 => (),
+                _ => return Err(Error::UnsupportedAlgorithm),
+            },
             JWKParams::EC(ec_params) => {
                 match &ec_params.curve.as_ref().ok_or(Error::MissingCurve)?[..] {
                     "secp256k1" => match algorithm {
