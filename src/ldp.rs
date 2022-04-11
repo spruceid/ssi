@@ -2310,8 +2310,8 @@ impl JsonWebSignature2020 {
                 // https://www.rfc-editor.org/rfc/rfc7518#section-6.3.1.1
                 match public_modulus.len() {
                     256 | 257 => (),
-                    _ => {
-                        return Err(Error::InvalidKeyLength);
+                    l => {
+                        return Err(Error::InvalidKeyLength(l));
                     }
                 }
                 match algorithm {

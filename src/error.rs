@@ -231,7 +231,7 @@ pub enum Error {
     /// Invalid ProofType type
     InvalidProofTypeType,
     /// Invalid key length
-    InvalidKeyLength,
+    InvalidKeyLength(usize),
     /// Inconsistent DID Key
     InconsistentDIDKey,
     /// Crypto error from `ring` crate
@@ -498,7 +498,7 @@ impl fmt::Display for Error {
             Error::ExpectedUnencodedHeader => write!(f, "Expected unencoded JWT header"),
             Error::ResourceNotFound(id) => write!(f, "Resource not found: {}", id),
             Error::InvalidProofTypeType => write!(f, "Invalid ProofType type"),
-            Error::InvalidKeyLength => write!(f, "Invalid key length"),
+            Error::InvalidKeyLength(len) => write!(f, "Invalid key length: {}", len),
             Error::InconsistentDIDKey => write!(f, "Inconsistent DID Key"),
             Error::DIDURL => write!(f, "Invalid DID URL"),
             Error::UnexpectedDIDFragment => write!(f, "Unexpected DID fragment"),

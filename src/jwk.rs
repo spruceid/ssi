@@ -526,7 +526,7 @@ impl RSAParams {
     pub fn validate_key_size(&self) -> Result<(), Error> {
         let n = &self.modulus.as_ref().ok_or(Error::MissingModulus)?.0;
         if n.len() < 256 {
-            return Err(Error::InvalidKeyLength);
+            return Err(Error::InvalidKeyLength(n.len()));
         }
         Ok(())
     }
