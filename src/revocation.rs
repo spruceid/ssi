@@ -76,6 +76,7 @@ pub struct RevocationList2020 {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct EncodedList(pub String);
 
+#[deprecated(note = "Use RevocationList2020Subject instead")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum RevocationSubject {
