@@ -1,5 +1,5 @@
 use crate::did_resolve::DIDResolver;
-use crate::jsonld::REVOCATION_LIST_2020_V1_CONTEXT;
+use crate::jsonld::{REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
 use crate::one_or_many::OneOrMany;
 use crate::vc::{Credential, CredentialStatus, Issuer, VerificationResult, URI};
 use async_trait::async_trait;
@@ -37,6 +37,29 @@ pub struct RevocationList2020Status {
     pub revocation_list_credential: URL,
 }
 
+/// Revocation List 2021 Status object, for use in a Verifiable Credential's credentialStatus
+/// property.
+/// <https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021entry>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusList2021Entry {
+    /// URL for status information of the verifiable credential - but not the URL of the status
+    /// list.
+    pub id: URI,
+    /// Status purpose
+    ///
+    /// Defined in <https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021entry>
+    /// and <https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021credential>
+    ///
+    /// It is allowed to be an arbitrary string, although specific values "revocation" and
+    /// "suspension" are defined.
+    pub status_purpose: String,
+    /// Index of this credential's status in the status list credential
+    pub status_list_index: RevocationListIndex,
+    /// URL to a [StatusList2021Credential]
+    pub status_list_credential: URL,
+}
+
 /// Integer identifying a bit position of the revocation status of a verifiable credential in a
 /// revocation list, e.g. in a [RevocationList2020].
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -63,6 +86,25 @@ pub enum RevocationList2020Subject {
     RevocationList2020(RevocationList2020),
 }
 
+/// [Credential subject](https://www.w3.org/TR/vc-data-model/#credential-subject) of a [StatusList2021Credential]
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum StatusList2021Subject {
+    StatusList2021(StatusList2021),
+}
+
+/// Verifiable Credential of type StatusList2021Credential.
+/// <https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021credential>
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusList2021Credential {
+    pub id: URI,
+    pub issuer: Issuer,
+    pub credential_subject: StatusList2021Subject,
+    #[serde(flatten)]
+    pub more_properties: Value,
+}
+
 /// Credential subject of type RevocationList2020, expected to be used in a Verifiable Credential of type [RevocationList2020Credential]
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020credential>
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -73,10 +115,19 @@ pub struct RevocationList2020 {
     pub more_properties: Value,
 }
 
+/// Credential subject of type StatusList2021, expected to be used in a Verifiable Credential of type [StatusList2021Credential](https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021credential)
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusList2021 {
+    pub encoded_list: EncodedList,
+    #[serde(flatten)]
+    pub more_properties: Value,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct EncodedList(pub String);
 
-#[deprecated(note = "Use RevocationList2020Subject instead")]
+#[deprecated(note = "Use RevocationList2020Subject or StatusList2021Subject instead")]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum RevocationSubject {
@@ -116,6 +167,46 @@ pub enum SetStatusError {
 
 impl RevocationList2020 {
     /// Set the revocation status for a given index in the list.
+    pub fn set_status(&mut self, index: usize, revoked: bool) -> Result<(), SetStatusError> {
+        let mut list = List::try_from(&self.encoded_list)?;
+        let bitstring_len = list.0.len() * 8;
+        let mut bitstring = BitVec::<Lsb0, u8>::try_from_vec(list.0)
+            .map_err(|_| SetStatusError::ListTooLarge(bitstring_len))?;
+        if bitstring_len < MIN_BITSTRING_LENGTH {
+            return Err(SetStatusError::ListTooSmall(
+                bitstring_len,
+                MIN_BITSTRING_LENGTH,
+            ));
+        }
+        if let Some(mut bitref) = bitstring.get_mut(index) {
+            *bitref = revoked;
+        } else {
+            return Err(SetStatusError::OutOfBounds(index, bitstring_len));
+        }
+        list.0 = bitstring.into_vec();
+        self.encoded_list = EncodedList::try_from(&list)?;
+        Ok(())
+    }
+}
+
+/// Error resulting from attempting to construct a [new StatusList2021](StatusList2021::new)
+#[derive(Error, Debug)]
+pub enum NewStatusListError {
+    #[error("Unable to encode list")]
+    EncodedList(#[source] NewEncodedListError),
+}
+
+impl StatusList2021 {
+    /// Construct a new empty [StatusList2021]
+    pub fn new(len: usize) -> Result<Self, NewStatusListError> {
+        Ok(StatusList2021 {
+            encoded_list: EncodedList::new(len).map_err(NewStatusListError::EncodedList)?,
+            more_properties: serde_json::Value::Null,
+        })
+    }
+
+    /// Set the revocation status for a given index in the list.
+    // TODO: dedupe with RevocationList2020::set_status
     pub fn set_status(&mut self, index: usize, revoked: bool) -> Result<(), SetStatusError> {
         let mut list = List::try_from(&self.encoded_list)?;
         let bitstring_len = list.0.len() * 8;
@@ -183,6 +274,30 @@ impl Default for EncodedList {
     }
 }
 
+/// Error resulting from attempting to construct a [new EncodedList](EncodedList::new)
+#[derive(Error, Debug)]
+pub enum NewEncodedListError {
+    #[error("Length is not a multiple of 8: {0}")]
+    LengthMultiple8(usize),
+    #[error("Unable to encode list")]
+    Encode(#[source] EncodeListError),
+}
+
+impl EncodedList {
+    /// Construct a new empty [EncodedList] of a given bit length.
+    ///
+    /// Given length must be a multiple of 8.
+    pub fn new(bit_len: usize) -> Result<Self, NewEncodedListError> {
+        if bit_len % 8 != 0 {
+            return Err(NewEncodedListError::LengthMultiple8(bit_len));
+        }
+        let byte_len = bit_len / 8;
+        let vec: Vec<u8> = vec![0; byte_len];
+        let list = List(vec);
+        EncodedList::try_from(&list).map_err(NewEncodedListError::Encode)
+    }
+}
+
 impl TryFrom<&EncodedList> for List {
     type Error = DecodeListError;
     fn try_from(encoded_list: &EncodedList) -> Result<Self, Self::Error> {
@@ -233,7 +348,7 @@ impl CredentialStatus for RevocationList2020Status {
         {
             // TODO: support JSON-LD credentials defining the terms elsewhere.
             return result.with_error(format!(
-                "Missing expected context URI {} for RevocationList2020",
+                "Missing expected context URI {} for credential using RevocationList2020",
                 REVOCATION_LIST_2020_V1_CONTEXT
             ));
         }
@@ -342,6 +457,135 @@ impl CredentialStatus for RevocationList2020Status {
     }
 }
 
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+impl CredentialStatus for StatusList2021Entry {
+    /// Validate a credential's revocation status according to [Status List 2021](https://w3c-ccg.github.io/vc-status-list-2021/#validate-algorithm).
+    async fn check(
+        &self,
+        credential: &Credential,
+        resolver: &dyn DIDResolver,
+    ) -> VerificationResult {
+        let mut result = VerificationResult::new();
+        // TODO: prefix errors or change return type
+        let issuer_id = match &credential.issuer {
+            Some(issuer) => issuer.get_id().clone(),
+            None => {
+                return result.with_error("Credential is missing issuer".to_string());
+            }
+        };
+        if !credential.context.contains_uri(STATUS_LIST_2021_V1_CONTEXT) {
+            // TODO: support JSON-LD credentials defining the terms elsewhere.
+            return result.with_error(format!(
+                "Missing expected context URI {} for credential using StatusList2021",
+                STATUS_LIST_2021_V1_CONTEXT
+            ));
+        }
+        if self.id == URI::String(self.status_list_credential.clone()) {
+            return result.with_error(format!(
+                "Expected statusListCredential to be different from status id: {}",
+                self.id
+            ));
+        }
+        // Check the status list URL before attempting to load it.
+        // Status List 2021 does not specify an expected URL scheme (URI scheme), but
+        // examples and test vectors use https.
+        match self.status_list_credential.split_once(':') {
+            Some(("https", _)) => (),
+            // TODO: an option to allow HTTP?
+            // TODO: load from DID URLs?
+            Some((_scheme, _)) => return result.with_error(format!("Invalid schema: {}", self.id)),
+            _ => return result.with_error(format!("Invalid rsrc: {}", self.id)),
+        }
+        let status_list_credential = match load_credential(&self.status_list_credential).await {
+            Ok(credential) => credential,
+            Err(e) => {
+                return result.with_error(format!(
+                    "Unable to fetch status list credential: {}",
+                    e.to_string()
+                ));
+            }
+        };
+        let list_issuer_id = match &status_list_credential.issuer {
+            Some(issuer) => issuer.get_id().clone(),
+            None => {
+                return result.with_error(format!("Status list credential is missing issuer"));
+            }
+        };
+        if issuer_id != list_issuer_id {
+            return result.with_error(format!(
+                "Status list issuer mismatch. Credential: {}, Status list: {}",
+                issuer_id, list_issuer_id
+            ));
+        }
+
+        match status_list_credential.validate() {
+            Err(e) => {
+                return result.with_error(format!("Invalid list credential: {}", e.to_string()));
+            }
+            Ok(()) => {}
+        }
+        let vc_result = status_list_credential.verify(None, resolver).await;
+        for warning in vc_result.warnings {
+            result.warnings.push(format!("Status list: {}", warning));
+        }
+        for error in vc_result.errors {
+            result.errors.push(format!("Status list: {}", error));
+            return result;
+        }
+        // Note: vc_result.checks is not checked here. It is assumed that default checks passed.
+
+        let status_list_credential =
+            match StatusList2021Credential::try_from(status_list_credential) {
+                Ok(credential) => credential,
+                Err(e) => {
+                    return result.with_error(format!(
+                        "Unable to parse status list credential: {}",
+                        e.to_string()
+                    ));
+                }
+            };
+        if status_list_credential.id != URI::String(self.status_list_credential.to_string()) {
+            return result.with_error(format!(
+                "Status list credential id mismatch. statusListCredential: {}, id: {}",
+                self.status_list_credential, status_list_credential.id
+            ));
+        }
+        let StatusList2021Subject::StatusList2021(status_list) =
+            status_list_credential.credential_subject;
+
+        let list = match List::try_from(&status_list.encoded_list) {
+            Ok(list) => list,
+            Err(e) => {
+                return result
+                    .with_error(format!("Unable to decode status list: {}", e.to_string()))
+            }
+        };
+        let credential_index = self.status_list_index.0;
+        use bitvec::prelude::*;
+        let bitstring = match BitVec::<Lsb0, u8>::try_from_vec(list.0) {
+            Ok(bitstring) => bitstring,
+            Err(list) => {
+                return result.with_error(format!(
+                    "Revocation list is too large for bitvec: {}",
+                    list.len()
+                ))
+            }
+        };
+        let revoked = match bitstring.get(credential_index) {
+            Some(bitref) => *bitref,
+            None => {
+                return result
+                    .with_error("Credential index in revocation list is invalid.".to_string());
+            }
+        };
+        if revoked {
+            return result.with_error("Credential is revoked.".to_string());
+        }
+        result
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum LoadResourceError {
     #[error("Error building HTTP client: {0}")]
@@ -374,6 +618,9 @@ async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
     match url {
         crate::vc::tests::EXAMPLE_REVOCATION_2020_LIST_URL => {
             return Ok(crate::vc::tests::EXAMPLE_REVOCATION_2020_LIST.to_vec());
+        }
+        crate::vc::tests::EXAMPLE_STATUS_LIST_2021_URL => {
+            return Ok(crate::vc::tests::EXAMPLE_STATUS_LIST_2021.to_vec());
         }
         _ => {}
     }
@@ -533,6 +780,49 @@ impl TryFrom<RevocationList2020Credential> for Credential {
         use serde_json::json;
         credential["@context"] = json!([DEFAULT_CONTEXT, REVOCATION_LIST_2020_V1_CONTEXT]);
         credential["type"] = json!(["VerifiableCredential", "RevocationList2020Credential"]);
+        let credential =
+            serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
+        Ok(credential)
+    }
+}
+
+/// Convert Credential to a [StatusList2021Credential], while [validating](https://w3c-ccg.github.io/vc-status-list-2021/#validate-algorithm) it.
+///
+/// Note: this is a lossy operation. Only known StatusList2021Credential fields are preserved.
+impl TryFrom<Credential> for StatusList2021Credential {
+    type Error = CredentialConversionError;
+    fn try_from(credential: Credential) -> Result<Self, Self::Error> {
+        if !credential.context.contains_uri(STATUS_LIST_2021_V1_CONTEXT) {
+            return Err(CredentialConversionError::MissingContext(
+                STATUS_LIST_2021_V1_CONTEXT,
+            ));
+        }
+        if !credential
+            .type_
+            .contains(&"StatusList2021Credential".to_string())
+        {
+            return Err(CredentialConversionError::MissingType(
+                "StatusList2021Credential",
+                credential.type_,
+            ));
+        }
+        let credential =
+            serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
+        let credential =
+            serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
+        Ok(credential)
+    }
+}
+
+impl TryFrom<StatusList2021Credential> for Credential {
+    type Error = CredentialConversionError;
+    fn try_from(credential: StatusList2021Credential) -> Result<Self, Self::Error> {
+        let mut credential =
+            serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
+        use crate::vc::DEFAULT_CONTEXT;
+        use serde_json::json;
+        credential["@context"] = json!([DEFAULT_CONTEXT, STATUS_LIST_2021_V1_CONTEXT]);
+        credential["type"] = json!(["VerifiableCredential", "StatusList2021Credential"]);
         let credential =
             serde_json::from_value(credential).map_err(CredentialConversionError::FromValue)?;
         Ok(credential)

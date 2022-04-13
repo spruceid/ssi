@@ -246,6 +246,7 @@ pub struct Status {
 #[serde(tag = "type")]
 pub enum CheckableStatus {
     RevocationList2020Status(crate::revocation::RevocationList2020Status),
+    StatusList2021Entry(crate::revocation::StatusList2021Entry),
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -1408,6 +1409,7 @@ impl CheckableStatus {
     ) -> VerificationResult {
         match self {
             Self::RevocationList2020Status(status) => status.check(credential, resolver).await,
+            Self::StatusList2021Entry(status) => status.check(credential, resolver).await,
         }
     }
 }
@@ -2443,6 +2445,10 @@ pub(crate) mod tests {
     pub const EXAMPLE_REVOCATION_2020_LIST: &'static [u8] =
         include_bytes!("../tests/revocationList.json");
 
+    pub const EXAMPLE_STATUS_LIST_2021_URL: &'static str =
+        "https://example.com/credentials/status/3";
+    pub const EXAMPLE_STATUS_LIST_2021: &'static [u8] = include_bytes!("../tests/statusList.json");
+
     const JWK_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
 
     #[test]
@@ -3118,6 +3124,65 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let verification_result = revoked_vc.verify(Some(verify_options), &DIDExample).await;
         println!("{:#?}", verification_result);
         assert_ne!(verification_result.errors.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn credential_status_2021() {
+        use serde_json::json;
+        // status list credential is generated in examples/issue-status-list.rs
+
+        // based on https://w3c-ccg.github.io/vc-status-list-2021/#example-example-statuslist2021credential
+        let unrevoked_credential: Credential = serde_json::from_value(json!({
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://w3id.org/vc/status-list/2021/v1"
+          ],
+          "id": "https://example.com/credentials/23894672394",
+          "type": ["VerifiableCredential"],
+          "issuer": "did:example:12345",
+          "issued": "2021-04-05T14:27:42Z",
+          "credentialStatus": {
+            "id": "_:1",
+            "type": "StatusList2021Entry",
+            "statusPurpose": "revocation",
+            "statusListIndex": "94567",
+            "statusListCredential": EXAMPLE_STATUS_LIST_2021_URL
+          },
+          "credentialSubject": {
+            "id": "did:example:6789",
+            "type": "Person"
+          }
+        }))
+        .unwrap();
+        let vres = unrevoked_credential.check_status(&DIDExample).await;
+        println!("{:#?}", vres);
+        assert_eq!(vres.errors.len(), 0);
+
+        let revoked_credential: Credential = serde_json::from_value(json!({
+          "@context": [
+            "https://www.w3.org/2018/credentials/v1",
+            "https://w3id.org/vc/status-list/2021/v1"
+          ],
+          "id": "https://example.com/credentials/23894672394",
+          "type": ["VerifiableCredential"],
+          "issuer": "did:example:12345",
+          "issued": "2021-04-05T14:27:42Z",
+          "credentialStatus": {
+            "id": "_:1",
+            "type": "StatusList2021Entry",
+            "statusPurpose": "revocation",
+            "statusListIndex": "1",
+            "statusListCredential": EXAMPLE_STATUS_LIST_2021_URL
+          },
+          "credentialSubject": {
+            "id": "did:example:6789",
+            "type": "Person"
+          }
+        }))
+        .unwrap();
+        let vres = revoked_credential.check_status(&DIDExample).await;
+        println!("{:#?}", vres);
+        assert_ne!(vres.errors.len(), 0);
     }
 
     #[async_std::test]

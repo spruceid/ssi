@@ -1,0 +1,27 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://w3id.org/vc/status-list/2021/v1"
+  ],
+  "id": "https://example.com/credentials/status/3",
+  "type": [
+    "VerifiableCredential",
+    "StatusList2021Credential"
+  ],
+  "credentialSubject": {
+    "type": "StatusList2021",
+    "encodedList": "H4sIAAAAAAAA_-3AMQ0AAAACIGf_0MbwgQYAAAAAAAAAAAAAAAAAAAB4G7mHB0sAQAAA"
+  },
+  "issuer": "did:example:12345",
+  "issuanceDate": "2022-04-12T21:48:38.044Z",
+  "proof": {
+    "@context": [
+      "https://w3id.org/security/suites/jws-2020/v1"
+    ],
+    "type": "JsonWebSignature2020",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "did:example:12345#key1",
+    "created": "2022-04-12T21:48:38.044Z",
+    "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..feXmGMLFgZ5j0dvUUy2IM43y3TOr_2KfoWAyAPScQByGIb0LNJNJgFRK69XMdAvBkR7ZjVcXq509y7aLJh3Up_mDL6xIW39pVSKi2K7eUAsLzrl-pVNghKUztZ8-2VrnfJD2S64WcjSb2MR3tFuAEZrKzGUE5-loRPjT4GkPv4xQxQjujk9gZDdrOFpZemI5cGaPR5tvelZeXdqpoapzPWU19v4j_d8QQCSO1P5eZfcNXlE953Z17Wfu1G0-jVNc-cf_JhOWImxuWb4d30gHeh3y7tqU2fdgHMkO9VaRD-dNYD1RByLTgkfLFhKtd5Ikag-S0jz7ZBCFTps0VjHIDQ"
+  }
+}

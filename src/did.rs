@@ -1304,6 +1304,7 @@ pub mod example {
 
     const DOC_JSON_FOO: &str = include_str!("../tests/did-example-foo.json");
     const DOC_JSON_BAR: &str = include_str!("../tests/did-example-bar.json");
+    const DOC_JSON_12345: &str = include_str!("../tests/did-example-12345.json");
 
     // For vc-test-suite
     const DOC_JSON_TEST_ISSUER: &str = include_str!("../tests/did-example-test-issuer.json");
@@ -1342,6 +1343,7 @@ pub mod example {
                 "did:example:foo" => DOC_JSON_FOO,
                 "did:example:bar" => DOC_JSON_BAR,
                 "did:example:0xab" => DOC_JSON_TEST_ISSUER,
+                "did:example:12345" => DOC_JSON_12345,
                 "did:example:ebfeb1f712ebc6f1c276e12ec21" => DOC_JSON_TEST_HOLDER,
                 _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
             };

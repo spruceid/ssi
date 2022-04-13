@@ -1,0 +1,25 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/suites/jws-2020/v1"
+  ],
+  "id": "did:example:12345",
+  "verificationMethod": [
+    {
+      "id": "did:example:12345#key1",
+      "type": "JsonWebKey2020",
+      "controller": "did:example:12345",
+      "publicKeyJwk": {
+        "kty": "RSA",
+        "n": "sbX82NTV6IylxCh7MfV4hlyvaniCajuP97GyOqSvTmoEdBOflFvZ06kR_9D6ctt45Fk6hskfnag2GG69NALVH2o4RCR6tQiLRpKcMRtDYE_thEmfBvDzm_VVkOIYfxu-Ipuo9J_S5XDNDjczx2v-3oDh5-CIHkU46hvFeCvpUS-L8TJSbgX0kjVk_m4eIb9wh63rtmD6Uz_KBtCo5mmR4TEtcLZKYdqMp3wCjN-TlgHiz_4oVXWbHUefCEe8rFnX1iQnpDHU49_SaXQoud1jCaexFn25n-Aa8f8bc5Vm-5SeRwidHa6ErvEhTvf1dz6GoNPp2iRvm-wJ1gxwWJEYPQ",
+        "e": "AQAB"
+      }
+    }
+  ],
+  "assertionMethod": [
+    "did:example:12345#key1"
+  ],
+  "authentication": [
+    "did:example:12345#key1"
+  ]
+}
