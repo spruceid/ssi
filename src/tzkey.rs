@@ -97,7 +97,23 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
                 })?;
                 pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
             }
-            #[cfg(all(not(feature = "ring"), not(feature = "ed25519-dalek")))]
+            #[cfg(feature = "openssl")]
+            {
+                let pkey = openssl::pkey::PKey::private_key_from_raw_bytes(
+                    if sk_bytes.len() == 64 {
+                        &sk_bytes[..32]
+                    } else {
+                        &sk_bytes
+                    },
+                    openssl::pkey::Id::ED25519,
+                )?;
+                pk_bytes = pkey.raw_public_key()?;
+            }
+            #[cfg(all(
+                not(feature = "ring"),
+                not(feature = "ed25519-dalek"),
+                not(feature = "openssl")
+            ))]
             return Err(Error::MissingFeatures("ring or ed25519-dalek"));
             (
                 Algorithm::EdBlake2b,

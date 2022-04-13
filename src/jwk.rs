@@ -275,6 +275,19 @@ impl JWK {
         })))
     }
 
+    #[cfg(feature = "openssl")]
+    pub fn generate_ed25519() -> Result<JWK, Error> {
+        use openssl::pkey::PKey;
+        let pkey = PKey::generate_ed25519()?;
+        let public_key = pkey.raw_public_key()?;
+        let private_key = pkey.raw_private_key()?;
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(public_key),
+            private_key: Some(Base64urlUInt(private_key)),
+        })))
+    }
+
     #[cfg(feature = "k256")]
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
@@ -620,6 +633,99 @@ impl ToASN1 for OctetParams {
             let key = Ed25519PublicKey { public_key };
             key.to_asn1_class(class)
         }
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&Base64urlUInt> for openssl::bn::BigNum {
+    type Error = Error;
+    fn try_from(uint: &Base64urlUInt) -> Result<Self, Self::Error> {
+        Ok(Self::from_slice(&uint.0)?)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&RSAParams> for openssl::rsa::Rsa<openssl::pkey::Public> {
+    type Error = Error;
+    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
+        use std::convert::TryInto;
+        let n = params.modulus.as_ref().ok_or(Error::MissingModulus)?;
+        let e = params.exponent.as_ref().ok_or(Error::MissingExponent)?;
+        Ok(Self::from_public_components(n.try_into()?, e.try_into()?)?)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&RSAParams> for openssl::rsa::Rsa<openssl::pkey::Private> {
+    type Error = Error;
+    fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
+        if params.other_primes_info.is_some() {
+            // openssl crate doesn't have functions for multi-prime.
+            // Fallback to passing the key as DER.
+            let der = simple_asn1::der_encode(params)?;
+            return Ok(Self::private_key_from_der(&der)?);
+        }
+        use std::convert::TryInto;
+        let n = params
+            .modulus
+            .as_ref()
+            .ok_or(Error::MissingModulus)?
+            .try_into()?;
+        let e = params
+            .exponent
+            .as_ref()
+            .ok_or(Error::MissingExponent)?
+            .try_into()?;
+        let d = params
+            .private_exponent
+            .as_ref()
+            .ok_or(Error::MissingExponent)?
+            .try_into()?;
+        let mut builder = openssl::rsa::RsaPrivateKeyBuilder::new(n, e, d)?;
+        if let (Some(p), Some(q)) = (
+            params.first_prime_factor.as_ref(),
+            params.second_prime_factor.as_ref(),
+        ) {
+            builder = builder.set_factors(p.try_into()?, q.try_into()?)?;
+        }
+        if let (Some(dp), Some(dq), Some(qi)) = (
+            params.first_prime_factor_crt_exponent.as_ref(),
+            params.second_prime_factor_crt_exponent.as_ref(),
+            params.first_crt_coefficient.as_ref(),
+        ) {
+            builder = builder.set_crt_params(dp.try_into()?, dq.try_into()?, qi.try_into()?)?;
+        }
+        Ok(builder.build())
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&OctetParams> for openssl::pkey::PKey<openssl::pkey::Private> {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        let private_key = params
+            .private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let pkey = Self::private_key_from_raw_bytes(&private_key.0, openssl::pkey::Id::ED25519)?;
+        Ok(pkey)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&OctetParams> for openssl::pkey::PKey<openssl::pkey::Public> {
+    type Error = Error;
+    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
+        if params.curve != *"Ed25519" {
+            return Err(Error::CurveNotImplemented(params.curve.to_string()));
+        }
+        Ok(Self::public_key_from_raw_bytes(
+            &params.public_key.0,
+            openssl::pkey::Id::ED25519,
+        )?)
     }
 }
 

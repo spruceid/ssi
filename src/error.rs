@@ -20,6 +20,8 @@ use json_ld::ErrorCode as JSONLDErrorCode;
 #[cfg(feature = "k256")]
 use k256::ecdsa::Error as Secp256k1Error;
 use multibase::Error as MultibaseError;
+#[cfg(feature = "openssl")]
+use openssl::error::ErrorStack as OpenSSLErrors;
 #[cfg(feature = "p256")]
 use p256::ecdsa::Error as Secp256r1Error;
 #[cfg(feature = "ring")]
@@ -321,6 +323,8 @@ pub enum Error {
     /// Error from `p256` crate
     #[cfg(feature = "p256")]
     Secp256r1(Secp256r1Error),
+    #[cfg(feature = "openssl")]
+    OpenSSL(OpenSSLErrors),
     /// Error encoding ASN.1 data structure.
     ASN1Encode(ASN1EncodeError),
     /// Error decoding Base64
@@ -558,6 +562,8 @@ impl fmt::Display for Error {
             Error::Secp256k1(e) => e.fmt(f),
             #[cfg(feature = "p256")]
             Error::Secp256r1(e) => e.fmt(f),
+            #[cfg(feature = "openssl")]
+            Error::OpenSSL(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -688,6 +694,13 @@ impl From<CharTryFromError> for Error {
 impl From<RsaError> for Error {
     fn from(err: RsaError) -> Error {
         Error::Rsa(err)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl From<OpenSSLErrors> for Error {
+    fn from(err: OpenSSLErrors) -> Error {
+        Error::OpenSSL(err)
     }
 }
 

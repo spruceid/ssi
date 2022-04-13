@@ -71,6 +71,24 @@ fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
 
 pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8>, Error> {
     let signature = match &key.params {
+        #[cfg(feature = "openssl")]
+        JWKParams::RSA(rsa_params) => {
+            let (digest, is_pss) = match algorithm {
+                Algorithm::RS256 => (openssl::hash::MessageDigest::sha256(), false),
+                Algorithm::PS256 => (openssl::hash::MessageDigest::sha256(), true),
+                _ => return Err(Error::AlgorithmNotImplemented),
+            };
+            use std::convert::TryInto;
+            let rsa_key: openssl::rsa::Rsa<openssl::pkey::Private> = rsa_params.try_into()?;
+            let pkey = openssl::pkey::PKey::from_rsa(rsa_key)?;
+            let mut signer = openssl::sign::Signer::new(digest, &pkey)?;
+            if is_pss {
+                signer.set_rsa_padding(openssl::rsa::Padding::PKCS1_PSS)?;
+                signer.set_rsa_pss_saltlen(openssl::sign::RsaPssSaltlen::DIGEST_LENGTH)?;
+            }
+            signer.update(data)?;
+            signer.sign_to_vec()?
+        }
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
@@ -108,7 +126,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             }
             private_key.sign(padding, &hashed)?
         }
-        #[cfg(any(feature = "ring", feature = "ed25519-dalek"))]
+        #[cfg(any(feature = "ring", feature = "ed25519-dalek", feature = "openssl"))]
         JWKParams::OKP(okp) => {
             if algorithm != Algorithm::EdDSA && algorithm != Algorithm::EdBlake2b {
                 return Err(Error::UnsupportedAlgorithm);
@@ -135,6 +153,14 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let keypair = ed25519_dalek::Keypair::try_from(okp)?;
                 use ed25519_dalek::Signer;
                 keypair.sign(&hash).to_bytes().to_vec()
+            }
+            #[cfg(feature = "openssl")]
+            {
+                use openssl::pkey::{PKey, Private};
+                use openssl::sign::Signer;
+                let pkey = PKey::<Private>::try_from(okp)?;
+                let mut signer = Signer::new_without_digest(&pkey)?;
+                signer.sign_oneshot_to_vec(&hash)?
             }
         }
         #[allow(unused)]
@@ -263,6 +289,24 @@ pub fn verify_bytes_warnable(
         }
     }
     match &key.params {
+        #[cfg(feature = "openssl")]
+        JWKParams::RSA(rsa_params) => {
+            let (digest, is_pss) = match algorithm {
+                Algorithm::RS256 => (openssl::hash::MessageDigest::sha256(), false),
+                Algorithm::PS256 => (openssl::hash::MessageDigest::sha256(), true),
+                _ => return Err(Error::AlgorithmNotImplemented),
+            };
+            use std::convert::TryInto;
+            let rsa_key: openssl::rsa::Rsa<openssl::pkey::Public> = rsa_params.try_into()?;
+            let pkey = openssl::pkey::PKey::from_rsa(rsa_key)?;
+            let mut verifier = openssl::sign::Verifier::new(digest, &pkey)?;
+            if is_pss {
+                verifier.set_rsa_padding(openssl::rsa::Padding::PKCS1_PSS)?;
+                verifier.set_rsa_pss_saltlen(openssl::sign::RsaPssSaltlen::DIGEST_LENGTH)?;
+            }
+            verifier.update(data)?;
+            verifier.verify(signature)?;
+        }
         #[cfg(feature = "ring")]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
@@ -299,7 +343,7 @@ pub fn verify_bytes_warnable(
             public_key.verify(padding, &hashed, signature)?;
         }
         // TODO: SymmetricParams
-        #[cfg(any(feature = "ring", feature = "ed25519-dalek"))]
+        #[cfg(any(feature = "ring", feature = "ed25519-dalek", feature = "openssl"))]
         JWKParams::OKP(okp) => {
             if okp.curve != *"Ed25519" {
                 return Err(Error::CurveNotImplemented(okp.curve.to_string()));
@@ -326,6 +370,16 @@ pub fn verify_bytes_warnable(
                 let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
                 let signature = ed25519_dalek::Signature::from_bytes(signature)?;
                 public_key.verify(&hash, &signature)?;
+            }
+            #[cfg(feature = "openssl")]
+            {
+                use openssl::pkey::{PKey, Public};
+                use openssl::sign::Verifier;
+                let pkey = PKey::<Public>::try_from(okp)?;
+                let mut verifier = Verifier::new_without_digest(&pkey).unwrap();
+                if !verifier.verify_oneshot(&signature, &hash)? {
+                    return Err(Error::InvalidSignature);
+                }
             }
         }
         #[allow(unused)]
