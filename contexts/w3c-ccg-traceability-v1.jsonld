@@ -34,13 +34,13 @@
     "AgActivity": {
       "@id": "https://w3id.org/traceability#AgActivity",
       "@context": {
-        "farm": {
+        "business": {
           "@id": "https://w3id.org/traceability#dfn-entities"
         },
         "actor": {
           "@id": "https://w3id.org/traceability#Person"
         },
-        "field": {
+        "location": {
           "@id": "https://www.gs1.org/voc/Place"
         },
         "activityDate": {
@@ -80,6 +80,18 @@
         },
         "observation": {
           "@id": "https://w3id.org/traceability#observation"
+        },
+        "name": {
+          "@id": "https://www.schema.org/name"
+        },
+        "status": {
+          "@id": "https://www.schema.org/status"
+        },
+        "regulatoryAgency": {
+          "@id": "https://schema.org/Organization"
+        },
+        "delegateOf": {
+          "@id": "https://schema.org/Organization"
         }
       }
     },
@@ -109,6 +121,9 @@
         },
         "agProduct": {
           "@id": "https://schema.org/ItemList"
+        },
+        "harvest": {
+          "@id": "https://w3id.org/traceability#AgActivity"
         }
       }
     },
@@ -142,8 +157,23 @@
         "consignee": {
           "@id": "https://schema.org/Organization"
         },
+        "shipper": {
+          "@id": "https://schema.org/Organization"
+        },
+        "purchaser": {
+          "@id": "https://schema.org/Organization"
+        },
+        "carrier": {
+          "@id": "https://schema.org/Organization"
+        },
+        "broker": {
+          "@id": "https://schema.org/Organization"
+        },
         "AgPackage": {
           "@id": "https://w3id.org/traceability#AgPackage"
+        },
+        "movementPoints": {
+          "@id": "https://schema.org/Trip"
         }
       }
     },
@@ -168,8 +198,17 @@
         "labelImageUrl": {
           "@id": "https://schema.org/url"
         },
+        "productImageUrl": {
+          "@id": "https://schema.org/url"
+        },
         "labelImageHash": {
           "@id": "https://w3id.org/traceability#labelImageHash"
+        },
+        "name": {
+          "@id": "https://www.schema.org/name"
+        },
+        "productImageHash": {
+          "@id": "https://w3id.org/traceability#productImageHash"
         }
       }
     },
@@ -510,6 +549,10 @@
         }
       }
     },
+    "CrudeOilProductCertificate": {
+      "@id": "https://w3id.org/traceability#CrudeOilProductCertificate",
+      "@context": {}
+    },
     "Customer": {
       "@id": "https://w3id.org/traceability#Customer",
       "@context": {
@@ -650,9 +693,6 @@
     "DocumentVerificationEvidence": {
       "@id": "https://w3id.org/traceability#DocumentVerificationEvidence",
       "@context": {
-        "verifier": {
-          "@id": "https://schema.org/Organization"
-        },
         "evidenceDocument": {
           "@id": "https://schema.org/DigitalDocument"
         },
@@ -1452,12 +1492,6 @@
         "invoiceID": {
           "@id": "https://schema.org/identifier"
         },
-        "orderID": {
-          "@id": "https://schema.org/orderNumber"
-        },
-        "productInOrder": {
-          "@id": "https://schema.org/productID"
-        },
         "certificateName": {
           "@id": "https://schema.org/name"
         }
@@ -1545,12 +1579,6 @@
         "language": {
           "@id": "https://schema.org/Language"
         },
-        "addressLines": {
-          "@id": "https://schema.org/streetAddress"
-        },
-        "addressNumber": {
-          "@id": "https://schema.org/Number"
-        },
         "addressNumberWithinBuilding": {
           "@id": "https://schema.org/value"
         },
@@ -1593,12 +1621,6 @@
         },
         "legalNameLanguage": {
           "@id": "https://schema.org/Language"
-        },
-        "otherNames": {
-          "@id": "https://schema.org/alternateName"
-        },
-        "transliteratedOtherNames": {
-          "@id": "https://schema.org/name"
         },
         "legalAddress": {
           "@id": "https://w3id.org/traceability#LEIaddress"
@@ -1649,9 +1671,6 @@
         },
         "registration": {
           "@id": "https://w3id.org/traceability#LEIregistration"
-        },
-        "bic": {
-          "@id": "https://www.iso.org/obp/ui/#iso:std:60390:en"
         }
       }
     },
@@ -1925,6 +1944,10 @@
           "@id": "https://w3id.org/traceability#observation"
         }
       }
+    },
+    "NaturalGasProductCertificate": {
+      "@id": "https://w3id.org/traceability#NaturalGasProductCertificate",
+      "@context": {}
     },
     "OGBillOfLading": {
       "@id": "https://w3id.org/traceability#OGBillOfLading",
@@ -2866,6 +2889,14 @@
         }
       }
     },
+    "SoftwareBillOfMaterials": {
+      "@id": "https://w3id.org/traceability#SoftwareBillOfMaterials",
+      "@context": {}
+    },
+    "SoftwareBillofMaterialsCertificate": {
+      "@id": "https://w3id.org/traceability#SoftwareBillOfMaterialsCredential",
+      "@context": {}
+    },
     "SteelProduct": {
       "@id": "https://w3id.org/traceability#SteelProduct",
       "@context": {
@@ -2901,6 +2932,14 @@
         },
         "commodity": {
           "@id": "https://w3id.org/traceability#Commodity"
+        }
+      }
+    },
+    "Template": {
+      "@id": "https://w3id.org/traceability#Template",
+      "@context": {
+        "image": {
+          "@id": "https://schema.org/image"
         }
       }
     },
@@ -3173,12 +3212,6 @@
         "masterWayBill": {
           "@id": "https://https://schema.org/status"
         },
-        "wayBillVCID": {
-          "@id": "https://https://schema.org/identifier"
-        },
-        "packageVCID": {
-          "@id": "https://schema.org/ListItem"
-        },
         "certificateName": {
           "@id": "https://schema.org/name"
         }
@@ -3242,6 +3275,22 @@
           "@id": "https://w3id.org/traceability#intendedUse"
         }
       }
+    },
+    "OssfScorecard": {
+      "@id": "https://w3id.org/traceability#OssfScorecard",
+      "@context": {}
+    },
+    "VerifiableScorecard": {
+      "@id": "https://w3id.org/traceability#VerifiableScorecard",
+      "@context": {}
+    },
+    "PostmanCollection": {
+      "@id": "https://w3id.org/traceability#PostmanCollection",
+      "@context": {}
+    },
+    "VerifiablePostmanCollection": {
+      "@id": "https://w3id.org/traceability#VerifiablePostmanCollection",
+      "@context": {}
     }
   }
 }
