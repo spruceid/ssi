@@ -1902,7 +1902,7 @@ mod tests {
 
         // Verify the VC/proof
         let mut vc = vc.clone();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         vc.add_proof(proof.clone());
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
@@ -2038,7 +2038,7 @@ mod tests {
 
         let basic_doc = ExampleDocument(TEST_BASIC_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let verification_result = proof.verify(&basic_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -2221,7 +2221,7 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let verification_result = proof.verify(&nested_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -2261,7 +2261,7 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let verification_result = proof.verify(&nested_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -2380,7 +2380,7 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let verification_result = proof.verify(&nested_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());

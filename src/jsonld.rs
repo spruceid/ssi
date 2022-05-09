@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap as Map, HashMap};
 use std::convert::TryFrom;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::rdf::{
@@ -10,6 +11,7 @@ use crate::rdf::{
     Object, Predicate, StringLiteral, Subject, Triple, LANG_STRING_IRI_STR,
 };
 
+use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
@@ -319,7 +321,9 @@ lazy_static! {
     };
 }
 
+#[derive(Clone)]
 pub struct StaticLoader;
+
 impl Loader for StaticLoader {
     type Document = JsonValue;
     fn load<'a>(
@@ -380,12 +384,37 @@ pub type ContextMap = HashMap<String, RemoteDocument<JsonValue>>;
 
 #[derive(Clone)]
 pub struct ContextLoader {
-    context_map: std::sync::Arc<async_std::sync::RwLock<ContextMap>>,
+    // Specifies if StaticLoader is meant to be checked first.
+    static_loader: Option<StaticLoader>,
+    // This map holds the optional, additional context objects.  This is where any app-specific context
+    // objects would go.  The Arc<RwLock<_>> is necessary because json_ld::Loader trait unfortunately
+    // has a method that uses `&mut self`.
+    context_map: Option<Arc<RwLock<ContextMap>>>,
 }
 
-impl From<std::sync::Arc<async_std::sync::RwLock<ContextMap>>> for ContextLoader {
-    fn from(context_map: std::sync::Arc<async_std::sync::RwLock<ContextMap>>) -> Self {
-        Self { context_map }
+impl ContextLoader {
+    /// Constructs an "empty" ContextLoader.
+    pub fn empty() -> Self {
+        Self { static_loader: None, context_map: None }
+    }
+    /// Using the builder pattern, the StaticLoader can be enabled so that contexts are checked
+    /// against it before being checked against context_map.
+    pub fn with_static_loader(mut self) -> Self {
+        self.static_loader = Some(StaticLoader);
+        self
+    }
+    /// Using the builder pattern, the map of additional contexts can be set.  These will be checked
+    /// after StaticLoader (if it's specified).
+    pub fn with_context_map(mut self, context_map: Arc<RwLock<ContextMap>>) -> Self {
+        self.context_map = Some(context_map);
+        self
+    }
+}
+
+/// The default ContextLoader only uses StaticLoader.
+impl std::default::Default for ContextLoader {
+    fn default() -> Self {
+        Self { static_loader: Some(StaticLoader), context_map: None }
     }
 }
 
@@ -395,62 +424,43 @@ impl Loader for ContextLoader {
         &'a mut self,
         url: Iri<'_>,
     ) -> BoxFuture<'a, Result<RemoteDocument<Self::Document>, json_ld::Error>> {
-        let url: IriBuf = url.into();
+        let url_buf: IriBuf = url.into();
         async move {
-            self.context_map
-                .read()
-                .await
-                .get(url.as_str())
-                .map(|rd| rd.clone())
-                .ok_or_else(|| {
-                    eprintln!("unknown context {}", url);
-                    json_ld::ErrorCode::LoadingDocumentFailed.into()
-                })
+            if let Some(static_loader) = &mut self.static_loader {
+                match static_loader.load(url_buf.as_iri()).await {
+                    Ok(x) => {
+                        // The url was present in StaticLoader.
+                        return Ok(x);
+                    }
+                    Err(e) => {
+                        if e.code() == json_ld::ErrorCode::LoadingDocumentFailed {
+                            // This is ok, the url just wasn't found in StaticLoader.  Fall through
+                            // to self.context_map.
+                        } else {
+                            // Any other error is a legit error.
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            // If we fell through, then try self.context_map.
+            if let Some(context_map) = &mut self.context_map {
+                context_map
+                    .read()
+                    .await
+                    .get(url_buf.as_str())
+                    .map(|rd| rd.clone())
+                    .ok_or_else(|| {
+                        eprintln!("unknown context {}", url_buf);
+                        json_ld::ErrorCode::LoadingDocumentFailed.into()
+                    })
+            } else {
+                eprintln!("unknown context {}", url_buf);
+                Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
+            }
         }
         .boxed()
     }
-}
-
-lazy_static! {
-    /// This is the built-in, default map of contexts.
-    pub static ref CONTEXT_MAP: std::sync::Arc<async_std::sync::RwLock<ContextMap>> =
-        std::sync::Arc::new(async_std::sync::RwLock::new({
-            let mut context_map = ContextMap::new();
-            context_map.insert(CREDENTIALS_V1_CONTEXT.to_string(), CREDENTIALS_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(CREDENTIALS_EXAMPLES_V1_CONTEXT.to_string(), CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(ODRL_CONTEXT.to_string(), ODRL_CONTEXT_DOCUMENT.clone());
-            context_map.insert(SECURITY_V1_CONTEXT.to_string(), SECURITY_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(SECURITY_V2_CONTEXT.to_string(), SECURITY_V2_CONTEXT_DOCUMENT.clone());
-            context_map.insert(SCHEMA_ORG_CONTEXT.to_string(), SCHEMA_ORG_CONTEXT_DOCUMENT.clone());
-            context_map.insert(DID_V1_CONTEXT.to_string(), DID_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(DID_V1_CONTEXT_NO_WWW.to_string(), DID_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(W3ID_DID_V1_CONTEXT.to_string(), DID_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(DID_RESOLUTION_V1_CONTEXT.to_string(), DID_RESOLUTION_V1_CONTEXT_DOCUMENT.clone());
-            #[allow(deprecated)]
-            context_map.insert(DIF_ESRS2020_CONTEXT.to_string(), DIF_ESRS2020_CONTEXT_DOCUMENT.clone());
-            context_map.insert(W3ID_ESRS2020_V2_CONTEXT.to_string(), W3ID_ESRS2020_V2_CONTEXT_DOCUMENT.clone());
-            #[allow(deprecated)]
-            context_map.insert(ESRS2020_EXTRA_CONTEXT.to_string(), ESRS2020_EXTRA_CONTEXT_DOCUMENT.clone());
-            context_map.insert(LDS_JWS2020_V1_CONTEXT.to_string(), LDS_JWS2020_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(W3ID_JWS2020_V1_CONTEXT.to_string(), W3ID_JWS2020_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(W3ID_ED2020_V1_CONTEXT.to_string(), W3ID_ED2020_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(BLOCKCHAIN2021_V1_CONTEXT.to_string(), BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(CITIZENSHIP_V1_CONTEXT.to_string(), CITIZENSHIP_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(VACCINATION_V1_CONTEXT.to_string(), VACCINATION_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(TRACEABILITY_CONTEXT.to_string(), TRACEABILITY_CONTEXT_DOCUMENT.clone());
-            context_map.insert(REVOCATION_LIST_2020_V1_CONTEXT.to_string(), REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(STATUS_LIST_2021_V1_CONTEXT.to_string(), STATUS_LIST_2021_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(EIP712SIG_V0_1_CONTEXT.to_string(), EIP712SIG_V0_1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(BBS_V1_CONTEXT.to_string(), BBS_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(EIP712SIG_V1_CONTEXT.to_string(), EIP712SIG_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(PRESENTATION_SUBMISSION_V1_CONTEXT.to_string(), PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(VDL_V1_CONTEXT.to_string(), VDL_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(WALLET_V1_CONTEXT.to_string(), WALLET_V1_CONTEXT_DOCUMENT.clone());
-            context_map.insert(ZCAP_V1_CONTEXT.to_string(), ZCAP_V1_CONTEXT_DOCUMENT.clone());
-            context_map
-        }));
-    /// This is the built-in, default ContextLoader (it uses the built-in, default CONTEXT_MAP).
-    pub static ref CONTEXT_LOADER: ContextLoader = ContextLoader::from(CONTEXT_MAP.clone());
 }
 
 impl FromStr for RdfDirection {

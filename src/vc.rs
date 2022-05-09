@@ -2565,7 +2565,7 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc_opt, verification_result) =
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
@@ -2610,7 +2610,7 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc1_opt, verification_result) =
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
@@ -2669,7 +2669,7 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc1_opt, verification_result) =
             Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
@@ -2694,7 +2694,7 @@ pub(crate) mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
@@ -2742,7 +2742,7 @@ pub(crate) mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key3".to_string()));
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
@@ -2789,7 +2789,7 @@ pub(crate) mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
@@ -2821,7 +2821,7 @@ pub(crate) mod tests {
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
 
@@ -2895,7 +2895,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 Ok(self.0.clone())
             }
         }
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let parent = ProofContexts(json!(["https://w3id.org/security/v1", DEFAULT_CONTEXT]));
         let proof_dataset = proof.to_dataset_for_signing(Some(&parent), &mut context_loader).await.unwrap();
         let proof_dataset_normalized = urdna2015::normalize(&proof_dataset).unwrap();
@@ -2928,7 +2928,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
 "#;
         let vc: Credential = serde_json::from_str(credential_str).unwrap();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let credential_dataset = vc.to_dataset_for_signing(None, &mut context_loader).await.unwrap();
         let credential_dataset_normalized = urdna2015::normalize(&credential_dataset).unwrap();
         let credential_urdna2015 = credential_dataset_normalized.to_nquads().unwrap();
@@ -2939,11 +2939,11 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[async_std::test]
     async fn credential_verify() {
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         good_vc(include_str!("../examples/vc.jsonld"), &mut context_loader).await;
 
         let vc_jwt = include_str!("../examples/vc.jwt");
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc_opt, result) = Credential::decode_verify_jwt(vc_jwt, None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         let vc = vc_opt.unwrap();
@@ -2972,7 +2972,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // These test vectors were generated using examples/issue.rs with the verify part disabled,
         // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
         // object into the VC.
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         good_vc(include_str!("../examples/vc-jws2020-inline-context.jsonld"), &mut context_loader).await;
         bad_vc(include_str!("../examples/vc-jws2020-bad-type.jsonld"), &mut context_loader).await;
         bad_vc(include_str!("../examples/vc-jws2020-bad-purpose.jsonld"), &mut context_loader).await;
@@ -3001,7 +3001,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let mut vc: Value = serde_json::from_str(vc_str).unwrap();
         vc["newProp"] = json!("foo");
         let vc: Credential = serde_json::from_value(vc).unwrap();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         assert!(!result.errors.is_empty());
@@ -3015,7 +3015,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let vp = Presentation::from_json(vp_str).unwrap();
         let mut verify_options = LinkedDataProofOptions::default();
         verify_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let result = vp.verify(Some(verify_options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
@@ -3129,7 +3129,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ..Default::default()
         };
 
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         // Issue unrevoked VC
         let proof = unrevoked_vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
@@ -3189,7 +3189,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
           }
         }))
         .unwrap();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let vres = unrevoked_credential.check_status(&DIDExample, &mut context_loader).await;
         println!("{:#?}", vres);
         assert_eq!(vres.errors.len(), 0);
@@ -3216,7 +3216,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
           }
         }))
         .unwrap();
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let vres = revoked_credential.check_status(&DIDExample, &mut context_loader).await;
         println!("{:#?}", vres);
         assert_ne!(vres.errors.len(), 0);
@@ -3244,7 +3244,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
         vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
         vc_issue_options.checks = None;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let vc_proof = vc
             .generate_proof(&key, &vc_issue_options, &DIDExample, &mut context_loader)
             .await

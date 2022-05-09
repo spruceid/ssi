@@ -8,7 +8,7 @@ async fn main() {
     use std::convert::TryFrom;
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let resolver = &ssi::did::example::DIDExample;
-    let mut context_loader = ssi::jsonld::CONTEXT_LOADER.clone();
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     use ssi::revocation::{
         RevocationList2020, RevocationList2020Credential, RevocationList2020Subject,
     };

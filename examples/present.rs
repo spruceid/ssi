@@ -44,7 +44,7 @@ async fn main() {
     proof_options.proof_purpose = Some(ssi::vc::ProofPurpose::Authentication);
     proof_options.challenge = Some("example".to_string());
 
-    let mut context_loader = ssi::jsonld::CONTEXT_LOADER.clone();
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     match &proof_format_out[..] {
         "ldp" => {
             let proof = vp

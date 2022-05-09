@@ -21,7 +21,7 @@ async fn main() {
     let verification_method = "did:example:foo#key1".to_string();
     proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
     let proof_format = std::env::args().skip(1).next();
-    let mut context_loader = ssi::jsonld::CONTEXT_LOADER.clone();
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     match &proof_format.unwrap()[..] {
         "ldp" => {
             let proof = vc

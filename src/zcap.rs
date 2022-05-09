@@ -483,7 +483,7 @@ mod tests {
     #[async_std::test]
     async fn round_trip() {
         let dk = DIDExample;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
 
         let alice_did = "did:example:foo";
         let alice_vm = format!("{}#key2", alice_did);

@@ -2467,7 +2467,7 @@ mod tests {
             ..Default::default()
         };
         let resolver = DIDExample;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let doc = ExampleDocument;
         let _proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
@@ -2486,7 +2486,7 @@ mod tests {
         };
         let doc = ExampleDocument;
         let resolver = DIDExample;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
@@ -2507,7 +2507,7 @@ mod tests {
         };
         let doc = ExampleDocument;
         let resolver = DIDExample;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
@@ -2527,7 +2527,7 @@ mod tests {
         };
         let doc = ExampleDocument;
         let resolver = DIDExample;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
@@ -2634,7 +2634,7 @@ mod tests {
         for proof in vc.proof.iter().flatten() {
             n_proofs += 1;
             let resolver = ExampleResolver;
-            let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+            let mut context_loader = crate::jsonld::ContextLoader::default();
             let warnings = EcdsaSecp256k1RecoverySignature2020
                 .verify(&proof, &vc, &resolver, &mut context_loader)
                 .await
@@ -2760,7 +2760,7 @@ mod tests {
         };
 
         let resolver = ED2020ExampleResolver { issuer_document };
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
 
         println!("{}", serde_json::to_string(&vc).unwrap());
         // reissue VC
@@ -2882,7 +2882,7 @@ mod tests {
         let vc_str = include_str!("../tests/lds-aleo2021-vc0.jsonld");
         let mut vc = Credential::from_json_unsigned(vc_str).unwrap();
         let resolver = ExampleResolver;
-        let mut context_loader = crate::jsonld::CONTEXT_LOADER.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
 
         if vc.proof.iter().flatten().next().is_none() {
             // Issue VC / Generate Test Vector
