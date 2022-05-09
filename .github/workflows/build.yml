@@ -37,6 +37,9 @@ jobs:
     - name: Test with alternative crypto libraries
       run: cargo test --no-default-features --features rsa,ed25519-dalek,sha2,rand
 
+    - name: Test with openssl
+      run: cargo test --no-default-features --features=ring,openssl
+
     - name: Test with secp256k1
       run: |
         cargo test --verbose --workspace --features secp256k1

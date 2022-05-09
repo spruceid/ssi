@@ -15,6 +15,7 @@ documentation = "https://docs.rs/did-key/"
 default = ["ssi/ring"]
 secp256k1 = ["k256", "ssi/secp256k1"]
 secp256r1 = ["p256", "ssi/secp256r1"]
+ssi_p384 = ["ssi/openssl"]
 
 [dependencies]
 ssi = { version = "0.4", path = "../", default-features = false }

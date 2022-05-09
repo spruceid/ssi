@@ -226,6 +226,7 @@ pub enum Algorithm {
     EdDSA,
     EdBlake2b,
     ES256,
+    ES384,
     ES256K,
     /// <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
     #[serde(rename = "ES256K-R")]
@@ -299,6 +300,30 @@ impl JWK {
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
+    #[cfg(feature = "openssl")]
+    pub fn generate_p384() -> Result<JWK, Error> {
+        let group = openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::SECP384R1)?;
+        let keypair = openssl::ec::EcKey::generate(&group)?;
+        let form = openssl::ec::PointConversionForm::UNCOMPRESSED;
+        let mut ctx = openssl::bn::BigNumContext::new()?;
+        let sk_bytes = keypair.private_key().to_vec();
+        if sk_bytes.len() != 48 {
+            return Err(Error::InvalidKeyLength(sk_bytes.len()));
+        }
+        let pk_bytes = keypair.public_key().to_bytes(&group, form, &mut ctx)?;
+        if pk_bytes.len() != 97 {
+            return Err(Error::InvalidKeyLength(pk_bytes.len()));
+        }
+        let x = pk_bytes[1..49].to_vec();
+        let y = pk_bytes[49..97].to_vec();
+        Ok(JWK::from(Params::EC(ECParams {
+            curve: Some("P-384".to_string()),
+            x_coordinate: Some(Base64urlUInt(x)),
+            y_coordinate: Some(Base64urlUInt(y)),
+            ecc_private_key: Some(Base64urlUInt(sk_bytes)),
+        })))
+    }
+
     #[cfg(feature = "aleosig")]
     pub fn generate_aleo() -> Result<JWK, Error> {
         crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
@@ -330,6 +355,9 @@ impl JWK {
                     }
                     "P-256" => {
                         return Some(Algorithm::ES256);
+                    }
+                    "P-384" => {
+                        return Some(Algorithm::ES384);
                     }
                     _ => {}
                 }
@@ -623,6 +651,66 @@ impl ToASN1 for OctetParams {
     }
 }
 
+#[cfg(feature = "openssl")]
+impl TryFrom<&Base64urlUInt> for openssl::bn::BigNum {
+    type Error = Error;
+    fn try_from(uint: &Base64urlUInt) -> Result<Self, Self::Error> {
+        Ok(Self::from_slice(&uint.0)?)
+    }
+}
+
+#[cfg(feature = "openssl")]
+fn openssl_curve_to_nid(crv: &str) -> Result<openssl::nid::Nid, Error> {
+    use openssl::nid::Nid;
+    let nid = match &crv[..] {
+        "secp256k1" => Nid::SECP256K1,
+        "P-256" => Nid::X9_62_PRIME256V1,
+        "P-384" => Nid::SECP384R1,
+        crv => return Err(Error::CurveNotImplemented(crv.to_string())),
+    };
+    Ok(nid)
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&ECParams> for openssl::ec::EcKey<openssl::pkey::Private> {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        let curve_nid = openssl_curve_to_nid(&curve)?;
+        let private_key = params
+            .ecc_private_key
+            .as_ref()
+            .ok_or(Error::MissingPrivateKey)?;
+        let group = openssl::ec::EcGroup::from_curve_name(curve_nid)?;
+        let private_number = openssl::bn::BigNum::try_from(private_key)?;
+        let public_key = openssl::ec::EcKey::<openssl::pkey::Public>::try_from(params)?;
+        let pkey = Self::from_private_components(
+            group.as_ref(),
+            &private_number,
+            public_key.public_key(),
+        )?;
+        Ok(pkey)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl TryFrom<&ECParams> for openssl::ec::EcKey<openssl::pkey::Public> {
+    type Error = Error;
+    fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
+        let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
+        let curve_nid = openssl_curve_to_nid(&curve)?;
+        let group = openssl::ec::EcGroup::from_curve_name(curve_nid)?;
+        let x = openssl::bn::BigNum::try_from(
+            params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?,
+        )?;
+        let y = openssl::bn::BigNum::try_from(
+            params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?,
+        )?;
+        let pk = openssl::ec::EcKey::from_public_key_affine_coordinates(group.as_ref(), &x, &y)?;
+        Ok(pk)
+    }
+}
+
 #[cfg(feature = "rsa")]
 impl From<&Base64urlUInt> for rsa::BigUint {
     fn from(uint: &Base64urlUInt) -> Self {
@@ -869,6 +957,47 @@ pub fn rsa_x509_pub_parse(pk_bytes: &[u8]) -> Result<JWK, RsaX509PubParseError> 
     Ok(JWK::from(Params::RSA(rsa_params)))
 }
 
+#[cfg(feature = "openssl")]
+/// Parse a P-384 public key
+pub fn p384_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
+    let (x, y) = match pk_bytes.len() {
+        96 => (pk_bytes[0..48].to_vec(), pk_bytes[48..96].to_vec()),
+        49 | 97 => {
+            let group = openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::SECP384R1)?;
+            let mut ctx = openssl::bn::BigNumContext::new()?;
+            let point = openssl::ec::EcPoint::from_bytes(&group, pk_bytes, &mut ctx)?;
+            let form = openssl::ec::PointConversionForm::UNCOMPRESSED;
+            let uncompressed_bytes = point.to_bytes(&group, form, &mut ctx)?;
+            if uncompressed_bytes.len() != 97 {
+                return Err(Error::P384KeyLength(uncompressed_bytes.len()));
+            }
+            (
+                uncompressed_bytes[1..49].to_vec(),
+                uncompressed_bytes[49..97].to_vec(),
+            )
+        }
+        _ => return Err(Error::P384KeyLength(pk_bytes.len())),
+    };
+    let jwk = JWK::from(Params::EC(ECParams {
+        curve: Some("P-384".to_string()),
+        x_coordinate: Some(Base64urlUInt(x)),
+        y_coordinate: Some(Base64urlUInt(y)),
+        ecc_private_key: None,
+    }));
+    Ok(jwk)
+}
+
+/// Serialize a P-384 public key
+#[cfg(feature = "openssl")]
+pub fn p384_serialize(params: &ECParams) -> Result<Vec<u8>, Error> {
+    let public_key = openssl::ec::EcKey::<openssl::pkey::Public>::try_from(params)?;
+    let group = openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::SECP384R1)?;
+    let form = openssl::ec::PointConversionForm::COMPRESSED;
+    let mut ctx = openssl::bn::BigNumContext::new()?;
+    let bytes = public_key.public_key().to_bytes(&group, form, &mut ctx)?;
+    Ok(bytes.to_vec())
+}
+
 #[cfg(feature = "k256")]
 impl TryFrom<&ECParams> for k256::SecretKey {
     type Error = Error;
@@ -1038,6 +1167,12 @@ mod tests {
     #[cfg(feature = "p256")]
     fn p256_generate() {
         let _jwk = JWK::generate_p256().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "openssl")]
+    fn p384_generate() {
+        let _jwk = JWK::generate_p384().unwrap();
     }
 
     #[test]

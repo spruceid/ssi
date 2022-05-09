@@ -139,6 +139,24 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         }
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
+            Algorithm::ES384 => {
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "P-384" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                #[cfg(feature = "openssl")]
+                {
+                    let sk = openssl::ec::EcKey::<openssl::pkey::Private>::try_from(ec)?;
+                    let digest = openssl::hash::MessageDigest::sha384();
+                    let hash = openssl::hash::hash(digest, &data)?;
+                    let sig = openssl::ecdsa::EcdsaSig::sign(&hash, &sk)?;
+                    [sig.r().to_vec(), sig.s().to_vec()].concat()
+                }
+                #[cfg(not(feature = "openssl"))]
+                {
+                    return Err(Error::MissingFeatures("openssl"));
+                }
+            }
             #[cfg(feature = "p256")]
             Algorithm::ES256 => {
                 use p256::ecdsa::signature::{Signature, Signer};
@@ -448,6 +466,26 @@ pub fn verify_bytes_warnable(
                     Digest::chain(<PassthroughDigest as Digest>::new(), &hash),
                     &sig,
                 )?;
+            }
+            #[cfg(feature = "openssl")]
+            Algorithm::ES384 => {
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "P-384" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                if signature.len() != 96 {
+                    return Err(Error::UnexpectedSignatureLength(96, signature.len()));
+                }
+                let pk = openssl::ec::EcKey::<openssl::pkey::Public>::try_from(ec)?;
+                let digest = openssl::hash::MessageDigest::sha384();
+                let sig = openssl::ecdsa::EcdsaSig::from_private_components(
+                    openssl::bn::BigNum::from_slice(&signature[0..48])?,
+                    openssl::bn::BigNum::from_slice(&signature[48..96])?,
+                )?;
+                let hash = openssl::hash::hash(digest, &data)?;
+                if !sig.verify(&hash, &pk)? {
+                    return Err(Error::InvalidSignature);
+                }
             }
             _ => {
                 return Err(Error::UnsupportedAlgorithm);
@@ -795,5 +833,26 @@ mod tests {
         let jws = encode_sign(Algorithm::ES256, payload, &key).unwrap();
         assert_eq!(jws, "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.rJzO6MmTNS8Tn-L3baIf9_2Jr9OoK8E06MxJtofz8xMUGSom6eRUmWGZ7oQVjgP3HogOD80miTvuvKTWa54Nvw");
         decode_verify(&jws, &key).unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "openssl")]
+    fn p384_sign_verify() {
+        let key = JWK::generate_p384().unwrap();
+        let data = b"asdf";
+        let bad_data = b"no";
+        let sig = sign_bytes(Algorithm::ES384, data, &key).unwrap();
+        verify_bytes(Algorithm::ES384, data, &key, &sig).unwrap();
+        verify_bytes(Algorithm::ES384, bad_data, &key, &sig).unwrap_err();
+
+        let key: JWK =
+            serde_json::from_str(include_str!("../tests/secp384r1-2022-05-10.json")).unwrap();
+        let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
+        let jws = encode_sign(Algorithm::ES384, payload, &key).unwrap();
+        dbg!(&jws);
+        decode_verify(&jws, &key).unwrap();
+
+        const JWS: &str = "eyJhbGciOiJFUzM4NCJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.2vpBSFN7DxuS57epgq_e7-NyNiJ5eOOrExmi65C_wtZOC2-9i6fVvMnfUig7QmgiirznAg1wr_b7_kH-bbMCI5Pdf8pAnxQg3LL9I9OhzttyG06qAl9L7BE6aNS-aqnf";
+        decode_verify(&JWS, &key).unwrap();
     }
 }
