@@ -139,6 +139,24 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         }
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
+            Algorithm::ES384 => {
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "P-384" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                #[cfg(feature = "openssl")]
+                {
+                    let sk = openssl::ec::EcKey::<openssl::pkey::Private>::try_from(ec)?;
+                    let digest = openssl::hash::MessageDigest::sha384();
+                    let hash = openssl::hash::hash(digest, &data)?;
+                    let sig = openssl::ecdsa::EcdsaSig::sign(&hash, &sk)?;
+                    [sig.r().to_vec(), sig.s().to_vec()].concat()
+                }
+                #[cfg(not(feature = "openssl"))]
+                {
+                    return Err(Error::MissingFeatures("openssl"));
+                }
+            }
             #[cfg(feature = "p256")]
             Algorithm::ES256 => {
                 use p256::ecdsa::signature::{Signature, Signer};
@@ -448,6 +466,26 @@ pub fn verify_bytes_warnable(
                     Digest::chain(<PassthroughDigest as Digest>::new(), &hash),
                     &sig,
                 )?;
+            }
+            #[cfg(feature = "openssl")]
+            Algorithm::ES384 => {
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                if curve != "P-384" {
+                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                }
+                if signature.len() != 96 {
+                    return Err(Error::UnexpectedSignatureLength(96, signature.len()));
+                }
+                let pk = openssl::ec::EcKey::<openssl::pkey::Public>::try_from(ec)?;
+                let digest = openssl::hash::MessageDigest::sha384();
+                let sig = openssl::ecdsa::EcdsaSig::from_private_components(
+                    openssl::bn::BigNum::from_slice(&signature[0..48])?,
+                    openssl::bn::BigNum::from_slice(&signature[48..96])?,
+                )?;
+                let hash = openssl::hash::hash(digest, &data)?;
+                if !sig.verify(&hash, &pk)? {
+                    return Err(Error::InvalidSignature);
+                }
             }
             _ => {
                 return Err(Error::UnsupportedAlgorithm);

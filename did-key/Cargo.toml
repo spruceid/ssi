@@ -12,9 +12,10 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-key/"
 documentation = "https://docs.rs/did-key/"
 
 [features]
-default = ["ssi/ring"]
+default = ["ssi/ring", "ssi_p384"]
 secp256k1 = ["k256", "ssi/secp256k1"]
 secp256r1 = ["p256", "ssi/secp256r1"]
+ssi_p384 = ["ssi/openssl"]
 
 [dependencies]
 ssi = { version = "0.4", path = "../", default-features = false }

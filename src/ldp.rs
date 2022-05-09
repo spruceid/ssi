@@ -113,6 +113,7 @@ fn pick_proof_suite<'a, 'b>(
     Ok(match algorithm {
         Algorithm::RS256 => &RsaSignature2018,
         Algorithm::PS256 => &JsonWebSignature2020,
+        Algorithm::ES384 => &JsonWebSignature2020,
         Algorithm::AleoTestnet1Signature => {
             #[cfg(not(feature = "aleosig"))]
             return Err(Error::MissingFeatures("aleosig"));
@@ -2290,7 +2291,7 @@ impl JsonWebSignature2020 {
             Algorithm::EdDSA => (),
             Algorithm::ES256K => (),
             Algorithm::ES256 => (),
-            // Algorithm::ES384 => (), TODO
+            Algorithm::ES384 => (),
             Algorithm::PS256 => (),
             _ => return Err(Error::UnsupportedAlgorithm),
         }
@@ -2316,7 +2317,10 @@ impl JsonWebSignature2020 {
                     },
                     "P-256" => match algorithm {
                         Algorithm::ES256 => (),
-                        // Algorithm::ES384 => (), TODO
+                        _ => return Err(Error::UnsupportedAlgorithm),
+                    },
+                    "P-384" => match algorithm {
+                        Algorithm::ES384 => (),
                         _ => return Err(Error::UnsupportedAlgorithm),
                     },
                     _ => {

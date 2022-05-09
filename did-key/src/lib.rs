@@ -22,6 +22,7 @@ const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 const DID_KEY_SECP256K1_PREFIX: [u8; 2] = [0xe7, 0x01];
 const DID_KEY_BLS12381_G2_PREFIX: [u8; 2] = [0xeb, 0x01];
 const DID_KEY_P256_PREFIX: [u8; 2] = [0x80, 0x24];
+const DID_KEY_P384_PREFIX: [u8; 2] = [0x81, 0x24];
 const DID_KEY_RSA_PREFIX: [u8; 2] = [0x85, 0x24];
 
 #[derive(Error, Debug)]
@@ -164,6 +165,22 @@ impl DIDResolver for DIDKey {
             #[cfg(not(feature = "secp256r1"))]
             return (
                 ResolutionMetadata::from_error("did:key type P-256 not supported"),
+                None,
+                None,
+            );
+        } else if data[0] == DID_KEY_P384_PREFIX[0] && data[1] == DID_KEY_P384_PREFIX[1] {
+            #[cfg(feature = "ssi_p384")]
+            match ssi::jwk::p384_parse(&data[2..]) {
+                Ok(jwk) => {
+                    vm_type = "JsonWebKey2020".to_string();
+                    vm_type_iri = "https://w3id.org/security#JsonWebKey2020".to_string();
+                    jwk
+                }
+                Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
+            }
+            #[cfg(not(feature = "ssi_p384"))]
+            return (
+                ResolutionMetadata::from_error("did:key type P-384 not supported"),
                 None,
                 None,
             );
@@ -321,6 +338,18 @@ impl DIDMethod for DIDKey {
                                     pk.to_encoded_point(true).as_bytes().to_vec(),
                                 ]
                                 .concat(),
+                            )
+                    }
+                    #[cfg(feature = "ssi_p384")]
+                    "P-384" => {
+                        let pk_bytes = match ssi::jwk::p384_serialize(params) {
+                            Ok(pk) => pk,
+                            Err(_err) => return None,
+                        };
+                        "did:key:".to_string()
+                            + &multibase::encode(
+                                multibase::Base::Base58Btc,
+                                [DID_KEY_P384_PREFIX.to_vec(), pk_bytes].concat(),
                             )
                     }
                     //_ => return Some(Err(DIDKeyError::UnsupportedCurve(params.curve.clone()))),

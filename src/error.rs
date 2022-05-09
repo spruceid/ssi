@@ -20,6 +20,8 @@ use json_ld::ErrorCode as JSONLDErrorCode;
 #[cfg(feature = "k256")]
 use k256::ecdsa::Error as Secp256k1Error;
 use multibase::Error as MultibaseError;
+#[cfg(feature = "openssl")]
+use openssl::error::ErrorStack as OpenSSLErrors;
 #[cfg(feature = "p256")]
 use p256::ecdsa::Error as Secp256r1Error;
 #[cfg(feature = "ring")]
@@ -321,6 +323,8 @@ pub enum Error {
     /// Error from `p256` crate
     #[cfg(feature = "p256")]
     Secp256r1(Secp256r1Error),
+    #[cfg(feature = "openssl")]
+    OpenSSL(OpenSSLErrors),
     /// Error encoding ASN.1 data structure.
     ASN1Encode(ASN1EncodeError),
     /// Error decoding Base64
@@ -385,6 +389,8 @@ pub enum Error {
     UnableToResolve(String),
     /// Expected 64 byte uncompressed key or 33 bytes compressed key
     P256KeyLength(usize),
+    /// Expected 96 byte uncompressed key or 49 bytes compressed key (P-384)
+    P384KeyLength(usize),
     /// Unable to encode elliptic curve key
     ECEncodingError,
     /// Unable to decompress elliptic curve
@@ -558,6 +564,8 @@ impl fmt::Display for Error {
             Error::Secp256k1(e) => e.fmt(f),
             #[cfg(feature = "p256")]
             Error::Secp256r1(e) => e.fmt(f),
+            #[cfg(feature = "openssl")]
+            Error::OpenSSL(e) => e.fmt(f),
             Error::Base64(e) => e.fmt(f),
             Error::Multibase(e) => e.fmt(f),
             Error::ASN1Encode(e) => e.fmt(f),
@@ -589,6 +597,7 @@ impl fmt::Display for Error {
             #[cfg(feature = "p256")]
             Error::P256EC(e) => e.fmt(f),
             Error::P256KeyLength(len) => write!(f, "Expected 64 byte uncompressed key or 33 bytes compressed key but found length: {}", len),
+            Error::P384KeyLength(len) => write!(f, "Expected 96 byte uncompressed key or 49 bytes compressed key but found length: {}", len),
             Error::ECEncodingError => write!(f, "Unable to encode EC key"),
             Error::ECDecompress => write!(f, "Unable to decompress elliptic curve"),
             Error::MissingFeatures(features) => write!(f, "Missing features: {}", features),
@@ -688,6 +697,13 @@ impl From<CharTryFromError> for Error {
 impl From<RsaError> for Error {
     fn from(err: RsaError) -> Error {
         Error::Rsa(err)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl From<OpenSSLErrors> for Error {
+    fn from(err: OpenSSLErrors) -> Error {
+        Error::OpenSSL(err)
     }
 }
 
