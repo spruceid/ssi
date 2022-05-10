@@ -320,7 +320,7 @@ impl JWK {
             curve: Some("P-384".to_string()),
             x_coordinate: Some(Base64urlUInt(x)),
             y_coordinate: Some(Base64urlUInt(y)),
-            ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+            ecc_private_key: Some(Base64urlUInt(sk_bytes)),
         })))
     }
 
