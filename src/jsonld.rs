@@ -402,11 +402,21 @@ impl ContextLoader {
         self.static_loader = Some(StaticLoader);
         self
     }
-    /// Using the builder pattern, the map of additional contexts can be set.  These will be checked
-    /// after StaticLoader (if it's specified).
-    pub fn with_context_map(mut self, context_map: Arc<RwLock<ContextMap>>) -> Self {
-        self.context_map = Some(context_map);
-        self
+    /// Using the builder pattern, the map of additional contexts can be set.  These context objects
+    /// will be checked after StaticLoader (if it's specified).  preparsed_context_map should map
+    /// the context URLs to their JSON content.
+    pub fn with_context_map_from(mut self, preparsed_context_map: HashMap<String, String>) -> Result<Self, Error> {
+        let context_map =
+            preparsed_context_map
+                .iter()
+                .map(|(url, jsonld)| -> Result<(String, RemoteDocument<JsonValue>), Error> {
+                    let doc = json::parse(jsonld)?;
+                    let iri = Iri::new(url)?;
+                    Ok((url.clone(), RemoteDocument::new(doc, iri)))
+                })
+                .collect::<Result<HashMap<String, RemoteDocument<JsonValue>>, Error>>()?;
+        self.context_map = Some(Arc::new(RwLock::new(context_map)));
+        Ok(self)
     }
 }
 
