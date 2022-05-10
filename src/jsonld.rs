@@ -371,7 +371,6 @@ impl Loader for StaticLoader {
                 WALLET_V1_CONTEXT => Ok(WALLET_V1_CONTEXT_DOCUMENT.clone()),
                 ZCAP_V1_CONTEXT => Ok(ZCAP_V1_CONTEXT_DOCUMENT.clone()),
                 _ => {
-                    eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
                 }
             }
@@ -451,11 +450,9 @@ impl Loader for ContextLoader {
                     .get(url_buf.as_str())
                     .map(|rd| rd.clone())
                     .ok_or_else(|| {
-                        eprintln!("unknown context {}", url_buf);
                         json_ld::ErrorCode::LoadingDocumentFailed.into()
                     })
             } else {
-                eprintln!("unknown context {}", url_buf);
                 Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
             }
         }
