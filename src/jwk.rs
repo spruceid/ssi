@@ -356,6 +356,9 @@ impl JWK {
                     "P-256" => {
                         return Some(Algorithm::ES256);
                     }
+                    "P-384" => {
+                        return Some(Algorithm::ES384);
+                    }
                     _ => {}
                 }
             }
