@@ -300,6 +300,30 @@ impl JWK {
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
+    #[cfg(feature = "openssl")]
+    pub fn generate_p384() -> Result<JWK, Error> {
+        let group = openssl::ec::EcGroup::from_curve_name(openssl::nid::Nid::SECP384R1)?;
+        let keypair = openssl::ec::EcKey::generate(&group)?;
+        let form = openssl::ec::PointConversionForm::UNCOMPRESSED;
+        let mut ctx = openssl::bn::BigNumContext::new()?;
+        let sk_bytes = keypair.private_key().to_vec();
+        if sk_bytes.len() != 48 {
+            return Err(Error::InvalidKeyLength(sk_bytes.len()));
+        }
+        let pk_bytes = keypair.public_key().to_bytes(&group, form, &mut ctx)?;
+        if pk_bytes.len() != 97 {
+            return Err(Error::InvalidKeyLength(pk_bytes.len()));
+        }
+        let x = pk_bytes[1..49].to_vec();
+        let y = pk_bytes[49..97].to_vec();
+        Ok(JWK::from(Params::EC(ECParams {
+            curve: Some("P-384".to_string()),
+            x_coordinate: Some(Base64urlUInt(x)),
+            y_coordinate: Some(Base64urlUInt(y)),
+            ecc_private_key: Some(Base64urlUInt(sk_bytes.to_vec())),
+        })))
+    }
+
     #[cfg(feature = "aleosig")]
     pub fn generate_aleo() -> Result<JWK, Error> {
         crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
@@ -1140,6 +1164,12 @@ mod tests {
     #[cfg(feature = "p256")]
     fn p256_generate() {
         let _jwk = JWK::generate_p256().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "openssl")]
+    fn p384_generate() {
+        let _jwk = JWK::generate_p384().unwrap();
     }
 
     #[test]
