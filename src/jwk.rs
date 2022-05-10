@@ -633,17 +633,23 @@ impl TryFrom<&Base64urlUInt> for openssl::bn::BigNum {
 }
 
 #[cfg(feature = "openssl")]
+fn openssl_curve_to_nid(crv: &str) -> Result<openssl::nid::Nid, Error> {
+    use openssl::nid::Nid;
+    let nid = match &crv[..] {
+        "secp256k1" => Nid::SECP256K1,
+        "P-256" => Nid::X9_62_PRIME256V1,
+        "P-384" => Nid::SECP384R1,
+        crv => return Err(Error::CurveNotImplemented(crv.to_string())),
+    };
+    Ok(nid)
+}
+
+#[cfg(feature = "openssl")]
 impl TryFrom<&ECParams> for openssl::ec::EcKey<openssl::pkey::Private> {
     type Error = Error;
     fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
-        use openssl::nid::Nid;
         let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
-        let curve_nid = match &curve[..] {
-            "secp256k1" => Nid::SECP256K1,
-            "P-256" => Nid::X9_62_PRIME256V1,
-            "P-384" => Nid::SECP384R1,
-            crv => return Err(Error::CurveNotImplemented(crv.to_string())),
-        };
+        let curve_nid = openssl_curve_to_nid(&curve)?;
         let private_key = params
             .ecc_private_key
             .as_ref()
@@ -664,14 +670,8 @@ impl TryFrom<&ECParams> for openssl::ec::EcKey<openssl::pkey::Private> {
 impl TryFrom<&ECParams> for openssl::ec::EcKey<openssl::pkey::Public> {
     type Error = Error;
     fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
-        use openssl::nid::Nid;
         let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
-        let curve_nid = match &curve[..] {
-            "secp256k1" => Nid::SECP256K1,
-            "P-256" => Nid::X9_62_PRIME256V1,
-            "P-384" => Nid::SECP384R1,
-            crv => return Err(Error::CurveNotImplemented(crv.to_string())),
-        };
+        let curve_nid = openssl_curve_to_nid(&curve)?;
         let group = openssl::ec::EcGroup::from_curve_name(curve_nid)?;
         let x = openssl::bn::BigNum::try_from(
             params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?,
