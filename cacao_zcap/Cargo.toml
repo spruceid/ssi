@@ -1,0 +1,57 @@
+[package]
+name = "cacao-zcap"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+authors = ["Spruce Systems, Inc."]
+categories = ["authorization"]
+keywords = ["linked-data", "zcap", "cacao", "authorization"]
+description = "Integration of CACAO with ZCAP"
+repository = "https://github.com/spruceid/cacao-zcap-rs/"
+
+[features]
+default = ["bidirectional", "verify"]
+cacao_to_zcap = []
+zcap_to_cacao = []
+bidirectional = ["cacao_to_zcap", "zcap_to_cacao"]
+verify = ["zcap_to_cacao"]
+
+[dependencies]
+uint = "=0.9.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_jcs = "0.1"
+base64 = "0.12"
+thiserror = "1.0"
+async-std = { version = "1.9", features = ["attributes"] }
+async-trait = "0.1"
+multibase = "0.8"
+hex = "0.4"
+anyhow = "1.0"
+iri-string = { version = "0.4", features = ["serde", "serde-std"] }
+percent-encoding = "2.1"
+libipld = "0.12"
+uuid = { version = "0.8", features = ["v4", "serde"] }
+sha2 = "0.9"
+
+[dependencies.ssi]
+version = ">=0.3, <0.5"
+default-features = false
+features = ["sha2"]
+git = "https://github.com/spruceid/ssi.git"
+rev = "4c30f1a"
+
+[dependencies.cacaos]
+version = "0.2"
+git = "https://github.com/spruceid/cacao-rs.git"
+rev = "2715184"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = "0.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["wasmbind"] }
+
+[dev-dependencies]
+pretty_assertions = "1.2"
