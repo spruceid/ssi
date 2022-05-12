@@ -1,0 +1,29 @@
+{
+  "@context": {
+    "@protected": true,
+    "validFrom": {
+      "@id": "https://www.w3.org/2018/credentials#validFrom",
+      "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+    },
+    "CacaoZcap2022": {
+      "@id": "https://demo.didkit.dev/2022/cacao-zcap/#CacaoZcap2022",
+      "@context": {
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "cacaoPayloadType": "https://demo.didkit.dev/2022/cacao-zcap/#cacaoPayloadType",
+        "cacaoZcapSubstatement": "https://demo.didkit.dev/2022/cacao-zcap/#cacaoZcapSubstatement",
+        "cacaoRequestId": "https://demo.didkit.dev/2022/cacao-zcap/#cacaoRequestId"
+      }
+    },
+    "CacaoZcapProof2022": {
+      "@id": "https://demo.didkit.dev/2022/cacao-zcap/#CacaoZcapProof2022",
+      "@context": {
+        "@protected": true,
+        "id": "@id",
+        "type": "@type",
+        "cacaoSignatureType": "https://demo.didkit.dev/2022/cacao-zcap/#cacaoSignatureType"
+      }
+    }
+  }
+}

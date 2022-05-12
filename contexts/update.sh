@@ -27,4 +27,5 @@ exec curl \
 	https://w3id.org/zcap/v1 -o w3id-zcap-v1.jsonld \
 	https://w3id.org/vc-revocation-list-2020/v1 -o w3id-vc-revocation-list-2020-v1.jsonld \
 	https://w3id.org/vc/status-list/2021/v1 -o w3id-vc-status-list-2021-v1.jsonld \
+	https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json -o cacao-zcap-v1.jsonld \
 	-L
