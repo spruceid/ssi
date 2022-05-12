@@ -101,6 +101,12 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
         }
         "JsonWebSignature2020" => &JsonWebSignature2020,
         "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
+        "CacaoZcapProof2022" => {
+            #[cfg(not(feature = "cacao-zcap"))]
+            return Err(Error::MissingFeatures("cacao-zcap"));
+            #[cfg(feature = "cacao-zcap")]
+            &crate::cacao_zcap::proof::CacaoZcapProof2022
+        }
         _ => return Err(Error::ProofTypeNotImplemented),
     })
 }
