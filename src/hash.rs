@@ -15,7 +15,7 @@ pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
         let hash = hasher.finalize().into();
         Ok(hash)
     }
-    #[cfg(feature = "ring")]
+    #[cfg(all(feature = "ring", not(feature = "sha2")))]
     {
         use ring::digest;
         use std::convert::TryInto;
