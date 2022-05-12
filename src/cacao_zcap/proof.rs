@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use async_trait::async_trait;
-use cacaos::siwe_cacao::SignInWithEthereum;
-use serde_json::Value;
-use ssi::{
+use crate::{
     did_resolve::DIDResolver,
     error::Error as SSIError,
     jwk::JWK,
@@ -12,8 +9,11 @@ use ssi::{
     vc::{LinkedDataProofOptions, Proof},
     zcap::Delegation,
 };
+use async_trait::async_trait;
+use cacaos::siwe_cacao::SignInWithEthereum;
+use serde_json::Value;
 
-use crate::{
+use crate::cacao_zcap::{
     translation::zcap_to_cacao::zcap_to_cacao, CacaoZcapExtraProps, CacaoZcapProofExtraProps,
 };
 

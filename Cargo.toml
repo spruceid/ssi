@@ -12,7 +12,7 @@ resolver = "2"
 exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 
 [features]
-default = ["ring"]
+default = ["ring", "cacao-zcap"]
 http-did = ["http", "percent-encoding"]
 libsecp256k1 = ["secp256k1"] # backward compatibility
 secp256k1 = ["k256", "rand", "k256/keccak256"]
@@ -23,6 +23,7 @@ ripemd-160 = ["ripemd160", "secp256k1"]
 keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
 sha = ["sha2", "k256/sha256"]
 example-http-issuer = []
+cacao-zcap = ["libipld", "percent-encoding", "uuid", "cacaos", "sha2"]
 
 [dependencies]
 json-ld = "0.4"
@@ -88,6 +89,11 @@ snarkvm-algorithms = { version= "0.7.9", optional = true }
 snarkvm-curves = { version= "0.7.9", optional = true }
 snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
+uint = "=0.9.1"
+iri-string = { version = "0.4", features = ["serde", "serde-std"] }
+libipld = { version = "0.12", optional = true }
+uuid = { version = "0.8", features = ["v4", "serde"], optional = true }
+cacaos = { version = "0.2", git = "https://github.com/spruceid/cacao-rs.git", rev = "2715184", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -118,6 +124,7 @@ uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
 tokio = { version = "1.0", features = ["macros"] }
 hyper = { version = "0.14", features = ["server", "http1", "stream"] }
+pretty_assertions = "1.2"
 
 [package.metadata.docs.rs]
 features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]

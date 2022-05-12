@@ -1,8 +1,8 @@
 //! [CACAO-ZCAP](https://demo.didkit.dev/2022/cacao-zcap/) implementation
 
 mod core;
-pub use crate::core::*;
-#[cfg(feature = "verify")]
+pub use self::core::*;
+#[cfg(feature = "cacao-zcap")]
 pub mod proof;
 pub mod translation;
 
@@ -10,6 +10,7 @@ pub use cacaos;
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryInto;
     use std::str::FromStr;
 
     use cacaos::siwe::Message;
@@ -18,16 +19,16 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     pub struct ExampleDIDPKH;
-    use async_trait::async_trait;
-    use serde_json::Value;
-    use ssi::did::{DIDMethod, Document};
-    use ssi::did_resolve::{
+    use crate::did::{DIDMethod, Document};
+    use crate::did_resolve::{
         DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
     };
+    use async_trait::async_trait;
+    use serde_json::Value;
 
-    use crate::translation::cacao_to_zcap::cacao_to_zcap;
-    use crate::translation::zcap_to_cacao::zcap_to_cacao;
-    use crate::CapabilityChainItem;
+    use crate::cacao_zcap::translation::cacao_to_zcap::cacao_to_zcap;
+    use crate::cacao_zcap::translation::zcap_to_cacao::zcap_to_cacao;
+    use crate::cacao_zcap::CapabilityChainItem;
     const EXAMPLE_DID: &str = "did:pkh:eip155:1:0x6da01670d8fc844e736095918bbe11fe8d564163";
     const DOC_JSON: &str = r#"
 {
@@ -124,8 +125,8 @@ Issued At: 2021-12-07T18:28:18.807Z"#,
 
     #[async_std::test]
     async fn zcap_cacao_kepler_session() {
-        let siwe_msg_str = include_str!("../tests/delegation0.siwe");
-        let siwe_msg_sig_hex = include_str!("../tests/delegation0.siwe.sig");
+        let siwe_msg_str = include_str!("../../tests/cacao_zcap/delegation0.siwe");
+        let siwe_msg_sig_hex = include_str!("../../tests/cacao_zcap/delegation0.siwe.sig");
         let siwe_msg = Message::from_str(siwe_msg_str).unwrap();
         let payload = Payload::from(siwe_msg);
         let (_base, sig) = multibase::decode(&format!("f{}", siwe_msg_sig_hex)).unwrap();
@@ -135,15 +136,17 @@ Issued At: 2021-12-07T18:28:18.807Z"#,
         let cacao = CACAO::<SignInWithEthereum>::new(payload, sig);
         let zcap = cacao_to_zcap(&cacao).unwrap();
         let zcap_json = serde_json::to_value(&zcap).unwrap();
-        let zcap_json_expected: Value =
-            serde_json::from_str(include_str!("../tests/delegation0-zcap.jsonld")).unwrap();
+        let zcap_json_expected: Value = serde_json::from_str(include_str!(
+            "../../tests/cacao_zcap/delegation0-zcap.jsonld"
+        ))
+        .unwrap();
         assert_eq!(zcap_json, zcap_json_expected);
 
         let _resolver = ExampleDIDPKH;
         // Verify cacao as zcap
         /* Can't call zcap.verify yet because that depends on ssi
          * having this proof type.
-        use ssi::vc::Check;
+        use crate::vc::Check;
         let res = zcap.verify(None, &resolver).await;
         assert_eq!(res.errors, Vec::<String>::new());
         assert!(res.checks.iter().any(|c| c == &Check::Proof));
@@ -169,8 +172,8 @@ Issued At: 2021-12-07T18:28:18.807Z"#,
         // Note: the delegation change is not verified currently. To make sense, it should be
         // updated here so that the invoker in the first delegation is a PKH DID matches issuer of the
         // second delegation.
-        let siwe_msg_str = include_str!("../tests/delegation1.siwe");
-        let siwe_msg_sig_hex = include_str!("../tests/delegation1.siwe.sig");
+        let siwe_msg_str = include_str!("../../tests/cacao_zcap/delegation1.siwe");
+        let siwe_msg_sig_hex = include_str!("../../tests/cacao_zcap/delegation1.siwe.sig");
         let siwe_msg = Message::from_str(siwe_msg_str).unwrap();
         let message: Payload = siwe_msg.into();
         let (_base, sig) = multibase::decode(&format!("f{}", siwe_msg_sig_hex)).unwrap();
@@ -182,15 +185,17 @@ Issued At: 2021-12-07T18:28:18.807Z"#,
         let zcap_json = serde_json::to_value(&zcap).unwrap();
 
         // Ensure last resource matches parent
-        let parent_expected_str = include_str!("../tests/delegation0-zcap.jsonld");
+        let parent_expected_str = include_str!("../../tests/cacao_zcap/delegation0-zcap.jsonld");
         let parent_expected_json: Value = serde_json::from_str(parent_expected_str).unwrap();
         let last_resource = cacao.payload().resources.iter().next_back().unwrap();
         let parent_capability = CapabilityChainItem::from_resource_uri(&last_resource).unwrap();
         let parent_zcap_json = serde_json::to_value(parent_capability).unwrap();
         assert_eq!(parent_zcap_json, parent_expected_json);
 
-        let zcap_json_expected: Value =
-            serde_json::from_str(include_str!("../tests/delegation1-zcap.jsonld")).unwrap();
+        let zcap_json_expected: Value = serde_json::from_str(include_str!(
+            "../../tests/cacao_zcap/delegation1-zcap.jsonld"
+        ))
+        .unwrap();
         assert_eq!(zcap_json, zcap_json_expected);
 
         // Convert back

@@ -4,6 +4,7 @@ use std::{
     str::FromStr,
 };
 
+use crate::{one_or_many::OneOrMany, vc::URI, zcap::Delegation};
 use cacaos::{SignatureScheme, CACAO};
 use iri_string::types::UriString;
 use libipld::{
@@ -12,7 +13,6 @@ use libipld::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use ssi::{one_or_many::OneOrMany, vc::URI, zcap::Delegation};
 use thiserror::Error;
 use uuid::adapter::Urn;
 

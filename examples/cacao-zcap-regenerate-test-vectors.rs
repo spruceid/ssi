@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
-use cacao_zcap::translation::cacao_to_zcap::cacao_to_zcap;
-use cacao_zcap::CapabilityChainItem;
 use cacaos::siwe::Message;
 use cacaos::siwe_cacao::SignInWithEthereum;
 use cacaos::BasicSignature;
 use cacaos::{Payload, CACAO};
+use ssi::cacao_zcap::translation::cacao_to_zcap::cacao_to_zcap;
+use ssi::cacao_zcap::CapabilityChainItem;
+use std::convert::TryInto;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -27,12 +28,12 @@ fn read_siwe_sig(path: &PathBuf) -> Result<Vec<u8>> {
 
 fn main() {
     let crate_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let siwe0_path = crate_dir.join("tests/delegation0.siwe");
-    let siwe1_path = crate_dir.join("tests/delegation1.siwe");
-    let siwe0_sig_path = crate_dir.join("tests/delegation0.siwe.sig");
-    let siwe1_sig_path = crate_dir.join("tests/delegation1.siwe.sig");
-    let zcap0_path = crate_dir.join("tests/delegation0-zcap.jsonld");
-    let zcap1_path = crate_dir.join("tests/delegation1-zcap.jsonld");
+    let siwe0_path = crate_dir.join("tests/cacao_zcap/delegation0.siwe");
+    let siwe1_path = crate_dir.join("tests/cacao_zcap/delegation1.siwe");
+    let siwe0_sig_path = crate_dir.join("tests/cacao_zcap/delegation0.siwe.sig");
+    let siwe1_sig_path = crate_dir.join("tests/cacao_zcap/delegation1.siwe.sig");
+    let zcap0_path = crate_dir.join("tests/cacao_zcap/delegation0-zcap.jsonld");
+    let zcap1_path = crate_dir.join("tests/cacao_zcap/delegation1-zcap.jsonld");
 
     let siwe0 = read_siwe(&siwe0_path).unwrap();
     let siwe1 = read_siwe(&siwe1_path).unwrap();

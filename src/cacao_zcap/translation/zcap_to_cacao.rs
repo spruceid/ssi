@@ -1,17 +1,18 @@
+use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
-use cacaos::siwe::TimeStamp;
-use cacaos::{Payload, SignatureScheme, Version as CacaoVersion, CACAO};
-use iri_string::types::UriString;
-use libipld::cbor::DagCbor;
-use ssi::{
+use crate::{
     jsonld::SECURITY_V2_CONTEXT,
     vc::{Proof, ProofPurpose, URI},
     zcap::{Context, Contexts, Delegation},
 };
+use cacaos::siwe::TimeStamp;
+use cacaos::{Payload, SignatureScheme, Version as CacaoVersion, CACAO};
+use iri_string::types::UriString;
+use libipld::cbor::DagCbor;
 use thiserror::Error;
 
-use crate::{
+use crate::cacao_zcap::{
     cacao_cid_uuid, CacaoZcapExtraProps, CacaoZcapProofConvertError, CacaoZcapProofExtraProps,
     CacaoZcapStatement, CapToResourceError, ZcapRootURN, ZcapRootURNParseError, CONTEXT_URL_V1,
     DELEGATION_TYPE_2022, PROOF_TYPE_2022,
