@@ -129,3 +129,7 @@ pretty_assertions = "1.2"
 [package.metadata.docs.rs]
 features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]
 rustdoc-args = ["--cfg", "docsrs"]
+
+[[example]]
+name = "cacao-zcap-regenerate-test-vectors"
+required-features = ["cacao-zcap"]
