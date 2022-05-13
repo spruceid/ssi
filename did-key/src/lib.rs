@@ -508,22 +508,23 @@ mod tests {
         let did = DIDKey.generate(&Source::Key(&key)).unwrap();
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
+        let mut context_loader = ssi::jsonld::ContextLoader::default();
         vc.issuer = Some(Issuer::URI(URI::String(did.clone())));
         issue_options.verification_method = Some(URI::String(verification_method));
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDKey)
+            .generate_proof(&key, &issue_options, &DIDKey, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDKey).await;
+        let verification_result = vc.verify(None, &DIDKey, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None, &DIDKey).await.errors.len() > 0);
+        assert!(vc.verify(None, &DIDKey, &mut context_loader).await.errors.len() > 0);
     }
 
     #[async_std::test]
@@ -547,21 +548,22 @@ mod tests {
 
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
+        let mut context_loader = ssi::jsonld::ContextLoader::default();
         issue_options.verification_method = Some(URI::String(verification_method));
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDKey)
+            .generate_proof(&key, &issue_options, &DIDKey, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDKey).await;
+        let verification_result = vc.verify(None, &DIDKey, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None, &DIDKey).await.errors.len() > 0);
+        assert!(vc.verify(None, &DIDKey, &mut context_loader).await.errors.len() > 0);
     }
 
     #[async_std::test]
@@ -585,20 +587,21 @@ mod tests {
 
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
+        let mut context_loader = ssi::jsonld::ContextLoader::default();
         issue_options.verification_method = Some(URI::String(verification_method));
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDKey)
+            .generate_proof(&key, &issue_options, &DIDKey, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDKey).await;
+        let verification_result = vc.verify(None, &DIDKey, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None, &DIDKey).await.errors.len() > 0);
+        assert!(vc.verify(None, &DIDKey, &mut context_loader).await.errors.len() > 0);
     }
 }

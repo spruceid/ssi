@@ -309,20 +309,21 @@ mod tests {
         let key: JWK = serde_json::from_str(key_str).unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:web:localhost#key1".to_string()));
+        let mut context_loader = ssi::jsonld::ContextLoader::default();
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDWeb)
+            .generate_proof(&key, &issue_options, &DIDWeb, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDWeb).await;
+        let verification_result = vc.verify(None, &DIDWeb, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None, &DIDWeb).await.errors.len() > 0);
+        assert!(vc.verify(None, &DIDWeb, &mut context_loader).await.errors.len() > 0);
 
         PROXY.with(|proxy| {
             proxy.replace(None);

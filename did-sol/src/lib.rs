@@ -274,34 +274,35 @@ mod tests {
             issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         }
         eprintln!("vm {:?}", issue_options.verification_method);
+        let mut context_loader = ssi::jsonld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDSol)
+            .generate_proof(&key, &issue_options, &DIDSol, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDSol).await;
+        let verification_result = vc.verify(None, &DIDSol, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDSol).await.errors.len() > 0);
+        assert!(vc_bad_issuer.verify(None, &DIDSol, &mut context_loader).await.errors.len() > 0);
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &DIDSol, &other_key, None)
+            .sign(&vc_no_proof, &issue_options, &DIDSol, &mut context_loader, &other_key, None)
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDSol).await.errors.len() > 0);
+        assert!(vc_wrong_key.verify(None, &DIDSol, &mut context_loader).await.errors.len() > 0);
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -324,14 +325,15 @@ mod tests {
         vp.holder = Some(URI::String(did.to_string()));
         vp_issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        let mut context_loader = ssi::jsonld::ContextLoader::default();
         let vp_proof = vp
-            .generate_proof(&key, &vp_issue_options, &DIDSol)
+            .generate_proof(&key, &vp_issue_options, &DIDSol, &mut context_loader)
             .await
             .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDSol).await;
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDSol, &mut context_loader).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -346,14 +348,14 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDSol).await;
+        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDSol, &mut context_loader).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDSol).await.errors.len() > 0);
+        assert!(vp2.verify(None, &DIDSol, &mut context_loader).await.errors.len() > 0);
     }
 
     /*
