@@ -391,6 +391,13 @@ pub struct ContextLoader {
     context_map: Option<Arc<RwLock<ContextMap>>>,
 }
 
+impl std::fmt::Debug for ContextLoader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("ContextLoader")
+         .finish_non_exhaustive()
+    }
+}
+
 impl ContextLoader {
     /// Constructs an "empty" ContextLoader.
     pub fn empty() -> Self {
