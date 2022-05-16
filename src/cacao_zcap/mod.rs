@@ -2,7 +2,6 @@
 
 mod core;
 pub use self::core::*;
-#[cfg(feature = "cacao-zcap")]
 pub mod proof;
 pub mod translation;
 
