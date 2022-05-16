@@ -141,12 +141,14 @@ Issued At: 2021-12-07T18:28:18.807Z"#,
         .unwrap();
         assert_eq!(zcap_json, zcap_json_expected);
 
-        let _resolver = ExampleDIDPKH;
+        let resolver = ExampleDIDPKH;
         // Verify cacao as zcap
-        /* Can't call zcap.verify yet because that depends on ssi
-         * having this proof type.
+        // This should fail because the signature in this test vector is not real.
         use crate::vc::Check;
         let res = zcap.verify(None, &resolver).await;
+        dbg!(&res);
+        assert!(!res.errors.is_empty());
+        /*
         assert_eq!(res.errors, Vec::<String>::new());
         assert!(res.checks.iter().any(|c| c == &Check::Proof));
         */
