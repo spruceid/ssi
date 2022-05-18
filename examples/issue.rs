@@ -21,14 +21,15 @@ async fn main() {
     let verification_method = "did:example:foo#key1".to_string();
     proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
     let proof_format = std::env::args().skip(1).next();
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     match &proof_format.unwrap()[..] {
         "ldp" => {
             let proof = vc
-                .generate_proof(&key, &proof_options, resolver)
+                .generate_proof(&key, &proof_options, resolver, &mut context_loader)
                 .await
                 .unwrap();
             vc.add_proof(proof);
-            let result = vc.verify(None, resolver).await;
+            let result = vc.verify(None, resolver, &mut context_loader).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }
@@ -42,7 +43,7 @@ async fn main() {
                 .generate_jwt(Some(&key), &proof_options, resolver)
                 .await
                 .unwrap();
-            let result = ssi::vc::Credential::verify_jwt(&jwt, None, resolver).await;
+            let result = ssi::vc::Credential::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }

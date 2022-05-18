@@ -1,5 +1,5 @@
 use crate::did_resolve::DIDResolver;
-use crate::jsonld::{REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
+use crate::jsonld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
 use crate::one_or_many::OneOrMany;
 use crate::vc::{Credential, CredentialStatus, Issuer, VerificationResult, URI};
 use async_trait::async_trait;
@@ -333,6 +333,7 @@ impl CredentialStatus for RevocationList2020Status {
         &self,
         credential: &Credential,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         let mut result = VerificationResult::new();
         // TODO: prefix errors or change return type
@@ -396,7 +397,7 @@ impl CredentialStatus for RevocationList2020Status {
             }
             Ok(()) => {}
         }
-        let vc_result = revocation_list_credential.verify(None, resolver).await;
+        let vc_result = revocation_list_credential.verify(None, resolver, context_loader).await;
         for warning in vc_result.warnings {
             result
                 .warnings
@@ -465,6 +466,7 @@ impl CredentialStatus for StatusList2021Entry {
         &self,
         credential: &Credential,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         let mut result = VerificationResult::new();
         // TODO: prefix errors or change return type
@@ -525,7 +527,7 @@ impl CredentialStatus for StatusList2021Entry {
             }
             Ok(()) => {}
         }
-        let vc_result = status_list_credential.verify(None, resolver).await;
+        let vc_result = status_list_credential.verify(None, resolver, context_loader).await;
         for warning in vc_result.warnings {
             result.warnings.push(format!("Status list: {}", warning));
         }

@@ -22,12 +22,13 @@ async fn main() {
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = "did:example:12345#key1".to_string();
     proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     let proof = vc
-        .generate_proof(&key, &proof_options, resolver)
+        .generate_proof(&key, &proof_options, resolver, &mut context_loader)
         .await
         .unwrap();
     vc.add_proof(proof);
-    let result = vc.verify(None, resolver).await;
+    let result = vc.verify(None, resolver, &mut context_loader).await;
     if result.errors.len() > 0 {
         panic!("verify failed: {:#?}", result);
     }

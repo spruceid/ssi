@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use crate::did_resolve::DIDResolver;
 use crate::error::Error;
-use crate::jsonld::{json_to_dataset, StaticLoader, SECURITY_V2_CONTEXT};
+use crate::jsonld::{ContextLoader, json_to_dataset, SECURITY_V2_CONTEXT};
 use crate::jwk::JWK;
 use crate::ldp::{LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
@@ -79,11 +79,12 @@ where
         &self,
         _options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
-                let mut result = proof.verify(self, resolver).await;
+                let mut result = proof.verify(self, resolver, context_loader).await;
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityDelegation) {
                     result.errors.push("Incorrect Proof Purpose".into());
                 };
@@ -150,6 +151,7 @@ where
         jwk: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         capability_chain: &[&str],
     ) -> Result<Proof, Error> {
         let mut ps = Map::<String, Value>::new();
@@ -157,7 +159,7 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::sign(self, options, resolver, jwk, Some(ps)).await
+        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -167,6 +169,7 @@ where
         public_key: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         capability_chain: &[&str],
     ) -> Result<ProofPreparation, Error> {
         let mut ps = Map::<String, Value>::new();
@@ -174,7 +177,7 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::prepare(self, options, resolver, public_key, Some(ps)).await
+        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, Some(ps)).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -199,6 +202,7 @@ where
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        context_loader: &mut ContextLoader,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
@@ -207,8 +211,7 @@ where
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
     }
 
     fn to_value(&self) -> Result<Value, Error> {
@@ -260,6 +263,7 @@ where
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, P>,
     ) -> VerificationResult
@@ -268,7 +272,7 @@ where
         P: Serialize + Send + Sync + Clone,
     {
         let mut result = target_capability.validate_invocation(self);
-        let mut r2 = self.verify_signature(options, resolver).await;
+        let mut r2 = self.verify_signature(options, resolver, context_loader).await;
         result.append(&mut r2);
         result
     }
@@ -277,11 +281,12 @@ where
         &self,
         _options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
-                let mut result = proof.verify(self, resolver).await;
+                let mut result = proof.verify(self, resolver, context_loader).await;
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
                     result.errors.push("Incorrect Proof Purpose".into());
                 };
@@ -299,11 +304,12 @@ where
         jwk: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         target: &URI,
     ) -> Result<Proof, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::sign(self, options, resolver, jwk, Some(ps)).await
+        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -313,11 +319,12 @@ where
         public_key: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         target: &URI,
     ) -> Result<ProofPreparation, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::prepare(self, options, resolver, public_key, Some(ps)).await
+        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, Some(ps)).await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -341,6 +348,7 @@ where
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        context_loader: &mut ContextLoader,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
@@ -349,8 +357,7 @@ where
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
     }
 
     fn to_value(&self) -> Result<Value, Error> {
@@ -476,6 +483,7 @@ mod tests {
     #[async_std::test]
     async fn round_trip() {
         let dk = DIDExample;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
 
         let alice_did = "did:example:foo";
         let alice_vm = format!("{}#key2", alice_did);
@@ -515,22 +523,22 @@ mod tests {
             ..Default::default()
         };
         let signed_del = del.clone().set_proof(
-            del.generate_proof(&alice, &ldpo_alice, &dk, &[])
+            del.generate_proof(&alice, &ldpo_alice, &dk, &mut context_loader, &[])
                 .await
                 .unwrap(),
         );
         let signed_inv = inv.clone().set_proof(
-            inv.generate_proof(&bob, &ldpo_bob, &dk, &del.id)
+            inv.generate_proof(&bob, &ldpo_bob, &dk, &mut context_loader, &del.id)
                 .await
                 .unwrap(),
         );
 
         // happy path
-        let s_d_v = signed_del.verify(None, &dk).await;
+        let s_d_v = signed_del.verify(None, &dk, &mut context_loader).await;
         assert!(s_d_v.errors.is_empty());
         assert!(s_d_v.checks.iter().any(|c| c == &Check::Proof));
 
-        let s_i_v = signed_inv.verify(None, &dk, &signed_del).await;
+        let s_i_v = signed_inv.verify(None, &dk, &mut context_loader, &signed_del).await;
         assert!(s_i_v.errors.is_empty());
         assert!(s_i_v.checks.iter().any(|c| c == &Check::Proof));
 
@@ -544,9 +552,9 @@ mod tests {
         };
 
         // invalid proof for data
-        assert!(!bad_sig_del.verify(None, &dk).await.errors.is_empty());
+        assert!(!bad_sig_del.verify(None, &dk, &mut context_loader).await.errors.is_empty());
         assert!(!bad_sig_inv
-            .verify(None, &dk, &signed_del)
+            .verify(None, &dk, &mut context_loader, &signed_del)
             .await
             .errors
             .is_empty());
@@ -557,12 +565,12 @@ mod tests {
             ..del.clone()
         };
         let proof = wrong_del
-            .generate_proof(&alice, &ldpo_alice, &dk, &[])
+            .generate_proof(&alice, &ldpo_alice, &dk, &mut context_loader, &[])
             .await
             .unwrap();
         let signed_wrong_del = wrong_del.set_proof(proof);
         assert!(!signed_inv
-            .verify(None, &dk, &signed_wrong_del)
+            .verify(None, &dk, &mut context_loader, &signed_wrong_del)
             .await
             .errors
             .is_empty());

@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::did_resolve::DIDResolver;
 use crate::error::Error;
-use crate::jsonld::{json_to_dataset, StaticLoader};
+use crate::jsonld::{ContextLoader, json_to_dataset};
 use crate::jwk::{JWTKeys, JWK};
 use crate::jws::Header;
 use crate::ldp::{
@@ -256,6 +256,7 @@ pub trait CredentialStatus: Sync {
         &self,
         credential: &Credential,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult;
 }
 
@@ -1058,8 +1059,9 @@ impl Credential {
         jwt: &str,
         options_opt: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
-        let (_vc, result) = Self::decode_verify_jwt(jwt, options_opt, resolver).await;
+        let (_vc, result) = Self::decode_verify_jwt(jwt, options_opt, resolver, context_loader).await;
         result
     }
 
@@ -1067,6 +1069,7 @@ impl Credential {
         jwt: &str,
         options_opt: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> (Option<Self>, VerificationResult) {
         let checks = options_opt
             .as_ref()
@@ -1178,7 +1181,7 @@ impl Credential {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vc, resolver).await;
+            let mut result = proof.verify(&vc, resolver, context_loader).await;
             results.append(&mut result);
             if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1186,7 +1189,7 @@ impl Credential {
             };
         }
         if checks.contains(&Check::CredentialStatus) {
-            results.append(&mut vc.check_status(resolver).await);
+            results.append(&mut vc.check_status(resolver, context_loader).await);
         }
         (Some(vc), results)
     }
@@ -1301,6 +1304,7 @@ impl Credential {
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         let checks = options
             .as_ref()
@@ -1319,7 +1323,7 @@ impl Credential {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver).await;
+            let mut result = proof.verify(self, resolver, context_loader).await;
             results.append(&mut result);
             if result.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1327,7 +1331,7 @@ impl Credential {
             };
         }
         if checks.contains(&Check::CredentialStatus) {
-            results.append(&mut self.check_status(resolver).await);
+            results.append(&mut self.check_status(resolver, context_loader).await);
         }
         results
     }
@@ -1340,8 +1344,9 @@ impl Credential {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, resolver, jwk, None).await
+        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, None).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -1351,8 +1356,9 @@ impl Credential {
         public_key: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, resolver, public_key, None).await
+        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1369,7 +1375,7 @@ impl Credential {
     }
 
     /// Check the credentials [status](https://www.w3.org/TR/vc-data-model/#status)
-    pub async fn check_status(&self, resolver: &dyn DIDResolver) -> VerificationResult {
+    pub async fn check_status(&self, resolver: &dyn DIDResolver, context_loader: &mut ContextLoader) -> VerificationResult {
         let status = match self.credential_status {
             Some(ref status) => status,
             None => return VerificationResult::error("Missing credentialStatus"),
@@ -1392,7 +1398,7 @@ impl Credential {
                 ))
             }
         };
-        let mut result = checkable_status.check(self, resolver).await;
+        let mut result = checkable_status.check(self, resolver, context_loader).await;
         if !result.errors.is_empty() {
             return result;
         }
@@ -1406,10 +1412,11 @@ impl CheckableStatus {
         &self,
         credential: &Credential,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         match self {
-            Self::RevocationList2020Status(status) => status.check(credential, resolver).await,
-            Self::StatusList2021Entry(status) => status.check(credential, resolver).await,
+            Self::RevocationList2020Status(status) => status.check(credential, resolver, context_loader).await,
+            Self::StatusList2021Entry(status) => status.check(credential, resolver, context_loader).await,
         }
     }
 }
@@ -1424,6 +1431,7 @@ impl LinkedDataDocument for Credential {
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        context_loader: &mut ContextLoader,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
@@ -1432,8 +1440,7 @@ impl LinkedDataDocument for Credential {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
     }
 
     fn to_value(&self) -> Result<Value, Error> {
@@ -1587,6 +1594,7 @@ impl Presentation {
         jwt: &str,
         options_opt: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> (Option<Self>, VerificationResult) {
         let checks = options_opt
             .as_ref()
@@ -1708,7 +1716,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vp, resolver).await;
+            let mut result = proof.verify(&vp, resolver, context_loader).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return (Some(vp), result);
@@ -1722,8 +1730,9 @@ impl Presentation {
         jwt: &str,
         options_opt: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
-        let (_vp, result) = Self::decode_verify_jwt(jwt, options_opt, resolver).await;
+        let (_vp, result) = Self::decode_verify_jwt(jwt, options_opt, resolver, context_loader).await;
         result
     }
 
@@ -1761,8 +1770,9 @@ impl Presentation {
         jwk: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, resolver, jwk, None).await
+        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, None).await
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -1772,8 +1782,9 @@ impl Presentation {
         public_key: &JWK,
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, resolver, public_key, None).await
+        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, None).await
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1849,6 +1860,7 @@ impl Presentation {
         &self,
         options: Option<LinkedDataProofOptions>,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
         let checks = options
             .as_ref()
@@ -1873,7 +1885,7 @@ impl Presentation {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver).await;
+            let mut result = proof.verify(self, resolver, context_loader).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -1955,6 +1967,7 @@ impl LinkedDataDocument for Presentation {
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        context_loader: &mut ContextLoader,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.proof = None;
@@ -1963,8 +1976,7 @@ impl LinkedDataDocument for Presentation {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        let mut loader = StaticLoader;
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await
+        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
     }
 
     fn to_value(&self) -> Result<Value, Error> {
@@ -2068,8 +2080,9 @@ impl Proof {
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver)
+        LinkedDataProofs::verify(self, document, resolver, context_loader)
             .await
             .into()
     }
@@ -2155,6 +2168,7 @@ impl LinkedDataDocument for Proof {
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        context_loader: &mut ContextLoader,
     ) -> Result<DataSet, Error> {
         let mut copy = self.clone();
         copy.jws = None;
@@ -2164,9 +2178,8 @@ impl LinkedDataDocument for Proof {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        let mut loader = StaticLoader;
         let dataset =
-            json_to_dataset(&json, more_contexts.as_ref(), false, None, &mut loader).await?;
+            json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?;
         verify_proof_consistency(self, &dataset)?;
         Ok(dataset)
     }
@@ -2552,8 +2565,9 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc_opt, verification_result) =
-            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         let _vc = vc_opt.unwrap();
         assert_eq!(verification_result.errors.len(), 0);
@@ -2596,8 +2610,9 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc1_opt, verification_result) =
-            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
         let vc1 = vc1_opt.unwrap();
@@ -2613,7 +2628,7 @@ pub(crate) mod tests {
             .await
             .unwrap();
         let (_vc_opt, verification_result) =
-            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() > 0);
     }
@@ -2654,8 +2669,9 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let (vc1_opt, verification_result) =
-            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample).await;
+            Credential::decode_verify_jwt(&signed_jwt, Some(options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
     }
@@ -2678,14 +2694,15 @@ pub(crate) mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDExample)
+            .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
@@ -2701,7 +2718,7 @@ pub(crate) mod tests {
             },
         }
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() >= 1);
     }
@@ -2725,14 +2742,15 @@ pub(crate) mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key3".to_string()));
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDExample)
+            .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
@@ -2748,7 +2766,7 @@ pub(crate) mod tests {
             },
         }
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() >= 1);
     }
@@ -2771,14 +2789,15 @@ pub(crate) mod tests {
 
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDExample)
+            .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
     }
@@ -2802,11 +2821,12 @@ pub(crate) mod tests {
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
         issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
 
         let preparation = vc
-            .prepare_proof(&public_key, &issue_options, &DIDExample)
+            .prepare_proof(&public_key, &issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         let signing_input = match preparation.signing_input {
@@ -2820,7 +2840,7 @@ pub(crate) mod tests {
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
@@ -2836,7 +2856,7 @@ pub(crate) mod tests {
             },
         }
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.len() >= 1);
     }
@@ -2866,6 +2886,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             async fn to_dataset_for_signing(
                 &self,
                 _parent: Option<&(dyn LinkedDataDocument + Sync)>,
+                _context_loader: &mut ContextLoader,
             ) -> Result<DataSet, Error> {
                 Err(Error::NotImplemented)
             }
@@ -2874,8 +2895,9 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 Ok(self.0.clone())
             }
         }
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let parent = ProofContexts(json!(["https://w3id.org/security/v1", DEFAULT_CONTEXT]));
-        let proof_dataset = proof.to_dataset_for_signing(Some(&parent)).await.unwrap();
+        let proof_dataset = proof.to_dataset_for_signing(Some(&parent), &mut context_loader).await.unwrap();
         let proof_dataset_normalized = urdna2015::normalize(&proof_dataset).unwrap();
         let proof_urdna2015 = proof_dataset_normalized.to_nquads().unwrap();
         eprintln!("proof:\n{}", proof_urdna2015);
@@ -2906,7 +2928,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
 "#;
         let vc: Credential = serde_json::from_str(credential_str).unwrap();
-        let credential_dataset = vc.to_dataset_for_signing(None).await.unwrap();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let credential_dataset = vc.to_dataset_for_signing(None, &mut context_loader).await.unwrap();
         let credential_dataset_normalized = urdna2015::normalize(&credential_dataset).unwrap();
         let credential_urdna2015 = credential_dataset_normalized.to_nquads().unwrap();
         eprintln!("credential:\n{}", credential_urdna2015);
@@ -2916,10 +2939,12 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[async_std::test]
     async fn credential_verify() {
-        good_vc(include_str!("../examples/vc.jsonld")).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        good_vc(include_str!("../examples/vc.jsonld"), &mut context_loader).await;
 
         let vc_jwt = include_str!("../examples/vc.jwt");
-        let (vc_opt, result) = Credential::decode_verify_jwt(vc_jwt, None, &DIDExample).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let (vc_opt, result) = Credential::decode_verify_jwt(vc_jwt, None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         let vc = vc_opt.unwrap();
         println!("{:#?}", vc);
@@ -2927,17 +2952,17 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(result.warnings.is_empty());
     }
 
-    async fn good_vc(vc_str: &str) {
+    async fn good_vc(vc_str: &str, context_loader: &mut ContextLoader) {
         let vc = Credential::from_json(vc_str).unwrap();
-        let result = vc.verify(None, &DIDExample).await;
+        let result = vc.verify(None, &DIDExample, context_loader).await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
     }
 
-    async fn bad_vc(vc_str: &str) {
+    async fn bad_vc(vc_str: &str, context_loader: &mut ContextLoader) {
         let vc = Credential::from_json(vc_str).unwrap();
-        let result = vc.verify(None, &DIDExample).await;
+        let result = vc.verify(None, &DIDExample, context_loader).await;
         println!("{:#?}", result);
         assert!(result.errors.len() > 0);
     }
@@ -2947,18 +2972,25 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // These test vectors were generated using examples/issue.rs with the verify part disabled,
         // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
         // object into the VC.
-        good_vc(include_str!("../examples/vc-jws2020-inline-context.jsonld")).await;
-        bad_vc(include_str!("../examples/vc-jws2020-bad-type.jsonld")).await;
-        bad_vc(include_str!("../examples/vc-jws2020-bad-purpose.jsonld")).await;
-        bad_vc(include_str!("../examples/vc-jws2020-bad-method.jsonld")).await;
-        bad_vc(include_str!("../examples/vc-jws2020-bad-type-json.jsonld")).await;
-        bad_vc(include_str!(
-            "../examples/vc-jws2020-bad-purpose-json.jsonld"
-        ))
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        good_vc(include_str!("../examples/vc-jws2020-inline-context.jsonld"), &mut context_loader).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-type.jsonld"), &mut context_loader).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-purpose.jsonld"), &mut context_loader).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-method.jsonld"), &mut context_loader).await;
+        bad_vc(include_str!("../examples/vc-jws2020-bad-type-json.jsonld"), &mut context_loader).await;
+        bad_vc(
+            include_str!(
+                "../examples/vc-jws2020-bad-purpose-json.jsonld"
+            ),
+            &mut context_loader,
+        )
         .await;
-        bad_vc(include_str!(
-            "../examples/vc-jws2020-bad-method-json.jsonld"
-        ))
+        bad_vc(
+            include_str!(
+                "../examples/vc-jws2020-bad-method-json.jsonld"
+            ),
+            &mut context_loader,
+        )
         .await;
     }
 
@@ -2969,7 +3001,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let mut vc: Value = serde_json::from_str(vc_str).unwrap();
         vc["newProp"] = json!("foo");
         let vc: Credential = serde_json::from_value(vc).unwrap();
-        let result = vc.verify(None, &DIDExample).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         assert!(!result.errors.is_empty());
         assert!(result.warnings.is_empty());
@@ -2982,7 +3015,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let vp = Presentation::from_json(vp_str).unwrap();
         let mut verify_options = LinkedDataProofOptions::default();
         verify_options.proof_purpose = Some(ProofPurpose::Authentication);
-        let result = vp.verify(Some(verify_options.clone()), &DIDExample).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let result = vp.verify(Some(verify_options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
@@ -2990,14 +3024,14 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             Some(CredentialOrJWT::Credential(vc)) => vc,
             _ => unreachable!(),
         };
-        let result = vc.verify(None, &DIDExample).await;
+        let result = vc.verify(None, &DIDExample, &mut context_loader).await;
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
 
         // LDP VC in JWT VP
         let vp_jwt = include_str!("../examples/vp.jwt");
         let (vp_opt, result) =
-            Presentation::decode_verify_jwt(vp_jwt, Some(verify_options.clone()), &DIDExample)
+            Presentation::decode_verify_jwt(vp_jwt, Some(verify_options.clone()), &DIDExample, &mut context_loader)
                 .await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
@@ -3007,14 +3041,14 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             Some(CredentialOrJWT::Credential(vc)) => vc,
             _ => unreachable!(),
         };
-        let result = vc.verify(None, &DIDExample).await;
+        let result = vc.verify(None, &DIDExample, &mut context_loader).await;
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
 
         // JWT VC in LDP VP
         let vp_str = include_str!("../examples/vp-jwtvc.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
-        let result = vp.verify(Some(verify_options.clone()), &DIDExample).await;
+        let result = vp.verify(Some(verify_options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
@@ -3022,14 +3056,14 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             Some(CredentialOrJWT::JWT(jwt)) => jwt,
             _ => unreachable!(),
         };
-        let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
+        let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample, &mut context_loader).await;
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
 
         // JWT VC in JWT VP
         let vp_jwt = include_str!("../examples/vp-jwtvc.jwt");
         let (vp_opt, result) =
-            Presentation::decode_verify_jwt(vp_jwt, Some(verify_options.clone()), &DIDExample)
+            Presentation::decode_verify_jwt(vp_jwt, Some(verify_options.clone()), &DIDExample, &mut context_loader)
                 .await;
         println!("{:#?}", result);
         let vp = vp_opt.unwrap();
@@ -3040,7 +3074,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             Some(CredentialOrJWT::JWT(jwt)) => jwt,
             _ => unreachable!(),
         };
-        let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
+        let result = Credential::verify_jwt(&vc_jwt, None, &DIDExample, &mut context_loader).await;
         assert!(result.errors.is_empty());
         assert!(result.warnings.is_empty());
     }
@@ -3095,9 +3129,10 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ..Default::default()
         };
 
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         // Issue unrevoked VC
         let proof = unrevoked_vc
-            .generate_proof(&key, &issue_options, &DIDExample)
+            .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -3106,7 +3141,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // Issue revoked VC
         let proof = revoked_vc
-            .generate_proof(&key, &issue_options, &DIDExample)
+            .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -3115,13 +3150,13 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // Verify unrevoked VC
         let verification_result = unrevoked_vc
-            .verify(Some(verify_options.clone()), &DIDExample)
+            .verify(Some(verify_options.clone()), &DIDExample, &mut context_loader)
             .await;
         println!("{:#?}", verification_result);
         assert_eq!(verification_result.errors.len(), 0);
 
         // Verify revoked VC
-        let verification_result = revoked_vc.verify(Some(verify_options), &DIDExample).await;
+        let verification_result = revoked_vc.verify(Some(verify_options), &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert_ne!(verification_result.errors.len(), 0);
     }
@@ -3154,7 +3189,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
           }
         }))
         .unwrap();
-        let vres = unrevoked_credential.check_status(&DIDExample).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let vres = unrevoked_credential.check_status(&DIDExample, &mut context_loader).await;
         println!("{:#?}", vres);
         assert_eq!(vres.errors.len(), 0);
 
@@ -3180,7 +3216,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
           }
         }))
         .unwrap();
-        let vres = revoked_credential.check_status(&DIDExample).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let vres = revoked_credential.check_status(&DIDExample, &mut context_loader).await;
         println!("{:#?}", vres);
         assert_ne!(vres.errors.len(), 0);
     }
@@ -3207,14 +3244,15 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
         vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
         vc_issue_options.checks = None;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let vc_proof = vc
-            .generate_proof(&key, &vc_issue_options, &DIDExample)
+            .generate_proof(&key, &vc_issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         vc.add_proof(vc_proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         vc.validate().unwrap();
-        let vc_verification_result = vc.verify(None, &DIDExample).await;
+        let vc_verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", vc_verification_result);
         assert!(vc_verification_result.errors.is_empty());
 
@@ -3224,7 +3262,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .generate_jwt(Some(&key), &vc_issue_options, &DIDExample)
             .await
             .unwrap();
-        let vc_verification_result = Credential::verify_jwt(&vc_jwt, None, &DIDExample).await;
+        let vc_verification_result = Credential::verify_jwt(&vc_jwt, None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", vc_verification_result);
         assert!(vc_verification_result.errors.is_empty());
 
@@ -3247,13 +3285,13 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
         let vp_proof = vp
-            .generate_proof(&key, &vp_issue_options, &DIDExample)
+            .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
             .await
             .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDExample).await;
+        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDExample, &mut context_loader).await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -3269,7 +3307,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             _ => unreachable!(),
         }
         let vp_verification_result = vp1
-            .verify(Some(vp_issue_options.clone()), &DIDExample)
+            .verify(Some(vp_issue_options.clone()), &DIDExample, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
@@ -3277,7 +3315,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDExample).await.errors.len() > 0);
+        assert!(vp2.verify(None, &DIDExample, &mut context_loader).await.errors.len() > 0);
 
         // Test JWT VP
         let vp_jwt_issue_options = LinkedDataProofOptions {
@@ -3295,7 +3333,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ..Default::default()
         };
         let verification_result =
-            Presentation::verify_jwt(&vp_jwt, Some(vp_jwt_verify_options.clone()), &DIDExample)
+            Presentation::verify_jwt(&vp_jwt, Some(vp_jwt_verify_options.clone()), &DIDExample, &mut context_loader)
                 .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -3305,6 +3343,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             &vp_jwt_bad,
             Some(vp_jwt_verify_options.clone()),
             &DIDExample,
+            &mut context_loader,
         )
         .await;
         assert!(verification_result.errors.len() > 0);
@@ -3318,14 +3357,14 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // LDP VP
         let proof = vp_jwtvc
-            .generate_proof(&key, &vp_issue_options.clone(), &DIDExample)
+            .generate_proof(&key, &vp_issue_options.clone(), &DIDExample, &mut context_loader)
             .await
             .unwrap();
         let mut vp_jwtvc_ldp = vp_jwtvc.clone();
         vp_jwtvc_ldp.add_proof(proof);
         let vp_verify_options = vp_issue_options.clone();
         let verification_result = vp_jwtvc_ldp
-            .verify(Some(vp_verify_options.clone()), &DIDExample)
+            .verify(Some(vp_verify_options.clone()), &DIDExample, &mut context_loader)
             .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -3336,7 +3375,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await
             .unwrap();
         let verification_result =
-            Presentation::verify_jwt(&vp_vc_jwt, Some(vp_jwt_verify_options.clone()), &DIDExample)
+            Presentation::verify_jwt(&vp_vc_jwt, Some(vp_jwt_verify_options.clone()), &DIDExample, &mut context_loader)
                 .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
