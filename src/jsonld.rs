@@ -401,15 +401,17 @@ pub struct ContextLoader {
 
 impl std::fmt::Debug for ContextLoader {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("ContextLoader")
-         .finish_non_exhaustive()
+        f.debug_struct("ContextLoader").finish_non_exhaustive()
     }
 }
 
 impl ContextLoader {
     /// Constructs an "empty" ContextLoader.
     pub fn empty() -> Self {
-        Self { static_loader: None, context_map: None }
+        Self {
+            static_loader: None,
+            context_map: None,
+        }
     }
     /// Using the builder pattern, the StaticLoader can be enabled so that contexts are checked
     /// against it before being checked against context_map.
@@ -420,16 +422,20 @@ impl ContextLoader {
     /// Using the builder pattern, the map of additional contexts can be set.  These context objects
     /// will be checked after StaticLoader (if it's specified).  preparsed_context_map should map
     /// the context URLs to their JSON content.
-    pub fn with_context_map_from(mut self, preparsed_context_map: HashMap<String, String>) -> Result<Self, Error> {
-        let context_map =
-            preparsed_context_map
-                .iter()
-                .map(|(url, jsonld)| -> Result<(String, RemoteDocument<JsonValue>), Error> {
+    pub fn with_context_map_from(
+        mut self,
+        preparsed_context_map: HashMap<String, String>,
+    ) -> Result<Self, Error> {
+        let context_map = preparsed_context_map
+            .iter()
+            .map(
+                |(url, jsonld)| -> Result<(String, RemoteDocument<JsonValue>), Error> {
                     let doc = json::parse(jsonld)?;
                     let iri = Iri::new(url)?;
                     Ok((url.clone(), RemoteDocument::new(doc, iri)))
-                })
-                .collect::<Result<HashMap<String, RemoteDocument<JsonValue>>, Error>>()?;
+                },
+            )
+            .collect::<Result<HashMap<String, RemoteDocument<JsonValue>>, Error>>()?;
         self.context_map = Some(Arc::new(RwLock::new(context_map)));
         Ok(self)
     }
@@ -438,7 +444,10 @@ impl ContextLoader {
 /// The default ContextLoader only uses StaticLoader.
 impl std::default::Default for ContextLoader {
     fn default() -> Self {
-        Self { static_loader: Some(StaticLoader), context_map: None }
+        Self {
+            static_loader: Some(StaticLoader),
+            context_map: None,
+        }
     }
 }
 
@@ -474,9 +483,7 @@ impl Loader for ContextLoader {
                     .await
                     .get(url_buf.as_str())
                     .map(|rd| rd.clone())
-                    .ok_or_else(|| {
-                        json_ld::ErrorCode::LoadingDocumentFailed.into()
-                    })
+                    .ok_or_else(|| json_ld::ErrorCode::LoadingDocumentFailed.into())
             } else {
                 Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
             }
