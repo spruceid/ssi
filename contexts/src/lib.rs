@@ -55,6 +55,8 @@ pub const VDL_V1: &str = include_str!("../w3id-vdl-v1.jsonld");
 pub const WALLET_V1: &str = include_str!("../w3id-wallet-v1.jsonld");
 /// <https://w3id.org/zcap/v1>
 pub const ZCAP_V1: &str = include_str!("../w3id-zcap-v1.jsonld");
+/// <https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json>
+pub const CACAO_ZCAP_V1: &str = include_str!("../cacao-zcap-v1.jsonld");
 
 pub const TZ_V2: &str = include_str!("../tz-2021-v2.jsonld");
 pub const TZVM_V1: &str = include_str!("../tzvm-2021-v1.jsonld");

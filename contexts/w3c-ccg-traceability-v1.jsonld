@@ -706,7 +706,29 @@
     },
     "Entity": {
       "@id": "https://w3id.org/traceability#Entity",
-      "@context": {}
+      "@context": {
+        "name": {
+          "@id": "https://schema.org/name"
+        },
+        "legalName": {
+          "@id": "https://schema.org/legalName"
+        },
+        "url": {
+          "@id": "https://schema.org/url"
+        },
+        "taxId": {
+          "@id": "https://schema.org/taxID"
+        },
+        "address": {
+          "@id": "https://schema.org/PostalAddress"
+        },
+        "email": {
+          "@id": "https://schema.org/email"
+        },
+        "phoneNumber": {
+          "@id": "https://schema.org/telephone"
+        }
+      }
     },
     "EntrySummary": {
       "@id": "https://w3id.org/traceability#EntrySummary",

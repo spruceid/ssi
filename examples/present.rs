@@ -44,14 +44,15 @@ async fn main() {
     proof_options.proof_purpose = Some(ssi::vc::ProofPurpose::Authentication);
     proof_options.challenge = Some("example".to_string());
 
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     match &proof_format_out[..] {
         "ldp" => {
             let proof = vp
-                .generate_proof(&key, &proof_options, resolver)
+                .generate_proof(&key, &proof_options, resolver, &mut context_loader)
                 .await
                 .unwrap();
             vp.add_proof(proof);
-            let result = vp.verify(Some(proof_options), resolver).await;
+            let result = vp.verify(Some(proof_options), resolver, &mut context_loader).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }
@@ -66,7 +67,7 @@ async fn main() {
                 .await
                 .unwrap();
             print!("{}", jwt);
-            let result = ssi::vc::Presentation::verify_jwt(&jwt, None, resolver).await;
+            let result = ssi::vc::Presentation::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }

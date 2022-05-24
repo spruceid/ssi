@@ -17,6 +17,7 @@ use crate::did_resolve::{dereference, Content, DIDResolver, DereferencingInputMe
 use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
+use crate::jsonld::ContextLoader;
 use crate::jwk::Base64urlUInt;
 use crate::jwk::{Algorithm, Params as JWKParams, JWK};
 use crate::jws::Header;
@@ -216,6 +217,7 @@ pub trait LinkedDataDocument {
     async fn to_dataset_for_signing(
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
+        context_loader: &mut ContextLoader,
     ) -> Result<DataSet, Error>;
 }
 
@@ -227,6 +229,7 @@ pub trait ProofSuite {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error>;
@@ -236,6 +239,7 @@ pub trait ProofSuite {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error>;
@@ -251,6 +255,7 @@ pub trait ProofSuite {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error>;
 }
 
@@ -367,6 +372,7 @@ impl LinkedDataProofs {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -381,7 +387,7 @@ impl LinkedDataProofs {
         let mut options = options.clone();
         ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         suite
-            .sign(document, &options, resolver, key, extra_proof_properties)
+            .sign(document, &options, resolver, context_loader, key, extra_proof_properties)
             .await
     }
 
@@ -391,6 +397,7 @@ impl LinkedDataProofs {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -410,6 +417,7 @@ impl LinkedDataProofs {
                 document,
                 &options,
                 resolver,
+                context_loader,
                 public_key,
                 extra_proof_properties,
             )
@@ -421,9 +429,10 @@ impl LinkedDataProofs {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let suite = get_proof_suite(proof.type_.as_str())?;
-        suite.verify(proof, document, resolver).await
+        suite.verify(proof, document, resolver, context_loader).await
     }
 }
 
@@ -462,9 +471,10 @@ pub async fn resolve_vm(
 async fn to_jws_payload(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
+    context_loader: &mut ContextLoader,
 ) -> Result<Vec<u8>, Error> {
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
-    let doc_dataset = document.to_dataset_for_signing(None).await?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document), context_loader).await?;
+    let doc_dataset = document.to_dataset_for_signing(None, context_loader).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
@@ -483,6 +493,7 @@ async fn sign(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
     _resolver: &dyn DIDResolver,
+    context_loader: &mut ContextLoader,
     key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -496,7 +507,7 @@ async fn sign(
     let proof = Proof::new(type_)
         .with_options(options)
         .with_properties(extra_proof_properties);
-    sign_proof(document, proof, key, algorithm).await
+    sign_proof(document, proof, key, algorithm, context_loader).await
 }
 
 async fn sign_proof(
@@ -504,8 +515,9 @@ async fn sign_proof(
     mut proof: Proof,
     key: &JWK,
     algorithm: Algorithm,
+    context_loader: &mut ContextLoader,
 ) -> Result<Proof, Error> {
-    let message = to_jws_payload(document, &proof).await?;
+    let message = to_jws_payload(document, &proof, context_loader).await?;
     let jws = crate::jws::detached_sign_unencoded_payload(algorithm, &message, key)?;
     proof.jws = Some(jws);
     Ok(proof)
@@ -514,6 +526,7 @@ async fn sign_proof(
 async fn sign_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
+    context_loader: &mut ContextLoader,
     key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -531,7 +544,7 @@ async fn sign_nojws(
     if !document_has_context(document, context_uri)? {
         proof.context = serde_json::json!([context_uri]);
     }
-    let message = to_jws_payload(document, &proof).await?;
+    let message = to_jws_payload(document, &proof, context_loader).await?;
     let sig = crate::jws::sign_bytes(algorithm, &message, key)?;
     let sig_multibase = multibase::encode(multibase::Base::Base58Btc, sig);
     proof.proof_value = Some(sig_multibase);
@@ -542,6 +555,7 @@ async fn prepare(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
     _resolver: &dyn DIDResolver,
+    context_loader: &mut ContextLoader,
     public_key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -555,15 +569,16 @@ async fn prepare(
     let proof = Proof::new(type_)
         .with_options(options)
         .with_properties(extra_proof_properties);
-    prepare_proof(document, proof, algorithm).await
+    prepare_proof(document, proof, algorithm, context_loader).await
 }
 
 async fn prepare_proof(
     document: &(dyn LinkedDataDocument + Sync),
     proof: Proof,
     algorithm: Algorithm,
+    context_loader: &mut ContextLoader,
 ) -> Result<ProofPreparation, Error> {
-    let message = to_jws_payload(document, &proof).await?;
+    let message = to_jws_payload(document, &proof, context_loader).await?;
     let (jws_header, signing_input) =
         crate::jws::prepare_detached_unencoded_payload(algorithm, &message)?;
     Ok(ProofPreparation {
@@ -576,6 +591,7 @@ async fn prepare_proof(
 async fn prepare_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
+    context_loader: &mut ContextLoader,
     public_key: &JWK,
     type_: &str,
     algorithm: Algorithm,
@@ -593,7 +609,7 @@ async fn prepare_nojws(
     if !document_has_context(document, context_uri)? {
         proof.context = serde_json::json!([context_uri]);
     }
-    let message = to_jws_payload(document, &proof).await?;
+    let message = to_jws_payload(document, &proof, context_loader).await?;
     Ok(ProofPreparation {
         proof,
         jws_header: None,
@@ -617,6 +633,7 @@ async fn verify(
     proof: &Proof,
     document: &(dyn LinkedDataDocument + Sync),
     resolver: &dyn DIDResolver,
+    context_loader: &mut ContextLoader,
 ) -> Result<VerificationWarnings, Error> {
     let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let verification_method = proof
@@ -624,7 +641,7 @@ async fn verify(
         .as_ref()
         .ok_or(Error::MissingVerificationMethod)?;
     let key = resolve_key(verification_method, resolver).await?;
-    let message = to_jws_payload(document, proof).await?;
+    let message = to_jws_payload(document, proof, context_loader).await?;
     crate::jws::detached_verify(jws, &message, &key)?;
     Ok(Default::default())
 }
@@ -633,6 +650,7 @@ async fn verify_nojws(
     proof: &Proof,
     document: &(dyn LinkedDataDocument + Sync),
     resolver: &dyn DIDResolver,
+    context_loader: &mut ContextLoader,
     algorithm: Algorithm,
 ) -> Result<VerificationWarnings, Error> {
     let proof_value = proof
@@ -644,7 +662,7 @@ async fn verify_nojws(
         .as_ref()
         .ok_or(Error::MissingVerificationMethod)?;
     let key = resolve_key(verification_method, resolver).await?;
-    let message = to_jws_payload(document, proof).await?;
+    let message = to_jws_payload(document, proof, context_loader).await?;
     let (_base, sig) = multibase::decode(proof_value)?;
     crate::jws::verify_bytes_warnable(algorithm, &message, &key, &sig)
 }
@@ -658,6 +676,7 @@ impl ProofSuite for RsaSignature2018 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -665,6 +684,7 @@ impl ProofSuite for RsaSignature2018 {
             document,
             options,
             resolver,
+            context_loader,
             key,
             "RsaSignature2018",
             Algorithm::RS256,
@@ -677,6 +697,7 @@ impl ProofSuite for RsaSignature2018 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -684,6 +705,7 @@ impl ProofSuite for RsaSignature2018 {
             document,
             options,
             resolver,
+            context_loader,
             public_key,
             "RsaSignature2018",
             Algorithm::RS256,
@@ -696,8 +718,9 @@ impl ProofSuite for RsaSignature2018 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
-        verify(proof, document, resolver).await
+        verify(proof, document, resolver, context_loader).await
     }
     async fn complete(
         &self,
@@ -717,6 +740,7 @@ impl ProofSuite for Ed25519Signature2018 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -724,6 +748,7 @@ impl ProofSuite for Ed25519Signature2018 {
             document,
             options,
             resolver,
+            context_loader,
             key,
             "Ed25519Signature2018",
             Algorithm::EdDSA,
@@ -736,6 +761,7 @@ impl ProofSuite for Ed25519Signature2018 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -743,6 +769,7 @@ impl ProofSuite for Ed25519Signature2018 {
             document,
             options,
             resolver,
+            context_loader,
             public_key,
             "Ed25519Signature2018",
             Algorithm::EdDSA,
@@ -755,8 +782,9 @@ impl ProofSuite for Ed25519Signature2018 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
-        verify(proof, document, resolver).await
+        verify(proof, document, resolver, context_loader).await
     }
     async fn complete(
         &self,
@@ -776,12 +804,14 @@ impl ProofSuite for Ed25519Signature2020 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         sign_nojws(
             document,
             options,
+            context_loader,
             key,
             "Ed25519Signature2020",
             Algorithm::EdDSA,
@@ -795,20 +825,23 @@ impl ProofSuite for Ed25519Signature2020 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
-        verify_nojws(proof, document, resolver, Algorithm::EdDSA).await
+        verify_nojws(proof, document, resolver, context_loader, Algorithm::EdDSA).await
     }
     async fn prepare(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         prepare_nojws(
             document,
             options,
+            context_loader,
             public_key,
             "Ed25519Signature2020",
             Algorithm::EdDSA,
@@ -837,6 +870,7 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -844,6 +878,7 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
             document,
             options,
             resolver,
+            context_loader,
             key,
             "EcdsaSecp256k1Signature2019",
             Algorithm::ES256K,
@@ -856,6 +891,7 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -863,6 +899,7 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
             document,
             options,
             resolver,
+            context_loader,
             public_key,
             "EcdsaSecp256k1Signature2019",
             Algorithm::ES256K,
@@ -875,8 +912,9 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
-        verify(proof, document, resolver).await
+        verify(proof, document, resolver, context_loader).await
     }
     async fn complete(
         &self,
@@ -896,6 +934,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -915,7 +954,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        sign_proof(document, proof, key, Algorithm::ES256KR).await
+        sign_proof(document, proof, key, Algorithm::ES256KR, context_loader).await
     }
 
     async fn prepare(
@@ -923,6 +962,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -937,7 +977,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        prepare_proof(document, proof, Algorithm::ES256KR).await
+        prepare_proof(document, proof, Algorithm::ES256KR, context_loader).await
     }
 
     async fn complete(
@@ -953,6 +993,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let verification_method = proof
@@ -966,7 +1007,7 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         {
             return Err(Error::VerificationMethodMismatch);
         }
-        let message = to_jws_payload(document, proof).await?;
+        let message = to_jws_payload(document, proof, context_loader).await?;
         let (_header, jwk) = crate::jws::detached_recover(jws, &message)?;
         let mut warnings = VerificationWarnings::default();
         if let Err(_e) = vm.match_jwk(&jwk) {
@@ -992,6 +1033,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1015,7 +1057,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        sign_proof(document, proof, key, Algorithm::EdBlake2b).await
+        sign_proof(document, proof, key, Algorithm::EdBlake2b, context_loader).await
     }
 
     async fn prepare(
@@ -1023,6 +1065,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1040,7 +1083,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        prepare_proof(document, proof, Algorithm::EdBlake2b).await
+        prepare_proof(document, proof, Algorithm::EdBlake2b, context_loader).await
     }
 
     async fn complete(
@@ -1056,6 +1099,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
@@ -1072,7 +1116,7 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(verification_method, resolver).await?;
         vm.match_jwk(&jwk)?;
-        let message = to_jws_payload(document, proof).await?;
+        let message = to_jws_payload(document, proof, context_loader).await?;
         crate::jws::detached_verify(jws, &message, &jwk)?;
         Ok(Default::default())
     }
@@ -1088,6 +1132,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1110,7 +1155,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        sign_proof(document, proof, key, Algorithm::ESBlake2b).await
+        sign_proof(document, proof, key, Algorithm::ESBlake2b, context_loader).await
     }
 
     async fn prepare(
@@ -1118,6 +1163,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1135,7 +1181,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        prepare_proof(document, proof, Algorithm::ESBlake2b).await
+        prepare_proof(document, proof, Algorithm::ESBlake2b, context_loader).await
     }
 
     async fn complete(
@@ -1151,6 +1197,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let jwk: JWK = match proof.property_set {
@@ -1167,7 +1214,7 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
             .ok_or(Error::MissingVerificationMethod)?;
         let vm = resolve_vm(verification_method, resolver).await?;
         vm.match_jwk(&jwk)?;
-        let message = to_jws_payload(document, proof).await?;
+        let message = to_jws_payload(document, proof, context_loader).await?;
         crate::jws::detached_verify(jws, &message, &jwk)?;
         Ok(Default::default())
     }
@@ -1184,6 +1231,7 @@ impl ProofSuite for Eip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1194,7 +1242,7 @@ impl ProofSuite for Eip712Signature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let typed_data = TypedData::from_document_and_options(document, &proof).await?;
+        let typed_data = TypedData::from_document_and_options(document, &proof, context_loader).await?;
         let bytes = typed_data.bytes()?;
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
@@ -1216,6 +1264,7 @@ impl ProofSuite for Eip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1225,7 +1274,7 @@ impl ProofSuite for Eip712Signature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let typed_data = TypedData::from_document_and_options(document, &proof).await?;
+        let typed_data = TypedData::from_document_and_options(document, &proof, context_loader).await?;
         Ok(ProofPreparation {
             proof,
             jws_header: None,
@@ -1248,6 +1297,7 @@ impl ProofSuite for Eip712Signature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
@@ -1264,7 +1314,7 @@ impl ProofSuite for Eip712Signature2021 {
             "EcdsaSecp256k1RecoveryMethod2020" => (),
             _ => return Err(Error::VerificationMethodMismatch),
         };
-        let typed_data = TypedData::from_document_and_options(document, proof).await?;
+        let typed_data = TypedData::from_document_and_options(document, proof, context_loader).await?;
         let bytes = typed_data.bytes()?;
         if !sig_hex.starts_with("0x") {
             return Err(Error::HexString);
@@ -1305,6 +1355,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        _context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1345,6 +1396,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        _context_loader: &mut ContextLoader,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1384,6 +1436,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        _context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
@@ -1439,6 +1492,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1449,7 +1503,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let signing_string = string_from_document_and_options(document, &proof).await?;
+        let signing_string = string_from_document_and_options(document, &proof, context_loader).await?;
         let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
@@ -1471,6 +1525,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1480,7 +1535,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let signing_string = string_from_document_and_options(document, &proof).await?;
+        let signing_string = string_from_document_and_options(document, &proof, context_loader).await?;
         Ok(ProofPreparation {
             proof,
             jws_header: None,
@@ -1505,6 +1560,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
@@ -1527,7 +1583,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
-        let signing_string = string_from_document_and_options(document, proof).await?;
+        let signing_string = string_from_document_and_options(document, proof, context_loader).await?;
         let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
         let recovered_key = sig.recover_verify_key(&hash)?;
         use crate::jwk::ECParams;
@@ -1552,9 +1608,10 @@ impl ProofSuite for EthereumPersonalSignature2021 {
 async fn micheline_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
+    context_loader: &mut ContextLoader,
 ) -> Result<Vec<u8>, Error> {
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
-    let doc_dataset = document.to_dataset_for_signing(None).await?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document), context_loader).await?;
+    let doc_dataset = document.to_dataset_for_signing(None, context_loader).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
@@ -1583,9 +1640,10 @@ async fn micheline_from_document_and_options_jcs(
 async fn string_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
+    context_loader: &mut ContextLoader,
 ) -> Result<String, Error> {
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document)).await?;
-    let doc_dataset = document.to_dataset_for_signing(None).await?;
+    let sigopts_dataset = proof.to_dataset_for_signing(Some(document), context_loader).await?;
+    let doc_dataset = document.to_dataset_for_signing(None, context_loader).await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
@@ -1603,6 +1661,7 @@ impl ProofSuite for TezosSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1618,7 +1677,7 @@ impl ProofSuite for TezosSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let micheline = micheline_from_document_and_options(document, &proof, context_loader).await?;
         let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
         let mut sig_prefixed = Vec::new();
         let prefix: &[u8] = match algorithm {
@@ -1639,6 +1698,7 @@ impl ProofSuite for TezosSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1655,7 +1715,7 @@ impl ProofSuite for TezosSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let micheline = micheline_from_document_and_options(document, &proof, context_loader).await?;
         let micheline_string = hex::encode(micheline);
         Ok(ProofPreparation {
             proof,
@@ -1681,6 +1741,7 @@ impl ProofSuite for TezosSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_bs58 = proof
             .proof_value
@@ -1704,7 +1765,7 @@ impl ProofSuite for TezosSignature2021 {
             return Err(Error::VerificationMethodMismatch);
         }
 
-        let micheline = micheline_from_document_and_options(document, proof).await?;
+        let micheline = micheline_from_document_and_options(document, proof, context_loader).await?;
         let account_id_opt: Option<BlockchainAccountId> = match vm.blockchain_account_id {
             Some(account_id_string) => Some(account_id_string.parse()?),
             None => None,
@@ -1741,6 +1802,7 @@ impl ProofSuite for TezosJcsSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1757,7 +1819,7 @@ impl ProofSuite for TezosJcsSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        let micheline = micheline_from_document_and_options(document, &proof).await?;
+        let micheline = micheline_from_document_and_options(document, &proof, context_loader).await?;
         let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
         let mut sig_prefixed = Vec::new();
         let prefix: &[u8] = match algorithm {
@@ -1778,6 +1840,7 @@ impl ProofSuite for TezosJcsSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        _context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1822,6 +1885,7 @@ impl ProofSuite for TezosJcsSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        _context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_bs58 = proof
             .proof_value
@@ -1895,6 +1959,7 @@ impl ProofSuite for SolanaSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -1904,7 +1969,7 @@ impl ProofSuite for SolanaSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let message = to_jws_payload(document, &proof).await?;
+        let message = to_jws_payload(document, &proof, context_loader).await?;
         let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
         let bytes = tx.to_bytes();
         let sig = crate::jws::sign_bytes(Algorithm::EdDSA, &bytes, key)?;
@@ -1918,6 +1983,7 @@ impl ProofSuite for SolanaSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -1927,7 +1993,7 @@ impl ProofSuite for SolanaSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let message = to_jws_payload(document, &proof).await?;
+        let message = to_jws_payload(document, &proof, context_loader).await?;
         let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
         let bytes = tx.to_bytes();
         Ok(ProofPreparation {
@@ -1952,6 +2018,7 @@ impl ProofSuite for SolanaSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_b58 = proof
             .proof_value
@@ -1966,7 +2033,7 @@ impl ProofSuite for SolanaSignature2021 {
             return Err(Error::VerificationMethodMismatch);
         }
         let key = vm.public_key_jwk.ok_or(Error::MissingKey)?;
-        let message = to_jws_payload(document, proof).await?;
+        let message = to_jws_payload(document, proof, context_loader).await?;
         let tx = crate::soltx::LocalSolanaTransaction::with_message(&message);
         let bytes = tx.to_bytes();
         let sig = bs58::decode(&sig_b58).into_vec()?;
@@ -2037,6 +2104,7 @@ impl ProofSuite for AleoSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -2051,7 +2119,7 @@ impl ProofSuite for AleoSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let message = to_jws_payload(document, &proof).await?;
+        let message = to_jws_payload(document, &proof, context_loader).await?;
         let sig = crate::aleo::sign(&message, &key)?;
         let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
         proof.proof_value = Some(sig_mb);
@@ -2063,6 +2131,7 @@ impl ProofSuite for AleoSignature2021 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -2072,7 +2141,7 @@ impl ProofSuite for AleoSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let message = to_jws_payload(document, &proof).await?;
+        let message = to_jws_payload(document, &proof, context_loader).await?;
         Ok(ProofPreparation {
             proof,
             jws_header: None,
@@ -2095,6 +2164,7 @@ impl ProofSuite for AleoSignature2021 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         const NETWORK_ID: &str = "1";
         const NAMESPACE: &str = "aleo";
@@ -2125,7 +2195,7 @@ impl ProofSuite for AleoSignature2021 {
                 account_id.chain_id.namespace.to_string(),
             ));
         }
-        let message = to_jws_payload(document, proof).await?;
+        let message = to_jws_payload(document, proof, context_loader).await?;
         crate::aleo::verify(&message, &account_id.account_address, &sig)?;
         Ok(Default::default())
     }
@@ -2140,6 +2210,7 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -2147,6 +2218,7 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
             document,
             options,
             resolver,
+            context_loader,
             key,
             "EcdsaSecp256r1Signature2019",
             Algorithm::ES256,
@@ -2159,6 +2231,7 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -2166,6 +2239,7 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
             document,
             options,
             resolver,
+            context_loader,
             public_key,
             "EcdsaSecp256r1Signature2019",
             Algorithm::ES256,
@@ -2178,8 +2252,9 @@ impl ProofSuite for EcdsaSecp256r1Signature2019 {
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
-        verify(proof, document, resolver).await
+        verify(proof, document, resolver, context_loader).await
     }
     async fn complete(
         &self,
@@ -2210,6 +2285,7 @@ impl ProofSuite for JsonWebSignature2020 {
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -2226,13 +2302,14 @@ impl ProofSuite for JsonWebSignature2020 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        sign_proof(document, proof, key, algorithm).await
+        sign_proof(document, proof, key, algorithm, context_loader).await
     }
     async fn prepare(
         &self,
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
         _resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -2249,13 +2326,14 @@ impl ProofSuite for JsonWebSignature2020 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        prepare_proof(document, proof, algorithm).await
+        prepare_proof(document, proof, algorithm, context_loader).await
     }
     async fn verify(
         &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let jws = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
         let verification_method = proof
@@ -2263,7 +2341,7 @@ impl ProofSuite for JsonWebSignature2020 {
             .as_ref()
             .ok_or(Error::MissingVerificationMethod)?;
         let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
-        let message = to_jws_payload(document, proof).await?;
+        let message = to_jws_payload(document, proof, context_loader).await?;
         let crate::jws::DecodedJWS {
             header,
             signing_input,
@@ -2359,6 +2437,7 @@ mod tests {
         async fn to_dataset_for_signing(
             &self,
             _parent: Option<&(dyn LinkedDataDocument + Sync)>,
+            _context_loader: &mut ContextLoader,
         ) -> Result<DataSet, Error> {
             use crate::rdf;
             let mut dataset = DataSet::default();
@@ -2392,8 +2471,9 @@ mod tests {
             ..Default::default()
         };
         let resolver = DIDExample;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         let doc = ExampleDocument;
-        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
+        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
     }
@@ -2410,7 +2490,8 @@ mod tests {
         };
         let doc = ExampleDocument;
         let resolver = DIDExample;
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
@@ -2430,7 +2511,8 @@ mod tests {
         };
         let doc = ExampleDocument;
         let resolver = DIDExample;
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
@@ -2449,7 +2531,8 @@ mod tests {
         };
         let doc = ExampleDocument;
         let resolver = DIDExample;
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &key, None)
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
@@ -2555,8 +2638,9 @@ mod tests {
         for proof in vc.proof.iter().flatten() {
             n_proofs += 1;
             let resolver = ExampleResolver;
+            let mut context_loader = crate::jsonld::ContextLoader::default();
             let warnings = EcdsaSecp256k1RecoverySignature2020
-                .verify(&proof, &vc, &resolver)
+                .verify(&proof, &vc, &resolver, &mut context_loader)
                 .await
                 .unwrap();
             assert!(warnings.is_empty());
@@ -2680,23 +2764,24 @@ mod tests {
         };
 
         let resolver = ED2020ExampleResolver { issuer_document };
+        let mut context_loader = crate::jsonld::ContextLoader::default();
 
         println!("{}", serde_json::to_string(&vc).unwrap());
         // reissue VC
         let new_proof = Ed25519Signature2020
-            .sign(&vc, &issue_options, &resolver, &sk_jwk, None)
+            .sign(&vc, &issue_options, &resolver, &mut context_loader, &sk_jwk, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&new_proof).unwrap());
 
         // check new VC proof and original proof
         Ed25519Signature2020
-            .verify(&new_proof, &vc, &resolver)
+            .verify(&new_proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
         let orig_proof = vc.proof.iter().flatten().next().unwrap();
         Ed25519Signature2020
-            .verify(orig_proof, &vc, &resolver)
+            .verify(orig_proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
 
@@ -2711,26 +2796,26 @@ mod tests {
             ..Default::default()
         };
         let new_proof = Ed25519Signature2020
-            .sign(&vp, &vp_issue_options, &resolver, &sk_jwk, None)
+            .sign(&vp, &vp_issue_options, &resolver, &mut context_loader, &sk_jwk, None)
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&new_proof).unwrap());
 
         // check new VP proof and original proof
         Ed25519Signature2020
-            .verify(&new_proof, &vp, &resolver)
+            .verify(&new_proof, &vp, &resolver, &mut context_loader)
             .await
             .unwrap();
         let orig_proof = vp.proof.iter().flatten().next().unwrap();
         Ed25519Signature2020
-            .verify(orig_proof, &vp, &resolver)
+            .verify(orig_proof, &vp, &resolver, &mut context_loader)
             .await
             .unwrap();
 
         // Try using prepare/complete
         let pk_jwk = sk_jwk.to_public();
         let prep = Ed25519Signature2020
-            .prepare(&vp, &vp_issue_options, &resolver, &pk_jwk, None)
+            .prepare(&vp, &vp_issue_options, &resolver, &mut context_loader, &pk_jwk, None)
             .await
             .unwrap();
         let signing_input_bytes = match prep.signing_input {
@@ -2741,7 +2826,7 @@ mod tests {
         let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
         let completed_proof = Ed25519Signature2020.complete(prep, &sig_mb).await.unwrap();
         Ed25519Signature2020
-            .verify(&completed_proof, &vp, &resolver)
+            .verify(&completed_proof, &vp, &resolver, &mut context_loader)
             .await
             .unwrap();
     }
@@ -2801,6 +2886,7 @@ mod tests {
         let vc_str = include_str!("../tests/lds-aleo2021-vc0.jsonld");
         let mut vc = Credential::from_json_unsigned(vc_str).unwrap();
         let resolver = ExampleResolver;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
 
         if vc.proof.iter().flatten().next().is_none() {
             // Issue VC / Generate Test Vector
@@ -2811,7 +2897,7 @@ mod tests {
                 ..Default::default()
             };
             let proof = AleoSignature2021
-                .sign(&vc, &vc_issue_options, &resolver, &private_key, None)
+                .sign(&vc, &vc_issue_options, &resolver, &mut context_loader, &private_key, None)
                 .await
                 .unwrap();
             credential.add_proof(proof.clone());
@@ -2828,7 +2914,7 @@ mod tests {
         // Verify VC
         let proof = vc.proof.iter().flatten().next().unwrap();
         let warnings = AleoSignature2021
-            .verify(&proof, &vc, &resolver)
+            .verify(&proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
         assert!(warnings.is_empty());

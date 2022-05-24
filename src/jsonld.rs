@@ -1,8 +1,9 @@
 //! [JSON-LD](https://www.w3.org/TR/json-ld11/) functionality
 
-use std::collections::BTreeMap as Map;
+use std::collections::{BTreeMap as Map, HashMap};
 use std::convert::TryFrom;
 use std::str::FromStr;
+use std::sync::Arc;
 
 use crate::error::Error;
 use crate::rdf::{
@@ -10,6 +11,7 @@ use crate::rdf::{
     Object, Predicate, StringLiteral, Subject, Triple, LANG_STRING_IRI_STR,
 };
 
+use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
@@ -147,6 +149,7 @@ pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &str =
 pub const VDL_V1_CONTEXT: &str = "https://w3id.org/vdl/v1";
 pub const WALLET_V1_CONTEXT: &str = "https://w3id.org/wallet/v1";
 pub const ZCAP_V1_CONTEXT: &str = "https://w3id.org/zcap/v1";
+pub const CACAO_ZCAP_V1_CONTEXT: &str = "https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -317,9 +320,17 @@ lazy_static! {
         let iri = Iri::new(ZCAP_V1_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref CACAO_ZCAP_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::CACAO_ZCAP_V1;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(CACAO_ZCAP_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
+#[derive(Clone)]
 pub struct StaticLoader;
+
 impl Loader for StaticLoader {
     type Document = JsonValue;
     fn load<'a>(
@@ -366,10 +377,108 @@ impl Loader for StaticLoader {
                 VDL_V1_CONTEXT => Ok(VDL_V1_CONTEXT_DOCUMENT.clone()),
                 WALLET_V1_CONTEXT => Ok(WALLET_V1_CONTEXT_DOCUMENT.clone()),
                 ZCAP_V1_CONTEXT => Ok(ZCAP_V1_CONTEXT_DOCUMENT.clone()),
+                CACAO_ZCAP_V1_CONTEXT => Ok(CACAO_ZCAP_V1_CONTEXT_DOCUMENT.clone()),
                 _ => {
-                    eprintln!("unknown context {}", url);
                     Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
                 }
+            }
+        }
+        .boxed()
+    }
+}
+
+pub type ContextMap = HashMap<String, RemoteDocument<JsonValue>>;
+
+#[derive(Clone)]
+pub struct ContextLoader {
+    // Specifies if StaticLoader is meant to be checked first.
+    static_loader: Option<StaticLoader>,
+    // This map holds the optional, additional context objects.  This is where any app-specific context
+    // objects would go.  The Arc<RwLock<_>> is necessary because json_ld::Loader trait unfortunately
+    // has a method that uses `&mut self`.
+    context_map: Option<Arc<RwLock<ContextMap>>>,
+}
+
+impl std::fmt::Debug for ContextLoader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("ContextLoader")
+         .finish_non_exhaustive()
+    }
+}
+
+impl ContextLoader {
+    /// Constructs an "empty" ContextLoader.
+    pub fn empty() -> Self {
+        Self { static_loader: None, context_map: None }
+    }
+    /// Using the builder pattern, the StaticLoader can be enabled so that contexts are checked
+    /// against it before being checked against context_map.
+    pub fn with_static_loader(mut self) -> Self {
+        self.static_loader = Some(StaticLoader);
+        self
+    }
+    /// Using the builder pattern, the map of additional contexts can be set.  These context objects
+    /// will be checked after StaticLoader (if it's specified).  preparsed_context_map should map
+    /// the context URLs to their JSON content.
+    pub fn with_context_map_from(mut self, preparsed_context_map: HashMap<String, String>) -> Result<Self, Error> {
+        let context_map =
+            preparsed_context_map
+                .iter()
+                .map(|(url, jsonld)| -> Result<(String, RemoteDocument<JsonValue>), Error> {
+                    let doc = json::parse(jsonld)?;
+                    let iri = Iri::new(url)?;
+                    Ok((url.clone(), RemoteDocument::new(doc, iri)))
+                })
+                .collect::<Result<HashMap<String, RemoteDocument<JsonValue>>, Error>>()?;
+        self.context_map = Some(Arc::new(RwLock::new(context_map)));
+        Ok(self)
+    }
+}
+
+/// The default ContextLoader only uses StaticLoader.
+impl std::default::Default for ContextLoader {
+    fn default() -> Self {
+        Self { static_loader: Some(StaticLoader), context_map: None }
+    }
+}
+
+impl Loader for ContextLoader {
+    type Document = JsonValue;
+    fn load<'a>(
+        &'a mut self,
+        url: Iri<'_>,
+    ) -> BoxFuture<'a, Result<RemoteDocument<Self::Document>, json_ld::Error>> {
+        let url_buf: IriBuf = url.into();
+        async move {
+            if let Some(static_loader) = &mut self.static_loader {
+                match static_loader.load(url_buf.as_iri()).await {
+                    Ok(x) => {
+                        // The url was present in StaticLoader.
+                        return Ok(x);
+                    }
+                    Err(e) => {
+                        if e.code() == json_ld::ErrorCode::LoadingDocumentFailed {
+                            // This is ok, the url just wasn't found in StaticLoader.  Fall through
+                            // to self.context_map.
+                        } else {
+                            // Any other error is a legit error.
+                            return Err(e);
+                        }
+                    }
+                }
+            }
+            // If we fell through, then try self.context_map.
+            if let Some(context_map) = &mut self.context_map {
+                context_map
+                    .read()
+                    .await
+                    .get(url_buf.as_str())
+                    .map(|rd| rd.clone())
+                    .ok_or_else(|| {
+                        json_ld::ErrorCode::LoadingDocumentFailed.into()
+                    })
+            } else {
+                Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
             }
         }
         .boxed()

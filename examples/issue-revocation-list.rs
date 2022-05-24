@@ -8,6 +8,7 @@ async fn main() {
     use std::convert::TryFrom;
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let resolver = &ssi::did::example::DIDExample;
+    let mut context_loader = ssi::jsonld::ContextLoader::default();
     use ssi::revocation::{
         RevocationList2020, RevocationList2020Credential, RevocationList2020Subject,
     };
@@ -25,11 +26,11 @@ async fn main() {
     let verification_method = "did:example:foo#key1".to_string();
     proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
     let proof = vc
-        .generate_proof(&key, &proof_options, resolver)
+        .generate_proof(&key, &proof_options, resolver, &mut context_loader)
         .await
         .unwrap();
     vc.add_proof(proof);
-    let result = vc.verify(None, resolver).await;
+    let result = vc.verify(None, resolver, &mut context_loader).await;
     if result.errors.len() > 0 {
         panic!("verify failed: {:#?}", result);
     }

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use thiserror::Error;
 
+use crate::jsonld::ContextLoader;
 use crate::keccak_hash::bytes_to_lowerhex;
 use crate::ldp::LinkedDataDocument;
 use crate::vc::Proof;
@@ -790,9 +791,10 @@ impl TypedData {
     pub async fn from_document_and_options(
         document: &(dyn LinkedDataDocument + Sync),
         proof: &Proof,
+        context_loader: &mut ContextLoader,
     ) -> Result<Self, TypedDataConstructionError> {
         let doc_dataset = document
-            .to_dataset_for_signing(None)
+            .to_dataset_for_signing(None, context_loader)
             .await
             .map_err(|e| TypedDataConstructionError::DocumentToDataset(e.to_string()))?;
         let doc_dataset_normalized = crate::urdna2015::normalize(&doc_dataset)
@@ -801,7 +803,7 @@ impl TypedData {
         #[allow(clippy::redundant_closure)]
         doc_statements_normalized.sort_by_cached_key(|x| String::from(x));
         let sigopts_dataset = proof
-            .to_dataset_for_signing(Some(document))
+            .to_dataset_for_signing(Some(document), context_loader)
             .await
             .map_err(|e| TypedDataConstructionError::ProofToDataset(e.to_string()))?;
         let sigopts_dataset_normalized = crate::urdna2015::normalize(&sigopts_dataset)
@@ -1514,7 +1516,7 @@ mod tests {
         ];
         let values: Vec<String> = props
             .iter()
-            .map(|(name_, value)| Value::from((*value).clone()).as_str().unwrap().to_string())
+            .map(|(_name_, value)| Value::from((*value).clone()).as_str().unwrap().to_string())
             .collect();
         assert_eq!(values, expected_values);
     }
@@ -1900,16 +1902,16 @@ mod tests {
 
         // Verify the VC/proof
         let mut vc = vc.clone();
+        let mut context_loader = crate::jsonld::ContextLoader::default();
         vc.add_proof(proof.clone());
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDExample).await;
+        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         assert_eq!(sig_hex, "0x5fb8f18f21f54c2df8a2720d0afcee7dbbb18e4b7a22ce6e8183633d63b076d329122584db769cd78b6cd5a7094ede5ceaa43317907539187f1f0d8875f99e051b");
     }
 
-    use crate::ldp::resolve_vm;
     use crate::vc::{LinkedDataProofOptions, ProofPurpose, URI};
 
     #[async_std::test]
@@ -1966,6 +1968,7 @@ mod tests {
         async fn to_dataset_for_signing(
             &self,
             _parent: Option<&(dyn LinkedDataDocument + Sync)>,
+            _context_loader: &mut ContextLoader,
         ) -> Result<crate::rdf::DataSet, crate::error::Error> {
             todo!();
         }
@@ -2035,7 +2038,8 @@ mod tests {
 
         let basic_doc = ExampleDocument(TEST_BASIC_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let verification_result = proof.verify(&basic_doc, &resolver).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let verification_result = proof.verify(&basic_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
     }
@@ -2217,7 +2221,8 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let verification_result = proof.verify(&nested_doc, &resolver).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let verification_result = proof.verify(&nested_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
     }
@@ -2256,7 +2261,8 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let verification_result = proof.verify(&nested_doc, &resolver).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let verification_result = proof.verify(&nested_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
@@ -2374,7 +2380,8 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let verification_result = proof.verify(&nested_doc, &resolver).await;
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let verification_result = proof.verify(&nested_doc, &resolver, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
     }
