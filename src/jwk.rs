@@ -265,6 +265,25 @@ impl JWK {
         })))
     }
 
+    #[cfg(feature = "ring")]
+    pub fn generate_ed25519_from_bytes(bytes: String) -> Result<JWK, Error> {
+        let rng = ring::test::rand::FixedSliceRandom {
+            bytes: bytes.as_bytes(),
+        };
+        let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
+            .as_ref()
+            .to_vec();
+        // reference: ring/src/ec/curve25519/ed25519/signing.rs
+        let private_key = key_pkcs8[0x10..0x30].to_vec();
+        let public_key = key_pkcs8[0x35..0x55].to_vec();
+        key_pkcs8.zeroize();
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(public_key),
+            private_key: Some(Base64urlUInt(private_key)),
+        })))
+    }
+
     #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         let mut csprng = rand_old::rngs::OsRng {};
@@ -273,6 +292,18 @@ impl JWK {
             curve: "Ed25519".to_string(),
             public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
             private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
+        })))
+    }
+
+    #[cfg(feature = "ed25519-dalek")]
+    pub fn generate_ed25519_from_bytes(bytes: String) -> Result<JWK, Error> {
+        let bytes = bytes.as_bytes();
+        let secret = ed25519_dalek::SecretKey::from_bytes(bytes)?;
+        let public: ed25519_dalek::PublicKey = (&secret).into();
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(public.as_ref().to_vec()),
+            private_key: Some(Base64urlUInt(secret.as_ref().to_vec())),
         })))
     }
 
@@ -1131,6 +1162,7 @@ mod tests {
     const RSA_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25.der");
     const RSA_PK_DER: &'static [u8] = include_bytes!("../tests/rsa2048-2020-08-25-pk.der");
     const ED25519_JSON: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
+    const ED25519_A32_JSON: &'static str = include_str!("../tests/ed25519-a32.json");
 
     #[test]
     fn jwk_to_from_der_rsa() {
@@ -1155,6 +1187,15 @@ mod tests {
     #[test]
     fn generate_ed25519() {
         let _key = JWK::generate_ed25519().unwrap();
+    }
+
+    #[test]
+    fn generate_ed25519_from_bytes() {
+        let a32: JWK = serde_json::from_str(ED25519_A32_JSON).unwrap();
+        let generated_a_32 =
+            JWK::generate_ed25519_from_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())
+                .unwrap();
+        assert_eq!(generated_a_32, a32);
     }
 
     #[test]
