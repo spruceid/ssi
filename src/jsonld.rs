@@ -331,7 +331,7 @@ lazy_static! {
     pub static ref JFF_VC_EDU_PLUGFEST_2022_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
         let jsonld = ssi_contexts::JFF_VC_EDU_PLUGFEST_2022;
         let doc = json::parse(jsonld).unwrap();
-        let iri = Iri::new(CACAO_ZCAP_V1_CONTEXT).unwrap();
+        let iri = Iri::new(JFF_VC_EDU_PLUGFEST_2022_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
 }
