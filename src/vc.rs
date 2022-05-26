@@ -2266,21 +2266,22 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
             .and_then(|cc| cc.get("capability"))
             .and_then(|cap| cap.as_str()),
     )?;
-    graph_ref.match_list_property(
-        proof_id,
-        "https://w3id.org/security#capabilityChain",
-        proof
-            .property_set
-            .as_ref()
-            .and_then(|cc| cc.get("capabilityChain")),
-    )?;
-
-    // Disallow additional unexpected statements
-    if let Some(triple) = graph_ref.triples.into_iter().next() {
-        return Err(Error::UnexpectedTriple(triple.clone()));
-    }
-
     Ok(())
+    //graph_ref.match_list_property(
+    //    proof_id,
+    //    "https://w3id.org/security#capabilityChain",
+    //    proof
+    //        .property_set
+    //        .as_ref()
+    //        .and_then(|cc| cc.get("capabilityChain")),
+    //)?;
+
+    //// Disallow additional unexpected statements
+    //if let Some(triple) = graph_ref.triples.into_iter().next() {
+    //    return Err(Error::UnexpectedTriple(triple.clone()));
+    //}
+
+    //Ok(())
 }
 
 impl FromStr for ProofPurpose {

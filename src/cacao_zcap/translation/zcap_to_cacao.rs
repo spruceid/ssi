@@ -152,21 +152,24 @@ where
             .as_resource_uri()
             .map_err(ZcapToCacaoError::CapToResource)?)],
     };
-    let resources =
-        vec![Ok(root_target.clone())]
-            .into_iter()
-            .chain(intermediate_caps.map(|cap| {
-                UriString::try_from(cap.id()).map_err(ZcapToCacaoError::ResourceURIParse)
-            }))
-            .chain(last_cap_resources.into_iter())
-            .collect::<Result<Vec<UriString>, ZcapToCacaoError>>()?;
+    let resources = vec![
+        UriString::try_from(invocation_target.as_str()).map_err(ZcapToCacaoError::ResourceURIParse),
+        Ok(root_target.clone()),
+    ]
+    .into_iter()
+    .chain(
+        intermediate_caps
+            .map(|cap| UriString::try_from(cap.id()).map_err(ZcapToCacaoError::ResourceURIParse)),
+    )
+    .chain(last_cap_resources.into_iter())
+    .collect::<Result<Vec<UriString>, ZcapToCacaoError>>()?;
 
-    if invocation_target != root_target.as_str() {
-        return Err(ZcapToCacaoError::InvocationTargetInternalMismatch {
-            invocation_target: invocation_target.to_string(),
-            decoded_root_target: root_target,
-        });
-    }
+    //if invocation_target != root_target.as_str() {
+    //    return Err(ZcapToCacaoError::InvocationTargetInternalMismatch {
+    //        invocation_target: invocation_target.to_string(),
+    //        decoded_root_target: root_target,
+    //    });
+    //}
     // TODO: check parentCapability is last value (converted if first value)
 
     // Infer issuer (verification method controller) from verification method URL.

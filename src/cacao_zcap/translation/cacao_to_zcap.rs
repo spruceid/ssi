@@ -61,38 +61,38 @@ where
     let (header_type, signature_type) = get_header_and_signature_type(header)?;
     let uuid = cacao_cid_uuid(cacao);
     let id = URI::String(uuid.to_string());
-    let mut iter = resources.iter();
-    let (first_resource, last_resource, intermediate_resources) = (
+    let mut iter = resources.iter().cloned();
+    let (first_resource, second_resource, last_resource, intermediate_resources) = (
         iter.next().ok_or(CacaoToZcapError::MissingFirstResource)?,
+        iter.next().ok_or(CacaoToZcapError::MissingSecondResource)?,
         iter.next_back(),
         iter,
     );
 
     let invocation_target = first_resource;
+
     let root_cap_urn = ZcapRootURN {
-        target: first_resource.clone(),
+        target: second_resource,
     };
     let root_cap_urn_string = root_cap_urn.to_string();
     let root_cap_urn_uri = UriString::try_from(root_cap_urn_string.as_str())
         .map_err(CacaoToZcapError::RootCapUriParse)?;
-    let previous_caps = match last_resource {
-        None => vec![],
-        Some(resource) => vec![CapabilityChainItem::from_resource_uri(resource)
-            .map_err(CacaoToZcapError::CapFromResource)?],
-    };
-    let capability_chain: Vec<CapabilityChainItem> =
-        vec![CapabilityChainItem::Id(root_cap_urn_uri)]
-            .into_iter()
-            .chain(intermediate_resources.cloned().map(CapabilityChainItem::Id))
-            .chain(previous_caps.into_iter())
-            .collect();
-    let parent_capability_id = capability_chain
-        .iter()
-        .next_back()
-        // capability_chain has at least one value, but using unwrap_or here anyway
-        .map(|cap| cap.id())
-        .unwrap_or(&root_cap_urn_string)
-        .to_string();
+    let root_cap_chain_item = CapabilityChainItem::Id(root_cap_urn_uri);
+
+    let mut capability_chain: Vec<CapabilityChainItem>;
+    let parent_capability_id: String;
+
+    if let Some(resource) = last_resource {
+        let parent_capability = CapabilityChainItem::from_resource_uri(&resource)
+            .map_err(CacaoToZcapError::CapFromResource)?;
+        parent_capability_id = parent_capability.id().to_string();
+        capability_chain = vec![root_cap_chain_item];
+        capability_chain.extend(intermediate_resources.map(CapabilityChainItem::Id));
+        capability_chain.push(parent_capability);
+    } else {
+        parent_capability_id = root_cap_chain_item.id().to_string();
+        capability_chain = vec![root_cap_chain_item];
+    }
 
     let invoker_uri = URI::String(aud.as_str().to_string());
     let created_datetime = DateTime::parse_from_rfc3339(&iat.to_string())
@@ -174,17 +174,17 @@ pub enum CacaoToZcapError {
 
     /// Missing first resource
     ///
-    /// CACAO-zcap must have at least one resource URI.
+    /// CACAO-zcap must have at least two resource URIs.
     /// The first resource URI is the invocation target.
     #[error("Missing first resource")]
     MissingFirstResource,
 
-    /// Missing last resource
+    /// Missing second resource
     ///
-    /// CACAO-zcap must have last resource URI for the embedded previous delegation, unless
-    /// previous delegation is the root/target zcap.
-    #[error("Missing last resource")]
-    MissingLastResource,
+    /// CACAO-zcap must have at least two resource URIs.
+    /// The second resource URI is the root zcap.
+    #[error("Missing second resource")]
+    MissingSecondResource,
 
     /// Unable to convert resource URI to capability chain item
     #[error("Unable to convert resource URI to capability chain item")]
