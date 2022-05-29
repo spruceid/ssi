@@ -266,10 +266,8 @@ impl JWK {
     }
 
     #[cfg(feature = "ring")]
-    pub fn generate_ed25519_from_bytes(bytes: String) -> Result<JWK, Error> {
-        let rng = ring::test::rand::FixedSliceRandom {
-            bytes: bytes.as_bytes(),
-        };
+    pub fn generate_ed25519_from_bytes(bytes: &[u8]) -> Result<JWK, Error> {
+        let rng = ring::test::rand::FixedSliceRandom { bytes };
         let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
             .as_ref()
             .to_vec();
@@ -296,8 +294,7 @@ impl JWK {
     }
 
     #[cfg(feature = "ed25519-dalek")]
-    pub fn generate_ed25519_from_bytes(bytes: String) -> Result<JWK, Error> {
-        let bytes = bytes.as_bytes();
+    pub fn generate_ed25519_from_bytes(bytes: &[u8]) -> Result<JWK, Error> {
         let secret = ed25519_dalek::SecretKey::from_bytes(bytes)?;
         let public: ed25519_dalek::PublicKey = (&secret).into();
         Ok(JWK::from(Params::OKP(OctetParams {
@@ -1193,7 +1190,7 @@ mod tests {
     fn generate_ed25519_from_bytes() {
         let a32: JWK = serde_json::from_str(ED25519_A32_JSON).unwrap();
         let generated_a_32 =
-            JWK::generate_ed25519_from_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string())
+            JWK::generate_ed25519_from_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes())
                 .unwrap();
         assert_eq!(generated_a_32, a32);
     }
