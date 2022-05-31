@@ -53,6 +53,7 @@ pub mod ripemd;
 pub mod soltx;
 pub mod ssh;
 pub mod tzkey;
+pub mod ucan;
 pub mod urdna2015;
 pub mod vc;
 pub mod zcap;
