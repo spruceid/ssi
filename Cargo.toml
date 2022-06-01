@@ -93,7 +93,7 @@ uint = "=0.9.1"
 iri-string = { version = "0.4", features = ["serde", "serde-std"] }
 libipld = { version = "0.12", optional = true }
 uuid = { version = "0.8", features = ["v4", "serde"], optional = true }
-cacaos = { version = "0.2", git = "https://github.com/spruceid/cacao-rs.git", rev = "2715184", optional = true }
+cacaos = { version = "0.2", git = "https://github.com/spruceid/cacao-rs.git", rev = "b8cf7da", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
