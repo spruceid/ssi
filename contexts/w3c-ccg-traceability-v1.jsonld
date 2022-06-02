@@ -2989,6 +2989,11 @@
       },
       "@id": "https://w3id.org/traceability#Template"
     },
+    "TraceabilityAPI": {
+      "@context": {
+      },
+      "@id": "https://w3id.org/traceability#TraceabilityAPI"
+    },
     "TraceablePresentation": {
       "@context": {
       },
