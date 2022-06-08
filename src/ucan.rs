@@ -7,6 +7,7 @@ use crate::{
     jwt::decode_verify,
     vc::{NumericDate, URI},
 };
+use async_recursion::async_recursion;
 use futures::future::try_join_all;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -26,19 +27,21 @@ pub struct DecodedUcanTree<F = JsonValue, A = HashMap<String, JsonValue>> {
 }
 
 impl<F, A> Ucan<F, A> {
+    #[cfg_attr(target_arch = "wasm32", async_recursion(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_recursion)]
     pub async fn decode_verify(
         jwt: &str,
         resolver: &dyn DIDResolver,
     ) -> Result<DecodedUcanTree<F, A>, Error>
     where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
+        F: DeserializeOwned + Send,
+        A: DeserializeOwned + Send,
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
         let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
 
         // extract or deduce signing key
-        let key: &JWK = match (
+        let key: JWK = match (
             payload.issuer.split(':').nth(1),
             &parts.header.jwk,
             dereference(resolver, &payload.issuer, &Default::default())
@@ -46,9 +49,9 @@ impl<F, A> Ucan<F, A> {
                 .1,
         ) {
             // did:pkh with and without fragment
-            (Some("pkh"), Some(jwk), Content::DIDDocument(_) | Content::Object(_)) => jwk,
+            (Some("pkh"), Some(jwk), Content::DIDDocument(_) | Content::Object(_)) => jwk.clone(),
             // did:key without fragment
-            (Some("key"), _, Content::DIDDocument(d)) => &d
+            (Some("key"), _, Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -60,7 +63,7 @@ impl<F, A> Ucan<F, A> {
                 .ok_or_else(|| Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => &vm.get_jwk()?,
+            (Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
@@ -190,20 +193,8 @@ impl<F, A> Payload<F, A> {
         )
     }
 
-    pub fn decode_verify(jwt: &str, key: &JWK) -> Result<Self, Error>
-    where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
-    {
-        let p = decode_verify(jwt, key)?;
-        // TODO check that the issuing key matches/is part of the DID Doc
-
-        // TODO check parents!! we need to extract the issuing key somehow from them
-        Ok(p)
-    }
-
     pub fn parents(&self) -> ParentIter {
-        ParentIter(self.payload.proof.iter())
+        ParentIter(self.proof.iter())
     }
 }
 
