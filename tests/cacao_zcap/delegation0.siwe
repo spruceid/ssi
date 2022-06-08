@@ -1,0 +1,15 @@
+app.domain.com wants you to sign in with your Ethereum account:
+0x98626187D3B8e1F7C5b246eE443a07579b5923Ac
+
+Authorize action (read, write): Allow access to your Kepler orbit
+
+URI: did:key:z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp#z6MkiTBz1ymuepAQ4HEHYSF1H8quG5GLVVQR3djdX3mDooWp
+Version: 1
+Chain ID: 1
+Nonce: h8yQTdScwt9pTyaQa
+Issued At: 2022-03-14T13:30:42.763Z
+Expiration Time: 2022-03-14T13:32:42.763Z
+Not Before: 2022-03-14T13:31:42.763Z
+Request ID: https://example.org/delegations/981871674
+Resources:
+- kepler://my_orbit
