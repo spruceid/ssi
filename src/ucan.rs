@@ -13,7 +13,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Ucan<F = JsonValue, A = HashMap<String, JsonValue>> {
     pub header: Header,
     pub payload: Payload<F, A>,
@@ -42,16 +42,19 @@ impl<F, A> Ucan<F, A> {
 
         // extract or deduce signing key
         let key: JWK = match (
-            payload.issuer.split(':').nth(1),
+            payload.issuer.get(..8),
             &parts.header.jwk,
             dereference(resolver, &payload.issuer, &Default::default())
                 .await
                 .1,
         ) {
             // did:pkh with and without fragment
-            (Some("pkh"), Some(jwk), Content::DIDDocument(_) | Content::Object(_)) => jwk.clone(),
+            (Some("did:pkh:"), Some(jwk), Content::Object(_) | Content::DIDDocument(_)) => {
+                match_key_with_did_pkh(&jwk, &payload.issuer)?;
+                jwk.clone()
+            }
             // did:key without fragment
-            (Some("key"), _, Content::DIDDocument(d)) => d
+            (Some("did:key:"), _, Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -110,6 +113,18 @@ impl<F, A> Ucan<F, A> {
     }
 }
 
+fn match_key_with_did_pkh(key: &JWK, did: &str) -> Result<(), Error> {
+    use std::str::FromStr;
+    Ok(crate::caip10::BlockchainAccountId::from_str(
+        did.split_once('#')
+            .map(|(d, _)| d)
+            .unwrap_or(did)
+            .strip_prefix("did:pkh:")
+            .ok_or(Error::DIDURL)?,
+    )?
+    .verify(key)?)
+}
+
 pub struct ParentIter<'a>(std::slice::Iter<'a, String>);
 
 impl<'a> Iterator for ParentIter<'a> {
@@ -131,7 +146,7 @@ pub enum DecodeError<E> {
     Signature(E),
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct Payload<F = JsonValue, A = HashMap<String, JsonValue>> {
     #[serde(rename = "iss")]
     pub issuer: String,
@@ -200,7 +215,7 @@ impl<F, A> Payload<F, A> {
 
 /// 3.2.5 A JSON capability MUST include the with and can fields and
 /// MAY have additional fields needed to describe the capability
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct Capability<A = HashMap<String, JsonValue>> {
     pub with: URI,
     pub can: String,
