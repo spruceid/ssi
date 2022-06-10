@@ -4,7 +4,6 @@ use crate::{
     error::Error,
     jwk::{Algorithm, JWK},
     jws::{decode_jws_parts, encode_sign_custom_header, split_jws, verify_bytes, Header},
-    jwt::decode_verify,
     vc::{NumericDate, URI},
 };
 use async_recursion::async_recursion;
@@ -77,15 +76,24 @@ impl<F, A> Ucan<F, A> {
             &parts.signature,
         )?;
 
+        let parents = try_join_all(
+            payload
+                .proof
+                .iter()
+                .map(|s| Self::decode_verify(s, resolver)),
+        )
+        .await?;
+
+        if parents
+            .iter()
+            .any(|p| p.ucan.payload.audience != payload.issuer)
+        {
+            return Err(Error::InvalidIssuer);
+        }
+
         Ok(DecodedUcanTree {
             // decode and verify parents
-            parents: try_join_all(
-                payload
-                    .proof
-                    .iter()
-                    .map(|s| Self::decode_verify(s, resolver)),
-            )
-            .await?,
+            parents,
             ucan: Ucan {
                 header: parts.header,
                 payload,
@@ -225,4 +233,125 @@ pub struct Capability<A = HashMap<String, JsonValue>> {
 
 fn now() -> f64 {
     (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[async_std::test]
+    async fn rights_amplification() {
+        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOltdfQ.NaguDFWi8SkedAZ5eplUvQgMkeIQyZLzvl6084mH4vxqTazMxyDbT8RdHGumGug2NmKSvHn0_t2ae0KJK5U-BQ"#;
+        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
+            .await
+            .unwrap();
+    }
+
+    #[async_std::test]
+    async fn issuer_matches_delegate() {
+        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOlsiZXlKaGJHY2lPaUpGWkVSVFFTSXNJblI1Y0NJNklrcFhWQ0lzSW5WamRpSTZJakF1T0M0eEluMC5leUpwYzNNaU9pSmthV1E2YTJWNU9ubzJUV3R4Ym1KT2FUbDJaSFJFTkVSTFVXaHlTREpaUjFkMFFtZDNRak51TkRFeVFWRlVPRXhuVWpkQk5qZEZSeUlzSW1GMVpDSTZJbVJwWkRwclpYazZlalpOYTJabmRGaHJRMjVpT1V4WWJqaENibmxxZUZKTmJrdDBSbWRhWXpjMFRUWTROek4yTmpGeFEyTkxTR3BySWl3aVpYaHdJam8wT0RBME1UUXpOREV5TENKaGRIUWlPbHRkTENKd2NtWWlPbHRkZlEuTUFudEhWZFVxZVc5N3Y0RVByU0pqWjBQOUdjTExGaEZJZEVZRUhBZG12NHgyQ0RmbnRVYXFEekFnTUN4d0tDTkJDQVhCRnZ5MUFUMTVaRkhzMDIyQVEiXX0.TA5ugLsiu7jrK3y9fzrLFNuaqnzFSA8ogjvwUS84_pEi8xYk2fGC7LhOQCo0DuMqvlT9ubYp3ywGizHlZ0waAA"#;
+        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
+            .await
+            .unwrap();
+    }
+
+    #[async_std::test]
+    async fn versions_match() {
+        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOlsiZXlKaGJHY2lPaUpGWkVSVFFTSXNJblI1Y0NJNklrcFhWQ0lzSW5WamRpSTZJakF1T0M0eEluMC5leUpwYzNNaU9pSmthV1E2YTJWNU9ubzJUV3RtYm0xa1NEaHpUbTFEYUZWemEyaFJia3REVGpKTmNHaE5RMHhtUVcxU1FVYzBhVzlOZGtKV2RGRjFWaUlzSW1GMVpDSTZJbVJwWkRwclpYazZlalpOYTJabmRGaHJRMjVpT1V4WWJqaENibmxxZUZKTmJrdDBSbWRhWXpjMFRUWTROek4yTmpGeFEyTkxTR3BySWl3aVpYaHdJam8wT0RBME1UUXpOREV5TENKaGRIUWlPbHRkTENKd2NtWWlPbHRkZlEub2NURHU5emlkMW11NG9qOVJkVDRwMzdudlRPbEh1aWZkLW9EamZUTjF1ZHJaWnhpRjJiNUJKYmNzNGtEU0tKaU91enExT1hEVUctay1JOXNGdlMwQmciXX0.ok2xB1mr04nShwF76rgdBgv5dnUrbpAacMHXkOJCP-0kqvO4GYOwhLDwW6j43mnD2XCvy4U20LTTh_mkumxYAQ"#;
+        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
+            .await
+            .unwrap();
+    }
+
+    #[async_std::test]
+    async fn not_expired() {
+        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOltdfQ.NaguDFWi8SkedAZ5eplUvQgMkeIQyZLzvl6084mH4vxqTazMxyDbT8RdHGumGug2NmKSvHn0_t2ae0KJK5U-BQ"#;
+        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
+            .await
+            .unwrap();
+    }
+
+    pub struct DIDExample;
+    use crate::did::{DIDMethod, Document};
+    use crate::did_resolve::{
+        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+        ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+    };
+    use async_trait::async_trait;
+
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl DIDMethod for DIDExample {
+        fn name(&self) -> &'static str {
+            return "key";
+        }
+        fn to_resolver(&self) -> &dyn DIDResolver {
+            self
+        }
+    }
+
+    const DOC_JSON: &'static str = r#"{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "Ed25519VerificationKey2018": "https://w3id.org/security#Ed25519VerificationKey2018",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk",
+  "verificationMethod": [
+    {
+      "id": "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk#z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk",
+      "publicKeyJwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "Ell93DzMeUkCSs6CSuc2NxH5pYV5ozw9ro97b5sXRM8"
+      }
+    }
+  ],
+  "authentication": [
+    "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk#z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk"
+  ],
+  "assertionMethod": [
+    "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk#z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk"
+  ]
+}"#;
+    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+    impl DIDResolver for DIDExample {
+        async fn resolve(
+            &self,
+            did: &str,
+            _input_metadata: &ResolutionInputMetadata,
+        ) -> (
+            ResolutionMetadata,
+            Option<Document>,
+            Option<DocumentMetadata>,
+        ) {
+            if did != "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk" {
+                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
+            }
+            let doc: Document = match serde_json::from_str(DOC_JSON) {
+                Ok(doc) => doc,
+                Err(err) => {
+                    return (ResolutionMetadata::from_error(&err.to_string()), None, None);
+                }
+            };
+            (
+                // ResolutionMetadata::default(),
+                // Note: remove content type when https://github.com/spruceid/ssi/pull/224 is
+                // merged
+                ResolutionMetadata {
+                    content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                    ..Default::default()
+                },
+                Some(doc),
+                Some(DocumentMetadata::default()),
+            )
+        }
+    }
 }
