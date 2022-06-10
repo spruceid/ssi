@@ -224,13 +224,5 @@ pub struct Capability<A = HashMap<String, JsonValue>> {
 }
 
 fn now() -> f64 {
-    #[cfg(target_arch = "wasm32")]
-    use instant::SystemTime;
-    #[cfg(not(target_arch = "wasm32"))]
-    use std::time::SystemTime;
-
-    SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
-        .as_secs_f64()
+    (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
 }
