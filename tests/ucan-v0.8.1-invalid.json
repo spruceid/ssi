@@ -535,27 +535,6 @@
   },
   {
     "comment": "UCAN audience did:key is not valid",
-    "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtrUko5NnB0UDFTYjE0OWR5dlRDV2dObTlUYTFadHViZUxEeDlaeVF0aG9vWCIsImF1ZCI6ImRpZDprZXk6ek0rK204RHhXU3dRaGhaWWJnUGprQ05qbUx2dmEzRDdxQnNHUHZ3ejJneW5TaWFKIiwiZXhwIjo0ODA0MTQzNDA2LCJhdHQiOltdLCJwcmYiOltdfQ.YB9ltNMczA9GM1CnXXCy_WdquMWjFVlUg-uC53O9Axe1Zy0nNbDQym-vc5SpsRna0PayYQso6JBRr27PGYyQBw",
-    "assertions": {
-      "header": {
-        "alg": "EdDSA",
-        "typ": "JWT",
-        "ucv": "0.8.1"
-      },
-      "payload": {
-        "iss": "did:key:z6MkkRJ96ptP1Sb149dyvTCWgNm9Ta1ZtubeLDx9ZyQthooX",
-        "aud": "did:key:zM++m8DxWSwQhhZYbgPjkCNjmLvva3D7qBsGPvwz2gynSiaJ",
-        "exp": 4804143406,
-        "att": [],
-        "prf": []
-      },
-      "validationErrors": [
-        "audInvalidDidKey"
-      ]
-    }
-  },
-  {
-    "comment": "UCAN audience did:key is not valid",
     "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtrUko5NnB0UDFTYjE0OWR5dlRDV2dObTlUYTFadHViZUxEeDlaeVF0aG9vWCIsImF1ZCI6IiIsImV4cCI6NDgwNDE0MzQwNiwiYXR0IjpbXSwicHJmIjpbXX0.kcKCzMYP0LLlKlGn66baSaDF0C1v8FM_M7yRtb8r2VIOhXaNX8xhGKLE49LQB9xOc9QZNajlgF3X8dGCWvc1DA",
     "assertions": {
       "header": {
