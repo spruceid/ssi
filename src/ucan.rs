@@ -4,7 +4,7 @@ use crate::{
     error::Error,
     jwk::{Algorithm, JWK},
     jws::{decode_jws_parts, encode_sign_custom_header, split_jws, verify_bytes, Header},
-    vc::{NumericDate, URI},
+    vc::NumericDate,
 };
 use async_recursion::async_recursion;
 use futures::future::try_join_all;
@@ -38,6 +38,19 @@ impl<F, A> Ucan<F, A> {
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
         let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
+
+        if parts.header.type_.as_deref() != Some("JWT") {
+            return Err(Error::MissingType);
+        }
+
+        match parts.header.additional_parameters.get("ucv") {
+            Some(JsonValue::String(v)) if v == "0.8.1" => (),
+            _ => return Err(Error::MissingType),
+        }
+
+        if !payload.audience.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
 
         // extract or deduce signing key
         let key: JWK = match (
@@ -154,7 +167,7 @@ pub enum DecodeError<E> {
     Signature(E),
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F = JsonValue, A = HashMap<String, JsonValue>> {
     #[serde(rename = "iss")]
     pub issuer: String,
@@ -223,9 +236,9 @@ impl<F, A> Payload<F, A> {
 
 /// 3.2.5 A JSON capability MUST include the with and can fields and
 /// MAY have additional fields needed to describe the capability
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Capability<A = HashMap<String, JsonValue>> {
-    pub with: URI,
+    pub with: String,
     pub can: String,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     pub additional_fields: Option<A>,
@@ -238,36 +251,71 @@ fn now() -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[async_std::test]
-    async fn rights_amplification() {
-        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOltdfQ.NaguDFWi8SkedAZ5eplUvQgMkeIQyZLzvl6084mH4vxqTazMxyDbT8RdHGumGug2NmKSvHn0_t2ae0KJK5U-BQ"#;
-        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
-            .await
-            .unwrap();
+    async fn valid() {
+        let cases: Vec<ValidTestVector> =
+            serde_json::from_str(include_str!("../tests/ucan-v0.8.1-valid.json")).unwrap();
+        for case in cases {
+            let ucans =
+                match Ucan::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver()).await
+                {
+                    Ok(u) => u,
+                    Err(e) => {
+                        println!("{}", case.comment);
+                        Err(e).unwrap()
+                    }
+                };
+
+            assert!(ucans.ucan.payload.validate_time(None).is_ok());
+            assert_eq!(ucans.ucan.payload, case.assertions.payload);
+            assert_eq!(ucans.ucan.header, case.assertions.header);
+        }
     }
 
     #[async_std::test]
-    async fn issuer_matches_delegate() {
-        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOlsiZXlKaGJHY2lPaUpGWkVSVFFTSXNJblI1Y0NJNklrcFhWQ0lzSW5WamRpSTZJakF1T0M0eEluMC5leUpwYzNNaU9pSmthV1E2YTJWNU9ubzJUV3R4Ym1KT2FUbDJaSFJFTkVSTFVXaHlTREpaUjFkMFFtZDNRak51TkRFeVFWRlVPRXhuVWpkQk5qZEZSeUlzSW1GMVpDSTZJbVJwWkRwclpYazZlalpOYTJabmRGaHJRMjVpT1V4WWJqaENibmxxZUZKTmJrdDBSbWRhWXpjMFRUWTROek4yTmpGeFEyTkxTR3BySWl3aVpYaHdJam8wT0RBME1UUXpOREV5TENKaGRIUWlPbHRkTENKd2NtWWlPbHRkZlEuTUFudEhWZFVxZVc5N3Y0RVByU0pqWjBQOUdjTExGaEZJZEVZRUhBZG12NHgyQ0RmbnRVYXFEekFnTUN4d0tDTkJDQVhCRnZ5MUFUMTVaRkhzMDIyQVEiXX0.TA5ugLsiu7jrK3y9fzrLFNuaqnzFSA8ogjvwUS84_pEi8xYk2fGC7LhOQCo0DuMqvlT9ubYp3ywGizHlZ0waAA"#;
-        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
-            .await
-            .unwrap();
+    async fn invalid() {
+        let cases: Vec<InvalidTestVector> =
+            serde_json::from_str(include_str!("../tests/ucan-v0.8.1-invalid.json")).unwrap();
+        for case in cases {
+            match Ucan::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver()).await {
+                Ok(u) => {
+                    if u.ucan.payload.validate_time(None).is_ok() {
+                        assert!(false, "{}", case.comment);
+                    }
+                }
+                Err(e) => {}
+            };
+        }
     }
 
-    #[async_std::test]
-    async fn versions_match() {
-        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOlsiZXlKaGJHY2lPaUpGWkVSVFFTSXNJblI1Y0NJNklrcFhWQ0lzSW5WamRpSTZJakF1T0M0eEluMC5leUpwYzNNaU9pSmthV1E2YTJWNU9ubzJUV3RtYm0xa1NEaHpUbTFEYUZWemEyaFJia3REVGpKTmNHaE5RMHhtUVcxU1FVYzBhVzlOZGtKV2RGRjFWaUlzSW1GMVpDSTZJbVJwWkRwclpYazZlalpOYTJabmRGaHJRMjVpT1V4WWJqaENibmxxZUZKTmJrdDBSbWRhWXpjMFRUWTROek4yTmpGeFEyTkxTR3BySWl3aVpYaHdJam8wT0RBME1UUXpOREV5TENKaGRIUWlPbHRkTENKd2NtWWlPbHRkZlEub2NURHU5emlkMW11NG9qOVJkVDRwMzdudlRPbEh1aWZkLW9EamZUTjF1ZHJaWnhpRjJiNUJKYmNzNGtEU0tKaU91enExT1hEVUctay1JOXNGdlMwQmciXX0.ok2xB1mr04nShwF76rgdBgv5dnUrbpAacMHXkOJCP-0kqvO4GYOwhLDwW6j43mnD2XCvy4U20LTTh_mkumxYAQ"#;
-        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
-            .await
-            .unwrap();
+    #[derive(Deserialize)]
+    struct ValidAssertions {
+        pub header: Header,
+        pub payload: Payload,
     }
 
-    #[async_std::test]
-    async fn not_expired() {
-        let s = r#"eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOC4xIn0.eyJpc3MiOiJkaWQ6a2V5Ono2TWtmZ3RYa0NuYjlMWG44Qm55anhSTW5LdEZnWmM3NE02ODczdjYxcUNjS0hqayIsImF1ZCI6ImRpZDprZXk6ejZNa2dYNWpqUlVidHlzZ2dFNHJhQ2FxQ1g4OEF6U3ZZcTgxV0prQm9BMW90OGFlIiwiZXhwIjo0ODA0MTQzNDEyLCJhdHQiOltdLCJwcmYiOltdfQ.NaguDFWi8SkedAZ5eplUvQgMkeIQyZLzvl6084mH4vxqTazMxyDbT8RdHGumGug2NmKSvHn0_t2ae0KJK5U-BQ"#;
-        Ucan::<JsonValue>::decode_verify(s, DIDExample.to_resolver())
-            .await
-            .unwrap();
+    #[derive(Deserialize)]
+    struct ValidTestVector {
+        pub comment: String,
+        pub token: String,
+        pub assertions: ValidAssertions,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct InvalidAssertions {
+        pub header: Option<JsonValue>,
+        pub payload: Option<JsonValue>,
+        pub type_errors: Option<Vec<String>>,
+        pub validation_errors: Option<Vec<String>>,
+    }
+
+    #[derive(Deserialize)]
+    struct InvalidTestVector {
+        pub comment: String,
+        pub token: String,
+        pub assertions: InvalidAssertions,
     }
 
     pub struct DIDExample;
