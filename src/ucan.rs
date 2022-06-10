@@ -26,6 +26,26 @@ pub struct DecodedUcanTree<F = JsonValue, A = HashMap<String, JsonValue>> {
     pub parents: Vec<DecodedUcanTree<F, A>>,
 }
 
+impl<F, A> DecodedUcanTree<F, A> {
+    pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
+        let t = Some(time.unwrap_or_else(now));
+        self.ucan.payload.validate_time(t)?;
+        self.parents
+            .iter()
+            .map(|p| p.validate_time(t))
+            .collect::<Result<Vec<()>, TimeInvalid>>()?;
+        Ok(())
+    }
+
+    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
+    where
+        F: DeserializeOwned + Send,
+        A: DeserializeOwned + Send,
+    {
+        Ucan::<F, A>::decode_verify(jwt, resolver).await
+    }
+}
+
 impl<F, A> Ucan<F, A> {
     #[cfg_attr(target_arch = "wasm32", async_recursion(?Send))]
     #[cfg_attr(not(target_arch = "wasm32"), async_recursion)]
@@ -337,7 +357,7 @@ mod tests {
                     }
                 };
 
-            // assert!(ucans.ucan.payload.validate_time(None).is_ok());
+            // assert!(ucans.validate_time(None).is_ok());
             assert_eq!(ucans.ucan.payload, case.assertions.payload);
             assert_eq!(ucans.ucan.header, case.assertions.header);
         }
@@ -350,7 +370,7 @@ mod tests {
         for case in cases {
             match Ucan::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver()).await {
                 Ok(u) => {
-                    if u.ucan.payload.validate_time(None).is_ok() {
+                    if u.validate_time(None).is_ok() {
                         assert!(false, "{}", case.comment);
                     }
                 }
