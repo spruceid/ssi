@@ -289,37 +289,6 @@ mod tests {
         }
     }
 
-    const DOC_JSON: &'static str = r#"{
-  "@context": [
-    "https://www.w3.org/ns/did/v1",
-    {
-      "Ed25519VerificationKey2018": "https://w3id.org/security#Ed25519VerificationKey2018",
-      "publicKeyJwk": {
-        "@id": "https://w3id.org/security#publicKeyJwk",
-        "@type": "@json"
-      }
-    }
-  ],
-  "id": "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk",
-  "verificationMethod": [
-    {
-      "id": "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk#z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk",
-      "type": "Ed25519VerificationKey2018",
-      "controller": "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk",
-      "publicKeyJwk": {
-        "kty": "OKP",
-        "crv": "Ed25519",
-        "x": "Ell93DzMeUkCSs6CSuc2NxH5pYV5ozw9ro97b5sXRM8"
-      }
-    }
-  ],
-  "authentication": [
-    "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk#z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk"
-  ],
-  "assertionMethod": [
-    "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk#z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk"
-  ]
-}"#;
     #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl DIDResolver for DIDExample {
@@ -332,13 +301,12 @@ mod tests {
             Option<Document>,
             Option<DocumentMetadata>,
         ) {
-            if did != "did:key:z6MkfgtXkCnb9LXn8BnyjxRMnKtFgZc74M6873v61qCcKHjk" {
-                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
-            }
-            let doc: Document = match serde_json::from_str(DOC_JSON) {
-                Ok(doc) => doc,
-                Err(err) => {
-                    return (ResolutionMetadata::from_error(&err.to_string()), None, None);
+            let dids: HashMap<String, Document> =
+                serde_json::from_str(include_str!("../tests/did-key-statics.json")).unwrap();
+            let doc: Document = match dids.get(did) {
+                Some(doc) => doc.clone(),
+                _ => {
+                    return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
                 }
             };
             (
