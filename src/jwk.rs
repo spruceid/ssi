@@ -1196,15 +1196,15 @@ mod tests {
     #[test]
     fn generate_ed25519_from_bytes() {
         let a32: JWK = serde_json::from_str(ED25519_A32_JSON).unwrap();
-        let bytes = "a".repeat(32).as_bytes();
-        let generated_a_32 = JWK::generate_ed25519_from_bytes(bytes).unwrap();
+        let byte_string = "a".repeat(32);
+        let generated_a_32 = JWK::generate_ed25519_from_bytes(byte_string.as_bytes()).unwrap();
         assert_eq!(generated_a_32, a32);
     }
 
     #[test]
     fn generate_ed25519_from_bytes_checks_length() {
-        let bytes = "a".repeat(33).as_bytes();
-        let error = JWK::generate_ed25519_from_bytes(bytes);
+        let byte_string = "a".repeat(33);
+        let error = JWK::generate_ed25519_from_bytes(byte_string.as_bytes());
         assert!(error.is_err());
     }
 
