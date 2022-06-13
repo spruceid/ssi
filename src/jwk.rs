@@ -267,6 +267,9 @@ impl JWK {
 
     #[cfg(feature = "ring")]
     pub fn generate_ed25519_from_bytes(bytes: &[u8]) -> Result<JWK, Error> {
+        if bytes.len() != 32 {
+            return Err(Error::InvalidSeedLength(32, bytes.len()));
+        }
         let rng = ring::test::rand::FixedSliceRandom { bytes };
         let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
             .as_ref()
@@ -284,6 +287,10 @@ impl JWK {
 
     #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
+        if bytes.len() != 32 {
+            return Err(Error::InvalidSeedLength(32, bytes.len()));
+        }
+
         let mut csprng = rand_old::rngs::OsRng {};
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
         Ok(JWK::from(Params::OKP(OctetParams {
@@ -1189,10 +1196,16 @@ mod tests {
     #[test]
     fn generate_ed25519_from_bytes() {
         let a32: JWK = serde_json::from_str(ED25519_A32_JSON).unwrap();
-        let generated_a_32 =
-            JWK::generate_ed25519_from_bytes("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".as_bytes())
-                .unwrap();
+        let bytes = "a".repeat(32).as_bytes();
+        let generated_a_32 = JWK::generate_ed25519_from_bytes(bytes).unwrap();
         assert_eq!(generated_a_32, a32);
+    }
+
+    #[test]
+    fn generate_ed25519_from_bytes_checks_length() {
+        let bytes = "a".repeat(33).as_bytes();
+        let error = JWK::generate_ed25519_from_bytes(bytes);
+        assert!(error.is_err());
     }
 
     #[test]

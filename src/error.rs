@@ -234,6 +234,8 @@ pub enum Error {
     InvalidProofTypeType,
     /// Invalid key length
     InvalidKeyLength(usize),
+    /// Invalid seed length
+    InvalidSeedLength(usize, usize),
     /// Inconsistent DID Key
     InconsistentDIDKey,
     /// Crypto error from `ring` crate
@@ -505,6 +507,7 @@ impl fmt::Display for Error {
             Error::ResourceNotFound(id) => write!(f, "Resource not found: {}", id),
             Error::InvalidProofTypeType => write!(f, "Invalid ProofType type"),
             Error::InvalidKeyLength(len) => write!(f, "Invalid key length: {}", len),
+            Error::InvalidSeedLength(expected, actual) => write!(f, "Expected seed length {} but found {}", expected, actual),
             Error::InconsistentDIDKey => write!(f, "Inconsistent DID Key"),
             Error::DIDURL => write!(f, "Invalid DID URL"),
             Error::UnexpectedDIDFragment => write!(f, "Unexpected DID fragment"),
