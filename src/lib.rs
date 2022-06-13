@@ -26,6 +26,7 @@
 #[cfg(feature = "aleosig")]
 pub mod aleo;
 
+#[cfg(feature = "bbs")]
 pub mod bbs;
 pub mod blakesig;
 pub mod caip10;
