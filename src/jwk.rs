@@ -287,10 +287,6 @@ impl JWK {
 
     #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
-        if bytes.len() != 32 {
-            return Err(Error::InvalidSeedLength(32, bytes.len()));
-        }
-
         let mut csprng = rand_old::rngs::OsRng {};
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
         Ok(JWK::from(Params::OKP(OctetParams {
@@ -302,6 +298,10 @@ impl JWK {
 
     #[cfg(feature = "ed25519-dalek")]
     pub fn generate_ed25519_from_bytes(bytes: &[u8]) -> Result<JWK, Error> {
+        if bytes.len() != 32 {
+            return Err(Error::InvalidSeedLength(32, bytes.len()));
+        }
+
         let secret = ed25519_dalek::SecretKey::from_bytes(bytes)?;
         let public: ed25519_dalek::PublicKey = (&secret).into();
         Ok(JWK::from(Params::OKP(OctetParams {
