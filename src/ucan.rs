@@ -1,5 +1,5 @@
 use crate::{
-    did::{Resource, VerificationMethod},
+    did::{Document, Resource, VerificationMethod, VerificationMethodMap},
     did_resolve::{dereference, Content, DIDResolver},
     error::Error,
     jwk::{Algorithm, JWK},
@@ -81,9 +81,14 @@ impl<F, A> Ucan<F, A> {
                 .await
                 .1,
         ) {
-            // did:pkh with and without fragment
-            (Some("did:pkh:"), Some(jwk), Content::Object(_) | Content::DIDDocument(_)) => {
-                match_key_with_did_pkh(&jwk, &payload.issuer)?;
+            // did:pkh without fragment
+            (Some("did:pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+                match_key_with_did_pkh(&jwk, &d)?;
+                jwk.clone()
+            }
+            // did:pkh with fragment
+            (Some("did:pkh:"), Some(jwk), Content::Object(Resource::VerificationMethod(vm))) => {
+                match_key_with_vm(&jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
@@ -155,14 +160,25 @@ impl<F, A> Ucan<F, A> {
     }
 }
 
-fn match_key_with_did_pkh(key: &JWK, did: &str) -> Result<(), Error> {
+fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
+    doc.verification_method
+        .iter()
+        .flatten()
+        .find_map(|vm| match vm {
+            VerificationMethod::Map(vm) if vm.blockchain_account_id.is_some() => {
+                Some(match_key_with_vm(key, vm))
+            }
+            _ => None,
+        })
+        .unwrap_or(Err(Error::VerificationMethodMismatch))
+}
+
+fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error> {
     use std::str::FromStr;
     Ok(crate::caip10::BlockchainAccountId::from_str(
-        did.split_once('#')
-            .map(|(d, _)| d)
-            .unwrap_or(did)
-            .strip_prefix("did:pkh:")
-            .ok_or(Error::DIDURL)?,
+        &vm.blockchain_account_id
+            .as_ref()
+            .ok_or(Error::VerificationMethodMismatch)?,
     )?
     .verify(key)?)
 }
