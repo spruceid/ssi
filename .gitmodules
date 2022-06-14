@@ -3,4 +3,4 @@
 	url = https://github.com/w3c/json-ld-api
 [submodule "json-ld-normalization"]
 	path = json-ld-normalization
-	url = https://github.com/json-ld/rdf-dataset-canonicalization/
+	url = https://github.com/json-ld/rdf-dataset-canonicalization
