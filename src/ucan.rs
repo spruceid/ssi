@@ -14,14 +14,14 @@ use serde_with::{serde_as, DisplayFromStr};
 use std::collections::HashMap;
 
 #[derive(Clone, PartialEq)]
-pub struct Ucan<F = JsonValue, A = HashMap<String, JsonValue>> {
+pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
     pub signature: Vec<u8>,
 }
 
 #[derive(Clone)]
-pub struct DecodedUcanTree<F = JsonValue, A = HashMap<String, JsonValue>> {
+pub struct DecodedUcanTree<F = JsonValue, A = JsonValue> {
     pub ucan: Ucan<F, A>,
     pub parents: Vec<DecodedUcanTree<F, A>>,
 }
@@ -201,7 +201,7 @@ pub enum DecodeError<E> {
 }
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Payload<F = JsonValue, A = HashMap<String, JsonValue>> {
+pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "iss")]
     pub issuer: String,
     #[serde(rename = "aud")]
@@ -254,7 +254,7 @@ impl<F, A> Payload<F, A> {
                 type_: Some("JWT".to_string()),
                 additional_parameters: std::array::IntoIter::new([(
                     "ucv".to_string(),
-                    serde_json::Value::String("0.8.1".to_string()),
+                    serde_json::Value::String("0.9.0".to_string()),
                 )])
                 .collect(),
                 ..Default::default()
@@ -338,11 +338,11 @@ impl std::str::FromStr for UcanScope {
 /// MAY have additional fields needed to describe the capability
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Capability<A = HashMap<String, JsonValue>> {
+pub struct Capability<A = JsonValue> {
     pub with: UcanResource,
     #[serde_as(as = "DisplayFromStr")]
     pub can: UcanScope,
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nb", skip_serializing_if = "Option::is_none")]
     pub additional_fields: Option<A>,
 }
 
