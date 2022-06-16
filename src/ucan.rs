@@ -36,23 +36,9 @@ impl<F, A> DecodedUcanTree<F, A> {
             .collect::<Result<Vec<()>, TimeInvalid>>()?;
         Ok(())
     }
-
-    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
-    where
-        F: DeserializeOwned + Send,
-        A: DeserializeOwned + Send,
-    {
-        Ucan::<F, A>::decode_verify(jwt, resolver).await
-    }
-}
-
-impl<F, A> Ucan<F, A> {
     #[cfg_attr(target_arch = "wasm32", async_recursion(?Send))]
     #[cfg_attr(not(target_arch = "wasm32"), async_recursion)]
-    pub async fn decode_verify(
-        jwt: &str,
-        resolver: &dyn DIDResolver,
-    ) -> Result<DecodedUcanTree<F, A>, Error>
+    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
     where
         F: DeserializeOwned + Send,
         A: DeserializeOwned + Send,
@@ -139,6 +125,16 @@ impl<F, A> Ucan<F, A> {
                 signature: parts.signature,
             },
         })
+    }
+}
+
+impl<F, A> Ucan<F, A> {
+    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Ucan<F, A>, Error>
+    where
+        F: DeserializeOwned + Send,
+        A: DeserializeOwned + Send,
+    {
+        Ok(DecodedUcanTree::decode_verify(jwt, resolver).await?.ucan)
     }
 
     pub fn decode(jwt: &str) -> Result<Self, Error>
@@ -363,15 +359,18 @@ mod tests {
         let cases: Vec<ValidTestVector> =
             serde_json::from_str(include_str!("../tests/ucan-v0.8.1-valid.json")).unwrap();
         for case in cases {
-            let ucans =
-                match Ucan::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver()).await
-                {
-                    Ok(u) => u,
-                    Err(e) => {
-                        println!("{}", case.comment);
-                        Err(e).unwrap()
-                    }
-                };
+            let ucans = match DecodedUcanTree::<JsonValue>::decode_verify(
+                &case.token,
+                DIDExample.to_resolver(),
+            )
+            .await
+            {
+                Ok(u) => u,
+                Err(e) => {
+                    println!("{}", case.comment);
+                    Err(e).unwrap()
+                }
+            };
 
             // assert!(ucans.validate_time(None).is_ok());
             assert_eq!(ucans.ucan.payload, case.assertions.payload);
@@ -384,7 +383,9 @@ mod tests {
         let cases: Vec<InvalidTestVector> =
             serde_json::from_str(include_str!("../tests/ucan-v0.8.1-invalid.json")).unwrap();
         for case in cases {
-            match Ucan::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver()).await {
+            match DecodedUcanTree::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver())
+                .await
+            {
                 Ok(u) => {
                     if u.validate_time(None).is_ok() {
                         assert!(false, "{}", case.comment);
