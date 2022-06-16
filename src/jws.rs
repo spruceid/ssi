@@ -596,10 +596,18 @@ pub fn encode_sign(algorithm: Algorithm, payload: &str, key: &JWK) -> Result<Str
         key_id: key.key_id.clone(),
         ..Default::default()
     };
-    let header_b64 = base64_encode_json(&header)?;
+    encode_sign_custom_header(payload, key, &header)
+}
+
+pub fn encode_sign_custom_header(
+    payload: &str,
+    key: &JWK,
+    header: &Header,
+) -> Result<String, Error> {
+    let header_b64 = base64_encode_json(header)?;
     let payload_b64 = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
     let signing_input = header_b64 + "." + &payload_b64;
-    let sig_b64 = sign_bytes_b64(algorithm, signing_input.as_bytes(), key)?;
+    let sig_b64 = sign_bytes_b64(header.algorithm, signing_input.as_bytes(), key)?;
     let jws = [signing_input, sig_b64].join(".");
     Ok(jws)
 }
