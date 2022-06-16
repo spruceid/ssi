@@ -3,11 +3,15 @@ use crate::{
     did_resolve::{dereference, Content, DIDResolver},
     error::Error,
     jwk::{Algorithm, JWK},
-    jws::{decode_jws_parts, encode_sign_custom_header, split_jws, verify_bytes, Header},
+    jws::{
+        decode_jws_parts, encode_sign_custom_header, split_jws, verify_bytes, DecodedJWS, Header,
+    },
     vc::{NumericDate, URI},
 };
 use async_recursion::async_recursion;
+use async_trait::async_trait;
 use futures::future::try_join_all;
+use libipld::Cid;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{serde_as, DisplayFromStr};
@@ -20,10 +24,41 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub signature: Vec<u8>,
 }
 
-#[derive(Clone)]
+// to maintain serialisation
+#[derive(Clone, PartialEq)]
+pub struct PreserializedUcan<F = JsonValue, A = JsonValue> {
+    payload: Payload<F, A>,
+    parts: DecodedJWS,
+}
+
+impl<F, A> std::ops::Deref for PreserializedUcan<F, A> {
+    type Target = Payload<F, A>;
+    fn deref(&self) -> &Self::Target {
+        &self.payload
+    }
+}
+
+#[derive(Clone, PartialEq)]
 pub struct DecodedUcanTree<F = JsonValue, A = JsonValue> {
     pub ucan: Ucan<F, A>,
     pub parents: Vec<DecodedUcanTree<F, A>>,
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize)]
+pub struct UcanCollection {
+    #[serde(rename = "/")]
+    pub root: String,
+    #[serde(flatten)]
+    #[serde_as(as = "HashMap<DisplayFromStr, _>")]
+    pub ancestors: HashMap<Cid, String>,
+}
+
+#[async_trait]
+pub trait UcanStore {
+    type Err;
+    async fn get_ucan(&self, ucan: &Cid) -> Result<Option<Ucan>, Self::Err>;
+    async fn get_collection(&self, ucan: &Cid) -> Result<Option<UcanCollection>, Self::Err>;
 }
 
 impl<F, A> DecodedUcanTree<F, A> {
@@ -43,27 +78,13 @@ impl<F, A> DecodedUcanTree<F, A> {
         F: DeserializeOwned + Send,
         A: DeserializeOwned + Send,
     {
-        let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
-        let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
-
-        if parts.header.type_.as_deref() != Some("JWT") {
-            return Err(Error::MissingType);
-        }
-
-        match parts.header.additional_parameters.get("ucv") {
-            Some(JsonValue::String(v)) if v == "0.8.1" => (),
-            _ => return Err(Error::MissingType),
-        }
-
-        if !payload.audience.starts_with("did:") {
-            return Err(Error::DIDURL);
-        }
+        let ucan = Ucan::<F, A>::decode(jwt)?;
 
         // extract or deduce signing key
         let key: JWK = match (
-            payload.issuer.get(..8),
-            &parts.header.jwk,
-            dereference(resolver, &payload.issuer, &Default::default())
+            ucan.payload.issuer.get(..8),
+            &ucan.header.jwk,
+            dereference(resolver, &ucan.payload.issuer, &Default::default())
                 .await
                 .1,
         ) {
@@ -95,35 +116,30 @@ impl<F, A> DecodedUcanTree<F, A> {
         };
 
         verify_bytes(
-            parts.header.algorithm,
-            &parts.signing_input,
+            ucan.header.algorithm,
+            &jwt.rsplit_once('.').ok_or(Error::InvalidJWS)?.0.as_bytes(),
             &key,
-            &parts.signature,
+            &ucan.signature,
         )?;
 
-        let parents = try_join_all(
-            payload
-                .proof
-                .iter()
-                .map(|s| Self::decode_verify(s, resolver)),
-        )
-        .await?;
+        // let parents = try_join_all(
+        //     payload
+        //         .proof
+        //         .iter()
+        //         .map(|s| Self::decode_verify(s, resolver)),
+        // )
+        // .await?;
 
-        if parents
-            .iter()
-            .any(|p| p.ucan.payload.audience != payload.issuer)
-        {
-            return Err(Error::InvalidIssuer);
-        }
+        // if parents
+        //     .iter()
+        //     .any(|p| p.ucan.payload.audience != payload.issuer)
+        // {
+        //     return Err(Error::InvalidIssuer);
+        // }
 
         Ok(DecodedUcanTree {
-            // decode and verify parents
-            parents,
-            ucan: Ucan {
-                header: parts.header,
-                payload,
-                signature: parts.signature,
-            },
+            parents: Vec::new(),
+            ucan,
         })
     }
 }
@@ -144,15 +160,25 @@ impl<F, A> Ucan<F, A> {
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
         let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
+
+        if parts.header.type_.as_deref() != Some("JWT") {
+            return Err(Error::MissingType);
+        }
+
+        match parts.header.additional_parameters.get("ucv") {
+            Some(JsonValue::String(v)) if v == "0.8.1" => (),
+            _ => return Err(Error::MissingType),
+        }
+
+        if !payload.audience.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
+
         Ok(Self {
             header: parts.header,
             payload,
             signature: parts.signature,
         })
-    }
-
-    pub fn parents(&self) -> ParentIter {
-        self.payload.parents()
     }
 }
 
@@ -179,15 +205,6 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
     .verify(key)?)
 }
 
-pub struct ParentIter<'a>(std::slice::Iter<'a, String>);
-
-impl<'a> Iterator for ParentIter<'a> {
-    type Item = Result<Ucan, Error>;
-    fn next(&mut self) -> Option<Result<Ucan, Error>> {
-        self.0.next().map(|s| Ucan::decode(s))
-    }
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum DecodeError<E> {
     #[error(transparent)]
@@ -200,6 +217,7 @@ pub enum DecodeError<E> {
     Signature(E),
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "iss")]
@@ -214,8 +232,9 @@ pub struct Payload<F = JsonValue, A = JsonValue> {
     pub nonce: Option<String>,
     #[serde(rename = "fct", skip_serializing_if = "Option::is_none")]
     pub facts: Option<Vec<F>>,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
     #[serde(rename = "prf")]
-    pub proof: Vec<String>,
+    pub proof: Vec<Cid>,
     #[serde(rename = "att")]
     pub attenuation: Vec<Capability<A>>,
 }
@@ -260,10 +279,6 @@ impl<F, A> Payload<F, A> {
                 ..Default::default()
             },
         )
-    }
-
-    pub fn parents(&self) -> ParentIter {
-        ParentIter(self.proof.iter())
     }
 }
 
