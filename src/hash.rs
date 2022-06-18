@@ -6,32 +6,26 @@ use crate::error::Error;
 
 /// SHA-256 hash
 pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
-    #[cfg(not(feature = "ring"))]
-    #[cfg(feature = "sha2")]
+    #[cfg(feature = "ring")]
     {
+        // The "ring" feature takes precedence for the impl of sha256.
+        use ring::digest;
+        use std::convert::TryInto;
+        let hash = digest::digest(&digest::SHA256, data).as_ref().try_into()?;
+        return Ok(hash);
+    }
+    #[cfg(all(not(feature = "ring"), feature = "sha2"))]
+    {
+        // Only if "ring" is not enabled, but "sha2" is, does it use "sha2" for the sha256 impl.
         use sha2::Digest;
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
         let hash = hasher.finalize().into();
         return Ok(hash);
     }
-    #[cfg(feature = "ring")]
-    #[cfg(not(feature = "sha2"))]
+    #[cfg(all(not(feature = "ring"), not(feature = "sha2")))]
     {
-        use ring::digest;
-        use std::convert::TryInto;
-        let hash = digest::digest(&digest::SHA256, data).as_ref().try_into()?;
-        return Ok(hash);
-    }
-    #[cfg(feature = "ring")]
-    #[cfg(feature = "sha2")]
-    {
-        let _ = data;
-        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and both are currently enabled).");
-    }
-    #[cfg(not(feature = "ring"))]
-    #[cfg(not(feature = "sha2"))]
-    {
+        // If neither "ring" nor "sha2" are enabled, no sha256 impl is possible.
         let _ = data;
         unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and neither are currently enabled).");
     }
