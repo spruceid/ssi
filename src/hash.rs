@@ -5,7 +5,6 @@
 use crate::error::Error;
 
 /// SHA-256 hash
-#[cfg(any(feature = "sha2", feature = "ring"))]
 pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
     #[cfg(not(feature = "ring"))]
     #[cfg(feature = "sha2")]
@@ -28,13 +27,13 @@ pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
     #[cfg(feature = "sha2")]
     {
         let _ = data;
-        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` (not both).");
+        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and both are currently enabled).");
     }
     #[cfg(not(feature = "ring"))]
     #[cfg(not(feature = "sha2"))]
     {
         let _ = data;
-        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` (not both).");
+        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and neither are currently enabled).");
     }
 }
 
