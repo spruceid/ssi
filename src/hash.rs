@@ -7,20 +7,34 @@ use crate::error::Error;
 /// SHA-256 hash
 #[cfg(any(feature = "sha2", feature = "ring"))]
 pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
+    #[cfg(not(feature = "ring"))]
     #[cfg(feature = "sha2")]
     {
         use sha2::Digest;
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
         let hash = hasher.finalize().into();
-        Ok(hash)
+        return Ok(hash);
     }
     #[cfg(feature = "ring")]
+    #[cfg(not(feature = "sha2"))]
     {
         use ring::digest;
         use std::convert::TryInto;
         let hash = digest::digest(&digest::SHA256, data).as_ref().try_into()?;
-        Ok(hash)
+        return Ok(hash);
+    }
+    #[cfg(feature = "ring")]
+    #[cfg(feature = "sha2")]
+    {
+        let _ = data;
+        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` (not both).");
+    }
+    #[cfg(not(feature = "ring"))]
+    #[cfg(not(feature = "sha2"))]
+    {
+        let _ = data;
+        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` (not both).");
     }
 }
 
