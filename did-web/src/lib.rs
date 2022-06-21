@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-
 use ssi::did::{DIDMethod, Document};
 use ssi::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
 };
 use ssi::USER_AGENT;
+use urlencoding::decode;
 
 // For testing, enable handling requests at localhost.
 #[cfg(test)]
@@ -22,8 +22,16 @@ pub struct DIDWeb;
 
 fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
     let mut parts = did.split(':').peekable();
-    let domain_name = match (parts.next(), parts.next(), parts.next()) {
-        (Some("did"), Some("web"), Some(domain_name)) => domain_name,
+    let domain_section = match (parts.next(), parts.next(), parts.next()) {
+        (Some("did"), Some("web"), Some(domain_section)) => domain_section,
+        _ => {
+            return Err(ResolutionMetadata::from_error(ERROR_INVALID_DID));
+        }
+    };
+    let decoded_domain_and_port = decode(domain_section).expect("UTF-8");
+    let mut domain_port_parts = decoded_domain_and_port.split(':').peekable();
+    let hostname = match domain_port_parts.next() {
+        Some(hostname) => hostname,
         _ => {
             return Err(ResolutionMetadata::from_error(ERROR_INVALID_DID));
         }
@@ -38,13 +46,13 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
         None => ".well-known".to_string(),
     };
     // Use http for localhost, for testing purposes.
-    let proto = if domain_name == "localhost" {
+    let proto = if hostname == "localhost" {
         "http"
     } else {
         "https"
     };
     #[allow(unused_mut)]
-    let mut url = format!("{}://{}/{}/did.json", proto, domain_name, path);
+    let mut url = format!("{}://{}/{}/did.json", proto, decoded_domain_and_port, path);
     #[cfg(test)]
     PROXY.with(|proxy| {
         if let Some(ref proxy) = *proxy.borrow() {
@@ -208,6 +216,21 @@ mod tests {
         assert_eq!(
             did_web_url("did:web:example.com:u:bob").unwrap(),
             "https://example.com/u/bob/did.json"
+        );
+        // https://w3c-ccg.github.io/did-method-web/#method-specific-identifier
+        assert_eq!(
+            did_web_url("did:web:example.com%3A3000").unwrap(),
+            "https://example.com:3000/.well-known/did.json"
+        );
+
+        // localhost always use "http"
+        assert_eq!(
+            did_web_url("did:web:localhost").unwrap(),
+            "http://localhost/.well-known/did.json"
+        );
+        assert_eq!(
+            did_web_url("did:web:localhost%3A4000").unwrap(),
+            "http://localhost:4000/.well-known/did.json"
         );
     }
 
