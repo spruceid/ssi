@@ -3,88 +3,57 @@ use crate::{
     did_resolve::{dereference, Content, DIDResolver},
     error::Error,
     jwk::{Algorithm, JWK},
-    jws::{
-        decode_jws_parts, encode_sign_custom_header, split_jws, verify_bytes, DecodedJWS, Header,
-    },
+    jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header},
     vc::{NumericDate, URI},
 };
-use async_recursion::async_recursion;
-use async_trait::async_trait;
-use futures::future::try_join_all;
-use libipld::Cid;
+use libipld::{
+    codec::{Codec, Decode, Encode},
+    error::Error as IpldError,
+    json::DagJsonCodec,
+    serde::{from_ipld, to_ipld},
+    Cid, Ipld,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{serde_as, DisplayFromStr};
-use std::collections::HashMap;
+use std::io::{Read, Seek, Write};
 
 #[derive(Clone, PartialEq)]
 pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
     pub signature: Vec<u8>,
-}
-
-// to maintain serialisation
-#[derive(Clone, PartialEq)]
-pub struct PreserializedUcan<F = JsonValue, A = JsonValue> {
-    payload: Payload<F, A>,
-    parts: DecodedJWS,
-}
-
-impl<F, A> std::ops::Deref for PreserializedUcan<F, A> {
-    type Target = Payload<F, A>;
-    fn deref(&self) -> &Self::Target {
-        &self.payload
-    }
+    // unfortunately this matters for sig verification
+    // we have to keep track of how this ucan was created
+    // alternatively we could have 2 different types?
+    // e.g. DagJsonUcan and RawJwtUcan
+    codec: UcanCodec,
 }
 
 #[derive(Clone, PartialEq)]
-pub struct DecodedUcanTree<F = JsonValue, A = JsonValue> {
-    pub ucan: Ucan<F, A>,
-    pub parents: Vec<DecodedUcanTree<F, A>>,
+enum UcanCodec {
+    // maintain serialization
+    Raw(String),
+    DagJson,
 }
 
-#[serde_as]
-#[derive(Serialize, Deserialize)]
-pub struct UcanCollection {
-    #[serde(rename = "/")]
-    pub root: String,
-    #[serde(flatten)]
-    #[serde_as(as = "HashMap<DisplayFromStr, _>")]
-    pub ancestors: HashMap<Cid, String>,
-}
-
-#[async_trait]
-pub trait UcanStore {
-    type Err;
-    async fn get_ucan(&self, ucan: &Cid) -> Result<Option<Ucan>, Self::Err>;
-    async fn get_collection(&self, ucan: &Cid) -> Result<Option<UcanCollection>, Self::Err>;
-}
-
-impl<F, A> DecodedUcanTree<F, A> {
-    pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
-        let t = Some(time.unwrap_or_else(now));
-        self.ucan.payload.validate_time(t)?;
-        self.parents
-            .iter()
-            .map(|p| p.validate_time(t))
-            .collect::<Result<Vec<()>, TimeInvalid>>()?;
-        Ok(())
+impl Default for UcanCodec {
+    fn default() -> Self {
+        Self::DagJson
     }
-    #[cfg_attr(target_arch = "wasm32", async_recursion(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_recursion)]
-    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
+}
+
+impl<F, A> Ucan<F, A> {
+    pub async fn verify_signature(&self, resolver: &dyn DIDResolver) -> Result<(), Error>
     where
-        F: DeserializeOwned + Send,
-        A: DeserializeOwned + Send,
+        F: Serialize + Send,
+        A: Serialize + Send,
     {
-        let ucan = Ucan::<F, A>::decode(jwt)?;
-
         // extract or deduce signing key
         let key: JWK = match (
-            ucan.payload.issuer.get(..8),
-            &ucan.header.jwk,
-            dereference(resolver, &ucan.payload.issuer, &Default::default())
+            self.payload.issuer.get(..8),
+            &self.header.jwk,
+            dereference(resolver, &self.payload.issuer, &Default::default())
                 .await
                 .1,
         ) {
@@ -111,46 +80,21 @@ impl<F, A> DecodedUcanTree<F, A> {
                 .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
+            (Some("did:"), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
         verify_bytes(
-            ucan.header.algorithm,
-            &jwt.rsplit_once('.').ok_or(Error::InvalidJWS)?.0.as_bytes(),
+            self.header.algorithm,
+            &self
+                .encode()?
+                .rsplit_once('.')
+                .ok_or(Error::InvalidJWS)?
+                .0
+                .as_bytes(),
             &key,
-            &ucan.signature,
-        )?;
-
-        // let parents = try_join_all(
-        //     payload
-        //         .proof
-        //         .iter()
-        //         .map(|s| Self::decode_verify(s, resolver)),
-        // )
-        // .await?;
-
-        // if parents
-        //     .iter()
-        //     .any(|p| p.ucan.payload.audience != payload.issuer)
-        // {
-        //     return Err(Error::InvalidIssuer);
-        // }
-
-        Ok(DecodedUcanTree {
-            parents: Vec::new(),
-            ucan,
-        })
-    }
-}
-
-impl<F, A> Ucan<F, A> {
-    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Ucan<F, A>, Error>
-    where
-        F: DeserializeOwned + Send,
-        A: DeserializeOwned + Send,
-    {
-        Ok(DecodedUcanTree::decode_verify(jwt, resolver).await?.ucan)
+            &self.signature,
+        )
     }
 
     pub fn decode(jwt: &str) -> Result<Self, Error>
@@ -159,14 +103,21 @@ impl<F, A> Ucan<F, A> {
         A: DeserializeOwned,
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
-        let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
+        let (payload, codec): (Payload<F, A>, UcanCodec) =
+            match serde_json::from_slice(&parts.payload) {
+                Ok(p) => Ok((p, UcanCodec::Raw(jwt.to_string()))),
+                Err(e) => match DagJsonCodec.decode(&parts.payload) {
+                    Ok(p) => Ok((p, UcanCodec::DagJson)),
+                    Err(_) => Err(e),
+                },
+            }?;
 
         if parts.header.type_.as_deref() != Some("JWT") {
             return Err(Error::MissingType);
         }
 
         match parts.header.additional_parameters.get("ucv") {
-            Some(JsonValue::String(v)) if v == "0.8.1" => (),
+            Some(JsonValue::String(v)) if v == "0.9.0" => (),
             _ => return Err(Error::MissingType),
         }
 
@@ -178,7 +129,84 @@ impl<F, A> Ucan<F, A> {
             header: parts.header,
             payload,
             signature: parts.signature,
+            codec,
         })
+    }
+
+    pub fn encode(&self) -> Result<String, Error>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        Ok(match &self.codec {
+            UcanCodec::Raw(r) => r.clone(),
+            UcanCodec::DagJson => [
+                base64::encode_config(
+                    &DagJsonCodec.encode(
+                        &to_ipld(&self.header)
+                            .map_err(IpldError::new)
+                            .map_err(Error::Other)?,
+                    )?,
+                    base64::URL_SAFE,
+                ),
+                base64::encode_config(&DagJsonCodec.encode(&self.payload)?, base64::URL_SAFE),
+                base64::encode_config(&self.signature, base64::URL_SAFE),
+            ]
+            .join("."),
+        })
+    }
+}
+
+impl<F, A, C> Encode<C> for Payload<F, A>
+where
+    F: Serialize,
+    A: Serialize,
+    C: Codec,
+    Ipld: Encode<C>,
+{
+    fn encode<W: Write>(&self, c: C, w: &mut W) -> Result<(), IpldError> {
+        let mut ipld = match to_ipld(self)? {
+            Ipld::Map(m) => m,
+            _ => return Err(IpldError::msg("Invalid Format")),
+        };
+
+        if let Some(Ipld::List(li)) = ipld.get_mut("prf") {
+            *li = li
+                .iter()
+                .map(|l| match l {
+                    Ipld::String(s) => Ok(Ipld::Link(s.parse()?)),
+                    _ => Err(IpldError::msg("Invalid Proof Entry")),
+                })
+                .collect::<Result<Vec<Ipld>, IpldError>>()?
+        };
+        Ipld::Map(ipld).encode(c, w)
+    }
+}
+
+impl<F, A, C> Decode<C> for Payload<F, A>
+where
+    F: DeserializeOwned,
+    A: DeserializeOwned,
+    C: Codec,
+    Ipld: Decode<C>,
+{
+    fn decode<R: Read + Seek>(c: C, r: &mut R) -> Result<Self, IpldError> {
+        let mut ipld = match Ipld::decode(c, r)? {
+            Ipld::Map(m) => m,
+            _ => return Err(IpldError::msg("Invalid Format")),
+        };
+
+        if let Some(Ipld::List(li)) = ipld.get_mut("prf") {
+            *li = li
+                .iter()
+                .map(|l| match l {
+                    Ipld::Link(c) => Ok(Ipld::String(c.to_string())),
+                    _ => Err(IpldError::msg("Invalid Proof Entry")),
+                })
+                .collect::<Result<Vec<Ipld>, IpldError>>()?
+        };
+
+        Ok(from_ipld(Ipld::Map(ipld))?)
     }
 }
 
@@ -259,26 +287,43 @@ impl<F, A> Payload<F, A> {
 
     // NOTE IntoIter::new is deprecated, but into_iter() returns references until we move to 2021 edition
     #[allow(deprecated)]
-    pub fn encode_sign(&self, algorithm: Algorithm, key: &JWK) -> Result<String, Error>
+    pub fn sign(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
     where
         F: Serialize,
         A: Serialize,
     {
-        encode_sign_custom_header(
-            &serde_json::to_string(&self)?,
+        let header = Header {
+            algorithm,
+            key_id: key.key_id.clone(),
+            type_: Some("JWT".to_string()),
+            additional_parameters: std::array::IntoIter::new([(
+                "ucv".to_string(),
+                serde_json::Value::String("0.9.0".to_string()),
+            )])
+            .collect(),
+            ..Default::default()
+        };
+
+        let signature = sign_bytes(
+            algorithm,
+            [
+                base64::encode_config(
+                    &DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
+                    base64::URL_SAFE,
+                ),
+                base64::encode_config(&DagJsonCodec.encode(&self)?, base64::URL_SAFE),
+            ]
+            .join(".")
+            .as_bytes(),
             key,
-            &Header {
-                algorithm,
-                key_id: key.key_id.clone(),
-                type_: Some("JWT".to_string()),
-                additional_parameters: std::array::IntoIter::new([(
-                    "ucv".to_string(),
-                    serde_json::Value::String("0.9.0".to_string()),
-                )])
-                .collect(),
-                ..Default::default()
-            },
-        )
+        )?;
+
+        Ok(Ucan {
+            header,
+            payload: self,
+            signature,
+            codec: UcanCodec::DagJson,
+        })
     }
 }
 
@@ -368,18 +413,14 @@ fn now() -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[async_std::test]
     async fn valid() {
         let cases: Vec<ValidTestVector> =
             serde_json::from_str(include_str!("../tests/ucan-v0.8.1-valid.json")).unwrap();
         for case in cases {
-            let ucans = match DecodedUcanTree::<JsonValue>::decode_verify(
-                &case.token,
-                DIDExample.to_resolver(),
-            )
-            .await
-            {
+            let ucan = match Ucan::decode(&case.token) {
                 Ok(u) => u,
                 Err(e) => {
                     println!("{}", case.comment);
@@ -387,9 +428,16 @@ mod tests {
                 }
             };
 
-            // assert!(ucans.validate_time(None).is_ok());
-            assert_eq!(ucans.ucan.payload, case.assertions.payload);
-            assert_eq!(ucans.ucan.header, case.assertions.header);
+            match ucan.verify_signature(DIDExample.to_resolver()).await {
+                Err(e) => {
+                    println!("{}", case.comment);
+                    Err(e).unwrap()
+                }
+                _ => {}
+            };
+
+            assert_eq!(ucan.payload, case.assertions.payload);
+            assert_eq!(ucan.header, case.assertions.header);
         }
     }
 
@@ -398,11 +446,11 @@ mod tests {
         let cases: Vec<InvalidTestVector> =
             serde_json::from_str(include_str!("../tests/ucan-v0.8.1-invalid.json")).unwrap();
         for case in cases {
-            match DecodedUcanTree::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver())
-                .await
-            {
+            match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
-                    if u.validate_time(None).is_ok() {
+                    if u.payload.validate_time(None).is_ok()
+                        && u.verify_signature(DIDExample.to_resolver()).await.is_ok()
+                    {
                         assert!(false, "{}", case.comment);
                     }
                 }
