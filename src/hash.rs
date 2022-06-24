@@ -27,7 +27,7 @@ pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
     {
         // If neither "ring" nor "sha2" are enabled, no sha256 impl is possible.
         let _ = data;
-        unimplemented!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and neither are currently enabled).");
+        compile_error!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and neither are currently enabled).");
     }
 }
 
