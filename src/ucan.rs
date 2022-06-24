@@ -16,9 +16,12 @@ use libipld::{
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{serde_as, DisplayFromStr};
-use std::io::{Read, Seek, Write};
+use std::{
+    fmt::Display,
+    io::{Read, Seek, Write},
+};
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
@@ -30,7 +33,7 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
     codec: UcanCodec,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 enum UcanCodec {
     // maintain serialization
     Raw(String),
@@ -294,7 +297,6 @@ impl<F, A> Payload<F, A> {
     {
         let header = Header {
             algorithm,
-            key_id: key.key_id.clone(),
             type_: Some("JWT".to_string()),
             additional_parameters: std::array::IntoIter::new([(
                 "ucv".to_string(),
@@ -335,10 +337,19 @@ pub enum UcanResource {
     URI(URI),
 }
 
+impl Display for UcanResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match &self {
+            Self::Proof(p) => write!(f, "{}", p),
+            Self::URI(u) => write!(f, "{}", u),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Debug)]
 pub struct UcanProofRef(pub u64);
 
-impl std::fmt::Display for UcanProofRef {
+impl Display for UcanProofRef {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "prf/{}", self.0)
     }
