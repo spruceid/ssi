@@ -13,7 +13,7 @@ use crate::rdf::{
 };
 
 use async_std::sync::RwLock;
-use futures::future::{BoxFuture, FutureExt};
+use futures::future::{BoxFuture, FutureExt, Remote};
 use iref::{Iri, IriBuf};
 use json::JsonValue;
 use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
@@ -153,12 +153,19 @@ pub const ZCAP_V1_CONTEXT: &str = "https://w3id.org/zcap/v1";
 pub const CACAO_ZCAP_V1_CONTEXT: &str = "https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json";
 pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: &str =
     "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json";
+pub const BIG_PLATO_CONTEXT: &str = "https://big-plato.com/vocab";
 
 lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
         let jsonld = ssi_contexts::CREDENTIALS_V1;
         let doc = json::parse(jsonld).unwrap();
         let iri = Iri::new(CREDENTIALS_V1_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
+    pub static ref BIG_PLATO_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::BIGPLATO;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(BIG_PLATO_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
     pub static ref CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -350,6 +357,7 @@ impl Loader for StaticLoader {
         async move {
             match url.as_str() {
                 CREDENTIALS_V1_CONTEXT => Ok(CREDENTIALS_V1_CONTEXT_DOCUMENT.clone()),
+                BIG_PLATO_CONTEXT => Ok(BIG_PLATO_CONTEXT_DOCUMENT.clone()),
                 CREDENTIALS_EXAMPLES_V1_CONTEXT => {
                     Ok(CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT.clone())
                 }

@@ -1,0 +1,65 @@
+{
+    "@context": {
+        "@version": 1.1,
+        "id": "@id",
+        "type": "@type",
+        "DocumentVerification": {
+            "@context": {
+                "@protected": true,
+                "@version": 1.1,
+                "@vocab": "https://big-plato.com/vocab#DocumentVerification",
+                "cred": "https://www.w3.org/2018/credentials#",
+                "file": {
+                    "@type": "http://schema.org/image"
+                },
+                "fileName": {
+                    "@type": "xsd:string"
+                },
+                "verifier": {
+                    "@type": "cred:issuer"
+                },
+                "xsd": "http://www.w3.org/2001/XMLSchema#"
+            },
+            "@id": "https://big-plato.com/vocab#DocumentVerification"
+        },
+        "Passport": {
+            "@context": {
+                "@protected": true,
+                "@version": 1.1,
+                "@vocab": "https://big-plato.com/vocab#Passport",
+                "BirthDate": {
+                    "@type": "xsd:date"
+                },
+                "DocumentNumber": {
+                    "@type": "xsd:string"
+                },
+                "ExpireDate": {
+                    "@type": "xsd:date"
+                },
+                "Gender": {
+                    "@type": "xsd:string"
+                },
+                "GivenNames": {
+                    "@type": "xsd:string"
+                },
+                "IssueDate": {
+                    "@type": "xsd:date"
+                },
+                "Name": {
+                    "@type": "xsd:string"
+                },
+                "Nationality": {
+                    "@type": "xsd:string"
+                },
+                "Scan": {
+                    "@type": "DocumentVerification"
+                },
+                "Surname": {
+                    "@type": "xsd:string"
+                },
+                "xsd": "http://www.w3.org/2001/XMLSchema#"
+            },
+            "@id": "https://big-plato.com/vocab#Passport"
+        }
+    }
+}
