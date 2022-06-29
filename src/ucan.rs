@@ -11,7 +11,7 @@ use libipld::{
     error::Error as IpldError,
     json::DagJsonCodec,
     serde::{from_ipld, to_ipld},
-    Cid, Ipld,
+    Block, Cid, Ipld,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -158,58 +158,42 @@ impl<F, A> Ucan<F, A> {
             .join("."),
         })
     }
-}
 
-impl<F, A, C> Encode<C> for Payload<F, A>
-where
-    F: Serialize,
-    A: Serialize,
-    C: Codec,
-    Ipld: Encode<C>,
-{
-    fn encode<W: Write>(&self, c: C, w: &mut W) -> Result<(), IpldError> {
-        let mut ipld = match to_ipld(self)? {
-            Ipld::Map(m) => m,
-            _ => return Err(IpldError::msg("Invalid Format")),
-        };
-
-        if let Some(Ipld::List(li)) = ipld.get_mut("prf") {
-            *li = li
-                .iter()
-                .map(|l| match l {
-                    Ipld::String(s) => Ok(Ipld::Link(s.parse()?)),
-                    _ => Err(IpldError::msg("Invalid Proof Entry")),
-                })
-                .collect::<Result<Vec<Ipld>, IpldError>>()?
-        };
-        Ipld::Map(ipld).encode(c, w)
+    pub fn to_block<S, H>(&self, hash: H) -> Result<Block<S>, IpldError>
+    where
+        F: Serialize,
+        A: Serialize,
+        S: libipld::store::StoreParams,
+        H: Into<S::Hashes>,
+        S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
+    {
+        match &self.codec {
+            UcanCodec::Raw(r) => Block::encode(libipld::raw::RawCodec, hash.into(), r.as_bytes()),
+            UcanCodec::DagJson => Block::encode(
+                DagJsonCodec,
+                hash.into(),
+                &to_ipld(ipld_encoding::DagJsonUcanRef::from(self))?,
+            ),
+        }
     }
-}
 
-impl<F, A, C> Decode<C> for Payload<F, A>
-where
-    F: DeserializeOwned,
-    A: DeserializeOwned,
-    C: Codec,
-    Ipld: Decode<C>,
-{
-    fn decode<R: Read + Seek>(c: C, r: &mut R) -> Result<Self, IpldError> {
-        let mut ipld = match Ipld::decode(c, r)? {
-            Ipld::Map(m) => m,
-            _ => return Err(IpldError::msg("Invalid Format")),
-        };
-
-        if let Some(Ipld::List(li)) = ipld.get_mut("prf") {
-            *li = li
-                .iter()
-                .map(|l| match l {
-                    Ipld::Link(c) => Ok(Ipld::String(c.to_string())),
-                    _ => Err(IpldError::msg("Invalid Proof Entry")),
-                })
-                .collect::<Result<Vec<Ipld>, IpldError>>()?
-        };
-
-        Ok(from_ipld(Ipld::Map(ipld))?)
+    pub fn from_block<S>(block: &Block<S>) -> Result<Self, IpldError>
+    where
+        F: DeserializeOwned,
+        A: DeserializeOwned,
+        S: libipld::store::StoreParams,
+        S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
+        Ipld: Decode<S::Codecs>,
+    {
+        if block.cid().codec() == S::Codecs::from(DagJsonCodec).into() {
+            let ipld: Ipld = S::Codecs::from(DagJsonCodec).decode(block.data())?;
+            let du: ipld_encoding::DagJsonUcan<F, A> = from_ipld(ipld)?;
+            Ok(du.into())
+        } else if block.cid().codec() == S::Codecs::from(libipld::raw::RawCodec).into() {
+            Ok(Self::decode(std::str::from_utf8(block.data())?)?)
+        } else {
+            Err(IpldError::msg("Invalid Codec, expected 'raw' or 'dagJson'"))
+        }
     }
 }
 
@@ -419,6 +403,137 @@ pub struct Capability<A = JsonValue> {
 
 fn now() -> f64 {
     (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
+}
+
+mod ipld_encoding {
+    use super::*;
+
+    #[derive(Serialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonUcanRef<'a, F = JsonValue, A = JsonValue> {
+        header: &'a Header,
+        payload: DagJsonPayloadRef<'a, F, A>,
+        signature: &'a [u8],
+    }
+
+    #[derive(Deserialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonUcan<F = JsonValue, A = JsonValue> {
+        header: Header,
+        payload: DagJsonPayload<F, A>,
+        signature: Vec<u8>,
+    }
+
+    #[derive(Serialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonPayloadRef<'a, F = JsonValue, A = JsonValue> {
+        pub iss: &'a str,
+        pub aud: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nbf: &'a Option<NumericDate>,
+        pub exp: &'a NumericDate,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nnc: &'a Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub fct: &'a Option<Vec<F>>,
+        pub prf: &'a Vec<Cid>,
+        pub att: &'a Vec<Capability<A>>,
+    }
+
+    #[derive(Deserialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonPayload<F = JsonValue, A = JsonValue> {
+        pub iss: String,
+        pub aud: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nbf: Option<NumericDate>,
+        pub exp: NumericDate,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nnc: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub fct: Option<Vec<F>>,
+        pub prf: Vec<Cid>,
+        pub att: Vec<Capability<A>>,
+    }
+
+    impl<F, A> Decode<DagJsonCodec> for Ucan<F, A>
+    where
+        F: DeserializeOwned,
+        A: DeserializeOwned,
+    {
+        fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
+            let u: ipld_encoding::DagJsonUcan<F, A> = from_ipld(Ipld::decode(c, r)?)?;
+            Ok(u.into())
+        }
+    }
+
+    impl<F, A> Encode<DagJsonCodec> for Payload<F, A>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        fn encode<W: Write>(&self, c: DagJsonCodec, w: &mut W) -> Result<(), IpldError> {
+            to_ipld(ipld_encoding::DagJsonPayloadRef::from(self))?.encode(c, w)
+        }
+    }
+
+    impl<F, A> Decode<DagJsonCodec> for Payload<F, A>
+    where
+        F: DeserializeOwned,
+        A: DeserializeOwned,
+    {
+        fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
+            let p: ipld_encoding::DagJsonPayload<F, A> = from_ipld(Ipld::decode(c, r)?)?;
+            Ok(p.into())
+        }
+    }
+
+    impl<'a, F, A> From<&'a Ucan<F, A>> for DagJsonUcanRef<'a, F, A> {
+        fn from(u: &'a Ucan<F, A>) -> Self {
+            Self {
+                header: &u.header,
+                payload: DagJsonPayloadRef::from(&u.payload),
+                signature: &u.signature,
+            }
+        }
+    }
+
+    impl<F, A> From<DagJsonUcan<F, A>> for Ucan<F, A> {
+        fn from(u: DagJsonUcan<F, A>) -> Self {
+            Self {
+                header: u.header,
+                payload: u.payload.into(),
+                signature: u.signature,
+                codec: UcanCodec::DagJson,
+            }
+        }
+    }
+
+    impl<'a, F, A> From<&'a Payload<F, A>> for DagJsonPayloadRef<'a, F, A> {
+        fn from(p: &'a Payload<F, A>) -> Self {
+            Self {
+                iss: &p.issuer,
+                aud: &p.audience,
+                nbf: &p.not_before,
+                exp: &p.expiration,
+                nnc: &p.nonce,
+                fct: &p.facts,
+                prf: &p.proof,
+                att: &p.attenuation,
+            }
+        }
+    }
+
+    impl<F, A> From<DagJsonPayload<F, A>> for Payload<F, A> {
+        fn from(p: DagJsonPayload<F, A>) -> Self {
+            Self {
+                issuer: p.iss,
+                audience: p.aud,
+                not_before: p.nbf,
+                expiration: p.exp,
+                nonce: p.nnc,
+                facts: p.fct,
+                proof: p.prf,
+                attenuation: p.att,
+            }
+        }
+    }
 }
 
 #[cfg(test)]
