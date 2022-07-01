@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 
 use crate::did_resolve::DIDResolver;
 use crate::error::Error;
-use crate::jsonld::{ContextLoader, json_to_dataset, SECURITY_V2_CONTEXT};
+use crate::jsonld::{json_to_dataset, ContextLoader, SECURITY_V2_CONTEXT};
 use crate::jwk::JWK;
 use crate::ldp::{LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
@@ -177,7 +177,15 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, Some(ps)).await
+        LinkedDataProofs::prepare(
+            self,
+            options,
+            resolver,
+            context_loader,
+            public_key,
+            Some(ps),
+        )
+        .await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -272,7 +280,9 @@ where
         P: Serialize + Send + Sync + Clone,
     {
         let mut result = target_capability.validate_invocation(self);
-        let mut r2 = self.verify_signature(options, resolver, context_loader).await;
+        let mut r2 = self
+            .verify_signature(options, resolver, context_loader)
+            .await;
         result.append(&mut r2);
         result
     }
@@ -324,7 +334,15 @@ where
     ) -> Result<ProofPreparation, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, Some(ps)).await
+        LinkedDataProofs::prepare(
+            self,
+            options,
+            resolver,
+            context_loader,
+            public_key,
+            Some(ps),
+        )
+        .await
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -538,7 +556,9 @@ mod tests {
         assert!(s_d_v.errors.is_empty());
         assert!(s_d_v.checks.iter().any(|c| c == &Check::Proof));
 
-        let s_i_v = signed_inv.verify(None, &dk, &mut context_loader, &signed_del).await;
+        let s_i_v = signed_inv
+            .verify(None, &dk, &mut context_loader, &signed_del)
+            .await;
         assert!(s_i_v.errors.is_empty());
         assert!(s_i_v.checks.iter().any(|c| c == &Check::Proof));
 
@@ -552,7 +572,11 @@ mod tests {
         };
 
         // invalid proof for data
-        assert!(!bad_sig_del.verify(None, &dk, &mut context_loader).await.errors.is_empty());
+        assert!(!bad_sig_del
+            .verify(None, &dk, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
         assert!(!bad_sig_inv
             .verify(None, &dk, &mut context_loader, &signed_del)
             .await

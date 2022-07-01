@@ -43,7 +43,8 @@ async fn main() {
                 .generate_jwt(Some(&key), &proof_options, resolver)
                 .await
                 .unwrap();
-            let result = ssi::vc::Credential::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
+            let result =
+                ssi::vc::Credential::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }

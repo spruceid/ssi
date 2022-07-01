@@ -397,7 +397,9 @@ impl CredentialStatus for RevocationList2020Status {
             }
             Ok(()) => {}
         }
-        let vc_result = revocation_list_credential.verify(None, resolver, context_loader).await;
+        let vc_result = revocation_list_credential
+            .verify(None, resolver, context_loader)
+            .await;
         for warning in vc_result.warnings {
             result
                 .warnings
@@ -527,7 +529,9 @@ impl CredentialStatus for StatusList2021Entry {
             }
             Ok(()) => {}
         }
-        let vc_result = status_list_credential.verify(None, resolver, context_loader).await;
+        let vc_result = status_list_credential
+            .verify(None, resolver, context_loader)
+            .await;
         for warning in vc_result.warnings {
             result.warnings.push(format!("Status list: {}", warning));
         }

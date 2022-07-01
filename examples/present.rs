@@ -52,7 +52,9 @@ async fn main() {
                 .await
                 .unwrap();
             vp.add_proof(proof);
-            let result = vp.verify(Some(proof_options), resolver, &mut context_loader).await;
+            let result = vp
+                .verify(Some(proof_options), resolver, &mut context_loader)
+                .await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }
@@ -67,7 +69,8 @@ async fn main() {
                 .await
                 .unwrap();
             print!("{}", jwt);
-            let result = ssi::vc::Presentation::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
+            let result =
+                ssi::vc::Presentation::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
             if result.errors.len() > 0 {
                 panic!("verify failed: {:#?}", result);
             }

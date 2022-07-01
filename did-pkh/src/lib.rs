@@ -925,7 +925,14 @@ mod tests {
         // Sign with proof suite directly because there is not currently a way to do it
         // for Eip712Signature2021 in did-pkh otherwise.
         let proof = proof_suite
-            .sign(&vc, &issue_options, &DIDPKH, &mut context_loader, &key, None)
+            .sign(
+                &vc,
+                &issue_options,
+                &DIDPKH,
+                &mut context_loader,
+                &key,
+                None,
+            )
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -939,17 +946,38 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDPKH, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_bad_issuer
+                .verify(None, &DIDPKH, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let proof_bad = proof_suite
-            .sign(&vc_no_proof, &issue_options, &DIDPKH, &mut context_loader, &wrong_key, None)
+            .sign(
+                &vc_no_proof,
+                &issue_options,
+                &DIDPKH,
+                &mut context_loader,
+                &wrong_key,
+                None,
+            )
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDPKH, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_wrong_key
+                .verify(None, &DIDPKH, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
@@ -979,27 +1007,44 @@ mod tests {
         vp_issue_options.eip712_domain = vp_eip712_domain_opt;
         // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
         let vp_proof = proof_suite
-            .sign(&vp, &vp_issue_options, &DIDPKH, &mut context_loader, &key, None)
+            .sign(
+                &vp,
+                &vp_issue_options,
+                &DIDPKH,
+                &mut context_loader,
+                &key,
+                None,
+            )
             .await
             .unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader).await;
+        let vp_verification_result = vp
+            .verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
         // Mess with proof signature to make verify fail
         let mut vp_fuzzed = vp.clone();
         fuzz_proof_value(&mut vp_fuzzed.proof);
-        let vp_verification_result = vp_fuzzed.verify(Some(vp_issue_options), &DIDPKH, &mut context_loader).await;
+        let vp_verification_result = vp_fuzzed
+            .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // Test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDPKH, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vp2.verify(None, &DIDPKH, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
     }
 
     async fn credential_prepare_complete_verify_did_pkh_tz(
@@ -1034,7 +1079,14 @@ mod tests {
         let mut context_loader = ssi::jsonld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         let prep = proof_suite
-            .prepare(&vc, &issue_options, &DIDPKH, &mut context_loader, &key, None)
+            .prepare(
+                &vc,
+                &issue_options,
+                &DIDPKH,
+                &mut context_loader,
+                &key,
+                None,
+            )
             .await
             .unwrap();
 
@@ -1053,17 +1105,38 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDPKH, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_bad_issuer
+                .verify(None, &DIDPKH, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let proof_bad = proof_suite
-            .sign(&vc_no_proof, &issue_options, &DIDPKH, &mut context_loader, &wrong_key, None)
+            .sign(
+                &vc_no_proof,
+                &issue_options,
+                &DIDPKH,
+                &mut context_loader,
+                &wrong_key,
+                None,
+            )
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDPKH, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_wrong_key
+                .verify(None, &DIDPKH, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
@@ -1092,7 +1165,14 @@ mod tests {
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
 
         let prep = proof_suite
-            .prepare(&vp, &vp_issue_options, &DIDPKH, &mut context_loader, &key, None)
+            .prepare(
+                &vp,
+                &vp_issue_options,
+                &DIDPKH,
+                &mut context_loader,
+                &key,
+                None,
+            )
             .await
             .unwrap();
         let sig = sign_tezos(&prep, algorithm, &key);
@@ -1100,21 +1180,31 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader).await;
+        let vp_verification_result = vp
+            .verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
         // Mess with proof signature to make verify fail
         let mut vp_fuzzed = vp.clone();
         fuzz_proof_value(&mut vp_fuzzed.proof);
-        let vp_verification_result = vp_fuzzed.verify(Some(vp_issue_options), &DIDPKH, &mut context_loader).await;
+        let vp_verification_result = vp_fuzzed
+            .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // Test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDPKH, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vp2.verify(None, &DIDPKH, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
     }
 
     fn sign_tezos(prep: &ssi::ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {

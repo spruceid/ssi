@@ -323,7 +323,13 @@ mod tests {
 
         // test that issuer property is used for verification
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc.verify(None, &DIDWeb, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc.verify(None, &DIDWeb, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         PROXY.with(|proxy| {
             proxy.replace(None);

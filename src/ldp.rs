@@ -387,7 +387,14 @@ impl LinkedDataProofs {
         let mut options = options.clone();
         ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         suite
-            .sign(document, &options, resolver, context_loader, key, extra_proof_properties)
+            .sign(
+                document,
+                &options,
+                resolver,
+                context_loader,
+                key,
+                extra_proof_properties,
+            )
             .await
     }
 
@@ -432,7 +439,9 @@ impl LinkedDataProofs {
         context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let suite = get_proof_suite(proof.type_.as_str())?;
-        suite.verify(proof, document, resolver, context_loader).await
+        suite
+            .verify(proof, document, resolver, context_loader)
+            .await
     }
 }
 
@@ -473,8 +482,12 @@ async fn to_jws_payload(
     proof: &Proof,
     context_loader: &mut ContextLoader,
 ) -> Result<Vec<u8>, Error> {
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document), context_loader).await?;
-    let doc_dataset = document.to_dataset_for_signing(None, context_loader).await?;
+    let sigopts_dataset = proof
+        .to_dataset_for_signing(Some(document), context_loader)
+        .await?;
+    let doc_dataset = document
+        .to_dataset_for_signing(None, context_loader)
+        .await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
@@ -1242,7 +1255,8 @@ impl ProofSuite for Eip712Signature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let typed_data = TypedData::from_document_and_options(document, &proof, context_loader).await?;
+        let typed_data =
+            TypedData::from_document_and_options(document, &proof, context_loader).await?;
         let bytes = typed_data.bytes()?;
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
@@ -1274,7 +1288,8 @@ impl ProofSuite for Eip712Signature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let typed_data = TypedData::from_document_and_options(document, &proof, context_loader).await?;
+        let typed_data =
+            TypedData::from_document_and_options(document, &proof, context_loader).await?;
         Ok(ProofPreparation {
             proof,
             jws_header: None,
@@ -1314,7 +1329,8 @@ impl ProofSuite for Eip712Signature2021 {
             "EcdsaSecp256k1RecoveryMethod2020" => (),
             _ => return Err(Error::VerificationMethodMismatch),
         };
-        let typed_data = TypedData::from_document_and_options(document, proof, context_loader).await?;
+        let typed_data =
+            TypedData::from_document_and_options(document, proof, context_loader).await?;
         let bytes = typed_data.bytes()?;
         if !sig_hex.starts_with("0x") {
             return Err(Error::HexString);
@@ -1503,7 +1519,8 @@ impl ProofSuite for EthereumPersonalSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let signing_string = string_from_document_and_options(document, &proof, context_loader).await?;
+        let signing_string =
+            string_from_document_and_options(document, &proof, context_loader).await?;
         let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
         let ec_params = match &key.params {
             JWKParams::EC(ec) => ec,
@@ -1535,7 +1552,8 @@ impl ProofSuite for EthereumPersonalSignature2021 {
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
-        let signing_string = string_from_document_and_options(document, &proof, context_loader).await?;
+        let signing_string =
+            string_from_document_and_options(document, &proof, context_loader).await?;
         Ok(ProofPreparation {
             proof,
             jws_header: None,
@@ -1583,7 +1601,8 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64])?;
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
-        let signing_string = string_from_document_and_options(document, proof, context_loader).await?;
+        let signing_string =
+            string_from_document_and_options(document, proof, context_loader).await?;
         let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
         let recovered_key = sig.recover_verify_key(&hash)?;
         use crate::jwk::ECParams;
@@ -1610,8 +1629,12 @@ async fn micheline_from_document_and_options(
     proof: &Proof,
     context_loader: &mut ContextLoader,
 ) -> Result<Vec<u8>, Error> {
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document), context_loader).await?;
-    let doc_dataset = document.to_dataset_for_signing(None, context_loader).await?;
+    let sigopts_dataset = proof
+        .to_dataset_for_signing(Some(document), context_loader)
+        .await?;
+    let doc_dataset = document
+        .to_dataset_for_signing(None, context_loader)
+        .await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
@@ -1642,8 +1665,12 @@ async fn string_from_document_and_options(
     proof: &Proof,
     context_loader: &mut ContextLoader,
 ) -> Result<String, Error> {
-    let sigopts_dataset = proof.to_dataset_for_signing(Some(document), context_loader).await?;
-    let doc_dataset = document.to_dataset_for_signing(None, context_loader).await?;
+    let sigopts_dataset = proof
+        .to_dataset_for_signing(Some(document), context_loader)
+        .await?;
+    let doc_dataset = document
+        .to_dataset_for_signing(None, context_loader)
+        .await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads()?;
     let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
@@ -1677,7 +1704,8 @@ impl ProofSuite for TezosSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        let micheline = micheline_from_document_and_options(document, &proof, context_loader).await?;
+        let micheline =
+            micheline_from_document_and_options(document, &proof, context_loader).await?;
         let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
         let mut sig_prefixed = Vec::new();
         let prefix: &[u8] = match algorithm {
@@ -1715,7 +1743,8 @@ impl ProofSuite for TezosSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        let micheline = micheline_from_document_and_options(document, &proof, context_loader).await?;
+        let micheline =
+            micheline_from_document_and_options(document, &proof, context_loader).await?;
         let micheline_string = hex::encode(micheline);
         Ok(ProofPreparation {
             proof,
@@ -1765,7 +1794,8 @@ impl ProofSuite for TezosSignature2021 {
             return Err(Error::VerificationMethodMismatch);
         }
 
-        let micheline = micheline_from_document_and_options(document, proof, context_loader).await?;
+        let micheline =
+            micheline_from_document_and_options(document, proof, context_loader).await?;
         let account_id_opt: Option<BlockchainAccountId> = match vm.blockchain_account_id {
             Some(account_id_string) => Some(account_id_string.parse()?),
             None => None,
@@ -1819,7 +1849,8 @@ impl ProofSuite for TezosJcsSignature2021 {
                 .with_options(options)
                 .with_properties(props)
         };
-        let micheline = micheline_from_document_and_options(document, &proof, context_loader).await?;
+        let micheline =
+            micheline_from_document_and_options(document, &proof, context_loader).await?;
         let sig = crate::jws::sign_bytes(algorithm, &micheline, key)?;
         let mut sig_prefixed = Vec::new();
         let prefix: &[u8] = match algorithm {
@@ -2473,9 +2504,16 @@ mod tests {
         let resolver = DIDExample;
         let mut context_loader = crate::jsonld::ContextLoader::default();
         let doc = ExampleDocument;
-        let _proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
-            .await
-            .unwrap();
+        let _proof = LinkedDataProofs::sign(
+            &doc,
+            &issue_options,
+            &resolver,
+            &mut context_loader,
+            &key,
+            None,
+        )
+        .await
+        .unwrap();
     }
 
     #[async_std::test]
@@ -2491,9 +2529,16 @@ mod tests {
         let doc = ExampleDocument;
         let resolver = DIDExample;
         let mut context_loader = crate::jsonld::ContextLoader::default();
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
-            .await
-            .unwrap();
+        let proof = LinkedDataProofs::sign(
+            &doc,
+            &issue_options,
+            &resolver,
+            &mut context_loader,
+            &key,
+            None,
+        )
+        .await
+        .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
         // TODO: verify
     }
@@ -2512,9 +2557,16 @@ mod tests {
         let doc = ExampleDocument;
         let resolver = DIDExample;
         let mut context_loader = crate::jsonld::ContextLoader::default();
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
-            .await
-            .unwrap();
+        let proof = LinkedDataProofs::sign(
+            &doc,
+            &issue_options,
+            &resolver,
+            &mut context_loader,
+            &key,
+            None,
+        )
+        .await
+        .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
     }
 
@@ -2532,9 +2584,16 @@ mod tests {
         let doc = ExampleDocument;
         let resolver = DIDExample;
         let mut context_loader = crate::jsonld::ContextLoader::default();
-        let proof = LinkedDataProofs::sign(&doc, &issue_options, &resolver, &mut context_loader, &key, None)
-            .await
-            .unwrap();
+        let proof = LinkedDataProofs::sign(
+            &doc,
+            &issue_options,
+            &resolver,
+            &mut context_loader,
+            &key,
+            None,
+        )
+        .await
+        .unwrap();
         println!("{}", serde_json::to_string(&proof).unwrap());
     }
 
@@ -2769,7 +2828,14 @@ mod tests {
         println!("{}", serde_json::to_string(&vc).unwrap());
         // reissue VC
         let new_proof = Ed25519Signature2020
-            .sign(&vc, &issue_options, &resolver, &mut context_loader, &sk_jwk, None)
+            .sign(
+                &vc,
+                &issue_options,
+                &resolver,
+                &mut context_loader,
+                &sk_jwk,
+                None,
+            )
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&new_proof).unwrap());
@@ -2796,7 +2862,14 @@ mod tests {
             ..Default::default()
         };
         let new_proof = Ed25519Signature2020
-            .sign(&vp, &vp_issue_options, &resolver, &mut context_loader, &sk_jwk, None)
+            .sign(
+                &vp,
+                &vp_issue_options,
+                &resolver,
+                &mut context_loader,
+                &sk_jwk,
+                None,
+            )
             .await
             .unwrap();
         println!("{}", serde_json::to_string(&new_proof).unwrap());
@@ -2815,7 +2888,14 @@ mod tests {
         // Try using prepare/complete
         let pk_jwk = sk_jwk.to_public();
         let prep = Ed25519Signature2020
-            .prepare(&vp, &vp_issue_options, &resolver, &mut context_loader, &pk_jwk, None)
+            .prepare(
+                &vp,
+                &vp_issue_options,
+                &resolver,
+                &mut context_loader,
+                &pk_jwk,
+                None,
+            )
             .await
             .unwrap();
         let signing_input_bytes = match prep.signing_input {
@@ -2897,7 +2977,14 @@ mod tests {
                 ..Default::default()
             };
             let proof = AleoSignature2021
-                .sign(&vc, &vc_issue_options, &resolver, &mut context_loader, &private_key, None)
+                .sign(
+                    &vc,
+                    &vc_issue_options,
+                    &resolver,
+                    &mut context_loader,
+                    &private_key,
+                    None,
+                )
                 .await
                 .unwrap();
             credential.add_proof(proof.clone());

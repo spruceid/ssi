@@ -862,19 +862,40 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &didtz, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_bad_issuer
+                .verify(None, &didtz, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &didtz, &mut context_loader, &other_key, None)
+            .sign(
+                &vc_no_proof,
+                &issue_options,
+                &didtz,
+                &mut context_loader,
+                &other_key,
+                None,
+            )
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &didtz, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_wrong_key
+                .verify(None, &didtz, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -970,7 +991,9 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &didtz, &mut context_loader).await;
+        let vp_verification_result = vp
+            .verify(Some(vp_issue_options.clone()), &didtz, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -985,14 +1008,22 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &didtz, &mut context_loader).await;
+        let vp_verification_result = vp1
+            .verify(Some(vp_issue_options), &didtz, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &didtz, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vp2.verify(None, &didtz, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
     }
 
     #[tokio::test]
@@ -1036,19 +1067,40 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDTZ, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_bad_issuer
+                .verify(None, &DIDTZ, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &DIDTZ, &mut context_loader, &other_key, None)
+            .sign(
+                &vc_no_proof,
+                &issue_options,
+                &DIDTZ,
+                &mut context_loader,
+                &other_key,
+                None,
+            )
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDTZ, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_wrong_key
+                .verify(None, &DIDTZ, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -1081,7 +1133,9 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTZ, &mut context_loader).await;
+        let vp_verification_result = vp
+            .verify(Some(vp_issue_options.clone()), &DIDTZ, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -1096,14 +1150,22 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTZ, &mut context_loader).await;
+        let vp_verification_result = vp1
+            .verify(Some(vp_issue_options), &DIDTZ, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDTZ, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vp2.verify(None, &DIDTZ, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
     }
 
     #[tokio::test]
@@ -1483,19 +1545,40 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(vc_bad_issuer.verify(None, &DIDTZ, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_bad_issuer
+                .verify(None, &DIDTZ, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_p256().unwrap();
         use ssi::ldp::ProofSuite;
         let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-            .sign(&vc_no_proof, &issue_options, &DIDTZ, &mut context_loader, &other_key, None)
+            .sign(
+                &vc_no_proof,
+                &issue_options,
+                &DIDTZ,
+                &mut context_loader,
+                &other_key,
+                None,
+            )
             .await
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(vc_wrong_key.verify(None, &DIDTZ, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vc_wrong_key
+                .verify(None, &DIDTZ, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -1527,7 +1610,9 @@ mod tests {
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
-        let vp_verification_result = vp.verify(Some(vp_issue_options.clone()), &DIDTZ, &mut context_loader).await;
+        let vp_verification_result = vp
+            .verify(Some(vp_issue_options.clone()), &DIDTZ, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.is_empty());
 
@@ -1542,13 +1627,21 @@ mod tests {
             },
             _ => unreachable!(),
         }
-        let vp_verification_result = vp1.verify(Some(vp_issue_options), &DIDTZ, &mut context_loader).await;
+        let vp_verification_result = vp1
+            .verify(Some(vp_issue_options), &DIDTZ, &mut context_loader)
+            .await;
         println!("{:#?}", vp_verification_result);
         assert!(vp_verification_result.errors.len() >= 1);
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(vp2.verify(None, &DIDTZ, &mut context_loader).await.errors.len() > 0);
+        assert!(
+            vp2.verify(None, &DIDTZ, &mut context_loader)
+                .await
+                .errors
+                .len()
+                > 0
+        );
     }
 }
