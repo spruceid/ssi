@@ -1567,13 +1567,23 @@ impl Presentation {
         results
     }
 
+    /// Extended version of [get_verification_methods_for_purpose] that includes VMs of DIDs authorized to
+    /// act as holder
     async fn get_verification_methods_for_purpose_bindable(
         &self,
         holder: &str,
         resolver: &dyn DIDResolver,
         proof_purpose: ProofPurpose,
     ) -> Result<Vec<String>, String> {
-        get_verification_methods_for_purpose(holder, resolver, proof_purpose).await
+        // get_verification_methods_for_purpose(holder, resolver, proof_purpose).await
+        let vmms = crate::did_resolve::get_verification_methods_for_all(
+            &[holder],
+            proof_purpose.clone(),
+            resolver,
+        )
+        .await
+        .map_err(String::from)?;
+        Ok(vmms.into_keys().collect())
     }
 }
 
