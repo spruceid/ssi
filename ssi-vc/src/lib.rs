@@ -251,6 +251,17 @@ pub struct Presentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub holder: Option<URI>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub holder_binding: Option<HolderBinding>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HolderBinding {
+    #[serde(rename = "type")]
+    pub type_: String,
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
@@ -1224,6 +1235,17 @@ impl Presentation {
         }
     }
 
+    /// Check the VP's [Presentation::holder_binding]
+    pub async fn check_holder_binding(&self) -> VerificationResult {
+        let mut results = VerificationResult::new();
+        //
+        // TODO
+        results
+            .warnings
+            .push(format!("Holder binding check is not implemented!"));
+        results
+    }
+
     // Decode and verify a JWT-encoded Verifiable Presentation. On success, returns the Verifiable
     // Presentation and verification result.
     pub async fn decode_verify_jwt(
@@ -1296,6 +1318,12 @@ impl Presentation {
                 VerificationResult::error(&format!("Invalid VP: {}", err)),
             );
         }
+        let mut results = VerificationResult::new();
+        let mut result = vp.check_holder_binding().await;
+        if !result.errors.is_empty() {
+            return (None, result);
+        }
+        results.append(&mut result);
         // TODO: error if any unconvertable claims
         // TODO: unify with verify function?
         let (proofs, matched_jwt) = match vp
@@ -1325,7 +1353,6 @@ impl Presentation {
                 );
             }
         };
-        let mut results = VerificationResult::new();
         if matched_jwt {
             match ssi_jws::verify_bytes_warnable(header.algorithm, &signing_input, &key, &signature)
             {
@@ -1456,8 +1483,12 @@ impl Presentation {
                         .clone()
                         .unwrap_or(ProofPurpose::Authentication);
                     Some(
-                        get_verification_methods_for_purpose(holder, resolver, proof_purpose)
-                            .await?,
+                        self.get_verification_methods_for_purpose_bindable(
+                            holder,
+                            resolver,
+                            proof_purpose,
+                        )
+                        .await?,
                     )
                 } else {
                     None
@@ -1508,6 +1539,12 @@ impl Presentation {
                 "credentialStatus check not valid for VerifiablePresentation",
             );
         }
+        let mut results = VerificationResult::new();
+        let mut result = self.check_holder_binding().await;
+        if !result.errors.is_empty() {
+            return result;
+        }
+        results.append(&mut result);
         let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
@@ -1518,7 +1555,6 @@ impl Presentation {
             return VerificationResult::error("No applicable proof");
             // TODO: say why, e.g. expired
         }
-        let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
             let mut result = proof.verify(self, resolver, context_loader).await;
@@ -1529,6 +1565,15 @@ impl Presentation {
             results.append(&mut result);
         }
         results
+    }
+
+    async fn get_verification_methods_for_purpose_bindable(
+        &self,
+        holder: &str,
+        resolver: &dyn DIDResolver,
+        proof_purpose: ProofPurpose,
+    ) -> Result<Vec<String>, String> {
+        get_verification_methods_for_purpose(holder, resolver, proof_purpose).await
     }
 }
 
@@ -1541,6 +1586,7 @@ impl Default for Presentation {
             id: None,
             proof: None,
             holder: None,
+            holder_binding: None,
             property_set: None,
         }
     }
@@ -2698,6 +2744,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
             proof: None,
             holder: Some(URI::String("did:example:foo".to_string())),
+            holder_binding: None,
             property_set: None,
         };
         let vp_without_proof = vp.clone();
@@ -2835,626 +2882,54 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
-    #[cfg(feature = "eip")]
-    async fn esrs2020() {
-        use ssi_dids::did_resolve::{
-            DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
-            TYPE_DID_LD_JSON,
-        };
-        use ssi_dids::Document;
-
-        struct ExampleResolver;
-
-        const EXAMPLE_123_ID: &str = "did:example:123";
-        const EXAMPLE_123_JSON: &str = include_str!("../../tests/esrs2020-did.jsonld");
-
-        #[async_trait]
-        impl DIDResolver for ExampleResolver {
-            async fn resolve(
-                &self,
-                did: &str,
-                _input_metadata: &ResolutionInputMetadata,
-            ) -> (
-                ResolutionMetadata,
-                Option<Document>,
-                Option<DocumentMetadata>,
-            ) {
-                if did == EXAMPLE_123_ID {
-                    let doc = match Document::from_json(EXAMPLE_123_JSON) {
-                        Ok(doc) => doc,
-                        Err(err) => {
-                            return (
-                                ResolutionMetadata::from_error(&format!("JSON Error: {:?}", err)),
-                                None,
-                                None,
-                            );
-                        }
-                    };
-                    (
-                        ResolutionMetadata {
-                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                            ..Default::default()
-                        },
-                        Some(doc),
-                        Some(DocumentMetadata::default()),
-                    )
-                } else {
-                    (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
-                }
-            }
-
-            async fn resolve_representation(
-                &self,
-                did: &str,
-                _input_metadata: &ResolutionInputMetadata,
-            ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
-                if did == EXAMPLE_123_ID {
-                    let vec = EXAMPLE_123_JSON.as_bytes().to_vec();
-                    (
-                        ResolutionMetadata {
-                            error: None,
-                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                            property_set: None,
-                        },
-                        vec,
-                        Some(DocumentMetadata::default()),
-                    )
-                } else {
-                    (
-                        ResolutionMetadata::from_error(ERROR_NOT_FOUND),
-                        Vec::new(),
-                        None,
-                    )
-                }
-            }
-        }
-
-        let vc_str = include_str!("../../tests/esrs2020-vc.jsonld");
-        let vc = Credential::from_json(vc_str).unwrap();
-        let mut n_proofs = 0;
-        for proof in vc.proof.iter().flatten() {
-            n_proofs += 1;
-            let resolver = ExampleResolver;
-            let mut context_loader = ssi_json_ld::ContextLoader::default();
-            let warnings = EcdsaSecp256k1RecoverySignature2020
-                .verify(proof, &vc, &resolver, &mut context_loader)
-                .await
-                .unwrap();
-            assert!(warnings.is_empty());
-        }
-        assert_eq!(n_proofs, 4);
-    }
-
-    #[async_std::test]
-    async fn ed2020() {
-        // https://w3c-ccg.github.io/lds-ed25519-2020/#example-4
-        let vmm: VerificationMethodMap = serde_json::from_value(serde_json::json!({
-          "id": "https://example.com/issuer/123#key-0",
-          "type": "Ed25519KeyPair2020",
-          "controller": "https://example.com/issuer/123",
-          "publicKeyMultibase": "z6Mkf5rGMoatrSj1f4CyvuHBeXJELe9RPdzo2PKGNCKVtZxP",
-          "privateKeyMultibase": "zrv3kJcnBP1RpYmvNZ9jcYpKBZg41iSobWxSg3ix2U7Cp59kjwQFCT4SZTgLSL3HP8iGMdJs3nedjqYgNn6ZJmsmjRm"
-        }))
-        .unwrap();
-
-        let sk_hex = "9b937b81322d816cfab9d5a3baacc9b2a5febe4b149f126b3630f93a29527017095f9a1a595dde755d82786864ad03dfa5a4fbd68832566364e2b65e13cc9e44";
-        let sk_bytes = hex::decode(sk_hex).unwrap();
-        let sk_bytes_mc = [vec![0x80, 0x26], sk_bytes.clone()].concat();
-        let sk_mb = multibase::encode(multibase::Base::Base58Btc, &sk_bytes_mc);
-        let props = &vmm.property_set.unwrap();
-        let sk_mb_expected = props
-            .get("privateKeyMultibase")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        assert_eq!(&sk_mb, &sk_mb_expected);
-
-        let pk_hex = "095f9a1a595dde755d82786864ad03dfa5a4fbd68832566364e2b65e13cc9e44";
-        let pk_bytes = hex::decode(pk_hex).unwrap();
-        let pk_bytes_mc = [vec![0xed, 0x01], pk_bytes.clone()].concat();
-        let pk_mb = multibase::encode(multibase::Base::Base58Btc, &pk_bytes_mc);
-        let pk_mb_expected = props
-            .get("publicKeyMultibase")
-            .unwrap()
-            .as_str()
-            .unwrap()
-            .to_string();
-        assert_eq!(&pk_mb, &pk_mb_expected);
-
-        assert_eq!(&sk_bytes[32..64], &pk_bytes);
-
-        let is = include_str!("../../tests/lds-ed25519-2020-issuer0.jsonld");
-        // let vv: ssi_dids::VerificationMethod =
-        //     serde_json::from_str("https://example.com/issuer/123#key-0").unwrap();
-        // println!("{:?}", vv);
-        let issuer_document: Document = serde_json::from_str(is).unwrap();
-
-        let vc_str = include_str!("../../tests/lds-ed25519-2020-vc0.jsonld");
-        let vc = Credential::from_json(vc_str).unwrap();
-        let vp_str = include_str!("../../tests/lds-ed25519-2020-vp0.jsonld");
-        let vp = Presentation::from_json(vp_str).unwrap();
-
-        // "DID Resolver" for HTTPS issuer used in the test vectors.
-        struct ED2020ExampleResolver {
-            issuer_document: Document,
-        }
-        use ssi_dids::did_resolve::{
-            Content, ContentMetadata, DereferencingMetadata, DocumentMetadata,
-            ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
-        };
-        use ssi_dids::{Document, PrimaryDIDURL};
-        use ssi_jwk::{Algorithm, Base64urlUInt, OctetParams, Params as JWKParams};
-        use ssi_ldp::{suites::Ed25519Signature2020, ProofSuite};
-        #[async_trait]
-        impl DIDResolver for ED2020ExampleResolver {
-            async fn resolve(
-                &self,
-                did: &str,
-                _input_metadata: &ResolutionInputMetadata,
-            ) -> (
-                ResolutionMetadata,
-                Option<Document>,
-                Option<DocumentMetadata>,
-            ) {
-                // Return empty result here to allow DID URL dereferencing to proceed. The DID
-                // is resolved as part of DID URL dereferencing, but the DID document is not used.
-                if did == "https:" {
-                    let doc_meta = DocumentMetadata::default();
-                    let doc = Document::new(did);
-                    return (ResolutionMetadata::default(), Some(doc), Some(doc_meta));
-                }
-                (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
-            }
-
-            async fn dereference(
-                &self,
-                did_url: &PrimaryDIDURL,
-                _input_metadata: &DereferencingInputMetadata,
-            ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
-                match &did_url.to_string()[..] {
-                    "https://example.com/issuer/123" => Some((
-                        DereferencingMetadata {
-                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                            ..Default::default()
-                        },
-                        Content::DIDDocument(self.issuer_document.clone()),
-                        ContentMetadata::default(),
-                    )),
-                    _ => None,
-                }
-            }
-        }
-
-        let sk_jwk = JWK::from(JWKParams::OKP(OctetParams {
-            curve: "Ed25519".to_string(),
-            public_key: Base64urlUInt(sk_bytes[32..64].to_vec()),
-            private_key: Some(Base64urlUInt(sk_bytes[0..32].to_vec())),
-        }));
-        assert_eq!(sk_bytes.len(), 64);
-        eprintln!("{}", serde_json::to_string(&sk_jwk).unwrap());
-
-        let issue_options = LinkedDataProofOptions {
-            verification_method: Some(URI::String(
-                "https://example.com/issuer/123#key-0".to_string(),
-            )),
-            proof_purpose: Some(ProofPurpose::AssertionMethod),
-            created: Some(Utc::now().with_nanosecond(0).unwrap()),
-            ..Default::default()
-        };
-
-        let resolver = ED2020ExampleResolver { issuer_document };
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-
-        println!("{}", serde_json::to_string(&vc).unwrap());
-        // reissue VC
-        let new_proof = Ed25519Signature2020
-            .sign(
-                &vc,
-                &issue_options,
-                &resolver,
-                &mut context_loader,
-                &sk_jwk,
-                None,
-            )
-            .await
-            .unwrap();
-        println!("{}", serde_json::to_string(&new_proof).unwrap());
-
-        // check new VC proof and original proof
-        Ed25519Signature2020
-            .verify(&new_proof, &vc, &resolver, &mut context_loader)
-            .await
-            .unwrap();
-        let orig_proof = vc.proof.iter().flatten().next().unwrap();
-        Ed25519Signature2020
-            .verify(orig_proof, &vc, &resolver, &mut context_loader)
-            .await
-            .unwrap();
-
-        // re-generate VP proof
-        let vp_issue_options = LinkedDataProofOptions {
-            verification_method: Some(URI::String(
-                "https://example.com/issuer/123#key-0".to_string(),
-            )),
-            proof_purpose: Some(ProofPurpose::Authentication),
-            created: Some(Utc::now().with_nanosecond(0).unwrap()),
-            challenge: Some("123".to_string()),
-            ..Default::default()
-        };
-        let new_proof = Ed25519Signature2020
-            .sign(
-                &vp,
-                &vp_issue_options,
-                &resolver,
-                &mut context_loader,
-                &sk_jwk,
-                None,
-            )
-            .await
-            .unwrap();
-        println!("{}", serde_json::to_string(&new_proof).unwrap());
-
-        // check new VP proof and original proof
-        Ed25519Signature2020
-            .verify(&new_proof, &vp, &resolver, &mut context_loader)
-            .await
-            .unwrap();
-        let orig_proof = vp.proof.iter().flatten().next().unwrap();
-        Ed25519Signature2020
-            .verify(orig_proof, &vp, &resolver, &mut context_loader)
-            .await
-            .unwrap();
-
-        // Try using prepare/complete
-        let pk_jwk = sk_jwk.to_public();
-        let prep = Ed25519Signature2020
-            .prepare(
-                &vp,
-                &vp_issue_options,
-                &resolver,
-                &mut context_loader,
-                &pk_jwk,
-                None,
-            )
-            .await
-            .unwrap();
-        let signing_input_bytes = match prep.signing_input {
-            ssi_ldp::SigningInput::Bytes(Base64urlUInt(ref bytes)) => bytes,
-            _ => panic!("expected SigningInput::Bytes for Ed25519Signature2020 preparation"),
-        };
-        let sig = ssi_jws::sign_bytes(Algorithm::EdDSA, signing_input_bytes, &sk_jwk).unwrap();
-        let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
-        let completed_proof = Ed25519Signature2020.complete(prep, &sig_mb).await.unwrap();
-        Ed25519Signature2020
-            .verify(&completed_proof, &vp, &resolver, &mut context_loader)
-            .await
-            .unwrap();
-    }
-
-    #[async_std::test]
-    #[cfg(feature = "aleo")]
-    async fn aleosig2021() {
-        use crate::Credential;
-        use ssi_dids::did_resolve::{
-            DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
-            TYPE_DID_LD_JSON,
-        };
-        use ssi_dids::Document;
-
-        struct ExampleResolver;
-        const EXAMPLE_DID: &str = "did:example:aleovm2021";
-        const EXAMPLE_DOC: &'static str = include_str!("../../tests/lds-aleo2021-issuer0.jsonld");
-        #[async_trait]
-        impl DIDResolver for ExampleResolver {
-            async fn resolve(
-                &self,
-                did: &str,
-                _input_metadata: &ResolutionInputMetadata,
-            ) -> (
-                ResolutionMetadata,
-                Option<Document>,
-                Option<DocumentMetadata>,
-            ) {
-                if did == EXAMPLE_DID {
-                    let doc = match Document::from_json(EXAMPLE_DOC) {
-                        Ok(doc) => doc,
-                        Err(err) => {
-                            return (
-                                ResolutionMetadata::from_error(&format!("JSON Error: {:?}", err)),
-                                None,
-                                None,
-                            );
-                        }
-                    };
-                    (
-                        ResolutionMetadata {
-                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                            ..Default::default()
-                        },
-                        Some(doc),
-                        Some(DocumentMetadata::default()),
-                    )
-                } else {
-                    (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
-                }
-            }
-        }
-
-        let private_key: JWK =
-            serde_json::from_str(include_str!("../../tests/aleotestnet1-2021-11-22.json")).unwrap();
-
-        let vc_str = include_str!("../../tests/lds-aleo2021-vc0.jsonld");
-        let mut vc = Credential::from_json_unsigned(vc_str).unwrap();
-        let resolver = ExampleResolver;
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-
-        if vc.proof.iter().flatten().next().is_none() {
-            // Issue VC / Generate Test Vector
-            let mut credential = vc.clone();
-            let vc_issue_options = LinkedDataProofOptions {
-                verification_method: Some(URI::String("did:example:aleovm2021#id".to_string())),
-                proof_purpose: Some(ProofPurpose::AssertionMethod),
-                ..Default::default()
-            };
-            let proof = AleoSignature2021
-                .sign(
-                    &vc,
-                    &vc_issue_options,
-                    &resolver,
-                    &mut context_loader,
-                    &private_key,
-                    None,
-                )
-                .await
-                .unwrap();
-            credential.add_proof(proof.clone());
-            vc = credential;
-
-            use std::fs::File;
-            use std::io::{BufWriter, Write};
-            let outfile = File::create("tests/lds-aleo2021-vc0.jsonld").unwrap();
-            let mut output_writer = BufWriter::new(outfile);
-            serde_json::to_writer_pretty(&mut output_writer, &vc).unwrap();
-            output_writer.write(b"\n").unwrap();
-        }
-
-        // Verify VC
-        let proof = vc.proof.iter().flatten().next().unwrap();
-        let warnings = AleoSignature2021
-            .verify(&proof, &vc, &resolver, &mut context_loader)
-            .await
-            .unwrap();
-        assert!(warnings.is_empty());
-    }
-
-    #[cfg(feature = "eip")]
-    #[async_std::test]
-    #[ignore]
-    async fn verify_typed_data() {
-        use ssi_ldp::eip712::TypedData;
-        let proof: Proof = serde_json::from_value(json!({
-          "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
-          "created": "2021-07-09T19:47:41Z",
-          "proofPurpose": "assertionMethod",
-          "type": "EthereumEip712Signature2021",
-          "eip712": {
-            "types": {
-              "EIP712Domain": [
-                { "name": "name", "type": "string" },
-                { "name": "version", "type": "string" },
-                { "name": "chainId", "type": "uint256" },
-                { "name": "salt", "type": "bytes32" }
-              ],
-              "VerifiableCredential": [
-                { "name": "@context", "type": "string[]" },
-                { "name": "type", "type": "string[]" },
-                { "name": "id", "type": "string" },
-                { "name": "issuer", "type": "string" },
-                { "name": "issuanceDate", "type": "string" },
-                { "name": "credentialSubject", "type": "CredentialSubject" },
-                { "name": "credentialSchema", "type": "CredentialSchema" },
-                { "name": "proof", "type": "Proof" }
-              ],
-              "CredentialSchema": [
-                { "name": "id", "type": "string" },
-                { "name": "type", "type": "string" }
-              ],
-              "CredentialSubject": [
-                { "name": "type", "type": "string" },
-                { "name": "id", "type": "string" },
-                { "name": "name", "type": "string" },
-                { "name": "child", "type": "Person" }
-              ],
-              "Person": [
-                { "name": "type", "type": "string" },
-                { "name": "name", "type": "string" }
-              ],
-              "Proof": [
-                { "name": "verificationMethod", "type": "string" },
-                { "name": "created", "type": "string" },
-                { "name": "proofPurpose", "type": "string" },
-                { "name": "type", "type": "string" }
-              ]
-            },
-            "primaryType": "VerifiableCredential",
-            "domain": {
-              "name": "https://example.com",
-              "version": "2",
-              "chainId": 4,
-              "salt": "0x000000000000000000000000000000000000000000000000aaaabbbbccccdddd"
-            }
-          }
-        }))
-        .unwrap();
-        let vc: Credential = serde_json::from_value(json!({
-          "@context": [
-            "https://www.w3.org/2018/credentials/v1",
-            "https://schema.org"
-          ],
-          "type": [
-            "VerifiableCredential"
-          ],
-          "id": "https://example.org/person/1234",
-          "issuer": "did:example:aaaabbbb",
-          "issuanceDate": "2010-01-01T19:23:24Z",
-          "credentialSubject": {
-            "type": "Person",
-            "id": "did:example:bbbbaaaa",
-            "name": "Vitalik",
-            "child": {
-              "type": "Person",
-              "name": "Ethereum"
-            }
-          },
-          "credentialSchema": {
-            "id": "https://example.com/schemas/v1",
-            "type": "Eip712SchemaValidator2021"
-          }
-        }))
-        .unwrap();
-        let typed_data = TypedData::from_document_and_options_json(&vc, &proof)
-            .await
-            .unwrap();
-        // https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#example-5
-        let expected_typed_data = json!({
-          "types": {
-            "EIP712Domain": [
-              { "name": "name", "type": "string" },
-              { "name": "version", "type": "string" },
-              { "name": "chainId", "type": "uint256" },
-              { "name": "salt", "type": "bytes32" }
-            ],
-            "VerifiableCredential": [
-              { "name": "@context", "type": "string[]" },
-              { "name": "type", "type": "string[]" },
-              { "name": "id", "type": "string" },
-              { "name": "issuer", "type": "string" },
-              { "name": "issuanceDate", "type": "string" },
-              { "name": "credentialSubject", "type": "CredentialSubject" },
-              { "name": "credentialSchema", "type": "CredentialSchema" },
-              { "name": "proof", "type": "Proof" }
-            ],
-            "CredentialSchema": [
-              { "name": "id", "type": "string" },
-              { "name": "type", "type": "string" }
-            ],
-            "CredentialSubject": [
-              { "name": "type", "type": "string" },
-              { "name": "id", "type": "string" },
-              { "name": "name", "type": "string" },
-              { "name": "child", "type": "Person" }
-            ],
-            "Person": [
-              { "name": "type", "type": "string" },
-              { "name": "name", "type": "string" }
-            ],
-            "Proof": [
-              { "name": "verificationMethod", "type": "string" },
-              { "name": "created", "type": "string" },
-              { "name": "proofPurpose", "type": "string" },
-              { "name": "type", "type": "string" }
-            ]
-          },
-          "domain": {
-            "name": "https://example.com",
-            "version": "2",
-            "chainId": 4,
-            "salt": "0x000000000000000000000000000000000000000000000000aaaabbbbccccdddd"
-          },
-          "primaryType": "VerifiableCredential",
-          "message": {
+    async fn present_with_example_holder_binding() {
+        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut vp: Presentation = serde_json::from_value(serde_json::json!({
             "@context": [
-              "https://www.w3.org/2018/credentials/v1",
-              "https://schema.org"
+                "https://www.w3.org/2018/credentials/v1",
+                {
+                    "@vocab": "https://example.org/example-holder-binding#"
+                }
             ],
-            "type": [
-              "VerifiableCredential"
-            ],
-            "id": "https://example.org/person/1234",
-            "issuer": "did:example:aaaabbbb",
-            "issuanceDate": "2010-01-01T19:23:24Z",
-            "credentialSubject": {
-              "type": "Person",
-              "id": "did:example:bbbbaaaa",
-              "name": "Vitalik",
-              "child": {
-                "type": "Person",
-                "name": "Ethereum"
-              }
+            "type": ["VerifiablePresentation"],
+            "holderBinding": {
+                "type": "ExampleHolderBinding2022",
+                "from": "did:example:foo",
+                "to": "did:example:bar",
+                "proof": "IMMA_DELEGATE_CREDS"
             },
-            "credentialSchema": {
-              "id": "https://example.com/schemas/v1",
-              "type": "Eip712SchemaValidator2021"
-            },
-            "proof": {
-              "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
-              "created": "2021-07-09T19:47:41Z",
-              "proofPurpose": "assertionMethod",
-              "type": "EthereumEip712Signature2021"
-            }
-          }
-        });
-        assert_eq!(
-            serde_json::to_value(&typed_data).unwrap(),
-            expected_typed_data
-        );
-
-        let jwk: ssi_jwk::JWK = serde_json::from_value(json!({
-            "kty": "EC",
-            "crv": "secp256k1",
-            "x": "cmbYyDC6cbm807_OmFNYP4CLEL0aB2F1UG683SxFkXM",
-            "y": "zBw5HAh0cJM4YimSQvtYM1HFhzUXVUgrDhxJ70aajt0",
-            "d": "u7QuEl6W0XNppEY0iMVjATT99tC9acwV3Z2keEqvKGo"
+            "holder": "did:example:bar"
         }))
         .unwrap();
-        eprintln!("jwk {}", serde_json::to_string(&jwk).unwrap());
 
-        let td_jcs = serde_jcs::to_string(&typed_data).unwrap();
-        // Wrap string with line breaks
-        // https://stackoverflow.com/a/57032118
-        let jcs_lines = td_jcs
-            .chars()
-            .enumerate()
-            .flat_map(|(i, c)| {
-                if i != 0 && i % 90 == 0 {
-                    Some('\n')
-                } else {
-                    None
-                }
-                .into_iter()
-                .chain(std::iter::once(c))
-            })
-            .collect::<String>();
-        eprintln!("JCS: [\n{}\n]", jcs_lines);
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+        let mut vp_issue_options = LinkedDataProofOptions::default();
+        let vp_proof_vm = "did:example:foo#key1".to_string();
+        vp_issue_options.verification_method = Some(URI::String(vp_proof_vm));
+        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        vp_issue_options.checks = None;
+        let vp_proof = vp
+            .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
+            .await
+            .unwrap();
+        vp.add_proof(vp_proof);
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        vp.validate().unwrap();
+        let vp_verification_result = vp.verify(None, &DIDExample, &mut context_loader).await;
+        println!("{:#?}", vp_verification_result);
+        assert!(vp_verification_result.errors.is_empty());
 
-        // Sign proof
-        let bytes = typed_data.bytes().unwrap();
-        let ec_params = match &jwk.params {
-            ssi_jwk::Params::EC(ec) => ec,
-            _ => unreachable!(),
-        };
-        use k256::ecdsa::signature::Signer;
-        let secret_key = k256::SecretKey::try_from(ec_params).unwrap();
-        let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&bytes).unwrap();
-        let sig_bytes = &mut sig.as_ref().to_vec();
-        // Recovery ID starts at 27 instead of 0.
-        sig_bytes[64] += 27;
-        let sig_hex = ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes);
-        let mut proof = proof.clone();
-        proof.proof_value = Some(sig_hex.clone());
-        eprintln!("proof {}", serde_json::to_string(&proof).unwrap());
+        todo!();
+        // Sign presentation to create VP
+        // TODO
+        // Verify VP
 
-        // Verify the VC/proof
-        let mut vc = vc.clone();
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-        vc.add_proof(proof.clone());
-        vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(verification_result.errors.is_empty());
+        // Do the same thing but with a mismatched holder binding
+        // TODO
+        // Verify VP fails
+        // TODO
 
-        assert_eq!(sig_hex, "0x5fb8f18f21f54c2df8a2720d0afcee7dbbb18e4b7a22ce6e8183633d63b076d329122584db769cd78b6cd5a7094ede5ceaa43317907539187f1f0d8875f99e051b");
+        // Check that verifying a VP with an unknown holder binding type produces an error.
+        // TODO
     }
 }
