@@ -1483,12 +1483,8 @@ impl Presentation {
                         .clone()
                         .unwrap_or(ProofPurpose::Authentication);
                     Some(
-                        self.get_verification_methods_for_purpose_bindable(
-                            holder,
-                            resolver,
-                            proof_purpose,
-                        )
-                        .await?,
+                        self.get_verification_methods_for_purpose_bindable(resolver, proof_purpose)
+                            .await?,
                     )
                 } else {
                     None
@@ -1567,23 +1563,30 @@ impl Presentation {
         results
     }
 
-    /// Extended version of [get_verification_methods_for_purpose] that includes VMs of DIDs authorized to
-    /// act as holder
+    /// Like [get_verification_methods_for_purpose] but including VMs of DIDs authorized to
+    /// act as holder via [Presentation::holder_binding].
     async fn get_verification_methods_for_purpose_bindable(
         &self,
-        holder: &str,
         resolver: &dyn DIDResolver,
         proof_purpose: ProofPurpose,
     ) -> Result<Vec<String>, String> {
-        // get_verification_methods_for_purpose(holder, resolver, proof_purpose).await
+        let authorized_holders = self.get_authorized_holders();
         let vmms = crate::did_resolve::get_verification_methods_for_all(
-            &[holder],
+            &authorized_holders,
             proof_purpose.clone(),
             resolver,
         )
         .await
         .map_err(String::from)?;
         Ok(vmms.into_keys().collect())
+    }
+
+    fn get_authorized_holders(&self) -> Vec<String> {
+        let holders = match self.holder {
+            Some(URI::String(ref holder)) => vec![holder.to_string()],
+            None => return vec![],
+        };
+        holders
     }
 }
 
