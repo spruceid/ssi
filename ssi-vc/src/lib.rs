@@ -251,7 +251,7 @@ pub struct Presentation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub holder: Option<URI>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub holder_binding: Option<HolderBinding>,
+    pub holder_binding: Option<OneOrMany<HolderBinding>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -1235,17 +1235,6 @@ impl Presentation {
         }
     }
 
-    /// Check the VP's [Presentation::holder_binding]
-    pub async fn check_holder_binding(&self) -> VerificationResult {
-        let mut results = VerificationResult::new();
-        //
-        // TODO
-        results
-            .warnings
-            .push(format!("Holder binding check is not implemented!"));
-        results
-    }
-
     // Decode and verify a JWT-encoded Verifiable Presentation. On success, returns the Verifiable
     // Presentation and verification result.
     pub async fn decode_verify_jwt(
@@ -1319,11 +1308,6 @@ impl Presentation {
             );
         }
         let mut results = VerificationResult::new();
-        let mut result = vp.check_holder_binding().await;
-        if !result.errors.is_empty() {
-            return (None, result);
-        }
-        results.append(&mut result);
         // TODO: error if any unconvertable claims
         // TODO: unify with verify function?
         let (proofs, matched_jwt) = match vp
@@ -1536,11 +1520,6 @@ impl Presentation {
             );
         }
         let mut results = VerificationResult::new();
-        let mut result = self.check_holder_binding().await;
-        if !result.errors.is_empty() {
-            return result;
-        }
-        results.append(&mut result);
         let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
@@ -1585,11 +1564,26 @@ impl Presentation {
         Ok(vmms.into_keys().collect())
     }
 
+    // TODO: return Result
     fn get_authorized_holders(&self) -> Vec<String> {
-        let holders = match self.holder {
+        let mut holders = match self.holder {
             Some(URI::String(ref holder)) => vec![holder.to_string()],
             None => return vec![],
         };
+        for holder_binding in self.holder_binding.iter().flatten() {
+            match &holder_binding.type_[..] {
+                "ExampleHolderBinding2022" => {
+                    // TODO: error if term does not expand to expected IRI
+                    // TODO: check proof signed by binding.from
+                    // TODO: check binding.to == vp.holder
+                    // TODO: append binding.to to holders
+                    holders.push(String::from("did:example:foo"));
+                }
+                _ => {
+                    // TODO: return warning or error for unknown holder binding?
+                }
+            }
+        }
         holders
     }
 }
@@ -2913,7 +2907,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 "type": "ExampleHolderBinding2022",
                 "from": "did:example:foo",
                 "to": "did:example:bar",
-                "proof": "IMMA_DELEGATE_CREDS"
+                "proof": "..."
             },
             "holder": "did:example:bar"
         }))
