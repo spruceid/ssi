@@ -1572,7 +1572,11 @@ impl Presentation {
     ) -> Result<Vec<String>, String> {
         let authorized_holders = self.get_authorized_holders();
         let vmms = crate::did_resolve::get_verification_methods_for_all(
-            &authorized_holders,
+            authorized_holders
+                .iter()
+                .map(|x| x.as_str())
+                .collect::<Vec<&str>>()
+                .as_ref(),
             proof_purpose.clone(),
             resolver,
         )
