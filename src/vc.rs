@@ -2510,7 +2510,7 @@ pub(crate) mod tests {
         if let Contexts::Many(contexts) = doc.context {
             assert_eq!(contexts.len(), 2);
         } else {
-            assert!(false);
+            panic!();
         }
     }
 
@@ -2652,7 +2652,7 @@ pub(crate) mod tests {
         )
         .await;
         println!("{:#?}", verification_result);
-        assert!(verification_result.errors.len() > 0);
+        assert!(!verification_result.errors.is_empty());
     }
 
     #[async_std::test]
@@ -2692,7 +2692,7 @@ pub(crate) mod tests {
         println!("{:?}", signed_jwt);
 
         let mut context_loader = crate::jsonld::ContextLoader::default();
-        let (vc1_opt, verification_result) = Credential::decode_verify_jwt(
+        let (_vc1_opt, verification_result) = Credential::decode_verify_jwt(
             &signed_jwt,
             Some(options.clone()),
             &DIDExample,
@@ -2719,8 +2719,10 @@ pub(crate) mod tests {
 
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
+            ..Default::default()
+        };
         let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
@@ -2747,7 +2749,7 @@ pub(crate) mod tests {
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
         let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
-        assert!(verification_result.errors.len() >= 1);
+        assert!(!verification_result.errors.is_empty());
     }
 
     #[async_std::test]
@@ -2767,8 +2769,10 @@ pub(crate) mod tests {
         let key_str = include_str!("../tests/ed25519-2020-10-18.json");
         let key: JWK = serde_json::from_str(key_str).unwrap();
 
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(URI::String("did:example:foo#key3".to_string()));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String("did:example:foo#key3".to_string())),
+            ..Default::default()
+        };
         let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
@@ -2795,7 +2799,7 @@ pub(crate) mod tests {
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
         let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
-        assert!(verification_result.errors.len() >= 1);
+        assert!(!verification_result.errors.is_empty());
     }
 
     #[async_std::test]
@@ -2814,8 +2818,10 @@ pub(crate) mod tests {
 
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
+            ..Default::default()
+        };
         let mut context_loader = crate::jsonld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
@@ -2845,9 +2851,11 @@ pub(crate) mod tests {
 
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
-        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let issue_options = LinkedDataProofOptions {
+            proof_purpose: Some(ProofPurpose::AssertionMethod),
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
+            ..Default::default()
+        };
         let mut context_loader = crate::jsonld::ContextLoader::default();
         let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
@@ -2866,7 +2874,7 @@ pub(crate) mod tests {
             #[allow(unreachable_patterns)]
             _ => panic!("Unexpected signing input type"),
         };
-        let sig = crate::jws::sign_bytes(algorithm, &signing_input, &key).unwrap();
+        let sig = crate::jws::sign_bytes(algorithm, signing_input, &key).unwrap();
         let sig_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
         let proof = preparation.complete(&sig_b64).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -2890,7 +2898,7 @@ pub(crate) mod tests {
         println!("{}", serde_json::to_string_pretty(&vc).unwrap());
         let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", verification_result);
-        assert!(verification_result.errors.len() >= 1);
+        assert!(!verification_result.errors.is_empty());
     }
 
     #[async_std::test]
@@ -3003,7 +3011,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let vc = Credential::from_json(vc_str).unwrap();
         let result = vc.verify(None, &DIDExample, context_loader).await;
         println!("{:#?}", result);
-        assert!(result.errors.len() > 0);
+        assert!(!result.errors.is_empty());
     }
 
     #[async_std::test]
@@ -3068,8 +3076,10 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // LDP VC in LDP VP
         let vp_str = include_str!("../examples/vp.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
-        let mut verify_options = LinkedDataProofOptions::default();
-        verify_options.proof_purpose = Some(ProofPurpose::Authentication);
+        let verify_options = LinkedDataProofOptions {
+            proof_purpose: Some(ProofPurpose::Authentication),
+            ..Default::default()
+        };
         let mut context_loader = crate::jsonld::ContextLoader::default();
         let result = vp
             .verify(
@@ -3197,8 +3207,10 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         .unwrap();
         let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
 
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(URI::String("did:example:foo#key1".to_string()));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
+            ..Default::default()
+        };
         let verify_options = LinkedDataProofOptions {
             checks: Some(vec![Check::Proof, Check::CredentialStatus]),
             ..Default::default()
@@ -3406,18 +3418,16 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             )
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(
-            vp2.verify(None, &DIDExample, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vp2
+            .verify(None, &DIDExample, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Test JWT VP
         let vp_jwt_issue_options = LinkedDataProofOptions {
@@ -3452,7 +3462,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             &mut context_loader,
         )
         .await;
-        assert!(verification_result.errors.len() > 0);
+        assert!(!verification_result.errors.is_empty());
 
         // Test VP with JWT VC
         let vp_jwtvc = Presentation {

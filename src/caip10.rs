@@ -265,12 +265,12 @@ mod tests {
     async fn account_id() {
         // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
         let dummy_max_length = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4:6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7";
-        let account_id = BlockchainAccountId::from_str(&dummy_max_length).unwrap();
+        let account_id = BlockchainAccountId::from_str(dummy_max_length).unwrap();
         assert_eq!(account_id.to_string(), dummy_max_length);
 
         // Support old format, for backwards compatibility
         let old = "6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7@chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
-        let account_id_old = BlockchainAccountId::from_str(&old).unwrap();
+        let account_id_old = BlockchainAccountId::from_str(old).unwrap();
         assert_eq!(account_id_old.to_string(), dummy_max_length);
     }
 

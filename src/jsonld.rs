@@ -1910,7 +1910,7 @@ mod tests {
             _ => Err(Error::ExpectedObject),
         }
         .unwrap();
-        let case = std::env::args().skip(2).next();
+        let case = std::env::args().nth(2);
         let sequence = manifest_obj.get("sequence").unwrap();
         let mut passed = 0;
         let mut total = 0;
@@ -1964,7 +1964,7 @@ mod tests {
                 }
             }
             total += 1;
-            if let Err(err) = test_to_rdf(&obj).await {
+            if let Err(err) = test_to_rdf(obj).await {
                 if let Error::ExpectedOutput(expected, found) = err {
                     let changes = difference::Changeset::new(&found, &expected, "\n");
                     eprintln!("test {}: failed. diff:\n{}", id, changes);

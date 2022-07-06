@@ -437,7 +437,7 @@ mod tests {
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl DIDMethod for DIDExample {
         fn name(&self) -> &'static str {
-            return "key";
+            "key"
         }
         fn to_resolver(&self) -> &dyn DIDResolver {
             self

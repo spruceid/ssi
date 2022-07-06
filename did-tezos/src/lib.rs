@@ -29,14 +29,9 @@ use std::string::ToString;
 /// did:tz DID Method
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
+#[derive(Default)]
 pub struct DIDTz {
     tzkt_url: Option<String>,
-}
-
-impl Default for DIDTz {
-    fn default() -> Self {
-        Self { tzkt_url: None }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -422,11 +417,7 @@ impl DIDTz {
                 id: String::from(vm_didurl.clone()),
                 type_: proof_type.to_string(),
                 controller: did.to_string(),
-                blockchain_account_id: Some(format!(
-                    "tezos:{}:{}",
-                    genesis_block_hash,
-                    address.to_string()
-                )),
+                blockchain_account_id: Some(format!("tezos:{}:{}", genesis_block_hash, address)),
                 ..Default::default()
             })]),
             authentication: match public_key {
@@ -580,8 +571,8 @@ mod tests {
     use ssi::one_or_many::OneOrMany;
     use std::collections::BTreeMap as Map;
 
-    const TZ1: &'static str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
-    const TZ1_JSON: &'static str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
+    const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
+    const TZ1_JSON: &str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
 
     const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
     const LIVE_KT1: &str = "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi";
@@ -603,7 +594,7 @@ mod tests {
     #[test]
     fn jwk_to_did_tezos() {
         // TODO: add tz2 and tz3 test cases
-        let jwk: JWK = serde_json::from_str(&TZ1_JSON).unwrap();
+        let jwk: JWK = serde_json::from_str(TZ1_JSON).unwrap();
         let tz1 = DIDTZ.generate(&Source::Key(&jwk)).unwrap();
         assert_eq!(tz1, TZ1);
     }
@@ -780,9 +771,10 @@ mod tests {
         //     x509_thumbprint_sha256: None,
         // };
         let did = "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq".to_string();
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method =
-            Some(URI::String(did.to_string() + "#blockchainAccountId"));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(did.to_string() + "#blockchainAccountId")),
+            ..Default::default()
+        };
         eprintln!("vm {:?}", issue_options.verification_method);
         let mut context_loader = ssi::jsonld::ContextLoader::default();
         let vc_no_proof = vc.clone();
@@ -862,14 +854,11 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            vc_bad_issuer
-                .verify(None, &didtz, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc_bad_issuer
+            .verify(None, &didtz, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -888,14 +877,11 @@ mod tests {
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(
-            vc_wrong_key
-                .verify(None, &didtz, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc_wrong_key
+            .verify(None, &didtz, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -1012,18 +998,16 @@ mod tests {
             .verify(Some(vp_issue_options), &didtz, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(
-            vp2.verify(None, &didtz, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vp2
+            .verify(None, &didtz, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[tokio::test]
@@ -1047,9 +1031,10 @@ mod tests {
         }))
         .unwrap();
         vc.validate_unsigned().unwrap();
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method =
-            Some(URI::String(did.to_string() + "#blockchainAccountId"));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(did.to_string() + "#blockchainAccountId")),
+            ..Default::default()
+        };
         eprintln!("vm {:?}", issue_options.verification_method);
         let mut context_loader = ssi::jsonld::ContextLoader::default();
         let vc_no_proof = vc.clone();
@@ -1067,14 +1052,11 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            vc_bad_issuer
-                .verify(None, &DIDTZ, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc_bad_issuer
+            .verify(None, &DIDTZ, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -1093,14 +1075,11 @@ mod tests {
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(
-            vc_wrong_key
-                .verify(None, &DIDTZ, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc_wrong_key
+            .verify(None, &DIDTZ, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -1154,18 +1133,16 @@ mod tests {
             .verify(Some(vp_issue_options), &DIDTZ, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(
-            vp2.verify(None, &DIDTZ, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vp2
+            .verify(None, &DIDTZ, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[tokio::test]
@@ -1525,9 +1502,10 @@ mod tests {
         }))
         .unwrap();
         vc.validate_unsigned().unwrap();
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method =
-            Some(URI::String(did.to_string() + "#blockchainAccountId"));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(did.to_string() + "#blockchainAccountId")),
+            ..Default::default()
+        };
         eprintln!("vm {:?}", issue_options.verification_method);
         let mut context_loader = ssi::jsonld::ContextLoader::default();
         let vc_no_proof = vc.clone();
@@ -1545,14 +1523,11 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            vc_bad_issuer
-                .verify(None, &DIDTZ, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc_bad_issuer
+            .verify(None, &DIDTZ, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -1571,14 +1546,11 @@ mod tests {
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(
-            vc_wrong_key
-                .verify(None, &DIDTZ, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc_wrong_key
+            .verify(None, &DIDTZ, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -1631,17 +1603,15 @@ mod tests {
             .verify(Some(vp_issue_options), &DIDTZ, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(
-            vp2.verify(None, &DIDTZ, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vp2
+            .verify(None, &DIDTZ, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 }

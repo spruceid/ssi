@@ -710,7 +710,7 @@ mod tests {
             "did:pkh:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x",
         );
         test_generate(
-            secp256k1_pk.clone(),
+            secp256k1_pk,
             "tz",
             "did:pkh:tz:tz2CA2f3SWWcqbWsjHsMZPZxCY5iafSN3nDz",
         );
@@ -947,12 +947,10 @@ mod tests {
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
         assert!(
-            vc_bad_issuer
+            !vc_bad_issuer
                 .verify(None, &DIDPKH, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         // Check that proof JWK must match proof verificationMethod
@@ -971,12 +969,10 @@ mod tests {
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(
-            vc_wrong_key
+            !vc_wrong_key
                 .verify(None, &DIDPKH, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         // Mess with proof signature to make verify fail
@@ -984,7 +980,7 @@ mod tests {
         fuzz_proof_value(&mut vc_fuzzed.proof);
         let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH, &mut context_loader).await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // Make it into a VP
         use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
@@ -1033,17 +1029,15 @@ mod tests {
             .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // Test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
         assert!(
-            vp2.verify(None, &DIDPKH, &mut context_loader)
+            !vp2.verify(None, &DIDPKH, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
     }
 
@@ -1106,12 +1100,10 @@ mod tests {
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
         assert!(
-            vc_bad_issuer
+            !vc_bad_issuer
                 .verify(None, &DIDPKH, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         // Check that proof JWK must match proof verificationMethod
@@ -1130,12 +1122,10 @@ mod tests {
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(
-            vc_wrong_key
+            !vc_wrong_key
                 .verify(None, &DIDPKH, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         // Mess with proof signature to make verify fail
@@ -1143,7 +1133,7 @@ mod tests {
         fuzz_proof_value(&mut vc_fuzzed.proof);
         let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH, &mut context_loader).await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // Make it into a VP
         use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
@@ -1193,17 +1183,15 @@ mod tests {
             .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // Test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
         assert!(
-            vp2.verify(None, &DIDPKH, &mut context_loader)
+            !vp2.verify(None, &DIDPKH, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
     }
 
@@ -1536,7 +1524,7 @@ mod tests {
         vc.property_set = Some(map);
         let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
         println!("{:#?}", verification_result);
-        assert!(verification_result.errors.len() > 0);
+        assert!(!verification_result.errors.is_empty());
     }
 
     #[tokio::test]

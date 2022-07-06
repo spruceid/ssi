@@ -239,7 +239,7 @@ impl DIDResolver for DIDWebKey {
                 return (
                     ResolutionMetadata::from_error(&format!(
                         "Error building HTTP client: {}",
-                        err.to_string()
+                        err
                     )),
                     None,
                     None,
@@ -256,7 +256,7 @@ impl DIDResolver for DIDWebKey {
                 return (
                     ResolutionMetadata::from_error(&format!(
                         "Error sending HTTP request : {}",
-                        err.to_string()
+                        err
                     )),
                     None,
                     None,

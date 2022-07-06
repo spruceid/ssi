@@ -919,7 +919,7 @@ mod tests {
         }
         let mut out = String::new();
         out.push_str("_:");
-        while let Some(c) = chars.next() {
+        for c in chars.by_ref() {
             match c {
                 ' ' => break,
                 '\t' => break,

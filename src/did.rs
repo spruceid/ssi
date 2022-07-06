@@ -1471,7 +1471,7 @@ mod tests {
     #[test]
     fn vmm_to_jwk() {
         // Identity: publicKeyJWK -> JWK
-        const JWK: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
+        const JWK: &str = include_str!("../tests/ed25519-2020-10-18.json");
         let jwk: JWK = serde_json::from_str(JWK).unwrap();
         let pk_jwk = jwk.to_public();
         let vmm_ed = VerificationMethodMap {
@@ -1488,7 +1488,7 @@ mod tests {
     #[test]
     fn vmm_bs58_to_jwk() {
         // publicKeyBase58 (deprecated) -> JWK
-        const JWK: &'static str = include_str!("../tests/ed25519-2020-10-18.json");
+        const JWK: &str = include_str!("../tests/ed25519-2020-10-18.json");
         let jwk: JWK = serde_json::from_str(JWK).unwrap();
         let pk_jwk = jwk.to_public();
         let vmm_ed = VerificationMethodMap {
@@ -1506,7 +1506,7 @@ mod tests {
     #[cfg(feature = "k256")]
     fn vmm_hex_to_jwk() {
         // publicKeyHex (deprecated) -> JWK
-        const JWK: &'static str = include_str!("../tests/secp256k1-2021-02-17.json");
+        const JWK: &str = include_str!("../tests/secp256k1-2021-02-17.json");
         let jwk: JWK = serde_json::from_str(JWK).unwrap();
         let pk_jwk = jwk.to_public();
         let vmm_ed = VerificationMethodMap {

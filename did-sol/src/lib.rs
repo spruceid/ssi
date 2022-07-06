@@ -291,12 +291,10 @@ mod tests {
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
         assert!(
-            vc_bad_issuer
+            !vc_bad_issuer
                 .verify(None, &DIDSol, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         // Check that proof JWK must match proof verificationMethod
@@ -317,12 +315,10 @@ mod tests {
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
         assert!(
-            vc_wrong_key
+            !vc_wrong_key
                 .verify(None, &DIDSol, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         // Make it into a VP
@@ -375,17 +371,15 @@ mod tests {
             .verify(Some(vp_issue_options), &DIDSol, &mut context_loader)
             .await;
         println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.len() >= 1);
+        assert!(!vp_verification_result.errors.is_empty());
 
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
         assert!(
-            vp2.verify(None, &DIDSol, &mut context_loader)
+            !vp2.verify(None, &DIDSol, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
     }
 

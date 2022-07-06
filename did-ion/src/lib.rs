@@ -17,7 +17,7 @@ impl Sidetree for ION {
     }
 
     fn validate_key(key: &JWK) -> Result<(), SidetreeError> {
-        if !is_secp256k1(&key) {
+        if !is_secp256k1(key) {
             return Err(anyhow!("Key must be Secp256k1").into());
         }
         Ok(())

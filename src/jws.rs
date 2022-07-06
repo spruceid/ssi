@@ -190,7 +190,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let hash = crate::hash::sha256(&data)?;
+                let hash = crate::hash::sha256(data)?;
                 let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
                 let sig: k256::ecdsa::recoverable::Signature =
                     signing_key.try_sign_digest(digest)?;

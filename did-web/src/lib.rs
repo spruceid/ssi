@@ -115,7 +115,7 @@ impl DIDResolver for DIDWeb {
                 return (
                     ResolutionMetadata::from_error(&format!(
                         "Error building HTTP client: {}",
-                        err.to_string()
+                        err
                     )),
                     Vec::new(),
                     None,
@@ -132,7 +132,7 @@ impl DIDResolver for DIDWeb {
                 return (
                     ResolutionMetadata::from_error(&format!(
                         "Error sending HTTP request : {}",
-                        err.to_string()
+                        err
                     )),
                     Vec::new(),
                     None,
@@ -253,7 +253,7 @@ mod tests {
                 let (mut parts, body) = Response::<Body>::default().into_parts();
                 parts.status = hyper::StatusCode::NOT_FOUND;
                 let response = Response::from_parts(parts, body);
-                return Ok::<_, hyper::Error>(response);
+                Ok::<_, hyper::Error>(response)
             }))
         });
         let server = Server::try_bind(&addr)?.serve(make_svc);
@@ -324,11 +324,9 @@ mod tests {
         // test that issuer property is used for verification
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
         assert!(
-            vc.verify(None, &DIDWeb, &mut context_loader)
+            !vc.verify(None, &DIDWeb, &mut context_loader)
                 .await
-                .errors
-                .len()
-                > 0
+                .errors.is_empty()
         );
 
         PROXY.with(|proxy| {
