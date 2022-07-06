@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap as Map, HashMap};
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -491,7 +492,7 @@ impl Loader for ContextLoader {
                     .read()
                     .await
                     .get(url_buf.as_str())
-                    .map(|rd| rd.clone())
+                    .cloned()
                     .ok_or_else(|| json_ld::ErrorCode::LoadingDocumentFailed.into())
             } else {
                 Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
@@ -1627,7 +1628,7 @@ pub fn canonicalize_json_string(string: &str) -> String {
             '\\' => out.push_str("\\\\"),
             '\x00'..='\x1f' => {
                 let bytes: u32 = c.into();
-                out.push_str(&format!("\\u{:04x}", bytes))
+                let _ = write!(out, "\\u{:04x}", bytes);
             }
             c => out.push(c),
         }

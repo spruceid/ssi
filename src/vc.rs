@@ -1254,11 +1254,11 @@ impl Credential {
         Ok(())
     }
 
-    async fn filter_proofs(
-        &self,
+    async fn filter_proofs<'a, 'b>(
+        &'a self,
         options: Option<LinkedDataProofOptions>,
         jwt_params: Option<(&Header, &JWTClaims)>,
-        resolver: &dyn DIDResolver,
+        resolver: &'b dyn DIDResolver,
     ) -> Result<(Vec<&Proof>, bool), String> {
         // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
@@ -1810,10 +1810,10 @@ impl Presentation {
         }
     }
 
-    async fn filter_proofs(
-        &self,
+    async fn filter_proofs<'a, 'b>(
+        &'a self,
         options: Option<LinkedDataProofOptions>,
-        jwt_params: Option<(&Header, &JWTClaims)>,
+        jwt_params: Option<(&'b Header, &JWTClaims)>,
         resolver: &dyn DIDResolver,
     ) -> Result<(Vec<&Proof>, bool), String> {
         // Allow any of holder's verification methods matching proof purpose by default
@@ -2463,16 +2463,13 @@ pub(crate) mod tests {
         let _ = NumericDate::MAX + Duration::microseconds(1);
     }
 
-    pub const EXAMPLE_REVOCATION_2020_LIST_URL: &'static str =
-        "https://example.test/revocationList.json";
-    pub const EXAMPLE_REVOCATION_2020_LIST: &'static [u8] =
-        include_bytes!("../tests/revocationList.json");
+    pub const EXAMPLE_REVOCATION_2020_LIST_URL: &str = "https://example.test/revocationList.json";
+    pub const EXAMPLE_REVOCATION_2020_LIST: &[u8] = include_bytes!("../tests/revocationList.json");
 
-    pub const EXAMPLE_STATUS_LIST_2021_URL: &'static str =
-        "https://example.com/credentials/status/3";
-    pub const EXAMPLE_STATUS_LIST_2021: &'static [u8] = include_bytes!("../tests/statusList.json");
+    pub const EXAMPLE_STATUS_LIST_2021_URL: &str = "https://example.com/credentials/status/3";
+    pub const EXAMPLE_STATUS_LIST_2021: &[u8] = include_bytes!("../tests/statusList.json");
 
-    const JWK_JSON: &'static str = include_str!("../tests/rsa2048-2020-08-25.json");
+    const JWK_JSON: &str = include_str!("../tests/rsa2048-2020-08-25.json");
 
     #[test]
     fn credential_from_json() {

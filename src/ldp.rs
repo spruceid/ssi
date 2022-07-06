@@ -502,6 +502,7 @@ async fn to_jws_payload(
     Ok(data)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn sign(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -536,6 +537,7 @@ async fn sign_proof(
     Ok(proof)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn sign_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -564,6 +566,7 @@ async fn sign_nojws(
     Ok(proof)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -601,6 +604,7 @@ async fn prepare_proof(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -2628,7 +2632,7 @@ mod tests {
         struct ExampleResolver;
 
         const EXAMPLE_123_ID: &str = "did:example:123";
-        const EXAMPLE_123_JSON: &'static str = include_str!("../tests/esrs2020-did.jsonld");
+        const EXAMPLE_123_JSON: &str = include_str!("../tests/esrs2020-did.jsonld");
 
         #[async_trait]
         impl DIDResolver for ExampleResolver {
