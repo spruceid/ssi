@@ -553,11 +553,11 @@ mod tests {
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            !vc.verify(None, &DIDKey, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vc
+            .verify(None, &DIDKey, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[async_std::test]
@@ -596,11 +596,11 @@ mod tests {
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            !vc.verify(None, &DIDKey, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vc
+            .verify(None, &DIDKey, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[async_std::test]
@@ -639,10 +639,10 @@ mod tests {
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            !vc.verify(None, &DIDKey, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vc
+            .verify(None, &DIDKey, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 }

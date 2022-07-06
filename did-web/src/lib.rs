@@ -113,10 +113,7 @@ impl DIDResolver for DIDWeb {
             Ok(c) => c,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error building HTTP client: {}",
-                        err
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
                     Vec::new(),
                     None,
                 )
@@ -323,11 +320,11 @@ mod tests {
 
         // test that issuer property is used for verification
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            !vc.verify(None, &DIDWeb, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vc
+            .verify(None, &DIDWeb, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         PROXY.with(|proxy| {
             proxy.replace(None);

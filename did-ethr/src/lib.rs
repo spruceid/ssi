@@ -462,12 +462,11 @@ mod tests {
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            !vc_bad_issuer
-                .verify(None, &DIDEthr, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vc_bad_issuer
+            .verify(None, &DIDEthr, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
@@ -486,12 +485,11 @@ mod tests {
             .unwrap();
         vc_wrong_key.add_proof(proof_bad);
         vc_wrong_key.validate().unwrap();
-        assert!(
-            !vc_wrong_key
-                .verify(None, &DIDEthr, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vc_wrong_key
+            .verify(None, &DIDEthr, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
 
         // Make it into a VP
         use ssi::one_or_many::OneOrMany;
@@ -551,11 +549,11 @@ mod tests {
         // test that holder is verified
         let mut vp2 = vp.clone();
         vp2.holder = Some(URI::String("did:example:bad".to_string()));
-        assert!(
-            !vp2.verify(None, &DIDEthr, &mut context_loader)
-                .await
-                .errors.is_empty()
-        );
+        assert!(!vp2
+            .verify(None, &DIDEthr, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[tokio::test]

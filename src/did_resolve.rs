@@ -948,10 +948,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(client) => client,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error building HTTP client: {}",
-                        err
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
                     None,
                     None,
                 );
