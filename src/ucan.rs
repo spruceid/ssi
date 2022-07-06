@@ -331,20 +331,20 @@ impl Display for UcanResource {
 }
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct UcanProofRef(pub u64);
+pub struct UcanProofRef(pub Cid);
 
 impl Display for UcanProofRef {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "prf/{}", self.0)
+        write!(f, "ucan:{}", self.0)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum ProofRefParseErr {
-    #[error("Missing prf prefix")]
+    #[error("Missing ucan prefix")]
     Format,
-    #[error("Invalid Integer reference")]
-    ParseInt(#[from] std::num::ParseIntError),
+    #[error("Invalid Cid reference")]
+    ParseCid(#[from] libipld::cid::Error),
 }
 
 impl std::str::FromStr for UcanProofRef {
@@ -352,8 +352,8 @@ impl std::str::FromStr for UcanProofRef {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(UcanProofRef(
-            s.strip_prefix("prf/")
-                .map(u64::from_str)
+            s.strip_prefix("ucan:")
+                .map(Cid::from_str)
                 .ok_or(ProofRefParseErr::Format)??,
         ))
     }
@@ -450,6 +450,16 @@ mod ipld_encoding {
         pub fct: Option<Vec<F>>,
         pub prf: Vec<Cid>,
         pub att: Vec<Capability<A>>,
+    }
+
+    impl<F, A> Encode<DagJsonCodec> for Ucan<F, A>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        fn encode<W: Write>(&self, c: DagJsonCodec, w: &mut W) -> Result<(), IpldError> {
+            to_ipld(ipld_encoding::DagJsonUcanRef::from(self))?.encode(c, w)
+        }
     }
 
     impl<F, A> Decode<DagJsonCodec> for Ucan<F, A>
