@@ -15,7 +15,10 @@ use libipld::{
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use serde_with::{serde_as, DisplayFromStr};
+use serde_with::{
+    base64::{Base64, UrlSafe},
+    serde_as, DisplayFromStr,
+};
 use std::{
     fmt::Display,
     io::{Read, Seek, Write},
@@ -403,6 +406,79 @@ pub struct Capability<A = JsonValue> {
 
 fn now() -> f64 {
     (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
+}
+
+#[serde_as]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct UcanRevocation {
+    #[serde(rename = "iss")]
+    pub issuer: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub revoke: Cid,
+    #[serde_as(as = "Base64<UrlSafe>")]
+    pub challenge: Vec<u8>,
+}
+
+impl UcanRevocation {
+    pub fn sign(
+        issuer: String,
+        revoke: Cid,
+        jwk: &JWK,
+        algorithm: Algorithm,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            issuer,
+            revoke,
+            challenge: sign_bytes(algorithm, format!("REVOKE:{}", revoke).as_bytes(), jwk)?,
+        })
+    }
+    pub async fn verify_signature(
+        &self,
+        resolver: &dyn DIDResolver,
+        algorithm: Algorithm,
+        jwk: Option<&JWK>,
+    ) -> Result<(), Error> {
+        let key: JWK = match (
+            self.issuer.get(..8),
+            jwk,
+            dereference(resolver, &self.issuer, &Default::default())
+                .await
+                .1,
+        ) {
+            // did:pkh without fragment
+            (Some("did:pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+                match_key_with_did_pkh(&jwk, &d)?;
+                jwk.clone()
+            }
+            // did:pkh with fragment
+            (Some("did:pkh:"), Some(jwk), Content::Object(Resource::VerificationMethod(vm))) => {
+                match_key_with_vm(&jwk, &vm)?;
+                jwk.clone()
+            }
+            // did:key without fragment
+            (Some("did:key:"), _, Content::DIDDocument(d)) => d
+                .verification_method
+                .iter()
+                .flatten()
+                .next()
+                .and_then(|v| match v {
+                    VerificationMethod::Map(vm) => Some(vm),
+                    _ => None,
+                })
+                .ok_or_else(|| Error::VerificationMethodMismatch)?
+                .get_jwk()?,
+            // general case, did with fragment
+            (Some("did:"), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
+            _ => return Err(Error::VerificationMethodMismatch),
+        };
+
+        verify_bytes(
+            algorithm,
+            format!("REVOKE:{}", self.revoke).as_bytes(),
+            &key,
+            &self.challenge,
+        )
+    }
 }
 
 mod ipld_encoding {
