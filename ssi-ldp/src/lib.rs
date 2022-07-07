@@ -406,7 +406,7 @@ pub async fn ensure_or_pick_verification_relationship(
         }
     }
     if let Some(URI::String(ref vm_id)) = options.verification_method {
-        ensure_verification_relationship(issuer, proof_purpose, vm_id, key, resolver).await?;
+        // ensure_verification_relationship(issuer, proof_purpose, vm_id, key, resolver).await?;
     } else {
         options.verification_method = Some(URI::String(
             pick_default_vm(issuer, proof_purpose, key, resolver).await?,
