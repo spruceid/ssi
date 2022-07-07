@@ -1,6 +1,7 @@
 use std::collections::hash_map::Iter as HashMapIter;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::iter::Peekable;
 use std::str::Chars;
 use std::str::FromStr;
@@ -167,7 +168,7 @@ impl From<&IRIRef> for String {
             match c {
                 '\x00'..='\x20' | '<' | '>' | '"' | '{' | '}' | '|' | '^' | '`' | '\\' => {
                     let bytes: u32 = c.into();
-                    out.push_str(&format!("\\u{:#04x}", bytes))
+                    let _ = write!(out, "\\u{:#04x}", bytes);
                 }
                 _ => out.push(c),
             }
@@ -918,7 +919,7 @@ mod tests {
         }
         let mut out = String::new();
         out.push_str("_:");
-        while let Some(c) = chars.next() {
+        for c in chars.by_ref() {
             match c {
                 ' ' => break,
                 '\t' => break,

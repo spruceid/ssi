@@ -127,13 +127,6 @@ pub struct StatusList2021 {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct EncodedList(pub String);
 
-#[deprecated(note = "Use RevocationList2020Subject or StatusList2021Subject instead")]
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "type")]
-pub enum RevocationSubject {
-    RevocationList2020(RevocationList2020),
-}
-
 /// A decoded [revocation list][EncodedList].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct List(pub Vec<u8>);
@@ -391,11 +384,8 @@ impl CredentialStatus for RevocationList2020Status {
             ));
         }
 
-        match revocation_list_credential.validate() {
-            Err(e) => {
-                return result.with_error(format!("Invalid list credential: {}", e));
-            }
-            Ok(()) => {}
+        if let Err(e) = revocation_list_credential.validate() {
+            return result.with_error(format!("Invalid list credential: {}", e));
         }
         let vc_result = revocation_list_credential
             .verify(None, resolver, context_loader)
@@ -504,16 +494,13 @@ impl CredentialStatus for StatusList2021Entry {
         let status_list_credential = match load_credential(&self.status_list_credential).await {
             Ok(credential) => credential,
             Err(e) => {
-                return result.with_error(format!(
-                    "Unable to fetch status list credential: {}",
-                    e.to_string()
-                ));
+                return result.with_error(format!("Unable to fetch status list credential: {}", e));
             }
         };
         let list_issuer_id = match &status_list_credential.issuer {
             Some(issuer) => issuer.get_id().clone(),
             None => {
-                return result.with_error(format!("Status list credential is missing issuer"));
+                return result.with_error("Status list credential is missing issuer".to_string());
             }
         };
         if issuer_id != list_issuer_id {
@@ -523,11 +510,8 @@ impl CredentialStatus for StatusList2021Entry {
             ));
         }
 
-        match status_list_credential.validate() {
-            Err(e) => {
-                return result.with_error(format!("Invalid list credential: {}", e.to_string()));
-            }
-            Ok(()) => {}
+        if let Err(e) = status_list_credential.validate() {
+            return result.with_error(format!("Invalid list credential: {}", e));
         }
         let vc_result = status_list_credential
             .verify(None, resolver, context_loader)
@@ -535,7 +519,7 @@ impl CredentialStatus for StatusList2021Entry {
         for warning in vc_result.warnings {
             result.warnings.push(format!("Status list: {}", warning));
         }
-        for error in vc_result.errors {
+        if let Some(error) = vc_result.errors.into_iter().next() {
             result.errors.push(format!("Status list: {}", error));
             return result;
         }
@@ -545,10 +529,8 @@ impl CredentialStatus for StatusList2021Entry {
             match StatusList2021Credential::try_from(status_list_credential) {
                 Ok(credential) => credential,
                 Err(e) => {
-                    return result.with_error(format!(
-                        "Unable to parse status list credential: {}",
-                        e.to_string()
-                    ));
+                    return result
+                        .with_error(format!("Unable to parse status list credential: {}", e));
                 }
             };
         if status_list_credential.id != URI::String(self.status_list_credential.to_string()) {
@@ -562,10 +544,7 @@ impl CredentialStatus for StatusList2021Entry {
 
         let list = match List::try_from(&status_list.encoded_list) {
             Ok(list) => list,
-            Err(e) => {
-                return result
-                    .with_error(format!("Unable to decode status list: {}", e.to_string()))
-            }
+            Err(e) => return result.with_error(format!("Unable to decode status list: {}", e)),
         };
         let credential_index = self.status_list_index.0;
         use bitvec::prelude::*;

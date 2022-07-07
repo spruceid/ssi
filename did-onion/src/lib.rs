@@ -114,10 +114,7 @@ impl DIDResolver for DIDOnion {
             }
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error constructing proxy: {}",
-                        err.to_string()
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error constructing proxy: {}", err)),
                     Vec::new(),
                     None,
                 )
@@ -127,10 +124,7 @@ impl DIDResolver for DIDOnion {
             Ok(c) => c,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error building HTTP client: {}",
-                        err.to_string()
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
                     Vec::new(),
                     None,
                 )
@@ -146,7 +140,7 @@ impl DIDResolver for DIDOnion {
                 return (
                     ResolutionMetadata::from_error(&format!(
                         "Error sending HTTP request : {}",
-                        err.to_string()
+                        err
                     )),
                     Vec::new(),
                     None,

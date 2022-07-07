@@ -140,7 +140,7 @@ mod tests {
     async fn chain_id() {
         // See https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md#test-cases
         let dummy_max_length = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
-        let chain_id = ChainId::from_str(&dummy_max_length).unwrap();
+        let chain_id = ChainId::from_str(dummy_max_length).unwrap();
         assert_eq!(chain_id.to_string(), dummy_max_length);
 
         let reference_too_long = format!("{}0", dummy_max_length);

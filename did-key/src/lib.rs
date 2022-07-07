@@ -384,7 +384,7 @@ mod tests {
     async fn from_did_key() {
         let vm = "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH";
         let (res_meta, object, _meta) =
-            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+            dereference(&DIDKey, vm, &DereferencingInputMetadata::default()).await;
         assert_eq!(res_meta.error, None);
         let vm = match object {
             Content::Object(Resource::VerificationMethod(vm)) => vm,
@@ -404,7 +404,7 @@ mod tests {
 
         let vm = "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme#zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme";
         let (res_meta, object, _meta) =
-            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+            dereference(&DIDKey, vm, &DereferencingInputMetadata::default()).await;
         assert_eq!(res_meta.error, None);
         let vm = match object {
             Content::Object(Resource::VerificationMethod(vm)) => vm,
@@ -429,7 +429,7 @@ mod tests {
 
         let vm = "did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169#zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169";
         let (res_meta, object, _meta) =
-            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+            dereference(&DIDKey, vm, &DereferencingInputMetadata::default()).await;
         assert_eq!(res_meta.error, None);
         let vm = match object {
             Content::Object(Resource::VerificationMethod(vm)) => vm,
@@ -463,7 +463,7 @@ mod tests {
 
         let vm = "did:key:zUC7K4ndUaGZgV7Cp2yJy6JtMoUHY6u7tkcSYUvPrEidqBmLCTLmi6d5WvwnUqejscAkERJ3bfjEiSYtdPkRSE8kSa11hFBr4sTgnbZ95SJj19PN2jdvJjyzpSZgxkyyxNnBNnY#zUC7K4ndUaGZgV7Cp2yJy6JtMoUHY6u7tkcSYUvPrEidqBmLCTLmi6d5WvwnUqejscAkERJ3bfjEiSYtdPkRSE8kSa11hFBr4sTgnbZ95SJj19PN2jdvJjyzpSZgxkyyxNnBNnY";
         let (res_meta, object, _meta) =
-            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+            dereference(&DIDKey, vm, &DereferencingInputMetadata::default()).await;
         assert_eq!(res_meta.error, None);
         let vm = match object {
             Content::Object(Resource::VerificationMethod(vm)) => vm,
@@ -497,7 +497,7 @@ mod tests {
 
         let vm = "did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i#z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i";
         let (res_meta, object, _meta) =
-            dereference(&DIDKey, &vm, &DereferencingInputMetadata::default()).await;
+            dereference(&DIDKey, vm, &DereferencingInputMetadata::default()).await;
         assert_eq!(res_meta.error, None);
         let vm = match object {
             Content::Object(Resource::VerificationMethod(vm)) => vm,
@@ -553,13 +553,11 @@ mod tests {
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            vc.verify(None, &DIDKey, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc
+            .verify(None, &DIDKey, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[async_std::test]
@@ -598,13 +596,11 @@ mod tests {
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            vc.verify(None, &DIDKey, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc
+            .verify(None, &DIDKey, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 
     #[async_std::test]
@@ -643,12 +639,10 @@ mod tests {
 
         // test that issuer is verified
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-        assert!(
-            vc.verify(None, &DIDKey, &mut context_loader)
-                .await
-                .errors
-                .len()
-                > 0
-        );
+        assert!(!vc
+            .verify(None, &DIDKey, &mut context_loader)
+            .await
+            .errors
+            .is_empty());
     }
 }

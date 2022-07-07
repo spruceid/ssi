@@ -20,7 +20,7 @@ async fn main() {
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key1".to_string();
     proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
-    let proof_format = std::env::args().skip(1).next();
+    let proof_format = std::env::args().nth(1);
     let mut context_loader = ssi::jsonld::ContextLoader::default();
     match &proof_format.unwrap()[..] {
         "ldp" => {
@@ -30,7 +30,7 @@ async fn main() {
                 .unwrap();
             vc.add_proof(proof);
             let result = vc.verify(None, resolver, &mut context_loader).await;
-            if result.errors.len() > 0 {
+            if !result.errors.is_empty() {
                 panic!("verify failed: {:#?}", result);
             }
             let stdout_writer = std::io::BufWriter::new(std::io::stdout());
@@ -45,7 +45,7 @@ async fn main() {
                 .unwrap();
             let result =
                 ssi::vc::Credential::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
-            if result.errors.len() > 0 {
+            if !result.errors.is_empty() {
                 panic!("verify failed: {:#?}", result);
             }
             print!("{}", jwt);

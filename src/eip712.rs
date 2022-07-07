@@ -237,13 +237,6 @@ impl EIP712Value {
             _ => None,
         }
     }
-
-    fn as_struct_mut(&mut self) -> Option<&mut HashMap<StructName, EIP712Value>> {
-        match self {
-            EIP712Value::Struct(map) => Some(map),
-            _ => None,
-        }
-    }
 }
 
 impl fmt::Display for EIP712Type {
@@ -1037,7 +1030,7 @@ pub fn generate_types(
             // 7
             EIP712Value::Array(array) => {
                 // Ensure values have same primitive type.
-                let mut values = array.into_iter();
+                let mut values = array.iter();
                 let first_value = values
                     .next()
                     .ok_or_else(|| TypesGenerationError::EmptyArray(property_name.clone()))?;
@@ -1615,7 +1608,7 @@ mod tests {
         ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
     };
     use async_trait::async_trait;
-    const DOC_JSON: &'static str = r#"
+    const DOC_JSON: &str = r#"
 {
   "@context": "https://www.w3.org/ns/did/v1",
   "id": "did:example:aaaabbbb",
@@ -1644,7 +1637,7 @@ mod tests {
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl DIDMethod for DIDExample {
         fn name(&self) -> &'static str {
-            return "example";
+            "example"
         }
         fn to_resolver(&self) -> &dyn DIDResolver {
             self
@@ -1894,7 +1887,7 @@ mod tests {
         let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&bytes).unwrap();
         let sig_bytes = &mut sig.as_ref().to_vec();
         // Recovery ID starts at 27 instead of 0.
-        sig_bytes[64] = sig_bytes[64] + 27;
+        sig_bytes[64] += 27;
         let sig_hex = crate::keccak_hash::bytes_to_lowerhex(sig_bytes);
         let mut proof = proof.clone();
         proof.proof_value = Some(sig_hex.clone());
@@ -2024,7 +2017,7 @@ mod tests {
           }
         }))
         .unwrap();
-        let ldp_options = LinkedDataProofOptions::from(input_options);
+        let _ldp_options = LinkedDataProofOptions::from(input_options);
 
         // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L685-L691
         let proof: Proof = serde_json::from_value(json!({
@@ -2132,7 +2125,7 @@ mod tests {
           "embed": true
         }))
         .unwrap();
-        let ldp_options = LinkedDataProofOptions::from(input_options);
+        let _ldp_options = LinkedDataProofOptions::from(input_options);
 
         // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L788-L872
         let proof: Proof = serde_json::from_value(json!({
@@ -2245,7 +2238,7 @@ mod tests {
           }
         }))
         .unwrap();
-        let ldp_options = LinkedDataProofOptions::from(input_options);
+        let _ldp_options = LinkedDataProofOptions::from(input_options);
 
         // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L898-L911
         let proof: Proof = serde_json::from_value(json!({
@@ -2295,7 +2288,7 @@ mod tests {
           "embed": true
         }))
         .unwrap();
-        let ldp_options = LinkedDataProofOptions::from(input_options);
+        let _ldp_options = LinkedDataProofOptions::from(input_options);
 
         // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L996-L1080
         let proof: Proof = serde_json::from_value(json!({

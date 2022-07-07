@@ -230,7 +230,7 @@ mod tests {
         // Attempt to decode tzsig that would involve subslicing
         // through a char boundary.
         let bad_tzk = "xx💣️";
-        jwk_from_tezos_key(&bad_tzk).unwrap_err();
+        jwk_from_tezos_key(bad_tzk).unwrap_err();
     }
 
     #[test]

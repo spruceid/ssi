@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, ensure, Context, Error as AError, Result as AResult};
 use async_trait::async_trait;
 use core::fmt::Debug;
 use json_patch::Patch;
-use reqwest::{header, Client, StatusCode};
+use reqwest::Client;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use ssi::did::{
@@ -315,7 +315,7 @@ pub trait Sidetree {
             .context("Convert update key to PublicKeyJwk for Update operation")?;
         let canonicalized_update_pk = Self::json_canonicalization_scheme(&update_pk)
             .context("Canonicalize update public key for reveal value for Deactivate operation")?;
-        let update_reveal_value = Self::reveal_value(&canonicalized_update_pk.as_bytes());
+        let update_reveal_value = Self::reveal_value(canonicalized_update_pk.as_bytes());
 
         ensure!(
             new_update_pk != &update_pk,
@@ -323,7 +323,7 @@ pub trait Sidetree {
         );
 
         let new_update_commitment =
-            Self::commitment_scheme(&new_update_pk).context("Generate new update commitment")?;
+            Self::commitment_scheme(new_update_pk).context("Generate new update commitment")?;
 
         let update_operation_delta_object = Delta {
             patches,
@@ -372,11 +372,11 @@ pub trait Sidetree {
         );
         let canonicalized_recovery_pk = Self::json_canonicalization_scheme(&recovery_pk)
             .context("Canonicalize recovery public key for reveal value for Recover operation")?;
-        let recover_reveal_value = Self::reveal_value(&canonicalized_recovery_pk.as_bytes());
+        let recover_reveal_value = Self::reveal_value(canonicalized_recovery_pk.as_bytes());
         let new_update_commitment =
-            Self::commitment_scheme(&new_update_pk).context("Generate new update commitment")?;
+            Self::commitment_scheme(new_update_pk).context("Generate new update commitment")?;
         let new_recovery_commitment =
-            Self::commitment_scheme(&new_recovery_pk).context("Generate new update commitment")?;
+            Self::commitment_scheme(new_recovery_pk).context("Generate new update commitment")?;
 
         let recover_operation_delta_object = Delta {
             patches,
@@ -448,7 +448,7 @@ pub trait Sidetree {
         let canonicalized_recovery_pk = Self::json_canonicalization_scheme(&recovery_pk).context(
             "Canonicalize recovery public key for reveal value for Deactivate operation",
         )?;
-        let recover_reveal_value = Self::reveal_value(&canonicalized_recovery_pk.as_bytes());
+        let recover_reveal_value = Self::reveal_value(canonicalized_recovery_pk.as_bytes());
         let algorithm = Self::SIGNATURE_ALGORITHM;
         let claims = DeactivateClaims {
             did_suffix: did_suffix.clone(),
@@ -511,6 +511,7 @@ pub enum Operation {
 /// Partially verified DID Create operation
 ///
 /// Converted from [CreateOperation].
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PartiallyVerifiedCreateOperation {
     did_suffix: DIDSuffix,
@@ -533,6 +534,7 @@ pub struct PartiallyVerifiedUpdateOperation {
 /// Partially verified DID Recovery operation
 ///
 /// Converted from [RecoverOperation].
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct PartiallyVerifiedRecoverOperation {
     reveal_value: String,
@@ -622,10 +624,10 @@ fn ensure_reveal_commitment<S: Sidetree>(
     let canonicalized_public_key =
         S::json_canonicalization_scheme(&pk).context("Canonicalize JWK")?;
     let commitment_value = canonicalized_public_key.as_bytes();
-    let computed_reveal_value = S::reveal_value(&commitment_value);
+    let computed_reveal_value = S::reveal_value(commitment_value);
     ensure!(&computed_reveal_value == reveal_value);
     let computed_commitment =
-        S::commitment_scheme(&pk).context("Unable to compute public key commitment")?;
+        S::commitment_scheme(pk).context("Unable to compute public key commitment")?;
     ensure!(&computed_commitment == recovery_commitment);
     Ok(())
 }
@@ -670,7 +672,7 @@ impl PartiallyVerifiedOperation {
                     .update_commitment()
                     .ok_or(SidetreeError::MissingUpdateCommitment)?;
                 ensure_reveal_commitment::<S>(
-                    &update_commitment,
+                    update_commitment,
                     &update.reveal_value,
                     &update.signed_update_key,
                 )?;
@@ -680,7 +682,7 @@ impl PartiallyVerifiedOperation {
                     .recovery_commitment()
                     .ok_or(SidetreeError::MissingRecoveryCommitment)?;
                 ensure_reveal_commitment::<S>(
-                    &recovery_commitment,
+                    recovery_commitment,
                     &recover.reveal_value,
                     &recover.signed_recovery_key,
                 )?;
@@ -700,7 +702,7 @@ impl PartiallyVerifiedOperation {
                     .recovery_commitment()
                     .ok_or(SidetreeError::MissingRecoveryCommitment)?;
                 ensure_reveal_commitment::<S>(
-                    &recovery_commitment,
+                    recovery_commitment,
                     &deactivate.reveal_value,
                     &deactivate.signed_recovery_key,
                 )?;
@@ -1302,7 +1304,9 @@ impl<S: Sidetree> FromStr for SidetreeDID<S> {
         if let Some(network) = S::NETWORK {
             ensure!(parts.next() == Some(network), "Sidetree network mismatch");
         }
-        let did_suffix_str = parts.next().ok_or(anyhow!("Missing Sidetree DID Suffix"))?;
+        let did_suffix_str = parts
+            .next()
+            .ok_or_else(|| anyhow!("Missing Sidetree DID Suffix"))?;
         let did_suffix = DIDSuffix(did_suffix_str.to_string());
         S::validate_did_suffix(&did_suffix).context("Validate Sidetree DID Suffix")?;
         let create_operation_data_opt = parts.next();
@@ -1409,7 +1413,7 @@ impl<S: Sidetree> SidetreeClient<S> {
     pub fn new(api_url_opt: Option<String>) -> Self {
         let resolver_opt = api_url_opt
             .as_ref()
-            .map(|url| HTTPSidetreeDIDResolver::new(&url));
+            .map(|url| HTTPSidetreeDIDResolver::new(url));
         Self {
             endpoint: api_url_opt,
             resolver: resolver_opt,
@@ -1449,10 +1453,10 @@ fn new_did_state<S: Sidetree>(
     recovery_key: Option<JWK>,
     verification_key: Option<JWK>,
 ) -> AResult<(PublicKeyJwk, PublicKeyJwk, Vec<DIDStatePatch>)> {
-    let update_key = update_key.ok_or(anyhow!("Missing required update key"))?;
+    let update_key = update_key.ok_or_else(|| anyhow!("Missing required update key"))?;
     S::validate_key(&update_key).context("Validate update key")?;
     let update_pk = PublicKeyJwk::try_from(update_key.to_public()).context("Convert update key")?;
-    let recovery_key = recovery_key.ok_or(anyhow!("Missing required recovery key"))?;
+    let recovery_key = recovery_key.ok_or_else(|| anyhow!("Missing required recovery key"))?;
     S::validate_key(&recovery_key).context("Validate recovery key")?;
     let recovery_pk =
         PublicKeyJwk::try_from(recovery_key.to_public()).context("Convert recovery key")?;
@@ -1593,7 +1597,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             verification_key,
             options,
         } = create;
-        for opt in options.keys() {
+        if let Some(opt) = options.keys().next() {
             return Err(DIDMethodError::OptionNotSupported {
                 operation: "create",
                 option: opt.clone(),
@@ -1615,7 +1619,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         let endpoint = self
             .endpoint
             .as_ref()
-            .ok_or(anyhow!("Missing Sidetree REST API endpoint"))?;
+            .ok_or_else(|| anyhow!("Missing Sidetree REST API endpoint"))?;
         let url = format!("{}operations/", endpoint);
         let client = Client::builder().build().context("Build HTTP client")?;
         let resp = client
@@ -1673,14 +1677,15 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             options,
         } = update;
         let did = SidetreeDID::<S>::from_str(&did).context("Parse Sidetree DID")?;
-        for opt in options.keys() {
+        if let Some(opt) = options.keys().next() {
             return Err(DIDMethodError::OptionNotSupported {
                 operation: "update",
                 option: opt.clone(),
             });
         }
-        let update_key = update_key.ok_or(anyhow!("Missing required new update key"))?;
-        let new_update_key = new_update_key.ok_or(anyhow!("Missing required new update key"))?;
+        let update_key = update_key.ok_or_else(|| anyhow!("Missing required new update key"))?;
+        let new_update_key =
+            new_update_key.ok_or_else(|| anyhow!("Missing required new update key"))?;
         S::validate_key(&new_update_key).context("Validate update key")?;
         let new_update_pk =
             PublicKeyJwk::try_from(new_update_key.to_public()).context("Convert new update key")?;
@@ -1705,13 +1710,13 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
         } = recover;
         let did = SidetreeDID::<S>::from_str(&did).context("Parse Sidetree DID")?;
         let did_suffix = DIDSuffix::from(did);
-        for opt in options.keys() {
+        if let Some(opt) = options.keys().next() {
             return Err(DIDMethodError::OptionNotSupported {
                 operation: "recover",
                 option: opt.clone(),
             });
         }
-        let recovery_key = recovery_key.ok_or(anyhow!("Missing required recovery key"))?;
+        let recovery_key = recovery_key.ok_or_else(|| anyhow!("Missing required recovery key"))?;
         let (new_update_pk, new_recovery_pk, patches) =
             new_did_state::<S>(new_update_key, new_recovery_key, new_verification_key)
                 .context("Prepare keys for DID recovery")?;
@@ -1733,10 +1738,9 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
     ) -> Result<DIDMethodTransaction, DIDMethodError> {
         let DIDDeactivate { did, key, options } = deactivate;
         let did = SidetreeDID::<S>::from_str(&did).context("Parse Sidetree DID")?;
-        let recovery_key = key.ok_or(anyhow!(
-            "Missing required recovery key for DID deactivation"
-        ))?;
-        for opt in options.keys() {
+        let recovery_key =
+            key.ok_or_else(|| anyhow!("Missing required recovery key for DID deactivation"))?;
+        if let Some(opt) = options.keys().next() {
             return Err(DIDMethodError::OptionNotSupported {
                 operation: "deactivate",
                 option: opt.clone(),
@@ -1764,7 +1768,7 @@ impl<S: Sidetree> SidetreeClient<S> {
         let mut value = tx.value;
         let op_value = value
             .get_mut("sidetreeOperation")
-            .ok_or(anyhow!("Missing sidetreeOperation property"))?
+            .ok_or_else(|| anyhow!("Missing sidetreeOperation property"))?
             .take();
         let op: Operation =
             serde_json::from_value(op_value).context("Convert value to operation")?;
@@ -1868,7 +1872,7 @@ mod tests {
             Ok(key)
         }
         fn validate_key(key: &JWK) -> Result<(), SidetreeError> {
-            if !is_secp256k1(&key) {
+            if !is_secp256k1(key) {
                 return Err(anyhow!("Key must be Secp256k1").into());
             }
             Ok(())
@@ -2028,7 +2032,7 @@ mod tests {
             Operation::Create(op) => op,
             _ => panic!("Expected Create Operation"),
         };
-        let did = SidetreeDID::<Example>::from_create_operation(&create_operation).unwrap();
+        let did = SidetreeDID::<Example>::from_create_operation(create_operation).unwrap();
         assert_eq!(did.to_string(), LONGFORM_DID);
     }
 

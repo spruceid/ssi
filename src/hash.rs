@@ -12,7 +12,7 @@ pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
         use ring::digest;
         use std::convert::TryInto;
         let hash = digest::digest(&digest::SHA256, data).as_ref().try_into()?;
-        return Ok(hash);
+        Ok(hash)
     }
     #[cfg(all(not(feature = "ring"), feature = "sha2"))]
     {
@@ -21,7 +21,7 @@ pub fn sha256(data: &[u8]) -> Result<[u8; 32], Error> {
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
         let hash = hasher.finalize().into();
-        return Ok(hash);
+        Ok(hash)
     }
     #[cfg(all(not(feature = "ring"), not(feature = "sha2")))]
     {

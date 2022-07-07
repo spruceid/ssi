@@ -29,7 +29,7 @@ async fn main() {
         .unwrap();
     vc.add_proof(proof);
     let result = vc.verify(None, resolver, &mut context_loader).await;
-    if result.errors.len() > 0 {
+    if !result.errors.is_empty() {
         panic!("verify failed: {:#?}", result);
     }
     let stdout_writer = std::io::BufWriter::new(std::io::stdout());

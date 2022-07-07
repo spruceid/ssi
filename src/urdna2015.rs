@@ -421,7 +421,7 @@ mod tests {
         use std::fs::{self};
         use std::path::PathBuf;
         use std::str::FromStr;
-        let case = std::env::args().skip(2).next();
+        let case = std::env::args().nth(2);
         // Example usage to run a single test case:
         //   cargo test normalization_test_suite -- test022
         let mut passed = 0;

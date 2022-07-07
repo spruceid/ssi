@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap as Map, HashMap};
 use std::convert::TryFrom;
+use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -491,7 +492,7 @@ impl Loader for ContextLoader {
                     .read()
                     .await
                     .get(url_buf.as_str())
-                    .map(|rd| rd.clone())
+                    .cloned()
                     .ok_or_else(|| json_ld::ErrorCode::LoadingDocumentFailed.into())
             } else {
                 Err(json_ld::ErrorCode::LoadingDocumentFailed.into())
@@ -1627,7 +1628,7 @@ pub fn canonicalize_json_string(string: &str) -> String {
             '\\' => out.push_str("\\\\"),
             '\x00'..='\x1f' => {
                 let bytes: u32 = c.into();
-                out.push_str(&format!("\\u{:04x}", bytes))
+                let _ = write!(out, "\\u{:04x}", bytes);
             }
             c => out.push(c),
         }
@@ -1909,7 +1910,7 @@ mod tests {
             _ => Err(Error::ExpectedObject),
         }
         .unwrap();
-        let case = std::env::args().skip(2).next();
+        let case = std::env::args().nth(2);
         let sequence = manifest_obj.get("sequence").unwrap();
         let mut passed = 0;
         let mut total = 0;
@@ -1963,7 +1964,7 @@ mod tests {
                 }
             }
             total += 1;
-            if let Err(err) = test_to_rdf(&obj).await {
+            if let Err(err) = test_to_rdf(obj).await {
                 if let Error::ExpectedOutput(expected, found) = err {
                     let changes = difference::Changeset::new(&found, &expected, "\n");
                     eprintln!("test {}: failed. diff:\n{}", id, changes);

@@ -69,12 +69,12 @@ impl<F, A> DecodedUcanTree<F, A> {
         ) {
             // did:pkh without fragment
             (Some("did:pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(&jwk, &d)?;
+                match_key_with_did_pkh(jwk, &d)?;
                 jwk.clone()
             }
             // did:pkh with fragment
             (Some("did:pkh:"), Some(jwk), Content::Object(Resource::VerificationMethod(vm))) => {
-                match_key_with_vm(&jwk, &vm)?;
+                match_key_with_vm(jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
@@ -87,7 +87,7 @@ impl<F, A> DecodedUcanTree<F, A> {
                     VerificationMethod::Map(vm) => Some(vm),
                     _ => None,
                 })
-                .ok_or_else(|| Error::VerificationMethodMismatch)?
+                .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
             (Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
@@ -172,7 +172,7 @@ fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
 fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error> {
     use std::str::FromStr;
     Ok(crate::caip10::BlockchainAccountId::from_str(
-        &vm.blockchain_account_id
+        vm.blockchain_account_id
             .as_ref()
             .ok_or(Error::VerificationMethodMismatch)?,
     )?
@@ -437,7 +437,7 @@ mod tests {
     #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
     impl DIDMethod for DIDExample {
         fn name(&self) -> &'static str {
-            return "key";
+            "key"
         }
         fn to_resolver(&self) -> &dyn DIDResolver {
             self

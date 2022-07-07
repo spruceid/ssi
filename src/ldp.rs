@@ -502,6 +502,7 @@ async fn to_jws_payload(
     Ok(data)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn sign(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -536,6 +537,7 @@ async fn sign_proof(
     Ok(proof)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn sign_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -564,6 +566,7 @@ async fn sign_nojws(
     Ok(proof)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -601,6 +604,7 @@ async fn prepare_proof(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn prepare_nojws(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -2628,7 +2632,7 @@ mod tests {
         struct ExampleResolver;
 
         const EXAMPLE_123_ID: &str = "did:example:123";
-        const EXAMPLE_123_JSON: &'static str = include_str!("../tests/esrs2020-did.jsonld");
+        const EXAMPLE_123_JSON: &str = include_str!("../tests/esrs2020-did.jsonld");
 
         #[async_trait]
         impl DIDResolver for ExampleResolver {
@@ -2699,7 +2703,7 @@ mod tests {
             let resolver = ExampleResolver;
             let mut context_loader = crate::jsonld::ContextLoader::default();
             let warnings = EcdsaSecp256k1RecoverySignature2020
-                .verify(&proof, &vc, &resolver, &mut context_loader)
+                .verify(proof, &vc, &resolver, &mut context_loader)
                 .await
                 .unwrap();
             assert!(warnings.is_empty());
@@ -2725,7 +2729,7 @@ mod tests {
         let sk_bytes = hex::decode(sk_hex).unwrap();
         let sk_bytes_mc = [vec![0x80, 0x26], sk_bytes.clone()].concat();
         let sk_mb = multibase::encode(multibase::Base::Base58Btc, &sk_bytes_mc);
-        let ref props = vmm.property_set.unwrap();
+        let props = &vmm.property_set.unwrap();
         let sk_mb_expected = props
             .get("privateKeyMultibase")
             .unwrap()
@@ -2902,7 +2906,7 @@ mod tests {
             SigningInput::Bytes(Base64urlUInt(ref bytes)) => bytes,
             _ => panic!("expected SigningInput::Bytes for Ed25519Signature2020 preparation"),
         };
-        let sig = crate::jws::sign_bytes(Algorithm::EdDSA, &signing_input_bytes, &sk_jwk).unwrap();
+        let sig = crate::jws::sign_bytes(Algorithm::EdDSA, signing_input_bytes, &sk_jwk).unwrap();
         let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
         let completed_proof = Ed25519Signature2020.complete(prep, &sig_mb).await.unwrap();
         Ed25519Signature2020

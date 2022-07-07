@@ -102,6 +102,7 @@ pub enum ExecutionInput {
     },
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum ExecutionOutput {
@@ -281,7 +282,8 @@ async fn report_method_onion() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in &["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
+    {
+        let did = &"did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid";
         let did_vector = did_method_vector(&resolver, did).await;
         did_vectors.insert(did.to_string(), did_vector);
     }
@@ -338,7 +340,8 @@ async fn report_method_webkey() {
     let mut did_vectors = Map::new();
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
-    for did in &["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
+    {
+        let did = &"did:webkey:ssh:demo.spruceid.com:2021:07:14:keys";
         let did_vector = did_method_vector(&resolver, did).await;
         did_vectors.insert(did.to_string(), did_vector);
     }
@@ -508,7 +511,8 @@ async fn report_resolver_key() {
             .await;
     }
 
-    for did in &["did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH"] {
+    {
+        let did = &"did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH";
         report
             .resolve_representation(
                 &did_method_key::DIDKey,
@@ -540,7 +544,8 @@ async fn report_resolver_web() {
             .await;
     }
 
-    for did in &["did:web:identity.foundation"] {
+    {
+        let did = &"did:web:identity.foundation";
         report
             .resolve_representation(&did_web::DIDWeb, did, &ResolutionInputMetadata::default())
             .await;
@@ -571,7 +576,8 @@ async fn report_resolver_tz() {
             .await;
     }
 
-    for did in &["did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x"] {
+    {
+        let did = &"did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
         report
             .resolve_representation(&did_tz, did, &ResolutionInputMetadata::default())
             .await;
@@ -591,13 +597,15 @@ async fn report_resolver_onion() {
         executions: Vec::new(),
     };
 
-    for did in &["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
+    {
+        let did = &"did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid";
         report
             .resolve(&resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
-    for did in &["did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid"] {
+    {
+        let did = &"did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid";
         report
             .resolve_representation(&resolver, did, &ResolutionInputMetadata::default())
             .await;
@@ -617,13 +625,15 @@ async fn report_resolver_pkh() {
         executions: Vec::new(),
     };
 
-    for did in &["did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"] {
+    {
+        let did = &"did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L";
         report
             .resolve(&resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
-    for did in &["did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"] {
+    {
+        let did = &"did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L";
         report
             .resolve_representation(&resolver, did, &ResolutionInputMetadata::default())
             .await;
@@ -643,13 +653,15 @@ async fn report_resolver_webkey() {
         executions: Vec::new(),
     };
 
-    for did in &["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
+    {
+        let did = &"did:webkey:ssh:demo.spruceid.com:2021:07:14:keys";
         report
             .resolve(&resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
-    for did in &["did:webkey:ssh:demo.spruceid.com:2021:07:14:keys"] {
+    {
+        let did = &"did:webkey:ssh:demo.spruceid.com:2021:07:14:keys";
         report
             .resolve_representation(&resolver, did, &ResolutionInputMetadata::default())
             .await;

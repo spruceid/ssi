@@ -889,7 +889,7 @@ fn transform_resolution_result(
     } else {
         ResolutionMetadata::default()
     };
-    return (res_meta, result.did_document, result.did_document_metadata);
+    (res_meta, result.did_document, result.did_document_metadata)
 }
 
 #[cfg(feature = "http")]
@@ -924,7 +924,7 @@ impl DIDResolver for HTTPDIDResolver {
             }
         };
         let did_urlencoded =
-            percent_encoding::utf8_percent_encode(&did, percent_encoding::CONTROLS).to_string();
+            percent_encoding::utf8_percent_encode(did, percent_encoding::CONTROLS).to_string();
         let mut url = self.endpoint.clone() + &did_urlencoded;
         if !querystring.is_empty() {
             url.push('?');
@@ -948,10 +948,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(client) => client,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error building HTTP client: {}",
-                        err.to_string()
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
                     None,
                     None,
                 );
@@ -1099,7 +1096,7 @@ impl DIDResolver for HTTPDIDResolver {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
                         "Error building HTTP client: {}",
-                        err.to_string()
+                        err
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1451,9 +1448,9 @@ mod tests {
         ]
     }"#;
     #[cfg(feature = "http-did")]
-    const DID_KEY_ID: &'static str = "did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6";
+    const DID_KEY_ID: &str = "did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6";
     #[cfg(feature = "http-did")]
-    const DID_KEY_JSON: &'static str = include_str!("../tests/did-key-uniresolver-resp.json");
+    const DID_KEY_JSON: &str = include_str!("../tests/did-key-uniresolver-resp.json");
 
     #[async_trait]
     impl DIDResolver for ExampleResolver {
@@ -1627,7 +1624,7 @@ mod tests {
         assert_eq!(res_meta.error, None);
         assert!(doc_meta.is_some());
         let doc: Value = serde_json::from_slice(&doc_representation).unwrap();
-        let doc_expected: Value = serde_json::from_str(&EXAMPLE_123_JSON).unwrap();
+        let doc_expected: Value = serde_json::from_str(EXAMPLE_123_JSON).unwrap();
         assert_eq!(doc, doc_expected);
         shutdown().ok();
     }
@@ -1654,7 +1651,7 @@ mod tests {
         let (endpoint, shutdown) = did_resolver_server().unwrap();
         let resolver = HTTPDIDResolver { endpoint };
         let (res_meta, doc, doc_meta) = resolver
-            .resolve(&id, &ResolutionInputMetadata::default())
+            .resolve(id, &ResolutionInputMetadata::default())
             .await;
         eprintln!("res_meta = {:?}", &res_meta);
         eprintln!("doc_meta = {:?}", &doc_meta);
@@ -1758,7 +1755,7 @@ mod tests {
 	"publicKeyBase58": "H3C2AVvLMv6gmMNam3uVAjZpfkcJCwDwnZn6z3wXmqPV"
 }
         "#;
-        let vm: VerificationMethodMap = serde_json::from_str(&expected_output_resource).unwrap();
+        let vm: VerificationMethodMap = serde_json::from_str(expected_output_resource).unwrap();
         let expected_content = Content::Object(Resource::VerificationMethod(vm));
         let (deref_meta, content, content_meta) = dereference(
             &DerefExampleResolver,
