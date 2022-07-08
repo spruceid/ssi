@@ -57,24 +57,30 @@ impl<F, A> Ucan<F, A> {
     {
         // extract or deduce signing key
         let key: JWK = match (
-            self.payload.issuer.get(..8),
+            self.payload.issuer.get(..4),
+            self.payload.issuer.get(5..8),
             &self.header.jwk,
             dereference(resolver, &self.payload.issuer, &Default::default())
                 .await
                 .1,
         ) {
             // did:pkh without fragment
-            (Some("did:pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(jwk, &d)?;
+            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+                match_key_with_did_pkh(&jwk, &d)?;
                 jwk.clone()
             }
             // did:pkh with fragment
-            (Some("did:pkh:"), Some(jwk), Content::Object(Resource::VerificationMethod(vm))) => {
-                match_key_with_vm(jwk, &vm)?;
+            (
+                Some("did:"),
+                Some("pkh:"),
+                Some(jwk),
+                Content::Object(Resource::VerificationMethod(vm)),
+            ) => {
+                match_key_with_vm(&jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
-            (Some("did:key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -86,7 +92,9 @@ impl<F, A> Ucan<F, A> {
                 .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some("did:"), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
+            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+                vm.get_jwk()?
+            }
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
@@ -669,6 +677,13 @@ mod tests {
                 Err(_e) => {}
             };
         }
+    }
+
+    #[async_std::test]
+    async fn basic() {
+        let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0=.eyJhdHQiOlt7ImNhbiI6ImtlcGxlci5rdi9wdXQiLCJ3aXRoIjoia2VwbGVyOnBraDplaXAxNTU6MToweEY1NTdBMTBERTBFNGJENDQzZDdiNThCZGJGZmU3NTc0NDQ1NzlFRTI6Ly9kZWZhdWx0L2t2L3BsYWludGV4dCJ9XSwiYXVkIjoiZGlkOmtleTp6Nk1rdjh2aDh5ZU1xamFCRng1Nm1tcUxRUVJlaGJiRUVDemg4OVJCcllSMlU1ZGkjejZNa3Y4dmg4eWVNcWphQkZ4NTZtbXFMUVFSZWhiYkVFQ3poODlSQnJZUjJVNWRpIiwiZXhwIjoxNjU3MjgxNjA2LjMyNzAwMDEsImlzcyI6ImRpZDprZXk6ejZNa3Y4dmg4eWVNcWphQkZ4NTZtbXFMUVFSZWhiYkVFQ3poODlSQnJZUjJVNWRpI3o2TWt2OHZoOHllTXFqYUJGeDU2bW1xTFFRUmVoYmJFRUN6aDg5UkJyWVIyVTVkaSIsIm5uYyI6InVybjp1dWlkOjY2YWVkNzk1LWY4M2ItNGU0Mi1hN2Y2LTA2Y2JhZDIwOGEzMyIsInByZiI6W3siLyI6ImJhZnlyNGlodXIyanJycjdpZ2FjMmF1cDVoN2g3bTJuZXJidW1wNTV1cjd3ZzdydWptNWR1Z29iZnVlIn1dfQ==.0hwFupV_oY4MfOFjkimKn9ULrezZwHPTsa3Qyc9NVx4rmSgTVWC69Y6Z79mScAE7RrzQmqYGRfdoMl3eCskACA";
+        let u = Ucan::<JsonValue>::decode(case).unwrap();
+        u.verify_signature(DIDExample.to_resolver()).await.unwrap();
     }
 
     #[derive(Deserialize)]
