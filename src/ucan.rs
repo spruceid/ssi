@@ -66,7 +66,7 @@ impl<F, A> Ucan<F, A> {
         ) {
             // did:pkh without fragment
             (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(&jwk, &d)?;
+                match_key_with_did_pkh(jwk, &d)?;
                 jwk.clone()
             }
             // did:pkh with fragment
@@ -76,7 +76,7 @@ impl<F, A> Ucan<F, A> {
                 Some(jwk),
                 Content::Object(Resource::VerificationMethod(vm)),
             ) => {
-                match_key_with_vm(&jwk, &vm)?;
+                match_key_with_vm(jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
@@ -100,8 +100,7 @@ impl<F, A> Ucan<F, A> {
 
         verify_bytes(
             self.header.algorithm,
-            &self
-                .encode()?
+            self.encode()?
                 .rsplit_once('.')
                 .ok_or(Error::InvalidJWS)?
                 .0
@@ -447,24 +446,30 @@ impl UcanRevocation {
         jwk: Option<&JWK>,
     ) -> Result<(), Error> {
         let key: JWK = match (
-            self.issuer.get(..8),
+            self.issuer.get(..4),
+            self.issuer.get(5..8),
             jwk,
             dereference(resolver, &self.issuer, &Default::default())
                 .await
                 .1,
         ) {
             // did:pkh without fragment
-            (Some("did:pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(&jwk, &d)?;
+            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+                match_key_with_did_pkh(jwk, &d)?;
                 jwk.clone()
             }
             // did:pkh with fragment
-            (Some("did:pkh:"), Some(jwk), Content::Object(Resource::VerificationMethod(vm))) => {
-                match_key_with_vm(&jwk, &vm)?;
+            (
+                Some("did:"),
+                Some("pkh:"),
+                Some(jwk),
+                Content::Object(Resource::VerificationMethod(vm)),
+            ) => {
+                match_key_with_vm(jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
-            (Some("did:key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -473,10 +478,12 @@ impl UcanRevocation {
                     VerificationMethod::Map(vm) => Some(vm),
                     _ => None,
                 })
-                .ok_or_else(|| Error::VerificationMethodMismatch)?
+                .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some("did:"), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
+            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+                vm.get_jwk()?
+            }
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
