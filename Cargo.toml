@@ -89,7 +89,8 @@ snarkvm-algorithms = { version= "0.7.9", optional = true }
 snarkvm-curves = { version= "0.7.9", optional = true }
 snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
-serde_with = "1.14"
+serde_with = { version = "1.14", features = ["base64"]}
+libipld = { version = "0.13", features = ["serde-codec"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clear_on_drop = "0.2.4"

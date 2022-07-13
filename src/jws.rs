@@ -640,6 +640,7 @@ pub fn split_detached_jws(jws: &str) -> Result<(&str, &str), Error> {
     Ok((header_b64, signature_b64))
 }
 
+#[derive(Clone, PartialEq)]
 pub struct DecodedJWS {
     pub header: Header,
     pub signing_input: Vec<u8>,

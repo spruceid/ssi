@@ -1,0 +1,63 @@
+[
+  {
+    "comment": "UCAN sections contain invalid base64 characters",
+    "token": "@@JhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOCJ9.eyJpc3MiOiJkaWQ6a2V5Ono2TWtySnpWZVk3RXd2cVdNc3ROeDJ4SDdiZGVnYWREZGFjOHVGams2NTlnemJkeCIsImF1ZCI6ImRpZDprZXk6ek0wMG04RHhXU3dRaGhaWWJnUGprQ05qbUx2dmEzRDdxQnNHUHZ3ejJneW5TaWFKIiwiZXhwIjoxNjQ4MDc2MDQ0LCJhdHQiOltdLCJwcmYiOltdfQ.vLgf-O3Xrc94toabVJKoI15EmAO-d9SqHGFbxTkw3wyEZb-Q7YXA-6mWJv6b-b7kFQHiilMcdIl5s5IuXxsSAw",
+    "assertions": {
+      "validationErrors": [
+        "base64Invalid"
+      ]
+    }
+  },
+  {
+    "comment": "UCAN header section is malformed",
+    "token": "eyJpc3MiOiJkaWQ6a2V5Ono2TWtrUko5NnB0UDFTYjE0OWR5dlRDV2dObTlUYTFadHViZUxEeDlaeVF0aG9vWCIsImF1ZCI6ImRpZDprZXk6ejZNa293V2FLdU1icUZjZDd2WHJvR3NEOTh3WGJ3UHdTdjZGdldHamRodFA0TnplIiwiZXhwIjo0ODA0MTQzNDA1LCJhdHQiOltdLCJwcmYiOltdfQ.FgKew6C7oUMxZzjE_ER-rRaOObtXqMlvfdKZVus1krDYIbcn5PBSFpInBJ7izUYauuKDVkonfGOojq7afstUCg",
+    "assertions": {
+      "payload": {
+        "iss": "did:key:z6MkkRJ96ptP1Sb149dyvTCWgNm9Ta1ZtubeLDx9ZyQthooX",
+        "aud": "did:key:z6MkowWaKuMbqFcd7vXroGsD98wXbwPwSv6FvWGjdhtP4Nze",
+        "exp": 4804143405,
+        "att": [],
+        "prf": []
+      },
+      "validationErrors": [
+        "headerMalformed"
+      ]
+    }
+  },
+    {
+    "comment": "UCAN is expired",
+  "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjAuMCwiaXNzIjoiZGlkOmtleTp6Nk1rdUVFR3ZDWTZhNm9xcWttWFNQM1VKV245d1lLZnpxZlV4RDVCOUdwM1RlTUoiLCJwcmYiOltdfQ.7IK2NlUZB5NNlmrNCo_nKaQ90WN3TgfGKzpRU87JVzJB3bFRNnkfBV8Eu6PwACOTBAIZWagrCkrWQdYKPdpjDw",
+    "assertions": {
+  "payload": {
+    "iss": "did:key:z6MkuEEGvCY6a6oqqkmXSP3UJWn9wYKfzqfUxD5B9Gp3TeMJ",
+    "aud": "did:example:123",
+    "exp": 0.0,
+    "prf": [],
+    "att": []
+  },
+  "header": {
+    "alg": "EdDSA",
+    "typ": "JWT",
+    "ucv": "0.9.0"
+  }
+    }
+  },
+{
+    "comment": "UCAN signature is invalid",
+  "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjAuMCwiaXNzIjoiZGlkOmtleTp6Nk1rdUVFR3ZDWTZhNm9xcWttWFNQM1VKV245d1lLZnpxZlV4RDVCOUdwM1RlTUoiLCJwcmYiOltdfQ.7IK2NlUZB5NNlmrNCo_nKaQ90WN3TgfGKzpRU87JVzJB3bFRNnkfBV8Eu6PwACOTBAIZWagrCkrWQdYKPdpjDw",
+    "assertions": {
+  "payload": {
+    "iss": "did:key:z6MkjmzepTpg44Roz8JnN9AxTKD2295gjz3xt48Poi7261GS",
+    "aud": "did:example:123",
+    "exp": 9000000001.0,
+    "prf": [],
+    "att": []
+  },
+  "header": {
+    "alg": "EdDSA",
+    "typ": "JWT",
+    "ucv": "0.9.0"
+  }
+  }
+}
+]

@@ -3,82 +3,85 @@ use crate::{
     did_resolve::{dereference, Content, DIDResolver},
     error::Error,
     jwk::{Algorithm, JWK},
-    jws::{decode_jws_parts, encode_sign_custom_header, split_jws, verify_bytes, Header},
+    jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header},
     vc::{NumericDate, URI},
 };
-use async_recursion::async_recursion;
-use futures::future::try_join_all;
+use libipld::{
+    codec::{Codec, Decode, Encode},
+    error::Error as IpldError,
+    json::DagJsonCodec,
+    serde::{from_ipld, to_ipld},
+    Block, Cid, Ipld,
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use serde_with::{serde_as, DisplayFromStr};
-use std::collections::HashMap;
+use serde_with::{
+    base64::{Base64, UrlSafe},
+    serde_as, DisplayFromStr,
+};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    io::{Read, Seek, Write},
+};
 
-#[derive(Clone, PartialEq)]
-pub struct Ucan<F = JsonValue, A = HashMap<String, JsonValue>> {
+#[derive(Clone, PartialEq, Debug)]
+pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
     pub signature: Vec<u8>,
+    // unfortunately this matters for sig verification
+    // we have to keep track of how this ucan was created
+    // alternatively we could have 2 different types?
+    // e.g. DagJsonUcan and RawJwtUcan
+    codec: UcanCodec,
 }
 
-#[derive(Clone)]
-pub struct DecodedUcanTree<F = JsonValue, A = HashMap<String, JsonValue>> {
-    pub ucan: Ucan<F, A>,
-    pub parents: Vec<DecodedUcanTree<F, A>>,
+#[derive(Clone, PartialEq, Debug)]
+enum UcanCodec {
+    // maintain serialization
+    Raw(String),
+    DagJson,
 }
 
-impl<F, A> DecodedUcanTree<F, A> {
-    pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
-        let t = Some(time.unwrap_or_else(now));
-        self.ucan.payload.validate_time(t)?;
-        self.parents
-            .iter()
-            .map(|p| p.validate_time(t))
-            .collect::<Result<Vec<()>, TimeInvalid>>()?;
-        Ok(())
+impl Default for UcanCodec {
+    fn default() -> Self {
+        Self::DagJson
     }
-    #[cfg_attr(target_arch = "wasm32", async_recursion(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_recursion)]
-    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
+}
+
+impl<F, A> Ucan<F, A> {
+    pub async fn verify_signature(&self, resolver: &dyn DIDResolver) -> Result<(), Error>
     where
-        F: DeserializeOwned + Send,
-        A: DeserializeOwned + Send,
+        F: Serialize + Send,
+        A: Serialize + Send,
     {
-        let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
-        let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
-
-        if parts.header.type_.as_deref() != Some("JWT") {
-            return Err(Error::MissingType);
-        }
-
-        match parts.header.additional_parameters.get("ucv") {
-            Some(JsonValue::String(v)) if v == "0.8.1" => (),
-            _ => return Err(Error::MissingType),
-        }
-
-        if !payload.audience.starts_with("did:") {
-            return Err(Error::DIDURL);
-        }
-
         // extract or deduce signing key
         let key: JWK = match (
-            payload.issuer.get(..8),
-            &parts.header.jwk,
-            dereference(resolver, &payload.issuer, &Default::default())
+            self.payload.issuer.get(..4),
+            self.payload.issuer.get(4..8),
+            &self.header.jwk,
+            dereference(resolver, &self.payload.issuer, &Default::default())
                 .await
                 .1,
         ) {
             // did:pkh without fragment
-            (Some("did:pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
                 match_key_with_did_pkh(jwk, &d)?;
                 jwk.clone()
             }
             // did:pkh with fragment
-            (Some("did:pkh:"), Some(jwk), Content::Object(Resource::VerificationMethod(vm))) => {
+            (
+                Some("did:"),
+                Some("pkh:"),
+                Some(jwk),
+                Content::Object(Resource::VerificationMethod(vm)),
+            ) => {
                 match_key_with_vm(jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
-            (Some("did:key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -90,51 +93,22 @@ impl<F, A> DecodedUcanTree<F, A> {
                 .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => vm.get_jwk()?,
+            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+                vm.get_jwk()?
+            }
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
         verify_bytes(
-            parts.header.algorithm,
-            &parts.signing_input,
+            self.header.algorithm,
+            self.encode()?
+                .rsplit_once('.')
+                .ok_or(Error::InvalidJWS)?
+                .0
+                .as_bytes(),
             &key,
-            &parts.signature,
-        )?;
-
-        let parents = try_join_all(
-            payload
-                .proof
-                .iter()
-                .map(|s| Self::decode_verify(s, resolver)),
+            &self.signature,
         )
-        .await?;
-
-        if parents
-            .iter()
-            .any(|p| p.ucan.payload.audience != payload.issuer)
-        {
-            return Err(Error::InvalidIssuer);
-        }
-
-        Ok(DecodedUcanTree {
-            // decode and verify parents
-            parents,
-            ucan: Ucan {
-                header: parts.header,
-                payload,
-                signature: parts.signature,
-            },
-        })
-    }
-}
-
-impl<F, A> Ucan<F, A> {
-    pub async fn decode_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Ucan<F, A>, Error>
-    where
-        F: DeserializeOwned + Send,
-        A: DeserializeOwned + Send,
-    {
-        Ok(DecodedUcanTree::decode_verify(jwt, resolver).await?.ucan)
     }
 
     pub fn decode(jwt: &str) -> Result<Self, Error>
@@ -143,16 +117,97 @@ impl<F, A> Ucan<F, A> {
         A: DeserializeOwned,
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
-        let payload: Payload<F, A> = serde_json::from_slice(&parts.payload)?;
+        let (payload, codec): (Payload<F, A>, UcanCodec) =
+            match serde_json::from_slice(&parts.payload) {
+                Ok(p) => Ok((p, UcanCodec::Raw(jwt.to_string()))),
+                Err(e) => match DagJsonCodec.decode(&parts.payload) {
+                    Ok(p) => Ok((p, UcanCodec::DagJson)),
+                    Err(_) => Err(e),
+                },
+            }?;
+
+        if parts.header.type_.as_deref() != Some("JWT") {
+            return Err(Error::MissingType);
+        }
+
+        match parts.header.additional_parameters.get("ucv") {
+            Some(JsonValue::String(v)) if v == "0.9.0" => (),
+            _ => return Err(Error::MissingType),
+        }
+
+        if !payload.audience.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
+
         Ok(Self {
             header: parts.header,
             payload,
             signature: parts.signature,
+            codec,
         })
     }
 
-    pub fn parents(&self) -> ParentIter {
-        self.payload.parents()
+    pub fn encode(&self) -> Result<String, Error>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        Ok(match &self.codec {
+            UcanCodec::Raw(r) => r.clone(),
+            UcanCodec::DagJson => [
+                base64::encode_config(
+                    &DagJsonCodec.encode(
+                        &to_ipld(&self.header)
+                            .map_err(IpldError::new)
+                            .map_err(Error::Other)?,
+                    )?,
+                    base64::URL_SAFE_NO_PAD,
+                ),
+                base64::encode_config(
+                    &DagJsonCodec.encode(&self.payload)?,
+                    base64::URL_SAFE_NO_PAD,
+                ),
+                base64::encode_config(&self.signature, base64::URL_SAFE_NO_PAD),
+            ]
+            .join("."),
+        })
+    }
+
+    pub fn to_block<S, H>(&self, hash: H) -> Result<Block<S>, IpldError>
+    where
+        F: Serialize,
+        A: Serialize,
+        S: libipld::store::StoreParams,
+        H: Into<S::Hashes>,
+        S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
+    {
+        match &self.codec {
+            UcanCodec::Raw(r) => Block::encode(libipld::raw::RawCodec, hash.into(), r.as_bytes()),
+            UcanCodec::DagJson => Block::encode(
+                DagJsonCodec,
+                hash.into(),
+                &to_ipld(ipld_encoding::DagJsonUcanRef::from(self))?,
+            ),
+        }
+    }
+
+    pub fn from_block<S>(block: &Block<S>) -> Result<Self, IpldError>
+    where
+        F: DeserializeOwned,
+        A: DeserializeOwned,
+        S: libipld::store::StoreParams,
+        S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
+        Ipld: Decode<S::Codecs>,
+    {
+        if block.cid().codec() == S::Codecs::from(DagJsonCodec).into() {
+            let ipld: Ipld = S::Codecs::from(DagJsonCodec).decode(block.data())?;
+            let du: ipld_encoding::DagJsonUcan<F, A> = from_ipld(ipld)?;
+            Ok(du.into())
+        } else if block.cid().codec() == S::Codecs::from(libipld::raw::RawCodec).into() {
+            Ok(Self::decode(std::str::from_utf8(block.data())?)?)
+        } else {
+            Err(IpldError::msg("Invalid Codec, expected 'raw' or 'dagJson'"))
+        }
     }
 }
 
@@ -179,15 +234,6 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
     .verify(key)?)
 }
 
-pub struct ParentIter<'a>(std::slice::Iter<'a, String>);
-
-impl<'a> Iterator for ParentIter<'a> {
-    type Item = Result<Ucan, Error>;
-    fn next(&mut self) -> Option<Result<Ucan, Error>> {
-        self.0.next().map(|s| Ucan::decode(s))
-    }
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum DecodeError<E> {
     #[error(transparent)]
@@ -200,8 +246,9 @@ pub enum DecodeError<E> {
     Signature(E),
 }
 
+#[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Payload<F = JsonValue, A = HashMap<String, JsonValue>> {
+pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "iss")]
     pub issuer: String,
     #[serde(rename = "aud")]
@@ -214,8 +261,9 @@ pub struct Payload<F = JsonValue, A = HashMap<String, JsonValue>> {
     pub nonce: Option<String>,
     #[serde(rename = "fct", skip_serializing_if = "Option::is_none")]
     pub facts: Option<Vec<F>>,
+    #[serde_as(as = "Vec<DisplayFromStr>")]
     #[serde(rename = "prf")]
-    pub proof: Vec<String>,
+    pub proof: Vec<Cid>,
     #[serde(rename = "att")]
     pub attenuation: Vec<Capability<A>>,
 }
@@ -240,30 +288,42 @@ impl<F, A> Payload<F, A> {
 
     // NOTE IntoIter::new is deprecated, but into_iter() returns references until we move to 2021 edition
     #[allow(deprecated)]
-    pub fn encode_sign(&self, algorithm: Algorithm, key: &JWK) -> Result<String, Error>
+    pub fn sign(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
     where
         F: Serialize,
         A: Serialize,
     {
-        encode_sign_custom_header(
-            &serde_json::to_string(&self)?,
-            key,
-            &Header {
-                algorithm,
-                key_id: key.key_id.clone(),
-                type_: Some("JWT".to_string()),
-                additional_parameters: std::array::IntoIter::new([(
-                    "ucv".to_string(),
-                    serde_json::Value::String("0.8.1".to_string()),
-                )])
-                .collect(),
-                ..Default::default()
-            },
-        )
-    }
+        let header = Header {
+            algorithm,
+            type_: Some("JWT".to_string()),
+            additional_parameters: std::array::IntoIter::new([(
+                "ucv".to_string(),
+                serde_json::Value::String("0.9.0".to_string()),
+            )])
+            .collect(),
+            ..Default::default()
+        };
 
-    pub fn parents(&self) -> ParentIter {
-        ParentIter(self.proof.iter())
+        let signature = sign_bytes(
+            algorithm,
+            [
+                base64::encode_config(
+                    &DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
+                    base64::URL_SAFE_NO_PAD,
+                ),
+                base64::encode_config(&DagJsonCodec.encode(&self)?, base64::URL_SAFE_NO_PAD),
+            ]
+            .join(".")
+            .as_bytes(),
+            key,
+        )?;
+
+        Ok(Ucan {
+            header,
+            payload: self,
+            signature,
+            codec: UcanCodec::DagJson,
+        })
     }
 }
 
@@ -275,21 +335,30 @@ pub enum UcanResource {
     URI(URI),
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct UcanProofRef(pub u64);
-
-impl std::fmt::Display for UcanProofRef {
+impl Display for UcanResource {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "prf/{}", self.0)
+        match &self {
+            Self::Proof(p) => write!(f, "{}", p),
+            Self::URI(u) => write!(f, "{}", u),
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct UcanProofRef(pub Cid);
+
+impl Display for UcanProofRef {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "ucan:{}", self.0)
     }
 }
 
 #[derive(thiserror::Error, Debug)]
 pub enum ProofRefParseErr {
-    #[error("Missing prf prefix")]
+    #[error("Missing ucan prefix")]
     Format,
-    #[error("Invalid Integer reference")]
-    ParseInt(#[from] std::num::ParseIntError),
+    #[error("Invalid Cid reference")]
+    ParseCid(#[from] libipld::cid::Error),
 }
 
 impl std::str::FromStr for UcanProofRef {
@@ -297,8 +366,8 @@ impl std::str::FromStr for UcanProofRef {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(UcanProofRef(
-            s.strip_prefix("prf/")
-                .map(u64::from_str)
+            s.strip_prefix("ucan:")
+                .map(Cid::from_str)
                 .ok_or(ProofRefParseErr::Format)??,
         ))
     }
@@ -338,11 +407,11 @@ impl std::str::FromStr for UcanScope {
 /// MAY have additional fields needed to describe the capability
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Capability<A = HashMap<String, JsonValue>> {
+pub struct Capability<A = JsonValue> {
     pub with: UcanResource,
     #[serde_as(as = "DisplayFromStr")]
     pub can: UcanScope,
-    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nb", skip_serializing_if = "Option::is_none")]
     pub additional_fields: Option<A>,
 }
 
@@ -350,50 +419,277 @@ fn now() -> f64 {
     (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
 }
 
+#[serde_as]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct UcanRevocation {
+    #[serde(rename = "iss")]
+    pub issuer: String,
+    #[serde_as(as = "DisplayFromStr")]
+    pub revoke: Cid,
+    #[serde_as(as = "Base64<UrlSafe>")]
+    pub challenge: Vec<u8>,
+}
+
+impl UcanRevocation {
+    pub fn sign(
+        issuer: String,
+        revoke: Cid,
+        jwk: &JWK,
+        algorithm: Algorithm,
+    ) -> Result<Self, Error> {
+        Ok(Self {
+            issuer,
+            revoke,
+            challenge: sign_bytes(algorithm, format!("REVOKE:{}", revoke).as_bytes(), jwk)?,
+        })
+    }
+    pub async fn verify_signature(
+        &self,
+        resolver: &dyn DIDResolver,
+        algorithm: Algorithm,
+        jwk: Option<&JWK>,
+    ) -> Result<(), Error> {
+        let key: JWK = match (
+            self.issuer.get(..4),
+            self.issuer.get(4..8),
+            jwk,
+            dereference(resolver, &self.issuer, &Default::default())
+                .await
+                .1,
+        ) {
+            // did:pkh without fragment
+            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+                match_key_with_did_pkh(jwk, &d)?;
+                jwk.clone()
+            }
+            // did:pkh with fragment
+            (
+                Some("did:"),
+                Some("pkh:"),
+                Some(jwk),
+                Content::Object(Resource::VerificationMethod(vm)),
+            ) => {
+                match_key_with_vm(jwk, &vm)?;
+                jwk.clone()
+            }
+            // did:key without fragment
+            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
+                .verification_method
+                .iter()
+                .flatten()
+                .next()
+                .and_then(|v| match v {
+                    VerificationMethod::Map(vm) => Some(vm),
+                    _ => None,
+                })
+                .ok_or(Error::VerificationMethodMismatch)?
+                .get_jwk()?,
+            // general case, did with fragment
+            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+                vm.get_jwk()?
+            }
+            _ => return Err(Error::VerificationMethodMismatch),
+        };
+
+        verify_bytes(
+            algorithm,
+            format!("REVOKE:{}", self.revoke).as_bytes(),
+            &key,
+            &self.challenge,
+        )
+    }
+}
+
+mod ipld_encoding {
+    use super::*;
+
+    #[derive(Serialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonUcanRef<'a, F = JsonValue, A = JsonValue> {
+        header: &'a Header,
+        payload: DagJsonPayloadRef<'a, F, A>,
+        signature: &'a [u8],
+    }
+
+    #[derive(Deserialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonUcan<F = JsonValue, A = JsonValue> {
+        header: Header,
+        payload: DagJsonPayload<F, A>,
+        signature: Vec<u8>,
+    }
+
+    #[derive(Serialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonPayloadRef<'a, F = JsonValue, A = JsonValue> {
+        pub iss: &'a str,
+        pub aud: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nbf: &'a Option<NumericDate>,
+        pub exp: &'a NumericDate,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nnc: &'a Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub fct: &'a Option<Vec<F>>,
+        pub prf: &'a Vec<Cid>,
+        pub att: &'a Vec<Capability<A>>,
+    }
+
+    #[derive(Deserialize, Clone, PartialEq, Debug)]
+    pub struct DagJsonPayload<F = JsonValue, A = JsonValue> {
+        pub iss: String,
+        pub aud: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nbf: Option<NumericDate>,
+        pub exp: NumericDate,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub nnc: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub fct: Option<Vec<F>>,
+        pub prf: Vec<Cid>,
+        pub att: Vec<Capability<A>>,
+    }
+
+    impl<F, A> Encode<DagJsonCodec> for Ucan<F, A>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        fn encode<W: Write>(&self, c: DagJsonCodec, w: &mut W) -> Result<(), IpldError> {
+            to_ipld(ipld_encoding::DagJsonUcanRef::from(self))?.encode(c, w)
+        }
+    }
+
+    impl<F, A> Decode<DagJsonCodec> for Ucan<F, A>
+    where
+        F: DeserializeOwned,
+        A: DeserializeOwned,
+    {
+        fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
+            let u: ipld_encoding::DagJsonUcan<F, A> = from_ipld(Ipld::decode(c, r)?)?;
+            Ok(u.into())
+        }
+    }
+
+    impl<F, A> Encode<DagJsonCodec> for Payload<F, A>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        fn encode<W: Write>(&self, c: DagJsonCodec, w: &mut W) -> Result<(), IpldError> {
+            to_ipld(ipld_encoding::DagJsonPayloadRef::from(self))?.encode(c, w)
+        }
+    }
+
+    impl<F, A> Decode<DagJsonCodec> for Payload<F, A>
+    where
+        F: DeserializeOwned,
+        A: DeserializeOwned,
+    {
+        fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
+            let p: ipld_encoding::DagJsonPayload<F, A> = from_ipld(Ipld::decode(c, r)?)?;
+            Ok(p.into())
+        }
+    }
+
+    impl<'a, F, A> From<&'a Ucan<F, A>> for DagJsonUcanRef<'a, F, A> {
+        fn from(u: &'a Ucan<F, A>) -> Self {
+            Self {
+                header: &u.header,
+                payload: DagJsonPayloadRef::from(&u.payload),
+                signature: &u.signature,
+            }
+        }
+    }
+
+    impl<F, A> From<DagJsonUcan<F, A>> for Ucan<F, A> {
+        fn from(u: DagJsonUcan<F, A>) -> Self {
+            Self {
+                header: u.header,
+                payload: u.payload.into(),
+                signature: u.signature,
+                codec: UcanCodec::DagJson,
+            }
+        }
+    }
+
+    impl<'a, F, A> From<&'a Payload<F, A>> for DagJsonPayloadRef<'a, F, A> {
+        fn from(p: &'a Payload<F, A>) -> Self {
+            Self {
+                iss: &p.issuer,
+                aud: &p.audience,
+                nbf: &p.not_before,
+                exp: &p.expiration,
+                nnc: &p.nonce,
+                fct: &p.facts,
+                prf: &p.proof,
+                att: &p.attenuation,
+            }
+        }
+    }
+
+    impl<F, A> From<DagJsonPayload<F, A>> for Payload<F, A> {
+        fn from(p: DagJsonPayload<F, A>) -> Self {
+            Self {
+                issuer: p.iss,
+                audience: p.aud,
+                not_before: p.nbf,
+                expiration: p.exp,
+                nonce: p.nnc,
+                facts: p.fct,
+                proof: p.prf,
+                attenuation: p.att,
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[async_std::test]
     async fn valid() {
         let cases: Vec<ValidTestVector> =
-            serde_json::from_str(include_str!("../tests/ucan-v0.8.1-valid.json")).unwrap();
+            serde_json::from_str(include_str!("../tests/ucan-v0.9.0-valid.json")).unwrap();
+
         for case in cases {
-            let ucans = match DecodedUcanTree::<JsonValue>::decode_verify(
-                &case.token,
-                DIDExample.to_resolver(),
-            )
-            .await
-            {
+            let ucan = match Ucan::decode(&case.token) {
                 Ok(u) => u,
-                Err(e) => {
-                    println!("{}", case.comment);
-                    Err(e).unwrap()
-                }
+                Err(e) => Err(e).unwrap(),
             };
 
-            // assert!(ucans.validate_time(None).is_ok());
-            assert_eq!(ucans.ucan.payload, case.assertions.payload);
-            assert_eq!(ucans.ucan.header, case.assertions.header);
+            match ucan.verify_signature(DIDExample.to_resolver()).await {
+                Err(e) => Err(e).unwrap(),
+                _ => {}
+            };
+
+            assert_eq!(ucan.payload, case.assertions.payload);
+            assert_eq!(ucan.header, case.assertions.header);
         }
     }
 
     #[async_std::test]
     async fn invalid() {
         let cases: Vec<InvalidTestVector> =
-            serde_json::from_str(include_str!("../tests/ucan-v0.8.1-invalid.json")).unwrap();
+            serde_json::from_str(include_str!("../tests/ucan-v0.9.0-invalid.json")).unwrap();
         for case in cases {
-            match DecodedUcanTree::<JsonValue>::decode_verify(&case.token, DIDExample.to_resolver())
-                .await
-            {
+            match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
-                    if u.validate_time(None).is_ok() {
+                    if u.payload.validate_time(None).is_ok()
+                        && u.verify_signature(DIDExample.to_resolver()).await.is_ok()
+                    {
                         assert!(false, "{}", case.comment);
                     }
                 }
                 Err(_e) => {}
             };
         }
+    }
+
+    #[async_std::test]
+    async fn basic() {
+        let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
+        let u = Ucan::<JsonValue>::decode(case).unwrap();
+        u.verify_signature(DIDExample.to_resolver()).await.unwrap();
     }
 
     #[derive(Deserialize)]
@@ -404,7 +700,6 @@ mod tests {
 
     #[derive(Deserialize)]
     struct ValidTestVector {
-        pub comment: String,
         pub token: String,
         pub assertions: ValidAssertions,
     }
