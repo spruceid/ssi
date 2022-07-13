@@ -20,6 +20,7 @@ use serde_with::{
     serde_as, DisplayFromStr,
 };
 use std::{
+    collections::HashMap,
     fmt::Display,
     io::{Read, Seek, Write},
 };
@@ -58,7 +59,7 @@ impl<F, A> Ucan<F, A> {
         // extract or deduce signing key
         let key: JWK = match (
             self.payload.issuer.get(..4),
-            self.payload.issuer.get(5..8),
+            self.payload.issuer.get(4..8),
             &self.header.jwk,
             dereference(resolver, &self.payload.issuer, &Default::default())
                 .await
@@ -160,10 +161,13 @@ impl<F, A> Ucan<F, A> {
                             .map_err(IpldError::new)
                             .map_err(Error::Other)?,
                     )?,
-                    base64::URL_SAFE,
+                    base64::URL_SAFE_NO_PAD,
                 ),
-                base64::encode_config(&DagJsonCodec.encode(&self.payload)?, base64::URL_SAFE),
-                base64::encode_config(&self.signature, base64::URL_SAFE),
+                base64::encode_config(
+                    &DagJsonCodec.encode(&self.payload)?,
+                    base64::URL_SAFE_NO_PAD,
+                ),
+                base64::encode_config(&self.signature, base64::URL_SAFE_NO_PAD),
             ]
             .join("."),
         })
@@ -305,9 +309,9 @@ impl<F, A> Payload<F, A> {
             [
                 base64::encode_config(
                     &DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE,
+                    base64::URL_SAFE_NO_PAD,
                 ),
-                base64::encode_config(&DagJsonCodec.encode(&self)?, base64::URL_SAFE),
+                base64::encode_config(&DagJsonCodec.encode(&self)?, base64::URL_SAFE_NO_PAD),
             ]
             .join(".")
             .as_bytes(),
@@ -447,7 +451,7 @@ impl UcanRevocation {
     ) -> Result<(), Error> {
         let key: JWK = match (
             self.issuer.get(..4),
-            self.issuer.get(5..8),
+            self.issuer.get(4..8),
             jwk,
             dereference(resolver, &self.issuer, &Default::default())
                 .await
@@ -645,21 +649,16 @@ mod tests {
     #[async_std::test]
     async fn valid() {
         let cases: Vec<ValidTestVector> =
-            serde_json::from_str(include_str!("../tests/ucan-v0.8.1-valid.json")).unwrap();
+            serde_json::from_str(include_str!("../tests/ucan-v0.9.0-valid.json")).unwrap();
+
         for case in cases {
             let ucan = match Ucan::decode(&case.token) {
                 Ok(u) => u,
-                Err(e) => {
-                    println!("{}", case.comment);
-                    Err(e).unwrap()
-                }
+                Err(e) => Err(e).unwrap(),
             };
 
             match ucan.verify_signature(DIDExample.to_resolver()).await {
-                Err(e) => {
-                    println!("{}", case.comment);
-                    Err(e).unwrap()
-                }
+                Err(e) => Err(e).unwrap(),
                 _ => {}
             };
 
@@ -671,7 +670,7 @@ mod tests {
     #[async_std::test]
     async fn invalid() {
         let cases: Vec<InvalidTestVector> =
-            serde_json::from_str(include_str!("../tests/ucan-v0.8.1-invalid.json")).unwrap();
+            serde_json::from_str(include_str!("../tests/ucan-v0.9.0-invalid.json")).unwrap();
         for case in cases {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
@@ -688,7 +687,7 @@ mod tests {
 
     #[async_std::test]
     async fn basic() {
-        let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0=.eyJhdHQiOlt7ImNhbiI6ImtlcGxlci5rdi9wdXQiLCJ3aXRoIjoia2VwbGVyOnBraDplaXAxNTU6MToweEY1NTdBMTBERTBFNGJENDQzZDdiNThCZGJGZmU3NTc0NDQ1NzlFRTI6Ly9kZWZhdWx0L2t2L3BsYWludGV4dCJ9XSwiYXVkIjoiZGlkOmtleTp6Nk1rdjh2aDh5ZU1xamFCRng1Nm1tcUxRUVJlaGJiRUVDemg4OVJCcllSMlU1ZGkjejZNa3Y4dmg4eWVNcWphQkZ4NTZtbXFMUVFSZWhiYkVFQ3poODlSQnJZUjJVNWRpIiwiZXhwIjoxNjU3MjgxNjA2LjMyNzAwMDEsImlzcyI6ImRpZDprZXk6ejZNa3Y4dmg4eWVNcWphQkZ4NTZtbXFMUVFSZWhiYkVFQ3poODlSQnJZUjJVNWRpI3o2TWt2OHZoOHllTXFqYUJGeDU2bW1xTFFRUmVoYmJFRUN6aDg5UkJyWVIyVTVkaSIsIm5uYyI6InVybjp1dWlkOjY2YWVkNzk1LWY4M2ItNGU0Mi1hN2Y2LTA2Y2JhZDIwOGEzMyIsInByZiI6W3siLyI6ImJhZnlyNGlodXIyanJycjdpZ2FjMmF1cDVoN2g3bTJuZXJidW1wNTV1cjd3ZzdydWptNWR1Z29iZnVlIn1dfQ==.0hwFupV_oY4MfOFjkimKn9ULrezZwHPTsa3Qyc9NVx4rmSgTVWC69Y6Z79mScAE7RrzQmqYGRfdoMl3eCskACA";
+        let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
         let u = Ucan::<JsonValue>::decode(case).unwrap();
         u.verify_signature(DIDExample.to_resolver()).await.unwrap();
     }
@@ -701,7 +700,6 @@ mod tests {
 
     #[derive(Deserialize)]
     struct ValidTestVector {
-        pub comment: String,
         pub token: String,
         pub assertions: ValidAssertions,
     }
