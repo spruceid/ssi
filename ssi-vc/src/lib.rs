@@ -4,8 +4,10 @@ use std::str::FromStr;
 
 pub mod error;
 pub use error::Error;
+mod cacao;
 pub mod revocation;
 
+use cacao::HolderBindingDelegation;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
@@ -258,12 +260,19 @@ pub struct Presentation {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct HolderBinding {
-    #[serde(rename = "type")]
-    pub type_: String,
-    #[serde(flatten)]
-    pub property_set: Option<Map<String, Value>>,
+#[serde(tag = "type")]
+pub enum HolderBinding {
+    ExampleHolderBinding2022 {
+        to: URI,
+        from: String,
+        // proof: String,
+    },
+    #[serde(rename_all = "camelCase")]
+    CacaoDelegationHolderBinding2022 {
+        cacao_delegation: HolderBindingDelegation,
+    },
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -769,8 +778,9 @@ impl Credential {
         }
         // TODO: error if any unconvertable claims
         // TODO: unify with verify function?
+        let h = header.clone();
         let (proofs, matched_jwt) = match vc
-            .filter_proofs(options_opt, Some((&header, &claims)), resolver)
+            .filter_proofs(options_opt, Some((&h, &claims)), resolver)
             .await
         {
             Ok(matches) => matches,
@@ -891,12 +901,12 @@ impl Credential {
         Ok(())
     }
 
-    async fn filter_proofs<'a, 'b>(
+    async fn filter_proofs<'a>(
         &'a self,
         options: Option<LinkedDataProofOptions>,
         jwt_params: Option<(&Header, &JWTClaims)>,
-        resolver: &'b dyn DIDResolver,
-    ) -> Result<(Vec<&Proof>, bool), String> {
+        resolver: &'a dyn DIDResolver,
+    ) -> Result<(Vec<&'a Proof>, bool), String> {
         // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
         let allowed_vms = match options.verification_method.take() {
@@ -1447,10 +1457,10 @@ impl Presentation {
         }
     }
 
-    async fn filter_proofs<'a, 'b>(
+    async fn filter_proofs<'a>(
         &'a self,
         options: Option<LinkedDataProofOptions>,
-        jwt_params: Option<(&'b Header, &JWTClaims)>,
+        jwt_params: Option<(&Header, &JWTClaims)>,
         resolver: &dyn DIDResolver,
     ) -> Result<(Vec<&Proof>, bool), String> {
         // Allow any of holder's verification methods matching proof purpose by default
@@ -1549,7 +1559,7 @@ impl Presentation {
         resolver: &dyn DIDResolver,
         proof_purpose: ProofPurpose,
     ) -> Result<Vec<String>, String> {
-        let authorized_holders = self.get_authorized_holders();
+        let authorized_holders = self.get_authorized_holders().await?;
         let vmms = crate::did_resolve::get_verification_methods_for_all(
             authorized_holders
                 .iter()
@@ -1564,27 +1574,44 @@ impl Presentation {
         Ok(vmms.into_keys().collect())
     }
 
-    // TODO: return Result
-    fn get_authorized_holders(&self) -> Vec<String> {
-        let mut holders = match self.holder {
-            Some(URI::String(ref holder)) => vec![holder.to_string()],
-            None => return vec![],
+    pub(crate) async fn get_authorized_holders(&self) -> Result<Vec<String>, String> {
+        let mut holders = match (self.holder.as_ref(), self.holder_binding.as_ref()) {
+            (Some(_), Some(_)) | (None, None) => vec![],
+            (Some(h), None) => vec![h.to_string()],
+            (None, Some(_)) => return Err("No holder".to_string()),
         };
         for holder_binding in self.holder_binding.iter().flatten() {
-            match &holder_binding.type_[..] {
-                "ExampleHolderBinding2022" => {
+            match &holder_binding {
+                HolderBinding::ExampleHolderBinding2022 { to, from } => {
                     // TODO: error if term does not expand to expected IRI
                     // TODO: check proof signed by binding.from
-                    // TODO: check binding.to == vp.holder
-                    // TODO: append binding.to to holders
+                    if self.holder.is_none() || Some(to) != self.holder.as_ref() {
+                        continue;
+                    }
+                    // let signature = base64::decode_config(proof, base64::URL_SAFE_NO_PAD)?;
                     holders.push(String::from("did:example:foo"));
                 }
-                _ => {
+                HolderBinding::CacaoDelegationHolderBinding2022 { cacao_delegation } => {
+                    match cacao_delegation
+                        .validate(
+                            self.id.as_ref(),
+                            self.verifiable_credential.as_ref(),
+                            self.holder.as_ref(),
+                        )
+                        .await
+                    {
+                        Ok(Some(h)) => holders.push(h),
+                        Ok(None) => continue,
+                        Err(e) => Err(e)?,
+                    }
+                }
+                HolderBinding::Unknown => {
                     // TODO: return warning or error for unknown holder binding?
+                    return Err(String::from("Unknown holder binding"));
                 }
             }
         }
-        holders
+        Ok(holders)
     }
 }
 
