@@ -908,6 +908,32 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     };
     Ok(jwk)
 }
+/// Serialize a secp256k1 public key as a 33-byte string with point compression.
+#[cfg(feature = "k256")]
+pub fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
+    use std::convert::TryFrom;
+    let pk = k256::PublicKey::try_from(params)?;
+    let pk_compressed_bytes = pk.to_encoded_point(true);
+    Ok(pk_compressed_bytes.as_bytes().to_vec())
+}
+
+/// Serialize a P-256 public key as a 33-byte string with point compression.
+#[cfg(feature = "p256")]
+pub fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+    // TODO: check that curve is P-256
+    use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
+    let x = FieldBytes::<p256::NistP256>::from_slice(
+        &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
+    );
+    let y = FieldBytes::<p256::NistP256>::from_slice(
+        &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
+    );
+    let encoded_point: EncodedPoint<p256::NistP256> =
+        EncodedPoint::from_affine_coordinates(x, y, true);
+    let pk_compressed_bytes = encoded_point.to_bytes();
+    Ok(pk_compressed_bytes.to_vec())
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum RSAParamsFromPublicKeyError {

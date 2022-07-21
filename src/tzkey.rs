@@ -30,7 +30,7 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
             #[cfg(feature = "k256")]
             {
                 // TODO: p2sk
-                bytes = crate::blakesig::serialize_secp256k1(ec_params)?;
+                bytes = crate::jwk::serialize_secp256k1(ec_params)?;
                 (SPPK_PREFIX, &bytes)
             }
         }
@@ -42,7 +42,7 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
             return Err(Error::MissingFeatures("p256"));
             #[cfg(feature = "p256")]
             {
-                bytes = crate::blakesig::serialize_p256(ec_params)?;
+                bytes = crate::jwk::serialize_p256(ec_params)?;
                 (P2PK_PREFIX, &bytes)
             }
         }
