@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::error::Error;
 use crate::hash::sha256;
-use crate::jwk::{Params, JWK};
+use jwk::{Params, JWK};
 
 use k256::elliptic_curve::sec1::ToEncodedPoint;
 use ripemd160::{Digest, Ripemd160};
@@ -29,7 +29,7 @@ pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::jwk::ECParams;
+    use jwk::ECParams;
 
     #[test]
     fn hash() {

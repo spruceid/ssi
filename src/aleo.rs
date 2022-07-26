@@ -8,7 +8,7 @@
 //! using static parameters ([COM_PARAMS], [ENC_PARAMS], [SIG_PARAMS])
 //! and a [JWK-based keypair representation](OKP_CURVE).
 
-use crate::jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use jwk::{Base64urlUInt, OctetParams, Params, JWK};
 use thiserror::Error;
 
 use blake2::Blake2s;

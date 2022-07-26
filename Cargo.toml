@@ -47,8 +47,6 @@ rand = { version = "0.8", optional = true }
 rand_old = { package = "rand", version = "0.7" }
 openssl = { version = "0.10", optional = true }
 multibase = "0.8"
-simple_asn1 = "^0.5.2"
-num-bigint = "0.4"
 async-std = { version = "1.9", features = ["attributes"] }
 async-trait = "0.1"
 async-recursion = "1.0"
@@ -91,6 +89,7 @@ snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
 serde_with = { version = "1.14", features = ["base64"]}
 libipld = { version = "0.13", features = ["serde-codec"] }
+jwk = { path = "./jwk" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clear_on_drop = "0.2.4"
@@ -115,6 +114,8 @@ members = [
   "did-webkey",
   "vc-test",
   "did-test",
+  "caips",
+  "jwk",
 ]
 
 [dev-dependencies]

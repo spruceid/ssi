@@ -1,7 +1,7 @@
 use crate::error::Error;
-use crate::jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 #[cfg(any(feature = "k256", feature = "p256"))]
 use crate::passthrough_digest::PassthroughDigest;
+use jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -516,7 +516,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             let hash = crate::hash::sha256(data)?;
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = sig.recover_verify_key_from_digest_bytes(digest)?;
-            use crate::jwk::ECParams;
+            use jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
                     &recovered_key.to_bytes(),
@@ -536,7 +536,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         Algorithm::ESKeccakKR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
             let recovered_key = sig.recover_verify_key(data)?;
-            use crate::jwk::ECParams;
+            use jwk::ECParams;
             let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
                 &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())?,
             )?));

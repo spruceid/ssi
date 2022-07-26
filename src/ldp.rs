@@ -18,8 +18,8 @@ use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jsonld::ContextLoader;
-use crate::jwk::Base64urlUInt;
-use crate::jwk::{Algorithm, Params as JWKParams, JWK};
+use jwk::Base64urlUInt;
+use jwk::{Algorithm, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
@@ -1345,7 +1345,7 @@ impl ProofSuite for Eip712Signature2021 {
         let sig = k256::ecdsa::recoverable::Signature::new(&sig, rec_id)?;
         // TODO this step needs keccak-hash, may need better features management
         let recovered_key = sig.recover_verify_key(&bytes)?;
-        use crate::jwk::ECParams;
+        use jwk::ECParams;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
                 &recovered_key.to_bytes(),
@@ -1482,7 +1482,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let typed_data = TypedData::from_document_and_options_json(document, proof).await?;
         let bytes = typed_data.bytes()?;
         let recovered_key = sig.recover_verify_key(&bytes)?;
-        use crate::jwk::ECParams;
+        use jwk::ECParams;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
                 &recovered_key.to_bytes(),
@@ -1609,7 +1609,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
             string_from_document_and_options(document, proof, context_loader).await?;
         let hash = crate::keccak_hash::prefix_personal_message(&signing_string);
         let recovered_key = sig.recover_verify_key(&hash)?;
-        use crate::jwk::ECParams;
+        use jwk::ECParams;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
                 &recovered_key.to_bytes(),
@@ -2809,7 +2809,7 @@ mod tests {
             }
         }
 
-        let sk_jwk = JWK::from(JWKParams::OKP(crate::jwk::OctetParams {
+        let sk_jwk = JWK::from(JWKParams::OKP(jwk::OctetParams {
             curve: "Ed25519".to_string(),
             public_key: Base64urlUInt(sk_bytes[32..64].to_vec()),
             private_key: Some(Base64urlUInt(sk_bytes[0..32].to_vec())),

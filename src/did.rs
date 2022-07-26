@@ -18,7 +18,7 @@ use crate::did_resolve::{
     ERROR_METHOD_NOT_SUPPORTED, TYPE_DID_LD_JSON,
 };
 use crate::error::Error;
-use crate::jwk::JWK;
+use jwk::JWK;
 use crate::one_or_many::OneOrMany;
 
 /// A [verification relationship](https://w3c.github.io/did-core/#dfn-verification-relationship).
@@ -822,9 +822,9 @@ impl VerificationMethodMap {
         };
         let params = match &self.type_[..] {
             // TODO: check against IRIs when in JSON-LD
-            "Ed25519VerificationKey2018" => crate::jwk::Params::OKP(crate::jwk::OctetParams {
+            "Ed25519VerificationKey2018" => jwk::Params::OKP(crate::jwk::OctetParams {
                 curve: "Ed25519".to_string(),
-                public_key: crate::jwk::Base64urlUInt(pk_bytes),
+                public_key: jwk::Base64urlUInt(pk_bytes),
                 private_key: None,
             }),
             "Ed25519VerificationKey2020" => {
@@ -834,15 +834,15 @@ impl VerificationMethodMap {
                 if pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
                     return Err(Error::MultibaseKeyPrefix);
                 }
-                crate::jwk::Params::OKP(crate::jwk::OctetParams {
+                jwk::Params::OKP(crate::jwk::OctetParams {
                     curve: "Ed25519".to_string(),
-                    public_key: crate::jwk::Base64urlUInt(pk_bytes[2..].to_owned()),
+                    public_key: jwk::Base64urlUInt(pk_bytes[2..].to_owned()),
                     private_key: None,
                 })
             }
             #[cfg(feature = "k256")]
             "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
-                use crate::jwk::secp256k1_parse;
+                use jwk::secp256k1_parse;
                 return secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse);
             }
             _ => return Err(Error::UnsupportedKeyType),

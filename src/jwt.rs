@@ -2,7 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::error::Error;
-use crate::jwk::{Algorithm, JWK};
+use jwk::{Algorithm, JWK};
 
 // RFC 7519 - JSON Web Token (JWT)
 

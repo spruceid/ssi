@@ -1,6 +1,6 @@
 use crate::error::Error;
-use crate::jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
 use core::convert::TryFrom;
+use jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
 
 const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
 #[cfg(feature = "k256")]
@@ -30,7 +30,7 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
             #[cfg(feature = "k256")]
             {
                 // TODO: p2sk
-                bytes = crate::jwk::serialize_secp256k1(ec_params)?;
+                bytes = jwk::serialize_secp256k1(ec_params)?;
                 (SPPK_PREFIX, &bytes)
             }
         }
@@ -42,7 +42,7 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
             return Err(Error::MissingFeatures("p256"));
             #[cfg(feature = "p256")]
             {
-                bytes = crate::jwk::serialize_p256(ec_params)?;
+                bytes = jwk::serialize_p256(ec_params)?;
                 (P2PK_PREFIX, &bytes)
             }
         }
@@ -111,13 +111,13 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
         #[cfg(feature = "secp256k1")]
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = crate::jwk::secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse)?;
+            let jwk = jwk::secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse)?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
         #[cfg(feature = "p256")]
         Some("p2pk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = crate::jwk::p256_parse(&pk_bytes)?;
+            let jwk = jwk::p256_parse(&pk_bytes)?;
             (Algorithm::ESBlake2b, jwk.params)
         }
         // TODO: more secret keys

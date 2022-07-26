@@ -15,9 +15,9 @@
 // https://tools.ietf.org/html/rfc8410
 
 use num_bigint::{BigInt, Sign};
-use simple_asn1::{der_encode, ASN1Block, ASN1Class, ASN1DecodeErr, FromASN1, ToASN1};
-
-use crate::error::Error;
+use simple_asn1::{
+    der_encode, ASN1Block, ASN1Class, ASN1DecodeErr, ASN1EncodeErr, FromASN1, ToASN1,
+};
 
 /// RSA private key for ASN.1 encoding, as specified in [RFC 8017].
 ///
@@ -100,7 +100,7 @@ pub struct OctetString(pub Vec<u8>);
 pub struct BitString(pub Vec<u8>);
 
 impl ToASN1 for RSAPrivateKey {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         let multiprime = self.other_prime_infos.is_some();
         let version = Integer(BigInt::new(
@@ -130,7 +130,7 @@ impl ToASN1 for RSAPrivateKey {
 }
 
 impl ToASN1 for RSAPublicKey {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Sequence(
             0,
@@ -187,7 +187,7 @@ impl Ed25519PrivateKey {
 }
 
 impl ToASN1 for Ed25519PrivateKey {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, _class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         let version = 0;
         // TODO: include public key
@@ -203,7 +203,7 @@ impl ToASN1 for Ed25519PrivateKey {
 }
 
 impl ToASN1 for Ed25519PublicKey {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Sequence(
             0,
@@ -213,42 +213,43 @@ impl ToASN1 for Ed25519PublicKey {
 }
 
 impl ToASN1 for Integer {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, _: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Integer(0, self.0.clone())])
     }
 }
 
 impl ToASN1 for OctetString {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, _: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::OctetString(0, self.0.clone())])
     }
 }
 
 impl ToASN1 for BitString {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
+    type Error = Infallible;
     fn to_asn1_class(&self, _: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::BitString(0, 0, self.0.clone())])
     }
 }
 
 impl ToASN1 for OtherPrimeInfos {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Sequence(
             0,
             self.0
                 .iter()
                 .map(|x| x.to_asn1_class(class))
-                .collect::<Result<Vec<Vec<ASN1Block>>, Error>>()?
+                .collect::<Result<Vec<Vec<ASN1Block>>, ASN1EncodeErr>>()?
                 .concat(),
         )])
     }
 }
 
 impl ToASN1 for OtherPrimeInfo {
-    type Error = Error;
+    type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Sequence(
             0,

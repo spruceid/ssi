@@ -1847,7 +1847,7 @@ mod tests {
             expected_typed_data
         );
 
-        let jwk: crate::jwk::JWK = serde_json::from_value(json!({
+        let jwk: jwk::JWK = serde_json::from_value(json!({
             "kty": "EC",
             "crv": "secp256k1",
             "x": "cmbYyDC6cbm807_OmFNYP4CLEL0aB2F1UG683SxFkXM",
@@ -1878,7 +1878,7 @@ mod tests {
         // Sign proof
         let bytes = typed_data.bytes().unwrap();
         let ec_params = match &jwk.params {
-            crate::jwk::Params::EC(ec) => ec,
+            jwk::Params::EC(ec) => ec,
             _ => unreachable!(),
         };
         use k256::ecdsa::signature::Signer;
@@ -1913,7 +1913,7 @@ mod tests {
         let addr = "0xaed7ea8035eec47e657b34ef5d020c7005487443";
         let sk_hex = "0x149195a4059ac8cafe2d56fc612f613b6b18b9265a73143c9f6d7cfbbed76b7e";
         let sk_bytes = bytes_from_hex(sk_hex).unwrap();
-        use crate::jwk::{Base64urlUInt, ECParams, Params, JWK};
+        use jwk::{Base64urlUInt, ECParams, Params, JWK};
 
         let sk = k256::SecretKey::from_bytes(&sk_bytes).unwrap();
         let pk = sk.public_key();

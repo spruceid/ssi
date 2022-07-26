@@ -4,11 +4,12 @@ use std::convert::TryFrom;
 use std::result::Result;
 use zeroize::Zeroize;
 
-use crate::der::{
+pub mod der;
+
+use der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
     RSAPublicKey, RSAPublicKeyFromASN1Error,
 };
-use crate::error::Error;
 
 use serde::{Deserialize, Serialize};
 
@@ -249,7 +250,7 @@ impl Default for Algorithm {
 
 impl JWK {
     #[cfg(feature = "ring")]
-    pub fn generate_ed25519() -> Result<JWK, Error> {
+    pub fn generate_ed25519() -> Result<JWK, ring::error::Unspecified> {
         let rng = ring::rand::SystemRandom::new();
         let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
             .as_ref()
@@ -910,7 +911,7 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
 }
 /// Serialize a secp256k1 public key as a 33-byte string with point compression.
 #[cfg(feature = "k256")]
-pub fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+pub fn serialize_secp256k1(params: &jwk::ECParams) -> Result<Vec<u8>, Error> {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     use std::convert::TryFrom;
     let pk = k256::PublicKey::try_from(params)?;
@@ -920,7 +921,7 @@ pub fn serialize_secp256k1(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Err
 
 /// Serialize a P-256 public key as a 33-byte string with point compression.
 #[cfg(feature = "p256")]
-pub fn serialize_p256(params: &crate::jwk::ECParams) -> Result<Vec<u8>, Error> {
+pub fn serialize_p256(params: &jwk::ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-256
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
     let x = FieldBytes::<p256::NistP256>::from_slice(

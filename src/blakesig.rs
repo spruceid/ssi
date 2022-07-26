@@ -8,7 +8,7 @@
 //! [Tezos]: https://tezos.gitlab.io/
 use crate::error::Error;
 
-use crate::jwk::{Params, JWK};
+use jwk::{Params, JWK};
 
 const TZ1_HASH: [u8; 3] = [0x06, 0xa1, 0x9f];
 #[cfg(feature = "secp256k1")]
@@ -34,12 +34,12 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
             match &curve[..] {
                 #[cfg(feature = "secp256k1")]
                 "secp256k1" => {
-                    bytes = crate::jwk::serialize_secp256k1(params)?;
+                    bytes = jwk::serialize_secp256k1(params)?;
                     (&TZ2_HASH, &bytes)
                 }
                 #[cfg(feature = "p256")]
                 "P-256" => {
-                    bytes = crate::jwk::serialize_p256(params)?;
+                    bytes = jwk::serialize_p256(params)?;
                     (&TZ3_HASH, &bytes)
                 }
                 _ => return Err(Error::CurveNotImplemented(curve.to_string())),

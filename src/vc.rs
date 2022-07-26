@@ -5,7 +5,7 @@ use std::str::FromStr;
 use crate::did_resolve::DIDResolver;
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, ContextLoader};
-use crate::jwk::{JWTKeys, JWK};
+use jwk::{JWTKeys, JWK};
 use crate::jws::Header;
 use crate::ldp::{
     now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation, VerificationWarnings,
@@ -1025,7 +1025,7 @@ impl Credential {
         let algorithm = if let Some(jwk) = jwk {
             jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?
         } else {
-            crate::jwk::Algorithm::None
+            jwk::Algorithm::None
         };
         // Ensure consistency between key ID and verification method URI.
         let key_id = match (jwk.and_then(|jwk| jwk.key_id.clone()), verification_method) {
@@ -1568,7 +1568,7 @@ impl Presentation {
         let algorithm = if let Some(jwk) = jwk {
             jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?
         } else {
-            crate::jwk::Algorithm::None
+            jwk::Algorithm::None
         };
         let key_id = match (jwk.and_then(|jwk| jwk.key_id.clone()), verification_method) {
             (Some(jwk_kid), None) => Some(jwk_kid),
