@@ -3,6 +3,11 @@ use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use std::convert::TryFrom;
 use std::result::Result;
 use zeroize::Zeroize;
+pub mod error;
+pub use error::Error;
+
+#[cfg(feature = "aleosig")]
+pub mod aleo;
 
 pub mod der;
 
@@ -461,9 +466,10 @@ impl JWK {
                 format!(r#"{{"k":"{}","kty":"oct"}}"#, String::from(k))
             }
         };
-        let hash = crate::hash::sha256(json_string.as_bytes())?;
-        let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
-        Ok(thumbprint)
+        // let hash = crate::hash::sha256(json_string.as_bytes())?;
+        // let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
+        // Ok(thumbprint)
+        todo!()
     }
 }
 
@@ -599,13 +605,13 @@ impl ToASN1 for RSAParams {
                 },
                 other_prime_infos: None,
             };
-            key.to_asn1_class(class)
+            Ok(key.to_asn1_class(class)?)
         } else {
             let key = RSAPublicKey {
                 modulus,
                 public_exponent,
             };
-            key.to_asn1_class(class)
+            Ok(key.to_asn1_class(class)?)
         }
     }
 }
@@ -644,10 +650,10 @@ impl ToASN1 for OctetParams {
                 public_key,
                 private_key,
             };
-            key.to_asn1_class(class)
+            Ok(key.to_asn1_class(class)?)
         } else {
             let key = Ed25519PublicKey { public_key };
-            key.to_asn1_class(class)
+            Ok(key.to_asn1_class(class)?)
         }
     }
 }
@@ -852,13 +858,8 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
 }
 
 #[cfg(feature = "k256")]
-pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, String> {
-    let pk = match k256::PublicKey::from_sec1_bytes(data) {
-        Ok(pk) => pk,
-        Err(err) => {
-            return Err(format!("Error parsing key: {}", err));
-        }
-    };
+pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
+    let pk = k256::PublicKey::from_sec1_bytes(data)?;
     let jwk = JWK {
         params: Params::EC(ECParams::try_from(&pk)?),
         public_key_use: None,
@@ -911,9 +912,8 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
 }
 /// Serialize a secp256k1 public key as a 33-byte string with point compression.
 #[cfg(feature = "k256")]
-pub fn serialize_secp256k1(params: &jwk::ECParams) -> Result<Vec<u8>, Error> {
+pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
-    use std::convert::TryFrom;
     let pk = k256::PublicKey::try_from(params)?;
     let pk_compressed_bytes = pk.to_encoded_point(true);
     Ok(pk_compressed_bytes.as_bytes().to_vec())
@@ -921,7 +921,7 @@ pub fn serialize_secp256k1(params: &jwk::ECParams) -> Result<Vec<u8>, Error> {
 
 /// Serialize a P-256 public key as a 33-byte string with point compression.
 #[cfg(feature = "p256")]
-pub fn serialize_p256(params: &jwk::ECParams) -> Result<Vec<u8>, Error> {
+pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-256
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
     let x = FieldBytes::<p256::NistP256>::from_slice(
@@ -1129,12 +1129,12 @@ impl TryFrom<&p256::PublicKey> for ECParams {
 }
 
 impl TryFrom<String> for Base64urlUInt {
-    type Error = Error;
+    type Error = base64::DecodeError;
     fn try_from(data: String) -> Result<Self, Self::Error> {
-        match base64::decode_config(data, base64::URL_SAFE) {
-            Ok(bytes) => Ok(Base64urlUInt(bytes)),
-            Err(err) => Err(Error::Base64(err)),
-        }
+        Ok(Base64urlUInt(base64::decode_config(
+            data,
+            base64::URL_SAFE,
+        )?))
     }
 }
 

@@ -228,7 +228,6 @@ impl ToASN1 for OctetString {
 
 impl ToASN1 for BitString {
     type Error = ASN1EncodeErr;
-    type Error = Infallible;
     fn to_asn1_class(&self, _: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::BitString(0, 0, self.0.clone())])
     }
