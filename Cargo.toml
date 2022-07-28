@@ -117,7 +117,8 @@ members = [
   "caips",
   "ssi-jwk",
   "ssi-core",
-  "ssi-crypto"
+  "ssi-crypto",
+  "ssi-json-ld"
 ]
 
 [dev-dependencies]

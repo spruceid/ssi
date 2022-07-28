@@ -6,6 +6,9 @@ use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 
+mod error;
+pub mod rdf;
+
 use crate::error::Error;
 use crate::rdf::{
     BlankNodeLabel, DataSet, Graph, GraphLabel, IRIOrBlankNodeIdentifier, IRIRef, Lang, Literal,
@@ -15,7 +18,7 @@ use crate::rdf::{
 use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
-use json::JsonValue;
+use json::{array, JsonValue};
 use json_ld::{util::AsJson, Document, JsonContext, Loader, ProcessingMode, RemoteDocument};
 
 #[derive(Debug, Clone)]
@@ -154,7 +157,7 @@ pub const CACAO_ZCAP_V1_CONTEXT: &str = "https://demo.didkit.dev/2022/cacao-zcap
 pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: &str =
     "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json";
 
-lazy_static! {
+lazy_static::lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
         let jsonld = ssi_contexts::CREDENTIALS_V1;
         let doc = json::parse(jsonld).unwrap();
