@@ -9,6 +9,8 @@ pub use error::Error;
 #[cfg(feature = "aleosig")]
 pub mod aleo;
 
+pub mod eip155;
+
 pub mod der;
 
 use der::{
@@ -466,10 +468,9 @@ impl JWK {
                 format!(r#"{{"k":"{}","kty":"oct"}}"#, String::from(k))
             }
         };
-        // let hash = crate::hash::sha256(json_string.as_bytes())?;
-        // let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
-        // Ok(thumbprint)
-        todo!()
+        let hash = ssi_crypto::hashes::sha256::sha256(json_string.as_bytes());
+        let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
+        Ok(thumbprint)
     }
 }
 

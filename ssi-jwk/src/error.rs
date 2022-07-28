@@ -30,6 +30,9 @@ pub enum Error {
     /// Missing key value for symmetric key
     #[error("Missing key value for symmetric key")]
     MissingKeyValue,
+    /// Key type is not supported
+    #[error("Key type not supported")]
+    UnsupportedKeyType,
     /// Key type not implemented
     #[error("Key type not implemented")]
     KeyTypeNotImplemented,
@@ -71,6 +74,9 @@ pub enum Error {
     /// Error parsing integer
     #[error(transparent)]
     ParseInt(#[from] ParseIntError),
+    /// Error eip155 encoding a JWK
+    #[error(transparent)]
+    Eip155(#[from] ssi_crypto::hashes::keccak::Eip155Error),
     /// Error parsing a char
     #[error(transparent)]
     CharTryFrom(#[from] CharTryFromError),

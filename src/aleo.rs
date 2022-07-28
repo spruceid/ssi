@@ -8,7 +8,7 @@
 //! using static parameters ([COM_PARAMS], [ENC_PARAMS], [SIG_PARAMS])
 //! and a [JWK-based keypair representation](OKP_CURVE).
 
-use jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use jwk::{aleo::*, Base64urlUInt, OctetParams, Params, JWK};
 use thiserror::Error;
 
 use blake2::Blake2s;
@@ -57,19 +57,6 @@ pub enum AleoVerifyError {
     ReadSignature(#[source] std::io::Error),
 }
 
-/// An error resulting from attempting to [generate a JWK Aleo private key](generate_private_key_jwk).
-#[derive(Error, Debug)]
-pub enum AleoGeneratePrivateKeyError {
-    #[error("Unable to generate new key: {0}")]
-    NewKey(#[source] snarkvm_dpc::AccountError),
-    #[error("Unable to base58-decode new key: {0}")]
-    DecodePrivateKey(#[source] bs58::decode::Error),
-    #[error("Unable to convert private key to account address: {0}")]
-    PrivateKeyToAddress(#[source] snarkvm_dpc::AccountError),
-    #[error("Unable to write account address as bytes: {0}")]
-    WriteAddress(#[source] std::io::Error),
-}
-
 /// An error resulting from attempting to convert a [JWK] to an Aleo private key.
 ///
 /// The expected JWK format is described in [OKP_CURVE].
@@ -105,35 +92,6 @@ pub enum ParseAddressError {
     ExpectedOKP,
     #[error("Unable to read address from bytes: {0}")]
     ReadAddress(#[source] std::io::Error),
-}
-
-lazy_static! {
-    /// Aleo account signature parameters
-    pub static ref SIG_PARAMS: Schnorr<EdwardsAffine, Blake2s> = {
-        SchnorrParameters::read_le(AccountSignatureParameters::load_bytes().unwrap().as_slice())
-            .unwrap()
-            .into()
-    };
-
-    /// Aleo account commitment parameters
-    pub static ref COM_PARAMS: PedersenCompressedCommitment<EdwardsProjective, 8, 192> = {
-            let com_params_bytes = AccountCommitmentParameters::load_bytes().unwrap();
-        PedersenCommitmentParameters::read_le(com_params_bytes.as_slice())
-            .unwrap()
-            .into()
-    };
-
-    /// Aleo account encryption parameters
-    pub static ref ENC_PARAMS: GroupEncryption<EdwardsProjective, EdwardsAffine, Blake2s> = {
-        let enc_params_bytes = AccountEncryptionParameters::load_bytes()
-                .unwrap();
-        GroupEncryptionParameters::read_le(
-            enc_params_bytes
-                .as_slice(),
-        )
-        .unwrap()
-        .into()
-    };
 }
 
 /// Unregistered JWK OKP curve for Aleo private keys in Aleo Testnet 1

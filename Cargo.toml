@@ -89,7 +89,7 @@ snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
 serde_with = { version = "1.14", features = ["base64"]}
 libipld = { version = "0.13", features = ["serde-codec"] }
-jwk = { path = "./jwk" }
+ssi-jwk = { path = "./ssi-jwk" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clear_on_drop = "0.2.4"
@@ -115,7 +115,9 @@ members = [
   "vc-test",
   "did-test",
   "caips",
-  "jwk",
+  "ssi-jwk",
+  "ssi-core",
+  "ssi-crypto"
 ]
 
 [dev-dependencies]
