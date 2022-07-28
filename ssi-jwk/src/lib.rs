@@ -11,6 +11,8 @@ pub mod aleo;
 
 pub mod eip155;
 
+pub mod blakesig;
+
 pub mod der;
 
 use der::{

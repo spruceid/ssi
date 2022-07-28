@@ -22,9 +22,8 @@
 //! [CAIP-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
 //! [test cases]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
 
-use crate::blakesig;
 use crate::caip2::{ChainId, ChainIdParseError};
-use crate::jwk::{Params, JWK};
+use ssi_jwk::{blakesig, Params, JWK};
 use std::fmt;
 use std::str::FromStr;
 

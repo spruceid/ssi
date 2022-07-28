@@ -37,3 +37,4 @@ snarkvm-algorithms = { version= "0.7.9", optional = true }
 snarkvm-curves = { version= "0.7.9", optional = true }
 snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
+blake2b_simd = "0.5"
