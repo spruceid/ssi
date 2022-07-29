@@ -2,8 +2,8 @@ use std::collections::BTreeMap as Map;
 use std::collections::HashSet;
 
 use crate::error::Error;
-use crate::hash::sha256;
 use crate::rdf::{BlankNodeLabel, DataSet, Predicate, Statement};
+use ssi_crypto::hashes::sha256::sha256;
 
 /// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#normalization-state>
 #[derive(Debug, Clone)]
@@ -86,7 +86,7 @@ pub fn hash_first_degree_quads(
     nquads.sort();
     // 5
     let joined_nquads = nquads.join("");
-    let nquads_digest = sha256(joined_nquads.as_bytes())?;
+    let nquads_digest = sha256(joined_nquads.as_bytes());
     let hash_hex = digest_to_lowerhex(&nquads_digest);
     Ok(hash_hex)
 }
@@ -366,7 +366,7 @@ pub fn hash_n_degree_quads(
         issuer = &mut issuer_tmp;
     }
     // 6
-    let digest = sha256(data_to_hash.as_bytes())?;
+    let digest = sha256(data_to_hash.as_bytes());
     let hash = digest_to_lowerhex(&digest);
     Ok(HashNDegreeQuadsOutput {
         hash,
@@ -406,7 +406,7 @@ pub fn hash_related_blank_node(
     // 4
     input += &identifier;
     // 5
-    let digest = sha256(input.as_bytes())?;
+    let digest = sha256(input.as_bytes());
     let hash_hex = digest_to_lowerhex(&digest);
     Ok(hash_hex)
 }

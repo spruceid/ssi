@@ -10,6 +10,12 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Missing identifier
+    #[error("Missing identifier")]
+    MissingIdentifier,
+    /// Missing chosen issuer
+    #[error("Missing chosen issuer")]
+    MissingChosenIssuer,
     /// Expected RDF term
     #[error("Expected RDF term")]
     ExpectedTerm,

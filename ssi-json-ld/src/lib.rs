@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 mod error;
 pub mod rdf;
+pub mod urdna2015;
 
 use crate::error::Error;
 use crate::rdf::{
