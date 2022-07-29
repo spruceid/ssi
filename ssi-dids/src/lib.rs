@@ -16,6 +16,9 @@ use thiserror::Error;
 pub mod did_resolve;
 pub mod error;
 
+#[cfg(featuer = "parser")]
+pub mod parser;
+
 use crate::did_resolve::{
     Content, ContentMetadata, DIDResolver, DereferencingInputMetadata, DereferencingMetadata,
     DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
