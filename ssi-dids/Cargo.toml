@@ -1,0 +1,30 @@
+[package]
+name = "ssi-dids"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_urlencoded = "0.7"
+async-std = { version = "1.9", features = ["attributes"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+derive_builder = "0.9"
+bs58 = { version = "0.4", features = ["check"] }
+hex = "0.4"
+multibase = "0.8"
+ssi-jwk = { path = "../ssi-jwk" }
+ssi-json-ld = { path = "../ssi-json-ld" }
+ssi-core = { path = "../ssi-core" }
+caips = { path = "../caips" }
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }

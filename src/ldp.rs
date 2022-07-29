@@ -18,12 +18,12 @@ use crate::eip712::TypedData;
 use crate::error::Error;
 use crate::hash::sha256;
 use crate::jsonld::ContextLoader;
-use jwk::Base64urlUInt;
-use jwk::{Algorithm, Params as JWKParams, JWK};
 use crate::jws::Header;
 use crate::rdf::DataSet;
 use crate::urdna2015;
 use crate::vc::{LinkedDataProofOptions, Proof, ProofPurpose, URI};
+use jwk::Base64urlUInt;
+use jwk::{Algorithm, Params as JWKParams, JWK};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -443,38 +443,6 @@ impl LinkedDataProofs {
             .verify(proof, document, resolver, context_loader)
             .await
     }
-}
-
-/// Resolve a verificationMethod to a key
-pub async fn resolve_key(
-    verification_method: &str,
-    resolver: &dyn DIDResolver,
-) -> Result<JWK, Error> {
-    let vmm = resolve_vm(verification_method, resolver).await?;
-    let jwk = vmm.get_jwk()?;
-    Ok(jwk)
-}
-
-/// Resolve a verificationMethod
-pub async fn resolve_vm(
-    verification_method: &str,
-    resolver: &dyn DIDResolver,
-) -> Result<VerificationMethodMap, Error> {
-    let (res_meta, object, _meta) = dereference(
-        resolver,
-        verification_method,
-        &DereferencingInputMetadata::default(),
-    )
-    .await;
-    if let Some(error) = res_meta.error {
-        return Err(Error::DIDURLDereference(error));
-    }
-    let vm = match object {
-        Content::Object(Resource::VerificationMethod(vm)) => vm,
-        Content::Null => return Err(Error::ResourceNotFound(verification_method.to_string())),
-        _ => return Err(Error::ExpectedObject),
-    };
-    Ok(vm)
 }
 
 async fn to_jws_payload(

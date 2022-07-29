@@ -4,7 +4,8 @@
 //!
 //! [did-core]: https://www.w3.org/TR/did-core/
 
-use crate::caip10::BlockchainAccountId;
+use caips::caip10::BlockchainAccountId;
+use derive_builder::Builder;
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -12,21 +13,100 @@ use std::fmt;
 use std::str::FromStr;
 use thiserror::Error;
 
+pub mod did_resolve;
+pub mod error;
+
 use crate::did_resolve::{
     Content, ContentMetadata, DIDResolver, DereferencingInputMetadata, DereferencingMetadata,
     DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_METHOD_NOT_SUPPORTED, TYPE_DID_LD_JSON,
 };
-use crate::error::Error;
-use jwk::JWK;
-use crate::one_or_many::OneOrMany;
+pub use crate::error::Error;
+use ssi_core::one_or_many::OneOrMany;
+use ssi_jwk::JWK;
 
 /// A [verification relationship](https://w3c.github.io/did-core/#dfn-verification-relationship).
 ///
 /// The relationship between a [verification method][VerificationMethod] and a DID
 /// Subject (as described by a [DID Document][Document]) is considered analogous to a [proof
 /// purpose](crate::vc::ProofPurpose).
-pub type VerificationRelationship = crate::vc::ProofPurpose;
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(try_from = "String")]
+#[serde(rename_all = "camelCase")]
+pub enum VerificationRelationship {
+    AssertionMethod,
+    Authentication,
+    KeyAgreement,
+    ContractAgreement,
+    CapabilityInvocation,
+    CapabilityDelegation,
+}
+
+impl Default for VerificationRelationship {
+    fn default() -> Self {
+        Self::AssertionMethod
+    }
+}
+
+impl FromStr for VerificationRelationship {
+    type Err = Error;
+    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
+        match purpose {
+            "authentication" => Ok(Self::Authentication),
+            "assertionMethod" => Ok(Self::AssertionMethod),
+            "keyAgreement" => Ok(Self::KeyAgreement),
+            "contractAgreement" => Ok(Self::ContractAgreement),
+            "capabilityInvocation" => Ok(Self::CapabilityInvocation),
+            "capabilityDelegation" => Ok(Self::CapabilityDelegation),
+            _ => Err(Error::UnsupportedVerificationRelationship),
+        }
+    }
+}
+
+impl TryFrom<String> for VerificationRelationship {
+    type Error = Error;
+    fn try_from(purpose: String) -> Result<Self, Self::Error> {
+        Self::from_str(&purpose)
+    }
+}
+
+impl From<VerificationRelationship> for String {
+    fn from(purpose: VerificationRelationship) -> String {
+        match purpose {
+            VerificationRelationship::Authentication => "authentication".to_string(),
+            VerificationRelationship::AssertionMethod => "assertionMethod".to_string(),
+            VerificationRelationship::KeyAgreement => "keyAgreement".to_string(),
+            VerificationRelationship::ContractAgreement => "contractAgreement".to_string(),
+            VerificationRelationship::CapabilityInvocation => "capabilityInvocation".to_string(),
+            VerificationRelationship::CapabilityDelegation => "capabilityDelegation".to_string(),
+        }
+    }
+}
+
+impl VerificationRelationship {
+    pub fn to_iri(&self) -> &'static str {
+        match self {
+            VerificationRelationship::Authentication => {
+                "https://w3id.org/security#authenticationMethod"
+            }
+            VerificationRelationship::AssertionMethod => {
+                "https://w3id.org/security#assertionMethod"
+            }
+            VerificationRelationship::KeyAgreement => {
+                "https://w3id.org/security#keyAgreementMethod"
+            }
+            VerificationRelationship::ContractAgreement => {
+                "https://w3id.org/security#contractAgreementMethod"
+            }
+            VerificationRelationship::CapabilityInvocation => {
+                "https://w3id.org/security#capabilityInvocationMethod"
+            }
+            VerificationRelationship::CapabilityDelegation => {
+                "https://w3id.org/security#capabilityDelegationMethod"
+            }
+        }
+    }
+}
 
 use async_trait::async_trait;
 use chrono::prelude::{DateTime, Utc};
@@ -45,8 +125,8 @@ use serde_json::Value;
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
 
 /// Aliases for the [default required DID document context URI][DEFAULT_CONTEXT]. Allowed for compatibility reasons. [DEFAULT_CONTEXT][] should be used instead.
-pub const DEFAULT_CONTEXT_NO_WWW: &str = crate::jsonld::DID_V1_CONTEXT_NO_WWW;
-pub const ALT_DEFAULT_CONTEXT: &str = crate::jsonld::W3ID_DID_V1_CONTEXT;
+pub const DEFAULT_CONTEXT_NO_WWW: &str = ssi_json_ld::DID_V1_CONTEXT_NO_WWW;
+pub const ALT_DEFAULT_CONTEXT: &str = ssi_json_ld::W3ID_DID_V1_CONTEXT;
 
 /// DID Core v0.11 context URI. Allowed for legacy
 /// reasons. The [v1.0 context URI][DEFAULT_CONTEXT] should be used instead.
@@ -822,9 +902,9 @@ impl VerificationMethodMap {
         };
         let params = match &self.type_[..] {
             // TODO: check against IRIs when in JSON-LD
-            "Ed25519VerificationKey2018" => jwk::Params::OKP(crate::jwk::OctetParams {
+            "Ed25519VerificationKey2018" => ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
                 curve: "Ed25519".to_string(),
-                public_key: jwk::Base64urlUInt(pk_bytes),
+                public_key: ssi_jwk::Base64urlUInt(pk_bytes),
                 private_key: None,
             }),
             "Ed25519VerificationKey2020" => {
@@ -834,15 +914,15 @@ impl VerificationMethodMap {
                 if pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
                     return Err(Error::MultibaseKeyPrefix);
                 }
-                jwk::Params::OKP(crate::jwk::OctetParams {
+                ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
                     curve: "Ed25519".to_string(),
-                    public_key: jwk::Base64urlUInt(pk_bytes[2..].to_owned()),
+                    public_key: ssi_jwk::Base64urlUInt(pk_bytes[2..].to_owned()),
                     private_key: None,
                 })
             }
             #[cfg(feature = "k256")]
             "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
-                use jwk::secp256k1_parse;
+                use ssi_jwk::secp256k1_parse;
                 return secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse);
             }
             _ => return Err(Error::UnsupportedKeyType),
@@ -1295,11 +1375,11 @@ impl Document {
 
 /// Some example functionality.
 pub mod example {
-    use crate::did::{DIDMethod, Document};
     use crate::did_resolve::{
         DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
         ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
     };
+    use crate::{DIDMethod, Document};
     use async_trait::async_trait;
 
     const DOC_JSON_FOO: &str = include_str!("../tests/did-example-foo.json");

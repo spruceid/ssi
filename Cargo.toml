@@ -92,6 +92,7 @@ libipld = { version = "0.13", features = ["serde-codec"] }
 ssi-jwk = { path = "./ssi-jwk" }
 ssi-json-ld = { path = "./ssi-json-ld" }
 ssi-core = { path = "./ssi-core" }
+ssi-dids = { path = "./ssi-dids" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clear_on_drop = "0.2.4"
@@ -120,7 +121,8 @@ members = [
   "ssi-jwk",
   "ssi-core",
   "ssi-crypto",
-  "ssi-json-ld"
+  "ssi-json-ld",
+  "ssi-dids"
 ]
 
 [dev-dependencies]

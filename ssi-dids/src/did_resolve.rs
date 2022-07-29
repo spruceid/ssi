@@ -14,13 +14,14 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryFrom;
 
 // https://w3c-ccg.github.io/did-resolution/
-use crate::did::{
+use crate::error::Error;
+use crate::{
     DIDMethod, DIDParameters, Document, PrimaryDIDURL, Resource, ServiceEndpoint,
     VerificationMethod, VerificationMethodMap, VerificationRelationship, DIDURL,
 };
-use crate::error::Error;
-use crate::jsonld::DID_RESOLUTION_V1_CONTEXT;
-use crate::one_or_many::OneOrMany;
+use ssi_core::one_or_many::OneOrMany;
+use ssi_json_ld::DID_RESOLUTION_V1_CONTEXT;
+use ssi_jwk::JWK;
 
 /// Media type for JSON.
 pub const TYPE_JSON: &str = "application/json";
@@ -1382,7 +1383,7 @@ pub async fn get_verification_methods(
         {
             if let VerificationMethod::Map(mut vmm) = vm {
                 let vm_id = vmm.get_id(&doc.id);
-                crate::did::merge_context(&mut vmm.context, &doc.context);
+                crate::merge_context(&mut vmm.context, &doc.context);
                 vmms_by_id.insert(vm_id, vmm);
             }
         }
@@ -1392,12 +1393,44 @@ pub async fn get_verification_methods(
         let vmm = if let Some(vmm) = vmms_by_id.remove(&id) {
             vmm
         } else {
-            crate::ldp::resolve_vm(&id, resolver).await?
+            resolve_vm(&id, resolver).await?
         };
         vmms.insert(id, vmm);
     }
     // TODO: verify VM controller properties.
     Ok(vmms)
+}
+
+/// Resolve a verificationMethod to a key
+pub async fn resolve_key(
+    verification_method: &str,
+    resolver: &dyn DIDResolver,
+) -> Result<JWK, Error> {
+    let vmm = resolve_vm(verification_method, resolver).await?;
+    let jwk = vmm.get_jwk()?;
+    Ok(jwk)
+}
+
+/// Resolve a verificationMethod
+pub async fn resolve_vm(
+    verification_method: &str,
+    resolver: &dyn DIDResolver,
+) -> Result<VerificationMethodMap, Error> {
+    let (res_meta, object, _meta) = dereference(
+        resolver,
+        verification_method,
+        &DereferencingInputMetadata::default(),
+    )
+    .await;
+    if let Some(error) = res_meta.error {
+        return Err(Error::DIDURLDereference(error));
+    }
+    let vm = match object {
+        Content::Object(Resource::VerificationMethod(vm)) => vm,
+        Content::Null => return Err(Error::ResourceNotFound(verification_method.to_string())),
+        _ => return Err(Error::ExpectedObject),
+    };
+    Ok(vm)
 }
 
 #[cfg(test)]
