@@ -4,11 +4,11 @@ use std::convert::TryFrom;
 use crate::did_resolve::DIDResolver;
 use crate::error::Error;
 use crate::jsonld::{json_to_dataset, ContextLoader, SECURITY_V2_CONTEXT};
+use crate::jwk::JWK;
 use crate::ldp::{LinkedDataDocument, LinkedDataProofs, ProofPreparation};
 use crate::one_or_many::OneOrMany;
 use crate::rdf::DataSet;
 use crate::vc::{Check, LinkedDataProofOptions, Proof, ProofPurpose, VerificationResult, URI};
-use jwk::JWK;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

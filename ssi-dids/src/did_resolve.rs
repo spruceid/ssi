@@ -1323,7 +1323,7 @@ impl<'a> DIDResolver for SeriesResolver<'a> {
 
 // TODO: replace with Try trait implementation once stabilized.
 // <https://github.com/rust-lang/rust/issues/84277>
-pub(crate) async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Result<Document, Error> {
+pub async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Result<Document, Error> {
     let (res_meta, doc_opt, _meta) = resolver
         .resolve(did, &ResolutionInputMetadata::default())
         .await;

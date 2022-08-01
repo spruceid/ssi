@@ -15,11 +15,11 @@ use blake2::Blake2s;
 use snarkvm_algorithms::{
     commitment::{PedersenCommitmentParameters, PedersenCompressedCommitment},
     encryption::{GroupEncryption, GroupEncryptionParameters},
-    signature::{Schnorr, SchnorrParameters},
+    signature::{Schnorr, SchnorrParameters, SchnorrSignature},
 };
 use snarkvm_curves::edwards_bls12::{EdwardsAffine, EdwardsProjective};
 use snarkvm_dpc::{
-    account::{Address, PrivateKey},
+    account::{Address, PrivateKey, ViewKey},
     testnet1::instantiated::Components,
 };
 use snarkvm_parameters::{
@@ -29,6 +29,33 @@ use snarkvm_parameters::{
     Parameter,
 };
 use snarkvm_utilities::{FromBytes, ToBytes};
+use std::str::FromStr;
+
+/// An error resulting from attempting to [sign a message using an Aleo private key](sign).
+#[derive(Error, Debug)]
+pub enum AleoSignError {
+    #[error("Unable to convert JWK to Aleo private key: {0}")]
+    JWKToPrivateKey(#[source] ParsePrivateKeyError),
+    #[error("Unable to convert Aleo private key to view key: {0}")]
+    ViewKeyFromPrivateKey(#[source] snarkvm_dpc::AccountError),
+    #[error("Unable to sign with view key: {0}")]
+    Sign(#[source] snarkvm_dpc::AccountError),
+    #[error("Unable to write signture as bytes: {0}")]
+    WriteSignature(#[source] std::io::Error),
+}
+
+/// An error resulting from attempting to [verify a signature from an Aleo account](verify).
+#[derive(Error, Debug)]
+pub enum AleoVerifyError {
+    #[error("Invalid signature over message")]
+    InvalidSignature,
+    #[error("Unable to verify signature: {0}")]
+    VerifySignature(#[source] snarkvm_dpc::AccountError),
+    #[error("Unable to deserialize account address: {0}")]
+    AddressFromStr(#[source] snarkvm_dpc::AccountError),
+    #[error("Unable to read signature bytes: {0}")]
+    ReadSignature(#[source] std::io::Error),
+}
 
 /// An error resulting from attempting to [generate a JWK Aleo private key](generate_private_key_jwk).
 #[derive(Error, Debug)]
@@ -156,6 +183,104 @@ pub fn generate_private_key_jwk() -> Result<JWK, AleoGeneratePrivateKeyError> {
     })))
 }
 
+/// Convert JWK private key to Aleo private key
+///
+/// Uses [SIG_PARAMS], [COM_PARAMS], and [ENC_PARAMS] to compute the account address.
+fn aleo_jwk_to_private_key(jwk: &JWK) -> Result<PrivateKey<Components>, ParsePrivateKeyError> {
+    let params = match &jwk.params {
+        Params::OKP(ref okp_params) => {
+            if okp_params.curve != OKP_CURVE {
+                return Err(ParsePrivateKeyError::UnexpectedCurve(
+                    okp_params.curve.to_string(),
+                ));
+            }
+            okp_params
+        }
+        _ => return Err(ParsePrivateKeyError::ExpectedOKP),
+    };
+    let private_key_bytes = params
+        .private_key
+        .as_ref()
+        .ok_or(ParsePrivateKeyError::MissingPrivateKey)?;
+    let private_key_base58 = bs58::encode(&private_key_bytes.0).into_string();
+    let address = aleo_jwk_to_address(jwk).map_err(ParsePrivateKeyError::JWKToAddress)?;
+    let private_key = PrivateKey::<Components>::from_str(&private_key_base58)
+        .map_err(ParsePrivateKeyError::PrivateKeyFromStr)?;
+    let address_computed = Address::from_private_key(
+        &SIG_PARAMS.clone(),
+        &COM_PARAMS.clone(),
+        &ENC_PARAMS.clone(),
+        &private_key,
+    )
+    .map_err(ParsePrivateKeyError::PrivateKeyToAddress)?;
+    if address_computed != address {
+        return Err(ParsePrivateKeyError::AddressMismatch {
+            computed: address_computed,
+            expected: address,
+        });
+    }
+    Ok(private_key)
+}
+
+fn aleo_jwk_to_address(jwk: &JWK) -> Result<Address<Components>, ParseAddressError> {
+    let params = match &jwk.params {
+        Params::OKP(ref okp_params) => {
+            if okp_params.curve != OKP_CURVE {
+                return Err(ParseAddressError::UnexpectedCurve(
+                    okp_params.curve.to_string(),
+                ));
+            }
+            okp_params
+        }
+        _ => return Err(ParseAddressError::ExpectedOKP),
+    };
+    let public_key_bytes = &params.public_key.0;
+    let address = Address::<Components>::read_le(&**public_key_bytes)
+        .map_err(ParseAddressError::ReadAddress)?;
+    Ok(address)
+}
+
+/// Create an Aleo signature.
+///
+/// The message is signed using [ENC_PARAMS] and a View Key derived from the given JWK private key with [SIG_PARAMS] and [COM_PARAMS].
+///
+/// The JWK private key `key` is expected to use key type `OKP` with curve according to
+/// [OKP_CURVE].
+pub fn sign(msg: &[u8], key: &JWK) -> Result<Vec<u8>, AleoSignError> {
+    let private_key = aleo_jwk_to_private_key(key).map_err(AleoSignError::JWKToPrivateKey)?;
+    let enc_params = ENC_PARAMS.clone();
+    let sig_params = SIG_PARAMS.clone();
+    let com_params = COM_PARAMS.clone();
+    let view_key = ViewKey::<Components>::from_private_key(&sig_params, &com_params, &private_key)
+        .map_err(AleoSignError::ViewKeyFromPrivateKey)?;
+    let mut rng = rand::rngs::OsRng {};
+    let sig = view_key
+        .sign(&enc_params, msg, &mut rng)
+        .map_err(AleoSignError::Sign)?;
+    let mut sig_bytes = Vec::new();
+    sig.write_le(&mut sig_bytes)
+        .map_err(AleoSignError::WriteSignature)?;
+    Ok(sig_bytes)
+}
+
+/// Verify an Aleo signature by an Aleo address as a string.
+///
+/// Verification uses [ENC_PARAMS].
+pub fn verify(msg: &[u8], address: &str, sig: &[u8]) -> Result<(), AleoVerifyError> {
+    let address =
+        Address::<Components>::from_str(address).map_err(AleoVerifyError::AddressFromStr)?;
+    let sig =
+        SchnorrSignature::<EdwardsAffine>::read_le(sig).map_err(AleoVerifyError::ReadSignature)?;
+    let enc_params = ENC_PARAMS.clone();
+    let valid = address
+        .verify_signature(&enc_params, msg, &sig)
+        .map_err(AleoVerifyError::VerifySignature)?;
+    if !valid {
+        return Err(AleoVerifyError::InvalidSignature);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +306,20 @@ mod tests {
             address.to_string(),
             "aleo1al8unplh8vtsuwna0h6u2t6g0hvr7t0tnfkem2we5gj7t70aeuxsd94hsy"
         );
+    }
+
+    #[test]
+    fn aleo_jwk_sign_verify() {
+        let private_key: JWK =
+            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+
+        let public_key = private_key.to_public();
+        let msg1 = b"asdf";
+        let msg2 = b"asdfg";
+        let sig = sign(msg1, &private_key).unwrap();
+        let address = aleo_jwk_to_address(&public_key).unwrap();
+        let address_string = format!("{}", &address);
+        verify(msg1, &address_string, &sig).unwrap();
+        verify(msg2, &address_string, &sig).unwrap_err();
     }
 }

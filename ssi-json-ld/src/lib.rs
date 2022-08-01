@@ -6,11 +6,11 @@ use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 
-mod error;
+pub mod error;
 pub mod rdf;
 pub mod urdna2015;
 
-use crate::error::Error;
+pub use crate::error::Error;
 use crate::rdf::{
     BlankNodeLabel, DataSet, Graph, GraphLabel, IRIOrBlankNodeIdentifier, IRIRef, Lang, Literal,
     Object, Predicate, StringLiteral, Subject, Triple, LANG_STRING_IRI_STR,

@@ -23,30 +23,16 @@
     html_favicon_url = "https://demo.didkit.dev/2021/10/21/rust-favicon.ico"
 )]
 
-#[cfg(feature = "aleosig")]
-pub mod aleo;
-
 #[cfg(feature = "bbs")]
 pub mod bbs;
-pub mod blakesig;
-pub mod caip10;
-pub mod caip2;
-pub mod der;
-pub mod did;
-pub mod did_resolve;
 #[cfg(feature = "keccak-hash")]
 pub mod eip712;
 pub mod error;
-pub mod hash;
-pub mod jsonld;
-pub mod jwk;
 pub mod jws;
 pub mod jwt;
 #[cfg(feature = "keccak-hash")]
 pub mod keccak_hash;
 pub mod ldp;
-pub mod one_or_many;
-pub mod rdf;
 pub mod revocation;
 #[cfg(feature = "ripemd160")]
 pub mod ripemd;
@@ -54,9 +40,25 @@ pub mod soltx;
 pub mod ssh;
 pub mod tzkey;
 pub mod ucan;
-pub mod urdna2015;
 pub mod vc;
 pub mod zcap;
+
+// maintain old structure here
+pub use caips::caip10;
+pub use caips::caip2;
+pub use ssi_core::one_or_many;
+pub use ssi_crypto::hashes as hash;
+pub use ssi_dids as did;
+pub use ssi_dids::did_resolve;
+pub use ssi_json_ld as jsonld;
+pub use ssi_json_ld::rdf;
+pub use ssi_json_ld::urdna2015;
+pub use ssi_jwk as jwk;
+pub use ssi_jwk::blakesig;
+pub use ssi_jwk::der;
+
+#[cfg(feature = "aleosig")]
+pub use ssi_jwk::aleo;
 
 pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
