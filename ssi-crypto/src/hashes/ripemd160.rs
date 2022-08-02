@@ -1,29 +1,21 @@
 use std::convert::TryFrom;
 
-use crate::error::Error;
-use crate::hash::sha256;
-use jwk::{Params, JWK};
+use crate::hashes::sha256::sha256;
 
-use k256::elliptic_curve::sec1::ToEncodedPoint;
+use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey};
 use ripemd160::{Digest, Ripemd160};
 
-pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
-    let ec_params = match jwk.params {
-        Params::EC(ref params) => params,
-        _ => return Err(Error::UnsupportedKeyType),
-    };
-    let pk = k256::PublicKey::try_from(ec_params)?;
+pub fn hash_public_key(pk: &PublicKey, version: u8) -> String {
     let pk_bytes = pk.to_encoded_point(true);
     if pk_bytes.len() != 33 {
         return Err(Error::UnsupportedKeyType);
     }
-    let pk_sha256 = sha256(pk_bytes.as_bytes())?;
+    let pk_sha256 = sha256(pk_bytes.as_bytes());
     let pk_ripemd160 = Ripemd160::digest(&pk_sha256);
     let mut extended_ripemd160 = Vec::with_capacity(21);
     extended_ripemd160.extend_from_slice(&[version]);
     extended_ripemd160.extend_from_slice(&pk_ripemd160);
-    let addr = bs58::encode(&extended_ripemd160).with_check().into_string();
-    Ok(addr)
+    bs58::encode(&extended_ripemd160).with_check().into_string()
 }
 
 #[cfg(test)]
