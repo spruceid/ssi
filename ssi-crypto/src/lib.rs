@@ -1,4 +1,5 @@
 pub mod hashes;
+pub mod signatures;
 
 #[cfg(test)]
 mod tests {
