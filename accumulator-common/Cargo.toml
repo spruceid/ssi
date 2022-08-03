@@ -1,0 +1,35 @@
+[package]
+authors = ["Michael Lodder <redmike7@gmail.com>"]
+categories = ["cryptography", "rsa"]
+description = "Cryptographic Accumulator common structs and methods"
+edition = "2018"
+license = "Apache-2.0"
+name = "accumulator-common"
+repository = "https://github.com/spruceid/ssi"
+version = "0.1.0"
+
+[features]
+default = ["bi-rust"]
+bi-rust = ["glass_pumpkin", "num-bigint", "num-traits", "num-integer", "rand"]
+bi-ossl = ["openssl"]
+bi-gmp = ["hex", "rust-gmp"]
+
+[dependencies]
+failure = "0.1"
+hex = { version = "0.4", optional = true }
+glass_pumpkin = { version = "1", optional = true }
+num-bigint = { version = "0.4", features = ["rand"], optional = true }
+num-traits = { version = "0.2", optional = true }
+num-integer = { version = "0.1", optional = true }
+openssl = { version = "0.10", optional = true }
+rand = { version = "0.8", optional = true }
+rust-gmp = { version = "0.5", optional = true, git = "https://github.com/mikelodder7/rust-gmp" }
+serde = { version = "1", features = ["serde_derive"] }
+zeroize = { version = "1", features = ["zeroize_derive"] }
+
+[dev-dependencies]
+rust-gmp = { version = "0.5",  git = "https://github.com/mikelodder7/rust-gmp" }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
