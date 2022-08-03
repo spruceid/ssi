@@ -17,7 +17,7 @@ http-did = ["http", "percent-encoding"]
 libsecp256k1 = ["secp256k1"] # backward compatibility
 secp256k1 = ["k256", "rand", "k256/keccak256"]
 secp256r1 = ["p256", "rand"]
-aleosig = ["rand", "blake2", "snarkvm-dpc", "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters"]
+aleosig = ["rand", "blake2"]
 ripemd-160 = ["ripemd160", "secp256k1"]
 # TODO handle better keccak and sha
 keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
@@ -80,11 +80,6 @@ url = { version = "2.2", features = ["serde"] }
 anyhow = "1.0"
 rand_xorshift = "0.3"
 bech32 = "0.8"
-snarkvm-dpc = { version = "0.7.9", optional = true }
-snarkvm-algorithms = { version= "0.7.9", optional = true }
-snarkvm-curves = { version= "0.7.9", optional = true }
-snarkvm-utilities = { version = "0.7.9", optional = true }
-snarkvm-parameters = { version = "0.7.9", optional = true }
 serde_with = { version = "1.14", features = ["base64"]}
 libipld = { version = "0.13", features = ["serde-codec"] }
 ssi-jwk = { path = "./ssi-jwk" }
@@ -92,6 +87,7 @@ ssi-json-ld = { path = "./ssi-json-ld" }
 ssi-core = { path = "./ssi-core" }
 ssi-dids = { path = "./ssi-dids" }
 ssi-crypto = { path = "./ssi-crypto" }
+ssi-jws = { path = "./ssi-jws" }
 caips = { path = "./caips" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -122,7 +118,8 @@ members = [
   "ssi-core",
   "ssi-crypto",
   "ssi-json-ld",
-  "ssi-dids"
+  "ssi-dids",
+  "ssi-jws"
 ]
 
 [dev-dependencies]

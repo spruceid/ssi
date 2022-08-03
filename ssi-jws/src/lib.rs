@@ -1,8 +1,9 @@
-use crate::error::Error;
-use crate::jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
-#[cfg(any(feature = "k256", feature = "p256"))]
-use crate::passthrough_digest::PassthroughDigest;
+pub mod error;
+pub use error::Error;
 use serde::{Deserialize, Serialize};
+#[cfg(any(feature = "k256", feature = "p256"))]
+use ssi_crypto::passthrough_digest::PassthroughDigest;
+use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
@@ -95,14 +96,16 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
-                    hashed = crate::hash::sha256(data)?;
+                    hashed = ssi_crypto::hashes::sha256::sha256(data)?;
                 }
                 Algorithm::PS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     let rng = rand_old::rngs::OsRng {};
-                    padding =
-                        rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
-                    hashed = crate::hash::sha256(data)?;
+                    padding = rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256::Sha256, _>(
+                        rng,
+                        hash.size(),
+                    );
+                    hashed = ssi_crypto::hashes::sha256::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
             }
@@ -140,9 +143,14 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
             Algorithm::ES384 => {
-                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                let curve = ec
+                    .curve
+                    .as_ref()
+                    .ok_or(Error::JWK(ssi_jwk::Error::MissingCurve))?;
                 if curve != "P-384" {
-                    return Err(Error::CurveNotImplemented(curve.to_string()));
+                    return Err(Error::JWK(ssi_jwk::Error::CurveNotImplemented(
+                        curve.to_string(),
+                    )));
                 }
                 #[cfg(feature = "openssl")]
                 {
@@ -190,7 +198,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let hash = crate::hash::sha256(data)?;
+                let hash = ssi_crypto::hashes::sha256::sha256(data)?;
                 let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
                 let sig: k256::ecdsa::recoverable::Signature =
                     signing_key.try_sign_digest(digest)?;
@@ -250,7 +258,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 return Err(Error::UnsupportedAlgorithm);
             }
         },
-        _ => return Err(Error::KeyTypeNotImplemented),
+        _ => return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented)),
     };
     clear_on_drop::clear_stack(1);
     Ok(signature)
@@ -304,13 +312,13 @@ pub fn verify_bytes_warnable(
                 Algorithm::RS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     padding = rsa::padding::PaddingScheme::new_pkcs1v15_sign(Some(hash));
-                    hashed = crate::hash::sha256(data)?;
+                    hashed = ssi_crypto::hashes::sha256::sha256(data)?;
                 }
                 Algorithm::PS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     let rng = rand_old::rngs::OsRng {};
-                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
-                    hashed = crate::hash::sha256(data)?;
+                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256::Sha256, _>(rng);
+                    hashed = ssi_crypto::hashes::sha256::sha256(data)?;
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
             }
@@ -400,7 +408,7 @@ pub fn verify_bytes_warnable(
                     k256::ecdsa::recoverable::Signature::try_from(signature)
                 })
                 .map_err(|e| Error::Secp256k1Parse("Error parsing signature".to_string()))??;
-                let hash = crate::hash::sha256(data)?;
+                let hash = ssi_crypto::hashes::sha256::sha256(data)?;
                 let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
                 if let Err(_e) = verifying_key.verify_digest(digest, &sig) {
                     // Legacy mode: allow using Keccak-256 instead of SHA-256
@@ -491,7 +499,7 @@ pub fn verify_bytes_warnable(
                 return Err(Error::UnsupportedAlgorithm);
             }
         },
-        _ => return Err(Error::KeyTypeNotImplemented),
+        _ => return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented)),
     }
     Ok(warnings)
 }
@@ -513,10 +521,10 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         #[cfg(feature = "k256")]
         Algorithm::ES256KR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
-            let hash = crate::hash::sha256(data)?;
+            let hash = ssi_crypto::hashes::sha256::sha256(data)?;
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = sig.recover_verify_key_from_digest_bytes(digest)?;
-            use crate::jwk::ECParams;
+            use ssi_jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(&k256::PublicKey::from_sec1_bytes(
                     &recovered_key.to_bytes(),
@@ -536,7 +544,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         Algorithm::ESKeccakKR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)?;
             let recovered_key = sig.recover_verify_key(data)?;
-            use crate::jwk::ECParams;
+            use ssi_jwk::ECParams;
             let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
                 &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())?,
             )?));
@@ -685,7 +693,7 @@ pub fn decode_jws_parts(
 
 /// Verify a JWS with detached payload. Returns the JWS header on success.
 pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Header, Error> {
-    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+    let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let DecodedJWS {
         header,
         signing_input,
@@ -698,7 +706,7 @@ pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Heade
 
 /// Recover a JWK from a JWS and payload, if the algorithm supports that (such as [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r)).
 pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), Error> {
-    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+    let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let DecodedJWS {
         header,
         signing_input,
@@ -713,7 +721,7 @@ pub(crate) fn detached_recover_legacy_keccak_es256kr(
     jws: &str,
     payload_enc: &[u8],
 ) -> Result<(Header, JWK), Error> {
-    let (header_b64, signature_b64) = crate::jws::split_detached_jws(jws)?;
+    let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let DecodedJWS {
         mut header,
         signing_input,
