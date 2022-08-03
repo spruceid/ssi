@@ -88,6 +88,7 @@ ssi-core = { path = "./ssi-core" }
 ssi-dids = { path = "./ssi-dids" }
 ssi-crypto = { path = "./ssi-crypto" }
 ssi-jws = { path = "./ssi-jws" }
+ssi-jwt = { path = "./ssi-jwt" }
 caips = { path = "./caips" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -119,7 +120,8 @@ members = [
   "ssi-crypto",
   "ssi-json-ld",
   "ssi-dids",
-  "ssi-jws"
+  "ssi-jws",
+  "ssi-jwt"
 ]
 
 [dev-dependencies]
