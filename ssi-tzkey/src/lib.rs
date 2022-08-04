@@ -1,6 +1,6 @@
-use crate::error::Error;
 use core::convert::TryFrom;
-use jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jws::{sign_bytes, Error as JwsError};
 
 const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
 #[cfg(feature = "k256")]
@@ -8,7 +8,7 @@ const SPPK_PREFIX: [u8; 4] = [3, 254, 226, 86];
 #[cfg(feature = "p256")]
 const P2PK_PREFIX: [u8; 4] = [3, 178, 139, 127];
 
-pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
+pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
     let mut tzkey_prefixed = Vec::new();
     #[cfg(any(feature = "k256", feature = "p256"))]
     let bytes;
@@ -16,38 +16,38 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
         Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
             if let Some(ref _sk) = okp_params.private_key {
                 // TODO: edsk
-                return Err(Error::UnsupportedAlgorithm);
+                return Err(JwsError::UnsupportedAlgorithm);
             }
             (EDPK_PREFIX, &okp_params.public_key.0)
         }
         Params::EC(ec_params) if ec_params.curve == Some("secp256k1".to_string()) => {
             if let Some(ref _sk) = ec_params.ecc_private_key {
                 // TODO: spsk
-                return Err(Error::UnsupportedAlgorithm);
+                return Err(JwsError::UnsupportedAlgorithm);
             }
             #[cfg(not(feature = "k256"))]
-            return Err(Error::MissingFeatures("k256"));
+            return Err(JwsError::MissingFeatures("k256"));
             #[cfg(feature = "k256")]
             {
                 // TODO: p2sk
-                bytes = jwk::serialize_secp256k1(ec_params)?;
+                bytes = ssi_jwk::serialize_secp256k1(ec_params)?;
                 (SPPK_PREFIX, &bytes)
             }
         }
         Params::EC(ec_params) if ec_params.curve == Some("P-256".to_string()) => {
             if let Some(ref _sk) = ec_params.ecc_private_key {
-                return Err(Error::UnsupportedAlgorithm);
+                return Err(JwsError::UnsupportedAlgorithm);
             }
             #[cfg(not(feature = "p256"))]
-            return Err(Error::MissingFeatures("p256"));
+            return Err(JwsError::MissingFeatures("p256"));
             #[cfg(feature = "p256")]
             {
-                bytes = jwk::serialize_p256(ec_params)?;
+                bytes = ssi_jwk::serialize_p256(ec_params)?;
                 (P2PK_PREFIX, &bytes)
             }
         }
         _ => {
-            return Err(Error::UnsupportedAlgorithm);
+            return Err(JwsError::UnsupportedAlgorithm);
         }
     };
     tzkey_prefixed.extend_from_slice(&prefix);
@@ -56,10 +56,22 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, Error> {
     Ok(tzkey)
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum DecodeTezosPkError {
+    #[error("Key Prefix")]
+    KeyPrefix,
+    #[error(transparent)]
+    B58(#[from] bs58::decode::Error),
+    #[error(transparent)]
+    JWK(#[from] ssi_jwk::Error),
+    #[error("Missing Features: {0}")]
+    MissingFeatures(&'static str),
+}
+
 /// Parse a Tezos key string into a JWK.
-pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
+pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
     if tz_pk.len() < 4 {
-        return Err(Error::KeyPrefix);
+        return Err(DecodeTezosPkError::KeyPrefix);
     }
     let (alg, params) = match tz_pk.get(..4) {
         Some("edpk") => (
@@ -98,7 +110,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
                 pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
             }
             #[cfg(all(not(feature = "ring"), not(feature = "ed25519-dalek")))]
-            return Err(Error::MissingFeatures("ring or ed25519-dalek"));
+            return Err(DecodeTezosPkError::MissingFeatures("ring or ed25519-dalek"));
             (
                 Algorithm::EdBlake2b,
                 Params::OKP(OctetParams {
@@ -111,7 +123,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
         #[cfg(feature = "secp256k1")]
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = jwk::secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse)?;
+            let jwk = jwk::secp256k1_parse(&pk_bytes).map_err(ssi_jwk::ErrorSecp256k1Parse)?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
         #[cfg(feature = "p256")]
@@ -121,7 +133,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, Error> {
             (Algorithm::ESBlake2b, jwk.params)
         }
         // TODO: more secret keys
-        _ => return Err(Error::KeyPrefix),
+        _ => return Err(DecodeTezosPkError::KeyPrefix),
     };
     Ok(JWK {
         public_key_use: None,
@@ -145,7 +157,7 @@ pub enum SignTezosError {
 }
 
 pub fn sign_tezos(data: &[u8], algorithm: Algorithm, key: &JWK) -> Result<String, SignTezosError> {
-    let sig = crate::jws::sign_bytes(algorithm, data, key)
+    let sig = ssi_jws::sign_bytes(algorithm, data, key)
         .map_err(|e| SignTezosError::Sign(e.to_string()))?;
     let mut sig_prefixed = Vec::new();
     const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
@@ -252,11 +264,11 @@ mod tests {
 
         let sig_bs58 = "edsigtpfAeN8PqB9dpYdzDTpbCFPFuNe6Vfo4pokAQWYzFczZCjkWtfmWH3zxsse1KbxSc2NksTfoAMJzpqCAee4PQL6gydVWyy";
         let (_, sig) = decode_tzsig(sig_bs58).unwrap();
-        crate::jws::verify_bytes(Algorithm::EdBlake2b, &tsm, &jwk, &sig).unwrap();
+        ssi_jws::verify_bytes(Algorithm::EdBlake2b, &tsm, &jwk, &sig).unwrap();
 
         // Negative test: alter signing input
         tsm[1] ^= 1;
-        crate::jws::verify_bytes(Algorithm::EdBlake2b, &tsm, &jwk, &sig).unwrap_err();
+        ssi_jws::verify_bytes(Algorithm::EdBlake2b, &tsm, &jwk, &sig).unwrap_err();
     }
 
     // Signature produced by Kukai wallet
@@ -280,9 +292,9 @@ mod tests {
 
         let sig_bs58 = "spsig1TJjahaMVSCyvSBPvHJFXQ1WxASgHsygTvxgJxAWbYsv5R9nH1yzj5BEeHoqmHCogVYioVCbeKDNDwP17hMaM9foFdF8SS";
         let (_, sig) = decode_tzsig(sig_bs58).unwrap();
-        crate::jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap();
+        ssi_jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap();
         tsm[1] ^= 1;
-        crate::jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap_err();
+        ssi_jws::verify_bytes(Algorithm::ESBlake2bK, &tsm, &jwk, &sig).unwrap_err();
     }
 
     #[test]
