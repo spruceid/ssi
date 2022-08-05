@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 pub mod one_or_many;
+pub mod uri;
 
 // one type of VM (e.g. a JWK) should be able to verify multiple types of things (payloads)
 // in multiple ways/contexts (context properties), so generic over those. but each impl should

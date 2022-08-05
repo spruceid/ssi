@@ -265,54 +265,6 @@ impl From<Check> for String {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(try_from = "String")]
-#[serde(untagged)]
-pub enum URI {
-    String(String),
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum URIParseErr {
-    #[error("Invalid URI")]
-    InvalidFormat,
-}
-
-impl std::convert::TryFrom<String> for URI {
-    type Error = URIParseErr;
-    fn try_from(uri: String) -> Result<Self, Self::Error> {
-        if uri.contains(':') {
-            Ok(URI::String(uri))
-        } else {
-            Err(URIParseErr::InvalidFormat)
-        }
-    }
-}
-
-impl URI {
-    /// Return the URI as a string slice
-    pub fn as_str(&self) -> &str {
-        match self {
-            URI::String(string) => string.as_str(),
-        }
-    }
-}
-
-impl core::str::FromStr for URI {
-    type Err = URIParseErr;
-    fn from_str(uri: &str) -> Result<Self, Self::Err> {
-        URI::try_from(String::from(uri))
-    }
-}
-
-impl std::fmt::Display for URI {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::String(ref string) => write!(f, "{}", string),
-        }
-    }
-}
-
 /// Verify alignment of proof options in JSON with RDF terms
 fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Error> {
     use ssi_json_ld::rdf;
