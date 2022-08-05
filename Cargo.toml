@@ -89,6 +89,9 @@ ssi-crypto = { path = "./ssi-crypto" }
 ssi-jws = { path = "./ssi-jws" }
 ssi-jwt = { path = "./ssi-jwt" }
 ssi-tzkey = { path = "./ssi-tzkey" }
+ssi-ldp = { path = "./ssi-ldp" }
+ssi-ssh = { path = "./ssi-ssh" }
+ssi-ucan = { path = "./ssi-ucan" }
 caips = { path = "./caips" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -123,7 +126,8 @@ members = [
   "ssi-jws",
   "ssi-jwt",
   "ssi-tzkey",
-  "ssi-ssh"
+  "ssi-ssh",
+  "ssi-ucan"
 ]
 
 [dev-dependencies]

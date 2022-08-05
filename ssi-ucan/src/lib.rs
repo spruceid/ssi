@@ -1,11 +1,5 @@
-use crate::{
-    did::{Document, Resource, VerificationMethod, VerificationMethodMap},
-    did_resolve::{dereference, Content, DIDResolver},
-    error::Error,
-    jwk::{Algorithm, JWK},
-    jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header},
-    vc::{NumericDate, URI},
-};
+pub mod error;
+pub use error::Error;
 use libipld::{
     codec::{Codec, Decode, Encode},
     error::Error as IpldError,
@@ -19,8 +13,15 @@ use serde_with::{
     base64::{Base64, UrlSafe},
     serde_as, DisplayFromStr,
 };
+use ssi_core::uri::URI;
+use ssi_dids::{
+    did_resolve::{dereference, Content, DIDResolver},
+    Document, Resource, VerificationMethod, VerificationMethodMap,
+};
+use ssi_jwk::{Algorithm, JWK};
+use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
+use ssi_jwt::NumericDate;
 use std::{
-    collections::HashMap,
     fmt::Display,
     io::{Read, Seek, Write},
 };
@@ -99,16 +100,16 @@ impl<F, A> Ucan<F, A> {
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
-        verify_bytes(
+        Ok(verify_bytes(
             self.header.algorithm,
             self.encode()?
                 .rsplit_once('.')
-                .ok_or(Error::InvalidJWS)?
+                .ok_or(ssi_jws::Error::InvalidJWS)?
                 .0
                 .as_bytes(),
             &key,
             &self.signature,
-        )
+        )?)
     }
 
     pub fn decode(jwt: &str) -> Result<Self, Error>
@@ -127,12 +128,12 @@ impl<F, A> Ucan<F, A> {
             }?;
 
         if parts.header.type_.as_deref() != Some("JWT") {
-            return Err(Error::MissingType);
+            return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
         match parts.header.additional_parameters.get("ucv") {
             Some(JsonValue::String(v)) if v == "0.9.0" => (),
-            _ => return Err(Error::MissingType),
+            _ => return Err(Error::MissingUCANHeaderField("ucv: 0.9.0")),
         }
 
         if !payload.audience.starts_with("did:") {
@@ -156,11 +157,7 @@ impl<F, A> Ucan<F, A> {
             UcanCodec::Raw(r) => r.clone(),
             UcanCodec::DagJson => [
                 base64::encode_config(
-                    &DagJsonCodec.encode(
-                        &to_ipld(&self.header)
-                            .map_err(IpldError::new)
-                            .map_err(Error::Other)?,
-                    )?,
+                    &DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?,
                     base64::URL_SAFE_NO_PAD,
                 ),
                 base64::encode_config(
@@ -226,7 +223,7 @@ fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
 
 fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error> {
     use std::str::FromStr;
-    Ok(crate::caip10::BlockchainAccountId::from_str(
+    Ok(caips::caip10::BlockchainAccountId::from_str(
         vm.blockchain_account_id
             .as_ref()
             .ok_or(Error::VerificationMethodMismatch)?,
@@ -491,12 +488,12 @@ impl UcanRevocation {
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
-        verify_bytes(
+        Ok(verify_bytes(
             algorithm,
             format!("REVOKE:{}", self.revoke).as_bytes(),
             &key,
             &self.challenge,
-        )
+        )?)
     }
 }
 
