@@ -123,6 +123,7 @@ members = [
   "ssi-dids",
   "ssi-jws",
   "ssi-jwt",
+  "ssi-ldp",
   "ssi-tzkey"
 ]
 

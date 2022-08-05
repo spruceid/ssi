@@ -717,7 +717,7 @@ pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), 
     Ok((header, key))
 }
 
-pub(crate) fn detached_recover_legacy_keccak_es256kr(
+pub fn detached_recover_legacy_keccak_es256kr(
     jws: &str,
     payload_enc: &[u8],
 ) -> Result<(Header, JWK), Error> {
