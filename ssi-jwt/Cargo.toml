@@ -6,7 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 ssi-jwk = { path = "../ssi-jwk" }
 ssi-jws = { path = "../ssi-jws" }
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }
