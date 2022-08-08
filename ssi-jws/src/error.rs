@@ -24,4 +24,6 @@ pub enum Error {
     /// Missing crate features
     #[error("Missing features: {0}")]
     MissingFeatures(&'static str),
+    #[error("Algorithm not implemented")]
+    AlgorithmNotImplemented,
 }

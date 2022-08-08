@@ -14,6 +14,7 @@ use ssi_dids::did_resolve::DIDResolver;
 use ssi_dids::VerificationRelationship as ProofPurpose;
 use ssi_json_ld::{json_to_dataset, ContextLoader, Error as JsonLdError};
 
+#[macro_export]
 macro_rules! assert_local {
     ($cond:expr) => {
         if !$cond {

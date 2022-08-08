@@ -13,6 +13,13 @@ pub enum URIParseErr {
     InvalidFormat,
 }
 
+impl From<URI> for String {
+    fn from(uri: URI) -> String {
+        let URI::String(string) = uri;
+        string
+    }
+}
+
 impl std::convert::TryFrom<String> for URI {
     type Error = URIParseErr;
     fn try_from(uri: String) -> Result<Self, Self::Error> {

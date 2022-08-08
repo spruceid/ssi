@@ -8,13 +8,13 @@ pub mod proof;
 pub use proof::{Check, LinkedDataProofOptions, Proof};
 pub mod context;
 pub mod error;
+pub use error::Error;
 pub mod soltx;
 pub use context::Context;
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedData;
-use crate::error::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_core::uri::URI;
@@ -370,7 +370,7 @@ fn use_epsig(key: &JWK) -> bool {
 
 // If a verificationMethod purpose was not provided, pick one. If one was provided,
 // verify that it is correct for the given issuer and proof purpose.
-pub(crate) async fn ensure_or_pick_verification_relationship(
+pub async fn ensure_or_pick_verification_relationship(
     options: &mut LinkedDataProofOptions,
     document: &(dyn LinkedDataDocument + Sync),
     key: &JWK,
