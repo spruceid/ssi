@@ -1,8 +1,11 @@
 use crate::one_or_many::OneOrMany;
 use crate::vc::{CredentialOrJWT, URI};
 
-use cacaos::{siwe_cacao::SiweCacao, CACAO};
-use capgrok::{verify_statement, RESOURCE_PREFIX};
+use cacaos::{
+    siwe_cacao::{siwe, SIWEPayloadConversionError, SiweCacao},
+    CACAO,
+};
+use capgrok::{extract_capabilities, verify_statement, Error as CapGrokError, RESOURCE_PREFIX};
 use libipld::{cbor::DagCborCodec, codec::Decode};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -37,24 +40,7 @@ impl HolderBindingDelegation {
         let payload = cacao.payload();
         let delegator = &payload.iss;
         let delegee = &payload.aud;
-        if let Some(credentials) = credentials {
-            for credential in credentials.into_iter() {
-                let subjects = match credential {
-                    CredentialOrJWT::Credential(c) => &c.credential_subject,
-                    _ => return Err("JWT VCs not handled".to_string()),
-                };
-                println!("{:?}", subjects);
-                if !subjects.into_iter().any(|subject| {
-                    if let Some(i) = &subject.id {
-                        i.to_string() == *delegator
-                    } else {
-                        false
-                    }
-                }) {
-                    return Ok(None);
-                }
-            }
-        }
+
         // TODO Do we want to support VPs without VCs?
         // else {
         //     return Ok(None);
@@ -70,28 +56,48 @@ impl HolderBindingDelegation {
             return Ok(None);
         }
 
-        // TODO if any of the fully-qualified array items in type prepended with the String type: in the verifiable credential matches the resource of the targeted action
-        if !payload.resources.iter().any(|resource| {
-            *resource
-                == format!(
-                    // TODO Should probably go through the siwe_capability_delegation crate
-                    "{}{}:eyJkZWZhdWx0QWN0aW9ucyI6WyJwcmVzZW50Il19",
-                    RESOURCE_PREFIX,
-                    id.unwrap()
-                )
-        }) {
+        let siwe: siwe::Message = payload
+            .clone()
+            .try_into()
+            .map_err(|e: SIWEPayloadConversionError| e.to_string())?;
+        if !verify_statement(&siwe).map_err(|e| e.to_string())? {
             return Ok(None);
+        }
+        let cap = match extract_capabilities(&siwe)
+            .map_err(|e| e.to_string())?
+            .remove(
+                &"credentials"
+                    .parse()
+                    .map_err(|e: CapGrokError| e.to_string())?,
+            ) {
+            Some(c) => c,
+            None => return Ok(None),
         };
 
-        if !verify_statement(
-            &payload
-                .clone()
-                .try_into()
-                .map_err(|e: cacaos::siwe_cacao::SIWEPayloadConversionError| e.to_string())?,
-        )
-        .map_err(|e| e.to_string())?
-        {
-            return Ok(None);
+        if let Some(credentials) = credentials {
+            for credential in credentials.into_iter() {
+                let (id, subjects) = match credential {
+                    CredentialOrJWT::Credential(c) => (c.id.as_ref(), &c.credential_subject),
+                    _ => return Err("JWT VCs not handled".to_string()),
+                };
+                println!("{:?}", subjects);
+                if let Some(i) = id {
+                    if !cap.can(i.as_str(), "present") {
+                        return Ok(None);
+                    }
+                } else {
+                    return Ok(None);
+                };
+                if !subjects.into_iter().any(|subject| {
+                    if let Some(i) = &subject.id {
+                        i.to_string() == *delegator
+                    } else {
+                        false
+                    }
+                }) {
+                    return Ok(None);
+                }
+            }
         }
 
         Ok(Some(delegee.to_string()))
@@ -128,7 +134,7 @@ pub(crate) mod tests {
         let secret_key = k256::SecretKey::try_from(ec_params).unwrap();
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
 
-        let vc_namespace: Namespace = resource_id.parse().unwrap();
+        let vc_namespace: Namespace = "credentials".parse().unwrap();
         let pk_hash: [u8; 20] = {
             let pk = k256::PublicKey::try_from(ec_params).unwrap();
             let pk_ec = pk.to_encoded_point(false);
@@ -137,7 +143,7 @@ pub(crate) mod tests {
             hash[12..32].try_into().unwrap()
         };
         let delegation_message = Builder::new()
-            .with_default_actions(&vc_namespace, vec!["present"])
+            .with_action(&vc_namespace, resource_id, "present")
             .build(siwe::Message {
                 domain: "example.com".parse().unwrap(),
                 address: pk_hash,
