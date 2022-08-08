@@ -778,9 +778,8 @@ impl Credential {
         }
         // TODO: error if any unconvertable claims
         // TODO: unify with verify function?
-        let h = header.clone();
         let (proofs, matched_jwt) = match vc
-            .filter_proofs(options_opt, Some((&h, &claims)), resolver)
+            .filter_proofs(options_opt, Some((&header, &claims)), resolver)
             .await
         {
             Ok(matches) => matches,

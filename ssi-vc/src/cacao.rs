@@ -22,10 +22,7 @@ impl HolderBindingDelegation {
         credentials: Option<&OneOrMany<CredentialOrJWT>>,
         holder: Option<&URI>,
     ) -> Result<Option<String>, String> {
-        #[warn(clippy::infallible_destructuring_match)]
-        let base64_cacao = match self {
-            HolderBindingDelegation::Base64Block(b) => b,
-        };
+        let HolderBindingDelegation::Base64Block(base64_cacao) = self;
         let cbor_cacao = if let Some(b) = base64_cacao.strip_prefix("data:;base64,") {
             base64::decode(b)
                 .map_err(|_| "Invalid base 64 encoding for the cacao delegation".to_string())?
@@ -41,22 +38,13 @@ impl HolderBindingDelegation {
         let delegator = &payload.iss;
         let delegee = &payload.aud;
         if let Some(credentials) = credentials {
-            // TODO remove clone
-            let credentials = match credentials.clone() {
-                OneOrMany::One(c) => vec![c],
-                OneOrMany::Many(cs) => cs,
-            };
-            for credential in credentials {
+            for credential in credentials.into_iter() {
                 let subjects = match credential {
-                    CredentialOrJWT::Credential(c) => c.credential_subject,
+                    CredentialOrJWT::Credential(c) => &c.credential_subject,
                     _ => return Err("JWT VCs not handled".to_string()),
                 };
-                let subjects = match subjects {
-                    OneOrMany::Many(ss) => ss,
-                    OneOrMany::One(s) => vec![s],
-                };
                 println!("{:?}", subjects);
-                if !subjects.iter().any(|subject| {
+                if !subjects.into_iter().any(|subject| {
                     if let Some(i) = &subject.id {
                         i.to_string() == *delegator
                     } else {
@@ -119,6 +107,7 @@ pub(crate) mod tests {
     const VC_ID: &str = "http://example.edu/credentials/1872";
     const JWK_JSON: &str = include_str!("../tests/rsa2048-2020-08-25.json");
 
+    #[cfg(all(feature = "k256", feature = "keccak-hash"))]
     async fn test_holder_binding_vp(
         resource_id: &str,
         holder: &str,
@@ -148,7 +137,7 @@ pub(crate) mod tests {
             hash[12..32].try_into().unwrap()
         };
         let delegation_message = Builder::new()
-            .with_default_actions(&vc_namespace, vec!["present".into()])
+            .with_default_actions(&vc_namespace, vec!["present"])
             .build(siwe::Message {
                 domain: "example.com".parse().unwrap(),
                 address: pk_hash,
