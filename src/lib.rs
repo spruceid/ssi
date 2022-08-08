@@ -23,23 +23,8 @@
     html_favicon_url = "https://demo.didkit.dev/2021/10/21/rust-favicon.ico"
 )]
 
-#[cfg(feature = "bbs")]
-pub mod bbs;
-#[cfg(feature = "keccak-hash")]
-pub mod eip712;
 pub mod error;
-pub mod jws;
-pub mod jwt;
-#[cfg(feature = "keccak-hash")]
-pub mod keccak_hash;
-pub mod ldp;
 pub mod revocation;
-#[cfg(feature = "ripemd160")]
-pub mod ripemd;
-pub mod soltx;
-pub mod ssh;
-pub mod tzkey;
-pub mod ucan;
 pub mod vc;
 pub mod zcap;
 
@@ -48,6 +33,10 @@ pub use caips::caip10;
 pub use caips::caip2;
 pub use ssi_core::one_or_many;
 pub use ssi_crypto::hashes as hash;
+#[cfg(feature = "keccak-hash")]
+pub use ssi_crypto::hashes::keccak;
+#[cfg(feature = "bbs")]
+pub use ssi_crypto::signatures::bbs;
 pub use ssi_dids as did;
 pub use ssi_dids::did_resolve;
 pub use ssi_json_ld as jsonld;
@@ -56,6 +45,17 @@ pub use ssi_json_ld::urdna2015;
 pub use ssi_jwk as jwk;
 pub use ssi_jwk::blakesig;
 pub use ssi_jwk::der;
+#[cfg(feature = "ripemd160")]
+pub use ssi_jwk::ripemd160 as ripemd;
+pub use ssi_jws as jws;
+pub use ssi_jwt as jwt;
+pub use ssi_ldp as ldp;
+#[cfg(feature = "keccak-hash")]
+pub use ssi_ldp::eip712;
+pub use ssi_ldp::soltx;
+pub use ssi_ssh as ssh;
+pub use ssi_tzkey as tzkey;
+pub use ssi_ucan as ucan;
 
 #[cfg(feature = "aleosig")]
 pub use ssi_jwk::aleo;
@@ -64,10 +64,3 @@ pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_P
 
 #[cfg(any(feature = "k256", feature = "p256"))]
 pub mod passthrough_digest;
-
-#[macro_use]
-extern crate derive_builder;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate json;

@@ -1,7 +1,7 @@
 use crate::did_resolve::DIDResolver;
 use crate::jsonld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
 use crate::one_or_many::OneOrMany;
-use crate::vc::{Credential, CredentialStatus, Issuer, VerificationResult, URI};
+use crate::vc::{Credential, CredentialStatus, Issuer};
 use async_trait::async_trait;
 use bitvec::prelude::Lsb0;
 use bitvec::slice::BitSlice;
@@ -9,6 +9,8 @@ use bitvec::vec::BitVec;
 use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ssi_core::uri::URI;
+use ssi_ldp::VerificationResult;
 use thiserror::Error;
 
 #[allow(clippy::upper_case_acronyms)]

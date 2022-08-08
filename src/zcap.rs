@@ -1,14 +1,15 @@
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 
-use crate::did_resolve::DIDResolver;
 use crate::error::Error;
-use crate::jsonld::{json_to_dataset, ContextLoader, SECURITY_V2_CONTEXT};
-use crate::jwk::JWK;
-use crate::ldp::{LinkedDataDocument, LinkedDataProofs, ProofPreparation};
-use crate::one_or_many::OneOrMany;
-use crate::rdf::DataSet;
-use crate::vc::{Check, LinkedDataProofOptions, Proof, ProofPurpose, VerificationResult, URI};
+use ssi_core::{one_or_many::OneOrMany, uri::URI};
+use ssi_dids::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
+use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader, SECURITY_V2_CONTEXT};
+use ssi_jwk::JWK;
+use ssi_ldp::{
+    Check, Context, Error as LdpError, LinkedDataDocument, LinkedDataProofOptions,
+    LinkedDataProofs, Proof, ProofPreparation, VerificationResult,
+};
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -159,7 +160,7 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await
+        Ok(LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await?)
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -177,7 +178,7 @@ where
             "capabilityChain".into(),
             serde_json::to_value(capability_chain)?,
         );
-        LinkedDataProofs::prepare(
+        Ok(LinkedDataProofs::prepare(
             self,
             options,
             resolver,
@@ -185,7 +186,7 @@ where
             public_key,
             Some(ps),
         )
-        .await
+        .await?)
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -203,7 +204,7 @@ where
     C: Serialize + Send + Sync + Clone,
     S: Serialize + Send + Sync + Clone,
 {
-    fn get_contexts(&self) -> Result<Option<String>, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, LdpError> {
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
@@ -211,7 +212,7 @@ where
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, Error> {
+    ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
         let json = serde_json::to_string(&copy)?;
@@ -219,10 +220,10 @@ where
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
+        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
     }
 
-    fn to_value(&self) -> Result<Value, Error> {
+    fn to_value(&self) -> Result<Value, LdpError> {
         Ok(serde_json::to_value(&self)?)
     }
 
@@ -319,7 +320,7 @@ where
     ) -> Result<Proof, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await
+        Ok(LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await?)
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -334,7 +335,7 @@ where
     ) -> Result<ProofPreparation, Error> {
         let mut ps = Map::<String, Value>::new();
         ps.insert("capability".into(), serde_json::to_value(target)?);
-        LinkedDataProofs::prepare(
+        Ok(LinkedDataProofs::prepare(
             self,
             options,
             resolver,
@@ -342,7 +343,7 @@ where
             public_key,
             Some(ps),
         )
-        .await
+        .await?)
     }
 
     pub fn set_proof(self, proof: Proof) -> Self {
@@ -359,7 +360,7 @@ impl<S> LinkedDataDocument for Invocation<S>
 where
     S: Serialize + Send + Sync + Clone,
 {
-    fn get_contexts(&self) -> Result<Option<String>, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, LdpError> {
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
@@ -367,7 +368,7 @@ where
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, Error> {
+    ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
         let json = serde_json::to_string(&copy)?;
@@ -375,10 +376,10 @@ where
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
+        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
     }
 
-    fn to_value(&self) -> Result<Value, Error> {
+    fn to_value(&self) -> Result<Value, LdpError> {
         Ok(serde_json::to_value(&self)?)
     }
 
@@ -406,23 +407,16 @@ impl Default for Contexts {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(untagged)]
-pub enum Context {
-    URI(URI),
-    Object(Map<String, Value>),
-}
-
 impl TryFrom<OneOrMany<Context>> for Contexts {
-    type Error = Error;
+    type Error = LdpError;
     fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
         let first_uri = match context.first() {
-            None => return Err(Error::MissingContext),
+            None => return Err(LdpError::MissingContext),
             Some(Context::URI(URI::String(uri))) => uri,
-            Some(Context::Object(_)) => return Err(Error::InvalidContext),
+            Some(Context::Object(_)) => return Err(LdpError::InvalidContext),
         };
         if first_uri != DEFAULT_CONTEXT {
-            return Err(Error::InvalidContext);
+            return Err(LdpError::InvalidContext);
         }
         Ok(match context {
             OneOrMany::One(context) => Contexts::One(context),

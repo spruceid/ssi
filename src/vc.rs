@@ -2,19 +2,20 @@ use std::collections::HashMap as Map;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
-use crate::did_resolve::DIDResolver;
 use crate::error::Error;
-use crate::jsonld::{json_to_dataset, ContextLoader};
-use jwk::{JWTKeys, JWK};
-use crate::jws::Header;
-use crate::ldp::{
-    now_ms, LinkedDataDocument, LinkedDataProofs, ProofPreparation, VerificationWarnings,
+use ssi_core::{one_or_many::OneOrMany, uri::URI};
+use ssi_dids::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
+use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
+use ssi_jwk::{JWTKeys, JWK};
+use ssi_jws::Header;
+use ssi_jwt::NumericDate;
+use ssi_ldp::{
+    assert_local, Check, Context, Error as LdpError, LinkedDataDocument, LinkedDataProofOptions,
+    LinkedDataProofs, Proof, ProofPreparation, VerificationResult,
 };
-use crate::one_or_many::OneOrMany;
-use crate::rdf::DataSet;
 
 use async_trait::async_trait;
-use chrono::{prelude::*, Duration, LocalResult};
+use chrono::{prelude::*, LocalResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -98,13 +99,6 @@ pub enum Contexts {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum Context {
-    URI(URI),
-    Object(Map<String, Value>),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CredentialSubject {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -162,53 +156,6 @@ pub struct ObjectWithId {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct Proof {
-    #[serde(rename = "@context")]
-    // TODO: use consistent types for context
-    #[serde(default, skip_serializing_if = "Value::is_null")]
-    pub context: Value,
-    #[serde(rename = "type")]
-    pub type_: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof_purpose: Option<ProofPurpose>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof_value: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub challenge: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub creator: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    // Note: ld-proofs specifies verificationMethod as a "set of parameters",
-    // but all examples use a single string.
-    pub verification_method: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<DateTime<Utc>>, // ISO 8601
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub domain: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub nonce: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub jws: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]
-    pub property_set: Option<Map<String, Value>>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(try_from = "String")]
-// #[serde(untagged)]
-#[serde(rename_all = "camelCase")]
-pub enum ProofPurpose {
-    AssertionMethod,
-    Authentication,
-    KeyAgreement,
-    ContractAgreement,
-    CapabilityInvocation,
-    CapabilityDelegation,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TermsOfUse {
@@ -258,13 +205,6 @@ pub trait CredentialStatus: Sync {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> VerificationResult;
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(try_from = "String")]
-#[serde(untagged)]
-pub enum URI {
-    String(String),
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -360,142 +300,16 @@ pub struct JWTClaims {
     pub property_set: Option<Map<String, Value>>,
 }
 
-// https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
-#[serde(deny_unknown_fields)]
-/// Options for specifying how the LinkedDataProof is created.
-/// Reference: vc-http-api
-pub struct LinkedDataProofOptions {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "type")]
-    /// The type of the proof. Default is an appropriate proof type corresponding to the verification method.
-    pub type_: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// The URI of the verificationMethod used for the proof. If omitted a default
-    /// assertionMethod will be used.
-    pub verification_method: Option<URI>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// The purpose of the proof. If omitted "assertionMethod" will be used.
-    pub proof_purpose: Option<ProofPurpose>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// The date of the proof. If omitted system time will be used.
-    pub created: Option<DateTime<Utc>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// The challenge of the proof.
-    pub challenge: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// The domain of the proof.
-    pub domain: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    /// Checks to perform
-    pub checks: Option<Vec<Check>>,
-    /// Metadata for EthereumEip712Signature2021 (not standard in vc-http-api)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg(feature = "keccak-hash")]
-    pub eip712_domain: Option<crate::eip712::ProofInfo>,
-    #[cfg(not(feature = "keccak-hash"))]
-    pub eip712_domain: Option<()>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(try_from = "String")]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub enum Check {
-    Proof,
-    #[serde(rename = "JWS")]
-    JWS,
-    CredentialStatus,
-}
-
-// https://w3c-ccg.github.io/vc-http-api/#/Verifier/verifyCredential
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-/// Object summarizing a verification
-/// Reference: vc-http-api
-pub struct VerificationResult {
-    /// The checks performed
-    pub checks: Vec<Check>,
-    /// Warnings
-    pub warnings: Vec<String>,
-    /// Errors
-    pub errors: Vec<String>,
-}
-
-impl Default for ProofPurpose {
-    fn default() -> Self {
-        Self::AssertionMethod
-    }
-}
-
-impl Default for LinkedDataProofOptions {
-    fn default() -> Self {
-        Self {
-            verification_method: None,
-            proof_purpose: Some(ProofPurpose::default()),
-            created: Some(now_ms()),
-            challenge: None,
-            domain: None,
-            checks: Some(vec![Check::Proof]),
-            eip712_domain: None,
-            type_: None,
-        }
-    }
-}
-
-impl VerificationResult {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn error(err: &str) -> Self {
-        Self {
-            checks: vec![],
-            warnings: vec![],
-            errors: vec![err.to_string()],
-        }
-    }
-
-    pub fn append(&mut self, other: &mut Self) {
-        self.checks.append(&mut other.checks);
-        self.warnings.append(&mut other.warnings);
-        self.errors.append(&mut other.errors);
-    }
-
-    pub fn with_error(mut self, error: String) -> Self {
-        self.errors.push(error);
-        self
-    }
-}
-
-impl From<Result<VerificationWarnings, Error>> for VerificationResult {
-    fn from(res: Result<VerificationWarnings, Error>) -> Self {
-        match res {
-            Ok(warnings) => Self {
-                checks: vec![],
-                warnings,
-                errors: vec![],
-            },
-            Err(error) => Self {
-                checks: vec![],
-                warnings: vec![],
-                errors: vec![error.to_string()],
-            },
-        }
-    }
-}
-
 impl TryFrom<OneOrMany<Context>> for Contexts {
-    type Error = Error;
+    type Error = LdpError;
     fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
         let first_uri = match context.first() {
-            None => return Err(Error::MissingContext),
+            None => return Err(LdpError::MissingContext),
             Some(Context::URI(URI::String(uri))) => uri,
-            Some(Context::Object(_)) => return Err(Error::InvalidContext),
+            Some(Context::Object(_)) => return Err(LdpError::InvalidContext),
         };
         if first_uri != DEFAULT_CONTEXT && first_uri != ALT_DEFAULT_CONTEXT {
-            return Err(Error::InvalidContext);
+            return Err(LdpError::InvalidContext);
         }
         Ok(match context {
             OneOrMany::One(context) => Contexts::One(context),
@@ -535,48 +349,6 @@ impl Contexts {
             }
         }
         false
-    }
-}
-
-impl TryFrom<String> for URI {
-    type Error = Error;
-    fn try_from(uri: String) -> Result<Self, Self::Error> {
-        if uri.contains(':') {
-            Ok(URI::String(uri))
-        } else {
-            Err(Error::URI)
-        }
-    }
-}
-
-impl URI {
-    /// Return the URI as a string slice
-    pub fn as_str(&self) -> &str {
-        match self {
-            URI::String(string) => string.as_str(),
-        }
-    }
-}
-
-impl FromStr for URI {
-    type Err = Error;
-    fn from_str(uri: &str) -> Result<Self, Self::Err> {
-        URI::try_from(String::from(uri))
-    }
-}
-
-impl From<URI> for String {
-    fn from(uri: URI) -> String {
-        let URI::String(string) = uri;
-        string
-    }
-}
-
-impl std::fmt::Display for URI {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::String(ref string) => write!(f, "{}", string),
-        }
     }
 }
 
@@ -663,53 +435,12 @@ fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
     } else if let Some(es256k_key) = &keys.es256k_private_key {
         es256k_key
     } else {
-        return Err(Error::MissingKey);
+        return Err(Error::LDP(LdpError::MissingKey));
     };
-    let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-    crate::jwt::encode_sign(algorithm, claims, jwk)
-}
-
-// Ensure a verification relationship exists between a given issuer and verification method for a
-// given proof purpose, and that the given JWK is matches the given verification method.
-pub(crate) async fn ensure_verification_relationship(
-    issuer: &str,
-    proof_purpose: ProofPurpose,
-    vm: &str,
-    jwk: &JWK,
-    resolver: &dyn DIDResolver,
-) -> Result<(), Error> {
-    let vmms =
-        crate::did_resolve::get_verification_methods(issuer, proof_purpose.clone(), resolver)
-            .await?;
-    let vmm = vmms.get(vm).ok_or_else(|| {
-        Error::MissingVerificationRelationship(issuer.to_string(), proof_purpose, vm.to_string())
-    })?;
-    vmm.match_jwk(jwk)?;
-    Ok(())
-}
-
-pub(crate) async fn pick_default_vm(
-    issuer: &str,
-    proof_purpose: ProofPurpose,
-    jwk: &JWK,
-    resolver: &dyn DIDResolver,
-) -> Result<String, Error> {
-    let vm_ids =
-        crate::did_resolve::get_verification_methods(issuer, proof_purpose.clone(), resolver)
-            .await?;
-    let mut err = Error::MissingKey;
-    for (vm_id, vmm) in vm_ids {
-        // Try to find a VM that matches this JWK and controller.
-        match vmm.match_jwk(jwk) {
-            Ok(()) => {
-                // Found appropriate VM.
-                return Ok(vm_id);
-            }
-            Err(e) => err = e,
-        }
-    }
-    // No matching VM found. Return any error encountered.
-    Err(err)
+    let algorithm = jwk
+        .get_algorithm()
+        .ok_or(Error::LDP(LdpError::MissingAlgorithm))?;
+    Ok(crate::jwt::encode_sign(algorithm, claims, jwk)?)
 }
 
 impl Credential {
@@ -730,9 +461,9 @@ impl Credential {
         let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
             rs256_key
         } else if keys.es256k_private_key.is_some() {
-            return Err(Error::AlgorithmNotImplemented);
+            return Err(Error::JWS(ssi_jws::Error::AlgorithmNotImplemented));
         } else {
-            return Err(Error::MissingKey);
+            return Err(Error::LDP(LdpError::MissingKey));
         };
         Credential::from_jwt(jwt, jwk)
     }
@@ -854,7 +585,7 @@ impl Credential {
             audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
             ..self.to_jwt_claims()?
         };
-        crate::jwt::encode_unsigned(&claims)
+        Ok(crate::jwt::encode_unsigned(&claims)?)
     }
 
     #[deprecated(note = "Use generate_jwt")]
@@ -876,7 +607,7 @@ impl Credential {
     ) -> Result<String, Error> {
         let mut options = options.clone();
         if let Some(jwk) = jwk {
-            crate::ldp::ensure_or_pick_verification_relationship(&mut options, self, jwk, resolver)
+            ssi_ldp::ensure_or_pick_verification_relationship(&mut options, self, jwk, resolver)
                 .await?;
             // If no JWK is passed, there is no verification relationship.
         }
@@ -916,9 +647,10 @@ impl Credential {
             ..self.to_jwt_claims()?
         };
         let algorithm = if let Some(jwk) = jwk {
-            jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?
+            jwk.get_algorithm()
+                .ok_or(Error::LDP(LdpError::MissingAlgorithm))?
         } else {
-            jwk::Algorithm::None
+            ssi_jwk::Algorithm::None
         };
         // Ensure consistency between key ID and verification method URI.
         let key_id = match (jwk.and_then(|jwk| jwk.key_id.clone()), verification_method) {
@@ -1039,7 +771,7 @@ impl Credential {
                 return (None, VerificationResult::error("JWT header missing key id"));
             }
         };
-        let key = match crate::ldp::resolve_key(&verification_method, resolver).await {
+        let key = match ssi_dids::did_resolve::resolve_key(&verification_method, resolver).await {
             Ok(key) => key,
             Err(err) => {
                 return (
@@ -1082,7 +814,7 @@ impl Credential {
                 break;
             };
         }
-        if checks.contains(&Check::CredentialStatus) {
+        if checks.contains(&Check::Status) {
             results.append(&mut vc.check_status(resolver, context_loader).await);
         }
         (Some(vc), results)
@@ -1093,7 +825,7 @@ impl Credential {
             return Err(Error::MissingTypeVerifiableCredential);
         }
         if self.issuer.is_none() {
-            return Err(Error::MissingIssuer);
+            return Err(Error::InvalidIssuer);
         }
         if self.credential_subject.is_empty() {
             // https://www.w3.org/TR/vc-data-model/#credential-subject
@@ -1224,7 +956,7 @@ impl Credential {
                 break;
             };
         }
-        if checks.contains(&Check::CredentialStatus) {
+        if checks.contains(&Check::Status) {
             results.append(&mut self.check_status(resolver, context_loader).await);
         }
         results
@@ -1239,7 +971,7 @@ impl Credential {
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
-    ) -> Result<Proof, Error> {
+    ) -> Result<Proof, LdpError> {
         LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, None).await
     }
 
@@ -1251,7 +983,7 @@ impl Credential {
         options: &LinkedDataProofOptions,
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
-    ) -> Result<ProofPreparation, Error> {
+    ) -> Result<ProofPreparation, LdpError> {
         LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, None).await
     }
 
@@ -1300,7 +1032,7 @@ impl Credential {
         if !result.errors.is_empty() {
             return result;
         }
-        result.checks.push(Check::CredentialStatus);
+        result.checks.push(Check::Status);
         result
     }
 }
@@ -1326,7 +1058,7 @@ impl CheckableStatus {
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LinkedDataDocument for Credential {
-    fn get_contexts(&self) -> Result<Option<String>, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, LdpError> {
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
@@ -1334,7 +1066,7 @@ impl LinkedDataDocument for Credential {
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, Error> {
+    ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
         let json = serde_json::to_string(&copy)?;
@@ -1342,10 +1074,10 @@ impl LinkedDataDocument for Credential {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
+        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
     }
 
-    fn to_value(&self) -> Result<Value, Error> {
+    fn to_value(&self) -> Result<Value, LdpError> {
         Ok(serde_json::to_value(&self)?)
     }
 
@@ -1459,9 +1191,10 @@ impl Presentation {
             ..self.to_jwt_claims()?
         };
         let algorithm = if let Some(jwk) = jwk {
-            jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?
+            jwk.get_algorithm()
+                .ok_or(Error::LDP(LdpError::MissingAlgorithm))?
         } else {
-            jwk::Algorithm::None
+            ssi_jwk::Algorithm::None
         };
         let key_id = match (jwk.and_then(|jwk| jwk.key_id.clone()), verification_method) {
             (Some(jwk_kid), None) => Some(jwk_kid),
@@ -1502,7 +1235,7 @@ impl Presentation {
             .as_ref()
             .and_then(|opts| opts.checks.clone())
             .unwrap_or_default();
-        if checks.contains(&Check::CredentialStatus) {
+        if checks.contains(&Check::Status) {
             // TODO: apply check to embedded VCs
             return (
                 None,
@@ -1582,7 +1315,7 @@ impl Presentation {
                 return (None, VerificationResult::error("JWT header missing key id"));
             }
         };
-        let key = match crate::ldp::resolve_key(&verification_method, resolver).await {
+        let key = match ssi_dids::did_resolve::resolve_key(&verification_method, resolver).await {
             Ok(key) => key,
             Err(err) => {
                 return (
@@ -1675,7 +1408,7 @@ impl Presentation {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> Result<Proof, Error> {
-        LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, None).await
+        Ok(LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, None).await?)
     }
 
     /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
@@ -1687,7 +1420,10 @@ impl Presentation {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> Result<ProofPreparation, Error> {
-        LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, None).await
+        Ok(
+            LinkedDataProofs::prepare(self, options, resolver, context_loader, public_key, None)
+                .await?,
+        )
     }
 
     pub fn add_proof(&mut self, proof: Proof) {
@@ -1769,7 +1505,7 @@ impl Presentation {
             .as_ref()
             .and_then(|opts| opts.checks.clone())
             .unwrap_or_default();
-        if checks.contains(&Check::CredentialStatus) {
+        if checks.contains(&Check::Status) {
             // TODO: apply check to embedded VCs
             return VerificationResult::error(
                 "credentialStatus check not valid for VerifiablePresentation",
@@ -1863,7 +1599,7 @@ pub async fn get_verification_methods_for_purpose(
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl LinkedDataDocument for Presentation {
-    fn get_contexts(&self) -> Result<Option<String>, Error> {
+    fn get_contexts(&self) -> Result<Option<String>, LdpError> {
         Ok(Some(serde_json::to_string(&self.context)?))
     }
 
@@ -1871,7 +1607,7 @@ impl LinkedDataDocument for Presentation {
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, Error> {
+    ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
         let json = serde_json::to_string(&copy)?;
@@ -1879,10 +1615,10 @@ impl LinkedDataDocument for Presentation {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await
+        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
     }
 
-    fn to_value(&self) -> Result<Value, Error> {
+    fn to_value(&self) -> Result<Value, LdpError> {
         Ok(serde_json::to_value(&self)?)
     }
 
@@ -1895,99 +1631,6 @@ impl LinkedDataDocument for Presentation {
 
     fn get_default_proof_purpose(&self) -> Option<ProofPurpose> {
         Some(ProofPurpose::Authentication)
-    }
-}
-
-macro_rules! assert_local {
-    ($cond:expr) => {
-        if !$cond {
-            return false;
-        }
-    };
-}
-
-impl Proof {
-    pub fn new(type_: &str) -> Self {
-        Self {
-            type_: type_.to_string(),
-            ..Self::default()
-        }
-    }
-
-    pub fn with_options(self, options: &LinkedDataProofOptions) -> Self {
-        Self {
-            proof_purpose: options.proof_purpose.clone(),
-            verification_method: options
-                .verification_method
-                .clone()
-                .map(|uri| uri.to_string()),
-            domain: options.domain.clone(),
-            challenge: options.challenge.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
-            ..self
-        }
-    }
-
-    pub fn with_properties(self, properties: Option<Map<String, Value>>) -> Self {
-        Self {
-            property_set: properties,
-            ..self
-        }
-    }
-
-    /// Check that a proof matches the given options.
-    #[allow(clippy::ptr_arg)]
-    pub fn matches_options(&self, options: &LinkedDataProofOptions) -> bool {
-        if let Some(ref verification_method) = options.verification_method {
-            assert_local!(
-                self.verification_method.as_ref() == Some(&verification_method.to_string())
-            );
-        }
-        if let Some(created) = self.created {
-            assert_local!(options.created.unwrap_or_else(now_ms) >= created);
-        } else {
-            return false;
-        }
-        if let Some(ref challenge) = options.challenge {
-            assert_local!(self.challenge.as_ref() == Some(challenge));
-        }
-        if let Some(ref domain) = options.domain {
-            assert_local!(self.domain.as_ref() == Some(domain));
-        }
-        if let Some(ref proof_purpose) = options.proof_purpose {
-            assert_local!(self.proof_purpose.as_ref() == Some(proof_purpose));
-        }
-        if let Some(ref type_) = options.type_ {
-            assert_local!(&self.type_ == type_);
-        }
-        true
-    }
-
-    /// Check that a proof's verification method belongs to the given set.
-    pub fn matches_vms(&self, allowed_vms: &[String]) -> bool {
-        if let Some(vm) = self.verification_method.as_ref() {
-            assert_local!(allowed_vms.contains(vm));
-        }
-        true
-    }
-
-    /// Check that a proof matches the given options and allowed verification methods.
-    ///
-    /// Equivalent to [Self::matches_options] and [Self::matches_vm].
-    #[allow(clippy::ptr_arg)]
-    pub fn matches(&self, options: &LinkedDataProofOptions, allowed_vms: &Vec<String>) -> bool {
-        self.matches_options(options) && self.matches_vms(allowed_vms)
-    }
-
-    pub async fn verify(
-        &self,
-        document: &(dyn LinkedDataDocument + Sync),
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-    ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver, context_loader)
-            .await
-            .into()
     }
 }
 
@@ -2059,225 +1702,6 @@ fn jwt_matches(
     }
     // TODO: support more claim checking via additional LDP options
     true
-}
-
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl LinkedDataDocument for Proof {
-    fn get_contexts(&self) -> Result<Option<String>, Error> {
-        Ok(None)
-    }
-
-    async fn to_dataset_for_signing(
-        &self,
-        parent: Option<&(dyn LinkedDataDocument + Sync)>,
-        context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, Error> {
-        let mut copy = self.clone();
-        copy.jws = None;
-        copy.proof_value = None;
-        let json = serde_json::to_string(&copy)?;
-        let more_contexts = match parent {
-            Some(parent) => parent.get_contexts()?,
-            None => None,
-        };
-        let dataset =
-            json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?;
-        verify_proof_consistency(self, &dataset)?;
-        Ok(dataset)
-    }
-
-    fn to_value(&self) -> Result<Value, Error> {
-        Ok(serde_json::to_value(&self)?)
-    }
-}
-
-/// Verify alignment of proof options in JSON with RDF terms
-fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Error> {
-    use crate::rdf;
-    let mut graph_ref = dataset.default_graph.as_ref();
-
-    let type_triple = graph_ref
-        .take(
-            None,
-            Some(&rdf::Predicate::IRIRef(rdf::IRIRef(
-                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-            ))),
-            None,
-        )
-        .ok_or(Error::MissingType)?;
-    let type_iri = match type_triple.object {
-        rdf::Object::IRIRef(rdf::IRIRef(ref iri)) => iri,
-        _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
-    };
-    match (proof.type_.as_str(), type_iri.as_str()) {
-        ("RsaSignature2018", "https://w3id.org/security#RsaSignature2018") => (),
-        ("Ed25519Signature2018", "https://w3id.org/security#Ed25519Signature2018") => (),
-        ("Ed25519Signature2020", "https://w3id.org/security#Ed25519Signature2020") => (),
-        ("EcdsaSecp256k1Signature2019", "https://w3id.org/security#EcdsaSecp256k1Signature2019") => (),
-        ("EcdsaSecp256r1Signature2019", "https://w3id.org/security#EcdsaSecp256r1Signature2019") => (),
-        ("EcdsaSecp256k1RecoverySignature2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020") => (),
-        ("EcdsaSecp256k1RecoverySignature2020", "https://w3id.org/security#EcdsaSecp256k1RecoverySignature2020") => (),
-        ("JsonWebSignature2020", "https://w3id.org/security#JsonWebSignature2020") => (),
-        ("EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021") => (),
-        ("EthereumPersonalSignature2021", "https://w3id.org/security#EthereumPersonalSignature2021") => (),
-        ("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
-        ("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
-        ("Eip712Signature2021", "https://w3id.org/security#Eip712Signature2021") => (),
-        ("TezosSignature2021", "https://w3id.org/security#TezosSignature2021") => (),
-        ("TezosJcsSignature2021", "https://w3id.org/security#TezosJcsSignature2021") => (),
-        ("AleoSignature2021", "https://w3id.org/security#AleoSignature2021") => (),
-        ("SolanaSignature2021", "https://w3id.org/security#SolanaSignature2021") => (),
-        _ => return Err(Error::UnexpectedTriple(type_triple.clone())),
-    };
-    let proof_id = &type_triple.subject;
-
-    graph_ref.match_iri_property(
-        proof_id,
-        "https://w3id.org/security#proofPurpose",
-        proof.proof_purpose.as_ref().map(|pp| pp.to_iri()),
-    )?;
-    graph_ref.match_iri_property(
-        proof_id,
-        "https://w3id.org/security#verificationMethod",
-        proof.verification_method.as_deref(),
-    )?;
-    graph_ref.match_iri_or_string_property(
-        proof_id,
-        "https://w3id.org/security#challenge",
-        proof.challenge.as_deref(),
-    )?;
-    graph_ref.match_iri_or_string_property(
-        proof_id,
-        "https://w3id.org/security#domain",
-        proof.domain.as_deref(),
-    )?;
-    graph_ref.match_date_property(
-        proof_id,
-        "http://purl.org/dc/terms/created",
-        proof.created.as_ref(),
-    )?;
-    graph_ref.match_json_property(
-        proof_id,
-        "https://w3id.org/security#publicKeyJwk",
-        proof
-            .property_set
-            .as_ref()
-            .and_then(|cc| cc.get("publicKeyJwk")),
-    )?;
-    graph_ref.match_multibase_property(
-        proof_id,
-        "https://w3id.org/security#publicKeyMultibase",
-        proof
-            .property_set
-            .as_ref()
-            .and_then(|cc| cc.get("publicKeyMultibase")),
-    )?;
-    graph_ref.match_iri_property(
-        proof_id,
-        "https://w3id.org/security#capability",
-        proof
-            .property_set
-            .as_ref()
-            .and_then(|cc| cc.get("capability"))
-            .and_then(|cap| cap.as_str()),
-    )?;
-    graph_ref.match_list_property(
-        proof_id,
-        "https://w3id.org/security#capabilityChain",
-        proof
-            .property_set
-            .as_ref()
-            .and_then(|cc| cc.get("capabilityChain")),
-    )?;
-
-    // Disallow additional unexpected statements
-    if let Some(triple) = graph_ref.triples.into_iter().next() {
-        return Err(Error::UnexpectedTriple(triple.clone()));
-    }
-
-    Ok(())
-}
-
-impl FromStr for ProofPurpose {
-    type Err = Error;
-    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
-        match purpose {
-            "authentication" => Ok(Self::Authentication),
-            "assertionMethod" => Ok(Self::AssertionMethod),
-            "keyAgreement" => Ok(Self::KeyAgreement),
-            "contractAgreement" => Ok(Self::ContractAgreement),
-            "capabilityInvocation" => Ok(Self::CapabilityInvocation),
-            "capabilityDelegation" => Ok(Self::CapabilityDelegation),
-            _ => Err(Error::UnsupportedProofPurpose),
-        }
-    }
-}
-
-impl TryFrom<String> for ProofPurpose {
-    type Error = Error;
-    fn try_from(purpose: String) -> Result<Self, Self::Error> {
-        Self::from_str(&purpose)
-    }
-}
-
-impl From<ProofPurpose> for String {
-    fn from(purpose: ProofPurpose) -> String {
-        match purpose {
-            ProofPurpose::Authentication => "authentication".to_string(),
-            ProofPurpose::AssertionMethod => "assertionMethod".to_string(),
-            ProofPurpose::KeyAgreement => "keyAgreement".to_string(),
-            ProofPurpose::ContractAgreement => "contractAgreement".to_string(),
-            ProofPurpose::CapabilityInvocation => "capabilityInvocation".to_string(),
-            ProofPurpose::CapabilityDelegation => "capabilityDelegation".to_string(),
-        }
-    }
-}
-
-impl ProofPurpose {
-    pub fn to_iri(&self) -> &'static str {
-        match self {
-            ProofPurpose::Authentication => "https://w3id.org/security#authenticationMethod",
-            ProofPurpose::AssertionMethod => "https://w3id.org/security#assertionMethod",
-            ProofPurpose::KeyAgreement => "https://w3id.org/security#keyAgreementMethod",
-            ProofPurpose::ContractAgreement => "https://w3id.org/security#contractAgreementMethod",
-            ProofPurpose::CapabilityInvocation => {
-                "https://w3id.org/security#capabilityInvocationMethod"
-            }
-            ProofPurpose::CapabilityDelegation => {
-                "https://w3id.org/security#capabilityDelegationMethod"
-            }
-        }
-    }
-}
-
-impl FromStr for Check {
-    type Err = Error;
-    fn from_str(purpose: &str) -> Result<Self, Self::Err> {
-        match purpose {
-            "proof" => Ok(Self::Proof),
-            "JWS" => Ok(Self::JWS),
-            "credentialStatus" => Ok(Self::CredentialStatus),
-            _ => Err(Error::UnsupportedCheck),
-        }
-    }
-}
-
-impl TryFrom<String> for Check {
-    type Error = Error;
-    fn try_from(purpose: String) -> Result<Self, Self::Error> {
-        Self::from_str(&purpose)
-    }
-}
-
-impl From<Check> for String {
-    fn from(check: Check) -> String {
-        match check {
-            Check::Proof => "proof".to_string(),
-            Check::JWS => "JWS".to_string(),
-            Check::CredentialStatus => "credentialStatus".to_string(),
-        }
-    }
 }
 
 #[cfg(test)]
