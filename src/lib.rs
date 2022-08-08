@@ -63,4 +63,4 @@ pub use ssi_jwk::aleo;
 pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 #[cfg(any(feature = "k256", feature = "p256"))]
-pub mod passthrough_digest;
+pub use ssi_crypto::hashes::passthrough_digest;

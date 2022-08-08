@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 
 use crate::error::Error;
 use crate::{Params, JWK};
-use ssi_crypto::hashes::ripemd160::hash_public_key;
+use ssi_crypto::hashes::ripemd160;
 
 /// Compute a hash of a public key as an ripemd160 hash.
 pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
@@ -11,7 +11,7 @@ pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
         _ => return Err(Error::UnsupportedKeyType),
     };
     let pk = k256::PublicKey::try_from(ec_params)?;
-    Ok(hash_public_key(pk))
+    Ok(ripemd160::hash_public_key(pk, version))
 }
 
 #[cfg(test)]
