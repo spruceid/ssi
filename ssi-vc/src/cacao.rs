@@ -2,9 +2,9 @@ use crate::one_or_many::OneOrMany;
 use crate::vc::{CredentialOrJWT, URI};
 
 use cacaos::{siwe_cacao::SiweCacao, CACAO};
+use capgrok::{verify_statement, RESOURCE_PREFIX};
 use libipld::{cbor::DagCborCodec, codec::Decode};
 use serde::{Deserialize, Serialize};
-use siwe_capability_delegation::{verify_statement_matches_delegations, RESOURCE_PREFIX};
 use std::convert::TryInto;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -95,7 +95,7 @@ impl HolderBindingDelegation {
             return Ok(None);
         };
 
-        if !verify_statement_matches_delegations(
+        if !verify_statement(
             &payload
                 .clone()
                 .try_into()
@@ -125,10 +125,10 @@ pub(crate) mod tests {
         holder_binding: &str,
     ) -> Vec<String> {
         use cacaos::{siwe, siwe_cacao::SiweCacao};
+        use capgrok::{Builder, Namespace};
         use k256::{ecdsa::signature::Signer, elliptic_curve::sec1::ToEncodedPoint};
         use keccak_hash::keccak;
         use libipld::{cbor::DagCborCodec, multihash::Code, store::DefaultParams, Block};
-        use siwe_capability_delegation::{Builder, Namespace};
         use std::convert::{TryFrom, TryInto};
 
         let key = JWK::generate_secp256k1().unwrap();
