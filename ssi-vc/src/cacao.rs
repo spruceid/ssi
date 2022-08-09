@@ -203,13 +203,15 @@ pub(crate) mod tests {
         vp_issue_options.verification_method = Some(URI::String(vp_proof_vm));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
-        let vp_proof = if let Ok(p) = vp
+        let vp_proof = match vp
             .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
             .await
         {
-            p
-        } else {
-            return vec!["Failed signing".to_string()];
+            Ok(p) => p,
+            Err(e) => {
+                println!("{:?}", e);
+                return vec!["Failed signing".to_string()];
+            }
         };
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
