@@ -29,8 +29,8 @@ iref = { version = "2.2.2", features = ["serde"] }
 static-iref = "2.0.0"
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.2" }
-ssi-core = { path = "../ssi-core", version = "0.1"}
-ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  }
+ssi-core = { path = "../ssi-core", version = "0.1" }
+ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -43,12 +43,7 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 async-std = { version = "1.9", features = ["attributes"] }
 tokio = { version = "1.15", features = ["macros"] }
 futures = "0.3"
-hyper = { version = "0.14", features = [
-    "server",
-    "client",
-    "http1",
-    "stream",
-] }
+hyper = { version = "0.14", features = ["server", "client", "http1", "stream"] }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["secp256k1", "ed25519"] }
 
 [package.metadata.docs.rs]

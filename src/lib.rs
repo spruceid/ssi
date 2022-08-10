@@ -25,6 +25,7 @@ pub use ssi_caips as caips;
 pub use ssi_caips::caip10;
 #[deprecated = "Use ssi::caips::caip2"]
 pub use ssi_caips::caip2;
+pub use ssi_cborld as cborld;
 pub use ssi_core as core;
 #[deprecated = "Use ssi::core::one_or_many"]
 pub use ssi_core::one_or_many;
