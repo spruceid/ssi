@@ -244,7 +244,7 @@ fn encode_multi_base(value: Value) -> Vec<u8> {
 fn encode_base_58_did_url(value: Value) -> Vec<u8> {
     let did_url = value.as_str().unwrap();
 
-    let mut prefix: Vec<u8> = vec![25, 4, 1, 88, 34];
+    let mut prefix: Vec<u8> = vec![25, 4, 1];
     let mut suffix: &str;
     if did_url.starts_with(DID_V1) {
         suffix = did_url.split_at(DID_V1.len()).1;
@@ -253,9 +253,14 @@ fn encode_base_58_did_url(value: Value) -> Vec<u8> {
     }
 
     let to_decode: Vec<&str> = suffix.split('#').collect();
-    let decode = to_decode[0];
-    let dec = &decode[1..];
-    let mut did_url_encoded = bs58::decode(dec).into_vec().unwrap();
+    let mut did_url_encoded: Vec<u8> = vec![];
+    for s in to_decode {
+        let dec = &s[1..];
+        let mut did = bs58::decode(dec).into_vec().unwrap();
+        did_url_encoded.append(&mut vec![88, 34]);
+        did_url_encoded.append(&mut did);
+    }
+
     let mut did_url: Vec<u8> = vec![];
     did_url.append(&mut prefix);
     did_url.append(&mut did_url_encoded);
@@ -312,29 +317,24 @@ pub fn encode_string_value(val: Value) -> Vec<u8> {
 
     if value_string.starts_with("https:/") {
         value_encoded = encode_context(value_string.clone());
-        println!("value encoded: {:?}", value_encoded);
     }
 
     if value_string.starts_with("urn:uuid:") {
         let urnuuid_bytes = encode_urnuuid(val.clone());
         value_encoded = urnuuid_bytes.to_vec();
-        println!("value encoded: {:?}", value_encoded);
     }
 
-    if value_string.starts_with("did:key") {
+    if value_string.starts_with("did:key") || value_string.starts_with("did:v1") {
         value_encoded = encode_base_58_did_url(val.clone());
-        println!("value encoded: {:?}", value_encoded);
     }
 
     if value_string.starts_with("z") {
         value_encoded = encode_multi_base(val.clone());
-        println!("value encoded: {:?}", value_encoded);
     }
 
     let is_it_a_date = DateTime::parse_from_rfc3339(value_string);
     if is_it_a_date.is_ok() {
         value_encoded = encode_xsd_datetime(val.clone());
-        println!("value encoded: {:?}", value_encoded);
     }
 
     value_encoded
@@ -353,14 +353,9 @@ pub async fn truage_jsonld_to_cborld(
     for (key, value) in doc {
         let key_encoded = key_map.get(&key.to_string()).unwrap();
 
-        println!("----------------------------------------");
-        println!("key: {:?}, value: {:?}", key, value);
-        println!("encoded key: {:?}", key_encoded);
-
         if value.is_array() {
             let nested_value = value.as_array().unwrap().clone();
             let key_encoded_plural = key_encoded + 1;
-            println!("encoded key plural: {:?}", key_encoded_plural);
 
             let mut value_array: Vec<u8> = vec![];
 
@@ -381,17 +376,15 @@ pub async fn truage_jsonld_to_cborld(
                     } else {
                         let value_encoded = encode_vocab_term(val.clone(), key_map.clone());
                         value_array.append(&mut value_encoded.clone());
-                        println!("term value encoded: {:?}", value_encoded);
                     }
                 }
+                //to do
                 if val.is_number() {
                     let value_encoded = val;
                 }
             }
 
             transform_map.insert(key_encoded_plural, value_array);
-
-            println!("----------------------------------------");
         } else if value.is_string() {
             let known_key_word = key_map.get(value.as_str().unwrap());
             if known_key_word.is_none() {
@@ -399,7 +392,6 @@ pub async fn truage_jsonld_to_cborld(
                 transform_map.insert(key_encoded.clone(), value_encoded);
             } else {
                 let value_encoded = encode_vocab_term(value.clone(), key_map.clone());
-                println!("term value encoded: {:?}", value_encoded);
                 transform_map.insert(key_encoded.clone(), value_encoded);
             }
         } else if value.is_object() {
@@ -411,36 +403,22 @@ pub async fn truage_jsonld_to_cborld(
             }
         }
     }
-    println!("----------------------------------------");
     transform_maps.push(transform_map.clone());
     results.push(transform_map);
-    //println!("transform_maps {:?}", transform_maps);
-
-    // let compressed_object = serde_cbor::ser::to_vec(&transform_maps);
-    // println!("compressed_object {:?}", compressed_object);
-    println!("results len {:?}", transform_maps.len());
-
-    //println!("results: {:?}", results);
 
     transform_maps
 }
 
-pub async fn encode(document: Value) {
-    let mut transform_maps = vec![];
+pub async fn encode(document: Value) -> Vec<u8> {
+    let transform_maps = vec![];
     let mut result = truage_jsonld_to_cborld(document, transform_maps).await;
-
-    println!("RESULT LEN  {:?}", result.len());
-    for value in result.clone() {
-        println!("result item {:?}", value);
-    }
-
     let mut level_one = result.pop().unwrap();
     let mut level_two = result.pop().unwrap();
     let level_three_object_1 = result.pop().unwrap();
     let level_three_object_2 = result.pop().unwrap();
 
     let mut compressed_credential_subject_array: Vec<u8> = vec![];
-    let map_indicator2: u8 = (level_three_object_2.len() + 160).try_into().unwrap();
+    let map_indicator2: u8 = (level_three_object_2.len() + 1 + 160).try_into().unwrap();
     compressed_credential_subject_array.push(map_indicator2);
     for (key, mut value) in level_three_object_2 {
         let mut prefix = vec![24, key];
@@ -459,9 +437,10 @@ pub async fn encode(document: Value) {
     }
 
     //hacking together the map structure
+    //to do: refactor these hardcoded values to generalize
     let mut compressed_proof_array: Vec<u8> = vec![];
     let map_indicator1: u8 = (level_three_object_1.len() + 160).try_into().unwrap();
-    compressed_credential_subject_array.push(map_indicator1);
+    compressed_proof_array.push(map_indicator1);
     for (key, mut value) in level_three_object_1 {
         let mut prefix = vec![24, key];
         let mut suffix: Vec<u8> = vec![];
@@ -471,9 +450,11 @@ pub async fn encode(document: Value) {
         } else if key == 192 {
             suffix = vec![88, 65];
             suffix.append(&mut value);
-        } else {
+        } else if key == 194 {
             suffix = vec![131];
             suffix.append(&mut value);
+        } else {
+            suffix = value;
         }
 
         compressed_proof_array.append(&mut prefix);
@@ -491,8 +472,21 @@ pub async fn encode(document: Value) {
         let mut prefix = vec![24, key];
         let mut suffix = vec![];
 
-        if value.len() == 1 || value.len() == 2 || value.len() == 3 {
+        if key == 1 {
+            prefix = vec![key];
             suffix = vec![(value.len() + 128).try_into().unwrap()];
+            suffix.append(&mut value);
+        } else if key == 117 {
+            suffix = vec![(value.len() + 128).try_into().unwrap()];
+            for val in value {
+                suffix.append(&mut vec![24, val])
+            }
+        } else if key == 112 {
+            suffix = vec![130, 3, 80];
+            suffix.append(&mut value);
+        } else if key == 168 {
+            prefix = vec![24, key];
+            suffix = vec![130];
             suffix.append(&mut value);
         } else {
             suffix = value;
@@ -511,139 +505,37 @@ pub async fn encode(document: Value) {
     final_result.push(map_indicator4);
 
     for (key, value) in level_one {
-        println!("level_one_entry key: {:?}, value: {:?}", key, value);
-        let mut prefix = vec![24, key];
-        let mut suffix = value;
+        //println!("level_one_entry key: {:?}, value: {:?}", key, value);
+
+        let mut prefix = vec![];
+        let mut suffix = vec![];
+        if key == 1 {
+            prefix = vec![key, 129];
+            suffix = value;
+        } else if key == 112 {
+            prefix = vec![24, key, 130, 3, 80];
+            suffix = value;
+        } else if key == 117 {
+            prefix = vec![24, key, 129];
+            for val in value {
+                suffix.append(&mut vec![24, val])
+            }
+        } else {
+            prefix = vec![24, key];
+            suffix = value;
+        }
 
         final_result.append(&mut prefix);
         final_result.append(&mut suffix);
     }
 
-    // println!("final result: {:?}", final_result);
-    // println!("final result length {:?}", final_result.len());
+    final_result
 }
 
 // tests will fail without the correct json_ld document input
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::BTreeMap;
-
-    #[async_std::test]
-    async fn test_cbor_compression() {
-        let doc: Value = serde_json::from_str(
-            r#"{
-                "@context": [
-                    "https://www.w3.org/2018/credentials/v1"
-                ],
-            }
-            "#,
-        )
-        .unwrap();
-
-        let document = process_json_to_json_ld_document(doc);
-
-        //To do: build up term_id_map with custom terms
-        let term_to_id_map = get_keywordsmap();
-
-        //CONTEXT
-        let context_encoded = encode_context(document.context[0].as_str().unwrap());
-        let context_tuple = (1, context_encoded);
-
-        let mut context_btree_map: BTreeMap<i32, Vec<u8>> = BTreeMap::new();
-        context_btree_map.insert(context_tuple.0, context_tuple.1);
-        let context_result = serde_cbor::ser::to_vec_packed(&context_btree_map);
-        println!("context_result: {:?}", context_result);
-
-        //URNUUID
-        let uuid = encode_urnuuid(document.id);
-        let uuid_bytes = Bytes::new(&uuid);
-        let uuid_tuple = (3, uuid_bytes);
-
-        let urn_uuid_tuple = (112, uuid_tuple);
-        let uuid_result = serde_cbor::ser::to_vec_packed(&urn_uuid_tuple);
-        println!("uuid_result: {:?}", uuid_result);
-
-        //TYPE = VerifiablePresentation
-        let vocab_term_id = encode_vocab_term(document.type_, term_to_id_map.clone());
-        let type_tuple = (117, vec![vocab_term_id]);
-        let type_result = serde_cbor::ser::to_vec(&type_tuple);
-        println!("type_result {:?}", type_result);
-
-        // verifiablecredential
-        //1, 112, 114, 117, 158, 162, 164, 166
-        let mut verifiable_credential_map = BTreeMap::new();
-        let vc_context: Vec<u8> = vec![17, 22, 20];
-        let context_byte = Bytes::new(&[17, 22, 20]);
-        verifiable_credential_map.insert(1, vc_context); //values for context urls
-
-        let verifiable_credential = document.verifiable_credential.as_array().unwrap();
-
-        let vc_id = verifiable_credential[0]["id"].clone();
-        let vc_uuid = encode_urnuuid(vc_id);
-        let vc_uuid_byte = Bytes::new(&vc_uuid);
-        let vc_uuid_tuple = (3, vc_uuid_byte);
-
-        let vc_uuid_result = serde_cbor::ser::to_vec(&vc_uuid_tuple).unwrap();
-        let vc_uuid_result_byte = Bytes::new(&vc_uuid_result);
-
-        verifiable_credential_map.insert(112, vc_uuid_result.clone()); //values for urn:uuid
-
-        let vc_proof_doc = verifiable_credential[0]["proof"].clone();
-        let vc_proof = process_json_to_proof(vc_proof_doc); // value map for proof
-
-        let vc_proof_type = vc_proof.type_;
-        let vc_proof_type_encoded = encode_vocab_term(vc_proof_type, term_to_id_map.clone());
-        let vc_proof_type_bytes = Bytes::new(&vc_proof_type_encoded);
-
-        let vc_proof_created = vc_proof.created;
-        let vc_proof_created_encoded = encode_xsd_datetime(vc_proof_created);
-        let vc_proof_created_bytes = Bytes::new(&vc_proof_created_encoded);
-
-        let vc_proof_purpose = vc_proof.proof_purpose;
-        let vc_proof_purpose_encoded = encode_vocab_term(vc_proof_purpose, term_to_id_map.clone());
-        let vc_proof_purpose_bytes = Bytes::new(&vc_proof_purpose_encoded);
-
-        let vc_proof_value = vc_proof.proof_value;
-        let vc_proof_value_encoded = encode_multi_base(vc_proof_value);
-        let vc_proof_value_bytes = Bytes::new(&vc_proof_value_encoded);
-
-        let vc_proof_verification_method = vc_proof.verification_method;
-        let vc_proof_verification_method_encoded =
-            encode_base_58_did_url(vc_proof_verification_method);
-        let vc_proof_verification_method_bytes = Bytes::new(&vc_proof_verification_method_encoded);
-
-        let vc_type = verifiable_credential[0]["type"].clone();
-        let vc_type_encoded = encode_vocab_term(vc_type, term_to_id_map.clone());
-        let vc_type_bytes = Bytes::new(&vc_type_encoded);
-        verifiable_credential_map.insert(117, vc_type_encoded.clone()); // values for vc_type
-
-        let vc_credential_subject = verifiable_credential[0]["credentialSubject"].clone();
-        //let mut vc_credential_subject_map: BTreeMap<i32, Vec<u8>> = BTreeMap::new();                                  // value map for credentialSubject
-
-        let credential_subject = process_json_to_credential_subject(vc_credential_subject);
-
-        //let vc_over_age = credential_subject.over_age;
-        //let vc_over_age_byte = encode_vocab_term(vc_over_age, term_to_id_map.clone());
-        let over_age_tuple = (148, 21);
-        let vc_over_age_result = serde_cbor::ser::to_vec(&over_age_tuple); // value for over_age
-
-        let vc_concealed_id_token = credential_subject.concealed_id_token;
-        let vc_concealed_id_bytes = encode_multi_base(vc_concealed_id_token);
-        let vc_concealed_id_result = Bytes::new(&vc_concealed_id_bytes); // value for concealed ID token
-
-        let vc_expiration = verifiable_credential[0]["expirationDate"].clone();
-        let vc_expiration_encoded = encode_xsd_datetime(vc_expiration); // values for expiration date
-
-        let vc_issuance = verifiable_credential[0]["issuanceDate"].clone();
-        let vc_issuance_encoded = encode_xsd_datetime(vc_issuance); // values for issuance date
-
-        let vc_issuer = verifiable_credential[0]["issuer"].clone();
-        let vc_issuer_encoded = encode_base_58_did_url(vc_issuer);
-
-        //compress veriableCredential
-        let vc_result = serde_cbor::ser::to_vec(&verifiable_credential_map);
-    }
 
     #[async_std::test]
     async fn test_general() {
@@ -657,6 +549,7 @@ mod tests {
         )
         .unwrap();
 
-        encode(doc).await;
+        let cborld_encoded = encode(doc).await;
+        assert_eq!(cborld_encoded.len(), 384);
     }
 }
