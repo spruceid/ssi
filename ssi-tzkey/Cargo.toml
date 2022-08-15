@@ -10,3 +10,9 @@ ssi-jwk = { path = "../ssi-jwk" }
 ssi-jws = { path = "../ssi-jws" }
 thiserror = "1.0"
 bs58 = { version = "0.4", features = ["check"] }
+
+[dev-dependencies]
+# serde = { version = "1.0", features = ["derive"] }
+# async-std = { version = "1.9", features = ["attributes"] }
+serde_json = "1.0"
+hex = "0.4"
