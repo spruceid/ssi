@@ -234,8 +234,8 @@ pub fn decode_tzsig(sig_bs58: &str) -> Result<(Algorithm, Vec<u8>), DecodeTezosS
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::blakesig::hash_public_key;
     use serde_json::json;
+    use ssi_jwk::blakesig::hash_public_key;
 
     #[test]
     fn test_jwk_from_tezos_key_glyph_split() {
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn edsk_sign() {
         let mut key: JWK =
-            serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap();
         key.algorithm = Some(Algorithm::EdBlake2b);
         eprintln!("key: {:?}", key);
         let hash = hash_public_key(&key).unwrap();

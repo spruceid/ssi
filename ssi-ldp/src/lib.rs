@@ -941,7 +941,7 @@ mod tests {
         struct ExampleResolver;
 
         const EXAMPLE_123_ID: &str = "did:example:123";
-        const EXAMPLE_123_JSON: &str = include_str!("../tests/esrs2020-did.jsonld");
+        const EXAMPLE_123_JSON: &str = include_str!("../../tests/esrs2020-did.jsonld");
 
         #[async_trait]
         impl DIDResolver for ExampleResolver {
@@ -1004,7 +1004,7 @@ mod tests {
             }
         }
 
-        let vc_str = include_str!("../tests/esrs2020-vc.jsonld");
+        let vc_str = include_str!("../../tests/esrs2020-vc.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();
         let mut n_proofs = 0;
         for proof in vc.proof.iter().flatten() {
@@ -1062,11 +1062,12 @@ mod tests {
         assert_eq!(&sk_bytes[32..64], &pk_bytes);
 
         let issuer_document: Document =
-            serde_json::from_str(include_str!("../tests/lds-ed25519-2020-issuer0.jsonld")).unwrap();
+            serde_json::from_str(include_str!("../../tests/lds-ed25519-2020-issuer0.jsonld"))
+                .unwrap();
 
-        let vc_str = include_str!("../tests/lds-ed25519-2020-vc0.jsonld");
+        let vc_str = include_str!("../../tests/lds-ed25519-2020-vc0.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();
-        let vp_str = include_str!("../tests/lds-ed25519-2020-vp0.jsonld");
+        let vp_str = include_str!("../../tests/lds-ed25519-2020-vp0.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
 
         // "DID Resolver" for HTTPS issuer used in the test vectors.
@@ -1236,7 +1237,7 @@ mod tests {
 
         struct ExampleResolver;
         const EXAMPLE_DID: &str = "did:example:aleovm2021";
-        const EXAMPLE_DOC: &'static str = include_str!("../tests/lds-aleo2021-issuer0.jsonld");
+        const EXAMPLE_DOC: &'static str = include_str!("../../tests/lds-aleo2021-issuer0.jsonld");
         #[async_trait]
         impl DIDResolver for ExampleResolver {
             async fn resolve(
@@ -1274,9 +1275,9 @@ mod tests {
         }
 
         let private_key: JWK =
-            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/aleotestnet1-2021-11-22.json")).unwrap();
 
-        let vc_str = include_str!("../tests/lds-aleo2021-vc0.jsonld");
+        let vc_str = include_str!("../../tests/lds-aleo2021-vc0.jsonld");
         let mut vc = Credential::from_json_unsigned(vc_str).unwrap();
         let resolver = ExampleResolver;
         let mut context_loader = ssi_json_ld::ContextLoader::default();

@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn parse_private_key_jwk() {
         let key: JWK =
-            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/aleotestnet1-2021-11-22.json")).unwrap();
         let private_key = aleo_jwk_to_private_key(&key).unwrap();
         let private_key_str = private_key.to_string();
         assert_eq!(
@@ -311,7 +311,7 @@ mod tests {
     #[test]
     fn aleo_jwk_sign_verify() {
         let private_key: JWK =
-            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/aleotestnet1-2021-11-22.json")).unwrap();
 
         let public_key = private_key.to_public();
         let msg1 = b"asdf";

@@ -1907,7 +1907,7 @@ mod tests {
     #[async_std::test]
     /// <https://w3c.github.io/json-ld-api/tests/toRdf-manifest.html>
     async fn to_rdf_test_suite() {
-        let manifest_str = include_str!("../json-ld-api/tests/toRdf-manifest.jsonld");
+        let manifest_str = include_str!("../../json-ld-api/tests/toRdf-manifest.jsonld");
         let manifest = json::parse(manifest_str).unwrap();
         let manifest_obj = match manifest {
             JsonValue::Object(obj) => Ok(obj),

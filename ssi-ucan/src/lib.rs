@@ -646,7 +646,7 @@ mod tests {
     #[async_std::test]
     async fn valid() {
         let cases: Vec<ValidTestVector> =
-            serde_json::from_str(include_str!("../tests/ucan-v0.9.0-valid.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-valid.json")).unwrap();
 
         for case in cases {
             let ucan = match Ucan::decode(&case.token) {
@@ -667,7 +667,7 @@ mod tests {
     #[async_std::test]
     async fn invalid() {
         let cases: Vec<InvalidTestVector> =
-            serde_json::from_str(include_str!("../tests/ucan-v0.9.0-invalid.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-invalid.json")).unwrap();
         for case in cases {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {

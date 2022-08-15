@@ -82,22 +82,6 @@ pub fn hash_personal_message(msg: &str) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn hash() {
-        let jwk: JWK = serde_json::from_value(json!({
-            "alg": "ES256K-R",
-            "kty": "EC",
-            "crv": "secp256k1",
-            "x": "_dV63sPUOOojf-RrM-4eAW7aa1hcPifqZmhsLqU1hHk",
-            "y": "Rjk_gUUlLupor-Z-KHs-2bMWhbpsOwAGCnO5sSQtaPc",
-        }))
-        .unwrap();
-        // https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020/blob/3b6dc297f92abc912049121c38c1098d819855d2/src/__tests__/ES256K-R.spec.js#L63
-        let hash = hash_public_key(&jwk).unwrap();
-        assert_eq!(hash, "0xf3beac30c498d9e26865f34fcaa57dbb935b0d74");
-    }
 
     #[test]
     fn test_hash_personal_message() {

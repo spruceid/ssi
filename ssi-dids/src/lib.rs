@@ -1385,13 +1385,13 @@ pub mod example {
     use crate::{DIDMethod, Document};
     use async_trait::async_trait;
 
-    const DOC_JSON_FOO: &str = include_str!("../tests/did-example-foo.json");
-    const DOC_JSON_BAR: &str = include_str!("../tests/did-example-bar.json");
-    const DOC_JSON_12345: &str = include_str!("../tests/did-example-12345.json");
+    const DOC_JSON_FOO: &str = include_str!("../../tests/did-example-foo.json");
+    const DOC_JSON_BAR: &str = include_str!("../../tests/did-example-bar.json");
+    const DOC_JSON_12345: &str = include_str!("../../tests/did-example-12345.json");
 
     // For vc-test-suite
-    const DOC_JSON_TEST_ISSUER: &str = include_str!("../tests/did-example-test-issuer.json");
-    const DOC_JSON_TEST_HOLDER: &str = include_str!("../tests/did-example-test-holder.json");
+    const DOC_JSON_TEST_ISSUER: &str = include_str!("../../tests/did-example-test-issuer.json");
+    const DOC_JSON_TEST_HOLDER: &str = include_str!("../../tests/did-example-test-holder.json");
 
     /// An implementation of `did:example`.
     ///
@@ -1554,7 +1554,7 @@ mod tests {
     #[test]
     fn vmm_to_jwk() {
         // Identity: publicKeyJWK -> JWK
-        const JWK: &str = include_str!("../tests/ed25519-2020-10-18.json");
+        const JWK: &str = include_str!("../../tests/ed25519-2020-10-18.json");
         let jwk: JWK = serde_json::from_str(JWK).unwrap();
         let pk_jwk = jwk.to_public();
         let vmm_ed = VerificationMethodMap {
@@ -1571,7 +1571,7 @@ mod tests {
     #[test]
     fn vmm_bs58_to_jwk() {
         // publicKeyBase58 (deprecated) -> JWK
-        const JWK: &str = include_str!("../tests/ed25519-2020-10-18.json");
+        const JWK: &str = include_str!("../../tests/ed25519-2020-10-18.json");
         let jwk: JWK = serde_json::from_str(JWK).unwrap();
         let pk_jwk = jwk.to_public();
         let vmm_ed = VerificationMethodMap {
@@ -1589,7 +1589,7 @@ mod tests {
     #[cfg(feature = "k256")]
     fn vmm_hex_to_jwk() {
         // publicKeyHex (deprecated) -> JWK
-        const JWK: &str = include_str!("../tests/secp256k1-2021-02-17.json");
+        const JWK: &str = include_str!("../../tests/secp256k1-2021-02-17.json");
         let jwk: JWK = serde_json::from_str(JWK).unwrap();
         let pk_jwk = jwk.to_public();
         let vmm_ed = VerificationMethodMap {

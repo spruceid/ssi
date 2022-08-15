@@ -845,7 +845,7 @@ mod tests {
         verify_bytes(Algorithm::ES256, bad_data, &key, &sig).unwrap_err();
 
         let key: JWK =
-            serde_json::from_str(include_str!("../tests/secp256r1-2021-03-18.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/secp256r1-2021-03-18.json")).unwrap();
         let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
         let jws = encode_sign(Algorithm::ES256, payload, &key).unwrap();
         assert_eq!(jws, "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.rJzO6MmTNS8Tn-L3baIf9_2Jr9OoK8E06MxJtofz8xMUGSom6eRUmWGZ7oQVjgP3HogOD80miTvuvKTWa54Nvw");
@@ -863,7 +863,7 @@ mod tests {
         verify_bytes(Algorithm::ES384, bad_data, &key, &sig).unwrap_err();
 
         let key: JWK =
-            serde_json::from_str(include_str!("../tests/secp384r1-2022-05-10.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/secp384r1-2022-05-10.json")).unwrap();
         let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
         let jws = encode_sign(Algorithm::ES384, payload, &key).unwrap();
         dbg!(&jws);

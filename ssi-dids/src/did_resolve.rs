@@ -383,7 +383,7 @@ impl Default for ResolutionResult {
 ///     ) {
 ///         match did {
 ///             "did:example:foo" => {
-///                 let doc = match Document::from_json(include_str!("../tests/did-example-foo.json")) {
+///                 let doc = match Document::from_json(include_str!("../../tests/did-example-foo.json")) {
 ///                     Ok(doc) => doc,
 ///                     Err(e) => {
 ///                         return (
@@ -1483,7 +1483,7 @@ mod tests {
     #[cfg(feature = "http-did")]
     const DID_KEY_ID: &str = "did:key:z6Mkfriq1MqLBoPWecGoDLjguo1sB9brj6wT3qZ5BxkKpuP6";
     #[cfg(feature = "http-did")]
-    const DID_KEY_JSON: &str = include_str!("../tests/did-key-uniresolver-resp.json");
+    const DID_KEY_JSON: &str = include_str!("../../tests/did-key-uniresolver-resp.json");
 
     #[async_trait]
     impl DIDResolver for ExampleResolver {
