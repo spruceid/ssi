@@ -50,7 +50,6 @@ pub enum Error {
     BlockchainAccountIdParse(#[from] caips::caip10::BlockchainAccountIdParseError),
     #[error(transparent)]
     BlockchainAccountIdVerify(#[from] caips::caip10::BlockchainAccountIdVerifyError),
-
     #[error(transparent)]
     DecodeTezosPublicKey(#[from] ssi_tzkey::DecodeTezosPkError),
     #[error(transparent)]

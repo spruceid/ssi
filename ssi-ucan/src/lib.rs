@@ -641,6 +641,7 @@ mod ipld_encoding {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use did_method_key::DIDKey;
     use std::collections::HashMap;
 
     #[async_std::test]
@@ -654,7 +655,7 @@ mod tests {
                 Err(e) => Err(e).unwrap(),
             };
 
-            match ucan.verify_signature(DIDExample.to_resolver()).await {
+            match ucan.verify_signature(DIDKey.to_resolver()).await {
                 Err(e) => Err(e).unwrap(),
                 _ => {}
             };
@@ -672,7 +673,7 @@ mod tests {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
                     if u.payload.validate_time(None).is_ok()
-                        && u.verify_signature(DIDExample.to_resolver()).await.is_ok()
+                        && u.verify_signature(DIDKey.to_resolver()).await.is_ok()
                     {
                         assert!(false, "{}", case.comment);
                     }
@@ -686,7 +687,7 @@ mod tests {
     async fn basic() {
         let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
         let u = Ucan::<JsonValue>::decode(case).unwrap();
-        u.verify_signature(DIDExample.to_resolver()).await.unwrap();
+        u.verify_signature(DIDKey.to_resolver()).await.unwrap();
     }
 
     #[derive(Deserialize)]
@@ -715,58 +716,5 @@ mod tests {
         pub comment: String,
         pub token: String,
         pub assertions: InvalidAssertions,
-    }
-
-    pub struct DIDExample;
-    use crate::did::{DIDMethod, Document};
-    use crate::did_resolve::{
-        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
-        ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
-    };
-    use async_trait::async_trait;
-
-    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-    impl DIDMethod for DIDExample {
-        fn name(&self) -> &'static str {
-            "key"
-        }
-        fn to_resolver(&self) -> &dyn DIDResolver {
-            self
-        }
-    }
-
-    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-    impl DIDResolver for DIDExample {
-        async fn resolve(
-            &self,
-            did: &str,
-            _input_metadata: &ResolutionInputMetadata,
-        ) -> (
-            ResolutionMetadata,
-            Option<Document>,
-            Option<DocumentMetadata>,
-        ) {
-            let dids: HashMap<String, Document> =
-                serde_json::from_str(include_str!("../tests/did-key-statics.json")).unwrap();
-            let doc: Document = match dids.get(did) {
-                Some(doc) => doc.clone(),
-                _ => {
-                    return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
-                }
-            };
-            (
-                // ResolutionMetadata::default(),
-                // Note: remove content type when https://github.com/spruceid/ssi/pull/224 is
-                // merged
-                ResolutionMetadata {
-                    content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                    ..Default::default()
-                },
-                Some(doc),
-                Some(DocumentMetadata::default()),
-            )
-        }
     }
 }

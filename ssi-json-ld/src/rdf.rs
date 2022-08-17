@@ -832,9 +832,8 @@ mod tests {
 
     fn parse_uchar(chars: &mut Peekable<Chars>, len: usize) -> Result<char, Error> {
         let escaped: String = chars.take(len).collect();
-        let c_u32 = u32::from_str_radix(&escaped, 16)?;
-        let c = char::try_from(c_u32)?;
-        Ok(c)
+        char::try_from(u32::from_str_radix(&escaped, 16).map_err(|_| Error::ExpectedString)?)
+            .map_err(|_| Error::ExpectedString)
     }
 
     fn parse_iri_ref(chars: &mut Peekable<Chars>) -> Result<IRIRef, Error> {

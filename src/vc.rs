@@ -1707,8 +1707,11 @@ fn jwt_matches(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::did::example::DIDExample;
+    use crate::did::{example::DIDExample, VerificationMethodMap};
     use crate::urdna2015;
+    use chrono::Duration;
+    use ssi_dids::did_resolve::DereferencingInputMetadata;
+    use ssi_ldp::{suites::*, ProofSuite};
 
     #[test]
     fn numeric_date() {
@@ -2236,7 +2239,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         struct ProofContexts(Value);
         #[async_trait]
         impl LinkedDataDocument for ProofContexts {
-            fn get_contexts(&self) -> Result<Option<String>, Error> {
+            fn get_contexts(&self) -> Result<Option<String>, ssi_ldp::Error> {
                 Ok(Some(serde_json::to_string(&self.0)?))
             }
 
@@ -2244,11 +2247,11 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 &self,
                 _parent: Option<&(dyn LinkedDataDocument + Sync)>,
                 _context_loader: &mut ContextLoader,
-            ) -> Result<DataSet, Error> {
-                Err(Error::NotImplemented)
+            ) -> Result<DataSet, ssi_ldp::Error> {
+                Err(ssi_ldp::Error::MissingAlgorithm)
             }
 
-            fn to_value(&self) -> Result<Value, Error> {
+            fn to_value(&self) -> Result<Value, ssi_ldp::Error> {
                 Ok(self.0.clone())
             }
         }
@@ -2529,7 +2532,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ..Default::default()
         };
         let verify_options = LinkedDataProofOptions {
-            checks: Some(vec![Check::Proof, Check::CredentialStatus]),
+            checks: Some(vec![Check::Proof, Check::Status]),
             ..Default::default()
         };
 
@@ -2825,5 +2828,396 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
+    }
+
+    #[async_std::test]
+    #[cfg(all(feature = "secp256k1", feature = "keccak-hash"))]
+    async fn esrs2020() {
+        use ssi_dids::did_resolve::{
+            DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
+            TYPE_DID_LD_JSON,
+        };
+        use ssi_dids::Document;
+
+        struct ExampleResolver;
+
+        const EXAMPLE_123_ID: &str = "did:example:123";
+        const EXAMPLE_123_JSON: &str = include_str!("../tests/esrs2020-did.jsonld");
+
+        #[async_trait]
+        impl DIDResolver for ExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                if did == EXAMPLE_123_ID {
+                    let doc = match Document::from_json(EXAMPLE_123_JSON) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            return (
+                                ResolutionMetadata::from_error(&format!("JSON Error: {:?}", err)),
+                                None,
+                                None,
+                            );
+                        }
+                    };
+                    (
+                        ResolutionMetadata {
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            ..Default::default()
+                        },
+                        Some(doc),
+                        Some(DocumentMetadata::default()),
+                    )
+                } else {
+                    (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
+                }
+            }
+
+            async fn resolve_representation(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
+                if did == EXAMPLE_123_ID {
+                    let vec = EXAMPLE_123_JSON.as_bytes().to_vec();
+                    (
+                        ResolutionMetadata {
+                            error: None,
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            property_set: None,
+                        },
+                        vec,
+                        Some(DocumentMetadata::default()),
+                    )
+                } else {
+                    (
+                        ResolutionMetadata::from_error(ERROR_NOT_FOUND),
+                        Vec::new(),
+                        None,
+                    )
+                }
+            }
+        }
+
+        let vc_str = include_str!("../tests/esrs2020-vc.jsonld");
+        let vc = Credential::from_json(vc_str).unwrap();
+        let mut n_proofs = 0;
+        for proof in vc.proof.iter().flatten() {
+            n_proofs += 1;
+            let resolver = ExampleResolver;
+            let mut context_loader = ssi_json_ld::ContextLoader::default();
+            let warnings = EcdsaSecp256k1RecoverySignature2020
+                .verify(proof, &vc, &resolver, &mut context_loader)
+                .await
+                .unwrap();
+            assert!(warnings.is_empty());
+        }
+        assert_eq!(n_proofs, 4);
+    }
+
+    #[async_std::test]
+    async fn ed2020() {
+        // https://w3c-ccg.github.io/lds-ed25519-2020/#example-4
+        let vmm: VerificationMethodMap = serde_json::from_value(serde_json::json!({
+          "id": "https://example.com/issuer/123#key-0",
+          "type": "Ed25519KeyPair2020",
+          "controller": "https://example.com/issuer/123",
+          "publicKeyMultibase": "z6Mkf5rGMoatrSj1f4CyvuHBeXJELe9RPdzo2PKGNCKVtZxP",
+          "privateKeyMultibase": "zrv3kJcnBP1RpYmvNZ9jcYpKBZg41iSobWxSg3ix2U7Cp59kjwQFCT4SZTgLSL3HP8iGMdJs3nedjqYgNn6ZJmsmjRm"
+        }))
+        .unwrap();
+
+        let sk_hex = "9b937b81322d816cfab9d5a3baacc9b2a5febe4b149f126b3630f93a29527017095f9a1a595dde755d82786864ad03dfa5a4fbd68832566364e2b65e13cc9e44";
+        let sk_bytes = hex::decode(sk_hex).unwrap();
+        let sk_bytes_mc = [vec![0x80, 0x26], sk_bytes.clone()].concat();
+        let sk_mb = multibase::encode(multibase::Base::Base58Btc, &sk_bytes_mc);
+        let props = &vmm.property_set.unwrap();
+        let sk_mb_expected = props
+            .get("privateKeyMultibase")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(&sk_mb, &sk_mb_expected);
+
+        let pk_hex = "095f9a1a595dde755d82786864ad03dfa5a4fbd68832566364e2b65e13cc9e44";
+        let pk_bytes = hex::decode(pk_hex).unwrap();
+        let pk_bytes_mc = [vec![0xed, 0x01], pk_bytes.clone()].concat();
+        let pk_mb = multibase::encode(multibase::Base::Base58Btc, &pk_bytes_mc);
+        let pk_mb_expected = props
+            .get("publicKeyMultibase")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert_eq!(&pk_mb, &pk_mb_expected);
+
+        assert_eq!(&sk_bytes[32..64], &pk_bytes);
+
+        let issuer_document: Document =
+            serde_json::from_str(include_str!("../tests/lds-ed25519-2020-issuer0.jsonld")).unwrap();
+
+        let vc_str = include_str!("../tests/lds-ed25519-2020-vc0.jsonld");
+        let vc = Credential::from_json(vc_str).unwrap();
+        let vp_str = include_str!("../tests/lds-ed25519-2020-vp0.jsonld");
+        let vp = Presentation::from_json(vp_str).unwrap();
+
+        // "DID Resolver" for HTTPS issuer used in the test vectors.
+        struct ED2020ExampleResolver {
+            issuer_document: Document,
+        }
+        use ssi_dids::did_resolve::{
+            Content, ContentMetadata, DereferencingMetadata, DocumentMetadata,
+            ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+        };
+        use ssi_dids::{Document, PrimaryDIDURL};
+        use ssi_jwk::{Algorithm, Base64urlUInt, OctetParams, Params as JWKParams};
+        use ssi_ldp::{suites::Ed25519Signature2020, ProofSuite};
+        #[async_trait]
+        impl DIDResolver for ED2020ExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                // Return empty result here to allow DID URL dereferencing to proceed. The DID
+                // is resolved as part of DID URL dereferencing, but the DID document is not used.
+                if did == "https:" {
+                    let doc_meta = DocumentMetadata::default();
+                    let doc = Document::new(did);
+                    return (ResolutionMetadata::default(), Some(doc), Some(doc_meta));
+                }
+                (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
+            }
+
+            async fn dereference(
+                &self,
+                did_url: &PrimaryDIDURL,
+                _input_metadata: &DereferencingInputMetadata,
+            ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
+                match &did_url.to_string()[..] {
+                    "https://example.com/issuer/123" => Some((
+                        DereferencingMetadata {
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            ..Default::default()
+                        },
+                        Content::DIDDocument(self.issuer_document.clone()),
+                        ContentMetadata::default(),
+                    )),
+                    _ => None,
+                }
+            }
+        }
+
+        let sk_jwk = JWK::from(JWKParams::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(sk_bytes[32..64].to_vec()),
+            private_key: Some(Base64urlUInt(sk_bytes[0..32].to_vec())),
+        }));
+        assert_eq!(sk_bytes.len(), 64);
+        eprintln!("{}", serde_json::to_string(&sk_jwk).unwrap());
+
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(
+                "https://example.com/issuer/123#key-0".to_string(),
+            )),
+            proof_purpose: Some(ProofPurpose::AssertionMethod),
+            created: Some(Utc::now().with_nanosecond(0).unwrap()),
+            ..Default::default()
+        };
+
+        let resolver = ED2020ExampleResolver { issuer_document };
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+
+        println!("{}", serde_json::to_string(&vc).unwrap());
+        // reissue VC
+        let new_proof = Ed25519Signature2020
+            .sign(
+                &vc,
+                &issue_options,
+                &resolver,
+                &mut context_loader,
+                &sk_jwk,
+                None,
+            )
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&new_proof).unwrap());
+
+        // check new VC proof and original proof
+        Ed25519Signature2020
+            .verify(&new_proof, &vc, &resolver, &mut context_loader)
+            .await
+            .unwrap();
+        let orig_proof = vc.proof.iter().flatten().next().unwrap();
+        Ed25519Signature2020
+            .verify(orig_proof, &vc, &resolver, &mut context_loader)
+            .await
+            .unwrap();
+
+        // re-generate VP proof
+        let vp_issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(
+                "https://example.com/issuer/123#key-0".to_string(),
+            )),
+            proof_purpose: Some(ProofPurpose::Authentication),
+            created: Some(Utc::now().with_nanosecond(0).unwrap()),
+            challenge: Some("123".to_string()),
+            ..Default::default()
+        };
+        let new_proof = Ed25519Signature2020
+            .sign(
+                &vp,
+                &vp_issue_options,
+                &resolver,
+                &mut context_loader,
+                &sk_jwk,
+                None,
+            )
+            .await
+            .unwrap();
+        println!("{}", serde_json::to_string(&new_proof).unwrap());
+
+        // check new VP proof and original proof
+        Ed25519Signature2020
+            .verify(&new_proof, &vp, &resolver, &mut context_loader)
+            .await
+            .unwrap();
+        let orig_proof = vp.proof.iter().flatten().next().unwrap();
+        Ed25519Signature2020
+            .verify(orig_proof, &vp, &resolver, &mut context_loader)
+            .await
+            .unwrap();
+
+        // Try using prepare/complete
+        let pk_jwk = sk_jwk.to_public();
+        let prep = Ed25519Signature2020
+            .prepare(
+                &vp,
+                &vp_issue_options,
+                &resolver,
+                &mut context_loader,
+                &pk_jwk,
+                None,
+            )
+            .await
+            .unwrap();
+        let signing_input_bytes = match prep.signing_input {
+            crate::ldp::SigningInput::Bytes(Base64urlUInt(ref bytes)) => bytes,
+            _ => panic!("expected SigningInput::Bytes for Ed25519Signature2020 preparation"),
+        };
+        let sig = ssi_jws::sign_bytes(Algorithm::EdDSA, signing_input_bytes, &sk_jwk).unwrap();
+        let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
+        let completed_proof = Ed25519Signature2020.complete(prep, &sig_mb).await.unwrap();
+        Ed25519Signature2020
+            .verify(&completed_proof, &vp, &resolver, &mut context_loader)
+            .await
+            .unwrap();
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "aleosig")]
+    async fn aleosig2021() {
+        use crate::did::Document;
+        use crate::did_resolve::{
+            DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
+            TYPE_DID_LD_JSON,
+        };
+        use crate::vc::Credential;
+
+        struct ExampleResolver;
+        const EXAMPLE_DID: &str = "did:example:aleovm2021";
+        const EXAMPLE_DOC: &'static str = include_str!("../tests/lds-aleo2021-issuer0.jsonld");
+        #[async_trait]
+        impl DIDResolver for ExampleResolver {
+            async fn resolve(
+                &self,
+                did: &str,
+                _input_metadata: &ResolutionInputMetadata,
+            ) -> (
+                ResolutionMetadata,
+                Option<Document>,
+                Option<DocumentMetadata>,
+            ) {
+                if did == EXAMPLE_DID {
+                    let doc = match Document::from_json(EXAMPLE_DOC) {
+                        Ok(doc) => doc,
+                        Err(err) => {
+                            return (
+                                ResolutionMetadata::from_error(&format!("JSON Error: {:?}", err)),
+                                None,
+                                None,
+                            );
+                        }
+                    };
+                    (
+                        ResolutionMetadata {
+                            content_type: Some(TYPE_DID_LD_JSON.to_string()),
+                            ..Default::default()
+                        },
+                        Some(doc),
+                        Some(DocumentMetadata::default()),
+                    )
+                } else {
+                    (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None)
+                }
+            }
+        }
+
+        let private_key: JWK =
+            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+
+        let vc_str = include_str!("../../tests/lds-aleo2021-vc0.jsonld");
+        let mut vc = Credential::from_json_unsigned(vc_str).unwrap();
+        let resolver = ExampleResolver;
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+
+        if vc.proof.iter().flatten().next().is_none() {
+            // Issue VC / Generate Test Vector
+            let mut credential = vc.clone();
+            let vc_issue_options = LinkedDataProofOptions {
+                verification_method: Some(URI::String("did:example:aleovm2021#id".to_string())),
+                proof_purpose: Some(ProofPurpose::AssertionMethod),
+                ..Default::default()
+            };
+            let proof = AleoSignature2021
+                .sign(
+                    &vc,
+                    &vc_issue_options,
+                    &resolver,
+                    &mut context_loader,
+                    &private_key,
+                    None,
+                )
+                .await
+                .unwrap();
+            credential.add_proof(proof.clone());
+            vc = credential;
+
+            use std::fs::File;
+            use std::io::{BufWriter, Write};
+            let outfile = File::create("tests/lds-aleo2021-vc0.jsonld").unwrap();
+            let mut output_writer = BufWriter::new(outfile);
+            serde_json::to_writer_pretty(&mut output_writer, &vc).unwrap();
+            output_writer.write(b"\n").unwrap();
+        }
+
+        // Verify VC
+        let proof = vc.proof.iter().flatten().next().unwrap();
+        let warnings = AleoSignature2021
+            .verify(&proof, &vc, &resolver, &mut context_loader)
+            .await
+            .unwrap();
+        assert!(warnings.is_empty());
     }
 }

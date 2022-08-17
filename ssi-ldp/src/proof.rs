@@ -5,7 +5,6 @@ use chrono::prelude::*;
 
 use super::*;
 
-// use crate::did::{VerificationMethod, VerificationMethodMap};
 #[cfg(feature = "keccak-hash")]
 use crate::eip712::TypedData;
 use serde::{Deserialize, Serialize};
