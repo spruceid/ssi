@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ssi-jwk = { path = "../ssi-jwk" }
-ssi-jws = { path = "../ssi-jws" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-jws = { path = "../ssi-jws", version = "0.1"}
 thiserror = "1.0"
 bs58 = { version = "0.4", features = ["check"] }
 

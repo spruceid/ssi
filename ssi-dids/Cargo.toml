@@ -26,10 +26,10 @@ multibase = "0.8"
 http = { version = "0.2", optional = true }
 reqwest = { version = "0.11", features = ["json"], optional = true }
 percent-encoding = { version = "2.1", optional = true }
-ssi-jwk = { path = "../ssi-jwk" }
-ssi-json-ld = { path = "../ssi-json-ld" }
-ssi-core = { path = "../ssi-core" }
-caips = { path = "../caips" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.1"}
+ssi-core = { path = "../ssi-core", version = "0.1"}
+caips = { path = "../caips", version = "0.1"}
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

@@ -43,18 +43,18 @@ ssi-contexts = { version = "0.1.3", path = "contexts/" }
 reqwest = { version = "0.11", features = ["json"] }
 flate2 = "1.0"
 bitvec = "0.20"
-ssi-jwk = { path = "./ssi-jwk" }
-ssi-json-ld = { path = "./ssi-json-ld" }
-ssi-core = { path = "./ssi-core" }
-ssi-dids = { path = "./ssi-dids" }
-ssi-crypto = { path = "./ssi-crypto" }
-ssi-jws = { path = "./ssi-jws" }
-ssi-jwt = { path = "./ssi-jwt" }
-ssi-tzkey = { path = "./ssi-tzkey" }
-ssi-ldp = { path = "./ssi-ldp" }
-ssi-ssh = { path = "./ssi-ssh" }
-ssi-ucan = { path = "./ssi-ucan" }
-caips = { path = "./caips" }
+ssi-jwk = { path = "./ssi-jwk", version = "0.1"}
+ssi-json-ld = { path = "./ssi-json-ld", version = "0.1"}
+ssi-core = { path = "./ssi-core", version = "0.1"}
+ssi-dids = { path = "./ssi-dids", version = "0.1"}
+ssi-crypto = { path = "./ssi-crypto", version = "0.1"}
+ssi-jws = { path = "./ssi-jws", version = "0.1"}
+ssi-jwt = { path = "./ssi-jwt", version = "0.1"}
+ssi-tzkey = { path = "./ssi-tzkey", version = "0.1"}
+ssi-ldp = { path = "./ssi-ldp", version = "0.1"}
+ssi-ssh = { path = "./ssi-ssh", version = "0.1"}
+ssi-ucan = { path = "./ssi-ucan", version = "0.1"}
+caips = { path = "./caips", version = "0.1"}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }

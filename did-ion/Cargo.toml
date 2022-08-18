@@ -14,11 +14,11 @@ documentation = "https://docs.rs/did-ion/"
 [features]
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", features = ["http"] }
-ssi-core = { path = "../ssi-core" }
-ssi-jwk = { path = "../ssi-jwk" }
-ssi-jws = { path = "../ssi-jws" }
-ssi-jwt = { path = "../ssi-jwt" }
+ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["http"] }
+ssi-core = { path = "../ssi-core", version = "0.1"}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-jws = { path = "../ssi-jws", version = "0.1"}
+ssi-jwt = { path = "../ssi-jwt", version = "0.1"}
 # ssi = { version = "0.4", path = "../", default-features = false, features = ["http-did", "secp256k1"] }
 async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }

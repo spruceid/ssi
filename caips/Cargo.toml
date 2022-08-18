@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 thiserror = "1"
-ssi-jwk = { path = "../ssi-jwk" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
 bs58 = { version = "0.4", features = ["check"] }
 
 [dev-dependencies]
