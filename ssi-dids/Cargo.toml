@@ -6,6 +6,7 @@ edition = "2021"
 [features]
 default = ["parser"]
 parser = ["pest", "pest_derive"]
+http = ["dep:http", "reqwest", "percent-encoding"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -22,6 +23,9 @@ derive_builder = "0.9"
 bs58 = { version = "0.4", features = ["check"] }
 hex = "0.4"
 multibase = "0.8"
+http = { version = "0.2", optional = true }
+reqwest = { version = "0.11", features = ["json"], optional = true }
+percent-encoding = { version = "2.1", optional = true }
 ssi-jwk = { path = "../ssi-jwk" }
 ssi-json-ld = { path = "../ssi-json-ld" }
 ssi-core = { path = "../ssi-core" }

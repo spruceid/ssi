@@ -60,7 +60,7 @@ pub use ssi_ucan as ucan;
 #[cfg(feature = "aleosig")]
 pub use ssi_jwk::aleo;
 
-pub static USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 #[cfg(any(feature = "k256", feature = "p256"))]
 pub use ssi_crypto::hashes::passthrough_digest;

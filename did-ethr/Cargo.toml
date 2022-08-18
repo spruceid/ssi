@@ -12,10 +12,12 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-ethr/"
 documentation = "https://docs.rs/did-ethr/"
 
 [features]
-default = ["ssi/ring"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false, features = ["secp256k1", "keccak"] }
+ssi-dids = { path = "../ssi-dids" }
+caips = { path = "../caips" }
+ssi-crypto = { path = "../ssi-crypto" }
+ssi-jwk = { path = "../ssi-jwk" }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

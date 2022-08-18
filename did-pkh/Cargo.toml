@@ -12,10 +12,12 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-pkh/"
 documentation = "https://docs.rs/did-pkh/"
 
 [features]
-default = ["ssi/ring"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false, features = ["secp256k1", "keccak-hash", "secp256r1", "ripemd160"] }
+caips = { path = "../caips" }
+ssi-dids = { path = "../ssi-dids" }
+ssi-jwk = { path = "../ssi-jwk", features = ["ripemd-160"] }
+ssi-crypto = { path = "../ssi-crypto" }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -24,6 +26,7 @@ bs58 = { version = "0.4", features = ["check"] }
 bech32 = "0.8"
 
 [dev-dependencies]
+ssi = { version = "0.4", path = "../", default-features = false, features = ["secp256k1", "keccak-hash", "secp256r1", "ripemd-160"] }
 tokio = { version = "1.0", features = ["macros", "rt"] }
 hex = "0.4"
 blake2b_simd = "0.5"

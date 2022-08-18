@@ -16,6 +16,8 @@ use thiserror::Error;
 pub mod did_resolve;
 pub mod error;
 
+pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
 #[cfg(featuer = "parser")]
 pub mod parser;
 

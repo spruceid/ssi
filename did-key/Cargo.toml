@@ -12,13 +12,15 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-key/"
 documentation = "https://docs.rs/did-key/"
 
 [features]
-default = ["ssi/ring"]
-secp256k1 = ["k256", "ssi/secp256k1"]
-secp256r1 = ["p256", "ssi/secp256r1"]
-ssi_p384 = ["ssi/openssl"]
+default = []
+secp256k1 = ["k256", "ssi-jwk/secp256k1"]
+secp256r1 = ["p256", "ssi-jwk/secp256r1"]
+ssi_p384 = ["ssi-jwk/openssl"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi-dids = { path = "../ssi-dids" }
+ssi-jwk = { path = "../ssi-jwk", features = ["ripemd-160"] }
+ssi-crypto = { path = "../ssi-crypto" }
 async-trait = "0.1"
 thiserror = "1.0"
 multibase = "0.8"
