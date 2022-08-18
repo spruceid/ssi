@@ -10,6 +10,7 @@ secp256k1 = ["k256", "rand", "k256/keccak256", "ssi-crypto/sha2", "ssi-crypto/se
 secp256r1 = ["p256", "rand"]
 ed25519 = ["ed25519-dalek", "rand_old"]
 aleosig = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters", "bs58"]
+ripemd-160 = ["ssi-crypto/ripemd-160"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

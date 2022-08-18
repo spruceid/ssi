@@ -45,7 +45,7 @@ pub use ssi_json_ld::urdna2015;
 pub use ssi_jwk as jwk;
 pub use ssi_jwk::blakesig;
 pub use ssi_jwk::der;
-#[cfg(feature = "ripemd160")]
+#[cfg(feature = "ripemd-160")]
 pub use ssi_jwk::ripemd160 as ripemd;
 pub use ssi_jws as jws;
 pub use ssi_jwt as jwt;

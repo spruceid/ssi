@@ -11,7 +11,7 @@ pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
         _ => return Err(Error::UnsupportedKeyType),
     };
     let pk = k256::PublicKey::try_from(ec_params)?;
-    Ok(ripemd160::hash_public_key(pk, version))
+    Ok(ripemd160::hash_public_key(&pk, version))
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use zeroize::Zeroize;
 pub mod error;
 pub use error::Error;
 
-#[cfg(feature = "ripemd")]
+#[cfg(feature = "ripemd-160")]
 pub mod ripemd160;
 
 #[cfg(feature = "aleosig")]

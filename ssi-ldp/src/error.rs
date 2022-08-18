@@ -34,6 +34,11 @@ pub enum Error {
     MissingType,
     #[error("Missing verification relationship. Issuer: {0}. Proof purpose: {1:?}. Verification method id: {2}")]
     MissingVerificationRelationship(String, ssi_dids::VerificationRelationship, String),
+    #[error("Invalid Hex String")]
+    HexString,
+    /// Error decoding hex data
+    #[error(transparent)]
+    FromHex(#[from] hex::FromHexError),
     #[error(transparent)]
     Multibase(#[from] multibase::Error),
     #[error(transparent)]
@@ -56,6 +61,15 @@ pub enum Error {
     DecodeTezosSignature(#[from] ssi_tzkey::DecodeTezosSignatureError),
     #[error(transparent)]
     EncodeTezosSignedMessage(#[from] ssi_tzkey::EncodeTezosSignedMessageError),
+    #[cfg(feature = "keccak-hash")]
+    #[error(transparent)]
+    Eip712Hash(#[from] crate::eip712::TypedDataHashError),
+    #[cfg(feature = "keccak-hash")]
+    #[error(transparent)]
+    Eip712Json(#[from] crate::eip712::TypedDataConstructionJSONError),
+    #[cfg(feature = "keccak-hash")]
+    #[error(transparent)]
+    Eip712Construction(#[from] crate::eip712::TypedDataConstructionError),
 }
 
 impl From<ssi_jwk::Error> for Error {

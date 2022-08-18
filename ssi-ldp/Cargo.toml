@@ -5,6 +5,10 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+keccak-hash = ["k256", "dep:keccak-hash"]
+k256 = ["dep:k256"]
+
 [dependencies]
 thiserror = "1.0"
 async-trait = "0.1"
@@ -15,6 +19,8 @@ serde_json = "1.0"
 serde_jcs = "0.1"
 hex = "0.4"
 multibase = "0.8"
+k256 = { version = "0.9.6", optional = true, features = ["zeroize", "ecdsa"] }
+keccak-hash = { version = "0.7", optional = true }
 ssi-jwk = { path = "../ssi-jwk" }
 ssi-json-ld = { path = "../ssi-json-ld" }
 ssi-core = { path = "../ssi-core" }

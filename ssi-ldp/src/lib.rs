@@ -12,9 +12,10 @@ pub use error::Error;
 pub mod soltx;
 pub use context::Context;
 
-// use crate::did::{VerificationMethod, VerificationMethodMap};
 #[cfg(feature = "keccak-hash")]
-use crate::eip712::TypedData;
+pub mod eip712;
+
+// use crate::did::{VerificationMethod, VerificationMethodMap};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_core::uri::URI;
@@ -330,7 +331,7 @@ pub struct ProofPreparation {
 pub enum SigningInput {
     Bytes(Base64urlUInt),
     #[cfg(feature = "keccak-hash")]
-    TypedData(TypedData),
+    TypedData(eip712::TypedData),
     #[serde(rename_all = "camelCase")]
     EthereumPersonalMessage {
         ethereum_personal_message: String,

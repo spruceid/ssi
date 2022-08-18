@@ -9,10 +9,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use thiserror::Error;
 
-use crate::jsonld::ContextLoader;
-use crate::keccak_hash::bytes_to_lowerhex;
-use crate::ldp::LinkedDataDocument;
-use crate::vc::Proof;
+use crate::{LinkedDataDocument, Proof};
+use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
+use ssi_json_ld::ContextLoader;
 
 static EMPTY_32: [u8; 32] = [0; 32];
 
@@ -830,7 +829,7 @@ impl TypedData {
             .into_iter()
             .collect(),
         };
-        use crate::rdf::Statement;
+        use ssi_json_ld::rdf::Statement;
         fn encode_statement(statement: Statement) -> EIP712Value {
             let mut terms = vec![
                 EIP712Value::String(String::from(&statement.subject)),

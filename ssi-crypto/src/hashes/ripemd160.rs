@@ -7,9 +7,7 @@ use ripemd160::{Digest, Ripemd160};
 
 pub fn hash_public_key(pk: &PublicKey, version: u8) -> String {
     let pk_bytes = pk.to_encoded_point(true);
-    if pk_bytes.len() != 33 {
-        return Err(Error::UnsupportedKeyType);
-    }
+    // as long as its a PublicKey input, I think we can skip the len check
     let pk_sha256 = sha256(pk_bytes.as_bytes());
     let pk_ripemd160 = Ripemd160::digest(&pk_sha256);
     let mut extended_ripemd160 = Vec::with_capacity(21);

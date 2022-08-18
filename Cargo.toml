@@ -18,7 +18,6 @@ libsecp256k1 = [] # backward compatibility
 secp256k1 = []
 secp256r1 = []
 aleosig = []
-ripemd-160 = []
 # TODO handle better keccak and sha
 keccak = []
 sha = []
@@ -29,9 +28,9 @@ rand = []
 ring = []
 sha2 = []
 openssl = []
-ripemd160 = []
+ripemd-160 = ["ssi-jwk/ripemd-160"]
 p256 = []
-keccak-hash = []
+keccak-hash = ["ssi-ldp/keccak-hash"]
 
 
 [dependencies]
