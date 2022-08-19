@@ -42,3 +42,4 @@ blake2b_simd = "0.5"
 
 [dev-dependencies]
 serde_json = "1.0"
+hex = "0.4"

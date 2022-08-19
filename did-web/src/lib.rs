@@ -287,7 +287,8 @@ mod tests {
     #[tokio::test]
     async fn credential_prove_verify_did_web() {
         use ssi::jwk::JWK;
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi::ldp::LinkedDataProofOptions;
+        use ssi::vc::{Credential, Issuer, URI};
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "type": ["VerifiableCredential"],

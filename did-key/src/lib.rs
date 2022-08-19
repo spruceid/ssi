@@ -377,8 +377,8 @@ impl DIDMethod for DIDKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi::did::Resource;
-    use ssi::did_resolve::{dereference, Content, DereferencingInputMetadata};
+    use ssi_dids::did_resolve::{dereference, Content, DereferencingInputMetadata};
+    use ssi_dids::Resource;
 
     #[async_std::test]
     async fn from_did_key() {

@@ -10,6 +10,7 @@ use serde_json::{Number, Value};
 use thiserror::Error;
 
 use crate::{LinkedDataDocument, Proof};
+use lazy_static::lazy_static;
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
 use ssi_json_ld::ContextLoader;
 
@@ -1601,12 +1602,12 @@ mod tests {
     }
 
     pub struct DIDExample;
-    use crate::did::{DIDMethod, Document};
-    use crate::did_resolve::{
+    use async_trait::async_trait;
+    use ssi_dids::did_resolve::{
         DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
         ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
     };
-    use async_trait::async_trait;
+    use ssi_dids::{DIDMethod, Document};
     const DOC_JSON: &str = r#"
 {
   "@context": "https://www.w3.org/ns/did/v1",
@@ -1733,7 +1734,7 @@ mod tests {
           }
         }))
         .unwrap();
-        let vc: crate::vc::Credential = serde_json::from_value(json!({
+        let vc: ssi::vc::Credential = serde_json::from_value(json!({
           "@context": [
             "https://www.w3.org/2018/credentials/v1",
             "https://schema.org"
@@ -1846,7 +1847,7 @@ mod tests {
             expected_typed_data
         );
 
-        let jwk: jwk::JWK = serde_json::from_value(json!({
+        let jwk: ssi_jwk::JWK = serde_json::from_value(json!({
             "kty": "EC",
             "crv": "secp256k1",
             "x": "cmbYyDC6cbm807_OmFNYP4CLEL0aB2F1UG683SxFkXM",
@@ -1877,7 +1878,7 @@ mod tests {
         // Sign proof
         let bytes = typed_data.bytes().unwrap();
         let ec_params = match &jwk.params {
-            jwk::Params::EC(ec) => ec,
+            ssi_jwk::Params::EC(ec) => ec,
             _ => unreachable!(),
         };
         use k256::ecdsa::signature::Signer;
@@ -1887,14 +1888,14 @@ mod tests {
         let sig_bytes = &mut sig.as_ref().to_vec();
         // Recovery ID starts at 27 instead of 0.
         sig_bytes[64] += 27;
-        let sig_hex = crate::keccak_hash::bytes_to_lowerhex(sig_bytes);
+        let sig_hex = ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes);
         let mut proof = proof.clone();
         proof.proof_value = Some(sig_hex.clone());
         eprintln!("proof {}", serde_json::to_string(&proof).unwrap());
 
         // Verify the VC/proof
         let mut vc = vc.clone();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         vc.add_proof(proof.clone());
         vc.validate().unwrap();
         let verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
@@ -1904,7 +1905,9 @@ mod tests {
         assert_eq!(sig_hex, "0x5fb8f18f21f54c2df8a2720d0afcee7dbbb18e4b7a22ce6e8183633d63b076d329122584db769cd78b6cd5a7094ede5ceaa43317907539187f1f0d8875f99e051b");
     }
 
-    use crate::vc::{LinkedDataProofOptions, ProofPurpose, URI};
+    use crate::LinkedDataProofOptions;
+    use ssi_core::uri::URI;
+    use ssi_dids::VerificationRelationship as ProofPurpose;
 
     #[async_std::test]
     async fn eip712sig_keypair() {
@@ -1912,14 +1915,14 @@ mod tests {
         let addr = "0xaed7ea8035eec47e657b34ef5d020c7005487443";
         let sk_hex = "0x149195a4059ac8cafe2d56fc612f613b6b18b9265a73143c9f6d7cfbbed76b7e";
         let sk_bytes = bytes_from_hex(sk_hex).unwrap();
-        use jwk::{Base64urlUInt, ECParams, Params, JWK};
+        use ssi_jwk::{Base64urlUInt, ECParams, Params, JWK};
 
         let sk = k256::SecretKey::from_bytes(&sk_bytes).unwrap();
         let pk = sk.public_key();
         let mut ec_params = ECParams::try_from(&pk).unwrap();
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
         let jwk = JWK::from(Params::EC(ec_params));
-        let hash = crate::keccak_hash::hash_public_key(&jwk).unwrap();
+        let hash = ssi_jwk::eip155::hash_public_key(&jwk).unwrap();
         assert_eq!(hash, addr);
     }
 
@@ -1961,7 +1964,7 @@ mod tests {
             &self,
             _parent: Option<&(dyn LinkedDataDocument + Sync)>,
             _context_loader: &mut ContextLoader,
-        ) -> Result<crate::rdf::DataSet, crate::error::Error> {
+        ) -> Result<ssi_json_ld::rdf::DataSet, crate::error::Error> {
             todo!();
         }
 
@@ -2030,7 +2033,7 @@ mod tests {
 
         let basic_doc = ExampleDocument(TEST_BASIC_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
             .verify(&basic_doc, &resolver, &mut context_loader)
             .await;
@@ -2215,7 +2218,7 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
             .verify(&nested_doc, &resolver, &mut context_loader)
             .await;
@@ -2257,7 +2260,7 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
             .verify(&nested_doc, &resolver, &mut context_loader)
             .await;
@@ -2378,7 +2381,7 @@ mod tests {
 
         let nested_doc = ExampleDocument(TEST_NESTED_DOCUMENT.clone());
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
             .verify(&nested_doc, &resolver, &mut context_loader)
             .await;

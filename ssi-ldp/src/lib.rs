@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 pub mod proof;
 pub use proof::{Check, LinkedDataProofOptions, Proof};
-pub mod context;
 pub mod error;
 pub use error::Error;
+pub mod context;
 pub mod soltx;
 pub use context::Context;
 

@@ -17,7 +17,7 @@ pub fn hash_public_key(jwk: &JWK, version: u8) -> Result<String, Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jwk::ECParams;
+    use crate::ECParams;
 
     #[test]
     fn hash() {

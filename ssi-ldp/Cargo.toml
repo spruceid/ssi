@@ -40,3 +40,4 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
+ssi = { version = "0.4", path = "../", default-features = false }

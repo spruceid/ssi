@@ -664,9 +664,8 @@ mod tests {
     use super::*;
     use serde_json::{from_str, from_value, json};
     use ssi::jwk::Algorithm;
-    use ssi::ldp::ProofSuite;
+    use ssi::ldp::{Proof, ProofSuite};
     use ssi::one_or_many::OneOrMany;
-    use ssi::vc::Proof;
 
     fn test_generate(jwk_value: Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();

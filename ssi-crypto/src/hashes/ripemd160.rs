@@ -19,7 +19,6 @@ pub fn hash_public_key(pk: &PublicKey, version: u8) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jwk::ECParams;
 
     #[test]
     fn hash() {
@@ -27,18 +26,7 @@ mod tests {
         let pk_hex = "0250863ad64a87ae8a2fe83c1af1a8403cb53f53e486d8511dad8a04887e5b2352";
         let pk_bytes = hex::decode(pk_hex).unwrap();
         let pk = k256::PublicKey::from_sec1_bytes(&pk_bytes).unwrap();
-        let jwk = JWK {
-            params: Params::EC(ECParams::try_from(&pk).unwrap()),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        };
-        let hash = hash_public_key(&jwk, 0).unwrap();
+        let hash = hash_public_key(&pk, 0);
         assert_eq!(hash, "1PMycacnJaSqwwJqjawXBErnLsZ7RkXUAs");
     }
 }

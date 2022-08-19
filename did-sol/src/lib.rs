@@ -201,8 +201,8 @@ impl DIDMethod for DIDSol {
 mod tests {
     use super::*;
     use serde_json::json;
-    use ssi::did_resolve::ResolutionInputMetadata;
-    use ssi::jwk::JWK;
+    use ssi_dids::did_resolve::ResolutionInputMetadata;
+    use ssi_jwk::JWK;
 
     #[test]
     fn key_to_did_sol() {

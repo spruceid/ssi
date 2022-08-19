@@ -27,4 +27,5 @@ chrono = { version = "0.4", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
 did-method-key = { path = "../did-key", version = "0.1"}

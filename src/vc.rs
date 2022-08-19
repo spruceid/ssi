@@ -3,16 +3,20 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
 use crate::error::Error;
-use ssi_core::{one_or_many::OneOrMany, uri::URI};
-use ssi_dids::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
+pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
+use ssi_dids::did_resolve::DIDResolver;
+pub use ssi_dids::VerificationRelationship as ProofPurpose;
 use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
 use ssi_jwk::{JWTKeys, JWK};
 use ssi_jws::Header;
 use ssi_jwt::NumericDate;
+pub use ssi_ldp::LinkedDataProofOptions;
 use ssi_ldp::{
-    assert_local, Check, Context, Error as LdpError, LinkedDataDocument, LinkedDataProofOptions,
-    LinkedDataProofs, Proof, ProofPreparation, VerificationResult,
+    assert_local, Check, Error as LdpError, LinkedDataDocument, LinkedDataProofs, Proof,
+    ProofPreparation, VerificationResult,
 };
+
+pub use ssi_ldp::Context;
 
 use async_trait::async_trait;
 use chrono::{prelude::*, LocalResult};

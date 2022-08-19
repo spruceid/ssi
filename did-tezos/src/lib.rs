@@ -565,10 +565,10 @@ impl DIDTz {
 mod tests {
     use super::*;
     use serde_json::json;
-    use ssi::did::ServiceEndpoint;
-    use ssi::did_resolve::ResolutionInputMetadata;
-    use ssi::jws::encode_sign;
-    use ssi::one_or_many::OneOrMany;
+    use ssi_core::one_or_many::OneOrMany;
+    use ssi_dids::did_resolve::ResolutionInputMetadata;
+    use ssi_dids::ServiceEndpoint;
+    use ssi_jws::encode_sign;
     use std::collections::BTreeMap as Map;
 
     const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";

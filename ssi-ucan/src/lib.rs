@@ -642,6 +642,7 @@ mod ipld_encoding {
 mod tests {
     use super::*;
     use did_method_key::DIDKey;
+    use ssi_dids::DIDMethod;
     use std::collections::HashMap;
 
     #[async_std::test]
