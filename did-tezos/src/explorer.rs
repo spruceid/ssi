@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::Deserialize;
-use ssi::did::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
-use ssi::one_or_many::OneOrMany;
+use ssi_core::one_or_many::OneOrMany;
+use ssi_dids::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
 use std::convert::TryFrom;
 use url::Url;
 

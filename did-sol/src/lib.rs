@@ -2,17 +2,17 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-use ssi::caip10::BlockchainAccountId;
-use ssi::caip2::ChainId;
-use ssi::did::{
-    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
-    DEFAULT_CONTEXT, DIDURL,
-};
-use ssi::did_resolve::{
+use caips::caip10::BlockchainAccountId;
+use caips::caip2::ChainId;
+use ssi_dids::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_dids::{
+    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
+    DEFAULT_CONTEXT, DIDURL,
+};
+use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-30.md
 const REFERENCE_SOLANA_MAINNET: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
