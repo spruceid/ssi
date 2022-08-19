@@ -53,8 +53,8 @@ pub enum Error {
     InvalidKeyLength(usize),
     /// Error parsing a key with `ring`
     #[cfg(feature = "ring")]
-    #[error(transparent)]
-    KeyRejected(#[from] KeyRejectedError),
+    #[error("{0}")]
+    KeyRejected(KeyRejectedError),
     /// Error parsing a UTF-8 string
     #[error(transparent)]
     FromUtf8(#[from] FromUtf8Error),
@@ -117,4 +117,11 @@ pub enum Error {
     #[cfg(all(feature = "p256", not(feature = "k256")))]
     #[error(transparent)]
     EC(#[from] p256::elliptic_curve::Error),
+}
+
+#[cfg(feature = "ring")]
+impl From<KeyRejectedError> for Error {
+    fn from(e: KeyRejectedError) -> Error {
+        Error::KeyRejected(e)
+    }
 }

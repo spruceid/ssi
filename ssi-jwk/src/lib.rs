@@ -278,7 +278,7 @@ impl JWK {
         })))
     }
 
-    #[cfg(feature = "ed25519-dalek")]
+    #[cfg(all(feature = "ed25519", not(feature = "ring")))]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         let mut csprng = rand_old::rngs::OsRng {};
         let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
