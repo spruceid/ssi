@@ -5,7 +5,7 @@ use chrono::prelude::*;
 
 use super::*;
 
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 use crate::eip712::TypedData;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -204,9 +204,9 @@ pub struct LinkedDataProofOptions {
     pub checks: Option<Vec<Check>>,
     /// Metadata for EthereumEip712Signature2021 (not standard in vc-http-api)
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg(feature = "keccak-hash")]
+    #[cfg(feature = "keccak")]
     pub eip712_domain: Option<crate::eip712::ProofInfo>,
-    #[cfg(not(feature = "keccak-hash"))]
+    #[cfg(not(feature = "keccak"))]
     pub eip712_domain: Option<()>,
 }
 

@@ -61,13 +61,13 @@ pub enum Error {
     DecodeTezosSignature(#[from] ssi_tzkey::DecodeTezosSignatureError),
     #[error(transparent)]
     EncodeTezosSignedMessage(#[from] ssi_tzkey::EncodeTezosSignedMessageError),
-    #[cfg(feature = "keccak-hash")]
+    #[cfg(feature = "keccak")]
     #[error(transparent)]
     Eip712Hash(#[from] crate::eip712::TypedDataHashError),
-    #[cfg(feature = "keccak-hash")]
+    #[cfg(feature = "keccak")]
     #[error(transparent)]
     Eip712Json(#[from] crate::eip712::TypedDataConstructionJSONError),
-    #[cfg(feature = "keccak-hash")]
+    #[cfg(feature = "keccak")]
     #[error(transparent)]
     Eip712Construction(#[from] crate::eip712::TypedDataConstructionError),
 }

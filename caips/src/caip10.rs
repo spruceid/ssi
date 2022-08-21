@@ -116,30 +116,30 @@ impl BlockchainAccountId {
         ) {
             ("tezos", _net) => blakesig::hash_public_key(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
-            #[cfg(feature = "keccak-hash")]
+            #[cfg(feature = "keccak")]
             // If account address contains uppercase, check EIP-55 checksum.
             // Otherwise, assume EIP-55 is not being used.
             ("eip155", _net) => if self
                 .account_address
                 .contains(|c: char| c.is_ascii_uppercase())
             {
-                crate::keccak_hash::hash_public_key_eip55(jwk)
+                ssi_jwk::eip155::hash_public_key_eip55(jwk)
             } else {
-                crate::keccak_hash::hash_public_key(jwk)
+                ssi_jwk::eip155::hash_public_key(jwk)
             }
             .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             ("solana", _net) => encode_ed25519(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             // Bitcoin
-            #[cfg(feature = "ripemd160")]
+            #[cfg(feature = "ripemd-160")]
             ("bip122", "000000000019d6689c085ae165831e93") => {
-                crate::ripemd::hash_public_key(jwk, 0x00)
+                ssi_jwk::ripemd160::hash_public_key(jwk, 0x00)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             // Dogecoin
-            #[cfg(feature = "ripemd160")]
+            #[cfg(feature = "ripemd-160")]
             ("bip122", "1a91e3dace36e2be3bf030a65679fe82") => {
-                crate::ripemd::hash_public_key(jwk, 0x1e)
+                ssi_jwk::ripemd160::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
             #[cfg(feature = "aleosig")]

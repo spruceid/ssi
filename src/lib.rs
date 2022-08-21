@@ -33,7 +33,7 @@ pub use caips::caip10;
 pub use caips::caip2;
 pub use ssi_core::one_or_many;
 pub use ssi_crypto::hashes as hash;
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 pub use ssi_crypto::hashes::keccak;
 #[cfg(feature = "bbs")]
 pub use ssi_crypto::signatures::bbs;
@@ -50,7 +50,7 @@ pub use ssi_jwk::ripemd160 as ripemd;
 pub use ssi_jws as jws;
 pub use ssi_jwt as jwt;
 pub use ssi_ldp as ldp;
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 pub use ssi_ldp::eip712;
 pub use ssi_ldp::soltx;
 pub use ssi_ssh as ssh;

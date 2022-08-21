@@ -14,12 +14,12 @@ exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 [features]
 default = []
 http-did = []
-libsecp256k1 = [] # backward compatibility
+libsecp256k1 = ["secp256k1"] # backward compatibility
 secp256k1 = []
 secp256r1 = []
 aleosig = []
 # TODO handle better keccak and sha
-keccak = []
+keccak = ["ssi-ldp/keccak"]
 sha = []
 example-http-issuer = []
 # fixes
@@ -30,7 +30,6 @@ sha2 = []
 openssl = []
 ripemd-160 = ["ssi-jwk/ripemd-160"]
 p256 = []
-keccak-hash = ["ssi-ldp/keccak-hash"]
 
 
 [dependencies]
@@ -98,6 +97,8 @@ tokio = { version = "1.0", features = ["macros"] }
 hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 hex = "0.4"
 multibase = "0.8"
+serde_jcs = "0.1"
+k256 = { version = "0.9", features = ["zeroize", "ecdsa"] }
 
 [package.metadata.docs.rs]
 features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]

@@ -1,5 +1,5 @@
 use std::collections::HashMap as Map;
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 use std::convert::TryFrom;
 
 use async_trait::async_trait;
@@ -9,7 +9,7 @@ const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
 const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 use crate::eip712::TypedData;
 use caips::caip10::BlockchainAccountId;
 use serde_json::Value;
@@ -572,11 +572,11 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     }
 }
 
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 pub struct Eip712Signature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 impl ProofSuite for Eip712Signature2021 {
     async fn sign(
         &self,
@@ -704,11 +704,11 @@ impl ProofSuite for Eip712Signature2021 {
     }
 }
 
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 pub struct EthereumEip712Signature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 impl ProofSuite for EthereumEip712Signature2021 {
     async fn sign(
         &self,
@@ -846,11 +846,11 @@ impl ProofSuite for EthereumEip712Signature2021 {
     }
 }
 
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 pub struct EthereumPersonalSignature2021;
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 impl ProofSuite for EthereumPersonalSignature2021 {
     async fn sign(
         &self,
@@ -1017,7 +1017,7 @@ async fn micheline_from_document_and_options_jcs(
     Ok(data)
 }
 
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 async fn string_from_document_and_options(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,

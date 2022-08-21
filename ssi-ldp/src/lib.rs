@@ -1,5 +1,5 @@
 use std::collections::HashMap as Map;
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 use std::convert::TryFrom;
 
 use async_trait::async_trait;
@@ -12,7 +12,7 @@ pub mod context;
 pub mod soltx;
 pub use context::Context;
 
-#[cfg(feature = "keccak-hash")]
+#[cfg(feature = "keccak")]
 pub mod eip712;
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
@@ -131,21 +131,21 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
         "EcdsaSecp256k1Signature2019" => &EcdsaSecp256k1Signature2019,
         "EcdsaSecp256k1RecoverySignature2020" => &EcdsaSecp256k1RecoverySignature2020,
         "Eip712Signature2021" => {
-            #[cfg(not(feature = "keccak-hash"))]
+            #[cfg(not(feature = "keccak"))]
             return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-            #[cfg(feature = "keccak-hash")]
+            #[cfg(feature = "keccak")]
             &Eip712Signature2021
         }
         "EthereumPersonalSignature2021" => {
-            #[cfg(not(feature = "keccak-hash"))]
+            #[cfg(not(feature = "keccak"))]
             return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-            #[cfg(feature = "keccak-hash")]
+            #[cfg(feature = "keccak")]
             &EthereumPersonalSignature2021
         }
         "EthereumEip712Signature2021" => {
-            #[cfg(not(feature = "keccak-hash"))]
+            #[cfg(not(feature = "keccak"))]
             return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-            #[cfg(feature = "keccak-hash")]
+            #[cfg(feature = "keccak")]
             &EthereumEip712Signature2021
         }
         "TezosSignature2021" => &TezosSignature2021,
@@ -224,14 +224,14 @@ fn pick_proof_suite<'a, 'b>(
         {
             #[allow(clippy::if_same_then_else)]
             if use_eip712sig(jwk) {
-                #[cfg(not(feature = "keccak-hash"))]
+                #[cfg(not(feature = "keccak"))]
                 return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-                #[cfg(feature = "keccak-hash")]
+                #[cfg(feature = "keccak")]
                 &EthereumEip712Signature2021
             } else if use_epsig(jwk) {
-                #[cfg(not(feature = "keccak-hash"))]
+                #[cfg(not(feature = "keccak"))]
                 return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-                #[cfg(feature = "keccak-hash")]
+                #[cfg(feature = "keccak")]
                 &EthereumPersonalSignature2021
             } else {
                 match verification_method {
@@ -239,9 +239,9 @@ fn pick_proof_suite<'a, 'b>(
                         if (vm.starts_with("did:ethr:") || vm.starts_with("did:pkh:eth:"))
                             && vm.ends_with("#Eip712Method2021") =>
                     {
-                        #[cfg(not(feature = "keccak-hash"))]
+                        #[cfg(not(feature = "keccak"))]
                         return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-                        #[cfg(feature = "keccak-hash")]
+                        #[cfg(feature = "keccak")]
                         &Eip712Signature2021
                     }
                     _ => &EcdsaSecp256k1RecoverySignature2020,
@@ -330,7 +330,7 @@ pub struct ProofPreparation {
 #[non_exhaustive]
 pub enum SigningInput {
     Bytes(Base64urlUInt),
-    #[cfg(feature = "keccak-hash")]
+    #[cfg(feature = "keccak")]
     TypedData(eip712::TypedData),
     #[serde(rename_all = "camelCase")]
     EthereumPersonalMessage {

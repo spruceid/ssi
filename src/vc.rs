@@ -1714,6 +1714,7 @@ pub(crate) mod tests {
     use crate::did::{example::DIDExample, VerificationMethodMap};
     use crate::urdna2015;
     use chrono::Duration;
+    use serde_json::json;
     use ssi_dids::did_resolve::DereferencingInputMetadata;
     use ssi_ldp::{suites::*, ProofSuite};
 
@@ -2835,7 +2836,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
-    #[cfg(all(feature = "secp256k1", feature = "keccak-hash"))]
+    #[cfg(all(feature = "secp256k1", feature = "keccak"))]
     async fn esrs2020() {
         use ssi_dids::did_resolve::{
             DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,

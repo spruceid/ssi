@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+keccak = ["ssi-jwk/keccak"]
+ripemd-160 = ["ssi-jwk/ripemd-160"]
 
 [dependencies]
 thiserror = "1"
-ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false}
 bs58 = { version = "0.4", features = ["check"] }
 
 [dev-dependencies]
