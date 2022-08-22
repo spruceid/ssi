@@ -26,4 +26,8 @@ pub enum Error {
     MissingFeatures(&'static str),
     #[error("Algorithm not implemented")]
     AlgorithmNotImplemented,
+    #[error("Expected signature length {0} but found {1}")]
+    UnexpectedSignatureLength(usize, usize),
+    #[error("Invalid signature")]
+    InvalidSignature,
 }

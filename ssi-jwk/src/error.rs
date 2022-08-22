@@ -48,6 +48,9 @@ pub enum Error {
     /// Missing exponent in RSA key
     #[error("Missing exponent in RSA key")]
     MissingExponent,
+    /// Missing prime in RSA key
+    #[error("Missing prime in RSA key")]
+    MissingPrime,
     /// Invalid key length
     #[error("Invalid key length: {0}")]
     InvalidKeyLength(usize),

@@ -26,4 +26,4 @@ hex = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi = { version = "0.4", path = "../", default-features = false, features = ["keccak", "secp256k1"] }

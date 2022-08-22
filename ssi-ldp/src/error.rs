@@ -6,7 +6,7 @@ pub enum Error {
     MissingKey,
     #[error("Missing Context")]
     MissingContext,
-    #[error("Invalid Context")]
+    #[error("Invalid context")]
     InvalidContext,
     #[error("Missing Verification Method")]
     MissingVerificationMethod,

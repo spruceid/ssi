@@ -15,7 +15,7 @@ exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 default = []
 http-did = []
 libsecp256k1 = ["secp256k1"] # backward compatibility
-secp256k1 = []
+secp256k1 = ["ssi-ldp/k256"]
 secp256r1 = []
 aleosig = []
 # TODO handle better keccak and sha
