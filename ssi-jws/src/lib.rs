@@ -101,10 +101,8 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 Algorithm::PS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     let rng = rand_old::rngs::OsRng {};
-                    padding = rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256::Sha256, _>(
-                        rng,
-                        hash.size(),
-                    );
+                    padding =
+                        rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),
@@ -326,7 +324,7 @@ pub fn verify_bytes_warnable(
                 Algorithm::PS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
                     let rng = rand_old::rngs::OsRng {};
-                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256::Sha256, _>(rng);
+                    padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 _ => return Err(Error::AlgorithmNotImplemented),

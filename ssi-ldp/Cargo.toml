@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["keccak", "k256", "rsa", "ed25519", "p256"]
-keccak = ["k256", "dep:keccak-hash"]
-k256 = ["dep:k256", "ssi-jws/k256"]
-p256 = ["dep:p256"]
-rsa = ["dep:rsa"]
-ed25519 = ["ed25519-dalek", "ssi-jws/p256"]
+default = ["keccak", "secp256k1", "rsa", "ed25519", "secp256r1"]
+keccak = ["dep:keccak-hash", "secp256k1"]
+secp256k1 = ["ssi-jws/secp256k1", "k256"]
+secp256r1 = ["ssi-jws/secp256r1", "p256"]
+rsa = ["ssi-jws/rsa"]
+ed25519 = ["ssi-jws/ed25519"]
 
 [dependencies]
 thiserror = "1.0"
@@ -26,8 +26,6 @@ multibase = "0.8"
 k256 = { version = "0.9", optional = true, features = ["zeroize", "ecdsa"] }
 p256 = { version = "0.9", optional = true, features = ["zeroize", "ecdsa"] }
 keccak-hash = { version = "0.7", optional = true }
-ed25519-dalek = { version = "1", optional = true }
-rsa = { version = "0.3", optional = true }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.1"}
 ssi-core = { path = "../ssi-core", version = "0.1"}
