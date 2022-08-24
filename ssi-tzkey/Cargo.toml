@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["k256", "p256"]
+k256 = []
+p256 = []
 
 [dependencies]
 ssi-jwk = { path = "../ssi-jwk", version = "0.1"}

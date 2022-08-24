@@ -129,7 +129,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
         #[cfg(feature = "p256")]
         Some("p2pk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = jwk::p256_parse(&pk_bytes)?;
+            let jwk = ssi_jwk::p256_parse(&pk_bytes)?;
             (Algorithm::ESBlake2b, jwk.params)
         }
         // TODO: more secret keys

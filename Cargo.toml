@@ -12,7 +12,7 @@ resolver = "2"
 exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 
 [features]
-default = []
+default = ["secp256k1", "secp256r1", "keccak", "ripemd-160"]
 http-did = []
 libsecp256k1 = ["secp256k1"] # backward compatibility
 secp256k1 = ["ssi-ldp/secp256k1"]
