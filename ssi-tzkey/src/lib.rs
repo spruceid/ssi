@@ -100,17 +100,18 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
                 };
                 pk_bytes = keypair.public_key().as_ref().to_vec()
             }
-            #[cfg(feature = "ed25519-dalek")]
+            #[cfg(feature = "ed25519")]
             {
                 let sk = ed25519_dalek::SecretKey::from_bytes(if sk_bytes.len() == 64 {
                     &sk_bytes[..32]
                 } else {
                     &sk_bytes
-                })?;
+                })
+                .map_err(ssi_jwk::Error::from)?;
                 pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
             }
-            #[cfg(all(not(feature = "ring"), not(feature = "ed25519-dalek")))]
-            return Err(DecodeTezosPkError::MissingFeatures("ring or ed25519-dalek"));
+            #[cfg(all(not(feature = "ring"), not(feature = "ed25519")))]
+            return Err(DecodeTezosPkError::MissingFeatures("ring or ed25519"));
             (
                 Algorithm::EdBlake2b,
                 Params::OKP(OctetParams {
@@ -123,7 +124,7 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
         #[cfg(feature = "secp256k1")]
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = jwk::secp256k1_parse(&pk_bytes).map_err(ssi_jwk::ErrorSecp256k1Parse)?;
+            let jwk = jwk::secp256k1_parse(&pk_bytes).map_err(ssi_jwk::Error::Secp256k1Parse)?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
         #[cfg(feature = "p256")]

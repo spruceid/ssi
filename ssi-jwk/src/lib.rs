@@ -289,7 +289,7 @@ impl JWK {
         })))
     }
 
-    #[cfg(feature = "k256")]
+    #[cfg(feature = "secp256k1")]
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = k256::SecretKey::random(&mut rng);
@@ -301,7 +301,7 @@ impl JWK {
         Ok(JWK::from(Params::EC(ec_params)))
     }
 
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     pub fn generate_p256() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = p256::SecretKey::random(&mut rng);
@@ -863,7 +863,7 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
     }
 }
 
-#[cfg(feature = "k256")]
+#[cfg(feature = "secp256k1")]
 pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
     let pk = k256::PublicKey::from_sec1_bytes(data)?;
     let jwk = JWK {
@@ -880,7 +880,7 @@ pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     let (x, y) = match pk_bytes.len() {
         64 => (pk_bytes[0..32].to_vec(), pk_bytes[32..64].to_vec()),
@@ -917,7 +917,7 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 /// Serialize a secp256k1 public key as a 33-byte string with point compression.
-#[cfg(feature = "k256")]
+#[cfg(feature = "secp256k1")]
 pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
     use k256::elliptic_curve::sec1::ToEncodedPoint;
     let pk = k256::PublicKey::try_from(params)?;
@@ -926,7 +926,7 @@ pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
 }
 
 /// Serialize a P-256 public key as a 33-byte string with point compression.
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-256
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
@@ -1031,7 +1031,7 @@ pub fn p384_serialize(params: &ECParams) -> Result<Vec<u8>, Error> {
     Ok(bytes.to_vec())
 }
 
-#[cfg(feature = "k256")]
+#[cfg(feature = "secp256k1")]
 impl TryFrom<&ECParams> for k256::SecretKey {
     type Error = Error;
     fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
@@ -1048,7 +1048,7 @@ impl TryFrom<&ECParams> for k256::SecretKey {
     }
 }
 
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 impl TryFrom<&ECParams> for p256::SecretKey {
     type Error = Error;
     fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
@@ -1065,7 +1065,7 @@ impl TryFrom<&ECParams> for p256::SecretKey {
     }
 }
 
-#[cfg(feature = "k256")]
+#[cfg(feature = "secp256k1")]
 impl TryFrom<&ECParams> for k256::PublicKey {
     type Error = Error;
     fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
@@ -1082,7 +1082,7 @@ impl TryFrom<&ECParams> for k256::PublicKey {
     }
 }
 
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 impl TryFrom<&ECParams> for p256::PublicKey {
     type Error = Error;
     fn try_from(params: &ECParams) -> Result<Self, Self::Error> {
@@ -1099,7 +1099,7 @@ impl TryFrom<&ECParams> for p256::PublicKey {
     }
 }
 
-#[cfg(feature = "k256")]
+#[cfg(feature = "secp256k1")]
 impl TryFrom<&k256::PublicKey> for ECParams {
     type Error = Error;
     fn try_from(pk: &k256::PublicKey) -> Result<Self, Self::Error> {
@@ -1117,7 +1117,7 @@ impl TryFrom<&k256::PublicKey> for ECParams {
     }
 }
 
-#[cfg(feature = "p256")]
+#[cfg(feature = "secp256r1")]
 impl TryFrom<&p256::PublicKey> for ECParams {
     type Error = Error;
     fn try_from(pk: &p256::PublicKey) -> Result<Self, Self::Error> {
@@ -1191,13 +1191,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "k256")]
+    #[cfg(feature = "secp256k1")]
     fn secp256k1_generate() {
         let _jwk = JWK::generate_secp256k1().unwrap();
     }
 
     #[test]
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     fn p256_generate() {
         let _jwk = JWK::generate_p256().unwrap();
     }

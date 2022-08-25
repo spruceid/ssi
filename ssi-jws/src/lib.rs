@@ -1,7 +1,7 @@
 pub mod error;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
-#[cfg(any(feature = "k256", feature = "p256"))]
+#[cfg(any(feature = "secp256k1", feature = "p256"))]
 use ssi_crypto::hashes::passthrough_digest::PassthroughDigest;
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::collections::BTreeMap;
@@ -178,7 +178,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
                 sig.as_bytes().to_vec()
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ES256K => {
                 use k256::ecdsa::signature::{Signature, Signer};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
@@ -191,7 +191,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
                 sig.as_bytes().to_vec()
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ES256KR => {
                 use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
@@ -207,7 +207,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     .map_err(ssi_jwk::Error::from)?;
                 sig.as_bytes().to_vec()
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ESKeccakKR => {
                 use k256::ecdsa::signature::{Signature, Signer};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
@@ -240,7 +240,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     .map_err(ssi_jwk::Error::from)?;
                 sig.as_bytes().to_vec()
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ESBlake2bK => {
                 // We will be able to use the blake2 crate directly once it allow 32B output
                 let hash = blake2b_simd::Params::new()
@@ -384,7 +384,7 @@ pub fn verify_bytes_warnable(
                     .verify(data, &sig)
                     .map_err(ssi_jwk::Error::from)?;
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ES256K => {
                 use k256::ecdsa::signature::Verifier;
                 use std::panic;
@@ -410,7 +410,7 @@ pub fn verify_bytes_warnable(
                     .verify(data, &sig)
                     .map_err(ssi_jwk::Error::from)?;
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ES256KR => {
                 use k256::ecdsa::signature::{digest::Digest, DigestVerifier, Verifier};
                 use std::panic;
@@ -431,7 +431,7 @@ pub fn verify_bytes_warnable(
                         .push("Signature uses legacy mode ES256K-R with Keccak-256".to_string());
                 }
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ESKeccakKR => {
                 use k256::ecdsa::signature::Verifier;
                 use std::panic;
@@ -471,7 +471,7 @@ pub fn verify_bytes_warnable(
                     )
                     .map_err(ssi_jwk::Error::from)?;
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             Algorithm::ESBlake2bK => {
                 // We will be able to use the blake2 crate directly once it allow 32B output
                 let hash = blake2b_simd::Params::new()
@@ -538,7 +538,7 @@ pub fn verify_bytes(
 /// [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r))
 pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JWK, Error> {
     match algorithm {
-        #[cfg(feature = "k256")]
+        #[cfg(feature = "secp256k1")]
         Algorithm::ES256KR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
                 .map_err(ssi_jwk::Error::from)?;
@@ -564,7 +564,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             };
             Ok(jwk)
         }
-        #[cfg(feature = "k256")]
+        #[cfg(feature = "secp256k1")]
         Algorithm::ESKeccakKR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
                 .map_err(ssi_jwk::Error::from)?;
@@ -817,7 +817,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "k256")]
+    #[cfg(feature = "secp256k1")]
     fn secp256k1_sign_verify() {
         let key = JWK::generate_secp256k1().unwrap();
         let data = b"asdf";

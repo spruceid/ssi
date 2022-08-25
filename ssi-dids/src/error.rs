@@ -15,9 +15,6 @@ pub enum Error {
     /// JWT key not found
     #[error("JWT key not found")]
     MissingKey,
-    /// Problem parsing Secp256k1 key
-    #[error("Problem parsing Secp256k1 key")]
-    Secp256k1Parse(String),
     /// A verification method MUST NOT contain multiple verification material properties for the same material. (DID Core)
     #[error("A verification method MUST NOT contain multiple verification material properties for the same material. (DID Core)")]
     MultipleKeyMaterial,
@@ -93,6 +90,9 @@ pub enum Error {
     /// Unable to resolve DID
     #[error("Unable to resolve: {0}")]
     UnableToResolve(String),
+    /// JWK error
+    #[error(transparent)]
+    JWK(#[from] ssi_jwk::Error),
 }
 
 impl From<Error> for String {

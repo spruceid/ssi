@@ -925,10 +925,10 @@ impl VerificationMethodMap {
                     private_key: None,
                 })
             }
-            #[cfg(feature = "k256")]
+            #[cfg(feature = "secp256k1")]
             "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
                 use ssi_jwk::secp256k1_parse;
-                return secp256k1_parse(&pk_bytes).map_err(Error::Secp256k1Parse);
+                return secp256k1_parse(&pk_bytes).map_err(Error::from);
             }
             _ => return Err(Error::UnsupportedKeyType),
         };
@@ -1390,6 +1390,7 @@ pub mod example {
     const DOC_JSON_FOO: &str = include_str!("../../tests/did-example-foo.json");
     const DOC_JSON_BAR: &str = include_str!("../../tests/did-example-bar.json");
     const DOC_JSON_12345: &str = include_str!("../../tests/did-example-12345.json");
+    const DOC_JSON_AABB: &str = include_str!("../../tests/lds-eip712-issuer.json");
 
     // For vc-test-suite
     const DOC_JSON_TEST_ISSUER: &str = include_str!("../../tests/did-example-test-issuer.json");
@@ -1430,6 +1431,7 @@ pub mod example {
                 "did:example:0xab" => DOC_JSON_TEST_ISSUER,
                 "did:example:12345" => DOC_JSON_12345,
                 "did:example:ebfeb1f712ebc6f1c276e12ec21" => DOC_JSON_TEST_HOLDER,
+                "did:example:aaaabbbb" => DOC_JSON_AABB,
                 _ => return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None),
             };
             let doc: Document = match serde_json::from_str(doc_str) {
@@ -1588,7 +1590,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "k256")]
+    #[cfg(feature = "secp256k1")]
     fn vmm_hex_to_jwk() {
         // publicKeyHex (deprecated) -> JWK
         const JWK: &str = include_str!("../../tests/secp256k1-2021-02-17.json");

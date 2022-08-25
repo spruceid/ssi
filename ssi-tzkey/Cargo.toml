@@ -5,13 +5,15 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["k256", "p256"]
+default = ["k256", "p256", "ed25519"]
 k256 = []
 p256 = []
+ed25519 = ["ed25519-dalek"]
 
 [dependencies]
 ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
 ssi-jws = { path = "../ssi-jws", version = "0.1"}
+ed25519-dalek = { version = "1", optional = true }
 thiserror = "1.0"
 bs58 = { version = "0.4", features = ["check"] }
 
