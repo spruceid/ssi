@@ -1601,82 +1601,11 @@ mod tests {
         assert_eq!(types_value, expected_types_value);
     }
 
-    pub struct DIDExample;
     use async_trait::async_trait;
     use ssi_dids::did_resolve::{
-        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
-        ERROR_NOT_FOUND, TYPE_DID_LD_JSON,
+        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
     };
-    use ssi_dids::{DIDMethod, Document};
-    const DOC_JSON: &str = r#"
-{
-  "@context": "https://www.w3.org/ns/did/v1",
-  "id": "did:example:aaaabbbb",
-  "verificationMethod": [
-    {
-      "id": "did:example:aaaabbbb#issuerKey-1",
-      "type": "EcdsaSecp256k1VerificationKey2019",
-      "controller": "did:example:aaaabbbb",
-      "publicKeyJwk": {
-        "kty": "EC",
-        "crv": "secp256k1",
-        "x": "cmbYyDC6cbm807_OmFNYP4CLEL0aB2F1UG683SxFkXM",
-        "y": "zBw5HAh0cJM4YimSQvtYM1HFhzUXVUgrDhxJ70aajt0"
-      }
-    }
-  ],
-  "assertionMethod": [
-    "did:example:aaaabbbb#issuerKey-1"
-  ],
-  "authentication": [
-    "did:example:aaaabbbb#issuerKey-1"
-  ]
-}
-    "#;
-    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-    impl DIDMethod for DIDExample {
-        fn name(&self) -> &'static str {
-            "example"
-        }
-        fn to_resolver(&self) -> &dyn DIDResolver {
-            self
-        }
-    }
-    #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-    #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-    impl DIDResolver for DIDExample {
-        async fn resolve(
-            &self,
-            did: &str,
-            _input_metadata: &ResolutionInputMetadata,
-        ) -> (
-            ResolutionMetadata,
-            Option<Document>,
-            Option<DocumentMetadata>,
-        ) {
-            if did != "did:example:aaaabbbb" {
-                return (ResolutionMetadata::from_error(ERROR_NOT_FOUND), None, None);
-            }
-            let doc: Document = match serde_json::from_str(DOC_JSON) {
-                Ok(doc) => doc,
-                Err(err) => {
-                    return (ResolutionMetadata::from_error(&err.to_string()), None, None);
-                }
-            };
-            (
-                // ResolutionMetadata::default(),
-                // Note: remove content type when https://github.com/spruceid/ssi/pull/224 is
-                // merged
-                ResolutionMetadata {
-                    content_type: Some(TYPE_DID_LD_JSON.to_string()),
-                    ..Default::default()
-                },
-                Some(doc),
-                Some(DocumentMetadata::default()),
-            )
-        }
-    }
+    use ssi_dids::Document;
 
     use crate::LinkedDataProofOptions;
     use ssi_core::uri::URI;

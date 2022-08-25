@@ -12,18 +12,18 @@ resolver = "2"
 exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 
 [features]
-default = ["secp256k1", "secp256r1", "keccak", "ripemd-160"]
+default = ["secp256k1", "secp256r1", "keccak", "ripemd-160", "ed25519-dalek"]
 http-did = []
 libsecp256k1 = ["secp256k1"] # backward compatibility
-secp256k1 = ["ssi-ldp/secp256k1"]
-secp256r1 = ["ssi-ldp/secp256r1"]
+secp256k1 = ["ssi-ldp/secp256k1", "ssi-tzkey/k256"]
+secp256r1 = ["ssi-ldp/secp256r1", "ssi-tzkey/p256"]
 aleosig = []
 # TODO handle better keccak and sha
 keccak = ["ssi-ldp/keccak"]
 sha = []
 example-http-issuer = []
 # fixes
-ed25519-dalek = []
+ed25519-dalek = ["ssi-tzkey/ed25519"]
 rand = []
 ring = []
 sha2 = []

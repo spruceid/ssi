@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = ["secp256k1", "secp256r1", "ed25519", "rsa"]
-secp256k1 = ["k256", "ssi-crypto/k256", "ssi-jwk/k256"]
-secp256r1 = ["p256", "ssi-crypto/p256", "ssi-jwk/p256"]
+secp256k1 = ["k256", "ssi-crypto/k256", "ssi-jwk/secp256k1"]
+secp256r1 = ["p256", "ssi-crypto/p256", "ssi-jwk/secp256r1"]
 ed25519 = ["ed25519-dalek", "ssi-jwk/ed25519-dalek"]
 rsa = ["dep:rsa", "ssi-jwk/rsa", "rand_old", "sha2"]
 openssl = []

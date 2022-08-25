@@ -14,7 +14,7 @@ documentation = "https://docs.rs/did-pkh/"
 [features]
 
 [dependencies]
-caips = { path = "../caips", version = "0.1"}
+caips = { path = "../caips", version = "0.1", features = ["keccak", "ripemd-160"]}
 ssi-dids = { path = "../ssi-dids", version = "0.1"}
 ssi-jwk = { path = "../ssi-jwk", features = ["ripemd-160"] }
 ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
