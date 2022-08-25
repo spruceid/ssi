@@ -2965,8 +2965,11 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         assert_eq!(&sk_bytes[32..64], &pk_bytes);
 
-        let issuer_document: Document =
-            serde_json::from_str(include_str!("../tests/lds-ed25519-2020-issuer0.jsonld")).unwrap();
+        let is = include_str!("../tests/lds-ed25519-2020-issuer0.jsonld");
+        // let vv: ssi_dids::VerificationMethod =
+        //     serde_json::from_str("https://example.com/issuer/123#key-0").unwrap();
+        // println!("{:?}", vv);
+        let issuer_document: Document = serde_json::from_str(is).unwrap();
 
         let vc_str = include_str!("../tests/lds-ed25519-2020-vc0.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();

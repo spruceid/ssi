@@ -8,6 +8,7 @@ default = ["parser", "secp256k1"]
 parser = ["pest", "pest_derive"]
 http = ["dep:http", "reqwest", "percent-encoding"]
 secp256k1 = ["ssi-jwk/secp256k1"]
+testing = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

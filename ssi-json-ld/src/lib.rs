@@ -1846,12 +1846,12 @@ mod tests {
         let input = obj.get("input").unwrap().as_str().unwrap();
         let input = base.to_string() + input;
         let mut base_iri = "https://w3c.github.io/".to_string() + &input;
-        let input_path = PathBuf::from(input);
+        let input_path = PathBuf::from("../".to_string() + &input);
         let in_str = fs::read_to_string(&input_path).unwrap();
         let mut loader = FsLoader::new();
         loader.mount(
             Iri::new("https://w3c.github.io/json-ld-api").unwrap(),
-            "json-ld-api",
+            "../json-ld-api",
         );
         let mut ld_options = DEFAULT_JSON_LD_OPTIONS.clone();
         if let Some(JsonValue::Object(options)) = obj.get("option") {
@@ -1885,7 +1885,7 @@ mod tests {
             .and_then(|dataset| dataset.to_nquads());
         if let Some(output) = obj.get("expect") {
             let output = output.as_str().unwrap();
-            let output_path = PathBuf::from(base.to_string() + output);
+            let output_path = PathBuf::from("../".to_string() + base + output);
             let output_string = fs::read_to_string(&output_path).unwrap();
             let output_dataset = DataSet::from_str(&output_string)?;
             let output_dataset_normalized = urdna2015::normalize(&output_dataset)?;
