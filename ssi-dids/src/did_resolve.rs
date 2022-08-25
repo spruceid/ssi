@@ -361,8 +361,8 @@ impl Default for ResolutionResult {
 ///
 /// ```
 /// use async_trait::async_trait;
-/// use ssi::did::Document;
-/// use ssi::did_resolve::{
+/// use ssi_dids::Document;
+/// use ssi_dids::did_resolve::{
 ///     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
 ///     ERROR_NOT_FOUND
 /// };
