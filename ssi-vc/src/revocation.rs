@@ -1,7 +1,4 @@
-use crate::did_resolve::DIDResolver;
-use crate::jsonld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
-use crate::one_or_many::OneOrMany;
-use crate::vc::{Credential, CredentialStatus, Issuer};
+use crate::{Credential, CredentialStatus, Issuer};
 use async_trait::async_trait;
 use bitvec::prelude::Lsb0;
 use bitvec::slice::BitSlice;
@@ -9,7 +6,10 @@ use bitvec::vec::BitVec;
 use core::convert::TryFrom;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ssi_core::one_or_many::OneOrMany;
 use ssi_core::uri::URI;
+use ssi_dids::did_resolve::DIDResolver;
+use ssi_json_ld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT, STATUS_LIST_2021_V1_CONTEXT};
 use ssi_ldp::VerificationResult;
 use thiserror::Error;
 
@@ -24,6 +24,8 @@ pub const MIN_BITSTRING_LENGTH: usize = 131072;
 pub const MAX_RESPONSE_LENGTH: usize = 2097152; // 2MB
 
 const EMPTY_RLIST: &str = "H4sIAAAAAAAA_-3AMQEAAADCoPVPbQwfKAAAAAAAAAAAAAAAAAAAAOBthtJUqwBAAAA";
+
+pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 /// Credential Status object for use in a Verifiable Credential.
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020status>
@@ -603,18 +605,18 @@ pub enum LoadResourceError {
 async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
     #[cfg(test)]
     match url {
-        crate::vc::tests::EXAMPLE_REVOCATION_2020_LIST_URL => {
-            return Ok(crate::vc::tests::EXAMPLE_REVOCATION_2020_LIST.to_vec());
+        crate::tests::EXAMPLE_REVOCATION_2020_LIST_URL => {
+            return Ok(crate::tests::EXAMPLE_REVOCATION_2020_LIST.to_vec());
         }
-        crate::vc::tests::EXAMPLE_STATUS_LIST_2021_URL => {
-            return Ok(crate::vc::tests::EXAMPLE_STATUS_LIST_2021.to_vec());
+        crate::tests::EXAMPLE_STATUS_LIST_2021_URL => {
+            return Ok(crate::tests::EXAMPLE_STATUS_LIST_2021.to_vec());
         }
         _ => {}
     }
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "User-Agent",
-        reqwest::header::HeaderValue::from_static(crate::USER_AGENT),
+        reqwest::header::HeaderValue::from_static(USER_AGENT),
     );
     let client = reqwest::Client::builder()
         .default_headers(headers)
@@ -763,7 +765,7 @@ impl TryFrom<RevocationList2020Credential> for Credential {
     fn try_from(credential: RevocationList2020Credential) -> Result<Self, Self::Error> {
         let mut credential =
             serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
-        use crate::vc::DEFAULT_CONTEXT;
+        use crate::DEFAULT_CONTEXT;
         use serde_json::json;
         credential["@context"] = json!([DEFAULT_CONTEXT, REVOCATION_LIST_2020_V1_CONTEXT]);
         credential["type"] = json!(["VerifiableCredential", "RevocationList2020Credential"]);
@@ -806,7 +808,7 @@ impl TryFrom<StatusList2021Credential> for Credential {
     fn try_from(credential: StatusList2021Credential) -> Result<Self, Self::Error> {
         let mut credential =
             serde_json::to_value(credential).map_err(CredentialConversionError::ToValue)?;
-        use crate::vc::DEFAULT_CONTEXT;
+        use crate::DEFAULT_CONTEXT;
         use serde_json::json;
         credential["@context"] = json!([DEFAULT_CONTEXT, STATUS_LIST_2021_V1_CONTEXT]);
         credential["type"] = json!(["VerifiableCredential", "StatusList2021Credential"]);

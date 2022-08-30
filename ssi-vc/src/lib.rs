@@ -2,21 +2,24 @@ use std::collections::HashMap as Map;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 
-use crate::error::Error;
-pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
+pub mod error;
+pub use error::Error;
+pub mod revocation;
+
+use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
-pub use ssi_dids::VerificationRelationship as ProofPurpose;
+use ssi_dids::VerificationRelationship as ProofPurpose;
 use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
 use ssi_jwk::{JWTKeys, JWK};
 use ssi_jws::Header;
 use ssi_jwt::NumericDate;
-pub use ssi_ldp::LinkedDataProofOptions;
+use ssi_ldp::LinkedDataProofOptions;
 use ssi_ldp::{
     assert_local, Check, Error as LdpError, LinkedDataDocument, LinkedDataProofs, Proof,
     ProofPreparation, VerificationResult,
 };
 
-pub use ssi_ldp::Context;
+use ssi_ldp::Context;
 
 use async_trait::async_trait;
 use chrono::{prelude::*, LocalResult};
@@ -196,8 +199,8 @@ pub struct Status {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum CheckableStatus {
-    RevocationList2020Status(crate::revocation::RevocationList2020Status),
-    StatusList2021Entry(crate::revocation::StatusList2021Entry),
+    RevocationList2020Status(revocation::RevocationList2020Status),
+    StatusList2021Entry(revocation::StatusList2021Entry),
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -444,7 +447,7 @@ fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
     let algorithm = jwk
         .get_algorithm()
         .ok_or(Error::LDP(LdpError::MissingAlgorithm))?;
-    Ok(crate::jwt::encode_sign(algorithm, claims, jwk)?)
+    Ok(ssi_jwt::encode_sign(algorithm, claims, jwk)?)
 }
 
 impl Credential {
@@ -473,19 +476,19 @@ impl Credential {
     }
 
     pub fn from_jwt(jwt: &str, key: &JWK) -> Result<Self, Error> {
-        let token_data: JWTClaims = crate::jwt::decode_verify(jwt, key)?;
+        let token_data: JWTClaims = ssi_jwt::decode_verify(jwt, key)?;
         Self::from_jwt_claims(token_data)
     }
 
     pub fn from_jwt_unsigned(jwt: &str) -> Result<Self, Error> {
-        let token_data: JWTClaims = crate::jwt::decode_unverified(jwt)?;
+        let token_data: JWTClaims = ssi_jwt::decode_unverified(jwt)?;
         let vc = Self::from_jwt_claims(token_data)?;
         vc.validate_unsigned()?;
         Ok(vc)
     }
 
     pub(crate) fn from_jwt_unsigned_embedded(jwt: &str) -> Result<Self, Error> {
-        let token_data: JWTClaims = crate::jwt::decode_unverified(jwt)?;
+        let token_data: JWTClaims = ssi_jwt::decode_unverified(jwt)?;
         let vc = Self::from_jwt_claims(token_data)?;
         vc.validate_unsigned_embedded()?;
         Ok(vc)
@@ -589,7 +592,7 @@ impl Credential {
             audience: Some(OneOrMany::One(StringOrURI::try_from(aud.to_string())?)),
             ..self.to_jwt_claims()?
         };
-        Ok(crate::jwt::encode_unsigned(&claims)?)
+        Ok(ssi_jwt::encode_unsigned(&claims)?)
     }
 
     #[deprecated(note = "Use generate_jwt")]
@@ -675,7 +678,7 @@ impl Credential {
         let payload_b64 = base64_encode_json(&claims)?;
         if let Some(jwk) = jwk {
             let signing_input = header_b64 + "." + &payload_b64;
-            let sig_b64 = crate::jws::sign_bytes_b64(algorithm, signing_input.as_bytes(), jwk)?;
+            let sig_b64 = ssi_jws::sign_bytes_b64(algorithm, signing_input.as_bytes(), jwk)?;
             let jws = signing_input + "." + &sig_b64;
             Ok(jws)
         } else {
@@ -705,7 +708,7 @@ impl Credential {
             .as_ref()
             .and_then(|opts| opts.checks.clone())
             .unwrap_or_default();
-        let (header_b64, payload_enc, signature_b64) = match crate::jws::split_jws(jwt) {
+        let (header_b64, payload_enc, signature_b64) = match ssi_jws::split_jws(jwt) {
             Ok(parts) => parts,
             Err(err) => {
                 return (
@@ -714,12 +717,12 @@ impl Credential {
                 );
             }
         };
-        let crate::jws::DecodedJWS {
+        let ssi_jws::DecodedJWS {
             header,
             signing_input,
             payload,
             signature,
-        } = match crate::jws::decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64) {
+        } = match ssi_jws::decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64) {
             Ok(decoded_jws) => decoded_jws,
             Err(err) => {
                 return (
@@ -786,12 +789,8 @@ impl Credential {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes_warnable(
-                header.algorithm,
-                &signing_input,
-                &key,
-                &signature,
-            ) {
+            match ssi_jws::verify_bytes_warnable(header.algorithm, &signing_input, &key, &signature)
+            {
                 Ok(mut warnings) => {
                     results.checks.push(Check::JWS);
                     results.warnings.append(&mut warnings);
@@ -1155,7 +1154,7 @@ impl Presentation {
     ) -> Result<String, Error> {
         let mut options = options.clone();
         if let Some(jwk) = jwk {
-            crate::ldp::ensure_or_pick_verification_relationship(&mut options, self, jwk, resolver)
+            ssi_ldp::ensure_or_pick_verification_relationship(&mut options, self, jwk, resolver)
                 .await?;
             // If no JWK is passed, there is no verification relationship.
         }
@@ -1218,7 +1217,7 @@ impl Presentation {
         let payload_b64 = base64_encode_json(&claims)?;
         if let Some(jwk) = jwk {
             let signing_input = header_b64 + "." + &payload_b64;
-            let sig_b64 = crate::jws::sign_bytes_b64(algorithm, signing_input.as_bytes(), jwk)?;
+            let sig_b64 = ssi_jws::sign_bytes_b64(algorithm, signing_input.as_bytes(), jwk)?;
             let jws = signing_input + "." + &sig_b64;
             Ok(jws)
         } else {
@@ -1249,7 +1248,7 @@ impl Presentation {
             );
         }
         // let mut options = options_opt.unwrap_or_default();
-        let (header_b64, payload_enc, signature_b64) = match crate::jws::split_jws(jwt) {
+        let (header_b64, payload_enc, signature_b64) = match ssi_jws::split_jws(jwt) {
             Ok(parts) => parts,
             Err(err) => {
                 return (
@@ -1258,12 +1257,12 @@ impl Presentation {
                 );
             }
         };
-        let crate::jws::DecodedJWS {
+        let ssi_jws::DecodedJWS {
             header,
             signing_input,
             payload,
             signature,
-        } = match crate::jws::decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64) {
+        } = match ssi_jws::decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64) {
             Ok(decoded_jws) => decoded_jws,
             Err(err) => {
                 return (
@@ -1330,12 +1329,8 @@ impl Presentation {
         };
         let mut results = VerificationResult::new();
         if matched_jwt {
-            match crate::jws::verify_bytes_warnable(
-                header.algorithm,
-                &signing_input,
-                &key,
-                &signature,
-            ) {
+            match ssi_jws::verify_bytes_warnable(header.algorithm, &signing_input, &key, &signature)
+            {
                 Ok(mut warnings) => {
                     results.checks.push(Check::JWS);
                     results.warnings.append(&mut warnings);
@@ -1555,7 +1550,7 @@ impl Default for Presentation {
 
 /// Get a DID's first verification method
 pub async fn get_verification_method(did: &str, resolver: &dyn DIDResolver) -> Option<String> {
-    let doc = match crate::did_resolve::easy_resolve(did, resolver).await {
+    let doc = match ssi_dids::did_resolve::easy_resolve(did, resolver).await {
         Ok(doc) => doc,
         Err(_) => return None,
     };
@@ -1577,7 +1572,7 @@ pub async fn get_verification_methods(
     did: &str,
     resolver: &dyn DIDResolver,
 ) -> Result<Vec<String>, String> {
-    let doc = crate::did_resolve::easy_resolve(did, resolver)
+    let doc = ssi_dids::did_resolve::easy_resolve(did, resolver)
         .await
         .map_err(String::from)?;
     let vms = doc
@@ -1594,9 +1589,10 @@ pub async fn get_verification_methods_for_purpose(
     resolver: &dyn DIDResolver,
     proof_purpose: ProofPurpose,
 ) -> Result<Vec<String>, String> {
-    let vmms = crate::did_resolve::get_verification_methods(did, proof_purpose.clone(), resolver)
-        .await
-        .map_err(String::from)?;
+    let vmms =
+        ssi_dids::did_resolve::get_verification_methods(did, proof_purpose.clone(), resolver)
+            .await
+            .map_err(String::from)?;
     Ok(vmms.into_keys().collect())
 }
 
@@ -1711,11 +1707,11 @@ fn jwt_matches(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use crate::did::{example::DIDExample, VerificationMethodMap};
-    use crate::urdna2015;
     use chrono::Duration;
     use serde_json::json;
     use ssi_dids::did_resolve::DereferencingInputMetadata;
+    use ssi_dids::{example::DIDExample, VerificationMethodMap};
+    use ssi_ldp::urdna2015;
     use ssi_ldp::{suites::*, ProofSuite};
 
     #[test]
@@ -1897,7 +1893,7 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let (vc_opt, verification_result) = Credential::decode_verify_jwt(
             &signed_jwt,
             Some(options.clone()),
@@ -1947,7 +1943,7 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let (vc1_opt, verification_result) = Credential::decode_verify_jwt(
             &signed_jwt,
             Some(options.clone()),
@@ -2016,7 +2012,7 @@ pub(crate) mod tests {
             .unwrap();
         println!("{:?}", signed_jwt);
 
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let (_vc1_opt, verification_result) = Credential::decode_verify_jwt(
             &signed_jwt,
             Some(options.clone()),
@@ -2048,7 +2044,7 @@ pub(crate) mod tests {
             verification_method: Some(URI::String("did:example:foo#key1".to_string())),
             ..Default::default()
         };
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
@@ -2098,7 +2094,7 @@ pub(crate) mod tests {
             verification_method: Some(URI::String("did:example:foo#key3".to_string())),
             ..Default::default()
         };
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
@@ -2147,7 +2143,7 @@ pub(crate) mod tests {
             verification_method: Some(URI::String("did:example:foo#key1".to_string())),
             ..Default::default()
         };
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
             .await
@@ -2181,7 +2177,7 @@ pub(crate) mod tests {
             verification_method: Some(URI::String("did:example:foo#key1".to_string())),
             ..Default::default()
         };
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let algorithm = key.get_algorithm().unwrap();
         let public_key = key.to_public();
 
@@ -2195,11 +2191,11 @@ pub(crate) mod tests {
             .await
             .unwrap();
         let signing_input = match preparation.signing_input {
-            crate::ldp::SigningInput::Bytes(ref bytes) => &bytes.0,
+            ssi_ldp::SigningInput::Bytes(ref bytes) => &bytes.0,
             #[allow(unreachable_patterns)]
             _ => panic!("Unexpected signing input type"),
         };
-        let sig = crate::jws::sign_bytes(algorithm, signing_input, &key).unwrap();
+        let sig = ssi_jws::sign_bytes(algorithm, signing_input, &key).unwrap();
         let sig_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
         let proof = preparation.complete(&sig_b64).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
@@ -2260,7 +2256,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 Ok(self.0.clone())
             }
         }
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let parent = ProofContexts(json!(["https://w3id.org/security/v1", DEFAULT_CONTEXT]));
         let proof_dataset = proof
             .to_dataset_for_signing(Some(&parent), &mut context_loader)
@@ -2296,7 +2292,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 <http://example.com/credentials/4643> <https://www.w3.org/2018/credentials#issuer> <https://example.com/issuers/14> .
 "#;
         let vc: Credential = serde_json::from_str(credential_str).unwrap();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let credential_dataset = vc
             .to_dataset_for_signing(None, &mut context_loader)
             .await
@@ -2310,11 +2306,11 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[async_std::test]
     async fn credential_verify() {
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         good_vc(include_str!("../examples/vc.jsonld"), &mut context_loader).await;
 
         let vc_jwt = include_str!("../examples/vc.jwt");
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let (vc_opt, result) =
             Credential::decode_verify_jwt(vc_jwt, None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
@@ -2344,7 +2340,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // These test vectors were generated using examples/issue.rs with the verify part disabled,
         // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
         // object into the VC.
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         good_vc(
             include_str!("../examples/vc-jws2020-inline-context.jsonld"),
             &mut context_loader,
@@ -2389,7 +2385,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         let mut vc: Value = serde_json::from_str(vc_str).unwrap();
         vc["newProp"] = json!("foo");
         let vc: Credential = serde_json::from_value(vc).unwrap();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let result = vc.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", result);
         assert!(!result.errors.is_empty());
@@ -2405,7 +2401,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             proof_purpose: Some(ProofPurpose::Authentication),
             ..Default::default()
         };
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let result = vp
             .verify(
                 Some(verify_options.clone()),
@@ -2541,7 +2537,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ..Default::default()
         };
 
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         // Issue unrevoked VC
         let proof = unrevoked_vc
             .generate_proof(&key, &issue_options, &DIDExample, &mut context_loader)
@@ -2607,7 +2603,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
           }
         }))
         .unwrap();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vres = unrevoked_credential
             .check_status(&DIDExample, &mut context_loader)
             .await;
@@ -2636,7 +2632,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
           }
         }))
         .unwrap();
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vres = revoked_credential
             .check_status(&DIDExample, &mut context_loader)
             .await;
@@ -2666,7 +2662,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
         vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
         vc_issue_options.checks = None;
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_proof = vc
             .generate_proof(&key, &vc_issue_options, &DIDExample, &mut context_loader)
             .await
@@ -3121,7 +3117,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await
             .unwrap();
         let signing_input_bytes = match prep.signing_input {
-            crate::ldp::SigningInput::Bytes(Base64urlUInt(ref bytes)) => bytes,
+            ssi_ldp::SigningInput::Bytes(Base64urlUInt(ref bytes)) => bytes,
             _ => panic!("expected SigningInput::Bytes for Ed25519Signature2020 preparation"),
         };
         let sig = ssi_jws::sign_bytes(Algorithm::EdDSA, signing_input_bytes, &sk_jwk).unwrap();
@@ -3136,12 +3132,12 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     #[async_std::test]
     #[cfg(feature = "aleosig")]
     async fn aleosig2021() {
-        use crate::did::Document;
-        use crate::did_resolve::{
+        use crate::Credential;
+        use ssi_dids::did_resolve::{
             DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
             TYPE_DID_LD_JSON,
         };
-        use crate::vc::Credential;
+        use ssi_dids::Document;
 
         struct ExampleResolver;
         const EXAMPLE_DID: &str = "did:example:aleovm2021";

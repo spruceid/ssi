@@ -23,10 +23,12 @@
     html_favicon_url = "https://demo.didkit.dev/2021/10/21/rust-favicon.ico"
 )]
 
-pub mod error;
-pub mod revocation;
-pub mod vc;
-pub mod zcap;
+// TODO
+// move out vc, revocation and zcap
+// organise jws features around crypto impl
+// organise remaining higher level module features around actual features and underlying crypto dependancy choice
+// "rust-crypto" as default, "ring" feature enabled would replace applicable functionality. "openssl" is in the same position as "ring"?
+//
 
 // maintain old structure here
 pub use caips::caip10;
@@ -56,6 +58,9 @@ pub use ssi_ldp::soltx;
 pub use ssi_ssh as ssh;
 pub use ssi_tzkey as tzkey;
 pub use ssi_ucan as ucan;
+pub use ssi_vc as vc;
+pub use ssi_zcap_ld as zcap;
+pub use vc::revocation;
 
 #[cfg(feature = "aleosig")]
 pub use ssi_jwk::aleo;

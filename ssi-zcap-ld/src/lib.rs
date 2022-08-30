@@ -1,7 +1,9 @@
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;
 
-use crate::error::Error;
+pub mod error;
+pub use error::Error;
+
 use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
 use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader, SECURITY_V2_CONTEXT};

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-/// Error type for `ssi`.
+/// Error type for `ssi-vc`.
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
