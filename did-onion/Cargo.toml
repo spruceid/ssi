@@ -2,7 +2,7 @@
 name = "did-onion"
 version = "0.1.2"
 authors = ["Spruce Systems, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 keywords = ["ssi", "did", "tor", "onion"]
 description = "did:onion DID method, using the ssi crate"

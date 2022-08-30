@@ -8,8 +8,10 @@ edition = "2021"
 [features]
 default = ["keccak", "secp256k1", "rsa", "ed25519", "secp256r1"]
 keccak = ["dep:keccak-hash", "secp256k1", "caips/keccak"]
+
 secp256k1 = ["ssi-jws/secp256k1", "k256", "ssi-tzkey/k256"]
 secp256r1 = ["ssi-jws/secp256r1", "p256", "ssi-tzkey/p256"]
+
 rsa = ["ssi-jws/rsa"]
 ed25519 = ["ssi-jws/ed25519"]
 

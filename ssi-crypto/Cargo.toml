@@ -5,7 +5,9 @@ edition = "2021"
 
 [features]
 default = ["ring"]
+
 secp256k1 = ["k256", "k256/keccak256", "keccak"]
+
 bbs = ["dep:bbs", "pairing-plus"]
 ripemd-160 = ["ripemd160", "secp256k1", "bs58"]
 keccak = ["keccak-hash"]
