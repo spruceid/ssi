@@ -439,7 +439,7 @@ impl From<Contexts> for OneOrMany<Context> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::did::example::DIDExample;
+    use ssi_dids::example::DIDExample;
 
     #[derive(Deserialize, PartialEq, Debug, Clone, Serialize)]
     enum Actions {
@@ -453,7 +453,7 @@ mod tests {
     }
     #[test]
     fn delegation_from_json() {
-        let zcap_str = include_str!("../examples/zcap_delegation.jsonld");
+        let zcap_str = include_str!("../../examples/zcap_delegation.jsonld");
         let zcap: Delegation<(), ()> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
@@ -481,7 +481,7 @@ mod tests {
         enum AC {
             Drive,
         }
-        let zcap_str = include_str!("../examples/zcap_invocation.jsonld");
+        let zcap_str = include_str!("../../examples/zcap_invocation.jsonld");
         let zcap: Invocation<DefaultProps<AC>> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
@@ -497,20 +497,20 @@ mod tests {
     #[async_std::test]
     async fn round_trip() {
         let dk = DIDExample;
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
 
         let alice_did = "did:example:foo";
         let alice_vm = format!("{}#key2", alice_did);
         let alice: JWK = JWK {
             key_id: Some(alice_vm.clone()),
-            ..serde_json::from_str(include_str!("../tests/ed25519-2020-10-18.json")).unwrap()
+            ..serde_json::from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap()
         };
 
         let bob_did = "did:example:bar";
         let bob_vm = format!("{}#key1", bob_did);
         let bob: JWK = JWK {
             key_id: Some(bob_vm.clone()),
-            ..serde_json::from_str(include_str!("../tests/ed25519-2021-06-16.json")).unwrap()
+            ..serde_json::from_str(include_str!("../../tests/ed25519-2021-06-16.json")).unwrap()
         };
 
         let del: Delegation<(), DefaultProps<Actions>> = Delegation {

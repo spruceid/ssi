@@ -6,20 +6,18 @@ pub mod error;
 pub use error::Error;
 pub mod revocation;
 
-use ssi_core::{one_or_many::OneOrMany, uri::URI};
+pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
-use ssi_dids::VerificationRelationship as ProofPurpose;
+pub use ssi_dids::VerificationRelationship as ProofPurpose;
 use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
 use ssi_jwk::{JWTKeys, JWK};
 use ssi_jws::Header;
-use ssi_jwt::NumericDate;
-use ssi_ldp::LinkedDataProofOptions;
+pub use ssi_jwt::NumericDate;
 use ssi_ldp::{
     assert_local, Check, Error as LdpError, LinkedDataDocument, LinkedDataProofs, Proof,
-    ProofPreparation, VerificationResult,
+    ProofPreparation,
 };
-
-use ssi_ldp::Context;
+pub use ssi_ldp::{Context, LinkedDataProofOptions, VerificationResult};
 
 use async_trait::async_trait;
 use chrono::{prelude::*, LocalResult};
@@ -1711,7 +1709,7 @@ pub(crate) mod tests {
     use serde_json::json;
     use ssi_dids::did_resolve::DereferencingInputMetadata;
     use ssi_dids::{example::DIDExample, VerificationMethodMap};
-    use ssi_ldp::urdna2015;
+    use ssi_json_ld::urdna2015;
     use ssi_ldp::{suites::*, ProofSuite};
 
     #[test]
@@ -1785,12 +1783,13 @@ pub(crate) mod tests {
     }
 
     pub const EXAMPLE_REVOCATION_2020_LIST_URL: &str = "https://example.test/revocationList.json";
-    pub const EXAMPLE_REVOCATION_2020_LIST: &[u8] = include_bytes!("../tests/revocationList.json");
+    pub const EXAMPLE_REVOCATION_2020_LIST: &[u8] =
+        include_bytes!("../../tests/revocationList.json");
 
     pub const EXAMPLE_STATUS_LIST_2021_URL: &str = "https://example.com/credentials/status/3";
-    pub const EXAMPLE_STATUS_LIST_2021: &[u8] = include_bytes!("../tests/statusList.json");
+    pub const EXAMPLE_STATUS_LIST_2021: &[u8] = include_bytes!("../../tests/statusList.json");
 
-    const JWK_JSON: &str = include_str!("../tests/rsa2048-2020-08-25.json");
+    const JWK_JSON: &str = include_str!("../../tests/rsa2048-2020-08-25.json");
 
     #[test]
     fn credential_from_json() {
@@ -2087,7 +2086,7 @@ pub(crate) mod tests {
         }"###;
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
 
-        let key_str = include_str!("../tests/ed25519-2020-10-18.json");
+        let key_str = include_str!("../../tests/ed25519-2020-10-18.json");
         let key: JWK = serde_json::from_str(key_str).unwrap();
 
         let issue_options = LinkedDataProofOptions {
@@ -2307,9 +2306,13 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     #[async_std::test]
     async fn credential_verify() {
         let mut context_loader = ssi_json_ld::ContextLoader::default();
-        good_vc(include_str!("../examples/vc.jsonld"), &mut context_loader).await;
+        good_vc(
+            include_str!("../../examples/vc.jsonld"),
+            &mut context_loader,
+        )
+        .await;
 
-        let vc_jwt = include_str!("../examples/vc.jwt");
+        let vc_jwt = include_str!("../../examples/vc.jwt");
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let (vc_opt, result) =
             Credential::decode_verify_jwt(vc_jwt, None, &DIDExample, &mut context_loader).await;
@@ -2342,37 +2345,37 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // object into the VC.
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         good_vc(
-            include_str!("../examples/vc-jws2020-inline-context.jsonld"),
+            include_str!("../../examples/vc-jws2020-inline-context.jsonld"),
             &mut context_loader,
         )
         .await;
         bad_vc(
-            include_str!("../examples/vc-jws2020-bad-type.jsonld"),
+            include_str!("../../examples/vc-jws2020-bad-type.jsonld"),
             &mut context_loader,
         )
         .await;
         bad_vc(
-            include_str!("../examples/vc-jws2020-bad-purpose.jsonld"),
+            include_str!("../../examples/vc-jws2020-bad-purpose.jsonld"),
             &mut context_loader,
         )
         .await;
         bad_vc(
-            include_str!("../examples/vc-jws2020-bad-method.jsonld"),
+            include_str!("../../examples/vc-jws2020-bad-method.jsonld"),
             &mut context_loader,
         )
         .await;
         bad_vc(
-            include_str!("../examples/vc-jws2020-bad-type-json.jsonld"),
+            include_str!("../../examples/vc-jws2020-bad-type-json.jsonld"),
             &mut context_loader,
         )
         .await;
         bad_vc(
-            include_str!("../examples/vc-jws2020-bad-purpose-json.jsonld"),
+            include_str!("../../examples/vc-jws2020-bad-purpose-json.jsonld"),
             &mut context_loader,
         )
         .await;
         bad_vc(
-            include_str!("../examples/vc-jws2020-bad-method-json.jsonld"),
+            include_str!("../../examples/vc-jws2020-bad-method-json.jsonld"),
             &mut context_loader,
         )
         .await;
@@ -2381,7 +2384,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     #[async_std::test]
     async fn cannot_add_properties_after_signing() {
         use serde_json::json;
-        let vc_str = include_str!("../examples/vc.jsonld");
+        let vc_str = include_str!("../../examples/vc.jsonld");
         let mut vc: Value = serde_json::from_str(vc_str).unwrap();
         vc["newProp"] = json!("foo");
         let vc: Credential = serde_json::from_value(vc).unwrap();
@@ -2395,7 +2398,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     #[async_std::test]
     async fn presentation_verify() {
         // LDP VC in LDP VP
-        let vp_str = include_str!("../examples/vp.jsonld");
+        let vp_str = include_str!("../../examples/vp.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
         let verify_options = LinkedDataProofOptions {
             proof_purpose: Some(ProofPurpose::Authentication),
@@ -2421,7 +2424,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(result.warnings.is_empty());
 
         // LDP VC in JWT VP
-        let vp_jwt = include_str!("../examples/vp.jwt");
+        let vp_jwt = include_str!("../../examples/vp.jwt");
         let (vp_opt, result) = Presentation::decode_verify_jwt(
             vp_jwt,
             Some(verify_options.clone()),
@@ -2442,7 +2445,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(result.warnings.is_empty());
 
         // JWT VC in LDP VP
-        let vp_str = include_str!("../examples/vp-jwtvc.jsonld");
+        let vp_str = include_str!("../../examples/vp-jwtvc.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
         let result = vp
             .verify(
@@ -2463,7 +2466,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(result.warnings.is_empty());
 
         // JWT VC in JWT VP
-        let vp_jwt = include_str!("../examples/vp-jwtvc.jwt");
+        let vp_jwt = include_str!("../../examples/vp-jwtvc.jwt");
         let (vp_opt, result) = Presentation::decode_verify_jwt(
             vp_jwt,
             Some(verify_options.clone()),
@@ -2485,7 +2488,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(result.warnings.is_empty());
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn credential_status() {
         use serde_json::json;
         let mut unrevoked_vc: Credential = serde_json::from_value(json!({
@@ -2575,7 +2578,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert_ne!(verification_result.errors.len(), 0);
     }
 
-    #[tokio::test]
+    #[async_std::test]
     async fn credential_status_2021() {
         use serde_json::json;
         // status list credential is generated in examples/issue-status-list.rs
@@ -2843,7 +2846,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         struct ExampleResolver;
 
         const EXAMPLE_123_ID: &str = "did:example:123";
-        const EXAMPLE_123_JSON: &str = include_str!("../tests/esrs2020-did.jsonld");
+        const EXAMPLE_123_JSON: &str = include_str!("../../tests/esrs2020-did.jsonld");
 
         #[async_trait]
         impl DIDResolver for ExampleResolver {
@@ -2906,7 +2909,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             }
         }
 
-        let vc_str = include_str!("../tests/esrs2020-vc.jsonld");
+        let vc_str = include_str!("../../tests/esrs2020-vc.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();
         let mut n_proofs = 0;
         for proof in vc.proof.iter().flatten() {
@@ -2961,15 +2964,15 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         assert_eq!(&sk_bytes[32..64], &pk_bytes);
 
-        let is = include_str!("../tests/lds-ed25519-2020-issuer0.jsonld");
+        let is = include_str!("../../tests/lds-ed25519-2020-issuer0.jsonld");
         // let vv: ssi_dids::VerificationMethod =
         //     serde_json::from_str("https://example.com/issuer/123#key-0").unwrap();
         // println!("{:?}", vv);
         let issuer_document: Document = serde_json::from_str(is).unwrap();
 
-        let vc_str = include_str!("../tests/lds-ed25519-2020-vc0.jsonld");
+        let vc_str = include_str!("../../tests/lds-ed25519-2020-vc0.jsonld");
         let vc = Credential::from_json(vc_str).unwrap();
-        let vp_str = include_str!("../tests/lds-ed25519-2020-vp0.jsonld");
+        let vp_str = include_str!("../../tests/lds-ed25519-2020-vp0.jsonld");
         let vp = Presentation::from_json(vp_str).unwrap();
 
         // "DID Resolver" for HTTPS issuer used in the test vectors.
@@ -3141,7 +3144,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         struct ExampleResolver;
         const EXAMPLE_DID: &str = "did:example:aleovm2021";
-        const EXAMPLE_DOC: &'static str = include_str!("../tests/lds-aleo2021-issuer0.jsonld");
+        const EXAMPLE_DOC: &'static str = include_str!("../../tests/lds-aleo2021-issuer0.jsonld");
         #[async_trait]
         impl DIDResolver for ExampleResolver {
             async fn resolve(
@@ -3179,7 +3182,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         }
 
         let private_key: JWK =
-            serde_json::from_str(include_str!("../tests/aleotestnet1-2021-11-22.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/aleotestnet1-2021-11-22.json")).unwrap();
 
         let vc_str = include_str!("../../tests/lds-aleo2021-vc0.jsonld");
         let mut vc = Credential::from_json_unsigned(vc_str).unwrap();

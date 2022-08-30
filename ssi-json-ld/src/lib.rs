@@ -1838,7 +1838,6 @@ mod tests {
     use json_ld::FsLoader;
 
     async fn test_to_rdf(obj: &json::object::Object) -> Result<(), Error> {
-        use crate::urdna2015;
         use std::fs;
         use std::path::PathBuf;
         let base1 = "https://w3c.github.io/json-ld-api/tests/".to_string();

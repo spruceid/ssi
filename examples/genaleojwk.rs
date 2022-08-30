@@ -1,6 +1,6 @@
 #[async_std::main]
 #[ignore] // Skip expensive key generation
-async fn main() -> Result<(), ssi::error::Error> {
+async fn main() -> Result<(), ssi_jwk::Error> {
     #[cfg(feature = "aleosig")]
     {
         let jwk = ssi::jwk::JWK::generate_aleo()?;

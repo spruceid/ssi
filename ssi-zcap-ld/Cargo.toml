@@ -15,3 +15,6 @@ ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.1" }
 ssi-ldp = { path = "../ssi-ldp", version = "0.1" }
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }

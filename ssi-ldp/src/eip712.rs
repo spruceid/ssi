@@ -369,86 +369,6 @@ impl Types {
     }
 }
 
-#[cfg(test)]
-lazy_static! {
-    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L917-L966
-    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26/files#r798853853
-    static ref EXAMPLE_TYPES: Value = {
-        serde_json::json!({
-          "Data": [
-            {
-              "name": "job",
-              "type": "Job"
-            },
-            {
-              "name": "name",
-              "type": "Name"
-            }
-          ],
-          "Job": [
-            {
-              "name": "employer",
-              "type": "string"
-            },
-            {
-              "name": "jobTitle",
-              "type": "string"
-            }
-          ],
-          "Name": [
-            {
-              "name": "firstName",
-              "type": "string"
-            },
-            {
-              "name": "lastName",
-              "type": "string"
-            }
-          ],
-          "Document": [
-            {
-              "name": "@context",
-              "type": "string[]"
-            },
-            {
-              "name": "@type",
-              "type": "string"
-            },
-            {
-              "name": "data",
-              "type": "Data"
-            },
-            {
-              "name": "proof",
-              "type": "Proof"
-            },
-            {
-              "name": "telephone",
-              "type": "string"
-            }
-          ],
-          "Proof": [
-            {
-              "name": "created",
-              "type": "string"
-            },
-            {
-              "name": "proofPurpose",
-              "type": "string"
-            },
-            {
-              "name": "type",
-              "type": "string"
-            },
-            {
-              "name": "verificationMethod",
-              "type": "string"
-            }
-          ]
-        })
-    };
-}
-
 impl TypesOrURI {
     #[allow(clippy::match_single_binding)]
     #[allow(unreachable_code)]
@@ -460,7 +380,7 @@ impl TypesOrURI {
         };
         let value = match &uri[..] {
             #[cfg(test)]
-            "https://example.org/types.json" => EXAMPLE_TYPES.clone(),
+            "https://example.org/types.json" => tests::EXAMPLE_TYPES.clone(),
             _ => return Err(DereferenceTypesError::RemoteLoadingNotImplemented),
         };
         let types: Types = serde_json::from_value(value).map_err(DereferenceTypesError::JSON)?;
@@ -1188,6 +1108,7 @@ pub fn generate_proof_info(doc: &EIP712Value) -> Result<ProofInfo, ProofGenerati
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lazy_static::lazy_static;
     use serde_json::json;
 
     #[test]
@@ -1425,59 +1346,136 @@ mod tests {
     }
 
     lazy_static! {
-        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L637-L645
-        static ref TEST_BASIC_DOCUMENT: Value = {
-            json!({
-                "@context": ["https://schema.org", "https://w3id.org/security/v2"],
-                "@type": "Person",
-                "firstName": "Jane",
-                "lastName": "Does",
-                "jobTitle": "Professor",
-                "telephone": "(425) 123-4567",
-                "email": "jane.doe@example.com"
-            })
-        };
-        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L646-L660
-        static ref TEST_NESTED_DOCUMENT: Value = {
-            json!({
-                "@context": ["https://schema.org", "https://w3id.org/security/v2"],
-                "@type": "Person",
-                "data": {
-                  "name": {
-                    "firstName": "John",
-                    "lastName": "Doe"
-                  },
-                  "job": {
+            // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L637-L645
+            static ref TEST_BASIC_DOCUMENT: Value = {
+                json!({
+                    "@context": ["https://schema.org", "https://w3id.org/security/v2"],
+                    "@type": "Person",
+                    "firstName": "Jane",
+                    "lastName": "Does",
                     "jobTitle": "Professor",
-                    "employer": "University of Waterloo"
-                  }
+                    "telephone": "(425) 123-4567",
+                    "email": "jane.doe@example.com"
+                })
+            };
+            // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L646-L660
+            static ref TEST_NESTED_DOCUMENT: Value = {
+                json!({
+                    "@context": ["https://schema.org", "https://w3id.org/security/v2"],
+                    "@type": "Person",
+                    "data": {
+                      "name": {
+                        "firstName": "John",
+                        "lastName": "Doe"
+                      },
+                      "job": {
+                        "jobTitle": "Professor",
+                        "employer": "University of Waterloo"
+                      }
+                    },
+                    "telephone": "(425) 123-4567"
+                })
+            };
+
+            static ref MOCK_ETHR_DID_RESOLVER: MockEthrDIDResolver =
+                MockEthrDIDResolver {
+                    doc: serde_json::from_value(json!({
+                      "@context": [
+                        "https://www.w3.org/ns/did/v1",
+                        {
+                          "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
+                          "blockchainAccountId": "https://w3id.org/security#blockchainAccountId"
+                        }
+                      ],
+                      "id": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443",
+                      "verificationMethod": [{
+                          "id": "#blockchainAccountId",
+                          "type": "EcdsaSecp256k1RecoveryMethod2020",
+                          "controller": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443",
+                          "blockchainAccountId": "eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443"
+                      }],
+                      "assertionMethod": [
+                          "#blockchainAccountId"
+                      ]
+                    })).unwrap()
+                };
+
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L917-L966
+        // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26/files#r798853853
+        pub static ref EXAMPLE_TYPES: Value = {
+            serde_json::json!({
+              "Data": [
+                {
+                  "name": "job",
+                  "type": "Job"
                 },
-                "telephone": "(425) 123-4567"
+                {
+                  "name": "name",
+                  "type": "Name"
+                }
+              ],
+              "Job": [
+                {
+                  "name": "employer",
+                  "type": "string"
+                },
+                {
+                  "name": "jobTitle",
+                  "type": "string"
+                }
+              ],
+              "Name": [
+                {
+                  "name": "firstName",
+                  "type": "string"
+                },
+                {
+                  "name": "lastName",
+                  "type": "string"
+                }
+              ],
+              "Document": [
+                {
+                  "name": "@context",
+                  "type": "string[]"
+                },
+                {
+                  "name": "@type",
+                  "type": "string"
+                },
+                {
+                  "name": "data",
+                  "type": "Data"
+                },
+                {
+                  "name": "proof",
+                  "type": "Proof"
+                },
+                {
+                  "name": "telephone",
+                  "type": "string"
+                }
+              ],
+              "Proof": [
+                {
+                  "name": "created",
+                  "type": "string"
+                },
+                {
+                  "name": "proofPurpose",
+                  "type": "string"
+                },
+                {
+                  "name": "type",
+                  "type": "string"
+                },
+                {
+                  "name": "verificationMethod",
+                  "type": "string"
+                }
+              ]
             })
         };
-
-        static ref MOCK_ETHR_DID_RESOLVER: MockEthrDIDResolver =
-            MockEthrDIDResolver {
-                doc: serde_json::from_value(json!({
-                  "@context": [
-                    "https://www.w3.org/ns/did/v1",
-                    {
-                      "EcdsaSecp256k1RecoveryMethod2020": "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020",
-                      "blockchainAccountId": "https://w3id.org/security#blockchainAccountId"
-                    }
-                  ],
-                  "id": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443",
-                  "verificationMethod": [{
-                      "id": "#blockchainAccountId",
-                      "type": "EcdsaSecp256k1RecoveryMethod2020",
-                      "controller": "did:pkh:eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443",
-                      "blockchainAccountId": "eip155:1:0xAED7EA8035eEc47E657B34eF5D020c7005487443"
-                  }],
-                  "assertionMethod": [
-                      "#blockchainAccountId"
-                  ]
-                })).unwrap()
-            };
     }
 
     #[test]
