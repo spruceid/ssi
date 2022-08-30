@@ -1,6 +1,4 @@
 use std::collections::HashMap as Map;
-#[cfg(feature = "keccak")]
-use std::convert::TryFrom;
 
 use async_trait::async_trait;
 use chrono::prelude::*;

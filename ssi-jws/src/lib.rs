@@ -322,7 +322,6 @@ pub fn verify_bytes_warnable(
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 Algorithm::PS256 => {
-                    let hash = rsa::hash::Hash::SHA2_256;
                     let rng = rand_old::rngs::OsRng {};
                     padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
@@ -356,7 +355,6 @@ pub fn verify_bytes_warnable(
             }
             #[cfg(feature = "ed25519-dalek")]
             {
-                use ed25519_dalek::ed25519::signature::Signature;
                 use ed25519_dalek::Verifier;
                 let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
                 let signature = ed25519_dalek::Signature::from_bytes(signature)

@@ -1,6 +1,6 @@
 use core::convert::TryFrom;
 use ssi_jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
-use ssi_jws::{sign_bytes, Error as JwsError};
+use ssi_jws::Error as JwsError;
 
 const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
 #[cfg(feature = "k256")]

@@ -5,8 +5,6 @@ use chrono::prelude::*;
 
 use super::*;
 
-#[cfg(feature = "keccak")]
-use crate::eip712::TypedData;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_dids::did_resolve::DIDResolver;

@@ -8,7 +8,6 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     {
         // The "ring" feature takes precedence for the impl of sha256.
         use ring::digest;
-        use std::convert::TryInto;
         let hash = digest::digest(&digest::SHA256, data)
             .as_ref()
             .try_into()

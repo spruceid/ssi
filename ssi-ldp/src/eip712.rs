@@ -10,7 +10,6 @@ use serde_json::{Number, Value};
 use thiserror::Error;
 
 use crate::{LinkedDataDocument, Proof};
-use lazy_static::lazy_static;
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
 use ssi_json_ld::ContextLoader;
 

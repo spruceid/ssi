@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use crate::hashes::sha256::sha256;
 
 use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey};

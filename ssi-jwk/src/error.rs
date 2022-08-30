@@ -6,8 +6,6 @@ use base64::DecodeError as Base64Error;
 use openssl::error::ErrorStack as OpenSSLErrors;
 #[cfg(feature = "ring")]
 use ring::error::KeyRejected as KeyRejectedError;
-#[cfg(feature = "ring")]
-use ring::error::Unspecified as RingUnspecified;
 #[cfg(feature = "rsa")]
 use rsa::errors::Error as RsaError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;

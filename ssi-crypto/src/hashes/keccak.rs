@@ -1,5 +1,3 @@
-use std::convert::TryFrom;
-
 use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey};
 use keccak_hash::keccak;
 
