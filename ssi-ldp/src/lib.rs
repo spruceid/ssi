@@ -10,7 +10,7 @@ pub mod context;
 pub mod soltx;
 pub use context::Context;
 
-#[cfg(feature = "keccak")]
+#[cfg(feature = "eip")]
 pub mod eip712;
 
 // use crate::did::{VerificationMethod, VerificationMethodMap};
@@ -115,48 +115,53 @@ impl From<Result<VerificationWarnings, Error>> for VerificationResult {
     }
 }
 
+macro_rules! feature_gate {
+    ($name:literal, $type:ident) => {{
+        #[cfg(not(feature = $name))]
+        return Err(Error::JWS(ssi_jws::Error::MissingFeatures($name)));
+        #[cfg(feature = $name)]
+        &$type
+    }};
+}
+
 pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Error> {
     Ok(match proof_type {
-        "RsaSignature2018" => &RsaSignature2018,
-        "Ed25519Signature2018" => &Ed25519Signature2018,
-        "Ed25519Signature2020" => &Ed25519Signature2020,
+        "RsaSignature2018" => feature_gate!("w3c", RsaSignature2018),
+        "Ed25519Signature2018" => feature_gate!("w3c", Ed25519Signature2018),
+        "Ed25519Signature2020" => feature_gate!("w3c", Ed25519Signature2020),
         "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-            &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            feature_gate!(
+                "tezos",
+                Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            )
         }
         "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
-            &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            feature_gate!(
+                "tezos",
+                P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            )
         }
-        "EcdsaSecp256k1Signature2019" => &EcdsaSecp256k1Signature2019,
-        "EcdsaSecp256k1RecoverySignature2020" => &EcdsaSecp256k1RecoverySignature2020,
+        "EcdsaSecp256k1Signature2019" => feature_gate!("w3c", EcdsaSecp256k1Signature2019),
+        "EcdsaSecp256k1RecoverySignature2020" => {
+            feature_gate!("w3c", EcdsaSecp256k1RecoverySignature2020)
+        }
         "Eip712Signature2021" => {
-            #[cfg(not(feature = "keccak"))]
-            return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-            #[cfg(feature = "keccak")]
-            &Eip712Signature2021
+            feature_gate!("eip", Eip712Signature2021)
         }
         "EthereumPersonalSignature2021" => {
-            #[cfg(not(feature = "keccak"))]
-            return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-            #[cfg(feature = "keccak")]
-            &EthereumPersonalSignature2021
+            feature_gate!("eip", EthereumPersonalSignature2021)
         }
         "EthereumEip712Signature2021" => {
-            #[cfg(not(feature = "keccak"))]
-            return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-            #[cfg(feature = "keccak")]
-            &EthereumEip712Signature2021
+            feature_gate!("eip", EthereumEip712Signature2021)
         }
-        "TezosSignature2021" => &TezosSignature2021,
-        "TezosJcsSignature2021" => &TezosJcsSignature2021,
-        "SolanaSignature2021" => &SolanaSignature2021,
+        "TezosSignature2021" => feature_gate!("tezos", TezosSignature2021),
+        "TezosJcsSignature2021" => feature_gate!("tezos", TezosJcsSignature2021),
+        "SolanaSignature2021" => feature_gate!("solana", SolanaSignature2021),
         "AleoSignature2021" => {
-            #[cfg(not(feature = "aleosig"))]
-            return Err(Error::JWS(ssi_jws::Error::MissingFeatures("aleosig")));
-            #[cfg(feature = "aleosig")]
-            &AleoSignature2021
+            feature_gate!("aleo", AleoSignature2021)
         }
-        "JsonWebSignature2020" => &JsonWebSignature2020,
-        "EcdsaSecp256r1Signature2019" => &EcdsaSecp256r1Signature2019,
+        "JsonWebSignature2020" => feature_gate!("w3c", JsonWebSignature2020),
+        "EcdsaSecp256r1Signature2019" => feature_gate!("w3c", EcdsaSecp256r1Signature2019),
         _ => return Err(Error::ProofTypeNotImplemented),
     })
 }
@@ -167,82 +172,74 @@ fn pick_proof_suite<'a, 'b>(
 ) -> Result<&'b (dyn ProofSuite + Sync), Error> {
     let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
     Ok(match algorithm {
-        Algorithm::RS256 => &RsaSignature2018,
-        Algorithm::PS256 => &JsonWebSignature2020,
-        Algorithm::ES384 => &JsonWebSignature2020,
-        Algorithm::AleoTestnet1Signature => {
-            #[cfg(not(feature = "aleosig"))]
-            return Err(Error::JWS(ssi_jws::Error::MissingFeatures("aleosig")));
-            #[cfg(feature = "aleosig")]
-            &AleoSignature2021
-        }
+        Algorithm::RS256 => feature_gate!("w3c", RsaSignature2018),
+        Algorithm::PS256 => feature_gate!("w3c", JsonWebSignature2020),
+        Algorithm::ES384 => feature_gate!("w3c", JsonWebSignature2020),
+        Algorithm::AleoTestnet1Signature => feature_gate!("aleo", AleoSignature2021),
         Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
             Some(URI::String(ref vm))
                 if (vm.starts_with("did:sol:") || vm.starts_with("did:pkh:sol:"))
                     && vm.ends_with("#SolanaMethod2021") =>
             {
-                &SolanaSignature2021
+                feature_gate!("solana", SolanaSignature2021)
             }
             Some(URI::String(ref vm))
                 if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
             {
                 if vm.ends_with("#TezosMethod2021") {
-                    &TezosSignature2021
+                    feature_gate!("tezos", TezosSignature2021)
                 } else {
-                    &Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    feature_gate!(
+                        "tezos",
+                        Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    )
                 }
             }
-            _ => &Ed25519Signature2018,
+            _ => feature_gate!("w3c", Ed25519Signature2018),
         },
         Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
             Some(URI::String(ref vm))
                 if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
             {
                 if vm.ends_with("#TezosMethod2021") {
-                    &TezosSignature2021
+                    feature_gate!("tezos", TezosSignature2021)
                 } else {
-                    &P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    feature_gate!(
+                        "tezos",
+                        P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    )
                 }
             }
-            _ => &JsonWebSignature2020,
+            _ => feature_gate!("w3c", JsonWebSignature2020),
         },
         Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
             Some(URI::String(ref vm))
                 if vm.starts_with("did:tz:") || vm.starts_with("did:pkh:tz:") =>
             {
                 if vm.ends_with("#TezosMethod2021") {
-                    &TezosSignature2021
+                    feature_gate!("tezos", TezosSignature2021)
                 } else {
-                    &EcdsaSecp256k1RecoverySignature2020
+                    feature_gate!("w3c", EcdsaSecp256k1RecoverySignature2020)
                 }
             }
-            _ => &EcdsaSecp256k1Signature2019,
+            _ => feature_gate!("w3c", EcdsaSecp256k1Signature2019),
         },
         Algorithm::ES256KR =>
         {
             #[allow(clippy::if_same_then_else)]
             if use_eip712sig(jwk) {
-                #[cfg(not(feature = "keccak"))]
-                return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-                #[cfg(feature = "keccak")]
-                &EthereumEip712Signature2021
+                feature_gate!("eip", EthereumEip712Signature2021)
             } else if use_epsig(jwk) {
-                #[cfg(not(feature = "keccak"))]
-                return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-                #[cfg(feature = "keccak")]
-                &EthereumPersonalSignature2021
+                feature_gate!("eip", EthereumPersonalSignature2021)
             } else {
                 match verification_method {
                     Some(URI::String(ref vm))
                         if (vm.starts_with("did:ethr:") || vm.starts_with("did:pkh:eth:"))
                             && vm.ends_with("#Eip712Method2021") =>
                     {
-                        #[cfg(not(feature = "keccak"))]
-                        return Err(Error::JWS(ssi_jws::Error::MissingFeatures("keccak-hash")));
-                        #[cfg(feature = "keccak")]
-                        &Eip712Signature2021
+                        feature_gate!("eip", Eip712Signature2021)
                     }
-                    _ => &EcdsaSecp256k1RecoverySignature2020,
+                    _ => feature_gate!("w3c", EcdsaSecp256k1RecoverySignature2020),
                 }
             }
         }
@@ -328,7 +325,7 @@ pub struct ProofPreparation {
 #[non_exhaustive]
 pub enum SigningInput {
     Bytes(Base64urlUInt),
-    #[cfg(feature = "keccak")]
+    #[cfg(feature = "eip")]
     TypedData(eip712::TypedData),
     #[serde(rename_all = "camelCase")]
     EthereumPersonalMessage {

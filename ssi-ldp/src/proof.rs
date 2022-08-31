@@ -202,9 +202,9 @@ pub struct LinkedDataProofOptions {
     pub checks: Option<Vec<Check>>,
     /// Metadata for EthereumEip712Signature2021 (not standard in vc-http-api)
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[cfg(feature = "keccak")]
+    #[cfg(feature = "eip")]
     pub eip712_domain: Option<crate::eip712::ProofInfo>,
-    #[cfg(not(feature = "keccak"))]
+    #[cfg(not(feature = "eip"))]
     pub eip712_domain: Option<()>,
 }
 

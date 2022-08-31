@@ -61,15 +61,26 @@ pub enum Error {
     DecodeTezosSignature(#[from] ssi_tzkey::DecodeTezosSignatureError),
     #[error(transparent)]
     EncodeTezosSignedMessage(#[from] ssi_tzkey::EncodeTezosSignedMessageError),
-    #[cfg(feature = "keccak")]
+    #[cfg(feature = "eip")]
     #[error(transparent)]
     Eip712Hash(#[from] crate::eip712::TypedDataHashError),
-    #[cfg(feature = "keccak")]
+    #[cfg(feature = "eip")]
     #[error(transparent)]
     Eip712Json(#[from] crate::eip712::TypedDataConstructionJSONError),
-    #[cfg(feature = "keccak")]
+    #[cfg(feature = "eip")]
     #[error(transparent)]
     Eip712Construction(#[from] crate::eip712::TypedDataConstructionError),
+    #[cfg(feature = "aleo")]
+    #[error(transparent)]
+    AleoSign(#[from] ssi_jwk::aleo::AleoSignError),
+    #[cfg(feature = "aleo")]
+    #[error(transparent)]
+    AleoVerify(#[from] ssi_jwk::aleo::AleoVerifyError),
+    #[cfg(feature = "aleo")]
+    #[error("Expected Aleo network '{0}' but found '{1}'")]
+    UnexpectedAleoNetwork(String, String),
+    #[error("Expected CAIP-2 namespace '{0}' but found '{1}'")]
+    UnexpectedCAIP2Namespace(String, String),
 }
 
 impl From<ssi_jwk::Error> for Error {

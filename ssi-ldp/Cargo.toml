@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["keccak", "secp256k1", "rsa", "ed25519", "secp256r1"]
+default = ["eip", "tezos", "w3c", "solana", "aleo"]
 keccak = ["dep:keccak-hash", "secp256k1", "caips/keccak"]
 
 secp256k1 = ["ssi-jws/secp256k1", "k256", "ssi-tzkey/k256"]
@@ -14,6 +14,21 @@ secp256r1 = ["ssi-jws/secp256r1", "p256", "ssi-tzkey/p256"]
 
 rsa = ["ssi-jws/rsa"]
 ed25519 = ["ssi-jws/ed25519"]
+
+## enable the EIP-defined LDPs: EIP712
+eip = ["dep:keccak-hash", "caips/keccak", "k256"]
+## enable LDPs from the Tezos Ecosystem
+tezos = []
+## enable LDPs from the Aleo Ecosystem
+aleo = ["ssi-jwk/aleosig"]
+## enable LDPs from the Solana Ecosystem
+solana = []
+## enable LDPs from the W3C linked data proof registry: ed25519, secp256k1, rsa2018
+w3c = ["ssi-jws/rsa"]
+## Use the Ring crate for crypto operations
+ring = []
+## enable LDPs made with openssl integration: p384
+openssl = []
 
 [dependencies]
 thiserror = "1.0"
