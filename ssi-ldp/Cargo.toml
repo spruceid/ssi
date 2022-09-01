@@ -27,6 +27,8 @@ ring = ["ssi-jwt/ring"]
 ## Use the OpenSSL crate for crypto operations and P384
 openssl = ["ssi-jwt/openssl"]
 
+example-http-issuer = []
+
 [dependencies]
 thiserror = "1.0"
 async-trait = "0.1"
