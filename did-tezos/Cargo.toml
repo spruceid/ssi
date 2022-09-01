@@ -13,7 +13,7 @@ documentation = "https://docs.rs/did-tezos/"
 
 [features]
 default = ["ssi-jwk/ring"]
-dalek = ["ssi-jwk/ed25519", "ssi-jwk/rand"]
+ed25519 = ["ssi-jwk/ed25519", "ssi-jwk/rand"]
 secp256k1 = ["ssi-jwk/secp256k1", "ssi-jwk/rand"]
 secp256r1 = ["ssi-jwk/secp256r1"]
 p256 = ["secp256r1"]
