@@ -40,11 +40,11 @@ jobs:
     - name: Test
       run: cargo test --verbose --workspace
 
-    - name: Test with alternative crypto libraries
-      run: cargo test --no-default-features --features w3c
+    - name: Test with rust crypto libraries
+      run: cargo test --workspace --no-default-features --features=w3c
 
-    - name: Test with openssl
-      run: cargo test --no-default-features --features=ring,openssl
+    - name: Test with openssl and ring
+      run: cargo test --workspace --no-default-features --features=ring,openssl,w3c
 
     - name: Test with secp256k1
       run: |
