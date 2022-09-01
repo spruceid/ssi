@@ -30,4 +30,14 @@ pub enum Error {
     UnexpectedSignatureLength(usize, usize),
     #[error("Invalid signature")]
     InvalidSignature,
+    #[cfg(feature = "openssl")]
+    #[error(transparent)]
+    OpenSSL(#[from] openssl::error::ErrorStack),
+}
+
+#[cfg(feature = "ring")]
+impl From<ring::error::Unspecified> for Error {
+    fn from(e: ring::error::Unspecified) -> Self {
+        ssi_jwk::Error::from(e).into()
+    }
 }

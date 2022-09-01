@@ -111,7 +111,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 .sign(padding, &hashed)
                 .map_err(ssi_jwk::Error::from)?
         }
-        #[cfg(any(feature = "ring", feature = "ed25519-dalek"))]
+        #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
             if algorithm != Algorithm::EdDSA && algorithm != Algorithm::EdBlake2b {
                 return Err(Error::UnsupportedAlgorithm);
@@ -133,7 +133,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 key_pair.sign(&hash).as_ref().to_vec()
             }
             // TODO: SymmetricParams
-            #[cfg(feature = "ed25519-dalek")]
+            #[cfg(all(feature = "ed25519", not(feature = "ring")))]
             {
                 let keypair = ed25519_dalek::Keypair::try_from(okp)?;
                 use ed25519_dalek::Signer;
@@ -333,7 +333,7 @@ pub fn verify_bytes_warnable(
                 .map_err(ssi_jwk::Error::from)?;
         }
         // TODO: SymmetricParams
-        #[cfg(any(feature = "ring", feature = "ed25519-dalek"))]
+        #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
             if okp.curve != *"Ed25519" {
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
@@ -353,7 +353,7 @@ pub fn verify_bytes_warnable(
                 let public_key = UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
                 public_key.verify(&hash, signature)?;
             }
-            #[cfg(feature = "ed25519-dalek")]
+            #[cfg(feature = "ed25519")]
             {
                 use ed25519_dalek::Verifier;
                 let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
@@ -497,7 +497,7 @@ pub fn verify_bytes_warnable(
             Algorithm::ES384 => {
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "P-384" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()));
+                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
                 }
                 if signature.len() != 96 {
                     return Err(Error::UnexpectedSignatureLength(96, signature.len()));
