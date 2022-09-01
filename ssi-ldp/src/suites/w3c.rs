@@ -6,7 +6,9 @@ use ssi_json_ld::ContextLoader;
 use ssi_jwk::{Algorithm, Params as JWKParams, JWK};
 use std::collections::HashMap as Map;
 
+#[cfg(feature = "rsa")]
 pub struct RsaSignature2018;
+#[cfg(feature = "rsa")]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for RsaSignature2018 {
@@ -70,7 +72,9 @@ impl ProofSuite for RsaSignature2018 {
     }
 }
 
+#[cfg(feature = "ed25519")]
 pub struct Ed25519Signature2018;
+#[cfg(feature = "ed25519")]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519Signature2018 {
@@ -134,7 +138,9 @@ impl ProofSuite for Ed25519Signature2018 {
     }
 }
 
+#[cfg(feature = "ed25519")]
 pub struct Ed25519Signature2020;
+#[cfg(feature = "ed25519")]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for Ed25519Signature2020 {
@@ -200,7 +206,9 @@ impl ProofSuite for Ed25519Signature2020 {
     }
 }
 
+#[cfg(feature = "secp256k1")]
 pub struct EcdsaSecp256k1Signature2019;
+#[cfg(feature = "secp256k1")]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1Signature2019 {
@@ -264,7 +272,9 @@ impl ProofSuite for EcdsaSecp256k1Signature2019 {
     }
 }
 
+#[cfg(feature = "secp256k1")]
 pub struct EcdsaSecp256k1RecoverySignature2020;
+#[cfg(feature = "secp256k1")]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
@@ -361,7 +371,9 @@ impl ProofSuite for EcdsaSecp256k1RecoverySignature2020 {
         Ok(warnings)
     }
 }
+#[cfg(feature = "secp256r1")]
 pub struct EcdsaSecp256r1Signature2019;
+#[cfg(feature = "secp256r1")]
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl ProofSuite for EcdsaSecp256r1Signature2019 {
