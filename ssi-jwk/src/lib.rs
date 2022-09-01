@@ -263,32 +263,34 @@ impl Default for Algorithm {
 }
 
 impl JWK {
-    #[cfg(feature = "ring")]
-    pub fn generate_ed25519() -> Result<JWK, ring::error::Unspecified> {
-        let rng = ring::rand::SystemRandom::new();
-        let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
-            .as_ref()
-            .to_vec();
-        // reference: ring/src/ec/curve25519/ed25519/signing.rs
-        let private_key = key_pkcs8[0x10..0x30].to_vec();
-        let public_key = key_pkcs8[0x35..0x55].to_vec();
-        key_pkcs8.zeroize();
-        Ok(JWK::from(Params::OKP(OctetParams {
-            curve: "Ed25519".to_string(),
-            public_key: Base64urlUInt(public_key),
-            private_key: Some(Base64urlUInt(private_key)),
-        })))
-    }
-
-    #[cfg(all(feature = "ed25519", not(feature = "ring")))]
+    #[cfg(any(feature = "ed25519"))]
     pub fn generate_ed25519() -> Result<JWK, Error> {
-        let mut csprng = rand_old::rngs::OsRng {};
-        let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
-        Ok(JWK::from(Params::OKP(OctetParams {
-            curve: "Ed25519".to_string(),
-            public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
-            private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
-        })))
+        #[cfg(feature = "ring")]
+        {
+            let rng = ring::rand::SystemRandom::new();
+            let mut key_pkcs8 = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)?
+                .as_ref()
+                .to_vec();
+            // reference: ring/src/ec/curve25519/ed25519/signing.rs
+            let private_key = key_pkcs8[0x10..0x30].to_vec();
+            let public_key = key_pkcs8[0x35..0x55].to_vec();
+            key_pkcs8.zeroize();
+            Ok(JWK::from(Params::OKP(OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: Base64urlUInt(public_key),
+                private_key: Some(Base64urlUInt(private_key)),
+            })))
+        }
+        #[cfg(not(feature = "ring"))]
+        {
+            let mut csprng = rand_old::rngs::OsRng {};
+            let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
+            Ok(JWK::from(Params::OKP(OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
+                private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
+            })))
+        }
     }
 
     #[cfg(feature = "secp256k1")]

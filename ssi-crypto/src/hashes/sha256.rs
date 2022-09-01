@@ -15,7 +15,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
             .unwrap();
         hash
     }
-    #[cfg(all(not(feature = "ring"), feature = "sha2"))]
+    #[cfg(not(feature = "ring"))]
     {
         // Only if "ring" is not enabled, but "sha2" is, does it use "sha2" for the sha256 impl.
         use sha2::Digest;
@@ -23,12 +23,6 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
         hasher.update(data);
         let hash = hasher.finalize().into();
         Ok(hash)
-    }
-    #[cfg(all(not(feature = "ring"), not(feature = "sha2")))]
-    {
-        // If neither "ring" nor "sha2" are enabled, no sha256 impl is possible.
-        let _ = data;
-        compile_error!("The [`sha256`] function requires feature either `sha2` or `ring` but not both (and neither are currently enabled).");
     }
 }
 
