@@ -1,11 +1,11 @@
 //! Error types for `ssi-jwk` crate
-#[cfg(feature = "aleosig")]
+#[cfg(feature = "aleo")]
 use crate::aleo::AleoGeneratePrivateKeyError;
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "openssl")]
 use openssl::error::ErrorStack as OpenSSLErrors;
 #[cfg(feature = "ring")]
-use ring::error::KeyRejected as KeyRejectedError;
+use ring::error::{KeyRejected as KeyRejectedError, Unspecified as RingUnspecified};
 #[cfg(feature = "rsa")]
 use rsa::errors::Error as RsaError;
 use simple_asn1::ASN1EncodeErr as ASN1EncodeError;
@@ -56,6 +56,10 @@ pub enum Error {
     #[cfg(feature = "ring")]
     #[error("{0}")]
     KeyRejected(KeyRejectedError),
+    /// Unspecified Error using `ring`
+    #[cfg(feature = "ring")]
+    #[error("{0}")]
+    RingUnspecified(RingUnspecified),
     /// Error parsing a UTF-8 string
     #[error(transparent)]
     FromUtf8(#[from] FromUtf8Error),
@@ -85,7 +89,7 @@ pub enum Error {
     #[error(transparent)]
     TryFromSlice(#[from] TryFromSliceError),
     /// Error generating Aleo private key
-    #[cfg(feature = "aleosig")]
+    #[cfg(feature = "aleo")]
     #[error(transparent)]
     AleoGeneratePrivateKey(#[from] AleoGeneratePrivateKeyError),
     /// Expected 64 byte uncompressed key or 33 bytes compressed key
@@ -104,11 +108,7 @@ pub enum Error {
     #[cfg(all(feature = "p256", not(feature = "k256")))]
     #[error(transparent)]
     CryptoErr(#[from] p256::ecdsa::Error),
-    #[cfg(all(
-        feature = "ed25519-dalek",
-        not(feature = "k256"),
-        not(feature = "p256")
-    ))]
+    #[cfg(all(feature = "ed25519", not(feature = "k256"), not(feature = "p256")))]
     #[error(transparent)]
     CryptoErr(#[from] ed25519_dalek::ed25519::Error),
     /// Error from `elliptic-curve` crate
@@ -124,5 +124,12 @@ pub enum Error {
 impl From<KeyRejectedError> for Error {
     fn from(e: KeyRejectedError) -> Error {
         Error::KeyRejected(e)
+    }
+}
+
+#[cfg(feature = "ring")]
+impl From<RingUnspecified> for Error {
+    fn from(e: RingUnspecified) -> Error {
+        Error::RingUnspecified(e)
     }
 }

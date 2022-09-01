@@ -800,7 +800,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "secp256k1")]
+    #[cfg(feature = "eip")]
     #[async_std::test]
     async fn eip712vm() {
         let mut key = JWK::generate_secp256k1().unwrap();
@@ -826,6 +826,7 @@ mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "tezos")]
     async fn tezos_vm_tz1() {
         let mut key = JWK::generate_ed25519().unwrap();
         key.algorithm = Some(Algorithm::EdBlake2b);
@@ -853,7 +854,7 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "secp256k1")]
+    #[cfg(feature = "tezos")]
     async fn tezos_vm_tz2() {
         let mut key = JWK::generate_secp256k1().unwrap();
         key.algorithm = Some(Algorithm::ESBlake2bK);
@@ -880,7 +881,7 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "secp256k1")]
+    #[cfg(feature = "tezos")]
     async fn tezos_jcs_vm_tz2() {
         let mut key = JWK::generate_secp256k1().unwrap();
         key.algorithm = Some(Algorithm::ESBlake2bK);

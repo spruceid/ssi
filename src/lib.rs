@@ -23,19 +23,12 @@
     html_favicon_url = "https://demo.didkit.dev/2021/10/21/rust-favicon.ico"
 )]
 
-// TODO
-// move out vc, revocation and zcap
-// organise jws features around crypto impl
-// organise remaining higher level module features around actual features and underlying crypto dependancy choice
-// "rust-crypto" as default, "ring" feature enabled would replace applicable functionality. "openssl" is in the same position as "ring"?
-//
-
 // maintain old structure here
 pub use caips::caip10;
 pub use caips::caip2;
 pub use ssi_core::one_or_many;
 pub use ssi_crypto::hashes as hash;
-#[cfg(feature = "keccak")]
+#[cfg(feature = "eip")]
 pub use ssi_crypto::hashes::keccak;
 #[cfg(feature = "bbs")]
 pub use ssi_crypto::signatures::bbs;
@@ -52,7 +45,7 @@ pub use ssi_jwk::ripemd160 as ripemd;
 pub use ssi_jws as jws;
 pub use ssi_jwt as jwt;
 pub use ssi_ldp as ldp;
-#[cfg(feature = "keccak")]
+#[cfg(feature = "eip")]
 pub use ssi_ldp::eip712;
 pub use ssi_ldp::soltx;
 pub use ssi_ssh as ssh;
@@ -62,7 +55,7 @@ pub use ssi_vc as vc;
 pub use ssi_zcap_ld as zcap;
 pub use vc::revocation;
 
-#[cfg(feature = "aleosig")]
+#[cfg(feature = "aleo")]
 pub use ssi_jwk::aleo;
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));

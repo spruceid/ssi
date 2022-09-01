@@ -23,7 +23,7 @@
 //! [test cases]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
 
 use crate::caip2::{ChainId, ChainIdParseError};
-use ssi_jwk::{blakesig, Params, JWK};
+use ssi_jwk::{Params, JWK};
 use std::fmt;
 use std::str::FromStr;
 
@@ -72,13 +72,13 @@ fn encode_ed25519(jwk: &JWK) -> Result<String, &'static str> {
 }
 
 // convert a JWK to a Aleo account address string if it looks like an Aleo key
-#[cfg(feature = "aleosig")]
+#[cfg(feature = "aleo")]
 fn encode_aleo_address(jwk: &JWK, network_id: &str) -> Result<String, &'static str> {
     if network_id != "1" {
         return Err("Unexpected Aleo network id");
     }
     let params = match jwk.params {
-        Params::OKP(ref params) if params.curve == crate::aleo::OKP_CURVE => params,
+        Params::OKP(ref params) if params.curve == ssi_jwk::aleo::OKP_CURVE => params,
         _ => return Err("Invalid public key type for Aleo"),
     };
 
@@ -114,9 +114,10 @@ impl BlockchainAccountId {
             self.chain_id.namespace.as_str(),
             self.chain_id.reference.as_str(),
         ) {
-            ("tezos", _net) => blakesig::hash_public_key(jwk)
+            #[cfg(feature = "tezos")]
+            ("tezos", _net) => ssi_jwk::blakesig::hash_public_key(jwk)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
-            #[cfg(feature = "keccak")]
+            #[cfg(feature = "eip")]
             // If account address contains uppercase, check EIP-55 checksum.
             // Otherwise, assume EIP-55 is not being used.
             ("eip155", _net) => if self
@@ -142,7 +143,7 @@ impl BlockchainAccountId {
                 ssi_jwk::ripemd160::hash_public_key(jwk, 0x1e)
                     .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string()))
             }
-            #[cfg(feature = "aleosig")]
+            #[cfg(feature = "aleo")]
             ("aleo", network_id) => encode_aleo_address(jwk, network_id)
                 .map_err(|e| BlockchainAccountIdVerifyError::HashError(e.to_string())),
             _ => Err(BlockchainAccountIdVerifyError::UnknownChainId(

@@ -2835,7 +2835,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
-    #[cfg(all(feature = "secp256k1", feature = "keccak"))]
+    #[cfg(feature = "eip")]
     async fn esrs2020() {
         use ssi_dids::did_resolve::{
             DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
@@ -3133,7 +3133,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
-    #[cfg(feature = "aleosig")]
+    #[cfg(feature = "aleo")]
     async fn aleosig2021() {
         use crate::Credential;
         use ssi_dids::did_resolve::{
@@ -3228,7 +3228,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(warnings.is_empty());
     }
 
-    #[cfg(feature = "keccak")]
+    #[cfg(feature = "eip")]
     #[async_std::test]
     async fn verify_typed_data() {
         use ssi_ldp::eip712::TypedData;

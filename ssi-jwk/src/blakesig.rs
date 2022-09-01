@@ -30,12 +30,10 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
         Params::EC(ref params) => {
             let curve = params.curve.as_ref().ok_or(Error::MissingCurve)?;
             match &curve[..] {
-                #[cfg(feature = "secp256k1")]
                 "secp256k1" => {
                     bytes = crate::serialize_secp256k1(params)?;
                     (&TZ2_HASH, &bytes)
                 }
-                #[cfg(feature = "p256")]
                 "P-256" => {
                     bytes = crate::serialize_p256(params)?;
                     (&TZ3_HASH, &bytes)

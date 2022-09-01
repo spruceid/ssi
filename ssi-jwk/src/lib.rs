@@ -9,11 +9,13 @@ pub use error::Error;
 #[cfg(feature = "ripemd-160")]
 pub mod ripemd160;
 
-#[cfg(feature = "aleosig")]
+#[cfg(feature = "aleo")]
 pub mod aleo;
 
+#[cfg(feature = "eip")]
 pub mod eip155;
 
+#[cfg(feature = "tezos")]
 pub mod blakesig;
 
 pub mod der;
@@ -337,7 +339,7 @@ impl JWK {
         })))
     }
 
-    #[cfg(feature = "aleosig")]
+    #[cfg(feature = "aleo")]
     pub fn generate_aleo() -> Result<JWK, Error> {
         crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
     }
@@ -353,7 +355,7 @@ impl JWK {
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
             }
-            #[cfg(feature = "aleosig")]
+            #[cfg(feature = "aleo")]
             Params::OKP(okp_params) if okp_params.curve == crate::aleo::OKP_CURVE => {
                 return Some(Algorithm::AleoTestnet1Signature);
             }
@@ -796,7 +798,7 @@ impl TryFrom<&RSAParams> for ring::signature::RsaKeyPair {
     }
 }
 
-#[cfg(feature = "ed25519-dalek")]
+#[cfg(feature = "ed25519")]
 impl TryFrom<&OctetParams> for ed25519_dalek::PublicKey {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
@@ -807,7 +809,7 @@ impl TryFrom<&OctetParams> for ed25519_dalek::PublicKey {
     }
 }
 
-#[cfg(feature = "ed25519-dalek")]
+#[cfg(feature = "ed25519")]
 impl TryFrom<&OctetParams> for ed25519_dalek::SecretKey {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
@@ -822,7 +824,7 @@ impl TryFrom<&OctetParams> for ed25519_dalek::SecretKey {
     }
 }
 
-#[cfg(feature = "ed25519-dalek")]
+#[cfg(feature = "ed25519")]
 impl TryFrom<&OctetParams> for ed25519_dalek::Keypair {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {

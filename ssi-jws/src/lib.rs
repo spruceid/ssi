@@ -429,7 +429,7 @@ pub fn verify_bytes_warnable(
                         .push("Signature uses legacy mode ES256K-R with Keccak-256".to_string());
                 }
             }
-            #[cfg(feature = "secp256k1")]
+            #[cfg(feature = "eip")]
             Algorithm::ESKeccakKR => {
                 use k256::ecdsa::signature::Verifier;
                 use std::panic;
