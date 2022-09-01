@@ -7,28 +7,25 @@ edition = "2021"
 
 [features]
 default = ["eip", "tezos", "w3c", "solana", "aleo"]
-keccak = ["dep:keccak-hash", "secp256k1", "caips/keccak"]
-
-secp256k1 = ["ssi-jws/secp256k1", "k256", "ssi-tzkey/k256"]
-secp256r1 = ["ssi-jws/secp256r1", "p256", "ssi-tzkey/p256"]
-
-rsa = ["ssi-jws/rsa"]
-ed25519 = ["ssi-jws/ed25519"]
-
+## enable LDPs from the W3C linked data proof registry: ed25519, secp256k1, rsa2018, secp256r1
+w3c = ["secp256k1", "secp256r1", "rsa", "ed25519"]
+secp256k1 = ["ssi-jwt/secp256k1", "k256"]
+secp256r1 = ["ssi-jwt/secp256r1", "p256"]
+ed25519 = ["ssi-jwt/ed25519"]
+rsa = ["ssi-jwt/rsa"]
 ## enable the EIP-defined LDPs: EIP712
-eip = ["dep:keccak-hash", "caips/keccak", "k256"]
+eip = ["keccak-hash", "caips/eip", "k256", "ssi-jwt/eip"]
 ## enable LDPs from the Tezos Ecosystem
-tezos = []
+tezos = ["ssi-tzkey", "ssi-jwt/tezos"]
 ## enable LDPs from the Aleo Ecosystem
-aleo = ["ssi-jwk/aleosig"]
+aleo = ["ssi-jwt/aleo"]
 ## enable LDPs from the Solana Ecosystem
 solana = []
-## enable LDPs from the W3C linked data proof registry: ed25519, secp256k1, rsa2018
-w3c = ["ssi-jws/rsa"]
+
 ## Use the Ring crate for crypto operations
-ring = []
-## enable LDPs made with openssl integration: p384
-openssl = []
+ring = ["ssi-jwt/ring"]
+## Use the OpenSSL crate for crypto operations and P384
+openssl = ["ssi-jwt/openssl"]
 
 [dependencies]
 thiserror = "1.0"
@@ -50,8 +47,8 @@ ssi-dids = { path = "../ssi-dids", version = "0.1"}
 ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
 ssi-jws = { path = "../ssi-jws", version = "0.1"}
 ssi-jwt = { path = "../ssi-jwt", version = "0.1"}
-ssi-tzkey = { path = "../ssi-tzkey", version = "0.1"}
-caips = { path = "../caips", version = "0.1"}
+ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true}
+caips = { path = "../caips", version = "0.1" }
 ssi-contexts = { version = "0.1.3", path = "../contexts" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

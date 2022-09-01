@@ -5,13 +5,17 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-keccak = ["ssi-jwk/keccak"]
+default = ["eip", "ripemd-160", "aleo", "tezos"]
+eip = ["ssi-jwk/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160"]
+aleo = ["ssi-jwk/aleo", "bech32"]
+tezos = ["ssi-jwk/tezos"]
 
 [dependencies]
 thiserror = "1"
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 bs58 = { version = "0.4", features = ["check"] }
+bech32 = { version = "0.8", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"

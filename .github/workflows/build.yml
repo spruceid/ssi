@@ -41,7 +41,7 @@ jobs:
       run: cargo test --verbose --workspace
 
     - name: Test with alternative crypto libraries
-      run: cargo test --no-default-features --features rsa,ed25519-dalek,sha2,rand
+      run: cargo test --no-default-features --features w3c
 
     - name: Test with openssl
       run: cargo test --no-default-features --features=ring,openssl
@@ -55,8 +55,8 @@ jobs:
     - name: Test with p256
       run: |
         cargo test --verbose --workspace --features p256
-        cargo test --verbose --manifest-path did-key/Cargo.toml --features p256,ssi/p256,ssi/ring,ssi/rand
-        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features p256,ssi/p256,ssi/ring,ssi/rand
+        cargo test --verbose --manifest-path did-key/Cargo.toml --features p256,ssi/p256,ssi/ring
+        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features p256,ssi/p256,ssi/ring
 
     - name: Test DID Resolution HTTP(S) Binding
       run: cargo test --features http-did

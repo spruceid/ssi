@@ -4,6 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["eip", "tezos", "w3c", "solana", "aleo"]
+w3c = ["secp256k1", "secp256r1", "rsa", "ed25519", "ssi-ldp/w3c"]
+secp256k1 = ["ssi-ldp/secp256k1"]
+secp256r1 = ["ssi-ldp/secp256r1"]
+ed25519 = ["ssi-ldp/ed25519"]
+rsa = ["ssi-ldp/rsa"]
+eip = ["ssi-ldp/eip"]
+tezos = ["ssi-ldp/tezos"]
+solana = ["ssi-ldp/solana"]
+aleo = ["ssi-ldp/aleo"]
+
+openssl = ["ssi-ldp/openssl", "ssi-jwk/openssl"]
+ring = ["ssi-ldp/ring", "ssi-jwk/ring"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
