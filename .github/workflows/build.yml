@@ -41,10 +41,10 @@ jobs:
       run: cargo test --verbose --workspace
 
     - name: Test with rust crypto libraries
-      run: cargo test --workspace --no-default-features --features=w3c
+      run: cargo test --workspace --no-default-features --features w3c
 
     - name: Test with openssl and ring
-      run: cargo test --workspace --no-default-features --features=ring,openssl,w3c
+      run: cargo test --workspace --no-default-features --features ring,openssl,w3c
 
     - name: Test with secp256k1
       run: |
@@ -59,7 +59,7 @@ jobs:
         cargo test --verbose --manifest-path did-tezos/Cargo.toml --features secp256r1,ssi/secp256r1,ssi/ring
 
     - name: Test DID Resolution HTTP(S) Binding
-      run: cargo test --features http-did
+      run: cargo test --manifest-path ssi-dids/Cargo.toml --features http
 
     - name: Checkout vc-test-suite
       uses: actions/checkout@v2

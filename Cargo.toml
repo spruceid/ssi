@@ -35,7 +35,7 @@ openssl = ["ssi-vc/openssl", "ssi-ucan/openssl", "ssi-zcap-ld/openssl"]
 ## Use the OpenSSL crate for crypto operations
 ring = ["ssi-vc/ring", "ssi-ucan/ring", "ssi-zcap-ld/openssl"]
 
-http-did = []
+http-did = ["ssi-dids/http"]
 example-http-issuer = ["ssi-dids/testing", "ssi-ldp/example-http-issuer"]
 
 [dependencies]
