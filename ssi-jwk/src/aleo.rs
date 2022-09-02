@@ -13,9 +13,8 @@ use thiserror::Error;
 
 use blake2::Blake2s;
 use snarkvm_algorithms::{
-    commitment::{PedersenCommitmentParameters, PedersenCompressedCommitment},
-    encryption::{GroupEncryption, GroupEncryptionParameters},
-    signature::{Schnorr, SchnorrParameters, SchnorrSignature},
+    EncryptionScheme, GroupEncryptionParameters, PedersenCommitment, PedersenCompressedCommitment,
+    Schnorr, SchnorrParameters, SchnorrSignature,
 };
 use snarkvm_curves::edwards_bls12::{EdwardsAffine, EdwardsProjective};
 use snarkvm_dpc::{

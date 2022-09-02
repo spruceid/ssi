@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["eip", "tezos", "w3c", "solana", "aleo"]
+default = ["eip", "tezos", "w3c", "solana"]
 ## enable LDPs from the W3C linked data proof registry: ed25519, secp256k1, rsa2018, secp256r1
 w3c = ["secp256k1", "secp256r1", "rsa", "ed25519"]
 secp256k1 = ["ssi-jwt/secp256k1", "k256"]
@@ -16,9 +16,9 @@ rsa = ["ssi-jwt/rsa"]
 ## enable the EIP-defined LDPs: EIP712
 eip = ["keccak-hash", "caips/eip", "k256", "ssi-jwt/eip"]
 ## enable LDPs from the Tezos Ecosystem
-tezos = ["ssi-tzkey", "ssi-jwt/tezos"]
+tezos = ["ssi-tzkey", "ssi-jwt/tezos", "caips/tezos"]
 ## enable LDPs from the Aleo Ecosystem
-aleo = ["ssi-jwt/aleo"]
+aleo = ["ssi-jwt/aleo", "caips/aleo"]
 ## enable LDPs from the Solana Ecosystem
 solana = []
 

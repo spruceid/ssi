@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["eip", "tezos", "w3c", "solana", "aleo"]
+default = ["eip", "w3c"]
 w3c = ["secp256k1", "secp256r1", "rsa", "ed25519", "ssi-ldp/w3c"]
 secp256k1 = ["ssi-ldp/secp256k1"]
 secp256r1 = ["ssi-ldp/secp256r1"]
