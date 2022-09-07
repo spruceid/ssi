@@ -22,6 +22,12 @@ pub enum Error {
     MissingPresentation,
     #[error("Invalid issuer")]
     InvalidIssuer,
+    #[error("Missing holder property")]
+    MissingHolder,
+    #[error("Unsupported Holder Binding")]
+    UnsupportedHolderBinding,
+    #[error(transparent)]
+    HolderBindingVerification(#[from] crate::cacao::Error),
     #[error("Missing issuance date")]
     MissingIssuanceDate,
     #[error("Missing type VerifiableCredential")]
