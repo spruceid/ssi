@@ -1557,7 +1557,7 @@ impl Presentation {
         &self,
         resolver: &dyn DIDResolver,
         proof_purpose: ProofPurpose,
-    ) -> Result<Vec<String>, String> {
+    ) -> Result<Vec<String>, Error> {
         let authorized_holders = self.get_authorized_holders().await?;
         let vmms = crate::did_resolve::get_verification_methods_for_all(
             authorized_holders
@@ -1568,16 +1568,15 @@ impl Presentation {
             proof_purpose.clone(),
             resolver,
         )
-        .await
-        .map_err(String::from)?;
+        .await?;
         Ok(vmms.into_keys().collect())
     }
 
-    pub(crate) async fn get_authorized_holders(&self) -> Result<Vec<String>, String> {
+    pub(crate) async fn get_authorized_holders(&self) -> Result<Vec<String>, Error> {
         let mut holders = match (self.holder.as_ref(), self.holder_binding.as_ref()) {
             (Some(_), Some(_)) | (None, None) => vec![],
             (Some(h), None) => vec![h.to_string()],
-            (None, Some(_)) => return Err("No holder".to_string()),
+            (None, Some(_)) => return Err(Error::MissingHolder),
         };
         for holder_binding in self.holder_binding.iter().flatten() {
             match &holder_binding {
@@ -1588,7 +1587,7 @@ impl Presentation {
                         continue;
                     }
                     // let signature = base64::decode_config(proof, base64::URL_SAFE_NO_PAD)?;
-                    holders.push(String::from("did:example:foo"));
+                    holders.push(to.to_string());
                 }
                 HolderBinding::CacaoDelegationHolderBinding2022 { cacao_delegation } => {
                     match cacao_delegation
@@ -1606,7 +1605,7 @@ impl Presentation {
                 }
                 HolderBinding::Unknown => {
                     // TODO: return warning or error for unknown holder binding?
-                    return Err(String::from("Unknown holder binding"));
+                    return Err(Error::UnsupportedHolderBinding);
                 }
             }
         }
@@ -1873,6 +1872,7 @@ pub(crate) mod tests {
     pub const EXAMPLE_STATUS_LIST_2021: &[u8] = include_bytes!("../../tests/statusList.json");
 
     const JWK_JSON: &str = include_str!("../../tests/rsa2048-2020-08-25.json");
+    const JWK_JSON_BAR: &str = include_str!("../../tests/ed25519-2021-06-16.json");
 
     #[test]
     fn credential_from_json() {
@@ -2921,52 +2921,100 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     #[async_std::test]
     async fn present_with_example_holder_binding() {
         let mut context_loader = crate::jsonld::ContextLoader::default();
-        let mut vp: Presentation = serde_json::from_value(serde_json::json!({
-            "@context": [
-                "https://www.w3.org/2018/credentials/v1",
-                {
-                    "@vocab": "https://example.org/example-holder-binding#"
-                }
-            ],
-            "type": ["VerifiablePresentation"],
-            "holderBinding": {
-                "type": "ExampleHolderBinding2022",
-                "from": "did:example:foo",
-                "to": "did:example:bar",
-                "proof": "..."
-            },
-            "holder": "did:example:bar"
-        }))
-        .unwrap();
-
-        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+        let key: JWK = serde_json::from_str(JWK_JSON_BAR).unwrap();
         let mut vp_issue_options = LinkedDataProofOptions::default();
-        let vp_proof_vm = "did:example:foo#key1".to_string();
+        let vp_proof_vm = "did:example:bar#key1".to_string();
         vp_issue_options.verification_method = Some(URI::String(vp_proof_vm));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
-        let vp_proof = vp
-            .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
-            .await
+
+        {
+            let mut vp: Presentation = serde_json::from_value(serde_json::json!({
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    {
+                        "@vocab": "https://example.org/example-holder-binding#"
+                    }
+                ],
+                "type": ["VerifiablePresentation"],
+                "holderBinding": {
+                    "type": "ExampleHolderBinding2022",
+                    "from": "did:example:foo",
+                    "to": "did:example:bar",
+                    "proof": "..."
+                },
+                "holder": "did:example:bar"
+            }))
             .unwrap();
-        vp.add_proof(vp_proof);
-        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        vp.validate().unwrap();
-        let vp_verification_result = vp.verify(None, &DIDExample, &mut context_loader).await;
-        println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.is_empty());
 
-        todo!();
-        // Sign presentation to create VP
-        // TODO
-        // Verify VP
+            let vp_proof = vp
+                .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            vp.add_proof(vp_proof);
+            println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+            // Verify VP
+            vp.validate().unwrap();
+            let vp_verification_result = vp.verify(None, &DIDExample, &mut context_loader).await;
+            println!("{:#?}", vp_verification_result);
+            assert!(vp_verification_result.errors.is_empty());
+        }
 
-        // Do the same thing but with a mismatched holder binding
-        // TODO
-        // Verify VP fails
-        // TODO
+        {
+            // Do the same thing but with a mismatched holder binding
+            // Verify VP fails
+            let mut vp: Presentation = serde_json::from_value(serde_json::json!({
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    {
+                        "@vocab": "https://example.org/example-holder-binding#"
+                    }
+                ],
+                "type": ["VerifiablePresentation"],
+                "holderBinding": {
+                    "type": "ExampleHolderBinding2022",
+                    "from": "did:example:foo",
+                    "to": "did:example:foo",
+                    "proof": "..."
+                },
+                "holder": "did:example:bar"
+            }))
+            .unwrap();
+            let vp_proof = vp
+                .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            vp.add_proof(vp_proof);
+            let vp_verification_result = vp.verify(None, &DIDExample, &mut context_loader).await;
+            println!("{:#?}", vp_verification_result);
+            assert!(!vp_verification_result.errors.is_empty());
+        }
 
-        // Check that verifying a VP with an unknown holder binding type produces an error.
-        // TODO
+        {
+            // Check that verifying a VP with an unknown holder binding type produces an error.
+            let mut vp: Presentation = serde_json::from_value(serde_json::json!({
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    {
+                        "@vocab": "https://example.org/example-holder-binding#"
+                    }
+                ],
+                "type": ["VerifiablePresentation"],
+                "holderBinding": {
+                    "type": "SomeOtherThing",
+                    "field": "something"
+                },
+                "holder": "did:example:bar"
+            }))
+            .unwrap();
+            let vp_proof = vp
+                .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            vp.add_proof(vp_proof);
+            let vp_verification_result = vp.verify(None, &DIDExample, &mut context_loader).await;
+            println!("{:#?}", vp_verification_result);
+            assert!(!vp_verification_result.errors.is_empty());
+        }
     }
 }

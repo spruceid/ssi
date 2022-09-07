@@ -2,13 +2,16 @@ use crate::one_or_many::OneOrMany;
 use crate::vc::{CredentialOrJWT, URI};
 
 use cacaos::{
-    siwe_cacao::{siwe, SIWEPayloadConversionError, SiweCacao},
+    siwe_cacao::{
+        siwe, SIWEPayloadConversionError, SiweCacao, VerificationError as SiweVerificationError,
+    },
     CACAO,
 };
 use capgrok::{extract_capabilities, verify_statement, Error as CapGrokError, RESOURCE_PREFIX};
 use libipld::{cbor::DagCborCodec, codec::Decode};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
+use thiserror::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
@@ -18,33 +21,48 @@ pub enum HolderBindingDelegation {
     Base64Block(String),
 }
 
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("Invalid Base64 Block")]
+    InvalidBase64Block,
+    #[error("JWT VCs not supported")]
+    UnsupportedJwtVc,
+    #[error(transparent)]
+    Base64(#[from] base64::DecodeError),
+    #[error(transparent)]
+    SiweVerification(#[from] SiweVerificationError),
+    #[error(transparent)]
+    Ipld(#[from] libipld::error::Error),
+    #[error(transparent)]
+    CapGrok(#[from] CapGrokError),
+}
+
+impl From<SIWEPayloadConversionError> for Error {
+    fn from(e: SIWEPayloadConversionError) -> Error {
+        SiweVerificationError::from(e).into()
+    }
+}
+
 impl HolderBindingDelegation {
+    /// Given a presentation id, presented credentials and a holder, return authorised holders
     pub async fn validate(
         &self,
         id: Option<&URI>,
         credentials: Option<&OneOrMany<CredentialOrJWT>>,
         holder: Option<&URI>,
-    ) -> Result<Option<String>, String> {
+    ) -> Result<Option<String>, Error> {
         let HolderBindingDelegation::Base64Block(base64_cacao) = self;
         let cbor_cacao = if let Some(b) = base64_cacao.strip_prefix("data:;base64,") {
-            base64::decode(b)
-                .map_err(|_| "Invalid base 64 encoding for the cacao delegation".to_string())?
+            base64::decode(b)?
         } else {
-            return Err(String::from("Invalid cacao delegation"));
+            return Err(Error::InvalidBase64Block);
         };
-        let cacao: SiweCacao = CACAO::decode(DagCborCodec, &mut std::io::Cursor::new(cbor_cacao))
-            .map_err(|e| format!("Could not decode cacao delegation: {}", e))?;
-        if let Err(e) = cacao.verify().await {
-            return Err(format!("Verification of CACAO failed: {}", e));
-        }
+        let cacao: SiweCacao = CACAO::decode(DagCborCodec, &mut std::io::Cursor::new(cbor_cacao))?;
+        cacao.verify().await?;
         let payload = cacao.payload();
         let delegator = &payload.iss;
         let delegee = &payload.aud;
 
-        // TODO Do we want to support VPs without VCs?
-        // else {
-        //     return Ok(None);
-        // }
         if let Some(h) = holder {
             if *delegee != h.to_string() {
                 return Ok(None);
@@ -52,53 +70,47 @@ impl HolderBindingDelegation {
         } else {
             return Ok(None);
         }
-        if payload.resources.is_empty() {
+
+        let siwe: siwe::Message = payload.clone().try_into()?;
+        if !verify_statement(&siwe)? {
             return Ok(None);
         }
+        let capability = extract_capabilities(&siwe)?.remove(&"credentials".parse()?);
 
-        let siwe: siwe::Message = payload
-            .clone()
-            .try_into()
-            .map_err(|e: SIWEPayloadConversionError| e.to_string())?;
-        if !verify_statement(&siwe).map_err(|e| e.to_string())? {
-            return Ok(None);
-        }
-        let cap = match extract_capabilities(&siwe)
-            .map_err(|e| e.to_string())?
-            .remove(
-                &"credentials"
-                    .parse()
-                    .map_err(|e: CapGrokError| e.to_string())?,
-            ) {
-            Some(c) => c,
-            None => return Ok(None),
-        };
-
-        if let Some(credentials) = credentials {
-            for credential in credentials.into_iter() {
-                let (id, subjects) = match credential {
-                    CredentialOrJWT::Credential(c) => (c.id.as_ref(), &c.credential_subject),
-                    _ => return Err("JWT VCs not handled".to_string()),
-                };
-                println!("{:?}", subjects);
-                if let Some(i) = id {
-                    if !cap.can(i.as_str(), "present") {
+        match (credentials, capability) {
+            (Some(credentials), Some(cap)) if !credentials.is_empty() => {
+                for credential in credentials.into_iter() {
+                    let (id, subjects) = match credential {
+                        CredentialOrJWT::Credential(c) => (c.id.as_ref(), &c.credential_subject),
+                        _ => return Err(Error::UnsupportedJwtVc),
+                    };
+                    println!("{:?}", subjects);
+                    if let Some(i) = id {
+                        // if the credential isnt presentable according to the siwe cap
+                        if !cap.can(i.as_str(), "present") {
+                            return Ok(None);
+                        }
+                    } else {
+                        return Ok(None);
+                    };
+                    // if the delegator is not the subject of any of the credentials (?)
+                    if !subjects.into_iter().all(|subject| {
+                        subject
+                            .id
+                            .as_ref()
+                            .map(|i| i.as_str() == delegator.as_str())
+                            .unwrap_or(false)
+                    }) {
                         return Ok(None);
                     }
-                } else {
-                    return Ok(None);
-                };
-                if !subjects.into_iter().any(|subject| {
-                    if let Some(i) = &subject.id {
-                        i.to_string() == *delegator
-                    } else {
-                        false
-                    }
-                }) {
-                    return Ok(None);
                 }
             }
-        }
+            // creds with no cap is not allowed
+            (Some(credentials), None) if !credentials.is_empty() => return Ok(None),
+            // if there's no caps and no creds, that's ok
+            // if there's caps and no creds, that's ok
+            _ => {}
+        };
 
         Ok(Some(delegee.to_string()))
     }
