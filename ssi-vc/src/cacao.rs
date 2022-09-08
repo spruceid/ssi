@@ -84,7 +84,6 @@ impl HolderBindingDelegation {
                         CredentialOrJWT::Credential(c) => (c.id.as_ref(), &c.credential_subject),
                         _ => return Err(Error::UnsupportedJwtVc),
                     };
-                    println!("{:?}", subjects);
                     if let Some(i) = id {
                         // if the credential isnt presentable according to the siwe cap
                         if !cap.can(i.as_str(), "present") {
@@ -122,14 +121,24 @@ pub(crate) mod tests {
     use crate::jwk::JWK;
     use crate::vc::*;
 
-    const VC_ID: &str = "http://example.edu/credentials/1872";
-    const JWK_JSON: &str = include_str!("../tests/rsa2048-2020-08-25.json");
+    const VC_ID_1: &str = "http://example.edu/credentials/1872";
+    const VC_ID_2: &str = "http://example.edu/credentials/0000";
+    const VP_ID: &str = "uuid:my_vp";
+
+    const DID_FOO: &str = "did:example:foo";
+    const VM_FOO: &str = "did:example:foo#key1";
+    const JWK_JSON_FOO: &str = include_str!("../tests/rsa2048-2020-08-25.json");
+
+    const DID_BAR: &str = "did:example:bar";
+    const VM_BAR: &str = "did:example:bar#key1";
+    const JWK_JSON_BAR: &str = include_str!("../tests/ed25519-2021-06-16.json");
 
     #[cfg(all(feature = "k256", feature = "keccak-hash"))]
     async fn test_holder_binding_vp(
-        resource_id: &str,
-        holder: &str,
-        holder_binding: &str,
+        bound_vc_id: Option<&str>,
+        bound_holder: &str,
+        presenter: (&str, &str, &JWK),
+        credential: Option<(&str, (&str, &str, &JWK))>,
     ) -> Vec<String> {
         use cacaos::{siwe, siwe_cacao::SiweCacao};
         use capgrok::{Builder, Namespace};
@@ -138,6 +147,7 @@ pub(crate) mod tests {
         use libipld::{cbor::DagCborCodec, multihash::Code, store::DefaultParams, Block};
         use std::convert::{TryFrom, TryInto};
 
+        // generate eth account kp/id
         let key = JWK::generate_secp256k1().unwrap();
         let ec_params = match &key.params {
             crate::jwk::Params::EC(ec) => ec,
@@ -154,13 +164,16 @@ pub(crate) mod tests {
             let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
             hash[12..32].try_into().unwrap()
         };
-        let delegation_message = Builder::new()
-            .with_action(&vc_namespace, resource_id, "present")
+
+        // delegate presentation of `bound_vc_id` to `bound_holder`
+        let delegation_message = bound_vc_id
+            .map(|r| Builder::new().with_action(&vc_namespace, r, "present"))
+            .unwrap_or_else(Builder::new)
             .build(siwe::Message {
                 domain: "example.com".parse().unwrap(),
                 address: pk_hash,
                 statement: None,
-                uri: "did:example:foo".parse().unwrap(),
+                uri: bound_holder.parse().unwrap(),
                 version: siwe::Version::V1,
                 chain_id: 1,
                 nonce: "mynonce1".into(),
@@ -171,7 +184,41 @@ pub(crate) mod tests {
                 resources: vec![],
             })
             .unwrap();
-        println!("{}", delegation_message);
+
+        let vc = if let Some((id, (iss, iss_vm, iss_key))) = credential {
+            // issue cred to kp
+            let did = format!(
+                "did:pkh:eip155:1:{}",
+                crate::keccak_hash::eip55_checksum_addr(&crate::keccak_hash::bytes_to_lowerhex(
+                    &pk_hash
+                ))
+                .unwrap()
+            );
+
+            let mut credential: Credential = serde_json::from_value(serde_json::json!({
+                "@context": "https://www.w3.org/2018/credentials/v1",
+                "id": id,
+                "type": ["VerifiableCredential"],
+                "issuer": iss,
+                "issuanceDate": "2020-08-19T21:41:50Z",
+                "credentialSubject": {
+                    "id": did,
+                }
+            }))
+            .unwrap();
+            let mut vc_issue_options = LinkedDataProofOptions::default();
+            vc_issue_options.verification_method = Some(URI::String(iss_vm.to_string()));
+            vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
+            let mut context_loader = crate::jsonld::ContextLoader::default();
+            let proof = credential
+                .generate_proof(iss_key, &vc_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            credential.add_proof(proof);
+            Some(credential)
+        } else {
+            None
+        };
 
         let hash = crate::keccak_hash::prefix_personal_message(&delegation_message.to_string());
         let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&hash).unwrap();
@@ -188,6 +235,7 @@ pub(crate) mod tests {
                 .unwrap();
         let delegation_base64 = base64::encode(delegation_block.data());
 
+        // `presenter` presents cred
         let mut vp: Presentation = serde_json::from_value(serde_json::json!({
             "@context": [
                 "https://www.w3.org/2018/credentials/v1",
@@ -195,28 +243,31 @@ pub(crate) mod tests {
                     "@vocab": "https://example.org/example-holder-binding#"
                 }
             ],
-            "id": VC_ID,
+            "id": VP_ID,
             "type": ["VerifiablePresentation"],
             "holderBinding": {
                 "type": "CacaoDelegationHolderBinding2022",
                 "cacaoDelegation": format!("data:;base64,{}", delegation_base64)
             },
-            "holder": holder
+            "holder": presenter.0
         }))
         .unwrap();
 
-        // let authorized_holders = vp.get_authorized_holders().await.unwrap();
-        // assert!(authorized_holders.contains(&holder.to_string()));
+        vp.verifiable_credential =
+            vc.map(|v| crate::one_or_many::OneOrMany::One(CredentialOrJWT::Credential(v)));
 
         let mut context_loader = crate::jsonld::ContextLoader::default();
-        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
         let mut vp_issue_options = LinkedDataProofOptions::default();
-        let vp_proof_vm = format!("{}#key1", holder_binding);
-        vp_issue_options.verification_method = Some(URI::String(vp_proof_vm));
+        vp_issue_options.verification_method = Some(URI::String(presenter.1.to_string()));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         vp_issue_options.checks = None;
         let vp_proof = match vp
-            .generate_proof(&key, &vp_issue_options, &DIDExample, &mut context_loader)
+            .generate_proof(
+                presenter.2,
+                &vp_issue_options,
+                &DIDExample,
+                &mut context_loader,
+            )
             .await
         {
             Ok(p) => p,
@@ -226,7 +277,6 @@ pub(crate) mod tests {
             }
         };
         vp.add_proof(vp_proof);
-        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
         let vp_verification_result = vp.verify(None, &DIDExample, &mut context_loader).await;
         println!("{:#?}", vp_verification_result);
@@ -236,28 +286,56 @@ pub(crate) mod tests {
     #[cfg(all(feature = "k256", feature = "keccak-hash"))]
     #[async_std::test]
     async fn present_with_siwecacao_holder_binding() {
+        let foo = (
+            DID_FOO,
+            VM_FOO,
+            &serde_json::from_str(JWK_JSON_FOO).unwrap(),
+        );
+        let bar = (
+            DID_BAR,
+            VM_BAR,
+            &serde_json::from_str(JWK_JSON_BAR).unwrap(),
+        );
+
+        // foo can present an empty pres on behalf of eth account, given empty siwe
+        assert!(test_holder_binding_vp(None, foo.0, foo, None)
+            .await
+            .is_empty());
+
+        // foo can present an empty pres on behalf of eth account, given non-empty siwe
+        assert!(test_holder_binding_vp(Some(VC_ID_1), foo.0, foo, None)
+            .await
+            .is_empty());
+
+        // foo can present a cred on behalf of eth account, given proper non-empty siwe
         assert!(
-            test_holder_binding_vp(VC_ID, "did:example:foo", "did:example:foo")
+            test_holder_binding_vp(Some(VC_ID_1), foo.0, foo, Some((VC_ID_1, bar)))
                 .await
                 .is_empty()
         );
 
+        // foo cannot present an empty pres on behalf of eth account, bar is the holder
+        assert!(test_holder_binding_vp(None, bar.0, foo, None)
+            .await
+            .contains(&"No applicable proof".to_string()));
+
+        // foo cannot present an empty pres on behalf of eth account, bar is the holder
+        assert!(test_holder_binding_vp(Some(VC_ID_1), bar.0, foo, None)
+            .await
+            .contains(&"No applicable proof".to_string()));
+
+        // foo cannot present a cred on behalf of eth account, bar is the holder
         assert!(
-            test_holder_binding_vp(VC_ID, "did:example:bar", "did:example:foo")
+            test_holder_binding_vp(Some(VC_ID_1), bar.0, foo, Some((VC_ID_1, foo)))
                 .await
-                .contains(&"Failed signing".to_string())
+                .contains(&"No applicable proof".to_string())
         );
 
-        assert!(test_holder_binding_vp(
-            "http://example.edu/credentials/000",
-            "did:example:foo",
-            "did:example:foo"
-        )
-        .await
-        .contains(&"No applicable proof".to_string()));
-
-        // todo!();
-
-        // TODO factor out the checks for every kind of holder binding
+        // foo cannot present a cred on behalf of eth account, wrong vc ID
+        assert!(
+            test_holder_binding_vp(Some(VC_ID_2), foo.0, foo, Some((VC_ID_1, bar)))
+                .await
+                .contains(&"No applicable proof".to_string())
+        );
     }
 }
