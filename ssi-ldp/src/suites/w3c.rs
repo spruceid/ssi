@@ -586,7 +586,7 @@ impl JsonWebSignature2020 {
                     return Err(Error::UnsupportedCurve);
                 }
             },
-            _ => {}
+            _ => return Err(Error::UnsupportedCurve),
         }
         Ok(())
     }
