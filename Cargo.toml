@@ -32,10 +32,10 @@ tezos = ["ssi-vc/tezos", "ssi-ucan/tezos", "ssi-zcap-ld/tezos"]
 ## enable LDPs from the Solana Ecosystem
 solana = ["ssi-vc/solana", "ssi-zcap-ld/solana"]
 
-## Use the Ring crate for crypto operations
-openssl = ["ssi-vc/openssl", "ssi-ucan/openssl", "ssi-zcap-ld/openssl"]
 ## Use the OpenSSL crate for crypto operations
-ring = ["ssi-vc/ring", "ssi-ucan/ring", "ssi-zcap-ld/openssl"]
+openssl = ["ssi-vc/openssl", "ssi-ucan/openssl", "ssi-zcap-ld/openssl"]
+## Use the Ring crate for crypto operations
+ring = ["ssi-vc/ring", "ssi-ucan/ring", "ssi-zcap-ld/ring"]
 
 http-did = ["ssi-dids/http"]
 example-http-issuer = ["ssi-dids/testing", "ssi-ldp/example-http-issuer"]
