@@ -6,7 +6,6 @@ mod eip;
 mod solana;
 #[cfg(feature = "tezos")]
 mod tezos;
-#[cfg(feature = "w3c")]
 mod w3c;
 
 #[cfg(feature = "aleo")]
@@ -17,5 +16,4 @@ pub use eip::*;
 pub use solana::*;
 #[cfg(feature = "tezos")]
 pub use tezos::*;
-#[cfg(feature = "w3c")]
 pub use w3c::*;
