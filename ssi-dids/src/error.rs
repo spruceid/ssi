@@ -1,8 +1,8 @@
 //! Error types for `ssi` crate
-use ssi_caips::caip10::{BlockchainAccountIdParseError, BlockchainAccountIdVerifyError};
 use multibase::Error as MultibaseError;
 use serde_json::Error as SerdeJSONError;
 use serde_urlencoded::de::Error as SerdeUrlEncodedError;
+use ssi_caips::caip10::{BlockchainAccountIdParseError, BlockchainAccountIdVerifyError};
 use thiserror::Error;
 
 /// Error type for `ssi`.
