@@ -14,7 +14,7 @@ documentation = "https://docs.rs/did-sol/"
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1" }
-caips = { path = "../caips", version = "0.1" }
+ssi-caips = { path = "../ssi-caips", version = "0.1" }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

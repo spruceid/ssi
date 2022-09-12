@@ -8,13 +8,13 @@
 //! ## Example
 //! Round-trip parse and serialize a CAIP-10 string.
 //! ```
-//! use caips::caip10::BlockchainAccountId;
+//! use ssi_caips::caip10::BlockchainAccountId;
 //! use std::str::FromStr;
 //!
 //! let account_id_str = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4:6d9b0b4b9994e8a6afbd3dc3ed983cd51c755afb27cd1dc7825ef59c134a39f7";
 //! let account_id = BlockchainAccountId::from_str(&account_id_str)?;
 //! assert_eq!(account_id.to_string(), account_id_str);
-//! # Ok::<(), caips::caip10::BlockchainAccountIdParseError>(())
+//! # Ok::<(),ssi_caips::caip10::BlockchainAccountIdParseError>(())
 //! ```
 //!
 //! More test cases may be found in the [CAIP-10 specification][test cases].

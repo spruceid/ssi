@@ -1,6 +1,6 @@
 use super::super::*;
 use async_trait::async_trait;
-use caips::caip10::BlockchainAccountId;
+use ssi_caips::caip10::BlockchainAccountId;
 use serde_json::Value;
 use ssi_dids::did_resolve::{resolve_vm, DIDResolver};
 use ssi_json_ld::ContextLoader;

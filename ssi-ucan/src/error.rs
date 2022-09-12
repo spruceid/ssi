@@ -15,7 +15,7 @@ pub enum Error {
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
-    Caip10Parse(#[from] caips::caip10::BlockchainAccountIdParseError),
+    Caip10Parse(#[from]ssi_caips::caip10::BlockchainAccountIdParseError),
     #[error(transparent)]
-    Caip10Verify(#[from] caips::caip10::BlockchainAccountIdVerifyError),
+    Caip10Verify(#[from]ssi_caips::caip10::BlockchainAccountIdVerifyError),
 }

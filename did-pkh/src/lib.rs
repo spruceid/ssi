@@ -3,8 +3,8 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
-use caips::caip10::BlockchainAccountId;
-use caips::caip2::ChainId;
+use ssi_caips::caip10::BlockchainAccountId;
+use ssi_caips::caip2::ChainId;
 use ssi_dids::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
 };

@@ -52,9 +52,9 @@ pub enum Error {
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
-    BlockchainAccountIdParse(#[from] caips::caip10::BlockchainAccountIdParseError),
+    BlockchainAccountIdParse(#[from] ssi_caips::caip10::BlockchainAccountIdParseError),
     #[error(transparent)]
-    BlockchainAccountIdVerify(#[from] caips::caip10::BlockchainAccountIdVerifyError),
+    BlockchainAccountIdVerify(#[from] ssi_caips::caip10::BlockchainAccountIdVerifyError),
     #[error(transparent)]
     DecodeTezosPublicKey(#[from] ssi_tzkey::DecodeTezosPkError),
     #[error(transparent)]

@@ -6,13 +6,13 @@
 //! ## Example
 //! Round-trip parse and serialize a CAIP-2 string.
 //! ```
-//! use caips::caip2::ChainId;
+//! use ssi_caips::caip2::ChainId;
 //! use std::str::FromStr;
 //!
 //! let chain_id_str = "chainstd:8c3444cf8970a9e41a706fab93e7a6c4";
 //! let chain_id = ChainId::from_str(&chain_id_str)?;
 //! assert_eq!(chain_id.to_string(), chain_id_str);
-//! # Ok::<(), caips::caip2::ChainIdParseError>(())
+//! # Ok::<(),ssi_caips::caip2::ChainIdParseError>(())
 //! ```
 //! More test cases may be found in the [CAIP-2 specification] [test cases].
 //!

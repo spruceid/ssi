@@ -223,7 +223,7 @@ fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
 
 fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error> {
     use std::str::FromStr;
-    Ok(caips::caip10::BlockchainAccountId::from_str(
+    Ok(ssi_caips::caip10::BlockchainAccountId::from_str(
         vm.blockchain_account_id
             .as_ref()
             .ok_or(Error::VerificationMethodMismatch)?,

@@ -4,7 +4,7 @@
 //!
 //! [did-core]: https://www.w3.org/TR/did-core/
 
-use caips::caip10::BlockchainAccountId;
+use ssi_caips::caip10::BlockchainAccountId;
 use derive_builder::Builder;
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;

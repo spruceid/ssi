@@ -24,8 +24,8 @@
 )]
 
 // maintain old structure here
-pub use caips::caip10;
-pub use caips::caip2;
+pub use ssi_caips::caip10;
+pub use ssi_caips::caip2;
 pub use ssi_core::one_or_many;
 pub use ssi_crypto::hashes as hash;
 #[cfg(feature = "eip")]
