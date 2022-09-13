@@ -262,6 +262,7 @@ pub struct Presentation {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type")]
 pub enum HolderBinding {
+    #[cfg(test)]
     ExampleHolderBinding2022 {
         to: URI,
         from: String,
@@ -1580,6 +1581,7 @@ impl Presentation {
         };
         for holder_binding in self.holder_binding.iter().flatten() {
             match &holder_binding {
+                #[cfg(test)]
                 HolderBinding::ExampleHolderBinding2022 { to, from } => {
                     // TODO: error if term does not expand to expected IRI
                     // TODO: check proof signed by binding.from
