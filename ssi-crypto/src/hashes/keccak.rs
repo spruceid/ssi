@@ -1,4 +1,3 @@
-use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey};
 use keccak_hash::keccak;
 
 pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
@@ -13,7 +12,9 @@ pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
 ///
 /// The hash is of the public key (64 bytes), using Keccak. The hash is truncated to the last 20
 /// bytes, lowercase-hex-encoded, and prefixed with "0x" to form the resulting string.
-pub fn hash_public_key(k: &PublicKey) -> String {
+#[cfg(feature = "secp256k1")]
+pub fn hash_public_key(k: &k256::PublicKey) -> String {
+    use k256::elliptic_curve::sec1::ToEncodedPoint;
     let pk_ec = k.to_encoded_point(false);
     let pk_bytes = pk_ec.as_bytes();
     let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
@@ -26,7 +27,8 @@ pub fn hash_public_key(k: &PublicKey) -> String {
 ///
 /// Same as [`hash_public_key_lowercase`], but with [EIP-55] mixed-case checksum encoding (using [`eip55_checksum_addr`]).
 /// [EIP-55]: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
-pub fn hash_public_key_eip55(k: &PublicKey) -> Result<String, Eip155Error> {
+#[cfg(feature = "secp256k1")]
+pub fn hash_public_key_eip55(k: &k256::PublicKey) -> Result<String, Eip155Error> {
     let hash_lowercase = hash_public_key(k);
     eip55_checksum_addr(&hash_lowercase)
 }

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["ring"]
+default = ["secp256k1", "ripemd-160"]
 secp256k1 = ["k256", "k256/keccak256", "keccak"]
 bbs = ["dep:bbs", "pairing-plus"]
 ripemd-160 = ["ripemd160", "secp256k1", "bs58"]
@@ -15,7 +15,7 @@ ring = ["dep:ring"]
 
 [dependencies]
 thiserror = "1.0"
-sha2 = { version = "0.10"}
+sha2 = { version = "0.10" }
 ring = { version = "0.16", optional = true }
 k256 = { version = "0.9.6", optional = true, features = ["zeroize", "ecdsa"] }
 keccak-hash = { version = "0.7", optional = true }
