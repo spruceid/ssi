@@ -12,6 +12,8 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-web/"
 documentation = "https://docs.rs/did-web/"
 
 [features]
+ring = ["ssi-dids/ring"]
+openssl = ["ssi-dids/openssl"]
 
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }

@@ -12,12 +12,15 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-webkey/"
 documentation = "https://docs.rs/did-webkey/"
 
 [features]
-# default = ["ssi/ring"]
-# p256 = ["ssi/p256"]
+default = ["secp256r1"]
+secp256r1 = ["ssi-ssh/secp256r1", "ssi-dids/secp256r1"]
+
+ring = ["ssi-dids/ring"]
+openssl = ["ssi-dids/openssl"]
 
 [dependencies]
-ssi-dids = { version = "0.1", path = "../ssi-dids" }
-ssi-ssh = { version = "0.1", path = "../ssi-ssh" }
+ssi-dids = { version = "0.1", path = "../ssi-dids", default-features = false, features = ["http"] }
+ssi-ssh = { version = "0.1", path = "../ssi-ssh", default-features = false }
 anyhow = "1.0.52"
 async-trait = "0.1.52"
 reqwest = { version = "0.11.9", features = ["json"] }

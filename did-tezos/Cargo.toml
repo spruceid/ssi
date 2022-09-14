@@ -13,9 +13,12 @@ documentation = "https://docs.rs/did-tezos/"
 
 [features]
 default = ["ed25519", "secp256k1", "secp256r1"]
-ed25519 = ["ssi-jwk/ed25519", "ssi-jwk/rand"]
-secp256k1 = ["ssi-jwk/secp256k1", "ssi-jwk/rand"]
-secp256r1 = ["ssi-jwk/secp256r1"]
+ed25519 = ["ssi-dids/ed25519", "ssi-jwk/rand"]
+secp256k1 = ["ssi-dids/secp256k1", "ssi-jwk/rand"]
+secp256r1 = ["ssi-dids/secp256r1"]
+
+ring = ["ssi-dids/ring"]
+openssl = ["ssi-dids/openssl"]
 
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
