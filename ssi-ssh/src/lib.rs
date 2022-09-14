@@ -23,11 +23,11 @@ fn pk_to_jwk_rsa(pk: &sshkeys::RsaPublicKey) -> JWK {
 fn pk_to_jwk_ecdsa(pk: &sshkeys::EcdsaPublicKey) -> Result<JWK, SSHKeyToJWKError> {
     match pk.curve.kind {
         sshkeys::CurveKind::Nistp256 => {
-            #[cfg(not(feature = "p256"))]
+            #[cfg(not(feature = "secp256r1"))]
             {
-                Err(SSHKeyToJWKError::MissingFeatures("p256"))
+                Err(SSHKeyToJWKError::MissingFeatures("secp256r1"))
             }
-            #[cfg(feature = "p256")]
+            #[cfg(feature = "secp256r1")]
             {
                 ssi_jwk::p256_parse(&pk.key).map_err(|e| SSHKeyToJWKError::P256Parse(e.to_string()))
             }
