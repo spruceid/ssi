@@ -1,5 +1,5 @@
-use crate::one_or_many::OneOrMany;
-use crate::vc::{CredentialOrJWT, URI};
+use crate::{CredentialOrJWT, URI};
+use ssi_core::one_or_many::OneOrMany;
 
 use cacaos::{
     siwe_cacao::{
@@ -15,9 +15,7 @@ use thiserror::Error;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
-pub enum HolderBindingDelegation {
-    // TODO
-    // IRIRef(crate::rdf::IRIRef),
+pub enum BindingDelegation {
     Base64Block(String),
 }
 
@@ -43,15 +41,14 @@ impl From<SIWEPayloadConversionError> for Error {
     }
 }
 
-impl HolderBindingDelegation {
-    /// Given a presentation id, presented credentials and a holder, return authorised holders
-    pub async fn validate(
+impl BindingDelegation {
+    /// presented credentials and a holder, return authorised holders
+    pub async fn validate_presentation(
         &self,
-        id: Option<&URI>,
         credentials: Option<&OneOrMany<CredentialOrJWT>>,
         holder: Option<&URI>,
     ) -> Result<Option<String>, Error> {
-        let HolderBindingDelegation::Base64Block(base64_cacao) = self;
+        let BindingDelegation::Base64Block(base64_cacao) = self;
         let cbor_cacao = if let Some(b) = base64_cacao.strip_prefix("data:;base64,") {
             base64::decode(b)?
         } else {

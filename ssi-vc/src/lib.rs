@@ -7,7 +7,7 @@ pub use error::Error;
 mod cacao;
 pub mod revocation;
 
-use cacao::HolderBindingDelegation;
+use cacao::BindingDelegation;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
@@ -269,9 +269,7 @@ pub enum HolderBinding {
         // proof: String,
     },
     #[serde(rename_all = "camelCase")]
-    CacaoDelegationHolderBinding2022 {
-        cacao_delegation: HolderBindingDelegation,
-    },
+    CacaoDelegationHolderBinding2022 { cacao_delegation: BindingDelegation },
     #[serde(other)]
     Unknown,
 }
@@ -1593,8 +1591,7 @@ impl Presentation {
                 }
                 HolderBinding::CacaoDelegationHolderBinding2022 { cacao_delegation } => {
                     match cacao_delegation
-                        .validate(
-                            self.id.as_ref(),
+                        .validate_presentation(
                             self.verifiable_credential.as_ref(),
                             self.holder.as_ref(),
                         )
