@@ -3,20 +3,20 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use thiserror::Error;
 
-use ssi::did::{
-    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
-    DEFAULT_CONTEXT, DIDURL,
-};
-use ssi::did_resolve::{
+use ssi_dids::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     ERROR_NOT_FOUND,
 };
+use ssi_dids::{
+    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
+    DEFAULT_CONTEXT, DIDURL,
+};
 #[cfg(feature = "secp256r1")]
-use ssi::jwk::p256_parse;
-use ssi::jwk::rsa_x509_pub_parse;
+use ssi_jwk::p256_parse;
+use ssi_jwk::rsa_x509_pub_parse;
 #[cfg(feature = "secp256k1")]
-use ssi::jwk::secp256k1_parse;
-use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::secp256k1_parse;
+use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
 const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 const DID_KEY_SECP256K1_PREFIX: [u8; 2] = [0xe7, 0x01];
@@ -143,7 +143,7 @@ impl DIDResolver for DIDKey {
                         "https://w3id.org/security#EcdsaSecp256k1VerificationKey2019".to_string();
                     jwk
                 }
-                Err(err) => return (ResolutionMetadata::from_error(&err), None, None),
+                Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
             }
             #[cfg(not(feature = "secp256k1"))]
             return (
@@ -307,7 +307,6 @@ impl DIDMethod for DIDKey {
                     #[cfg(feature = "secp256k1")]
                     "secp256k1" => {
                         use k256::elliptic_curve::sec1::ToEncodedPoint;
-                        use std::convert::TryFrom;
                         let pk = match k256::PublicKey::try_from(params) {
                             Ok(pk) => pk,
                             Err(_err) => return None,
@@ -325,7 +324,6 @@ impl DIDMethod for DIDKey {
                     #[cfg(feature = "secp256r1")]
                     "P-256" => {
                         use p256::elliptic_curve::sec1::ToEncodedPoint;
-                        use std::convert::TryFrom;
                         let pk = match p256::PublicKey::try_from(params) {
                             Ok(pk) => pk,
                             Err(_err) => return None,
@@ -377,8 +375,8 @@ impl DIDMethod for DIDKey {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi::did::Resource;
-    use ssi::did_resolve::{dereference, Content, DereferencingInputMetadata};
+    use ssi_dids::did_resolve::{dereference, Content, DereferencingInputMetadata};
+    use ssi_dids::Resource;
 
     #[async_std::test]
     async fn from_did_key() {

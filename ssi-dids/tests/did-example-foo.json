@@ -1,0 +1,63 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json",
+    {
+      "Ed25519VerificationKey2018": "https://w3id.org/security#Ed25519VerificationKey2018",
+      "publicKeyBase58": "https://w3id.org/security#publicKeyBase58",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:example:foo",
+  "verificationMethod": [
+    {
+      "id": "did:example:foo#key1",
+      "type": "JsonWebKey2020",
+      "controller": "did:example:foo",
+      "publicKeyJwk": {
+        "kty": "RSA",
+        "n": "sbX82NTV6IylxCh7MfV4hlyvaniCajuP97GyOqSvTmoEdBOflFvZ06kR_9D6ctt45Fk6hskfnag2GG69NALVH2o4RCR6tQiLRpKcMRtDYE_thEmfBvDzm_VVkOIYfxu-Ipuo9J_S5XDNDjczx2v-3oDh5-CIHkU46hvFeCvpUS-L8TJSbgX0kjVk_m4eIb9wh63rtmD6Uz_KBtCo5mmR4TEtcLZKYdqMp3wCjN-TlgHiz_4oVXWbHUefCEe8rFnX1iQnpDHU49_SaXQoud1jCaexFn25n-Aa8f8bc5Vm-5SeRwidHa6ErvEhTvf1dz6GoNPp2iRvm-wJ1gxwWJEYPQ",
+        "e": "AQAB"
+      }
+    },
+    {
+      "id": "did:example:foo#key2",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:example:foo",
+      "publicKeyJwk": {
+        "kty": "OKP",
+        "crv": "Ed25519",
+        "x": "G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww"
+      }
+    },
+    {
+      "id": "did:example:foo#key3",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:example:foo",
+      "publicKeyBase58": "2sXRz2VfrpySNEL6xmXJWQg6iY94qwNp1qrJJFBuPWmH"
+    }
+  ],
+  "assertionMethod": [
+    "did:example:foo#key1",
+    "did:example:foo#key2",
+    "did:example:foo#key3"
+  ],
+  "authentication": [
+    "did:example:foo#key1",
+    "did:example:foo#key2",
+    "did:example:foo#key3"
+  ],
+  "capabilityDelegation": [
+    "did:example:foo#key1",
+    "did:example:foo#key2",
+    "did:example:foo#key3"
+  ],
+  "capabilityInvocation": [
+    "did:example:foo#key1",
+    "did:example:foo#key2",
+    "did:example:foo#key3"
+  ]
+}

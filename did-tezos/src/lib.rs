@@ -1,18 +1,18 @@
-use ssi::blakesig::hash_public_key;
-use ssi::did::{
-    Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
-    VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
-};
-use ssi::did_resolve::{
+use ssi_dids::did_resolve::{
     dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
     ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
 };
+use ssi_dids::{
+    Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
+    VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
+};
+use ssi_jwk::blakesig::hash_public_key;
 #[cfg(feature = "secp256r1")]
-use ssi::jwk::p256_parse;
+use ssi_jwk::p256_parse;
 #[cfg(feature = "secp256k1")]
-use ssi::jwk::secp256k1_parse;
-use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
-use ssi::jws::{decode_unverified, decode_verify};
+use ssi_jwk::secp256k1_parse;
+use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jws::{decode_unverified, decode_verify};
 
 mod explorer;
 use anyhow::{anyhow, Result};
@@ -481,7 +481,7 @@ impl DIDTz {
                             return Err(anyhow!("Error dereferencing kid: {}", e));
                         } else {
                             match deref_content {
-                                ssi::did_resolve::Content::DIDDocument(d) => d,
+                                ssi_dids::did_resolve::Content::DIDDocument(d) => d,
                                 _ => {
                                     return Err(anyhow!("Dereferenced content not a DID document."))
                                 }
@@ -565,10 +565,10 @@ impl DIDTz {
 mod tests {
     use super::*;
     use serde_json::json;
-    use ssi::did::ServiceEndpoint;
-    use ssi::did_resolve::ResolutionInputMetadata;
-    use ssi::jws::encode_sign;
-    use ssi::one_or_many::OneOrMany;
+    use ssi_core::one_or_many::OneOrMany;
+    use ssi_dids::did_resolve::ResolutionInputMetadata;
+    use ssi_dids::ServiceEndpoint;
+    use ssi_jws::encode_sign;
     use std::collections::BTreeMap as Map;
 
     const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";

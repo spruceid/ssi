@@ -1,8 +1,8 @@
 use ssi::did::example::DIDExample;
 use ssi::jwk::JWTKeys;
 use ssi::jwk::JWK;
+use ssi::ldp::LinkedDataProofOptions;
 use ssi::vc::Credential;
-use ssi::vc::LinkedDataProofOptions;
 use ssi::vc::Presentation;
 
 fn usage() {

@@ -10,11 +10,11 @@ use sequoia_openpgp::{
     serialize::SerializeInto,
 };
 use sshkeys::PublicKeyKind;
-use ssi::did::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
-use ssi::did_resolve::{
+use ssi_dids::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
 };
-use ssi::ssh::ssh_pkk_to_jwk;
+use ssi_dids::{DIDMethod, Document, VerificationMethod, VerificationMethodMap, DIDURL};
+use ssi_ssh::ssh_pkk_to_jwk;
 
 // For testing, enable handling requests at localhost.
 #[cfg(test)]
@@ -297,8 +297,8 @@ impl DIDResolver for DIDWebKey {
                 }
             };
         let doc = Document {
-            context: ssi::did::Contexts::One(ssi::did::Context::URI(
-                ssi::did::DEFAULT_CONTEXT.to_string(),
+            context: ssi_dids::Contexts::One(ssi_dids::Context::URI(
+                ssi_dids::DEFAULT_CONTEXT.to_string(),
             )),
             id: did.to_string(),
             verification_method: Some(vm_maps),

@@ -2,15 +2,15 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-use ssi::caip10::BlockchainAccountId;
-use ssi::caip2::ChainId;
-use ssi::did::{
-    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
-    DEFAULT_CONTEXT, DIDURL,
-};
-use ssi::did_resolve::{
+use ssi_caips::caip10::BlockchainAccountId;
+use ssi_caips::caip2::ChainId;
+use ssi_dids::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
+};
+use ssi_dids::{
+    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
+    DEFAULT_CONTEXT, DIDURL,
 };
 
 /// did:ethr DID Method
@@ -93,7 +93,7 @@ fn resolve_pk(
         }
     };
 
-    let pk_jwk = match ssi::jwk::secp256k1_parse(&pk_bytes) {
+    let pk_jwk = match ssi_jwk::secp256k1_parse(&pk_bytes) {
         Ok(pk_bytes) => pk_bytes,
         Err(e) => {
             return (
@@ -103,7 +103,7 @@ fn resolve_pk(
             );
         }
     };
-    let account_address = match ssi::keccak_hash::hash_public_key_eip55(&pk_jwk) {
+    let account_address = match ssi_jwk::eip155::hash_public_key_eip55(&pk_jwk) {
         Ok(hash) => hash,
         Err(e) => {
             return (
@@ -305,7 +305,7 @@ impl DIDMethod for DIDEthr {
             }
             _ => return None,
         };
-        let hash = match ssi::keccak_hash::hash_public_key(jwk) {
+        let hash = match ssi_jwk::eip155::hash_public_key(jwk) {
             Ok(hash) => hash,
             _ => return None,
         };
@@ -322,8 +322,8 @@ impl DIDMethod for DIDEthr {
 mod tests {
     use super::*;
     use serde_json::json;
-    use ssi::did_resolve::ResolutionInputMetadata;
-    use ssi::jwk::JWK;
+    use ssi_dids::did_resolve::ResolutionInputMetadata;
+    use ssi_jwk::JWK;
 
     #[test]
     fn jwk_to_did_ethr() {

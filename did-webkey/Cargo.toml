@@ -2,7 +2,7 @@
 name = "did-webkey"
 version = "0.1.1"
 authors = ["Spruce Systems, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 keywords = ["ssi", "did"]
 categories = ["web-programming::http-client"]
@@ -12,13 +12,15 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-webkey/"
 documentation = "https://docs.rs/did-webkey/"
 
 [features]
-default = ["ssi/ring"]
-p256 = ["ssi/p256"]
+default = ["secp256r1"]
+secp256r1 = ["ssi-ssh/secp256r1", "ssi-dids/secp256r1"]
+
+ring = ["ssi-dids/ring"]
+openssl = ["ssi-dids/openssl"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false, features = [
-    "secp256r1",
-] }
+ssi-dids = { version = "0.1", path = "../ssi-dids", default-features = false, features = ["http"] }
+ssi-ssh = { version = "0.1", path = "../ssi-ssh", default-features = false }
 anyhow = "1.0.52"
 async-trait = "0.1.52"
 reqwest = { version = "0.11.9", features = ["json"] }

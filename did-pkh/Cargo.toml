@@ -2,7 +2,7 @@
 name = "did-pkh"
 version = "0.1.1"
 authors = ["Spruce Systems, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 keywords = ["ssi", "did"]
 categories = ["cryptography"]
@@ -12,10 +12,20 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-pkh/"
 documentation = "https://docs.rs/did-pkh/"
 
 [features]
-default = ["ssi/ring"]
+default = ["ripemd-160", "eip", "tezos"]
+ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-caips/ripemd-160"]
+eip = ["ssi-jwk/eip", "ssi-caips/eip"]
+aleo = ["ssi-jwk/aleo", "ssi-caips/aleo"]
+tezos = ["ssi-jwk/tezos", "ssi-caips/tezos"]
+
+ring = ["ssi-dids/ring"]
+openssl = ["ssi-dids/openssl"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false, features = ["secp256k1", "keccak-hash", "secp256r1", "ripemd160"] }
+ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
+ssi-crypto = { path = "../ssi-crypto", version = "0.1", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -24,6 +34,7 @@ bs58 = { version = "0.4", features = ["check"] }
 bech32 = "0.8"
 
 [dev-dependencies]
+ssi = { version = "0.4", path = "../" }
 tokio = { version = "1.0", features = ["macros", "rt"] }
 hex = "0.4"
 blake2b_simd = "0.5"

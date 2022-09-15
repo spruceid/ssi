@@ -2,7 +2,7 @@
 name = "did-tz"
 version = "0.1.2"
 authors = ["Spruce Systems, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 keywords = ["ssi", "did", "tezos"]
 categories = ["cryptography::cryptocurrencies"]
@@ -12,14 +12,19 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-tezos/"
 documentation = "https://docs.rs/did-tezos/"
 
 [features]
-default = ["ssi/ring"]
-dalek = ["ssi/ed25519-dalek", "ssi/rand", "ssi/sha2"]
-secp256k1 = ["ssi/secp256k1", "ssi/rand"]
-secp256r1 = ["ssi/secp256r1"]
-p256 = ["secp256r1"]
+default = ["ed25519", "secp256k1", "secp256r1"]
+ed25519 = ["ssi-dids/ed25519", "ssi-jwk/rand"]
+secp256k1 = ["ssi-dids/secp256k1", "ssi-jwk/rand"]
+secp256r1 = ["ssi-dids/secp256r1"]
+
+ring = ["ssi-dids/ring"]
+openssl = ["ssi-dids/openssl"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
+ssi-core = { path = "../ssi-core", version = "0.1" }
 chrono = { version = "0.4" }
 reqwest = { version = "0.11", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -35,5 +40,6 @@ version = "0.11"
 features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
+ssi = { version = "0.4", path = "../", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }
 wiremock = "0.5"

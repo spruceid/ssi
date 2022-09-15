@@ -1,0 +1,62 @@
+[package]
+name = "ssi-dids"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["parser", "secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
+parser = ["pest", "pest_derive"]
+http = ["dep:http", "reqwest", "percent-encoding"]
+testing = []
+
+secp256k1 = ["ssi-jwk/secp256k1"]
+secp256r1 = ["ssi-jwk/secp256r1"]
+ed25519 = ["ssi-jwk/ed25519"]
+rsa = ["ssi-jwk/rsa"]
+
+eip = ["ssi-caips/eip"]
+ripemd-160 = ["ssi-caips/ripemd-160"]
+aleo = ["ssi-caips/aleo"]
+tezos = ["ssi-caips/tezos"]
+
+ring = ["ssi-jwk/ring"]
+openssl = ["ssi-jwk/openssl"]
+
+[dependencies]
+pest = { version = "2.1", optional = true }
+pest_derive = { version = "2.1", optional = true }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_urlencoded = "0.7"
+async-std = { version = "1.9", features = ["attributes"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+derive_builder = "0.9"
+bs58 = { version = "0.4", features = ["check"] }
+hex = "0.4"
+multibase = "0.8"
+http = { version = "0.2", optional = true }
+reqwest = { version = "0.11", features = ["json"], optional = true }
+percent-encoding = { version = "2.1", optional = true }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.1" }
+ssi-core = { path = "../ssi-core", version = "0.1"}
+ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  }
+
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+
+[dev-dependencies]
+tokio = { version = "1.15", features = ["macros"] }
+futures = "0.3"
+hyper = { version = "0.14", features = [
+    "server",
+    "client",
+    "http1",
+    "stream",
+] }

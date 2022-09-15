@@ -3,16 +3,16 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
-use ssi::caip10::BlockchainAccountId;
-use ssi::caip2::ChainId;
-use ssi::did::{
+use ssi_caips::caip10::BlockchainAccountId;
+use ssi_caips::caip2::ChainId;
+use ssi_dids::did_resolve::{
+    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
+};
+use ssi_dids::{
     Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
 };
-use ssi::did_resolve::{
-    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-};
-use ssi::jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-3.md
 const REFERENCE_EIP155_ETHEREUM_MAINNET: &str = "1";
@@ -479,7 +479,7 @@ fn generate_sol(jwk: &JWK) -> Option<String> {
 }
 
 fn generate_btc(key: &JWK) -> Result<String, String> {
-    let addr = ssi::ripemd::hash_public_key(key, 0x00)?;
+    let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(|e| e.to_string())?;
     #[cfg(test)]
     if !addr.starts_with('1') {
         return Err("Expected Bitcoin address".to_string());
@@ -488,7 +488,7 @@ fn generate_btc(key: &JWK) -> Result<String, String> {
 }
 
 fn generate_doge(key: &JWK) -> Result<String, String> {
-    let addr = ssi::ripemd::hash_public_key(key, 0x1e)?;
+    let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(|e| e.to_string())?;
     #[cfg(test)]
     if !addr.starts_with('D') {
         return Err("Expected Dogecoin address".to_string());
@@ -500,7 +500,7 @@ fn generate_caip10_tezos(
     key: &JWK,
     ref_opt: Option<String>,
 ) -> Result<BlockchainAccountId, String> {
-    let hash = ssi::blakesig::hash_public_key(key)?;
+    let hash = ssi_jwk::blakesig::hash_public_key(key).map_err(|e| e.to_string())?;
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_TEZOS_MAINNET.to_string());
     Ok(BlockchainAccountId {
         account_address: hash,
@@ -515,7 +515,7 @@ fn generate_caip10_eip155(
     key: &JWK,
     ref_opt: Option<String>,
 ) -> Result<BlockchainAccountId, String> {
-    let hash = ssi::keccak_hash::hash_public_key_eip55(key)?;
+    let hash = ssi_jwk::eip155::hash_public_key_eip55(key).map_err(|e| e.to_string())?;
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_EIP155_ETHEREUM_MAINNET.to_string());
     Ok(BlockchainAccountId {
         account_address: hash,
@@ -534,13 +534,13 @@ fn generate_caip10_bip122(
     let addr;
     match &reference[..] {
         REFERENCE_BIP122_BITCOIN_MAINNET => {
-            addr = ssi::ripemd::hash_public_key(key, 0x00)?;
+            addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(|e| e.to_string())?;
             if !addr.starts_with('1') {
                 return Err("Expected Bitcoin address".to_string());
             }
         }
         REFERENCE_BIP122_DOGECOIN_MAINNET => {
-            addr = ssi::ripemd::hash_public_key(key, 0x1e)?;
+            addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(|e| e.to_string())?;
             if !addr.starts_with('D') {
                 return Err("Expected Dogecoin address".to_string());
             }
@@ -637,10 +637,10 @@ impl DIDMethod for DIDPKH {
         };
         let addr = match match &pkh_name[..] {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
-            "tz" => ssi::blakesig::hash_public_key(key).ok(),
-            "eth" => ssi::keccak_hash::hash_public_key(key).ok(),
-            "celo" => ssi::keccak_hash::hash_public_key(key).ok(),
-            "poly" => ssi::keccak_hash::hash_public_key(key).ok(),
+            "tz" => ssi_jwk::blakesig::hash_public_key(key).ok(),
+            "eth" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            "celo" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            "poly" => ssi_jwk::eip155::hash_public_key(key).ok(),
             "sol" => generate_sol(key),
             "btc" => generate_btc(key).ok(),
             "doge" => generate_doge(key).ok(),
@@ -664,9 +664,8 @@ mod tests {
     use super::*;
     use serde_json::{from_str, from_value, json};
     use ssi::jwk::Algorithm;
-    use ssi::ldp::ProofSuite;
+    use ssi::ldp::{Proof, ProofSuite};
     use ssi::one_or_many::OneOrMany;
-    use ssi::vc::Proof;
 
     fn test_generate(jwk_value: Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();

@@ -1,0 +1,58 @@
+[package]
+name = "ssi-jwk"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
+## enable secp256k1 keys
+secp256k1 = ["k256", "rand", "k256/keccak256", "ssi-crypto/secp256k1"]
+## enable secp256r1 (p256) keys
+secp256r1 = ["p256", "rand"]
+## enable ed25519 (EdDSA) keys
+ed25519 = ["ed25519-dalek", "rand_old"]
+## enable RSA keys
+rsa = ["dep:rsa"]
+## enable aleo ecosystem keys
+aleo = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters", "bs58"]
+## enable ripemd-160 hashing for keys, e.g. for bitcoin
+ripemd-160 = ["ssi-crypto/ripemd-160"]
+## enable ethereum style key hashing
+eip = ["ssi-crypto/keccak", "k256/keccak256"]
+## enable tezos style key hashing
+tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
+
+openssl = ["dep:openssl"]
+ring = ["dep:ring"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+num-bigint = "0.4"
+simple_asn1 = "^0.5.2"
+zeroize = { version = "1.4", features = ["zeroize_derive"] }
+serde = { version = "1.0", features = ["derive"] }
+base64 = "0.12"
+thiserror = "1.0"
+ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
+k256 = { version = "0.9.6", optional = true, features = ["zeroize", "ecdsa"] }
+p256 = { version = "0.9.0", optional = true, features = ["zeroize", "ecdsa"] }
+openssl = { version = "0.10", optional = true }
+ring = { version = "0.16", optional = true }
+rsa = { version = "0.3", optional = true }
+rand = { version = "0.8", optional = true }
+rand_old = { package = "rand", version = "0.7", optional = true }
+ed25519-dalek = { version = "1", optional = true }
+lazy_static = "1.4"
+bs58 = { version = "0.4", features = ["check"], optional = true }
+blake2 = { version = "0.9", optional = true }
+snarkvm-dpc = { version = "0.7.9", optional = true }
+snarkvm-algorithms = { version= "0.7.9", optional = true }
+snarkvm-curves = { version= "0.7.9", optional = true }
+snarkvm-utilities = { version = "0.7.9", optional = true }
+snarkvm-parameters = { version = "0.7.9", optional = true }
+blake2b_simd = { version = "0.5", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
+hex = "0.4"

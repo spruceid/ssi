@@ -1,0 +1,64 @@
+[package]
+name = "ssi-ldp"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["eip", "tezos", "w3c", "solana"]
+## enable LDPs from the W3C linked data proof registry: ed25519, secp256k1, rsa2018, secp256r1
+w3c = ["secp256k1", "secp256r1", "rsa", "ed25519"]
+secp256k1 = ["ssi-jwt/secp256k1", "k256"]
+secp256r1 = ["ssi-jwt/secp256r1", "p256"]
+ed25519 = ["ssi-jwt/ed25519"]
+rsa = ["ssi-jwt/rsa"]
+## enable the EIP-defined LDPs: EIP712
+eip = ["keccak-hash", "ssi-caips/eip", "k256", "ssi-jwt/eip"]
+## enable LDPs from the Tezos Ecosystem
+tezos = ["ssi-tzkey", "ssi-jwt/tezos", "ssi-caips/tezos"]
+## enable LDPs from the Aleo Ecosystem
+aleo = ["ssi-jwt/aleo", "ssi-caips/aleo"]
+## enable LDPs from the Solana Ecosystem
+solana = []
+
+## Use the Ring crate for crypto operations
+ring = ["ssi-jwt/ring"]
+## Use the OpenSSL crate for crypto operations and P384
+openssl = ["ssi-jwt/openssl"]
+
+example-http-issuer = []
+
+[dependencies]
+thiserror = "1.0"
+async-trait = "0.1"
+lazy_static = "1.4"
+bs58 = { version = "0.4", features = ["check"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_jcs = "0.1"
+hex = "0.4"
+multibase = "0.8"
+k256 = { version = "0.9", optional = true, features = ["zeroize", "ecdsa"] }
+p256 = { version = "0.9", optional = true, features = ["zeroize", "ecdsa"] }
+keccak-hash = { version = "0.7", optional = true }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.1"}
+ssi-core = { path = "../ssi-core", version = "0.1"}
+ssi-dids = { path = "../ssi-dids", version = "0.1"}
+ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
+ssi-jws = { path = "../ssi-jws", version = "0.1"}
+ssi-jwt = { path = "../ssi-jwt", version = "0.1"}
+ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true}
+ssi-caips = { path = "../ssi-caips", version = "0.1" }
+ssi-contexts = { version = "0.1.3", path = "../contexts" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
+ssi = { version = "0.4", path = "../", default-features = false }

@@ -1,10 +1,11 @@
 use anyhow::Result;
 use serde::Deserialize;
-use ssi::did::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
-use ssi::one_or_many::OneOrMany;
-use ssi::USER_AGENT;
+use ssi_core::one_or_many::OneOrMany;
+use ssi_dids::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
 use std::convert::TryFrom;
 use url::Url;
+
+pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 pub async fn retrieve_did_manager(tzkt_url: &str, address: &str) -> Result<Option<String>> {
     let client = reqwest::Client::builder().build()?;

@@ -5,18 +5,18 @@ use json_patch::Patch;
 use reqwest::Client;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use ssi::did::{
+use ssi_core::one_or_many::OneOrMany;
+use ssi_dids::did_resolve::{
+    DIDResolver, DocumentMetadata, HTTPDIDResolver, ResolutionInputMetadata, ResolutionMetadata,
+    ERROR_INVALID_DID,
+};
+use ssi_dids::{
     DIDCreate, DIDDeactivate, DIDDocumentOperation, DIDMethod, DIDMethodError,
     DIDMethodTransaction, DIDRecover, DIDUpdate, Document, Service, ServiceEndpoint,
     VerificationRelationship,
 };
-use ssi::did_resolve::{
-    DIDResolver, DocumentMetadata, HTTPDIDResolver, ResolutionInputMetadata, ResolutionMetadata,
-    ERROR_INVALID_DID,
-};
-use ssi::jwk::{Algorithm, Base64urlUInt, JWK};
-use ssi::jws::Header;
-use ssi::one_or_many::OneOrMany;
+use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
+use ssi_jws::Header;
 use std::convert::TryFrom;
 use std::fmt;
 use std::marker::PhantomData;
@@ -339,7 +339,7 @@ pub trait Sidetree {
             update_key: update_pk,
             delta_hash,
         };
-        let signed_data = ssi::jwt::encode_sign(algorithm, &claims, update_key)
+        let signed_data = ssi_jwt::encode_sign(algorithm, &claims, update_key)
             .context("Sign Update Operation")?;
         let update_op = UpdateOperation {
             did_suffix,
@@ -394,7 +394,7 @@ pub trait Sidetree {
             delta_hash,
             anchor_origin: None,
         };
-        let signed_data = ssi::jwt::encode_sign(algorithm, &claims, recovery_key)
+        let signed_data = ssi_jwt::encode_sign(algorithm, &claims, recovery_key)
             .context("Sign Recover Operation")?;
         let recover_op = RecoverOperation {
             did_suffix,
@@ -454,7 +454,7 @@ pub trait Sidetree {
             did_suffix: did_suffix.clone(),
             recovery_key: recovery_pk,
         };
-        let signed_data = ssi::jwt::encode_sign(algorithm, &claims, &recovery_key)
+        let signed_data = ssi_jwt::encode_sign(algorithm, &claims, &recovery_key)
             .context("Sign Deactivate Operation")?;
         let recover_op = DeactivateOperation {
             did_suffix,
@@ -1236,7 +1236,7 @@ pub struct DeactivateClaims {
 
 /// Public Key JWK (JSON Web Key)
 ///
-/// Wraps [ssi::jwk::JWK], while allowing a `nonce` property, and disallowing private key
+/// Wraps [ssi_jwk::JWK], while allowing a `nonce` property, and disallowing private key
 /// properties ("d").
 ///
 /// Sidetree may allow a `nonce` property in public key JWKs ([§6.2.2 JWK Nonce][jwkn]).
@@ -1423,7 +1423,7 @@ impl<S: Sidetree> SidetreeClient<S> {
 
 /// Check that a JWK is Secp256k1
 pub fn is_secp256k1(jwk: &JWK) -> bool {
-    matches!(jwk, JWK {params: ssi::jwk::Params::EC(ssi::jwk::ECParams { curve: Some(curve), ..}), ..} if curve == "secp256k1")
+    matches!(jwk, JWK {params: ssi_jwk::Params::EC(ssi_jwk::ECParams { curve: Some(curve), ..}), ..} if curve == "secp256k1")
 }
 
 struct NoOpResolver;
@@ -1626,7 +1626,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             .post(url)
             .json(&op)
             .header("Accept", "application/json")
-            .header("User-Agent", ssi::USER_AGENT)
+            .header("User-Agent", crate::USER_AGENT)
             .send()
             .await
             .context("Send HTTP request")?;
@@ -1807,10 +1807,10 @@ impl<S: Sidetree + Send + Sync> DIDResolver for HTTPSidetreeDIDResolver<S> {
 pub enum JWSDecodeVerifyError {
     /// Unable to split JWS
     #[error("Unable to split JWS")]
-    SplitJWS(#[source] ssi::error::Error),
+    SplitJWS(#[source] ssi_jws::Error),
     /// Unable to decode JWS parts
     #[error("Unable to decode JWS parts")]
-    DecodeJWSParts(#[source] ssi::error::Error),
+    DecodeJWSParts(#[source] ssi_jws::Error),
     /// Deserialize JWS payload
     #[error("Deserialize JWS payload")]
     DeserializeJWSPayload(#[source] serde_json::Error),
@@ -1819,12 +1819,12 @@ pub enum JWSDecodeVerifyError {
     JWKFromPublicKeyJwk(#[source] JWKFromPublicKeyJwkError),
     /// Unable to verify JWS
     #[error("Unable to verify JWS")]
-    VerifyJWS(#[source] ssi::error::Error),
+    VerifyJWS(#[source] ssi_jws::Error),
 }
 
 /// Decode and verify JWS with public key inside payload
 ///
-/// Similar to [ssi::jwt::decode_verify] or [ssi::jws::decode_verify], but for when the payload (claims) must be parsed to
+/// Similar to [ssi_jwt::decode_verify] or [ssi_jws::decode_verify], but for when the payload (claims) must be parsed to
 /// determine the public key.
 ///
 /// This function decodes and verifies a JWS/JWT, where the public key is expected to be found
@@ -1835,12 +1835,12 @@ pub enum JWSDecodeVerifyError {
 /// `get_key` function).
 ///
 /// The `get_key` function uses [PublicKeyJwk], for the convenience of this crate, but this
-/// function converts it to [ssi::jwk::JWK] internally.
+/// function converts it to [ssi_jwk::JWK] internally.
 pub fn jws_decode_verify_inner<Claims: DeserializeOwned>(
     jwt: &str,
     get_key: impl FnOnce(&Claims) -> &PublicKeyJwk,
 ) -> Result<(Header, Claims), JWSDecodeVerifyError> {
-    use ssi::jws::{decode_jws_parts, split_jws, verify_bytes, DecodedJWS};
+    use ssi_jws::{decode_jws_parts, split_jws, verify_bytes, DecodedJWS};
     let (header_b64, payload_enc, signature_b64) =
         split_jws(jwt).map_err(JWSDecodeVerifyError::SplitJWS)?;
     let DecodedJWS {

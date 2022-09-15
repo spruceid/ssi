@@ -40,11 +40,11 @@ jobs:
     - name: Test
       run: cargo test --verbose --workspace
 
-    - name: Test with alternative crypto libraries
-      run: cargo test --no-default-features --features rsa,ed25519-dalek,sha2,rand
+    - name: Test with rust crypto libraries
+      run: cargo test --workspace --no-default-features --features w3c,tezos,eip,solana
 
-    - name: Test with openssl
-      run: cargo test --no-default-features --features=ring,openssl
+    - name: Test with openssl and ring
+      run: cargo test --workspace --no-default-features --features ring,openssl,w3c,tezos,eip,solana
 
     - name: Test with secp256k1
       run: |
@@ -54,12 +54,12 @@ jobs:
 
     - name: Test with p256
       run: |
-        cargo test --verbose --workspace --features p256
-        cargo test --verbose --manifest-path did-key/Cargo.toml --features p256,ssi/p256,ssi/ring,ssi/rand
-        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features p256,ssi/p256,ssi/ring,ssi/rand
+        cargo test --verbose --workspace --features secp256r1
+        cargo test --verbose --manifest-path did-key/Cargo.toml --features secp256r1,ssi/secp256r1,ssi/ring
+        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features secp256r1,ssi/secp256r1,ssi/ring
 
     - name: Test DID Resolution HTTP(S) Binding
-      run: cargo test --features http-did
+      run: cargo test --manifest-path ssi-dids/Cargo.toml --features http
 
     - name: Checkout vc-test-suite
       uses: actions/checkout@v2
@@ -80,4 +80,4 @@ jobs:
         cargo check --workspace --target wasm32-unknown-unknown
 
     - name: Test Aleo signatures
-      run: cargo test --features=aleosig
+      run: cargo test --workspace --features aleo

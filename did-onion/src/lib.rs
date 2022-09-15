@@ -1,12 +1,12 @@
 use async_trait::async_trait;
 use std::default::Default;
 
-use ssi::did::{DIDMethod, Document};
-use ssi::did_resolve::{
+use ssi_dids::did_resolve::{
     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
     TYPE_DID_LD_JSON,
 };
-use ssi::USER_AGENT;
+use ssi_dids::{DIDMethod, Document};
+pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 const TOR_SOCKS_PORT: usize = 9050;
 

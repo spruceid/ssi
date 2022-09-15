@@ -12,10 +12,21 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-ion/"
 documentation = "https://docs.rs/did-ion/"
 
 [features]
-default = ["ssi/ring"]
+default = ["secp256k1", "secp256r1", "ed25519", "rsa"]
+secp256r1 = ["ssi-dids/secp256r1", "ssi-jwt/secp256r1"]
+secp256k1 = ["ssi-dids/secp256k1", "ssi-jwt/secp256k1"]
+ed25519 = ["ssi-dids/ed25519", "ssi-jwt/ed25519"]
+rsa = ["ssi-dids/rsa", "ssi-jwt/rsa"]
+
+ring = ["ssi-dids/ring", "ssi-jwt/ring"]
+openssl = ["ssi-dids/openssl", "ssi-jwt/openssl"]
 
 [dependencies]
-ssi = { version = "0.4", path = "../", default-features = false, features = ["http-did", "secp256k1"] }
+ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false, features = ["http"] }
+ssi-core = { path = "../ssi-core", version = "0.1" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
+ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
 async-trait = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

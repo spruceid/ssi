@@ -2,7 +2,7 @@
 name = "ssi"
 version = "0.4.0"
 authors = ["Spruce Systems, Inc."]
-edition = "2018"
+edition = "2021"
 license = "Apache-2.0"
 description = "Core library for Verifiable Credentials and Decentralized Identifiers."
 repository = "https://github.com/spruceid/ssi/"
@@ -12,95 +12,50 @@ resolver = "2"
 exclude = ["json-ld-api/*", "json-ld-normalization/*"]
 
 [features]
-default = ["ring"]
-http-did = ["http", "percent-encoding"]
-libsecp256k1 = ["secp256k1"] # backward compatibility
-secp256k1 = ["k256", "rand", "k256/keccak256"]
-secp256r1 = ["p256", "rand"]
-aleosig = ["rand", "blake2", "snarkvm-dpc", "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters"]
-ripemd-160 = ["ripemd160", "secp256k1"]
-# TODO handle better keccak and sha
-keccak = ["keccak-hash", "secp256k1", "k256/keccak256"]
-sha = ["sha2", "k256/sha256"]
-example-http-issuer = []
+default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
+
+w3c = ["ssi-vc/w3c", "ssi-ucan/w3c", "ssi-zcap-ld/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
+## enable secp256k1 signatures
+secp256k1 = ["ssi-vc/secp256k1", "ssi-ucan/secp256k1", "ssi-zcap-ld/secp256k1"]
+## enable secp256r1 (p256) signatures
+secp256r1 = ["ssi-vc/secp256r1", "ssi-ucan/secp256r1", "ssi-zcap-ld/secp256r1"]
+## enable ed25519 (EdDSA) signatures
+ed25519 = ["ssi-vc/ed25519", "ssi-ucan/ed25519", "ssi-zcap-ld/ed25519"]
+## enable RSA signatures
+rsa = ["ssi-vc/rsa", "ssi-ucan/rsa", "ssi-zcap-ld/rsa"]
+## enable aleo ecosystem signatures
+aleo = ["ssi-vc/aleo", "ssi-ucan/aleo", "ssi-zcap-ld/aleo", "ssi-caips/aleo"]
+## enable ethereum style signatures
+eip = ["ssi-vc/eip", "ssi-ucan/eip", "ssi-zcap-ld/eip"]
+## enable tezos style signatures
+tezos = ["ssi-vc/tezos", "ssi-ucan/tezos", "ssi-zcap-ld/tezos"]
+## enable LDPs from the Solana Ecosystem
+solana = ["ssi-vc/solana", "ssi-zcap-ld/solana"]
+
+## Use the OpenSSL crate for crypto operations
+openssl = ["ssi-vc/openssl", "ssi-ucan/openssl", "ssi-zcap-ld/openssl"]
+## Use the Ring crate for crypto operations
+ring = ["ssi-vc/ring", "ssi-ucan/ring", "ssi-zcap-ld/ring"]
+
+http-did = ["ssi-dids/http"]
+example-http-issuer = ["ssi-dids/testing", "ssi-ldp/example-http-issuer"]
 
 [dependencies]
-json-ld = "0.4"
-# SAFETY: bbs and pairing-plus are set to specific versions due to a
-# dependency on internal struct representations using transmute in src/bbs.rs.
-bbs = { version = "=0.4.1", optional = true }
-pairing-plus = "=0.19.0"
-ff = { version = "0.6", package = "ff-zeroize" }
-hkdf = "0.8"
-zeroize = { version = "1.4", features = ["zeroize_derive"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_jcs = "0.1"
-pest = "2.1"
-pest_derive = "2.1"
-derive_builder = "0.9"
-base64 = "0.12"
-ring = { version = "0.16", optional = true }
-rsa = { version = "0.3", optional = true }
-ed25519-dalek = { version = "1", optional = true }
-rand = { version = "0.8", optional = true }
-rand_old = { package = "rand", version = "0.7" }
-openssl = { version = "0.10", optional = true }
-multibase = "0.8"
-simple_asn1 = "^0.5.2"
-num-bigint = "0.4"
-async-std = { version = "1.9", features = ["attributes"] }
-async-trait = "0.1"
-async-recursion = "1.0"
-json = "^0.12"
-futures = "0.3"
-iref = "^2.0.3"
-lazy_static = "1.4"
-combination = "0.1"
-sha2 = { version = "0.9", optional = true }
-sha2_old = { package = "sha2", version = "0.8" }
-http = { version = "0.2", optional = true }
-hex = "0.4"
-serde_urlencoded = "0.7"
-percent-encoding = { version = "2.1", optional = true }
-tokio = { version = "1.0", optional = true, features = ["macros"] }
-blake2b_simd = "0.5"
-blake2 = { version = "0.9", optional = true }
-bs58 = { version = "0.4", features = ["check"] }
-thiserror = "1.0"
-keccak-hash = { version = "0.7", optional = true }
-# TODO make this optional, or remove it
-ecdsa = "0.11.1"
-digest = "0.9"
-k256 = { version = "0.9.6", optional = true, features = ["zeroize", "ecdsa"] }
-p256 = { version = "0.9.0", optional = true, features = ["zeroize", "ecdsa"] }
 ssi-contexts = { version = "0.1.3", path = "contexts/" }
-ripemd160 = { version = "0.9", optional = true }
-sshkeys = "0.3"
-reqwest = { version = "0.11", features = ["json"] }
-flate2 = "1.0"
-bitvec = "0.20"
-url = { version = "2.2", features = ["serde"] }
-anyhow = "1.0"
-rand_xorshift = "0.3"
-bech32 = "0.8"
-snarkvm-dpc = { version = "0.7.9", optional = true }
-snarkvm-algorithms = { version= "0.7.9", optional = true }
-snarkvm-curves = { version= "0.7.9", optional = true }
-snarkvm-utilities = { version = "0.7.9", optional = true }
-snarkvm-parameters = { version = "0.7.9", optional = true }
-serde_with = { version = "1.14", features = ["base64"]}
-libipld = { version = "0.13", features = ["serde-codec"] }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-clear_on_drop = "0.2.4"
-chrono = { version = "0.4", features = ["serde"] }
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-clear_on_drop = { version = "0.2.4", features = ["no_cc"] }
-chrono = { version = "0.4", features = ["serde", "wasmbind"] }
-# https://docs.rs/getrandom/0.2.2/getrandom/#indirect-dependencies
-getrandom = { version = "0.2", features = ["js"] }
+ssi-jwk = { path = "./ssi-jwk", version = "0.1" }
+ssi-json-ld = { path = "./ssi-json-ld", version = "0.1" }
+ssi-core = { path = "./ssi-core", version = "0.1" }
+ssi-dids = { path = "./ssi-dids", version = "0.1" }
+ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
+ssi-jws = { path = "./ssi-jws", version = "0.1" }
+ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
+ssi-tzkey = { path = "./ssi-tzkey", version = "0.1" }
+ssi-ldp = { path = "./ssi-ldp", version = "0.1" }
+ssi-ssh = { path = "./ssi-ssh", version = "0.1" }
+ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
+ssi-vc = { path = "./ssi-vc", version = "0.1" }
+ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
+ssi-caips = { path = "./ssi-caips", version = "0.1" }
 
 [workspace]
 members = [
@@ -115,14 +70,35 @@ members = [
   "did-webkey",
   "vc-test",
   "did-test",
+  "ssi-caips",
+  "ssi-jwk",
+  "ssi-core",
+  "ssi-crypto",
+  "ssi-json-ld",
+  "ssi-dids",
+  "ssi-jws",
+  "ssi-jwt",
+  "ssi-tzkey",
+  "ssi-ssh",
+  "ssi-ldp",
+  "ssi-ucan",
+  "ssi-vc",
+  "ssi-zcap-ld"
 ]
 
 [dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
 blake2_old = { package = "blake2", version = "0.8" } # for bbs doctest
 uuid = { version = "0.8", features = ["v4", "serde"] }
 difference = "2.0"
 tokio = { version = "1.0", features = ["macros"] }
 hyper = { version = "0.14", features = ["server", "http1", "stream"] }
+hex = "0.4"
+multibase = "0.8"
+serde_jcs = "0.1"
+k256 = { version = "0.9", features = ["zeroize", "ecdsa"] }
+serde_json = "1.0"
+ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["testing"] }
 
 [package.metadata.docs.rs]
 features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]
