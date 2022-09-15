@@ -1,4 +1,4 @@
-use crate::{CredentialOrJWT, URI};
+use crate::{Credential, CredentialOrJWT, Issuer, Proof, URI};
 use ssi_core::one_or_many::OneOrMany;
 
 use cacaos::{
@@ -109,6 +109,54 @@ impl BindingDelegation {
         };
 
         Ok(Some(delegee.to_string()))
+    }
+
+    pub async fn validate_credential(
+        &self,
+        issuer: &Issuer,
+        id: &URI,
+        proofs: impl IntoIterator<Item = &Proof>,
+    ) -> Result<Option<String>, Error> {
+        let BindingDelegation::Base64Block(base64_cacao) = self;
+        let cbor_cacao = if let Some(b) = base64_cacao.strip_prefix("data:;base64,") {
+            base64::decode(b)?
+        } else {
+            return Err(Error::InvalidBase64Block);
+        };
+        let cacao: SiweCacao = CACAO::decode(DagCborCodec, &mut std::io::Cursor::new(cbor_cacao))?;
+        cacao.verify().await?;
+        let payload = cacao.payload();
+        let delegator = &payload.iss;
+        let delegee = &payload.aud;
+
+        if *delegator != issuer.get_id_ref() {
+            return Ok(None);
+        }
+
+        let siwe: siwe::Message = payload.clone().try_into()?;
+        if !verify_statement(&siwe)? {
+            return Ok(None);
+        }
+        let capability = extract_capabilities(&siwe)?.remove(&"credentials".parse()?);
+
+        match capability {
+            Some(cap)
+            // if the credential is issuable according to the siwe cap
+                if cap.can(id.as_str(), "issue")
+                // and the delegee signed any of the proofs
+                    && !proofs
+                        .into_iter()
+                        .any(|proof| {
+                            proof
+                                .verification_method.as_ref()
+                                .map(|vm| delegee.as_str() == vm)
+                                .unwrap_or(false)
+                        }) =>
+            {
+                Ok(Some(delegee.to_string()))
+            }
+            _ => Ok(None),
+        }
     }
 }
 

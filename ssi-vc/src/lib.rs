@@ -79,6 +79,8 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_service: Option<OneOrMany<RefreshService>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuer_binding: Option<BindingDelegation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
@@ -905,27 +907,35 @@ impl Credential {
         jwt_params: Option<(&Header, &JWTClaims)>,
         resolver: &'a dyn DIDResolver,
     ) -> Result<(Vec<&'a Proof>, bool), String> {
-        // Allow any of issuer's verification methods by default
         let mut options = options.unwrap_or_default();
-        let allowed_vms = match options.verification_method.take() {
-            Some(vm) => vec![vm.to_string()],
-            None => {
-                if let Some(ref issuer) = self.issuer {
-                    let issuer_did = issuer.get_id();
-                    // https://w3c.github.io/did-core/#assertion
-                    // assertionMethod is the verification relationship usually used for issuing
-                    // VCs.
-                    let proof_purpose = options
-                        .proof_purpose
-                        .clone()
-                        .unwrap_or(ProofPurpose::AssertionMethod);
-                    get_verification_methods_for_purpose(&issuer_did, resolver, proof_purpose)
-                        .await?
-                } else {
-                    Vec::new()
-                }
-            }
+        let allowed_vms = if let Some(vm) = options.verification_method.take() {
+            vec![vm.to_string()]
+        // else check for bound issuers
+        } else if let (Some(iss), Some(id), Some(ib)) = (
+            self.issuer.as_ref(),
+            self.id.as_ref(),
+            self.issuer_binding.as_ref(),
+        ) {
+            ib.validate_credential(iss, id, self.proof.as_ref().into_iter().flatten())
+                .await
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .collect()
+        // Allow any of issuer's verification methods by default
+        } else if let Some(ref issuer) = self.issuer.as_ref() {
+            let issuer_did = issuer.get_id();
+            // https://w3c.github.io/did-core/#assertion
+            // assertionMethod is the verification relationship usually used for issuing
+            // VCs.
+            let proof_purpose = options
+                .proof_purpose
+                .clone()
+                .unwrap_or(ProofPurpose::AssertionMethod);
+            get_verification_methods_for_purpose(&issuer_did, resolver, proof_purpose).await?
+        } else {
+            Vec::new()
         };
+
         let matched_proofs = self
             .proof
             .iter()
