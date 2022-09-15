@@ -507,6 +507,7 @@ mod tests {
             proof: None,
             holder: None,
             property_set: None,
+            holder_binding: None,
         };
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp.holder = Some(URI::String(did.to_string()));
