@@ -1460,7 +1460,7 @@ impl Presentation {
         options: Option<LinkedDataProofOptions>,
         jwt_params: Option<(&Header, &JWTClaims)>,
         resolver: &dyn DIDResolver,
-    ) -> Result<(Vec<&Proof>, bool), String> {
+    ) -> Result<(Vec<&Proof>, bool), Error> {
         // Allow any of holder's verification methods matching proof purpose by default
         let mut options = options.unwrap_or_else(|| LinkedDataProofOptions {
             proof_purpose: Some(ProofPurpose::Authentication),
@@ -1558,7 +1558,7 @@ impl Presentation {
         proof_purpose: ProofPurpose,
     ) -> Result<Vec<String>, Error> {
         let authorized_holders = self.get_authorized_holders().await?;
-        let vmms = crate::did_resolve::get_verification_methods_for_all(
+        let vmms = ssi_dids::did_resolve::get_verification_methods_for_all(
             authorized_holders
                 .iter()
                 .map(|x| x.as_str())
