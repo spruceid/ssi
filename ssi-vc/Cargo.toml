@@ -51,5 +51,6 @@ async-std = { version = "1.9", features = ["attributes"] }
 multibase = "0.8"
 hex = "0.4"
 k256 = { version = "0.9", features = ["zeroize", "ecdsa"] }
+keccak-hash = { version = "0.7" }
 serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto", version = "0.1"}

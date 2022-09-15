@@ -9,6 +9,8 @@ pub enum Error {
     #[error(transparent)]
     JWS(#[from] ssi_jws::Error),
     #[error(transparent)]
+    DID(#[from] ssi_dids::Error),
+    #[error(transparent)]
     Base64(#[from] base64::DecodeError),
     #[error(transparent)]
     URIParse(#[from] ssi_core::uri::URIParseErr),
