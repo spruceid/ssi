@@ -7,7 +7,7 @@ use cacaos::{
     },
     CACAO,
 };
-use capgrok::{extract_capabilities, verify_statement, Error as CapGrokError, RESOURCE_PREFIX};
+use capgrok::{extract_capabilities, verify_statement, Error as CapGrokError};
 use libipld::{cbor::DagCborCodec, codec::Decode};
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
@@ -114,9 +114,9 @@ impl BindingDelegation {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use crate::did::example::DIDExample;
-    use crate::jwk::JWK;
-    use crate::vc::*;
+    use crate::*;
+    use ssi_dids::example::DIDExample;
+    use ssi_jwk::JWK;
 
     const VC_ID_1: &str = "http://example.edu/credentials/1872";
     const VC_ID_2: &str = "http://example.edu/credentials/0000";
@@ -124,13 +124,13 @@ pub(crate) mod tests {
 
     const DID_FOO: &str = "did:example:foo";
     const VM_FOO: &str = "did:example:foo#key1";
-    const JWK_JSON_FOO: &str = include_str!("../tests/rsa2048-2020-08-25.json");
+    const JWK_JSON_FOO: &str = include_str!("../../tests/rsa2048-2020-08-25.json");
 
     const DID_BAR: &str = "did:example:bar";
     const VM_BAR: &str = "did:example:bar#key1";
-    const JWK_JSON_BAR: &str = include_str!("../tests/ed25519-2021-06-16.json");
+    const JWK_JSON_BAR: &str = include_str!("../../tests/ed25519-2021-06-16.json");
 
-    #[cfg(all(feature = "k256", feature = "keccak-hash"))]
+    #[cfg(all(feature = "eip", feature = "secp256k1"))]
     async fn test_holder_binding_vp(
         bound_vc_id: Option<&str>,
         bound_holder: &str,
@@ -142,12 +142,11 @@ pub(crate) mod tests {
         use k256::{ecdsa::signature::Signer, elliptic_curve::sec1::ToEncodedPoint};
         use keccak_hash::keccak;
         use libipld::{cbor::DagCborCodec, multihash::Code, store::DefaultParams, Block};
-        use std::convert::{TryFrom, TryInto};
 
         // generate eth account kp/id
         let key = JWK::generate_secp256k1().unwrap();
         let ec_params = match &key.params {
-            crate::jwk::Params::EC(ec) => ec,
+            ssi_jwk::Params::EC(ec) => ec,
             _ => panic!(),
         };
         let secret_key = k256::SecretKey::try_from(ec_params).unwrap();
@@ -186,9 +185,9 @@ pub(crate) mod tests {
             // issue cred to kp
             let did = format!(
                 "did:pkh:eip155:1:{}",
-                crate::keccak_hash::eip55_checksum_addr(&crate::keccak_hash::bytes_to_lowerhex(
-                    &pk_hash
-                ))
+                ssi_crypto::hashes::keccak::eip55_checksum_addr(
+                    &ssi_crypto::hashes::keccak::bytes_to_lowerhex(&pk_hash)
+                )
                 .unwrap()
             );
 
@@ -206,7 +205,7 @@ pub(crate) mod tests {
             let mut vc_issue_options = LinkedDataProofOptions::default();
             vc_issue_options.verification_method = Some(URI::String(iss_vm.to_string()));
             vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
-            let mut context_loader = crate::jsonld::ContextLoader::default();
+            let mut context_loader = ssi_json_ld::ContextLoader::default();
             let proof = credential
                 .generate_proof(iss_key, &vc_issue_options, &DIDExample, &mut context_loader)
                 .await
@@ -217,7 +216,8 @@ pub(crate) mod tests {
             None
         };
 
-        let hash = crate::keccak_hash::prefix_personal_message(&delegation_message.to_string());
+        let hash =
+            ssi_crypto::hashes::keccak::prefix_personal_message(&delegation_message.to_string());
         let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&hash).unwrap();
         let mut delegation_sig = sig.as_ref().to_vec();
         delegation_sig[64] += 27;
@@ -251,9 +251,9 @@ pub(crate) mod tests {
         .unwrap();
 
         vp.verifiable_credential =
-            vc.map(|v| crate::one_or_many::OneOrMany::One(CredentialOrJWT::Credential(v)));
+            vc.map(|v| ssi_core::one_or_many::OneOrMany::One(CredentialOrJWT::Credential(v)));
 
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let mut vp_issue_options = LinkedDataProofOptions::default();
         vp_issue_options.verification_method = Some(URI::String(presenter.1.to_string()));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
@@ -280,7 +280,7 @@ pub(crate) mod tests {
         vp_verification_result.errors
     }
 
-    #[cfg(all(feature = "k256", feature = "keccak-hash"))]
+    #[cfg(all(feature = "eip", feature = "secp256k1"))]
     #[async_std::test]
     async fn present_with_siwecacao_holder_binding() {
         let foo = (

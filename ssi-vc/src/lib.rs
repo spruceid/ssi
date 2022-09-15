@@ -1469,7 +1469,7 @@ impl Presentation {
         let restrict_allowed_vms = match options.verification_method.take() {
             Some(vm) => Some(vec![vm.to_string()]),
             None => {
-                if let Some(URI::String(ref holder)) = self.holder {
+                if let Some(URI::String(ref _holder)) = self.holder {
                     let proof_purpose = options
                         .proof_purpose
                         .clone()
@@ -2919,7 +2919,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[async_std::test]
     async fn present_with_example_holder_binding() {
-        let mut context_loader = crate::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let key: JWK = serde_json::from_str(JWK_JSON_BAR).unwrap();
         let mut vp_issue_options = LinkedDataProofOptions::default();
         let vp_proof_vm = "did:example:bar#key1".to_string();
