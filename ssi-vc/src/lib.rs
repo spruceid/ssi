@@ -3044,4 +3044,130 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             assert!(!vp_verification_result.errors.is_empty());
         }
     }
+
+    #[async_std::test]
+    async fn issue_with_example_issuer_binding() {
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let foo: (&str, &str, JWK) = (
+            "did:example:foo",
+            "did:example:foo#key1",
+            serde_json::from_str(JWK_JSON).unwrap(),
+        );
+        let bar: (&str, &str, JWK) = (
+            "did:example:bar",
+            "did:example:bar#key1",
+            serde_json::from_str(JWK_JSON_BAR).unwrap(),
+        );
+
+        let mut vc_issue_options = LinkedDataProofOptions::default();
+        vc_issue_options.verification_method = Some(URI::String(bar.1.to_string()));
+        vc_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        vc_issue_options.checks = None;
+        let id = "uuid:my-vc";
+
+        {
+            // issue a cred with bar on behalf of foo
+            let mut vc: Credential = serde_json::from_value(serde_json::json!({
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    {
+                        "@vocab": "https://example.org/example-issuer-binding#"
+                    }
+                ],
+                "id": id,
+                "type": ["VerifiableCredential"],
+                "issuer": foo.0,
+                "issuanceDate": "2020-08-19T21:41:50Z",
+                "credentialSubject": {
+                    "id": "did:example:other",
+                },
+                "issuerBinding": {
+                    "type": "ExampleIssuerBinding2022",
+                    "from": foo.0,
+                    "to": bar.0,
+                },
+            }))
+            .unwrap();
+
+            let vc_proof = vc
+                .generate_proof(&bar.2, &vc_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            vc.add_proof(vc_proof);
+            println!("VP: {}", serde_json::to_string_pretty(&vc).unwrap());
+            // Verify VC
+            vc.validate().unwrap();
+            let vc_verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
+            println!("{:#?}", vc_verification_result);
+            assert!(vc_verification_result.errors.is_empty());
+        }
+
+        {
+            // Do the same thing but with a mismatched holder binding
+            // Verify VP fails
+            let mut vc: Credential = serde_json::from_value(serde_json::json!({
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    {
+                        "@vocab": "https://example.org/example-issuer-binding#"
+                    }
+                ],
+                "id": id,
+                "type": ["VerifiableCredential"],
+                "issuer": foo.0,
+                "issuanceDate": "2020-08-19T21:41:50Z",
+                "credentialSubject": {
+                    "id": "did:example:other",
+                },
+                "issuerBinding": {
+                    "type": "ExampleIssuerBinding2022",
+                    "from": bar.0,
+                    "to": bar.0,
+                },
+            }))
+            .unwrap();
+
+            let vc_proof = vc
+                .generate_proof(&bar.2, &vc_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            vc.add_proof(vc_proof);
+            println!("VP: {}", serde_json::to_string_pretty(&vc).unwrap());
+            let vc_verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
+            println!("{:#?}", vc_verification_result);
+            assert!(!vc_verification_result.errors.is_empty());
+        }
+
+        {
+            // Check that verifying a VP with an unknown issuer binding type produces an error.
+            let mut vc: Credential = serde_json::from_value(serde_json::json!({
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    {
+                        "@vocab": "https://example.org/example-issuer-binding#"
+                    }
+                ],
+                "id": id,
+                "type": ["VerifiableCredential"],
+                "issuer": foo.0,
+                "issuanceDate": "2020-08-19T21:41:50Z",
+                "credentialSubject": {
+                    "id": "did:example:other",
+                },
+                "holderBinding": {
+                    "type": "SomeOtherThing",
+                    "field": "something"
+                },
+            }))
+            .unwrap();
+            let vc_proof = vc
+                .generate_proof(&foo.2, &vc_issue_options, &DIDExample, &mut context_loader)
+                .await
+                .unwrap();
+            vc.add_proof(vc_proof);
+            let vp_verification_result = vc.verify(None, &DIDExample, &mut context_loader).await;
+            println!("{:#?}", vp_verification_result);
+            assert!(!vp_verification_result.errors.is_empty());
+        }
+    }
 }
