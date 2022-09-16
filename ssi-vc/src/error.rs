@@ -26,8 +26,8 @@ pub enum Error {
     InvalidIssuer,
     #[error("Missing holder property")]
     MissingHolder,
-    #[error("Unsupported Holder Binding")]
-    UnsupportedHolderBinding,
+    #[error("Unsupported Binding")]
+    UnsupportedBinding,
     #[error(transparent)]
     HolderBindingVerification(#[from] crate::cacao::Error),
     #[error("Missing issuance date")]

@@ -1,4 +1,4 @@
-use crate::{Credential, CredentialOrJWT, Issuer, Proof, URI};
+use crate::{CredentialOrJWT, Issuer, Proof, URI};
 use ssi_core::one_or_many::OneOrMany;
 
 use cacaos::{

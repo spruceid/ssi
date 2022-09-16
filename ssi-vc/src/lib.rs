@@ -79,7 +79,7 @@ pub struct Credential {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub refresh_service: Option<OneOrMany<RefreshService>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuer_binding: Option<BindingDelegation>,
+    pub issuer_binding: Option<IssuerBinding>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
@@ -265,13 +265,20 @@ pub struct Presentation {
 #[serde(tag = "type")]
 pub enum HolderBinding {
     #[cfg(test)]
-    ExampleHolderBinding2022 {
-        to: URI,
-        from: String,
-        // proof: String,
-    },
+    ExampleHolderBinding2022 { to: URI, from: String },
     #[serde(rename_all = "camelCase")]
     CacaoDelegationHolderBinding2022 { cacao_delegation: BindingDelegation },
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum IssuerBinding {
+    #[cfg(test)]
+    ExampleIssuerBinding2022 { to: URI, from: String },
+    #[serde(rename_all = "camelCase")]
+    CacaoDelegationIssuerBinding2022 { cacao_delegation: BindingDelegation },
     #[serde(other)]
     Unknown,
 }
@@ -906,8 +913,9 @@ impl Credential {
         options: Option<LinkedDataProofOptions>,
         jwt_params: Option<(&Header, &JWTClaims)>,
         resolver: &'a dyn DIDResolver,
-    ) -> Result<(Vec<&'a Proof>, bool), String> {
+    ) -> Result<(Vec<&'a Proof>, bool), Error> {
         let mut options = options.unwrap_or_default();
+        // get from options
         let allowed_vms = if let Some(vm) = options.verification_method.take() {
             vec![vm.to_string()]
         // else check for bound issuers
@@ -916,12 +924,23 @@ impl Credential {
             self.id.as_ref(),
             self.issuer_binding.as_ref(),
         ) {
-            ib.validate_credential(iss, id, self.proof.as_ref().into_iter().flatten())
-                .await
-                .map_err(|e| e.to_string())?
-                .into_iter()
-                .collect()
-        // Allow any of issuer's verification methods by default
+            match ib {
+                IssuerBinding::CacaoDelegationIssuerBinding2022 { cacao_delegation } => {
+                    cacao_delegation
+                        .validate_credential(iss, id, self.proof.as_ref().into_iter().flatten())
+                        .await?
+                        .into_iter()
+                        .collect()
+                }
+                IssuerBinding::Unknown => return Err(Error::UnsupportedBinding),
+                #[cfg(test)]
+                IssuerBinding::ExampleIssuerBinding2022 { to, from } => {
+                    if from != iss.get_id_ref() {
+                        return Err(Error::UnsupportedBinding);
+                    }
+                    vec![to.to_string()]
+                }
+            }
         } else if let Some(ref issuer) = self.issuer.as_ref() {
             let issuer_did = issuer.get_id();
             // https://w3c.github.io/did-core/#assertion
@@ -1614,7 +1633,7 @@ impl Presentation {
                 }
                 HolderBinding::Unknown => {
                     // TODO: return warning or error for unknown holder binding?
-                    return Err(Error::UnsupportedHolderBinding);
+                    return Err(Error::UnsupportedBinding);
                 }
             }
         }
@@ -1677,11 +1696,10 @@ pub async fn get_verification_methods_for_purpose(
     did: &str,
     resolver: &dyn DIDResolver,
     proof_purpose: ProofPurpose,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<String>, Error> {
     let vmms =
         ssi_dids::did_resolve::get_verification_methods(did, proof_purpose.clone(), resolver)
-            .await
-            .map_err(String::from)?;
+            .await?;
     Ok(vmms.into_keys().collect())
 }
 
