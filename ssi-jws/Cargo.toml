@@ -41,9 +41,9 @@ rand_old = { package = "rand", version = "0.7", optional = true }
 rand = { version = "0.8", optional = true }
 openssl = { version = "0.10", optional = true }
 ring = { version = "0.16", optional = true }
-ssi-core = { path = "../ssi-core", version = "0.1"}
-ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
-ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-core = { path = "../ssi-core" }
+ssi-crypto = { path = "../ssi-crypto" }
+ssi-jwk = { path = "../ssi-jwk" }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
