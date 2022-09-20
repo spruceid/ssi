@@ -16,10 +16,10 @@ ring = ["ssi-dids/ring"]
 openssl = ["ssi-dids/openssl"]
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false, features = ["secp256k1"] }
-ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false, features = ["eip"] }
-ssi-crypto = { path = "../ssi-crypto", version = "0.1", default-features = false, features = ["secp256k1"] }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["secp256k1", "eip"] }
+ssi-dids = { path = "../ssi-dids", default-features = false, features = ["secp256k1"] }
+ssi-caips = { path = "../ssi-caips", default-features = false, features = ["eip"] }
+ssi-crypto = { path = "../ssi-crypto", default-features = false, features = ["secp256k1"] }
+ssi-jwk = { path = "../ssi-jwk", default-features = false, features = ["secp256k1", "eip"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
