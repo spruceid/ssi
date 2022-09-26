@@ -22,7 +22,7 @@ use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
 use ssi_jwt::NumericDate;
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     io::{Read, Seek, Write},
 };
 
@@ -232,7 +232,10 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum DecodeError<E> {
+pub enum DecodeError<E>
+where
+    E: Debug + Display + serde::ser::StdError,
+{
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]

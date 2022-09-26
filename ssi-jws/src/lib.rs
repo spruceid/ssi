@@ -1,5 +1,6 @@
 pub mod error;
 pub use error::Error;
+use k256::ecdsa::signature::Signature;
 use serde::{Deserialize, Serialize};
 #[cfg(any(feature = "secp256k1", feature = "p256"))]
 use ssi_crypto::hashes::passthrough_digest::PassthroughDigest;
