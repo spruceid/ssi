@@ -60,6 +60,7 @@ ssi-caips = { path = "./ssi-caips", version = "0.1" }
 [workspace]
 members = [
   "did-tezos",
+  "did-jwk",
   "did-key",
   "did-web",
   "did-ethr",
