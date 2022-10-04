@@ -6,6 +6,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Add `ssi-core` crate to workspace ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-crypto` crate to workspace from `src/sha2.rs` and `src/passthrough_digest.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-jwk` crate to workspace from `ssi/jwk.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-jws` crate to workspace from `src/jws.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-jwt` crate to workspace from `src/jwt.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-dids` crate to workspace from `src/did.rs` and `src/did_resolve.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-json-ld` crate to workspace from `src/jsonld.rs`, `src/urdna2015.rs` and `src/rdf.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-ldp` crate to workspace from `src/ldp.rs` and `src/suites.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-vc` crate to workspace from `src/vc.rs` and `src/revocation.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-zcap-ld` crate to workspace from `src/zcap_ld.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-caips` crate to workspace from `src/caip10.rs` and `src/caip2.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-ucan` crate to workspace from `src/ucan.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-tzkey` crate to workspace ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ssi-ssh` crate to workspace from `src/ssh.rs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add appropriate `ssi-*::Error` types for each workspace crate ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `secp256k1`, `secp256r1`, `ed25519`, `rsa` features to most workspace crates for crypto support ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `eip`, `tezos`, `aleo` features to most workspace crates for ecosystem support/integration ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `ripemd-160` feature to `ssi-jwk`, `ssi-crypto`, `ssi-caips` for btc address support ([#457](https://github.com/spruceid/ssi/pull/457))
+- Add `openssl` and `ring` features to all crypto-using crates to select underlying implementation ([#457](https://github.com/spruceid/ssi/pull/457))
+
+### Changed
+- Adopt 2021 edition rust consistantly ([#457](https://github.com/spruceid/ssi/pull/457))
+- Change top-level `ssi` modules to re-export `ssi-*` workspace crates ([#457](https://github.com/spruceid/ssi/pull/457))
+- Rename `p256` feature to `secp256r1` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Rename `k256` feature to `secp256k1` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Rename `keccak` feature to `eip` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Rename `ed25519-dalek` feature to `ed25519` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Rename `blakesig` feature to `tezos` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Rename `aleosig` feature to `aleo` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `vc::URI` to `ssi-core::uri` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `vc::OneOrMany` to `ssi-core::one_or_many` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `vc::Proof` to `ssi-ldp::Proof` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `vc::Context` to `ssi-ldp::Context` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `ldp::resolve_*` functions to `ssi-did::did_resolve` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `vc::NumericDate` to `ssi-jwt` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `parser` to `ssi-dids` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `bbs` to `ssi-crypto::signatures::bbs` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `rdf` and `urdna2015` to `ssi-json-ld` ([#457](https://github.com/spruceid/ssi/pull/457))
+- Move `ssi-ldp::suites::*` types into relevent submodules ([#457](https://github.com/spruceid/ssi/pull/457))
+- Return `[u8; 32]` from `sha256` hash function ([#457](https://github.com/spruceid/ssi/pull/457))
+- Update github build workflow for new structure and features
+- Update w3c json-ld-normalization git submodule origin ref, repo has moved ([#463](https://github.com/spruceid/ssi/pull/463))
+
+### Fixed
+- return error if JWK params not JWS conformant ([#457](https://github.com/spruceid/ssi/pull/457))
+
+### Removed
+- top level `ssi::Error` type has been removed and broken up into more specific `ssi-*::Error` workspace crate errors ([#457](https://github.com/spruceid/ssi/pull/457))
+
+
 ## [0.4.0] 2022-03-02
 ### Added
 - Use CAIP-10 in did:pkh ([#279](https://github.com/spruceid/ssi/pull/279), [#286](https://github.com/spruceid/ssi/pull/286), [#303](https://github.com/spruceid/ssi/pull/303)).
