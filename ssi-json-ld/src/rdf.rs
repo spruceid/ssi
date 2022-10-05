@@ -49,18 +49,18 @@ pub struct Statement {
     pub graph_label: Option<GraphLabel>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Subject {
     IRIRef(IRIRef),
     BlankNodeLabel(BlankNodeLabel),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Predicate {
     IRIRef(IRIRef),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Object {
     IRIRef(IRIRef),
     BlankNodeLabel(BlankNodeLabel),
@@ -87,7 +87,7 @@ pub enum IRIOrBlankNodeIdentifier {
 
 pub const LANG_STRING_IRI_STR: &str = "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString";
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal {
     String {
         string: StringLiteral,
@@ -102,10 +102,10 @@ pub enum Literal {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StringLiteral(pub String);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Lang(pub String);
 
 impl From<&Statement> for String {

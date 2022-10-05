@@ -223,7 +223,7 @@ impl Default for LinkedDataProofOptions {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(try_from = "String")]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]

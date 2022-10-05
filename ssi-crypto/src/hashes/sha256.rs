@@ -25,8 +25,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
         use sha2::Digest;
         let mut hasher = sha2::Sha256::new();
         hasher.update(data);
-        let hash = hasher.finalize().into();
-        hash
+        hasher.finalize().into()
     }
 }
 

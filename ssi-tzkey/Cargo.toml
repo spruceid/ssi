@@ -11,7 +11,7 @@ p256 = []
 ed25519 = ["ed25519-dalek"]
 
 [dependencies]
-ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", features = ["tezos"]}
 ssi-jws = { path = "../ssi-jws", version = "0.1"}
 ed25519-dalek = { version = "1", optional = true }
 thiserror = "1.0"

@@ -5,7 +5,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
+default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160", "blake2b_simd"]
 ## enable secp256k1 signatures
 secp256k1 = ["ssi-jwk/secp256k1", "k256/keccak256", "ssi-crypto/secp256k1"]
 ## enable secp256r1 (p256) signatures

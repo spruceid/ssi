@@ -79,7 +79,7 @@ pub enum ResolverOutcome {
     DeactivatedOutcome,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ResolverFunction {
     Resolve,

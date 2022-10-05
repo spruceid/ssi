@@ -35,7 +35,7 @@ use thiserror::Error;
 ///
 /// [CAIP-10]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md
 /// [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
-#[derive(Clone, PartialEq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct BlockchainAccountId {
     /// The `account_address` part of a CAIP-10 string.
     pub account_address: String,

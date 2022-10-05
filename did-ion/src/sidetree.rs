@@ -865,7 +865,7 @@ impl SidetreeOperation for DeactivateOperation {
 /// [DID Suffix](https://identity.foundation/sidetree/spec/v1.0.0/#did-suffix)
 ///
 /// Unique identifier string within a Sidetree DID (short or long-form)
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct DIDSuffix(pub String);
 
 impl fmt::Display for DIDSuffix {
@@ -1242,7 +1242,7 @@ pub struct DeactivateClaims {
 /// Sidetree may allow a `nonce` property in public key JWKs ([§6.2.2 JWK Nonce][jwkn]).
 ///
 /// [jwkn]: https://identity.foundation/sidetree/spec/#jwk-nonce
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicKeyJwk {
     #[serde(skip_serializing_if = "Option::is_none")]

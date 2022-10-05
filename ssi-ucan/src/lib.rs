@@ -325,7 +325,7 @@ impl<F, A> Payload<F, A> {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum UcanResource {
     Proof(#[serde_as(as = "DisplayFromStr")] UcanProofRef),
@@ -341,7 +341,7 @@ impl Display for UcanResource {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct UcanProofRef(pub Cid);
 
 impl Display for UcanProofRef {
@@ -370,7 +370,7 @@ impl std::str::FromStr for UcanProofRef {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct UcanScope {
     pub namespace: String,
     pub capability: String,
@@ -403,7 +403,7 @@ impl std::str::FromStr for UcanScope {
 /// 3.2.5 A JSON capability MUST include the with and can fields and
 /// MAY have additional fields needed to describe the capability
 #[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct Capability<A = JsonValue> {
     pub with: UcanResource,
     #[serde_as(as = "DisplayFromStr")]
@@ -417,7 +417,7 @@ fn now() -> f64 {
 }
 
 #[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct UcanRevocation {
     #[serde(rename = "iss")]
     pub issuer: String,

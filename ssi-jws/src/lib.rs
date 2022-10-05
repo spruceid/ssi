@@ -12,7 +12,7 @@ pub type VerificationWarnings = Vec<String>;
 // RFC 7515 - JSON Web Signature (JWS)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Header {
     #[serde(rename = "alg")]
     pub algorithm: Algorithm,
@@ -672,7 +672,7 @@ pub fn split_detached_jws(jws: &str) -> Result<(&str, &str), Error> {
     Ok((header_b64, signature_b64))
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct DecodedJWS {
     pub header: Header,
     pub signing_input: Vec<u8>,

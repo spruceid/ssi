@@ -191,7 +191,7 @@ pub struct DereferencingMetadata {
     pub property_set: Option<HashMap<String, Metadata>>,
 }
 
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 /// A resource returned by [DID URL dereferencing][dereference]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]

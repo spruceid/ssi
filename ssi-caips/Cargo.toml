@@ -5,7 +5,7 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
-default = ["eip", "ripemd-160"]
+default = ["eip", "ripemd-160", "ssi-jwk/secp256k1"]
 eip = ["ssi-jwk/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160"]
 aleo = ["ssi-jwk/aleo", "bech32"]
