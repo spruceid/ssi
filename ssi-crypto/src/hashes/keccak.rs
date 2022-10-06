@@ -19,8 +19,7 @@ pub fn hash_public_key(k: &k256::PublicKey) -> String {
     let pk_bytes = pk_ec.as_bytes();
     let hash = keccak(&pk_bytes[1..65]).to_fixed_bytes();
     let hash_last20 = &hash[12..32];
-    let hash_last20_hex = bytes_to_lowerhex(hash_last20);
-    hash_last20_hex
+    bytes_to_lowerhex(hash_last20)
 }
 
 /// Compute a hash of a public key as an Ethereum address, with EIP-55 checksum.

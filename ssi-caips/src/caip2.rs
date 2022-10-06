@@ -26,7 +26,7 @@ use thiserror::Error;
 /// A parsed [CAIP-2] chain id.
 ///
 /// [CAIP-2]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-2.md
-#[derive(Clone, PartialEq, Hash, Debug)]
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct ChainId {
     /// The `namespace` part of a CAIP-2 string, i.e. the "virtual machine" or type of chain.
     pub namespace: String,

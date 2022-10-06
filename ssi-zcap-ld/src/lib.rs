@@ -395,7 +395,7 @@ where
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 #[serde(try_from = "OneOrMany<Context>")]
 pub enum Contexts {

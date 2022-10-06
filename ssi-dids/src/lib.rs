@@ -35,7 +35,7 @@ use ssi_jwk::JWK;
 /// The relationship between a [verification method][VerificationMethod] and a DID
 /// Subject (as described by a [DID Document][Document]) is considered analogous to a [proof
 /// purpose](crate::vc::ProofPurpose).
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(try_from = "String")]
 #[serde(rename_all = "camelCase")]
 pub enum VerificationRelationship {
@@ -144,7 +144,7 @@ const MULTICODEC_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 type DID = String;
 
 /// A [DID URL](https://w3c.github.io/did-core/#did-url-syntax).
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct DIDURL {
@@ -165,7 +165,7 @@ pub struct DIDURL {
 ///
 /// `relative-part` from [RFC 3986 - 4.2 Relative
 /// Reference](https://www.rfc-editor.org/rfc/rfc3986#section-4.2), excluding network-path references.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub enum RelativeDIDURLPath {
     /// Absolute-path reference. `path-absolute` from [RFC 3986](https://tools.ietf.org/html/rfc3986#section-3.3)
     Absolute(String),
@@ -178,7 +178,7 @@ pub enum RelativeDIDURLPath {
 /// A [Relative DID URL](https://www.w3.org/TR/did-core/#relative-did-urls).
 ///
 /// A kind of [relative reference (RFC 3986)](https://www.rfc-editor.org/rfc/rfc3986#section-4.2)
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct RelativeDIDURL {
@@ -192,7 +192,7 @@ pub struct RelativeDIDURL {
 
 /// A [DID URL][DIDURL] without a fragment. Used for [Dereferencing the Primary
 /// Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) in [DID URL Dereferencing][crate::did_resolve::dereference].
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
 pub struct PrimaryDIDURL {
@@ -207,7 +207,7 @@ pub struct PrimaryDIDURL {
 /// A [DID document]
 ///
 /// [DID document]: https://www.w3.org/TR/did-core/#dfn-did-documents
-#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[builder(
     setter(into, strip_option),
@@ -282,7 +282,7 @@ pub struct Document {
 /// [JSON-LD Context](https://www.w3.org/TR/json-ld11/#the-context) URI or map, for use in the
 /// [`@context`](https://www.w3.org/TR/did-core/#dfn-context) property of a [DID
 /// document][Document] in JSON-LD representation.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Context {
     /// Context referenced by a URL.
@@ -294,7 +294,7 @@ pub enum Context {
 /// [JSON-LD Context](https://www.w3.org/TR/json-ld11/#the-context) value or array of context
 /// values, for use in the [`@context`](https://www.w3.org/TR/did-core/#dfn-context) property of a
 /// DID document in JSON-LD representation.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 #[serde(try_from = "OneOrMany<Context>")]
 pub enum Contexts {
@@ -306,7 +306,7 @@ pub enum Contexts {
 
 /// A [Verification method](https://www.w3.org/TR/did-core/#verification-methods) map (object) in a DID
 /// document.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct VerificationMethodMap {
     /// [@context](https://www.w3.org/TR/did-core/#dfn-context) property of a verification method map. Used if the verification method map uses
@@ -353,7 +353,7 @@ pub struct VerificationMethodMap {
 
 /// A [Verification method](https://www.w3.org/TR/did-core/#verification-methods) in a DID
 /// document, embedded or referenced.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
@@ -371,7 +371,7 @@ pub enum VerificationMethod {
 ///
 /// "The value of the serviceEndpoint property MUST be a string \[URI], a map, or a set composed of one or
 /// more strings \[URIs] and/or maps."
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum ServiceEndpoint {
@@ -381,7 +381,7 @@ pub enum ServiceEndpoint {
 
 // <https://w3c.github.io/did-core/#service-properties>
 /// A [service](https://www.w3.org/TR/did-core/#services) map (object) in a DID document.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Service {
     /// id property (URI) of a service map.
@@ -402,7 +402,7 @@ pub struct Service {
 /// be on a [DID document][Document].
 ///
 /// See also the Verifiable Credential [Proof][crate::vc::Proof] type.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Proof {
     /// Proof type.
@@ -421,7 +421,7 @@ pub struct Proof {
 
 /// An object from a [DID document][Document] returned by [DID URL
 /// dereferencing][crate::did_resolve::dereference].
-#[derive(Debug, Serialize, Clone, PartialEq)]
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
@@ -436,7 +436,7 @@ pub enum Resource {
 }
 
 /// Something that can be used to derive (generate) a DID.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Source<'a> {
     /// A public key.
@@ -559,7 +559,7 @@ pub enum DIDDocumentOperation {
 }
 
 /// A transaction for a DID method
-#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Builder, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DIDMethodTransaction {
     /// DID method name

@@ -755,10 +755,9 @@ fn document_has_context(
     let contexts_string = document.get_contexts()?.ok_or(Error::MissingContext)?;
     let contexts: ssi_core::one_or_many::OneOrMany<Context> =
         serde_json::from_str(&contexts_string)?;
-    Ok(contexts.into_iter().any(|c| match c {
-        Context::URI(URI::String(u)) if u == context_uri => true,
-        _ => false,
-    }))
+    Ok(contexts
+        .into_iter()
+        .any(|c| matches!(c, Context::URI(URI::String(u)) if u == context_uri)))
 }
 
 #[cfg(test)]
@@ -772,7 +771,7 @@ mod tests {
     #[async_trait]
     impl LinkedDataDocument for ExampleDocument {
         fn get_contexts(&self) -> Result<Option<String>, Error> {
-            Ok(Some(serde_json::to_string(&*CREDENTIALS_V1_CONTEXT)?))
+            Ok(Some(serde_json::to_string(CREDENTIALS_V1_CONTEXT)?))
         }
         async fn to_dataset_for_signing(
             &self,

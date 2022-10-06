@@ -23,7 +23,7 @@ openssl = ["ssi-dids/openssl"]
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
-ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false, features = ["tezos"] }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 chrono = { version = "0.4" }
 reqwest = { version = "0.11", features = ["json"] }
