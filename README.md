@@ -4,7 +4,7 @@
 [![](https://img.shields.io/twitter/follow/spruceid?label=Follow&style=social)](https://twitter.com/spruceid)
 
 SSI's documentation is currently packaged with the DIDKit documentation
-[here](https://spruceid.dev/docs/didkit/).
+[here](https://spruceid.dev/didkit/didkit/).
 
 # SSI
 
@@ -13,8 +13,6 @@ functionality in Rust. Rust was chosen for its expressive type system, memory
 safety, simple dependency web, and suitability across different platforms
 including embedded systems. This library is embedded in the the cross-platform
 [`didkit`](https://github.com/spruceid/didkit) library as a core dependency.
-
-![DIDKit core components](https://user-images.githubusercontent.com/37127325/132885372-9cdf586e-ba6f-44c8-8b83-f72f16d86107.png)
 
 ## Security Audits
 
