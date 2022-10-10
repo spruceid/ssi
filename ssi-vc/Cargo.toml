@@ -47,6 +47,6 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 async-std = { version = "1.9", features = ["attributes"] }
 multibase = "0.8"
 hex = "0.4"
-k256 = { version = "0.9", features = ["zeroize", "ecdsa"] }
+k256 = { version = "0.11", features = ["ecdsa"] }
 serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto", version = "0.1"}

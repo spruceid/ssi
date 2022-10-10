@@ -297,8 +297,7 @@ impl JWK {
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = k256::SecretKey::random(&mut rng);
-        // SecretKey zeroizes on drop
-        let sk_bytes: &[u8] = secret_key.as_scalar_bytes().as_ref();
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -309,8 +308,7 @@ impl JWK {
     pub fn generate_p256() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = p256::SecretKey::random(&mut rng);
-        // SecretKey zeroizes on drop
-        let sk_bytes: &[u8] = secret_key.as_scalar_bytes().as_ref();
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -736,7 +734,7 @@ impl From<&Base64urlUInt> for rsa::BigUint {
 }
 
 #[cfg(feature = "rsa")]
-impl TryFrom<&RSAParams> for rsa::RSAPublicKey {
+impl TryFrom<&RSAParams> for rsa::RsaPublicKey {
     type Error = Error;
     fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
         let n = params.modulus.as_ref().ok_or(Error::MissingModulus)?;
@@ -746,7 +744,7 @@ impl TryFrom<&RSAParams> for rsa::RSAPublicKey {
 }
 
 #[cfg(feature = "rsa")]
-impl TryFrom<&RSAParams> for rsa::RSAPrivateKey {
+impl TryFrom<&RSAParams> for rsa::RsaPrivateKey {
     type Error = Error;
     #[allow(clippy::many_single_char_names)]
     fn try_from(params: &RSAParams) -> Result<Self, Self::Error> {
@@ -887,12 +885,10 @@ pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
 #[cfg(feature = "secp256r1")]
 pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     let (x, y) = match pk_bytes.len() {
-        64 => (pk_bytes[0..32].to_vec(), pk_bytes[32..64].to_vec()),
-        33 | 65 => {
-            use p256::elliptic_curve::sec1::EncodedPoint;
-            let encoded_point: EncodedPoint<p256::NistP256> = EncodedPoint::from_bytes(&pk_bytes)?
-                .decompress()
-                .ok_or(Error::ECDecompress)?;
+        33 | 64 | 65 => {
+            use p256::elliptic_curve::{sec1::ToEncodedPoint, PublicKey};
+            let encoded_point =
+                PublicKey::<p256::NistP256>::from_sec1_bytes(pk_bytes)?.to_encoded_point(false);
             (
                 encoded_point.x().ok_or(Error::MissingPoint)?.to_vec(),
                 encoded_point.y().ok_or(Error::MissingPoint)?.to_vec(),
@@ -940,8 +936,7 @@ pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     let y = FieldBytes::<p256::NistP256>::from_slice(
         &params.y_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
-    let encoded_point: EncodedPoint<p256::NistP256> =
-        EncodedPoint::from_affine_coordinates(x, y, true);
+    let encoded_point = EncodedPoint::<p256::NistP256>::from_affine_coordinates(x, y, true);
     let pk_compressed_bytes = encoded_point.to_bytes();
     Ok(pk_compressed_bytes.to_vec())
 }
@@ -1047,7 +1042,7 @@ impl TryFrom<&ECParams> for k256::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = k256::SecretKey::from_bytes(&private_key.0)?;
+        let secret_key = k256::SecretKey::from_be_bytes(&private_key.0)?;
         Ok(secret_key)
     }
 }
@@ -1064,7 +1059,7 @@ impl TryFrom<&ECParams> for p256::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = p256::SecretKey::from_bytes(&private_key.0)?;
+        let secret_key = p256::SecretKey::from_be_bytes(&private_key.0)?;
         Ok(secret_key)
     }
 }
@@ -1190,6 +1185,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "ed25519")]
     fn generate_ed25519() {
         let _key = JWK::generate_ed25519().unwrap();
     }

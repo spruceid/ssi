@@ -15,7 +15,7 @@ ed25519 = ["ssi-jwk/ed25519"]
 rsa = ["ssi-jwk/rsa"]
 
 eip = ["ssi-caips/eip"]
-ripemd-160 = ["ssi-caips/ripemd-160"]
+ripemd-160 = ["ssi-caips/ripemd-160", "secp256k1"]
 aleo = ["ssi-caips/aleo"]
 tezos = ["ssi-caips/tezos"]
 

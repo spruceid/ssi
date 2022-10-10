@@ -1,8 +1,6 @@
 pub mod error;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
-#[cfg(any(feature = "secp256k1", feature = "p256"))]
-use ssi_crypto::hashes::passthrough_digest::PassthroughDigest;
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -89,7 +87,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         #[cfg(feature = "rsa")]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
-            let private_key = rsa::RSAPrivateKey::try_from(rsa_params)?;
+            let private_key = rsa::RsaPrivateKey::try_from(rsa_params)?;
             let padding;
             let hashed;
             match algorithm {
@@ -100,7 +98,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 Algorithm::PS256 => {
                     let hash = rsa::hash::Hash::SHA2_256;
-                    let rng = rand_old::rngs::OsRng {};
+                    let rng = rand::rngs::OsRng {};
                     padding =
                         rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
@@ -113,6 +111,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         }
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
+            use blake2::digest::{consts::U32, Digest};
             if algorithm != Algorithm::EdDSA && algorithm != Algorithm::EdBlake2b {
                 return Err(Error::UnsupportedAlgorithm);
             }
@@ -120,10 +119,8 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }
             let hash = match algorithm {
-                Algorithm::EdBlake2b => blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
+                Algorithm::EdBlake2b => <blake2::Blake2b<U32> as Digest>::new_with_prefix(data)
+                    .finalize()
                     .to_vec(),
                 _ => data.to_vec(),
             };
@@ -141,129 +138,172 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             }
         }
         #[allow(unused)]
-        JWKParams::EC(ec) => match algorithm {
-            Algorithm::ES384 => {
-                let curve = ec
-                    .curve
-                    .as_ref()
-                    .ok_or(Error::JWK(ssi_jwk::Error::MissingCurve))?;
-                if curve != "P-384" {
-                    return Err(Error::JWK(ssi_jwk::Error::CurveNotImplemented(
-                        curve.to_string(),
-                    )));
+        JWKParams::EC(ec) => {
+            match algorithm {
+                Algorithm::ES384 => {
+                    let curve = ec
+                        .curve
+                        .as_ref()
+                        .ok_or(Error::JWK(ssi_jwk::Error::MissingCurve))?;
+                    if curve != "P-384" {
+                        return Err(Error::JWK(ssi_jwk::Error::CurveNotImplemented(
+                            curve.to_string(),
+                        )));
+                    }
+                    #[cfg(feature = "openssl")]
+                    {
+                        let sk = openssl::ec::EcKey::<openssl::pkey::Private>::try_from(ec)?;
+                        let digest = openssl::hash::MessageDigest::sha384();
+                        let hash = openssl::hash::hash(digest, &data)?;
+                        let sig = openssl::ecdsa::EcdsaSig::sign(&hash, &sk)?;
+                        [sig.r().to_vec(), sig.s().to_vec()].concat()
+                    }
+                    #[cfg(not(feature = "openssl"))]
+                    {
+                        return Err(Error::MissingFeatures("openssl"));
+                    }
                 }
-                #[cfg(feature = "openssl")]
-                {
-                    let sk = openssl::ec::EcKey::<openssl::pkey::Private>::try_from(ec)?;
-                    let digest = openssl::hash::MessageDigest::sha384();
-                    let hash = openssl::hash::hash(digest, &data)?;
-                    let sig = openssl::ecdsa::EcdsaSig::sign(&hash, &sk)?;
-                    [sig.r().to_vec(), sig.s().to_vec()].concat()
+                #[cfg(feature = "p256")]
+                Algorithm::ES256 => {
+                    use p256::ecdsa::signature::{Signature, Signer};
+                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                    if curve != "P-256" {
+                        return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
+                    }
+                    let secret_key = p256::SecretKey::try_from(ec)?;
+                    let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                    let sig: p256::ecdsa::Signature =
+                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                    sig.as_bytes().to_vec()
                 }
-                #[cfg(not(feature = "openssl"))]
-                {
-                    return Err(Error::MissingFeatures("openssl"));
+                #[cfg(feature = "secp256k1")]
+                Algorithm::ES256K => {
+                    use k256::ecdsa::signature::{Signature, Signer};
+                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                    if curve != "secp256k1" {
+                        return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
+                    }
+                    let secret_key = k256::SecretKey::try_from(ec)?;
+                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    let sig: k256::ecdsa::Signature =
+                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                    sig.as_bytes().to_vec()
+                }
+                #[cfg(feature = "secp256k1")]
+                Algorithm::ES256KR => {
+                    // use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
+                    // let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                    // if curve != "secp256k1" {
+                    //     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
+                    // }
+                    // let secret_key = k256::SecretKey::try_from(ec)?;
+                    // let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    // let hash = ssi_crypto::hashes::sha256::sha256(data);
+                    // let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
+                    // let sig: k256::ecdsa::recoverable::Signature = signing_key
+                    //     .try_sign_digest(digest)
+                    //     .map_err(ssi_jwk::Error::from)?;
+                    // sig.as_bytes().to_vec()
+                    use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
+                    // use sha2::Sha256;
+                    let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                    if curve != "secp256k1" {
+                        return Err(Error::CurveNotImplemented(curve.to_string()));
+                    }
+                    let secret_key = k256::SecretKey::try_from(ec)?;
+                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    // let digest = Sha256VarCore::new(32);
+                    // let hash = crate::hash::sha256(&data)?;
+                    // let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
+                    // let digest = Digest::chain(Sha256, &data);
+                    let sig: k256::ecdsa::recoverable::Signature = signing_key
+                        .try_sign_digest(<sha2::Sha256 as Digest>::new_with_prefix(data))?;
+                    sig.as_bytes().to_vec()
+                }
+                #[cfg(feature = "secp256k1")]
+                Algorithm::ESKeccakKR => {
+                    use k256::ecdsa::signature::{Signature, Signer};
+                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                    if curve != "secp256k1" {
+                        return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
+                    }
+                    let secret_key = k256::SecretKey::try_from(ec)?;
+                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    let sig: k256::ecdsa::recoverable::Signature =
+                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                    sig.as_bytes().to_vec()
+                }
+                #[cfg(feature = "p256")]
+                Algorithm::ESBlake2b => {
+                    // We will be able to use the blake2 crate directly once it allow 32B output
+                    // let hash = blake2b_simd::Params::new()
+                    //     .hash_length(32)
+                    //     .hash(data)
+                    //     .as_bytes()
+                    //     .to_vec();
+                    // use p256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
+                    // let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                    // if curve != "P-256" {
+                    //     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
+                    // }
+                    // let secret_key = p256::SecretKey::try_from(ec)?;
+                    // let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                    // let sig: p256::ecdsa::Signature = signing_key
+                    //     .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))
+                    //     .map_err(ssi_jwk::Error::from)?;
+                    // sig.as_bytes().to_vec()
+                    use p256::ecdsa::signature::{
+                        digest::{consts::U32, Digest},
+                        DigestSigner, Signature,
+                    };
+                    let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                    if curve != "P-256" {
+                        return Err(Error::CurveNotImplemented(curve.to_string()));
+                    }
+                    let secret_key = p256::SecretKey::try_from(ec)?;
+                    let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                    let sig: p256::ecdsa::Signature = signing_key
+                        .try_sign_digest(<blake2::Blake2b<U32> as Digest>::new_with_prefix(data))?;
+                    sig.as_bytes().to_vec()
+                }
+                #[cfg(feature = "secp256k1")]
+                Algorithm::ESBlake2bK => {
+                    // We will be able to use the blake2 crate directly once it allow 32B output
+                    // let hash = blake2b_simd::Params::new()
+                    //     .hash_length(32)
+                    //     .hash(data)
+                    //     .as_bytes()
+                    //     .to_vec();
+                    // use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
+                    // let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                    // if curve != "secp256k1" {
+                    //     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
+                    // }
+                    // let secret_key = k256::SecretKey::try_from(ec)?;
+                    // let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    // let sig: k256::ecdsa::Signature = signing_key
+                    //     .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))
+                    //     .map_err(ssi_jwk::Error::from)?;
+                    // sig.as_bytes().to_vec()
+                    use k256::ecdsa::signature::{
+                        digest::{consts::U32, Digest},
+                        DigestSigner, Signature,
+                    };
+                    let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                    if curve != "secp256k1" {
+                        return Err(Error::CurveNotImplemented(curve.to_string()));
+                    }
+                    let secret_key = k256::SecretKey::try_from(ec)?;
+                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    let sig: k256::ecdsa::Signature = signing_key
+                        .try_sign_digest(<blake2::Blake2b<U32> as Digest>::new_with_prefix(data))?;
+                    sig.as_bytes().to_vec()
+                }
+                _ => {
+                    return Err(Error::UnsupportedAlgorithm);
                 }
             }
-            #[cfg(feature = "p256")]
-            Algorithm::ES256 => {
-                use p256::ecdsa::signature::{Signature, Signer};
-                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                if curve != "P-256" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                }
-                let secret_key = p256::SecretKey::try_from(ec)?;
-                let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                let sig: p256::ecdsa::Signature =
-                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                sig.as_bytes().to_vec()
-            }
-            #[cfg(feature = "secp256k1")]
-            Algorithm::ES256K => {
-                use k256::ecdsa::signature::{Signature, Signer};
-                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                if curve != "secp256k1" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                }
-                let secret_key = k256::SecretKey::try_from(ec)?;
-                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::Signature =
-                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                sig.as_bytes().to_vec()
-            }
-            #[cfg(feature = "secp256k1")]
-            Algorithm::ES256KR => {
-                use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
-                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                if curve != "secp256k1" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                }
-                let secret_key = k256::SecretKey::try_from(ec)?;
-                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let hash = ssi_crypto::hashes::sha256::sha256(data);
-                let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
-                let sig: k256::ecdsa::recoverable::Signature = signing_key
-                    .try_sign_digest(digest)
-                    .map_err(ssi_jwk::Error::from)?;
-                sig.as_bytes().to_vec()
-            }
-            #[cfg(feature = "secp256k1")]
-            Algorithm::ESKeccakKR => {
-                use k256::ecdsa::signature::{Signature, Signer};
-                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                if curve != "secp256k1" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                }
-                let secret_key = k256::SecretKey::try_from(ec)?;
-                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::recoverable::Signature =
-                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                sig.as_bytes().to_vec()
-            }
-            #[cfg(feature = "p256")]
-            Algorithm::ESBlake2b => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
-                use p256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
-                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                if curve != "P-256" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                }
-                let secret_key = p256::SecretKey::try_from(ec)?;
-                let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                let sig: p256::ecdsa::Signature = signing_key
-                    .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))
-                    .map_err(ssi_jwk::Error::from)?;
-                sig.as_bytes().to_vec()
-            }
-            #[cfg(feature = "secp256k1")]
-            Algorithm::ESBlake2bK => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
-                use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
-                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                if curve != "secp256k1" {
-                    return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                }
-                let secret_key = k256::SecretKey::try_from(ec)?;
-                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: k256::ecdsa::Signature = signing_key
-                    .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))
-                    .map_err(ssi_jwk::Error::from)?;
-                sig.as_bytes().to_vec()
-            }
-            _ => {
-                return Err(Error::UnsupportedAlgorithm);
-            }
-        },
+        }
         _ => return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented)),
     };
     clear_on_drop::clear_stack(1);
@@ -312,7 +352,7 @@ pub fn verify_bytes_warnable(
             rsa_params.validate_key_size()?;
             use rsa::PublicKey;
             let public_key =
-                rsa::RSAPublicKey::try_from(rsa_params).map_err(ssi_jwk::Error::from)?;
+                rsa::RsaPublicKey::try_from(rsa_params).map_err(ssi_jwk::Error::from)?;
             let padding;
             let hashed;
             match algorithm {
@@ -322,7 +362,7 @@ pub fn verify_bytes_warnable(
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
                 Algorithm::PS256 => {
-                    let rng = rand_old::rngs::OsRng {};
+                    let rng = rand::rngs::OsRng {};
                     padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
@@ -335,14 +375,13 @@ pub fn verify_bytes_warnable(
         // TODO: SymmetricParams
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
+            use blake2::digest::{consts::U32, Digest};
             if okp.curve != *"Ed25519" {
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }
             let hash = match algorithm {
-                Algorithm::EdBlake2b => blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
+                Algorithm::EdBlake2b => <blake2::Blake2b<U32> as Digest>::new_with_prefix(data)
+                    .finalize()
                     .to_vec(),
                 _ => data.to_vec(),
             };
@@ -369,7 +408,6 @@ pub fn verify_bytes_warnable(
             #[cfg(feature = "p256")]
             Algorithm::ES256 => {
                 use p256::ecdsa::signature::Verifier;
-                use std::panic;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "P-256" {
                     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
@@ -385,20 +423,19 @@ pub fn verify_bytes_warnable(
             #[cfg(feature = "secp256k1")]
             Algorithm::ES256K => {
                 use k256::ecdsa::signature::Verifier;
-                use std::panic;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
                 }
                 let public_key = k256::PublicKey::try_from(ec)?;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
-                let mut sig =
+                let sig =
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
                 // Note: in newer ecdsa crate versions, normalize_s is non-mutating.
-                let was_non_normalized = sig.normalize_s().map_err(ssi_jwk::Error::from)?;
-                if was_non_normalized {
+                let maybe_normalized = sig.normalize_s();
+                if let Some(s) = maybe_normalized {
                     // For user convenience, output the normalized signature.
-                    let sig_normalized_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
+                    let sig_normalized_b64 = base64::encode_config(s, base64::URL_SAFE_NO_PAD);
                     warnings.push(format!(
                         "Non-normalized ES256K signature. Normalized: {}",
                         sig_normalized_b64
@@ -410,8 +447,10 @@ pub fn verify_bytes_warnable(
             }
             #[cfg(feature = "secp256k1")]
             Algorithm::ES256KR => {
-                use k256::ecdsa::signature::{digest::Digest, DigestVerifier, Verifier};
-                use std::panic;
+                use k256::ecdsa::signature::{
+                    digest::{consts::U32, Digest},
+                    DigestVerifier, Verifier,
+                };
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
@@ -420,9 +459,9 @@ pub fn verify_bytes_warnable(
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
                     .map_err(ssi_jwk::Error::from)?;
-                let hash = ssi_crypto::hashes::sha256::sha256(data);
-                let digest = Digest::chain(<PassthroughDigest as Digest>::new(), &hash);
-                if let Err(_e) = verifying_key.verify_digest(digest, &sig) {
+                if let Err(_e) = verifying_key
+                    .verify_digest(<sha2::Sha256 as Digest>::new_with_prefix(data), &sig)
+                {
                     // Legacy mode: allow using Keccak-256 instead of SHA-256
                     verify_bytes(Algorithm::ESKeccakKR, data, key, signature)?;
                     warnings
@@ -432,7 +471,6 @@ pub fn verify_bytes_warnable(
             #[cfg(feature = "eip")]
             Algorithm::ESKeccakKR => {
                 use k256::ecdsa::signature::Verifier;
-                use std::panic;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
@@ -447,13 +485,10 @@ pub fn verify_bytes_warnable(
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
-                use p256::ecdsa::signature::{digest::Digest, DigestVerifier, Signature};
+                use p256::ecdsa::signature::{
+                    digest::{consts::U32, Digest},
+                    DigestVerifier, Signature,
+                };
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "P-256" {
                     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
@@ -464,20 +499,17 @@ pub fn verify_bytes_warnable(
                     p256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
                 verifying_key
                     .verify_digest(
-                        Digest::chain(<PassthroughDigest as Digest>::new(), &hash),
+                        <blake2::Blake2b<U32> as Digest>::new_with_prefix(data),
                         &sig,
                     )
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]
             Algorithm::ESBlake2bK => {
-                // We will be able to use the blake2 crate directly once it allow 32B output
-                let hash = blake2b_simd::Params::new()
-                    .hash_length(32)
-                    .hash(data)
-                    .as_bytes()
-                    .to_vec();
-                use k256::ecdsa::signature::{digest::Digest, DigestVerifier};
+                use k256::ecdsa::signature::{
+                    digest::{consts::U32, Digest},
+                    DigestVerifier,
+                };
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 if curve != "secp256k1" {
                     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
@@ -488,7 +520,7 @@ pub fn verify_bytes_warnable(
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
                 verifying_key
                     .verify_digest(
-                        Digest::chain(<PassthroughDigest as Digest>::new(), &hash),
+                        <blake2::Blake2b<U32> as Digest>::new_with_prefix(data),
                         &sig,
                     )
                     .map_err(ssi_jwk::Error::from)?;
@@ -543,7 +575,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             let hash = ssi_crypto::hashes::sha256::sha256(data);
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = sig
-                .recover_verify_key_from_digest_bytes(digest)
+                .recover_verifying_key_from_digest_bytes(digest)
                 .map_err(ssi_jwk::Error::from)?;
             use ssi_jwk::ECParams;
             let jwk = JWK {
@@ -566,7 +598,9 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         Algorithm::ESKeccakKR => {
             let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
                 .map_err(ssi_jwk::Error::from)?;
-            let recovered_key = sig.recover_verify_key(data).map_err(ssi_jwk::Error::from)?;
+            let recovered_key = sig
+                .recover_verifying_key(data)
+                .map_err(ssi_jwk::Error::from)?;
             use ssi_jwk::ECParams;
             let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
                 &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
@@ -789,6 +823,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(feature = "rsa")]
     fn jws_encode() {
         // https://tools.ietf.org/html/rfc7515#appendix-A.2
         let payload =
@@ -840,12 +875,23 @@ mod tests {
         verify_bytes(Algorithm::ES256KR, data, &recovered_key, &sig).unwrap();
         let other_key = JWK::generate_secp256k1().unwrap();
         verify_bytes(Algorithm::ES256KR, data, &other_key, &sig).unwrap_err();
+    }
 
+    #[test]
+    #[cfg(feature = "eip")]
+    fn keccak_sign_verify() {
+        let key = JWK::generate_secp256k1().unwrap();
+        let data = b"asdf";
+        let bad_data = b"no";
         // ESKeccakK-R
         let key = JWK {
             algorithm: Some(Algorithm::ESKeccakKR),
             ..key
         };
+
+        let sig = sign_bytes(Algorithm::ES256KR, data, &key).unwrap();
+        let other_key = JWK::generate_secp256k1().unwrap();
+        // TODO check the error type
         verify_bytes(Algorithm::ESKeccakKR, data, &key, &sig).unwrap_err();
         verify_bytes(Algorithm::ESKeccakKR, bad_data, &key, &sig).unwrap_err();
 

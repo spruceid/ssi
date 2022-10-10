@@ -1,5 +1,18 @@
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// Missing curve in JWK
+    #[error("Missing curve in JWK")]
+    MissingCurve,
+    /// Curve not implemented
+    #[error("Curve not implemented: '{0}'")]
+    CurveNotImplemented(String),
+    /// Errors from p256, k256 and ed25519-dalek
+    #[cfg(feature = "k256")]
+    #[error(transparent)]
+    CryptoErr(#[from] k256::ecdsa::Error),
+    #[cfg(all(feature = "p256", not(feature = "k256")))]
+    #[error(transparent)]
+    CryptoErr(#[from] p256::ecdsa::Error),
     #[error(transparent)]
     JWK(#[from] ssi_jwk::Error),
     #[error(transparent)]

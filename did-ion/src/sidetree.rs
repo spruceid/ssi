@@ -2063,6 +2063,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_deactivate_verify_reveal() {
         let recover_pvo = RECOVER_OPERATION
             .clone()

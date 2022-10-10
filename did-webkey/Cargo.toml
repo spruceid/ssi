@@ -20,7 +20,7 @@ openssl = ["ssi-dids/openssl"]
 
 [dependencies]
 ssi-dids = { version = "0.1", path = "../ssi-dids", default-features = false, features = ["http"] }
-ssi-ssh = { version = "0.1", path = "../ssi-ssh", default-features = false }
+ssi-ssh = { version = "0.1", path = "../ssi-ssh" }
 anyhow = "1.0.52"
 async-trait = "0.1.52"
 reqwest = { version = "0.11.9", features = ["json"] }
@@ -30,12 +30,7 @@ serde_json = "1.0.75"
 serde = { version = "1.0.134", features = ["derive"] }
 sshkeys = "0.3.1"
 
-sequoia-openpgp = { version = "1.7.0", default-features = false, features = [
-    "compression-deflate",
-    "crypto-rust",
-    "allow-experimental-crypto",
-    "allow-variable-time-crypto",
-] }
+sequoia-openpgp = "1.10.0"
 
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]

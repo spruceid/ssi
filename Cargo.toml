@@ -96,7 +96,7 @@ hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 hex = "0.4"
 multibase = "0.8"
 serde_jcs = "0.1"
-k256 = { version = "0.9", features = ["zeroize", "ecdsa"] }
+k256 = { version = "0.11", features = ["ecdsa"] }
 serde_json = "1.0"
 ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["testing"] }
 
