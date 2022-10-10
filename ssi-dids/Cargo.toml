@@ -7,7 +7,6 @@ edition = "2021"
 default = ["parser", "secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
 parser = ["pest", "pest_derive"]
 http = ["dep:http", "reqwest", "percent-encoding"]
-testing = []
 
 secp256k1 = ["ssi-jwk/secp256k1"]
 secp256r1 = ["ssi-jwk/secp256r1"]
