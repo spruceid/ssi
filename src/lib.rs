@@ -59,6 +59,3 @@ pub use vc::revocation;
 pub use ssi_jwk::aleo;
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
-
-#[cfg(any(feature = "k256", feature = "p256"))]
-pub use ssi_crypto::hashes::passthrough_digest;
