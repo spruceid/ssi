@@ -10,9 +10,6 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-onion/"
 documentation = "https://docs.rs/did-onion/"
 
-[features]
-tor-tests = []
-
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1" }

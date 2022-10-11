@@ -1354,6 +1354,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_full_resolution() {
         // let address = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
         // let pk = "edpkvRWhuk5cLe5vwR7TGfSJxVLmVDk5og45WAhsAAvfqQXmYKNPve";
@@ -1440,6 +1441,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_full_resolution_kt1() {
         let live_did_manager = format!("did:tz:{}", LIVE_KT1);
 
