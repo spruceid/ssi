@@ -38,8 +38,11 @@ jobs:
     - name: Clippy
       run: RUSTFLAGS="-Dwarnings" cargo clippy --workspace
 
-    - name: Test
+    - name: Test each feature
       run: cargo hack test --each-feature --workspace --exclude-features "tor-tests" -- --test-threads=4
+
+    - name: Test all features
+      run: cargo test --workspace --all-features -- --test-threads=4
 
     - name: Checkout vc-test-suite
       uses: actions/checkout@v2
