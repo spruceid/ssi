@@ -17,6 +17,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: true
+    - uses: taiki-e/install-action@cargo-hack
 
     - name: Cache Cargo registry and build artifacts
       uses: actions/cache@v2
