@@ -8,6 +8,7 @@ use ssi_dids::{
     Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
 };
+use ssi_jwk::JWK;
 
 pub struct DIDJWK;
 
@@ -51,7 +52,7 @@ impl DIDResolver for DIDJWK {
             }
         };
 
-        let jwk = if let Ok(jwk) = serde_json::from_slice(&data) {
+        let jwk: JWK = if let Ok(jwk) = serde_json::from_slice(&data) {
             jwk
         } else {
             return (
@@ -64,6 +65,21 @@ impl DIDResolver for DIDJWK {
                 None,
             );
         };
+
+        let public_jwk = jwk.to_public();
+
+        if public_jwk != jwk {
+            return (
+                ResolutionMetadata {
+                    error: Some(ERROR_INVALID_DID.to_string()),
+                    content_type: None,
+                    property_set: None,
+                },
+                None,
+                None,
+            );
+        }
+
         let vm_didurl = DIDURL {
             did: did.to_string(),
             fragment: Some("0".to_string()),
@@ -244,5 +260,17 @@ mod tests {
             _ => unreachable!(),
         };
         assert_eq!(public_key_jwk, jwk);
+    }
+
+    #[async_std::test]
+    async fn deny_private_key() {
+        let jwk = JWK::generate_ed25519().unwrap();
+        let json = serde_jcs::to_string(&jwk).unwrap();
+        let did =
+            "did:jwk:".to_string() + &multibase::encode(multibase::Base::Base64Url, &json)[1..];
+
+        let (res_meta, _object, _meta) =
+            dereference(&DIDJWK, &did, &DereferencingInputMetadata::default()).await;
+        assert!(res_meta.error.is_some());
     }
 }
