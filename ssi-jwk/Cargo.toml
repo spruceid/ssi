@@ -10,7 +10,7 @@ secp256k1 = ["k256", "rand", "k256/keccak256", "ssi-crypto/secp256k1"]
 ## enable secp256r1 (p256) keys
 secp256r1 = ["p256", "rand"]
 ## enable ed25519 (EdDSA) keys
-ed25519 = ["ed25519-dalek", "rand_old"]
+ed25519 = ["ed25519-dalek", "rand_old", "getrandom"]
 ## enable RSA keys
 rsa = ["dep:rsa"]
 ## enable aleo ecosystem keys
@@ -52,6 +52,8 @@ snarkvm-curves = { version= "0.7.9", optional = true }
 snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
 blake2b_simd = { version = "0.5", optional = true }
+
+getrandom = { version = "0.2", features = ["js"], optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"
