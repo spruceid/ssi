@@ -39,7 +39,8 @@ jobs:
       run: RUSTFLAGS="-Dwarnings" cargo clippy --workspace
 
     - name: Test each feature
-      run: cargo hack test --each-feature --workspace -- --test-threads=4
+      # run: cargo hack test --each-feature --workspace -- --test-threads=4
+      run: cargo test --workspace -- --test-threads=4
 
     - name: Test all features
       run: cargo test --workspace --all-features -- --test-threads=4
