@@ -7,7 +7,6 @@ edition = "2021"
 default = ["parser", "secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
 parser = ["pest", "pest_derive"]
 http = ["dep:http", "reqwest", "percent-encoding"]
-testing = []
 
 secp256k1 = ["ssi-jwk/secp256k1"]
 secp256r1 = ["ssi-jwk/secp256r1"]
@@ -15,7 +14,7 @@ ed25519 = ["ssi-jwk/ed25519"]
 rsa = ["ssi-jwk/rsa"]
 
 eip = ["ssi-caips/eip"]
-ripemd-160 = ["ssi-caips/ripemd-160"]
+ripemd-160 = ["ssi-caips/ripemd-160", "secp256k1"]
 aleo = ["ssi-caips/aleo"]
 tezos = ["ssi-caips/tezos"]
 

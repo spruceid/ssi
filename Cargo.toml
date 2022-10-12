@@ -38,7 +38,7 @@ openssl = ["ssi-vc/openssl", "ssi-ucan/openssl", "ssi-zcap-ld/openssl"]
 ring = ["ssi-vc/ring", "ssi-ucan/ring", "ssi-zcap-ld/ring"]
 
 http-did = ["ssi-dids/http"]
-example-http-issuer = ["ssi-dids/testing", "ssi-ldp/example-http-issuer"]
+example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
 [dependencies]
 ssi-contexts = { version = "0.1.3", path = "contexts/" }
@@ -96,9 +96,9 @@ hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 hex = "0.4"
 multibase = "0.8"
 serde_jcs = "0.1"
-k256 = { version = "0.9", features = ["zeroize", "ecdsa"] }
+k256 = { version = "0.11", features = ["ecdsa"] }
 serde_json = "1.0"
-ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["testing"] }
+ssi-dids = { path = "./ssi-dids", version = "0.1" }
 
 [package.metadata.docs.rs]
 features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]

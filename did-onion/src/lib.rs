@@ -219,7 +219,7 @@ mod tests {
         "did:onion:fscst5exmlmr262byztwz4kzhggjlzumvc2ndvgytzoucr2tkgxf7mid";
 
     #[tokio::test]
-    #[cfg_attr(not(feature = "tor-tests"), ignore)]
+    #[ignore]
     async fn did_onion_resolve_live() {
         let (res_meta, doc_opt, _doc_meta) = DIDOnion::default()
             .resolve(TORGAP_DEMO_DID, &ResolutionInputMetadata::default())

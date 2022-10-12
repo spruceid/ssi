@@ -3230,6 +3230,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[cfg(feature = "eip")]
     #[async_std::test]
+    #[ignore]
     async fn verify_typed_data() {
         use ssi_ldp::eip712::TypedData;
         let proof: Proof = serde_json::from_value(json!({

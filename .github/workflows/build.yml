@@ -17,6 +17,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         submodules: true
+    - uses: taiki-e/install-action@cargo-hack
 
     - name: Cache Cargo registry and build artifacts
       uses: actions/cache@v2
@@ -29,7 +30,7 @@ jobs:
           ${{ runner.os }}-ssi2-cargo-
 
     - name: Build
-      run: cargo build --verbose --workspace
+      run: cargo build --workspace
 
     - name: Fmt
       run: cargo fmt -- --check
@@ -37,29 +38,12 @@ jobs:
     - name: Clippy
       run: RUSTFLAGS="-Dwarnings" cargo clippy --workspace
 
-    - name: Test
-      run: cargo test --verbose --workspace
+    - name: Test each feature
+      # run: cargo hack test --each-feature --workspace -- --test-threads=4
+      run: cargo test --workspace -- --test-threads=4
 
-    - name: Test with rust crypto libraries
-      run: cargo test --workspace --no-default-features --features w3c,tezos,eip,solana
-
-    - name: Test with openssl and ring
-      run: cargo test --workspace --no-default-features --features ring,openssl,w3c,tezos,eip,solana
-
-    - name: Test with secp256k1
-      run: |
-        cargo test --verbose --workspace --features secp256k1
-        cargo test --verbose --manifest-path did-key/Cargo.toml --features secp256k1,ssi/ring
-        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features secp256k1,ssi/ring
-
-    - name: Test with p256
-      run: |
-        cargo test --verbose --workspace --features secp256r1
-        cargo test --verbose --manifest-path did-key/Cargo.toml --features secp256r1,ssi/secp256r1,ssi/ring
-        cargo test --verbose --manifest-path did-tezos/Cargo.toml --features secp256r1,ssi/secp256r1,ssi/ring
-
-    - name: Test DID Resolution HTTP(S) Binding
-      run: cargo test --manifest-path ssi-dids/Cargo.toml --features http
+    - name: Test all features
+      run: cargo test --workspace --all-features -- --test-threads=4
 
     - name: Checkout vc-test-suite
       uses: actions/checkout@v2
@@ -78,6 +62,3 @@ jobs:
       run: |
         rustup target add wasm32-unknown-unknown
         cargo check --workspace --target wasm32-unknown-unknown
-
-    - name: Test Aleo signatures
-      run: cargo test --workspace --features aleo

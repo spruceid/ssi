@@ -274,6 +274,7 @@ mod tests {
         assert_eq!(account_id_old.to_string(), dummy_max_length);
     }
 
+    #[cfg(feature = "tezos")]
     #[test]
     fn verify() {
         use serde_json::json;

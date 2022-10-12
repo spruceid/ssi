@@ -22,7 +22,7 @@ use thiserror::Error;
 use zeroize::Zeroize;
 
 /// This shows how the generators are created with nothing up my sleeve values
-/// ```
+/// ```ignore
 /// const PREHASH: &'static [u8] = b"To be, or not to be- that is the question:
 /// Whether 'tis nobler in the mind to suffer
 /// The slings and arrows of outrageous fortune

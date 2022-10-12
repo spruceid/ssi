@@ -116,7 +116,7 @@ impl ProofSuite for Eip712Signature2021 {
             k256::ecdsa::recoverable::Signature::new(&sig, rec_id).map_err(ssi_jwk::Error::from)?;
         // TODO this step needs keccak-hash, may need better features management
         let recovered_key = sig
-            .recover_verify_key(&bytes)
+            .recover_verifying_key(&bytes)
             .map_err(ssi_jwk::Error::from)?;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(
@@ -256,7 +256,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         let typed_data = TypedData::from_document_and_options_json(document, proof).await?;
         let bytes = typed_data.bytes()?;
         let recovered_key = sig
-            .recover_verify_key(&bytes)
+            .recover_verifying_key(&bytes)
             .map_err(ssi_jwk::Error::from)?;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(
@@ -386,7 +386,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
             string_from_document_and_options(document, proof, context_loader).await?;
         let hash = ssi_crypto::hashes::keccak::prefix_personal_message(&signing_string);
         let recovered_key = sig
-            .recover_verify_key(&hash)
+            .recover_verifying_key(&hash)
             .map_err(ssi_jwk::Error::from)?;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(

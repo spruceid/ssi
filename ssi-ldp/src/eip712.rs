@@ -1616,7 +1616,7 @@ mod tests {
         let sk_bytes = bytes_from_hex(sk_hex).unwrap();
         use ssi_jwk::{Base64urlUInt, ECParams, Params, JWK};
 
-        let sk = k256::SecretKey::from_bytes(&sk_bytes).unwrap();
+        let sk = k256::SecretKey::from_be_bytes(&sk_bytes).unwrap();
         let pk = sk.public_key();
         let mut ec_params = ECParams::try_from(&pk).unwrap();
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));

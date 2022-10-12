@@ -170,7 +170,7 @@ impl DIDResolver for DIDKey {
             );
         } else if data[0] == DID_KEY_P384_PREFIX[0] && data[1] == DID_KEY_P384_PREFIX[1] {
             #[cfg(feature = "ssi_p384")]
-            match ssi::jwk::p384_parse(&data[2..]) {
+            match ssi_jwk::p384_parse(&data[2..]) {
                 Ok(jwk) => {
                     vm_type = "JsonWebKey2020".to_string();
                     vm_type_iri = "https://w3id.org/security#JsonWebKey2020".to_string();
@@ -340,7 +340,7 @@ impl DIDMethod for DIDKey {
                     }
                     #[cfg(feature = "ssi_p384")]
                     "P-384" => {
-                        let pk_bytes = match ssi::jwk::p384_serialize(params) {
+                        let pk_bytes = match ssi_jwk::p384_serialize(params) {
                             Ok(pk) => pk,
                             Err(_err) => return None,
                         };
