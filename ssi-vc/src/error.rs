@@ -9,6 +9,8 @@ pub enum Error {
     #[error(transparent)]
     JWS(#[from] ssi_jws::Error),
     #[error(transparent)]
+    DID(#[from] ssi_dids::Error),
+    #[error(transparent)]
     Base64(#[from] base64::DecodeError),
     #[error(transparent)]
     URIParse(#[from] ssi_core::uri::URIParseErr),
@@ -22,6 +24,12 @@ pub enum Error {
     MissingPresentation,
     #[error("Invalid issuer")]
     InvalidIssuer,
+    #[error("Missing holder property")]
+    MissingHolder,
+    #[error("Unsupported Holder Binding")]
+    UnsupportedHolderBinding,
+    #[error(transparent)]
+    HolderBindingVerification(#[from] crate::cacao::Error),
     #[error("Missing issuance date")]
     MissingIssuanceDate,
     #[error("Missing type VerifiableCredential")]

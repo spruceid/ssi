@@ -1337,14 +1337,30 @@ pub async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Result<Docum
 
 /// Get the resolved verification method maps for a given DID (including its controllers,
 /// recursively) and verification relationship (proof purpose).
+///
+/// This is a special case of [get_verification_methods_for_all].
 pub async fn get_verification_methods(
     did: &str,
     verification_relationship: VerificationRelationship,
     resolver: &dyn DIDResolver,
 ) -> Result<HashMap<String, VerificationMethodMap>, Error> {
+    get_verification_methods_for_all(&[did], verification_relationship, resolver).await
+}
+
+/// Get the resolved verification method maps for the given DIDs (including their controllers,
+/// recursively) and verification relationship (proof purpose).
+pub async fn get_verification_methods_for_all(
+    dids: &[&str],
+    verification_relationship: VerificationRelationship,
+    resolver: &dyn DIDResolver,
+) -> Result<HashMap<String, VerificationMethodMap>, Error> {
     // Resolve DIDs, recursing through DID controllers.
     let mut did_docs: HashMap<String, Document> = HashMap::new();
-    let mut dids_to_resolve = vec![did.to_string()];
+    let mut dids_to_resolve = dids
+        .iter()
+        .copied()
+        .map(|x| x.to_owned())
+        .collect::<Vec<String>>(); //vec![did.to_string()];
     while let Some(did) = dids_to_resolve.pop() {
         if !did_docs.contains_key(&did) {
             let doc = easy_resolve(&did, resolver).await?;
