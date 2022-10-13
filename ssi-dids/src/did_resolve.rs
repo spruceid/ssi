@@ -1357,8 +1357,8 @@ pub async fn get_verification_methods_for_all(
     // Resolve DIDs, recursing through DID controllers.
     let mut did_docs: HashMap<String, Document> = HashMap::new();
     let mut dids_to_resolve = dids
-        .to_vec()
-        .into_iter()
+        .iter()
+        .copied()
         .map(|x| x.to_owned())
         .collect::<Vec<String>>(); //vec![did.to_string()];
     while let Some(did) = dids_to_resolve.pop() {
