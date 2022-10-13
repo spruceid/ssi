@@ -3,17 +3,10 @@ name = "ssi-tzkey"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[features]
-default = ["k256", "p256", "ed25519"]
-k256 = []
-p256 = []
-ed25519 = ["ed25519-dalek"]
-
 [dependencies]
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", features = ["tezos"]}
-ssi-jws = { path = "../ssi-jws", version = "0.1"}
-ed25519-dalek = { version = "1", optional = true }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["tezos"]}
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false, features = ["tezos"] }
+ed25519-dalek = "1.0.1"
 thiserror = "1.0"
 bs58 = { version = "0.4", features = ["check"] }
 

@@ -3,14 +3,11 @@ use ssi_jwk::{Algorithm, Base64urlUInt, OctetParams, Params, JWK};
 use ssi_jws::Error as JwsError;
 
 const EDPK_PREFIX: [u8; 4] = [13, 15, 37, 217];
-#[cfg(feature = "k256")]
 const SPPK_PREFIX: [u8; 4] = [3, 254, 226, 86];
-#[cfg(feature = "p256")]
 const P2PK_PREFIX: [u8; 4] = [3, 178, 139, 127];
 
 pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
     let mut tzkey_prefixed = Vec::new();
-    #[cfg(any(feature = "k256", feature = "p256"))]
     let bytes;
     let (prefix, bytes) = match &jwk.params {
         Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
@@ -25,9 +22,6 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
                 // TODO: spsk
                 return Err(JwsError::UnsupportedAlgorithm);
             }
-            #[cfg(not(feature = "k256"))]
-            return Err(JwsError::MissingFeatures("k256"));
-            #[cfg(feature = "k256")]
             {
                 // TODO: p2sk
                 bytes = ssi_jwk::serialize_secp256k1(ec_params)?;
@@ -38,9 +32,6 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
             if let Some(ref _sk) = ec_params.ecc_private_key {
                 return Err(JwsError::UnsupportedAlgorithm);
             }
-            #[cfg(not(feature = "p256"))]
-            return Err(JwsError::MissingFeatures("p256"));
-            #[cfg(feature = "p256")]
             {
                 bytes = ssi_jwk::serialize_p256(ec_params)?;
                 (P2PK_PREFIX, &bytes)
@@ -64,8 +55,6 @@ pub enum DecodeTezosPkError {
     B58(#[from] bs58::decode::Error),
     #[error(transparent)]
     JWK(#[from] ssi_jwk::Error),
-    #[error("Missing Features: {0}")]
-    MissingFeatures(&'static str),
 }
 
 /// Parse a Tezos key string into a JWK.
@@ -87,20 +76,6 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
         Some("edsk") => {
             let sk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let pk_bytes;
-            #[cfg(feature = "ring")]
-            {
-                use ring::signature::KeyPair;
-                let keypair = if sk_bytes.len() == 64 {
-                    ring::signature::Ed25519KeyPair::from_seed_and_public_key(
-                        &sk_bytes[..32],
-                        &sk_bytes[32..],
-                    )?
-                } else {
-                    ring::signature::Ed25519KeyPair::from_seed_unchecked(&sk_bytes)?
-                };
-                pk_bytes = keypair.public_key().as_ref().to_vec()
-            }
-            #[cfg(feature = "ed25519")]
             {
                 let sk = ed25519_dalek::SecretKey::from_bytes(if sk_bytes.len() == 64 {
                     &sk_bytes[..32]
@@ -110,8 +85,6 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
                 .map_err(ssi_jwk::Error::from)?;
                 pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
             }
-            #[cfg(all(not(feature = "ring"), not(feature = "ed25519")))]
-            return Err(DecodeTezosPkError::MissingFeatures("ring or ed25519"));
             (
                 Algorithm::EdBlake2b,
                 Params::OKP(OctetParams {
@@ -121,13 +94,11 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
                 }),
             )
         }
-        #[cfg(feature = "secp256k1")]
         Some("sppk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
-            let jwk = jwk::secp256k1_parse(&pk_bytes).map_err(ssi_jwk::Error::Secp256k1Parse)?;
+            let jwk = ssi_jwk::secp256k1_parse(&pk_bytes)?;
             (Algorithm::ESBlake2bK, jwk.params)
         }
-        #[cfg(feature = "p256")]
         Some("p2pk") => {
             let pk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let jwk = ssi_jwk::p256_parse(&pk_bytes)?;
@@ -274,7 +245,6 @@ mod tests {
 
     // Signature produced by Kukai wallet
     #[test]
-    #[cfg(feature = "secp256k1")]
     fn sppk_jwk_tz_spsig() {
         let tzpk = "sppk7bYNanLcEPRpvLc231GBC8i6YfLBbQjiQMbz8kriz9qxASf5wHw";
         let jwk = jwk_from_tezos_key(tzpk).unwrap();
@@ -299,7 +269,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "p256")]
     fn p2pk_jwk() {
         let tzpk = "p2pk679D18uQNkdjpRxuBXL5CqcDKTKzsiXVtc9oCUT6xb82zQmgUks";
         let jwk = jwk_from_tezos_key(tzpk).unwrap();
@@ -328,7 +297,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "secp256k1")]
     fn spsk_sign() {
         let key: JWK = serde_json::from_value(json!({
             "alg": "ESBlake2bK",
@@ -346,7 +314,7 @@ mod tests {
             .unwrap();
         eprintln!("msg: {:x?}", tsm);
         let sig = sign_tezos(&tsm, Algorithm::ESBlake2bK, &key).unwrap();
-        let sig_expected = "spsig19QnXfsV17h2Ux5SNQr6tTqyD3kY9sPDJKKxLG2dihHYGW7LfmkxBHMqzxwFd1E54ixeEkxowqx926W5QymQEP7YUUi7cK";
+        let sig_expected = "spsig1NRgjYaq8jeaWTMPUSsxkawWUzW1C3RoMfczWY2JAZSkNQQGM9QvCkxtRMcauJRaSUNcKgkj6WfpzLh1upXwjcfLh4wqqX";
         assert_eq!(sig, sig_expected);
     }
 }
