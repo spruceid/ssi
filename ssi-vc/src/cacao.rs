@@ -7,9 +7,9 @@ use cacaos::{
     },
     CACAO,
 };
-use capgrok::{extract_capabilities, verify_statement, Error as CapGrokError};
 use libipld::{cbor::DagCborCodec, codec::Decode};
 use serde::{Deserialize, Serialize};
+use siwe_recap::{extract_capabilities, verify_statement, Error as ReCapError};
 use std::convert::TryInto;
 use thiserror::Error;
 
@@ -32,7 +32,7 @@ pub enum Error {
     #[error(transparent)]
     Ipld(#[from] libipld::error::Error),
     #[error(transparent)]
-    CapGrok(#[from] CapGrokError),
+    ReCap(#[from] ReCapError),
 }
 
 impl From<SIWEPayloadConversionError> for Error {
@@ -138,10 +138,10 @@ pub(crate) mod tests {
         credential: Option<(&str, (&str, &str, &JWK))>,
     ) -> Vec<String> {
         use cacaos::{siwe, siwe_cacao::SiweCacao};
-        use capgrok::{Builder, Namespace};
         use k256::{ecdsa::signature::Signer, elliptic_curve::sec1::ToEncodedPoint};
         use keccak_hash::keccak;
         use libipld::{cbor::DagCborCodec, multihash::Code, store::DefaultParams, Block};
+        use siwe_recap::{Builder, Namespace};
 
         // generate eth account kp/id
         let key = JWK::generate_secp256k1().unwrap();
