@@ -397,18 +397,19 @@ pub fn verify_bytes_warnable(
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig =
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
-                // Note: in newer ecdsa crate versions, normalize_s is non-mutating.
-                let maybe_normalized = sig.normalize_s();
-                if let Some(s) = maybe_normalized {
+                let normalized_sig = if let Some(s) = sig.normalize_s() {
                     // For user convenience, output the normalized signature.
                     let sig_normalized_b64 = base64::encode_config(s, base64::URL_SAFE_NO_PAD);
                     warnings.push(format!(
                         "Non-normalized ES256K signature. Normalized: {}",
                         sig_normalized_b64
                     ));
-                }
+                    s
+                } else {
+                    sig
+                };
                 verifying_key
-                    .verify(data, &sig)
+                    .verify(data, &normalized_sig)
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]
