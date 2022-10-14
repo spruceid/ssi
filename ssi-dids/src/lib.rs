@@ -18,9 +18,6 @@ pub mod error;
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-#[cfg(featuer = "parser")]
-pub mod parser;
-
 use crate::did_resolve::{
     Content, ContentMetadata, DIDResolver, DereferencingInputMetadata, DereferencingMetadata,
     DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
