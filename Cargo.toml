@@ -23,6 +23,12 @@ secp256r1 = ["ssi-vc/secp256r1", "ssi-ucan/secp256r1", "ssi-zcap-ld/secp256r1"]
 ed25519 = ["ssi-vc/ed25519", "ssi-ucan/ed25519", "ssi-zcap-ld/ed25519"]
 ## enable RSA signatures
 rsa = ["ssi-vc/rsa", "ssi-ucan/rsa", "ssi-zcap-ld/rsa"]
+## enable ripemd hashes
+ripemd-160 = ["ssi-jwk/ripemd-160"]
+## enable bbs
+bbs = ["ssi-crypto/bbs"]
+
+
 ## enable aleo ecosystem signatures
 aleo = ["ssi-vc/aleo", "ssi-ucan/aleo", "ssi-zcap-ld/aleo", "ssi-caips/aleo"]
 ## enable ethereum style signatures
@@ -91,7 +97,6 @@ members = [
 async-std = { version = "1.9", features = ["attributes"] }
 blake2_old = { package = "blake2", version = "0.8" } # for bbs doctest
 uuid = { version = "0.8", features = ["v4", "serde"] }
-difference = "2.0"
 tokio = { version = "1.0", features = ["macros"] }
 hyper = { version = "0.14", features = ["server", "http1", "stream"] }
 hex = "0.4"
