@@ -39,7 +39,6 @@ impl DIDResolver for DIDJWK {
         let data = match multibase::Base::decode(&multibase::Base::Base64Url, method_specific_id) {
             Ok(data) => data,
             Err(_err) => {
-                // TODO: pass through these errors somehow
                 return (
                     ResolutionMetadata {
                         error: Some(ERROR_INVALID_DID.to_string()),
@@ -131,7 +130,12 @@ impl DIDMethod for DIDJWK {
             _ => return None,
         };
         let jwk = jwk.to_public();
-        let jwk = serde_jcs::to_string(&jwk).unwrap();
+        let jwk = if let Ok(jwk) = serde_jcs::to_string(&jwk) {
+            jwk
+        } else {
+            return None;
+        };
+
         let did =
             "did:jwk:".to_string() + &multibase::encode(multibase::Base::Base64Url, &jwk)[1..];
         Some(did)
