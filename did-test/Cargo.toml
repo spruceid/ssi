@@ -10,7 +10,7 @@ publish = false
 [dependencies]
 ssi = { version = "0.4", path = "../" }
 did-method-key = { version = "0.1", path = "../did-key", features = ["secp256k1", "secp256r1"] }
-did-tz = { version = "0.1", path = "../did-tezos", default-features = false, features = ["secp256k1", "secp256r1"] }
+did-tz = { version = "0.1", path = "../did-tezos" }
 did-pkh = { version = "0.1", path = "../did-pkh" }
 did-web = { version = "0.1", path = "../did-web" }
 did-webkey = { version = "0.1", path = "../did-webkey" }

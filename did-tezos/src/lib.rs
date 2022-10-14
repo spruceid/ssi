@@ -1,30 +1,26 @@
-use ssi_dids::did_resolve::{
-    dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
-    ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-};
 use ssi_dids::{
+    did_resolve::{
+        dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
+        ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
+    },
     Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
     VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
 };
-use ssi_jwk::blakesig::hash_public_key;
-#[cfg(feature = "secp256r1")]
-use ssi_jwk::p256_parse;
-#[cfg(feature = "secp256k1")]
-use ssi_jwk::secp256k1_parse;
-use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::{
+    blakesig::hash_public_key, p256_parse, secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK,
+};
 use ssi_jws::{decode_unverified, decode_verify};
 
-mod explorer;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use json_patch::patch;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::default::Default;
-use std::str::FromStr;
-use std::string::ToString;
+use std::{
+    collections::BTreeMap, convert::TryInto, default::Default, str::FromStr, string::ToString,
+};
+
+mod explorer;
 
 /// did:tz DID Method
 ///
@@ -513,7 +509,6 @@ impl DIDTz {
                                     x509_thumbprint_sha256: None,
                                 }
                             }
-                            #[cfg(feature = "secp256k1")]
                             Prefix::TZ2 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
@@ -525,7 +520,6 @@ impl DIDTz {
                                     anyhow!("Couldn't create JWK from secp256k1 public key: {}", e)
                                 })?
                             }
-                            #[cfg(feature = "secp256r1")]
                             Prefix::TZ3 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
@@ -599,7 +593,6 @@ mod tests {
         assert_eq!(tz1, TZ1);
     }
 
-    #[cfg(feature = "secp256r1")]
     #[test]
     fn jwk_to_tz3() {
         let jwk: JWK = serde_json::from_value(serde_json::json!({
@@ -1012,7 +1005,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_tz2() {
         use ssi::jwk::Algorithm;
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
@@ -1148,7 +1140,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256r1")]
     async fn test_derivation_tz3() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
             .resolve(
@@ -1233,7 +1224,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256k1")]
     async fn test_json_patch_tz2() {
         let address = "tz2RZoj9oqoA8bDeUoAKLjf8nLPQKmYjaj6Q";
         let pk = "sppk7bRNbJ2n9PNQo295UJiYQ8iMma8ysRH9mCRFB14yhzLCwdGay9y";
@@ -1295,7 +1285,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256r1")]
     async fn test_json_patch_tz3() {
         let address = "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX";
         let pk = "p2pk679D18uQNkdjpRxuBXL5CqcDKTKzsiXVtc9oCUT6xb82zQmgUks";
@@ -1487,7 +1476,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_tz3() {
         use ssi::jwk::Algorithm;
         use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};

@@ -12,18 +12,12 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-tezos/"
 documentation = "https://docs.rs/did-tezos/"
 
 [features]
-default = ["ed25519", "secp256k1", "secp256r1"]
-ed25519 = ["ssi-dids/ed25519", "ssi-jwk/rand"]
-secp256k1 = ["ssi-dids/secp256k1", "ssi-jwk/rand"]
-secp256r1 = ["ssi-dids/secp256r1"]
-
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
+default = ["ssi-jwk/tezos", "ssi-jws/tezos"]
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
-ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false, features = ["tezos"] }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 chrono = { version = "0.4" }
 reqwest = { version = "0.11", features = ["json"] }
