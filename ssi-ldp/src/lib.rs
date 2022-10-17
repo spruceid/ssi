@@ -173,8 +173,8 @@ fn pick_proof_suite<'a, 'b>(
     let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
     Ok(match algorithm {
         Algorithm::RS256 => feature_gate!("rsa", RsaSignature2018),
-        Algorithm::PS256 => feature_gate!("w3c", JsonWebSignature2020),
-        Algorithm::ES384 => feature_gate!("w3c", JsonWebSignature2020),
+        Algorithm::PS256 => feature_gate!("rsa", JsonWebSignature2020),
+        Algorithm::ES384 => feature_gate!("openssl", JsonWebSignature2020),
         Algorithm::AleoTestnet1Signature => feature_gate!("aleo", AleoSignature2021),
         Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
             Some(URI::String(ref vm))
