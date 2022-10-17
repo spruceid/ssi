@@ -799,7 +799,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "eip")]
+    #[cfg(feature = "w3c")]
     #[async_std::test]
     async fn eip712vm() {
         let mut key = JWK::generate_secp256k1().unwrap();
