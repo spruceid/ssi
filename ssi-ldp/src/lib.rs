@@ -469,6 +469,8 @@ impl LinkedDataProofs {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
+        let mut options = options.clone();
+        ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         // Use type property if present
         let suite = if let Some(ref type_) = options.type_ {
             get_proof_suite(type_)?
@@ -477,8 +479,6 @@ impl LinkedDataProofs {
         else {
             pick_proof_suite(key, options.verification_method.as_ref())?
         };
-        let mut options = options.clone();
-        ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         suite
             .sign(
                 document,
