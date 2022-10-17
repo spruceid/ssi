@@ -134,8 +134,6 @@ pub const ALT_DEFAULT_CONTEXT: &str = ssi_json_ld::W3ID_DID_V1_CONTEXT;
 /// reasons. The [v1.0 context URI][DEFAULT_CONTEXT] should be used instead.
 pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
 
-const MULTICODEC_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
-
 // @TODO parsed data structs for DID and DIDURL
 #[allow(clippy::upper_case_acronyms)]
 type DID = String;
@@ -902,34 +900,7 @@ impl VerificationMethodMap {
                 return Err(Error::MultipleKeyMaterial);
             }
         };
-        let params = match &self.type_[..] {
-            // TODO: check against IRIs when in JSON-LD
-            "Ed25519VerificationKey2018" => ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
-                curve: "Ed25519".to_string(),
-                public_key: ssi_jwk::Base64urlUInt(pk_bytes),
-                private_key: None,
-            }),
-            "Ed25519VerificationKey2020" => {
-                if pk_bytes.len() != 34 {
-                    return Err(Error::MultibaseKeyLength(34, pk_bytes.len()));
-                }
-                if pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
-                    return Err(Error::MultibaseKeyPrefix);
-                }
-                ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
-                    curve: "Ed25519".to_string(),
-                    public_key: ssi_jwk::Base64urlUInt(pk_bytes[2..].to_owned()),
-                    private_key: None,
-                })
-            }
-            #[cfg(feature = "secp256k1")]
-            "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
-                use ssi_jwk::secp256k1_parse;
-                return secp256k1_parse(&pk_bytes).map_err(Error::from);
-            }
-            _ => return Err(Error::UnsupportedKeyType),
-        };
-        Ok(JWK::from(params))
+        Ok(ssi_jwk::JWK::from_vm_type(&self.type_, pk_bytes)?)
     }
 
     /// Verify that a given JWK can be used to satisfy this verification method.
@@ -1587,7 +1558,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "secp256k1")]
     fn vmm_hex_to_jwk() {
         // publicKeyHex (deprecated) -> JWK
         const JWK: &str = include_str!("../../tests/secp256k1-2021-02-17.json");

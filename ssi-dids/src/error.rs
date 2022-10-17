@@ -42,9 +42,6 @@ pub enum Error {
     /// Expected object
     #[error("Expected object")]
     ExpectedObject,
-    /// Unsupported key type
-    #[error("Unsupported key type")]
-    UnsupportedKeyType,
     /// Unsupported verification relationship
     #[error("Unsupported verification relationship")]
     UnsupportedVerificationRelationship,
@@ -54,12 +51,6 @@ pub enum Error {
     /// Expected string for publicKeyMultibase
     #[error("Expected string for publicKeyMultibase")]
     ExpectedStringPublicKeyMultibase,
-    /// Unexpected length for publicKeyMultibase
-    #[error("Unexpected length for publicKeyMultibase")]
-    MultibaseKeyLength(usize, usize),
-    /// Unexpected multibase (multicodec) key prefix multicodec
-    #[error("Unexpected multibase (multicodec) key prefix multicodec")]
-    MultibaseKeyPrefix,
     /// [`representationNotSupported`](https://www.w3.org/TR/did-spec-registries/#representationnotsupported) DID resolution error
     #[error("RepresentationNotSupported")]
     RepresentationNotSupported,
