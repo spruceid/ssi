@@ -34,7 +34,7 @@ features = ["json", "native-tls-vendored"]
 [dev-dependencies]
 ssi-vc = { path = "../ssi-vc", default-features = false }
 ssi-core = { path = "../ssi-core", default-features = false }
-ssi-ldp = { path = "../ssi-ldp", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos"] }
 ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 ssi-tzkey = { path = "../ssi-tzkey", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }

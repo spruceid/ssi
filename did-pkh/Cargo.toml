@@ -31,7 +31,7 @@ bs58 = { version = "0.4", features = ["check"] }
 bech32 = "0.8"
 
 [dev-dependencies]
-ssi-ldp = { path = "../ssi-ldp", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "eip", "w3c"] }
 ssi-tzkey = { path = "../ssi-tzkey", default-features = false }
 ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 ssi-vc = { path = "../ssi-vc", default-features = false }

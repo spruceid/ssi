@@ -16,7 +16,7 @@ rsa = ["ssi-jws/rsa"]
 ## enable the EIP-defined LDPs: EIP712
 eip = ["keccak-hash", "ssi-caips/eip", "secp256k1", "ssi-jws/eip"]
 ## enable LDPs from the Tezos Ecosystem
-tezos = ["ssi-tzkey", "ssi-jws/tezos", "ssi-caips/tezos"]
+tezos = ["ssi-tzkey", "ssi-jws/tezos", "ssi-caips/tezos", "secp256k1", "secp256r1"]
 ## enable LDPs from the Aleo Ecosystem
 aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 ## enable LDPs from the Solana Ecosystem

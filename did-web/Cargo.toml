@@ -25,7 +25,7 @@ features = ["json", "native-tls-vendored"]
 [dev-dependencies]
 ssi-jwk = { path = "../ssi-jwk", default-features = false }
 ssi-ldp = { path = "../ssi-ldp", default-features = false }
-ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-vc = { path = "../ssi-vc", default-features = false, features = ["w3c"] }
 ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }
 serde = { version = "1.0", features = ["derive"] }

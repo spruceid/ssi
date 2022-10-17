@@ -2106,6 +2106,7 @@ pub(crate) mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_issue_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -2155,6 +2156,7 @@ pub(crate) mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_issue_verify_bs58() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -2205,6 +2207,7 @@ pub(crate) mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_issue_verify_no_z() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -2238,6 +2241,7 @@ pub(crate) mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_proof_preparation() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -2386,6 +2390,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_verify() {
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         good_vc(
@@ -2421,6 +2426,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_verify_proof_consistency() {
         // These test vectors were generated using examples/issue.rs with the verify part disabled,
         // and with changes made to contexts/lds-jws2020-v1.jsonld, and then copying the context
@@ -2478,6 +2484,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn presentation_verify() {
         // LDP VC in LDP VP
         let vp_str = include_str!("../../examples/vp.jsonld");
@@ -2571,6 +2578,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_status() {
         use serde_json::json;
         let mut unrevoked_vc: Credential = serde_json::from_value(json!({
@@ -2661,6 +2669,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn credential_status_2021() {
         use serde_json::json;
         // status list credential is generated in examples/issue-status-list.rs
@@ -2726,6 +2735,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn presentation_from_credential_issue_verify() {
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
@@ -2918,6 +2928,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "w3c")]
     async fn present_with_example_holder_binding() {
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let key: JWK = serde_json::from_str(JWK_JSON_BAR).unwrap();
@@ -3109,6 +3120,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    #[cfg(feature = "ed25519")]
     async fn ed2020() {
         // https://w3c-ccg.github.io/lds-ed25519-2020/#example-4
         let vmm: VerificationMethodMap = serde_json::from_value(serde_json::json!({
