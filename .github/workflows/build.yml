@@ -25,8 +25,8 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-ssi2-cargo-
 
-    - name: Build
-      run: cargo build --workspace
+    - name: Check
+      run: cargo check --workspace
 
     - name: Fmt
       run: cargo fmt -- --check
