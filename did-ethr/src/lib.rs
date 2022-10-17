@@ -414,7 +414,7 @@ mod tests {
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
@@ -446,7 +446,7 @@ mod tests {
             issue_options.verification_method = Some(URI::String(did.to_string() + "#controller"));
         }
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDEthr, &mut context_loader)
@@ -471,8 +471,8 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
-        use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        use ssi_ldp::ProofSuite;
+        let proof_bad = ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
@@ -492,10 +492,10 @@ mod tests {
             .is_empty());
 
         // Make it into a VP
-        use ssi::one_or_many::OneOrMany;
-        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        use ssi_core::one_or_many::OneOrMany;
+        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
         let mut vp = Presentation {
-            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 
@@ -559,10 +559,10 @@ mod tests {
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
-        use ssi::vc::Credential;
+        use ssi_vc::Credential;
         let vc: Credential = serde_json::from_str(include_str!("../tests/vc.jsonld")).unwrap();
         eprintln!("vc {:?}", vc);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = vc.verify(None, &DIDEthr, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());

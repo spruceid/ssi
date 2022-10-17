@@ -24,4 +24,7 @@ hex = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
-ssi = { version = "0.4", path = "../", default-features = false, features = ["eip", "secp256k1"] }
+ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", default-features = false }
+ssi-core = { path = "../ssi-core", default-features = false }

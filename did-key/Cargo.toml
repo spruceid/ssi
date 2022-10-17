@@ -30,7 +30,8 @@ serde_json = "1.0"
 simple_asn1 = "^0.5.2"
 
 [dev-dependencies]
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }
 serde_json = "1.0"
