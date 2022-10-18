@@ -53,4 +53,4 @@ jobs:
     - uses: Swatinem/rust-cache@v2
 
     - name: Test each feature
-      run: cargo hack test --each-feature --workspace --exclude "ssi" -- --test-threads=4
+      run: cargo hack test --each-feature --workspace --exclude ssi --exclude 'ssi-did-test' --exclude 'ssi-vc-test'  -- --test-threads=4
