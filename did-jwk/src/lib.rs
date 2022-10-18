@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
-use ssi_dids::did_resolve::{
-    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-    ERROR_NOT_FOUND,
-};
 use ssi_dids::{
+    did_resolve::{
+        DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+        ERROR_INVALID_DID, ERROR_NOT_FOUND,
+    },
     Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
     DEFAULT_CONTEXT, DIDURL,
 };
@@ -153,6 +153,7 @@ mod tests {
     use ssi_dids::Resource;
 
     #[async_std::test]
+    #[cfg(feature = "secp256r1")]
     async fn from_p256() {
         let vm = "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9#0";
         let (res_meta, object, _meta) =
@@ -179,6 +180,7 @@ mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "secp256r1")]
     async fn to_p256() {
         let jwk: ssi_jwk::JWK = serde_json::from_value(serde_json::json!({
             "crv": "P-256",
@@ -267,6 +269,7 @@ mod tests {
     }
 
     #[async_std::test]
+    #[cfg(feature = "ed25519")]
     async fn deny_private_key() {
         let jwk = JWK::generate_ed25519().unwrap();
         let json = serde_jcs::to_string(&jwk).unwrap();
