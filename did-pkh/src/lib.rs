@@ -478,6 +478,7 @@ fn generate_sol(jwk: &JWK) -> Option<String> {
     }
 }
 
+#[cfg(feature = "ripemd-160")]
 fn generate_btc(key: &JWK) -> Result<String, String> {
     let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(|e| e.to_string())?;
     #[cfg(test)]
@@ -487,6 +488,7 @@ fn generate_btc(key: &JWK) -> Result<String, String> {
     Ok(addr)
 }
 
+#[cfg(feature = "ripemd-160")]
 fn generate_doge(key: &JWK) -> Result<String, String> {
     let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(|e| e.to_string())?;
     #[cfg(test)]
@@ -512,6 +514,7 @@ fn generate_caip10_tezos(
     })
 }
 
+#[cfg(feature = "eip")]
 fn generate_caip10_eip155(
     key: &JWK,
     ref_opt: Option<String>,
@@ -527,6 +530,7 @@ fn generate_caip10_eip155(
     })
 }
 
+#[cfg(feature = "ripemd-160")]
 fn generate_caip10_bip122(
     key: &JWK,
     ref_opt: Option<String>,
@@ -618,7 +622,9 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
     let account_id = match &namespace[..] {
         #[cfg(feature = "tezos")]
         "tezos" => generate_caip10_tezos(key, reference_opt)?,
+        #[cfg(feature = "eip")]
         "eip155" => generate_caip10_eip155(key, reference_opt)?,
+        #[cfg(feature = "ripemd-160")]
         "bip122" => generate_caip10_bip122(key, reference_opt)?,
         "solana" => generate_caip10_solana(key, reference_opt)?,
         "aleo" => generate_caip10_aleo(key, reference_opt)?,
@@ -639,12 +645,18 @@ impl DIDMethod for DIDPKH {
         };
         let addr = match match &pkh_name[..] {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
+            #[cfg(feature = "tezos")]
             "tz" => ssi_jwk::blakesig::hash_public_key(key).ok(),
+            #[cfg(feature = "eip")]
             "eth" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            #[cfg(feature = "eip")]
             "celo" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            #[cfg(feature = "eip")]
             "poly" => ssi_jwk::eip155::hash_public_key(key).ok(),
             "sol" => generate_sol(key),
+            #[cfg(feature = "ripemd-160")]
             "btc" => generate_btc(key).ok(),
+            #[cfg(feature = "ripemd-160")]
             "doge" => generate_doge(key).ok(),
             // CAIP-10/CAIP-2 chain id
             name => return generate_caip10_did(key, name).ok(),
