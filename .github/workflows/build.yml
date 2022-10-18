@@ -16,20 +16,14 @@ jobs:
 
     - uses: Swatinem/rust-cache@v2
 
-    - name: Check
-      run: cargo check --workspace
-
     - name: Fmt
       run: cargo fmt -- --check
 
+    - name: Build
+      run: cargo build --workspace
+
     - name: Clippy
       run: RUSTFLAGS="-Dwarnings" cargo clippy --workspace
-
-    - name: Checkout vc-test-suite
-      uses: actions/checkout@v2
-      with:
-        repository: w3c/vc-test-suite
-        path: vc-test-suite
 
     - name: Test vc-test-suite
       run: |
