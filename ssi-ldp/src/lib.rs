@@ -126,9 +126,9 @@ macro_rules! feature_gate {
 
 pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Error> {
     Ok(match proof_type {
-        "RsaSignature2018" => feature_gate!("w3c", RsaSignature2018),
-        "Ed25519Signature2018" => feature_gate!("w3c", Ed25519Signature2018),
-        "Ed25519Signature2020" => feature_gate!("w3c", Ed25519Signature2020),
+        "RsaSignature2018" => feature_gate!("rsa", RsaSignature2018),
+        "Ed25519Signature2018" => feature_gate!("ed25519", Ed25519Signature2018),
+        "Ed25519Signature2020" => feature_gate!("ed25519", Ed25519Signature2020),
         "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021" => {
             feature_gate!(
                 "tezos",
@@ -141,9 +141,9 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
                 P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             )
         }
-        "EcdsaSecp256k1Signature2019" => feature_gate!("w3c", EcdsaSecp256k1Signature2019),
+        "EcdsaSecp256k1Signature2019" => feature_gate!("secp256k1", EcdsaSecp256k1Signature2019),
         "EcdsaSecp256k1RecoverySignature2020" => {
-            feature_gate!("w3c", EcdsaSecp256k1RecoverySignature2020)
+            feature_gate!("secp256k1", EcdsaSecp256k1RecoverySignature2020)
         }
         "Eip712Signature2021" => {
             feature_gate!("eip", Eip712Signature2021)
@@ -161,7 +161,7 @@ pub fn get_proof_suite(proof_type: &str) -> Result<&(dyn ProofSuite + Sync), Err
             feature_gate!("aleo", AleoSignature2021)
         }
         "JsonWebSignature2020" => feature_gate!("w3c", JsonWebSignature2020),
-        "EcdsaSecp256r1Signature2019" => feature_gate!("w3c", EcdsaSecp256r1Signature2019),
+        "EcdsaSecp256r1Signature2019" => feature_gate!("secp256r1", EcdsaSecp256r1Signature2019),
         _ => return Err(Error::ProofTypeNotImplemented),
     })
 }
@@ -172,9 +172,9 @@ fn pick_proof_suite<'a, 'b>(
 ) -> Result<&'b (dyn ProofSuite + Sync), Error> {
     let algorithm = jwk.get_algorithm().ok_or(Error::MissingAlgorithm)?;
     Ok(match algorithm {
-        Algorithm::RS256 => feature_gate!("w3c", RsaSignature2018),
-        Algorithm::PS256 => feature_gate!("w3c", JsonWebSignature2020),
-        Algorithm::ES384 => feature_gate!("w3c", JsonWebSignature2020),
+        Algorithm::RS256 => feature_gate!("rsa", RsaSignature2018),
+        Algorithm::PS256 => feature_gate!("rsa", JsonWebSignature2020),
+        Algorithm::ES384 => feature_gate!("openssl", JsonWebSignature2020),
         Algorithm::AleoTestnet1Signature => feature_gate!("aleo", AleoSignature2021),
         Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
             Some(URI::String(ref vm))
@@ -195,7 +195,7 @@ fn pick_proof_suite<'a, 'b>(
                     )
                 }
             }
-            _ => feature_gate!("w3c", Ed25519Signature2018),
+            _ => feature_gate!("ed25519", Ed25519Signature2018),
         },
         Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
             Some(URI::String(ref vm))
@@ -210,7 +210,7 @@ fn pick_proof_suite<'a, 'b>(
                     )
                 }
             }
-            _ => feature_gate!("w3c", JsonWebSignature2020),
+            _ => feature_gate!("secp256r1", EcdsaSecp256r1Signature2019),
         },
         Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
             Some(URI::String(ref vm))
@@ -222,7 +222,7 @@ fn pick_proof_suite<'a, 'b>(
                     feature_gate!("w3c", EcdsaSecp256k1RecoverySignature2020)
                 }
             }
-            _ => feature_gate!("w3c", EcdsaSecp256k1Signature2019),
+            _ => feature_gate!("secp256k1", EcdsaSecp256k1Signature2019),
         },
         Algorithm::ES256KR =>
         {
@@ -239,7 +239,7 @@ fn pick_proof_suite<'a, 'b>(
                     {
                         feature_gate!("eip", Eip712Signature2021)
                     }
-                    _ => feature_gate!("w3c", EcdsaSecp256k1RecoverySignature2020),
+                    _ => feature_gate!("secp256k1", EcdsaSecp256k1RecoverySignature2020),
                 }
             }
         }
