@@ -13,12 +13,12 @@ documentation = "https://docs.rs/did-jwk/"
 
 [features]
 default = ["secp256k1", "secp256r1"]
-secp256k1 = ["ssi-dids/secp256k1"]
-secp256r1 = ["ssi-dids/secp256r1"]
+secp256k1 = ["ssi-jwk/secp256k1"]
+secp256r1 = ["ssi-jwk/secp256r1"]
 ssi_p384 = ["openssl"]
 
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
+ring = ["ssi-jwk/ring"]
+openssl = ["ssi-jwk/openssl"]
 
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
