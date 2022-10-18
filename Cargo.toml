@@ -8,7 +8,7 @@ description = "Core library for Verifiable Credentials and Decentralized Identif
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
 
-exclude = ["json-ld-api/*", "json-ld-normalization/*"]
+exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
 [features]
 default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
