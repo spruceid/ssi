@@ -11,9 +11,6 @@ ripemd-160 = ["ssi-jwk/ripemd-160"]
 aleo = ["ssi-jwk/aleo", "bech32"]
 tezos = ["ssi-jwk/tezos"]
 
-ring = ["ssi-jwk/ring"]
-openssl = ["ssi-jwk/openssl"]
-
 [dependencies]
 thiserror = "1"
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }

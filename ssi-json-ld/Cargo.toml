@@ -3,10 +3,6 @@ name = "ssi-json-ld"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[features]
-ring = ["ssi-crypto/ring"]
-
 [dependencies]
 thiserror = "1.0"
 async-std = { version = "1.9", features = ["attributes"] }

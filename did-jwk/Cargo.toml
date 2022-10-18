@@ -16,10 +16,6 @@ default = ["secp256k1", "secp256r1"]
 secp256k1 = ["ssi-jwk/secp256k1"]
 secp256r1 = ["ssi-jwk/secp256r1"]
 ed25519 = ["ssi-jwk/ed25519"]
-ssi_p384 = ["openssl"]
-
-ring = ["ssi-jwk/ring"]
-openssl = ["ssi-jwk/openssl"]
 
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1" }

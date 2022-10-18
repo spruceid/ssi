@@ -22,9 +22,6 @@ eip = ["ssi-jwk/eip", "ssi-jws/eip"]
 ## enable tezos style signatures
 tezos = ["ssi-jwk/tezos", "ssi-jws/tezos"]
 
-openssl = ["ssi-jwk/openssl", "ssi-jws/openssl"]
-ring = ["ssi-jwk/ring", "ssi-jws/ring"]
-
 [dependencies]
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }

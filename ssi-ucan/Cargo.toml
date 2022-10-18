@@ -16,9 +16,6 @@ eip = ["ssi-jwt/eip"]
 tezos = ["ssi-jwt/tezos"]
 aleo = ["ssi-jwt/aleo", "ssi-caips/aleo"]
 
-openssl = ["ssi-jws/openssl", "ssi-jwk/openssl", "ssi-jwt/openssl"]
-ring = ["ssi-jws/ring", "ssi-jwk/ring", "ssi-jwt/ring"]
-
 [dependencies]
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }

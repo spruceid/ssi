@@ -22,8 +22,6 @@ aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 ## enable LDPs from the Solana Ecosystem
 solana = []
 
-## Use the Ring crate for crypto operations
-ring = ["ssi-jws/ring"]
 ## Use the OpenSSL crate for crypto operations and P384
 openssl = ["ssi-jws/openssl"]
 
