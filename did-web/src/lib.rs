@@ -286,9 +286,9 @@ mod tests {
 
     #[tokio::test]
     async fn credential_prove_verify_did_web() {
-        use ssi::jwk::JWK;
-        use ssi::ldp::LinkedDataProofOptions;
-        use ssi::vc::{Credential, Issuer, URI};
+        use ssi_jwk::JWK;
+        use ssi_ldp::LinkedDataProofOptions;
+        use ssi_vc::{Credential, Issuer, URI};
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "type": ["VerifiableCredential"],
@@ -307,7 +307,7 @@ mod tests {
         let key: JWK = serde_json::from_str(key_str).unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
         issue_options.verification_method = Some(URI::String("did:web:localhost#key1".to_string()));
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDWeb, &mut context_loader)
             .await

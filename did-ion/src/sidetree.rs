@@ -2027,6 +2027,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "secp256k1")]
     fn test_longform_did_construction() {
         let create_operation = match &*CREATE_OPERATION {
             Operation::Create(op) => op,
@@ -2037,6 +2038,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "secp256k1")]
     fn test_update_verify_reveal() {
         let create_pvo = CREATE_OPERATION
             .clone()
@@ -2050,6 +2052,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "secp256k1")]
     fn test_recover_verify_reveal() {
         let create_pvo = CREATE_OPERATION
             .clone()
@@ -2063,7 +2066,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore]
+    #[cfg(feature = "secp256k1")]
     fn test_deactivate_verify_reveal() {
         let recover_pvo = RECOVER_OPERATION
             .clone()

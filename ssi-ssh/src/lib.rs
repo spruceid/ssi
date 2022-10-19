@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 use sshkeys::PublicKeyKind;
 use ssi_jwk::{Base64urlUInt, Params as JWKParams, JWK};
 use thiserror::Error;

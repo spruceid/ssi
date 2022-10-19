@@ -3018,7 +3018,6 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
-    #[cfg(feature = "eip")]
     async fn esrs2020() {
         use ssi_dids::did_resolve::{
             DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_NOT_FOUND,
@@ -3316,7 +3315,6 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
-    #[cfg(feature = "aleo")]
     async fn aleosig2021() {
         use crate::Credential;
         use ssi_dids::did_resolve::{
@@ -3411,9 +3409,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         assert!(warnings.is_empty());
     }
 
-    #[cfg(feature = "eip")]
     #[async_std::test]
-    #[ignore]
     async fn verify_typed_data() {
         use ssi_ldp::eip712::TypedData;
         let proof: Proof = serde_json::from_value(json!({
@@ -3638,6 +3634,6 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
-        assert_eq!(sig_hex, "0x5fb8f18f21f54c2df8a2720d0afcee7dbbb18e4b7a22ce6e8183633d63b076d329122584db769cd78b6cd5a7094ede5ceaa43317907539187f1f0d8875f99e051b");
+        assert_eq!(sig_hex, "0xd9a03af99298b50303343ae7b89e14eb7622d64023ddb2df6c220bd5b017fa2b48ab09a6754042eeeb3785ab64f3eab1dd4fd89dbbbbd0181f135b1b938b99841c");
     }
 }

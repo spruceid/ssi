@@ -14,16 +14,14 @@ secp256r1 = ["ssi-jws/secp256r1", "p256"]
 ed25519 = ["ssi-jws/ed25519"]
 rsa = ["ssi-jws/rsa"]
 ## enable the EIP-defined LDPs: EIP712
-eip = ["keccak-hash", "ssi-caips/eip", "k256", "ssi-jws/eip"]
+eip = ["keccak-hash", "ssi-caips/eip", "secp256k1", "ssi-jws/eip"]
 ## enable LDPs from the Tezos Ecosystem
-tezos = ["ssi-tzkey", "ssi-jws/tezos", "ssi-caips/tezos"]
+tezos = ["ssi-tzkey", "ssi-jws/tezos", "ssi-caips/tezos", "secp256k1", "secp256r1"]
 ## enable LDPs from the Aleo Ecosystem
 aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 ## enable LDPs from the Solana Ecosystem
 solana = []
 
-## Use the Ring crate for crypto operations
-ring = ["ssi-jws/ring"]
 ## Use the OpenSSL crate for crypto operations and P384
 openssl = ["ssi-jws/openssl"]
 
@@ -60,4 +58,7 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-ssi = { version = "0.4", path = "../", default-features = false }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

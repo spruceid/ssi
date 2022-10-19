@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 pub mod error;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
@@ -235,23 +237,6 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 #[cfg(feature = "p256")]
                 Algorithm::ESBlake2b => {
-                    // We will be able to use the blake2 crate directly once it allow 32B output
-                    // let hash = blake2b_simd::Params::new()
-                    //     .hash_length(32)
-                    //     .hash(data)
-                    //     .as_bytes()
-                    //     .to_vec();
-                    // use p256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
-                    // let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                    // if curve != "P-256" {
-                    //     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                    // }
-                    // let secret_key = p256::SecretKey::try_from(ec)?;
-                    // let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                    // let sig: p256::ecdsa::Signature = signing_key
-                    //     .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))
-                    //     .map_err(ssi_jwk::Error::from)?;
-                    // sig.as_bytes().to_vec()
                     use p256::ecdsa::signature::{
                         digest::{consts::U32, Digest},
                         DigestSigner, Signature,
@@ -268,23 +253,6 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 }
                 #[cfg(feature = "secp256k1")]
                 Algorithm::ESBlake2bK => {
-                    // We will be able to use the blake2 crate directly once it allow 32B output
-                    // let hash = blake2b_simd::Params::new()
-                    //     .hash_length(32)
-                    //     .hash(data)
-                    //     .as_bytes()
-                    //     .to_vec();
-                    // use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature};
-                    // let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                    // if curve != "secp256k1" {
-                    //     return Err(ssi_jwk::Error::CurveNotImplemented(curve.to_string()).into());
-                    // }
-                    // let secret_key = k256::SecretKey::try_from(ec)?;
-                    // let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                    // let sig: k256::ecdsa::Signature = signing_key
-                    //     .try_sign_digest(Digest::chain(<PassthroughDigest as Digest>::new(), &hash))
-                    //     .map_err(ssi_jwk::Error::from)?;
-                    // sig.as_bytes().to_vec()
                     use k256::ecdsa::signature::{
                         digest::{consts::U32, Digest},
                         DigestSigner, Signature,
@@ -431,18 +399,19 @@ pub fn verify_bytes_warnable(
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
                 let sig =
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
-                // Note: in newer ecdsa crate versions, normalize_s is non-mutating.
-                let maybe_normalized = sig.normalize_s();
-                if let Some(s) = maybe_normalized {
+                let normalized_sig = if let Some(s) = sig.normalize_s() {
                     // For user convenience, output the normalized signature.
                     let sig_normalized_b64 = base64::encode_config(s, base64::URL_SAFE_NO_PAD);
                     warnings.push(format!(
                         "Non-normalized ES256K signature. Normalized: {}",
                         sig_normalized_b64
                     ));
-                }
+                    s
+                } else {
+                    sig
+                };
                 verifying_key
-                    .verify(data, &sig)
+                    .verify(data, &normalized_sig)
                     .map_err(ssi_jwk::Error::from)?;
             }
             #[cfg(feature = "secp256k1")]

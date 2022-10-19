@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use std::convert::TryFrom;
@@ -26,6 +28,8 @@ use der::{
 };
 
 use serde::{Deserialize, Serialize};
+
+const MULTICODEC_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 
 // RFC 7516 - JSON Web Encryption (JWE)
 // RFC 7517 - JSON Web Key (JWK)
@@ -478,6 +482,35 @@ impl JWK {
         let hash = ssi_crypto::hashes::sha256::sha256(json_string.as_bytes());
         let thumbprint = String::from(Base64urlUInt(hash.to_vec()));
         Ok(thumbprint)
+    }
+
+    pub fn from_vm_type(type_: &str, pk_bytes: Vec<u8>) -> Result<Self, Error> {
+        Ok(match type_ {
+            // TODO: check against IRIs when in JSON-LD
+            "Ed25519VerificationKey2018" => Self::from(Params::OKP(OctetParams {
+                curve: "Ed25519".to_string(),
+                public_key: Base64urlUInt(pk_bytes),
+                private_key: None,
+            })),
+            "Ed25519VerificationKey2020" => {
+                if pk_bytes.len() != 34 {
+                    return Err(Error::MultibaseKeyLength(34, pk_bytes.len()));
+                }
+                if pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
+                    return Err(Error::MultibaseKeyPrefix);
+                }
+                Self::from(Params::OKP(OctetParams {
+                    curve: "Ed25519".to_string(),
+                    public_key: Base64urlUInt(pk_bytes[2..].to_owned()),
+                    private_key: None,
+                }))
+            }
+            #[cfg(feature = "secp256k1")]
+            "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
+                secp256k1_parse(&pk_bytes)?
+            }
+            _ => Err(Error::UnsupportedKeyType)?,
+        })
     }
 }
 

@@ -55,10 +55,13 @@ pub enum Error {
     BlockchainAccountIdParse(#[from] ssi_caips::caip10::BlockchainAccountIdParseError),
     #[error(transparent)]
     BlockchainAccountIdVerify(#[from] ssi_caips::caip10::BlockchainAccountIdVerifyError),
+    #[cfg(feature = "tezos")]
     #[error(transparent)]
     DecodeTezosPublicKey(#[from] ssi_tzkey::DecodeTezosPkError),
+    #[cfg(feature = "tezos")]
     #[error(transparent)]
     DecodeTezosSignature(#[from] ssi_tzkey::DecodeTezosSignatureError),
+    #[cfg(feature = "tezos")]
     #[error(transparent)]
     EncodeTezosSignedMessage(#[from] ssi_tzkey::EncodeTezosSignedMessageError),
     #[cfg(feature = "eip")]

@@ -11,15 +11,11 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-ethr/"
 documentation = "https://docs.rs/did-ethr/"
 
-[features]
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
-
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false, features = ["secp256k1"] }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false, features = ["eip"] }
 ssi-crypto = { path = "../ssi-crypto", version = "0.1", default-features = false, features = ["secp256k1"] }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["secp256k1", "eip"] }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["eip"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -28,4 +24,7 @@ hex = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
-ssi = { version = "0.4", path = "../", default-features = false, features = ["eip", "secp256k1"] }
+ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "eip"] }
+ssi-core = { path = "../ssi-core", default-features = false }

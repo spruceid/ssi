@@ -11,12 +11,8 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-web/"
 documentation = "https://docs.rs/did-web/"
 
-[features]
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
-
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
 async-trait = "0.1"
 reqwest = { version = "0.11", features = ["json"] }
 http = "0.2"
@@ -27,7 +23,10 @@ version = "0.11"
 features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi-jwk = { path = "../ssi-jwk", default-features = false }
+ssi-ldp = { path = "../ssi-ldp" }
+ssi-vc = { path = "../ssi-vc" }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }
 serde = { version = "1.0", features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }

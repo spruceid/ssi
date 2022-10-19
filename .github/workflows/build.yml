@@ -1,55 +1,29 @@
 name: ci
 
-on:
-  pull_request:
-  push:
-    branches:
-      - main
+on: [push, pull_request]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-and-lint:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout SSI Library
       uses: actions/checkout@v2
       with:
         submodules: true
-    - uses: taiki-e/install-action@cargo-hack
 
-    - name: Cache Cargo registry and build artifacts
-      uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-        key: ${{ runner.os }}-ssi2-cargo-${{ hashFiles('Cargo.toml', '**.rs') }}
-        restore-keys: |
-          ${{ runner.os }}-ssi2-cargo-
-
-    - name: Build
-      run: cargo build --workspace
+    - uses: Swatinem/rust-cache@v2
 
     - name: Fmt
       run: cargo fmt -- --check
 
+    - name: Build
+      run: cargo build --workspace
+
     - name: Clippy
       run: RUSTFLAGS="-Dwarnings" cargo clippy --workspace
-
-    - name: Test each feature
-      # run: cargo hack test --each-feature --workspace -- --test-threads=4
-      run: cargo test --workspace -- --test-threads=4
-
-    - name: Test all features
-      run: cargo test --workspace --all-features -- --test-threads=4
-
-    - name: Checkout vc-test-suite
-      uses: actions/checkout@v2
-      with:
-        repository: w3c/vc-test-suite
-        path: vc-test-suite
 
     - name: Test vc-test-suite
       run: |
@@ -62,3 +36,21 @@ jobs:
       run: |
         rustup target add wasm32-unknown-unknown
         cargo check --workspace --target wasm32-unknown-unknown
+
+    - name: Test examples
+      run: |
+        cargo test --examples
+
+  test-each-feature:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout SSI Library
+      uses: actions/checkout@v2
+      with:
+        submodules: true
+    - uses: taiki-e/install-action@cargo-hack
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Test each feature
+      run: cargo hack test --each-feature --workspace --exclude ssi --exclude 'ssi-did-test' --exclude 'ssi-vc-test'  -- --test-threads=4

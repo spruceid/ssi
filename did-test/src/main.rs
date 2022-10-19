@@ -4,12 +4,14 @@ use std::collections::{BTreeMap as Map, HashMap};
 use std::env::Args;
 use std::str::FromStr;
 
-use ssi::did::{Document, DIDURL};
-use ssi::did_resolve::{
-    dereference, Content, ContentMetadata, DIDResolver, DereferencingInputMetadata,
-    DereferencingMetadata, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
-    ERROR_INVALID_DID, ERROR_INVALID_DID_URL, ERROR_NOT_FOUND, ERROR_REPRESENTATION_NOT_SUPPORTED,
-    TYPE_DID_LD_JSON,
+use ssi_dids::{
+    did_resolve::{
+        dereference, Content, ContentMetadata, DIDResolver, DereferencingInputMetadata,
+        DereferencingMetadata, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
+        ERROR_INVALID_DID, ERROR_INVALID_DID_URL, ERROR_NOT_FOUND,
+        ERROR_REPRESENTATION_NOT_SUPPORTED, TYPE_DID_LD_JSON,
+    },
+    Document, DIDURL,
 };
 
 #[allow(clippy::upper_case_acronyms)]

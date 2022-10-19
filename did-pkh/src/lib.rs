@@ -478,6 +478,7 @@ fn generate_sol(jwk: &JWK) -> Option<String> {
     }
 }
 
+#[cfg(feature = "ripemd-160")]
 fn generate_btc(key: &JWK) -> Result<String, String> {
     let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(|e| e.to_string())?;
     #[cfg(test)]
@@ -487,6 +488,7 @@ fn generate_btc(key: &JWK) -> Result<String, String> {
     Ok(addr)
 }
 
+#[cfg(feature = "ripemd-160")]
 fn generate_doge(key: &JWK) -> Result<String, String> {
     let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(|e| e.to_string())?;
     #[cfg(test)]
@@ -496,6 +498,7 @@ fn generate_doge(key: &JWK) -> Result<String, String> {
     Ok(addr)
 }
 
+#[cfg(feature = "tezos")]
 fn generate_caip10_tezos(
     key: &JWK,
     ref_opt: Option<String>,
@@ -511,6 +514,7 @@ fn generate_caip10_tezos(
     })
 }
 
+#[cfg(feature = "eip")]
 fn generate_caip10_eip155(
     key: &JWK,
     ref_opt: Option<String>,
@@ -526,6 +530,7 @@ fn generate_caip10_eip155(
     })
 }
 
+#[cfg(feature = "ripemd-160")]
 fn generate_caip10_bip122(
     key: &JWK,
     ref_opt: Option<String>,
@@ -615,8 +620,11 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
         _ => return Err("Unable to parse chain id or namespace".to_string()),
     };
     let account_id = match &namespace[..] {
+        #[cfg(feature = "tezos")]
         "tezos" => generate_caip10_tezos(key, reference_opt)?,
+        #[cfg(feature = "eip")]
         "eip155" => generate_caip10_eip155(key, reference_opt)?,
+        #[cfg(feature = "ripemd-160")]
         "bip122" => generate_caip10_bip122(key, reference_opt)?,
         "solana" => generate_caip10_solana(key, reference_opt)?,
         "aleo" => generate_caip10_aleo(key, reference_opt)?,
@@ -637,12 +645,18 @@ impl DIDMethod for DIDPKH {
         };
         let addr = match match &pkh_name[..] {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
+            #[cfg(feature = "tezos")]
             "tz" => ssi_jwk::blakesig::hash_public_key(key).ok(),
+            #[cfg(feature = "eip")]
             "eth" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            #[cfg(feature = "eip")]
             "celo" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            #[cfg(feature = "eip")]
             "poly" => ssi_jwk::eip155::hash_public_key(key).ok(),
             "sol" => generate_sol(key),
+            #[cfg(feature = "ripemd-160")]
             "btc" => generate_btc(key).ok(),
+            #[cfg(feature = "ripemd-160")]
             "doge" => generate_doge(key).ok(),
             // CAIP-10/CAIP-2 chain id
             name => return generate_caip10_did(key, name).ok(),
@@ -663,9 +677,9 @@ impl DIDMethod for DIDPKH {
 mod tests {
     use super::*;
     use serde_json::{from_str, from_value, json};
-    use ssi::jwk::Algorithm;
-    use ssi::ldp::{Proof, ProofSuite};
-    use ssi::one_or_many::OneOrMany;
+    use ssi_core::one_or_many::OneOrMany;
+    use ssi_jwk::Algorithm;
+    use ssi_ldp::{Proof, ProofSuite};
 
     fn test_generate(jwk_value: Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();
@@ -676,6 +690,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     fn generate_did_pkh() {
         let secp256k1_pk = json!({
             "kty": "EC",
@@ -891,10 +906,10 @@ mod tests {
         type_: &str,
         vm_relative_url: &str,
         proof_suite: &dyn ProofSuite,
-        eip712_domain_opt: Option<ssi::eip712::ProofInfo>,
-        vp_eip712_domain_opt: Option<ssi::eip712::ProofInfo>,
+        eip712_domain_opt: Option<ssi_ldp::eip712::ProofInfo>,
+        vp_eip712_domain_opt: Option<ssi_ldp::eip712::ProofInfo>,
     ) {
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         let did = DIDPKH
             .generate(&Source::KeyAndPattern(&key, type_))
             .unwrap();
@@ -916,7 +931,7 @@ mod tests {
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         /*
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
@@ -980,10 +995,10 @@ mod tests {
         assert!(!vp_verification_result.errors.is_empty());
 
         // Make it into a VP
-        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
         let mut vp = Presentation {
             id: None,
-            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 
@@ -1047,7 +1062,7 @@ mod tests {
         vm_relative_url: &str,
         proof_suite: &dyn ProofSuite,
     ) {
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         let did = DIDPKH
             .generate(&Source::KeyAndPattern(&key, type_))
             .unwrap();
@@ -1068,7 +1083,7 @@ mod tests {
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         let prep = proof_suite
             .prepare(
@@ -1132,10 +1147,10 @@ mod tests {
         assert!(!vp_verification_result.errors.is_empty());
 
         // Make it into a VP
-        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
         let mut vp = Presentation {
             id: None,
-            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 
@@ -1192,16 +1207,17 @@ mod tests {
             .is_empty());
     }
 
-    fn sign_tezos(prep: &ssi::ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
+    fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
         // Simulate signing with a Tezos wallet
         let micheline = match prep.signing_input {
-            ssi::ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
+            ssi_ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
             _ => panic!("Expected Micheline expression for signing"),
         };
-        ssi::tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
+        ssi_tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
     }
 
     #[tokio::test]
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     async fn resolve_vc_issue_verify() {
         let key_secp256k1: JWK =
             from_str(include_str!("../../tests/secp256k1-2021-02-17.json")).unwrap();
@@ -1234,7 +1250,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+            &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1246,7 +1262,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi::ldp::Eip712Signature2021,
+            &ssi_ldp::Eip712Signature2021,
             None,
             None,
         )
@@ -1258,14 +1274,14 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi::ldp::EthereumPersonalSignature2021,
+            &ssi_ldp::EthereumPersonalSignature2021,
             None,
             None,
         )
         .await;
 
         // eth/Eip712
-        let eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
+        let eip712_domain: ssi_ldp::eip712::ProofInfo = serde_json::from_value(json!({
           "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
@@ -1295,7 +1311,7 @@ mod tests {
           "primaryType": "VerifiableCredential"
         }))
         .unwrap();
-        let vp_eip712_domain: ssi::eip712::ProofInfo = serde_json::from_value(json!({
+        let vp_eip712_domain: ssi_ldp::eip712::ProofInfo = serde_json::from_value(json!({
           "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
@@ -1354,7 +1370,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi::ldp::EthereumEip712Signature2021,
+            &ssi_ldp::EthereumEip712Signature2021,
             Some(eip712_domain),
             Some(vp_eip712_domain),
         )
@@ -1366,7 +1382,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi::ldp::Eip712Signature2021,
+            &ssi_ldp::Eip712Signature2021,
             None,
             None,
         )
@@ -1380,7 +1396,7 @@ mod tests {
             other_key_ed25519.clone(),
             "tz",
             "#blockchainAccountId",
-            &ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            &ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             None,
             None,
         )
@@ -1395,7 +1411,7 @@ mod tests {
         //     other_key_secp256k1.clone(),
         //     "tz",
         //     "#blockchainAccountId",
-        //     &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+        //     &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
         // )
         // .await;
 
@@ -1407,7 +1423,7 @@ mod tests {
             other_key_p256.clone(),
             "tz",
             "#blockchainAccountId",
-            &ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            &ssi_ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             None,
             None,
         )
@@ -1421,7 +1437,7 @@ mod tests {
             other_key_ed25519.clone(),
             "sol",
             "#controller",
-            &ssi::ldp::Ed25519Signature2018,
+            &ssi_ldp::Ed25519Signature2018,
             None,
             None,
         )
@@ -1434,7 +1450,7 @@ mod tests {
             other_key_ed25519.clone(),
             "sol",
             "#SolanaMethod2021",
-            &ssi::ldp::SolanaSignature2021,
+            &ssi_ldp::SolanaSignature2021,
         )
         .await;
         */
@@ -1445,7 +1461,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "btc",
             "#blockchainAccountId",
-            &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+            &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1457,7 +1473,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "doge",
             "#blockchainAccountId",
-            &ssi::ldp::EcdsaSecp256k1RecoverySignature2020,
+            &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1472,7 +1488,7 @@ mod tests {
             other_key_ed25519.clone(),
             "tz",
             "#TezosMethod2021",
-            &ssi::ldp::TezosSignature2021,
+            &ssi_ldp::TezosSignature2021,
         )
         .await;
         key_ed25519.algorithm = Some(Algorithm::EdDSA);
@@ -1486,7 +1502,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "tz",
             "#TezosMethod2021",
-            &ssi::ldp::TezosSignature2021,
+            &ssi_ldp::TezosSignature2021,
         )
         .await;
         */
@@ -1500,7 +1516,7 @@ mod tests {
             other_key_p256.clone(),
             "tz",
             "#TezosMethod2021",
-            &ssi::ldp::TezosSignature2021,
+            &ssi_ldp::TezosSignature2021,
         )
         .await;
         key_p256.algorithm = Some(Algorithm::ES256);
@@ -1508,9 +1524,9 @@ mod tests {
     }
 
     async fn test_verify_vc(vc_str: &str, num_warnings: usize) {
-        let mut vc = ssi::vc::Credential::from_json_unsigned(vc_str).unwrap();
+        let mut vc = ssi_vc::Credential::from_json_unsigned(vc_str).unwrap();
         vc.validate().unwrap();
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());

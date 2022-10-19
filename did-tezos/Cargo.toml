@@ -11,19 +11,11 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-tezos/"
 documentation = "https://docs.rs/did-tezos/"
 
-[features]
-default = ["ed25519", "secp256k1", "secp256r1"]
-ed25519 = ["ssi-dids/ed25519", "ssi-jwk/rand"]
-secp256k1 = ["ssi-dids/secp256k1", "ssi-jwk/rand"]
-secp256r1 = ["ssi-dids/secp256r1"]
-
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
-
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
-ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false, features = ["tezos"] }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
+# TODO Enabling the tezos feature all the time as it is gating the blakesig stuff in ssi_jwk
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["tezos"] }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 chrono = { version = "0.4" }
 reqwest = { version = "0.11", features = ["json"] }
@@ -40,6 +32,10 @@ version = "0.11"
 features = ["json", "native-tls-vendored"]
 
 [dev-dependencies]
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-core = { path = "../ssi-core", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos"] }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
+ssi-tzkey = { path = "../ssi-tzkey", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }
 wiremock = "0.5"

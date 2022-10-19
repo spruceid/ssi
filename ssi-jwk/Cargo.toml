@@ -13,6 +13,7 @@ secp256r1 = ["p256", "rand"]
 ed25519 = ["ed25519-dalek", "rand_old", "getrandom"]
 ## enable RSA keys
 rsa = ["dep:rsa"]
+
 ## enable aleo ecosystem keys
 aleo = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters", "bs58"]
 ## enable ripemd-160 hashing for keys, e.g. for bitcoin
@@ -61,3 +62,7 @@ getrandom = { version = "0.2", optional = true }
 [dev-dependencies]
 serde_json = "1.0"
 hex = "0.4"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

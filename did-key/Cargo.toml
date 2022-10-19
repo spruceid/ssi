@@ -13,15 +13,12 @@ documentation = "https://docs.rs/did-key/"
 
 [features]
 default = ["secp256k1", "secp256r1"]
-secp256k1 = ["k256", "ssi-dids/secp256k1"]
-secp256r1 = ["p256", "ssi-dids/secp256r1"]
-ssi_p384 = ["openssl"]
-
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
+secp256k1 = ["k256", "ssi-jwk/secp256k1"]
+secp256r1 = ["p256", "ssi-jwk/secp256r1"]
+ssi_p384 = ["ssi-jwk/openssl"]
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["ripemd-160"] }
 ssi-crypto = { path = "../ssi-crypto", default-features = false, version = "0.1"}
 async-trait = "0.1"
@@ -33,7 +30,9 @@ serde_json = "1.0"
 simple_asn1 = "^0.5.2"
 
 [dev-dependencies]
-ssi = { version = "0.4", path = "../", default-features = false }
+ssi-vc = { path = "../ssi-vc" }
+ssi-ldp = { path = "../ssi-ldp" }
+ssi-json-ld = { path = "../ssi-json-ld" }
 serde = { version = "1.0", features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }
 serde_json = "1.0"

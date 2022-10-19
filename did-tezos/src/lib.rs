@@ -1,30 +1,26 @@
-use ssi_dids::did_resolve::{
-    dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
-    ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-};
 use ssi_dids::{
+    did_resolve::{
+        dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
+        ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
+    },
     Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
     VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
 };
-use ssi_jwk::blakesig::hash_public_key;
-#[cfg(feature = "secp256r1")]
-use ssi_jwk::p256_parse;
-#[cfg(feature = "secp256k1")]
-use ssi_jwk::secp256k1_parse;
-use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
+use ssi_jwk::{
+    blakesig::hash_public_key, p256_parse, secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK,
+};
 use ssi_jws::{decode_unverified, decode_verify};
 
-mod explorer;
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use json_patch::patch;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::BTreeMap;
-use std::convert::TryInto;
-use std::default::Default;
-use std::str::FromStr;
-use std::string::ToString;
+use std::{
+    collections::BTreeMap, convert::TryInto, default::Default, str::FromStr, string::ToString,
+};
+
+mod explorer;
 
 /// did:tz DID Method
 ///
@@ -513,7 +509,6 @@ impl DIDTz {
                                     x509_thumbprint_sha256: None,
                                 }
                             }
-                            #[cfg(feature = "secp256k1")]
                             Prefix::TZ2 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
@@ -525,7 +520,6 @@ impl DIDTz {
                                     anyhow!("Couldn't create JWK from secp256k1 public key: {}", e)
                                 })?
                             }
-                            #[cfg(feature = "secp256r1")]
                             Prefix::TZ3 => {
                                 let pk = bs58::decode(public_key)
                                     .with_check(None)
@@ -599,7 +593,6 @@ mod tests {
         assert_eq!(tz1, TZ1);
     }
 
-    #[cfg(feature = "secp256r1")]
     #[test]
     fn jwk_to_tz3() {
         let jwk: JWK = serde_json::from_value(serde_json::json!({
@@ -703,7 +696,7 @@ mod tests {
 
     #[tokio::test]
     async fn credential_prove_verify_did_tz1() {
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         use wiremock::matchers::{method, path, query_param};
         use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -756,10 +749,10 @@ mod tests {
         //     PrivateKey::from_base58check("")
         //         .unwrap();
         // let key = JWK {
-        //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+        //     params: ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
         //         curve: "Ed25519".to_string(),
-        //         public_key: ssi::jwk::Base64urlUInt(public_key.as_ref()[..].into()),
-        //         private_key: Some(ssi::jwk::Base64urlUInt(private_key.as_ref()[..].into())),
+        //         public_key: ssi_jwk::Base64urlUInt(public_key.as_ref()[..].into()),
+        //         private_key: Some(ssi_jwk::Base64urlUInt(private_key.as_ref()[..].into())),
         //     }),
         //     public_key_use: None,
         //     key_operations: None,
@@ -776,7 +769,7 @@ mod tests {
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         // let proof = vc.generate_proof(&key, &issue_options, &DIDTZ).await.unwrap();
         let proof_str = r###"
@@ -863,8 +856,8 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
-        use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        use ssi_ldp::ProofSuite;
+        let proof_bad = ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
@@ -884,10 +877,10 @@ mod tests {
             .is_empty());
 
         // Make it into a VP
-        use ssi::one_or_many::OneOrMany;
-        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        use ssi_core::one_or_many::OneOrMany;
+        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
         let mut vp = Presentation {
-            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 
@@ -907,7 +900,7 @@ mod tests {
             Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         // let vp_proof = vp.generate_proof(&key, &vp_issue_options, &DIDTZ).await.unwrap();
         let vp_proof_str = r###"
 {
@@ -1012,10 +1005,9 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_tz2() {
-        use ssi::jwk::Algorithm;
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_jwk::Algorithm;
+        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
         let mut key = JWK::generate_secp256k1().unwrap();
         // mark this key as being for use with key recovery
@@ -1037,7 +1029,7 @@ mod tests {
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDTZ, &mut context_loader)
@@ -1062,8 +1054,8 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
-        use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        use ssi_ldp::ProofSuite;
+        let proof_bad = ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
@@ -1083,10 +1075,10 @@ mod tests {
             .is_empty());
 
         // Make it into a VP
-        use ssi::one_or_many::OneOrMany;
-        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        use ssi_core::one_or_many::OneOrMany;
+        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
         let mut vp = Presentation {
-            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 
@@ -1106,7 +1098,7 @@ mod tests {
             Some(URI::String(did.to_string() + "#blockchainAccountId"));
         vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
         eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vp_proof = vp
             .generate_proof(&key, &vp_issue_options, &DIDTZ, &mut context_loader)
             .await
@@ -1148,7 +1140,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256r1")]
     async fn test_derivation_tz3() {
         let (res_meta, doc_opt, _meta_opt) = DIDTZ
             .resolve(
@@ -1211,9 +1202,9 @@ mod tests {
         .unwrap();
         let key = JWK {
             key_id: Some(format!("{}#blockchainAccountId", did)),
-            ..ssi::tzkey::jwk_from_tezos_key(sk).unwrap()
+            ..ssi_tzkey::jwk_from_tezos_key(sk).unwrap()
         };
-        let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ1, &mut doc, json_update)
@@ -1233,7 +1224,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256k1")]
     async fn test_json_patch_tz2() {
         let address = "tz2RZoj9oqoA8bDeUoAKLjf8nLPQKmYjaj6Q";
         let pk = "sppk7bRNbJ2n9PNQo295UJiYQ8iMma8ysRH9mCRFB14yhzLCwdGay9y";
@@ -1258,9 +1248,9 @@ mod tests {
         .unwrap();
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
         let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
-        use ssi::jwk::ECParams;
+        use ssi_jwk::ECParams;
         let key = JWK {
-            params: ssi::jwk::Params::EC(ECParams {
+            params: ssi_jwk::Params::EC(ECParams {
                 curve: Some("secp256k1".to_string()),
                 x_coordinate: None,
                 y_coordinate: None,
@@ -1275,7 +1265,7 @@ mod tests {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let jws = encode_sign(ssi::jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::ES256KR, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ2, &mut doc, json_update)
@@ -1295,7 +1285,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256r1")]
     async fn test_json_patch_tz3() {
         let address = "tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX";
         let pk = "p2pk679D18uQNkdjpRxuBXL5CqcDKTKzsiXVtc9oCUT6xb82zQmgUks";
@@ -1321,7 +1310,7 @@ mod tests {
         // let public_key = pk.from_base58check().unwrap()[4..].to_vec();
         let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
         let key = JWK {
-            params: ssi::jwk::Params::EC(ssi::jwk::ECParams {
+            params: ssi_jwk::Params::EC(ssi_jwk::ECParams {
                 curve: Some("P-256".to_string()),
                 x_coordinate: None,
                 y_coordinate: None,
@@ -1336,7 +1325,7 @@ mod tests {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        let jws = encode_sign(ssi::jwk::Algorithm::ES256, JSON_PATCH, &key).unwrap();
+        let jws = encode_sign(ssi_jwk::Algorithm::ES256, JSON_PATCH, &key).unwrap();
         let json_update = Updates::SignedIetfJsonPatch(vec![jws.clone()]);
         DIDTZ
             .tier3_updates(Prefix::TZ3, &mut doc, json_update)
@@ -1366,10 +1355,10 @@ mod tests {
         // // let private_key = bs58::decode(&sk).with_check(None).into_vec().unwrap()[4..].to_owned();
         // // println!("LEN: {}", private_key.len());
         // // let key = JWK {
-        // //     params: ssi::jwk::Params::OKP(ssi::jwk::OctetParams {
+        // //     params: ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
         // //         curve: "Ed25519".to_string(),
-        // //         public_key: ssi::jwk::Base64urlUInt(public_key),
-        // //         private_key: Some(ssi::jwk::Base64urlUInt(private_key)),
+        // //         public_key: ssi_jwk::Base64urlUInt(public_key),
+        // //         private_key: Some(ssi_jwk::Base64urlUInt(private_key)),
         // //     }),
         // //     public_key_use: None,
         // //     key_operations: None,
@@ -1382,9 +1371,9 @@ mod tests {
         // // };
         // let key = JWK {
         //     key_id: Some(format!("{}#blockchainAccountId", did)),
-        //     ..ssi::tzkey::jwk_from_tezos_key(sk).unwrap()
+        //     ..ssi_tzkey::jwk_from_tezos_key(sk).unwrap()
         // };
-        // let jws = encode_sign(ssi::jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
+        // let jws = encode_sign(ssi_jwk::Algorithm::EdDSA, JSON_PATCH, &key).unwrap();
         // println!("{}", jws);
         // assert!(false);
         let jws = "eyJhbGciOiJFZERTQSIsImtpZCI6ImRpZDp0ejp0ejFnaURHc2lmV0I5cTlzaWVrQ0tRYUpLcm1DOWRhNU00M0ojYmxvY2tjaGFpbkFjY291bnRJZCJ9.eyJpZXRmLWpzb24tcGF0Y2giOiBbCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICJvcCI6ICJhZGQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInBhdGgiOiAiL3NlcnZpY2UvMSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAidmFsdWUiOiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgImlkIjogInRlc3Rfc2VydmljZV9pZCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgInR5cGUiOiAidGVzdF9zZXJ2aWNlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAic2VydmljZUVuZHBvaW50IjogInRlc3Rfc2VydmljZV9lbmRwb2ludCIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIF19.HqPI6jFXuEMZ-fQfSE9MstDlKifoqdt8sAtUJ8I3IYwMybLxrabl35hTXyf5Uj6XwnYKrKbBvXImt52WQla5CQ".to_string();
@@ -1487,10 +1476,9 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_tz3() {
-        use ssi::jwk::Algorithm;
-        use ssi::vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_jwk::Algorithm;
+        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
 
         let mut key = JWK::generate_p256().unwrap();
         key.algorithm = Some(Algorithm::ESBlake2b);
@@ -1511,7 +1499,7 @@ mod tests {
             ..Default::default()
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         let vc_no_proof = vc.clone();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDTZ, &mut context_loader)
@@ -1536,8 +1524,8 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_p256().unwrap();
-        use ssi::ldp::ProofSuite;
-        let proof_bad = ssi::ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        use ssi_ldp::ProofSuite;
+        let proof_bad = ssi_ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
@@ -1557,10 +1545,10 @@ mod tests {
             .is_empty());
 
         // Make it into a VP
-        use ssi::one_or_many::OneOrMany;
-        use ssi::vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
+        use ssi_core::one_or_many::OneOrMany;
+        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
         let mut vp = Presentation {
-            context: ssi::vc::Contexts::Many(vec![ssi::vc::Context::URI(ssi::vc::URI::String(
+            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 

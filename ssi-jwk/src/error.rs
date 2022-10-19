@@ -118,6 +118,12 @@ pub enum Error {
     #[cfg(all(feature = "p256", not(feature = "k256")))]
     #[error(transparent)]
     EC(#[from] p256::elliptic_curve::Error),
+    /// Unexpected length for publicKeyMultibase
+    #[error("Unexpected length for publicKeyMultibase")]
+    MultibaseKeyLength(usize, usize),
+    /// Unexpected multibase (multicodec) key prefix multicodec
+    #[error("Unexpected multibase (multicodec) key prefix multicodec")]
+    MultibaseKeyPrefix,
 }
 
 #[cfg(feature = "ring")]

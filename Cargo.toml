@@ -7,55 +7,63 @@ license = "Apache-2.0"
 description = "Core library for Verifiable Credentials and Decentralized Identifiers."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
-resolver = "2"
 
-exclude = ["json-ld-api/*", "json-ld-normalization/*"]
+exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
 [features]
-default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
+default = ["w3c", "ed25519", "rsa", "ripemd-160", "eip", "tezos"]
 
-w3c = ["ssi-vc/w3c", "ssi-ucan/w3c", "ssi-zcap-ld/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
+w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
 ## enable secp256k1 signatures
-secp256k1 = ["ssi-vc/secp256k1", "ssi-ucan/secp256k1", "ssi-zcap-ld/secp256k1"]
+secp256k1 = ["ssi-ldp/secp256k1"]
 ## enable secp256r1 (p256) signatures
-secp256r1 = ["ssi-vc/secp256r1", "ssi-ucan/secp256r1", "ssi-zcap-ld/secp256r1"]
+secp256r1 = ["ssi-ldp/secp256r1"]
 ## enable ed25519 (EdDSA) signatures
-ed25519 = ["ssi-vc/ed25519", "ssi-ucan/ed25519", "ssi-zcap-ld/ed25519"]
+ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
 ## enable RSA signatures
-rsa = ["ssi-vc/rsa", "ssi-ucan/rsa", "ssi-zcap-ld/rsa"]
+rsa = ["ssi-ldp/rsa"]
+## enable ripemd hashes
+ripemd-160 = ["ssi-jwk/ripemd-160"]
+## enable bbs
+bbs = ["ssi-crypto/bbs"]
+
 ## enable aleo ecosystem signatures
-aleo = ["ssi-vc/aleo", "ssi-ucan/aleo", "ssi-zcap-ld/aleo", "ssi-caips/aleo"]
+aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
 ## enable ethereum style signatures
-eip = ["ssi-vc/eip", "ssi-ucan/eip", "ssi-zcap-ld/eip"]
+eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
 ## enable tezos style signatures
-tezos = ["ssi-vc/tezos", "ssi-ucan/tezos", "ssi-zcap-ld/tezos"]
+tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", ]
 ## enable LDPs from the Solana Ecosystem
-solana = ["ssi-vc/solana", "ssi-zcap-ld/solana"]
+solana = ["ssi-ldp/solana"]
 
 ## Use the OpenSSL crate for crypto operations
-openssl = ["ssi-vc/openssl", "ssi-ucan/openssl", "ssi-zcap-ld/openssl"]
+openssl = ["ssi-jwk/openssl", "ssi-jws/openssl", "ssi-ldp/openssl"]
 ## Use the Ring crate for crypto operations
-ring = ["ssi-vc/ring", "ssi-ucan/ring", "ssi-zcap-ld/ring"]
+ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
 
 http-did = ["ssi-dids/http"]
 example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
+# Backward compatibility features
+ed25519-dalek = ["ed25519"]
+keccak = ["eip"]
+sha = ["rsa"]
+
 [dependencies]
-ssi-contexts = { version = "0.1.3", path = "contexts/" }
-ssi-jwk = { path = "./ssi-jwk", version = "0.1" }
-ssi-json-ld = { path = "./ssi-json-ld", version = "0.1" }
+ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
+ssi-json-ld = { path = "./ssi-json-ld", version = "0.1", default-features = false }
 ssi-core = { path = "./ssi-core", version = "0.1" }
 ssi-dids = { path = "./ssi-dids", version = "0.1" }
-ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
-ssi-jws = { path = "./ssi-jws", version = "0.1" }
-ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
-ssi-tzkey = { path = "./ssi-tzkey", version = "0.1" }
-ssi-ldp = { path = "./ssi-ldp", version = "0.1" }
-ssi-ssh = { path = "./ssi-ssh", version = "0.1" }
+ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
+ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
+ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
+ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
+ssi-ldp = { path = "./ssi-ldp", version = "0.1", default-features = false }
+ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
 ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.1" }
 ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
-ssi-caips = { path = "./ssi-caips", version = "0.1" }
+ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
 
 [workspace]
 members = [
@@ -89,18 +97,9 @@ members = [
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-blake2_old = { package = "blake2", version = "0.8" } # for bbs doctest
 uuid = { version = "0.8", features = ["v4", "serde"] }
-difference = "2.0"
-tokio = { version = "1.0", features = ["macros"] }
-hyper = { version = "0.14", features = ["server", "http1", "stream"] }
-hex = "0.4"
-multibase = "0.8"
-serde_jcs = "0.1"
-k256 = { version = "0.11", features = ["ecdsa"] }
 serde_json = "1.0"
-ssi-dids = { path = "./ssi-dids", version = "0.1" }
 
 [package.metadata.docs.rs]
-features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]
+all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

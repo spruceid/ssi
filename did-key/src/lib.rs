@@ -518,7 +518,7 @@ mod tests {
 
     #[async_std::test]
     async fn credential_prove_verify_did_key() {
-        use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
         let vc_str = r###"{
             "@context": "https://www.w3.org/2018/credentials/v1",
             "id": "http://example.org/credentials/3731",
@@ -535,7 +535,7 @@ mod tests {
         let did = DIDKey.generate(&Source::Key(&key)).unwrap();
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         vc.issuer = Some(Issuer::URI(URI::String(did.clone())));
         issue_options.verification_method = Some(URI::String(verification_method));
         let proof = vc
@@ -562,7 +562,7 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_key_secp256k1() {
         use serde_json::json;
-        use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
         let key = JWK::generate_secp256k1().unwrap();
         let did = DIDKey.generate(&Source::Key(&key)).unwrap();
         let mut vc: Credential = serde_json::from_value(json!({
@@ -579,7 +579,7 @@ mod tests {
 
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         issue_options.verification_method = Some(URI::String(verification_method));
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDKey, &mut context_loader)
@@ -605,7 +605,7 @@ mod tests {
     #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_key_p256() {
         use serde_json::json;
-        use ssi::vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
+        use ssi_vc::{get_verification_method, Credential, Issuer, LinkedDataProofOptions, URI};
         let key = JWK::generate_p256().unwrap();
         let did = DIDKey.generate(&Source::Key(&key)).unwrap();
         let mut vc: Credential = serde_json::from_value(json!({
@@ -622,7 +622,7 @@ mod tests {
 
         let verification_method = get_verification_method(&did, &DIDKey).await.unwrap();
         let mut issue_options = LinkedDataProofOptions::default();
-        let mut context_loader = ssi::jsonld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
         issue_options.verification_method = Some(URI::String(verification_method));
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDKey, &mut context_loader)

@@ -3,23 +3,6 @@ name = "ssi-vc"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[features]
-default = ["eip", "w3c"]
-w3c = ["secp256k1", "secp256r1", "rsa", "ed25519", "ssi-ldp/w3c"]
-secp256k1 = ["ssi-ldp/secp256k1"]
-secp256r1 = ["ssi-ldp/secp256r1"]
-ed25519 = ["ssi-ldp/ed25519"]
-rsa = ["ssi-ldp/rsa"]
-eip = ["ssi-ldp/eip"]
-tezos = ["ssi-ldp/tezos"]
-solana = ["ssi-ldp/solana"]
-aleo = ["ssi-ldp/aleo"]
-
-openssl = ["ssi-ldp/openssl", "ssi-jws/openssl", "ssi-jwk/openssl", "ssi-jwt/openssl"]
-ring = ["ssi-ldp/ring", "ssi-jws/ring", "ssi-jwk/ring", "ssi-jwt/ring"]
-
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -29,16 +12,17 @@ flate2 = "1.0"
 bitvec = "0.20"
 base64 = "0.12"
 reqwest = { version = "0.11", features = ["json"] }
-cacaos = { version = "0.5" }
+cacaos = { version = "0.5.1" }
 siwe-recap = { version = "0.1" }
-libipld = { version = "0.14" }
-ssi-jwt = { path = "../ssi-jwt", version = "0.1" }
-ssi-jws = { path = "../ssi-jws", version = "0.1" }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1" }
+libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "derive"]}
+multihash = { version = "*", default-features = false, features = ["blake3"] }
+ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-dids = { path = "../ssi-dids", version = "0.1" }
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.1" }
-ssi-ldp = { path = "../ssi-ldp", version = "0.1" }
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.1", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", version = "0.1", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -53,4 +37,5 @@ hex = "0.4"
 k256 = { version = "0.11", features = ["ecdsa"] }
 keccak-hash = { version = "0.7" }
 serde_jcs = "0.1"
-ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
+ssi-crypto = { path = "../ssi-crypto" }
+ssi-ldp = { path = "../ssi-ldp", features = ["aleo"] }

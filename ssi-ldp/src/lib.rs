@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 use std::collections::HashMap as Map;
 
 use async_trait::async_trait;
@@ -799,7 +801,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "eip")]
+    #[cfg(feature = "w3c")]
     #[async_std::test]
     async fn eip712vm() {
         let mut key = JWK::generate_secp256k1().unwrap();

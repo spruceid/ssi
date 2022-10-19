@@ -18,12 +18,9 @@ eip = ["ssi-jwk/eip", "ssi-caips/eip"]
 aleo = ["ssi-jwk/aleo", "ssi-caips/aleo"]
 tezos = ["ssi-jwk/tezos", "ssi-caips/tezos"]
 
-ring = ["ssi-dids/ring"]
-openssl = ["ssi-dids/openssl"]
-
 [dependencies]
 ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false }
-ssi-dids = { path = "../ssi-dids", version = "0.1", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-crypto = { path = "../ssi-crypto", version = "0.1", default-features = false }
 chrono = { version = "0.4", features = ["serde"] }
@@ -34,7 +31,11 @@ bs58 = { version = "0.4", features = ["check"] }
 bech32 = "0.8"
 
 [dev-dependencies]
-ssi = { version = "0.4", path = "../" }
+ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "eip", "w3c"] }
+ssi-tzkey = { path = "../ssi-tzkey", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
+ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-core = { path = "../ssi-core" }
 tokio = { version = "1.0", features = ["macros", "rt"] }
 hex = "0.4"
 blake2b_simd = "0.5"

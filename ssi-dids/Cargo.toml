@@ -4,26 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["parser", "secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
-parser = ["pest", "pest_derive"]
-http = ["dep:http", "reqwest", "percent-encoding"]
-
-secp256k1 = ["ssi-jwk/secp256k1"]
-secp256r1 = ["ssi-jwk/secp256r1"]
-ed25519 = ["ssi-jwk/ed25519"]
-rsa = ["ssi-jwk/rsa"]
-
-eip = ["ssi-caips/eip"]
-ripemd-160 = ["ssi-caips/ripemd-160", "secp256k1"]
-aleo = ["ssi-caips/aleo"]
-tezos = ["ssi-caips/tezos"]
-
-ring = ["ssi-jwk/ring"]
-openssl = ["ssi-jwk/openssl"]
+http = ["reqwest", "percent-encoding"]
 
 [dependencies]
-pest = { version = "2.1", optional = true }
-pest_derive = { version = "2.1", optional = true }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_urlencoded = "0.7"
@@ -35,7 +18,6 @@ derive_builder = "0.9"
 bs58 = { version = "0.4", features = ["check"] }
 hex = "0.4"
 multibase = "0.8"
-http = { version = "0.2", optional = true }
 reqwest = { version = "0.11", features = ["json"], optional = true }
 percent-encoding = { version = "2.1", optional = true }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
@@ -59,3 +41,8 @@ hyper = { version = "0.14", features = [
     "http1",
     "stream",
 ] }
+ssi-jwk = { path = "../ssi-jwk", version = "*", default-features = false, features = ["secp256k1"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -3,34 +3,12 @@ name = "ssi-jwt"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[features]
-default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
-## enable secp256k1 signatures
-secp256k1 = ["ssi-jwk/secp256k1", "ssi-jws/secp256k1"]
-## enable secp256r1 (p256) signatures
-secp256r1 = ["ssi-jwk/secp256r1", "ssi-jws/secp256r1"]
-## enable ed25519 (EdDSA) signatures
-ed25519 = ["ssi-jwk/ed25519", "ssi-jws/ed25519"]
-## enable RSA signatures
-rsa = ["ssi-jwk/rsa", "ssi-jws/rsa"]
-## enable aleo ecosystem signatures
-aleo = ["ssi-jwk/aleo", "ssi-jws/aleo"]
-## enable ethereum style signatures
-eip = ["ssi-jwk/eip", "ssi-jws/eip"]
-## enable tezos style signatures
-tezos = ["ssi-jwk/tezos", "ssi-jws/tezos"]
-
-openssl = ["ssi-jwk/openssl", "ssi-jws/openssl"]
-ring = ["ssi-jwk/ring", "ssi-jws/ring"]
-
 [dependencies]
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
-ssi-jws = { path = "../ssi-jws", version = "0.1"}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
+ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
