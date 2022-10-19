@@ -690,7 +690,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(features = "eip")]
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     fn generate_did_pkh() {
         let secp256k1_pk = json!({
             "kty": "EC",
@@ -1217,7 +1217,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(features = "eip")]
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     async fn resolve_vc_issue_verify() {
         let key_secp256k1: JWK =
             from_str(include_str!("../../tests/secp256k1-2021-02-17.json")).unwrap();
