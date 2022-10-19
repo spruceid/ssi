@@ -130,7 +130,6 @@ pub(crate) mod tests {
     const VM_BAR: &str = "did:example:bar#key1";
     const JWK_JSON_BAR: &str = include_str!("../../tests/ed25519-2021-06-16.json");
 
-    #[cfg(feature = "w3c")]
     async fn test_holder_binding_vp(
         bound_vc_id: Option<&str>,
         bound_holder: &str,
@@ -281,7 +280,6 @@ pub(crate) mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "w3c")]
     async fn present_with_siwecacao_holder_binding() {
         let foo = (
             DID_FOO,

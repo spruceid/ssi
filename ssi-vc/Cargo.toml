@@ -3,21 +3,6 @@ name = "ssi-vc"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-# TODO remove these crypto features like for ssi-dids
-[features]
-default = ["eip", "w3c"]
-w3c = ["secp256k1", "secp256r1", "rsa", "ed25519", "ssi-ldp/w3c"]
-secp256k1 = ["ssi-ldp/secp256k1"]
-secp256r1 = ["ssi-ldp/secp256r1"]
-ed25519 = ["ssi-ldp/ed25519"]
-rsa = ["ssi-ldp/rsa"]
-eip = ["ssi-ldp/eip"]
-tezos = ["ssi-ldp/tezos"]
-solana = ["ssi-ldp/solana"]
-aleo = ["ssi-ldp/aleo"]
-
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -53,3 +38,4 @@ k256 = { version = "0.11", features = ["ecdsa"] }
 keccak-hash = { version = "0.7" }
 serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto" }
+ssi-ldp = { path = "../ssi-ldp", features = ["aleo"] }
