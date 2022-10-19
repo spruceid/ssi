@@ -11,7 +11,7 @@ documentation = "https://docs.rs/ssi/"
 exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
 [features]
-default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
+default = ["w3c", "ed25519", "rsa", "ripemd-160", "eip", "tezos"]
 
 w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
 ## enable secp256k1 signatures
@@ -27,11 +27,10 @@ ripemd-160 = ["ssi-jwk/ripemd-160"]
 ## enable bbs
 bbs = ["ssi-crypto/bbs"]
 
-
 ## enable aleo ecosystem signatures
 aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
 ## enable ethereum style signatures
-eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip"]
+eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
 ## enable tezos style signatures
 tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", ]
 ## enable LDPs from the Solana Ecosystem
@@ -45,8 +44,12 @@ ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
 http-did = ["ssi-dids/http"]
 example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
+# Backward compatibility features
+ed25519-dalek = ["ed25519"]
+keccak = ["eip"]
+sha = ["rsa"]
+
 [dependencies]
-ssi-contexts = { version = "0.1.3", path = "contexts/", default-features = false }
 ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
 ssi-json-ld = { path = "./ssi-json-ld", version = "0.1", default-features = false }
 ssi-core = { path = "./ssi-core", version = "0.1" }
@@ -98,5 +101,5 @@ uuid = { version = "0.8", features = ["v4", "serde"] }
 serde_json = "1.0"
 
 [package.metadata.docs.rs]
-features = ["secp256r1", "secp256k1", "ripemd-160", "http-did"]
+all-features = true
 rustdoc-args = ["--cfg", "docsrs"]

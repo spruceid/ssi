@@ -1,3 +1,5 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 use std::collections::HashMap as Map;
 
 use async_trait::async_trait;

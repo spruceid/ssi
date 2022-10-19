@@ -10,5 +10,9 @@ secp256r1 = ["ssi-jwk/secp256r1"]
 
 [dependencies]
 thiserror = "1.0"
-ssi-jwk = { path = "../ssi-jwk", version = "0.1" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 sshkeys = "0.3"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

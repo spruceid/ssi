@@ -42,3 +42,7 @@ hyper = { version = "0.14", features = [
     "stream",
 ] }
 ssi-jwk = { path = "../ssi-jwk", version = "*", default-features = false, features = ["secp256k1"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

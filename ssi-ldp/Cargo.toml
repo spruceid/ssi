@@ -58,3 +58,7 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

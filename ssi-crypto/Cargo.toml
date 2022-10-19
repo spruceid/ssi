@@ -34,3 +34,7 @@ digest = "0.9"
 
 [dev-dependencies]
 hex = "0.4"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
