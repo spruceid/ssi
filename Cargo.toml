@@ -32,7 +32,7 @@ aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
 ## enable ethereum style signatures
 eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
 ## enable tezos style signatures
-tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", ]
+tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
 ## enable LDPs from the Solana Ecosystem
 solana = ["ssi-ldp/solana"]
 
