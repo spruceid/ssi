@@ -231,18 +231,6 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
     .verify(key)?)
 }
 
-#[derive(thiserror::Error, Debug)]
-pub enum DecodeError<E> {
-    #[error(transparent)]
-    Json(#[from] serde_json::Error),
-    #[error(transparent)]
-    Base64(#[from] base64::DecodeError),
-    #[error("Invalid JWT Structure")]
-    Form,
-    #[error(transparent)]
-    Signature(E),
-}
-
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
