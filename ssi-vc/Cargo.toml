@@ -11,7 +11,7 @@ thiserror = "1.0"
 flate2 = "1.0"
 bitvec = "0.20"
 base64 = "0.12"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 cacaos = { version = "0.5.1" }
 siwe-recap = { version = "0.1" }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "derive"]}
