@@ -15,7 +15,7 @@ documentation = "https://docs.rs/did-key/"
 default = ["secp256k1", "secp256r1"]
 secp256k1 = ["k256", "ssi-jwk/secp256k1"]
 secp256r1 = ["p256", "ssi-jwk/secp256r1"]
-ssi_p384 = ["ssi-jwk/openssl"]
+secp384r1 = ["ssi-jwk/secp384r1"]
 
 [dependencies]
 ssi-dids = { path = "../ssi-dids", version = "0.1" }

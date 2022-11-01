@@ -169,7 +169,7 @@ impl DIDResolver for DIDKey {
                 None,
             );
         } else if data[0] == DID_KEY_P384_PREFIX[0] && data[1] == DID_KEY_P384_PREFIX[1] {
-            #[cfg(feature = "ssi_p384")]
+            #[cfg(feature = "secp384r1")]
             match ssi_jwk::p384_parse(&data[2..]) {
                 Ok(jwk) => {
                     vm_type = "JsonWebKey2020".to_string();
@@ -178,7 +178,7 @@ impl DIDResolver for DIDKey {
                 }
                 Err(err) => return (ResolutionMetadata::from_error(&err.to_string()), None, None),
             }
-            #[cfg(not(feature = "ssi_p384"))]
+            #[cfg(not(feature = "secp384r1"))]
             return (
                 ResolutionMetadata::from_error("did:key type P-384 not supported"),
                 None,
@@ -338,9 +338,9 @@ impl DIDMethod for DIDKey {
                                 .concat(),
                             )
                     }
-                    #[cfg(feature = "ssi_p384")]
+                    #[cfg(feature = "secp384r1")]
                     "P-384" => {
-                        let pk_bytes = match ssi_jwk::p384_serialize(params) {
+                        let pk_bytes = match ssi_jwk::serialize_p384(params) {
                             Ok(pk) => pk,
                             Err(_err) => return None,
                         };

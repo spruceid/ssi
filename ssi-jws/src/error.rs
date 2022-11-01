@@ -13,6 +13,9 @@ pub enum Error {
     #[cfg(all(feature = "p256", not(feature = "k256")))]
     #[error(transparent)]
     CryptoErr(#[from] p256::ecdsa::Error),
+    #[cfg(all(feature = "p384", not(any(feature = "k256", feature = "p256"))))]
+    #[error(transparent)]
+    CryptoErr(#[from] p384::ecdsa::Error),
     #[error(transparent)]
     JWK(#[from] ssi_jwk::Error),
     #[error(transparent)]
@@ -43,9 +46,6 @@ pub enum Error {
     UnexpectedSignatureLength(usize, usize),
     #[error("Invalid signature")]
     InvalidSignature,
-    #[cfg(feature = "openssl")]
-    #[error(transparent)]
-    OpenSSL(#[from] openssl::error::ErrorStack),
 }
 
 #[cfg(feature = "ring")]
