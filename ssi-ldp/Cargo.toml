@@ -11,6 +11,7 @@ default = ["eip", "tezos", "w3c", "solana"]
 w3c = ["secp256k1", "secp256r1", "rsa", "ed25519"]
 secp256k1 = ["ssi-jws/secp256k1", "k256"]
 secp256r1 = ["ssi-jws/secp256r1", "p256"]
+secp384r1 = ["ssi-jws/secp384r1"]
 ed25519 = ["ssi-jws/ed25519"]
 rsa = ["ssi-jws/rsa"]
 ## enable the EIP-defined LDPs: EIP712
@@ -21,9 +22,6 @@ tezos = ["ssi-tzkey", "ssi-jws/tezos", "ssi-caips/tezos", "secp256k1", "secp256r
 aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 ## enable LDPs from the Solana Ecosystem
 solana = []
-
-## Use the OpenSSL crate for crypto operations and P384
-openssl = ["ssi-jws/openssl"]
 
 example-http-issuer = []
 

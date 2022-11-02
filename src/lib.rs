@@ -14,11 +14,10 @@
 //! `eip`                 |    ✅   | Enable Ethereum related signature suites and cryptographic dependencies.
 //! `tezos`               |    ✅   | Enable Tezos related signature suites and cryptographic dependencies.
 //! `solana`              |         | Enable Solana related signature suites and cryptographic dependencies.
-//! `openssl`             |         | Use OpenSSL (bindings) for P384 functionality.
 //! `ring`                |         | Use the [ring](https://crates.io/crates/ring) crate for RSA, Ed25519, and SHA-256 functionality.
 //! `http-did`            |         | Enable DID resolution tests using [hyper](https://crates.io/crates/hyper) and [tokio](https://crates.io/crates/tokio).
 //! `example-http-issuer` |         | Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
 // maintain old structure here
 pub use ssi_caips::caip10;

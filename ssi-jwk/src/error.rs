@@ -2,8 +2,6 @@
 #[cfg(feature = "aleo")]
 use crate::aleo::AleoGeneratePrivateKeyError;
 use base64::DecodeError as Base64Error;
-#[cfg(feature = "openssl")]
-use openssl::error::ErrorStack as OpenSSLErrors;
 #[cfg(feature = "ring")]
 use ring::error::{KeyRejected as KeyRejectedError, Unspecified as RingUnspecified};
 #[cfg(feature = "rsa")]
@@ -67,9 +65,6 @@ pub enum Error {
     #[cfg(feature = "rsa")]
     #[error(transparent)]
     Rsa(#[from] RsaError),
-    #[cfg(feature = "openssl")]
-    #[error(transparent)]
-    OpenSSL(#[from] OpenSSLErrors),
     /// Error encoding ASN.1 data structure.
     #[error(transparent)]
     ASN1Encode(#[from] ASN1EncodeError),
@@ -118,6 +113,9 @@ pub enum Error {
     #[cfg(all(feature = "p256", not(feature = "k256")))]
     #[error(transparent)]
     EC(#[from] p256::elliptic_curve::Error),
+    #[cfg(all(feature = "p384", not(any(feature = "p256", feature = "k256"))))]
+    #[error(transparent)]
+    EC(#[from] p384::elliptic_curve::Error),
     /// Unexpected length for publicKeyMultibase
     #[error("Unexpected length for publicKeyMultibase")]
     MultibaseKeyLength(usize, usize),
