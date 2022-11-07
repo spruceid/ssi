@@ -159,6 +159,8 @@ pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: &str =
     "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json";
 pub const DID_CONFIGURATION_V0_0_CONTEXT: &str =
     "https://identity.foundation/.well-known/contexts/did-configuration-v0.0.jsonld";
+pub const JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT: &str =
+    "https://purl.imsglobal.org/spec/ob/v3p0/context.json";
 
 lazy_static::lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -347,6 +349,12 @@ lazy_static::lazy_static! {
         let iri = Iri::new(DID_CONFIGURATION_V0_0_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::JFF_VC_EDU_PLUGFEST_2022_2;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
 #[derive(Clone)]
@@ -404,6 +412,9 @@ impl Loader for StaticLoader {
                 }
                 DID_CONFIGURATION_V0_0_CONTEXT => {
                     Ok(DID_CONFIGURATION_V0_0_CONTEXT_DOCUMENT.clone())
+                }
+                JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
+                    Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
                 }
                 _ => Err(json_ld::ErrorCode::LoadingDocumentFailed.into()),
             }
