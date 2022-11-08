@@ -257,6 +257,8 @@ pub enum Algorithm {
     ESBlake2bK,
     #[doc(hidden)]
     AleoTestnet1Signature,
+    // Per the specs it should only be `none` but `None` is kept for backwards compatibility
+    #[serde(rename = "none", alias = "None")]
     None,
 }
 
