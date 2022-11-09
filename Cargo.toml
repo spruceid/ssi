@@ -11,9 +11,9 @@ documentation = "https://docs.rs/ssi/"
 exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
 [features]
-default = ["w3c", "ed25519", "rsa", "ripemd-160", "eip", "tezos"]
+default = ["w3c", "ripemd-160", "eip", "tezos"]
 
-w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa", "secp384r1"]
+w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
 ## enable secp256k1 signatures
 secp256k1 = ["ssi-ldp/secp256k1"]
 ## enable secp256r1 (p256) signatures
