@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use chrono::{prelude::*, Duration, LocalResult};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::Error;
+use ssi_jws::{Error, Header};
 
 // RFC 7519 - JSON Web Token (JWT)
 
@@ -13,7 +13,13 @@ pub fn encode_sign<Claims: Serialize>(
     key: &JWK,
 ) -> Result<String, Error> {
     let payload = serde_json::to_string(claims)?;
-    ssi_jws::encode_sign(algorithm, &payload, key)
+    let header = Header {
+        algorithm,
+        key_id: key.key_id.clone(),
+        type_: Some("JWT".to_string()),
+        ..Default::default()
+    };
+    ssi_jws::encode_sign_custom_header(&payload, key, &header)
 }
 
 pub fn encode_unsigned<Claims: Serialize>(claims: &Claims) -> Result<String, Error> {
