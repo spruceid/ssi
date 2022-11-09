@@ -1,0 +1,13 @@
+{
+  "@context": [
+    {
+      "@version": 1.1,
+      "didcfg": "https://identity.foundation/.well-known/contexts/did-configuration-v0.0#",
+      "domainLinkageAssertion": "didcfg:domainLinkageAssertion",
+      "origin": "didcfg:origin",
+      "linked_dids": "didcfg:linked_dids",
+      "did": "didcfg:did",
+      "vc": "didcfg:vc"
+    }
+  ]
+}
