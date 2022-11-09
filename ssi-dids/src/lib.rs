@@ -926,6 +926,9 @@ impl FromStr for DIDURL {
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
         let mut parts = didurl.splitn(2, '#');
         let before_fragment = parts.next().unwrap().to_string();
+        if before_fragment.is_empty() {
+            return Err(Error::DIDURL);
+        }
         let fragment = parts.next().map(|x| x.to_owned());
         let primary_did_url = PrimaryDIDURL::try_from(before_fragment)?;
         Ok(Self {
