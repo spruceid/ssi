@@ -568,7 +568,7 @@ fn generate_caip10_solana(
     key: &JWK,
     ref_opt: Option<String>,
 ) -> Result<BlockchainAccountId, String> {
-    let reference = ref_opt.unwrap_or_else(|| "".to_string());
+    let reference = ref_opt.unwrap_or_default();
     let chain_id = ChainId {
         namespace: "solana".to_string(),
         reference,

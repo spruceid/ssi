@@ -84,7 +84,7 @@ impl ProofSuite for AleoSignature2021 {
                 .with_properties(extra_proof_properties)
         };
         let message = to_jws_payload(document, &proof, context_loader).await?;
-        let sig = ssi_jwk::aleo::sign(&message, &key)?;
+        let sig = ssi_jwk::aleo::sign(&message, key)?;
         let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
         proof.proof_value = Some(sig_mb);
         Ok(proof)
@@ -136,7 +136,7 @@ impl ProofSuite for AleoSignature2021 {
             .proof_value
             .as_ref()
             .ok_or(Error::MissingProofSignature)?;
-        let (_base, sig) = multibase::decode(&sig_mb)?;
+        let (_base, sig) = multibase::decode(sig_mb)?;
         let verification_method = proof
             .verification_method
             .as_ref()

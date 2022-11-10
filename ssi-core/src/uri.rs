@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(try_from = "String")]
@@ -40,7 +41,7 @@ impl URI {
     }
 }
 
-impl core::str::FromStr for URI {
+impl FromStr for URI {
     type Err = URIParseErr;
     fn from_str(uri: &str) -> Result<Self, Self::Err> {
         URI::try_from(String::from(uri))
@@ -78,5 +79,19 @@ impl From<String> for URIOrString {
         } else {
             URIOrString::String(id)
         }
+    }
+}
+
+impl From<&str> for URIOrString {
+    fn from(id: &str) -> Self {
+        id.to_string().into()
+    }
+}
+
+impl FromStr for URIOrString {
+    type Err = ();
+
+    fn from_str(id: &str) -> Result<Self, Self::Err> {
+        Ok(Self::from(id.to_string()))
     }
 }

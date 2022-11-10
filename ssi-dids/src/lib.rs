@@ -650,6 +650,7 @@ pub struct DIDMethods<'a> {
     pub methods: HashMap<&'a str, Box<dyn DIDMethod>>,
 }
 
+#[allow(clippy::borrowed_box)]
 impl<'a> DIDMethods<'a> {
     /// Add a DID method to the set. Returns the previous one set for the given method name, if any.
     pub fn insert(&mut self, method: Box<dyn DIDMethod>) -> Option<Box<dyn DIDMethod>> {
@@ -668,6 +669,7 @@ impl<'a> DIDMethods<'a> {
     }
 
     /// Get DID method to handle a given DID.
+    // TODO use DID type
     pub fn get_method(&self, did: &str) -> Result<&Box<dyn DIDMethod>, &'static str> {
         let mut parts = did.split(':');
         if parts.next() != Some("did") {
@@ -1179,7 +1181,7 @@ impl DocumentBuilder {
     fn validate(&self) -> Result<(), Error> {
         // validate is called before defaults are assigned.
         // None means default will be used.
-        if self.id == None || self.id == Some("".to_string()) {
+        if self.id.is_none() || self.id == Some("".to_string()) {
             return Err(Error::MissingDocumentId);
         }
         if let Some(ref context) = self.context {

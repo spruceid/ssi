@@ -226,7 +226,7 @@ where
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
-        Ok(serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(self)?)
     }
 
     fn get_issuer(&self) -> Option<&str> {
@@ -382,7 +382,7 @@ where
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
-        Ok(serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(self)?)
     }
 
     fn get_issuer(&self) -> Option<&str> {
