@@ -1432,7 +1432,7 @@ pub fn object_to_rdf(
         _ => None,
     } {
         value = JsonValue::String(value_bool.to_string());
-        if datatype == None {
+        if datatype.is_none() {
             datatype = Some("http://www.w3.org/2001/XMLSchema#boolean");
         }
     } else if let Some(num) = value.as_number() {
@@ -1458,7 +1458,7 @@ pub fn object_to_rdf(
             }
             let num: String = num_vec.iter().collect();
             value = JsonValue::String(num);
-            if datatype == None {
+            if datatype.is_none() {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#double");
             }
         } else {
@@ -1469,11 +1469,11 @@ pub fn object_to_rdf(
                 format!("{:.0}", num_f64)
             };
             value = JsonValue::String(num);
-            if datatype == None {
+            if datatype.is_none() {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#integer");
             }
         }
-    } else if datatype == None {
+    } else if datatype.is_none() {
         // 12
         datatype = Some(match item.language.is_some() {
             true => "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString",
@@ -1495,7 +1495,7 @@ pub fn object_to_rdf(
     if let (Some(direction), Some(rdf_direction)) = (item.direction, options.rdf_direction.as_ref())
     {
         // 13.1
-        let language = language.unwrap_or_else(|| "".to_string());
+        let language = language.unwrap_or_default();
         let direction = match direction.as_str() {
             Some(direction) => direction,
             None => return Err(Error::ExpectedString),
