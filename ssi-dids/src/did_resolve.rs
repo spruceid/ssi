@@ -987,7 +987,8 @@ impl DIDResolver for HTTPDIDResolver {
                     )
                 }
             })),
-        }.unwrap_or_default();
+        }
+        .unwrap_or_default();
         let res_result_representation = match resp.bytes().await {
             Ok(bytes) => bytes.to_vec(),
             Err(err) => {
@@ -1146,7 +1147,8 @@ impl DIDResolver for HTTPDIDResolver {
                     ))
                 }
             })),
-        }.unwrap_or_default();
+        }
+        .unwrap_or_default();
         let deref_result_bytes = match resp.bytes().await {
             Ok(bytes) => bytes.to_vec(),
             Err(err) => {
