@@ -298,6 +298,9 @@ pub struct JWTClaims {
     #[serde(rename = "exp")]
     pub expiration_time: Option<NumericDate>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "iat")]
+    pub issuance_date: Option<NumericDate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "iss")]
     pub issuer: Option<StringOrURI>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -535,7 +538,15 @@ impl Credential {
                 return Err(Error::InvalidIssuer);
             }
         }
-        if let Some(nbf) = claims.not_before {
+        if let Some(iat) = claims.issuance_date {
+            let iat_date_time: LocalResult<DateTime<Utc>> = iat.into();
+            if let Some(time) = iat_date_time.latest() {
+                vc.issuance_date = Some(VCDateTime {
+                    date_time: time.into(),
+                    use_z: true,
+                })
+            }
+        } else if let Some(nbf) = claims.not_before {
             let nbf_date_time: LocalResult<DateTime<Utc>> = nbf.into();
             if let Some(time) = nbf_date_time.latest() {
                 vc.issuance_date = Some(VCDateTime {
