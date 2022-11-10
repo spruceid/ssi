@@ -8,6 +8,7 @@ mod cacao;
 pub mod revocation;
 
 use cacao::BindingDelegation;
+use ssi_core::uri::URIOrString;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
@@ -240,7 +241,7 @@ pub struct Presentation {
     #[serde(rename = "@context")]
     pub context: Contexts,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<URI>,
+    pub id: Option<URIOrString>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1135,8 +1136,7 @@ impl Presentation {
             vp.holder = Some(issuer_uri);
         }
         if let Some(id) = claims.jwt_id {
-            let uri = URI::try_from(id)?;
-            vp.id = Some(uri);
+            vp.id = Some(id.into());
         }
         Ok(vp)
     }

@@ -54,3 +54,29 @@ impl std::fmt::Display for URI {
         }
     }
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum URIOrString {
+    URI(URI),
+    String(String),
+}
+
+impl From<URIOrString> for String {
+    fn from(id: URIOrString) -> Self {
+        match id {
+            URIOrString::String(s) => s,
+            URIOrString::URI(u) => u.into(),
+        }
+    }
+}
+
+impl From<String> for URIOrString {
+    fn from(id: String) -> Self {
+        if let Ok(uri) = URI::try_from(id.clone()) {
+            Self::URI(uri)
+        } else {
+            URIOrString::String(id)
+        }
+    }
+}
