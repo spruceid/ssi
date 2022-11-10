@@ -644,21 +644,21 @@ pub trait DIDMethod: Sync {
 }
 
 /// A collection of DID methods that can be used as a single [DID resolver][DIDResolver].
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct DIDMethods<'a> {
     /// Collection of DID methods by method id.
-    pub methods: HashMap<&'a str, &'a dyn DIDMethod>,
+    pub methods: HashMap<&'a str, Box<dyn DIDMethod>>,
 }
 
 impl<'a> DIDMethods<'a> {
     /// Add a DID method to the set. Returns the previous one set for the given method name, if any.
-    pub fn insert(&mut self, method: &'a dyn DIDMethod) -> Option<&'a dyn DIDMethod> {
+    pub fn insert(&mut self, method: Box<dyn DIDMethod>) -> Option<Box<dyn DIDMethod>> {
         let name = method.name();
         self.methods.insert(name, method)
     }
 
     /// Get a DID method from the set.
-    pub fn get(&self, method_name: &str) -> Option<&&'a dyn DIDMethod> {
+    pub fn get(&self, method_name: &str) -> Option<&Box<dyn DIDMethod>> {
         self.methods.get(method_name)
     }
 
@@ -668,7 +668,7 @@ impl<'a> DIDMethods<'a> {
     }
 
     /// Get DID method to handle a given DID.
-    pub fn get_method(&self, did: &str) -> Result<&&'a dyn DIDMethod, &'static str> {
+    pub fn get_method(&self, did: &str) -> Result<&Box<dyn DIDMethod>, &'static str> {
         let mut parts = did.split(':');
         if parts.next() != Some("did") {
             return Err(ERROR_INVALID_DID);
