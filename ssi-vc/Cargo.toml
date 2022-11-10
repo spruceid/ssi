@@ -15,7 +15,7 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 cacaos = { version = "0.5.1" }
 siwe-recap = { version = "0.1" }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "derive"]}
-multihash = { version = "*", default-features = false, features = ["blake3"] }
+multihash = { version = "0.16", default-features = false, features = ["blake3"] }
 ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
