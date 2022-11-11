@@ -671,6 +671,7 @@ impl Credential {
             checks,
             eip712_domain,
             type_,
+            nonce
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -859,7 +860,7 @@ impl Credential {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vc, resolver, context_loader).await;
+            let mut result = proof.verify(&vc, resolver, context_loader, None).await;
             results.append(&mut result);
             if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -982,6 +983,10 @@ impl Credential {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> VerificationResult {
+        let nonce = match options.as_ref() {
+            Some(ldp_options) => ldp_options.nonce.clone(),
+            None => None
+        };
         let checks = options
             .as_ref()
             .and_then(|opts| opts.checks.clone())
@@ -996,10 +1001,11 @@ impl Credential {
             return VerificationResult::error("No applicable proof");
             // TODO: say why, e.g. expired
         }
+
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader).await;
+            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref()).await;
             results.append(&mut result);
             if result.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1118,6 +1124,7 @@ impl LinkedDataDocument for Credential {
         context_loader: &mut ContextLoader,
     ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
+
         copy.proof = None;
         let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
         Ok(json_to_dataset(
@@ -1129,7 +1136,7 @@ impl LinkedDataDocument for Credential {
                 .flatten()
                 .as_deref()
                 .map(parse_ld_context)
-                .transpose()?,
+                .transpose()?
         )
         .await?)
     }
@@ -1221,6 +1228,7 @@ impl Presentation {
             checks,
             eip712_domain,
             type_,
+            nonce,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1409,7 +1417,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vp, resolver, context_loader).await;
+            let mut result = proof.verify(&vp, resolver, context_loader, None).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return (Some(vp), result);
@@ -1582,7 +1590,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader).await;
+            let mut result = proof.verify(self, resolver, context_loader, None).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -1830,6 +1838,83 @@ fn jwt_matches(
     }
     // TODO: support more claim checking via additional LDP options
     true
+}
+
+fn select_fields(subject: &CredentialSubject, selectors: &[String]) -> Map<String, Value> {
+    let mut selected = Map::new();
+
+    match &subject.property_set {
+        Some(properties) => {
+            for (k, v) in properties {
+                for i in 0..selectors.len() {
+                    if k.as_str() == selectors[i].as_str() {
+                        selected.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+        }
+        None => (),
+    }
+
+    selected
+}
+
+pub async fn derive_credential(
+    document: &Credential,
+    proof_nonce: &str,
+    selectors: &[String],
+    did_resolver: &dyn DIDResolver,
+) -> Result<Credential, Error> {
+    use bbs::prelude::*;
+    use ssi_jwk::{Base64urlUInt, OctetParams, Params as JWKParams, JWK};
+    use ssi_ldp::error::Error;
+
+    let mut derived_credential = document.clone();
+
+    let proofs = derived_credential.proof.unwrap();
+
+    let proof = match proofs {
+        OneOrMany::One(proof) => proof,
+        OneOrMany::Many(_) => unimplemented!(), // todo: handle multiple proof case
+    };
+
+    // before zeroing this out, this is needed to generate the proof
+    derived_credential.proof = None;
+
+    match &derived_credential.credential_subject {
+        OneOrMany::One(subject) => {
+            let selected_fields = select_fields(subject, selectors);
+
+            let mut new_subject = subject.clone();
+            new_subject.property_set = Some(selected_fields);
+            derived_credential.credential_subject = OneOrMany::One(new_subject);
+        }
+        OneOrMany::Many(subjects) => {
+            let mut new_subjects: Vec<CredentialSubject> = Vec::new();
+
+            for i in 0..subjects.len() {
+                let selected_fields = select_fields(&subjects[i], selectors);
+
+                let mut new_subject = subjects[i].clone();
+                new_subject.property_set = Some(selected_fields);
+                new_subjects.push(new_subject);
+            }
+
+            derived_credential.credential_subject = OneOrMany::Many(new_subjects);
+        }
+    }
+
+    // can generate a signature POK here
+    // todo do not hardcode type, may need to be something different because not the same proof type as original credential
+    // todo may need to add proof options and so on
+    // todo revealed message indices
+    // make sure to pass in the orignal document, which has all the messages
+    let proof =
+        ssi_ldp::generate_bbs_signature_pok(document, proof_nonce, &proof, did_resolver, selectors)
+            .await?;
+    derived_credential.add_proof(proof);
+
+    Ok(derived_credential)
 }
 
 #[cfg(test)]

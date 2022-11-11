@@ -59,6 +59,8 @@ pub struct Proof {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
+    #[serde(default)]
+    pub disclosed_messages: Option<Vec<usize>>,
 }
 
 impl Proof {
@@ -76,6 +78,7 @@ impl Proof {
             nonce: None,
             jws: None,
             property_set: None,
+            disclosed_messages: None,
         }
     }
 
@@ -149,8 +152,9 @@ impl Proof {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
     ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver, context_loader)
+        LinkedDataProofs::verify(self, document, resolver, context_loader, nonce)
             .await
             .into()
     }
@@ -171,6 +175,7 @@ impl LinkedDataDocument for Proof {
         let mut copy = self.clone();
         copy.jws = None;
         copy.proof_value = None;
+
         let json = json_syntax::to_value_with(copy, Default::default).unwrap();
         let dataset = json_to_dataset(
             json,
@@ -181,10 +186,9 @@ impl LinkedDataDocument for Proof {
                 .flatten()
                 .as_deref()
                 .map(parse_ld_context)
-                .transpose()?,
+                .transpose()?
         )
         .await?;
-
         verify_proof_consistency(self, &dataset)?;
         Ok(dataset)
     }
@@ -219,6 +223,9 @@ pub struct LinkedDataProofOptions {
     /// The challenge of the proof.
     pub challenge: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The nonce of the proof.
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// The domain of the proof.
     pub domain: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -243,6 +250,7 @@ impl Default for LinkedDataProofOptions {
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
             type_: None,
+            nonce: None,
         }
     }
 }

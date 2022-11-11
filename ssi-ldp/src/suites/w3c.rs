@@ -134,6 +134,10 @@ impl JsonWebSignature2020 {
                     Algorithm::EdDSA => (),
                     _ => return Err(Error::JWS(ssi_jws::Error::UnsupportedAlgorithm)),
                 },
+                "Bls12381G2" => match algorithm {
+                    Algorithm::BLS12381G2 => (),
+                    _ => return Err(Error::JWS(ssi_jws::Error::UnsupportedAlgorithm)),
+                },
                 _ => {
                     return Err(Error::UnsupportedCurve);
                 }

@@ -12,6 +12,7 @@ pub type DataSet =
 /// See <https://www.w3.org/TR/n-quads/>.
 pub trait IntoNQuads {
     fn into_nquads(self) -> String;
+    fn into_nquads_vec(self) -> Vec<String>;
 }
 
 impl<Q: IntoIterator> IntoNQuads for Q
@@ -26,6 +27,16 @@ where
         lines.sort();
         lines.dedup();
         lines.join("")
+    }
+
+    fn into_nquads_vec(self) -> Vec<String> {
+        let mut lines = self
+        .into_iter()
+        .map(|quad| NQuadsStatement(quad.borrow()).to_string())
+        .collect::<Vec<String>>();
+        lines.sort();
+        lines.dedup();
+        lines
     }
 }
 

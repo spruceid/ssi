@@ -33,6 +33,8 @@ tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
 ring = ["dep:ring"]
 
 [dependencies]
+# todo make bbs optional based on bbs feature
+bbs = { version = "0.4" }
 num-bigint = "0.4"
 simple_asn1 = "^0.5.2"
 zeroize = { version = "1.5", features = ["zeroize_derive"] }
