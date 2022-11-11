@@ -171,8 +171,21 @@ impl LinkedDataDocument for Proof {
             Some(parent) => parent.get_contexts()?,
             None => None,
         };
-        let dataset =
-            json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?;
+
+        let stable_blank_node_labels = match copy.type_.as_str() {
+            "BbsBlsSignatureProof2020" => true,
+            _ => false,
+        };
+
+        let dataset = json_to_dataset(
+            &json,
+            more_contexts.as_ref(),
+            false,
+            None,
+            context_loader,
+            stable_blank_node_labels,
+        )
+        .await?;
         verify_proof_consistency(self, &dataset)?;
         Ok(dataset)
     }

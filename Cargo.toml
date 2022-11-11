@@ -29,6 +29,7 @@ rsa = ["ssi-ldp/rsa"]
 ripemd-160 = ["ssi-jwk/ripemd-160"]
 ## enable bbs
 bbs = ["ssi-crypto/bbs"]
+bbsbls = []
 
 ## enable aleo ecosystem signatures
 aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]

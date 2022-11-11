@@ -488,6 +488,18 @@ impl DataSet {
         lines.dedup();
         Ok(lines.join(""))
     }
+
+    pub fn to_nquads_vec(&self) -> Result<Vec<String>, Error> {
+        // https://www.w3.org/TR/n-quads/
+        let mut lines = self
+            .statements()
+            .iter()
+            .map(|statement| statement.into())
+            .collect::<Vec<String>>();
+        lines.sort();
+        lines.dedup();
+        Ok(lines)
+    }
 }
 
 impl Graph {

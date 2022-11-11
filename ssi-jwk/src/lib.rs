@@ -6,6 +6,7 @@ use std::convert::TryFrom;
 use std::result::Result;
 use zeroize::Zeroize;
 pub mod error;
+use bbs::prelude::*;
 pub use error::Error;
 
 #[cfg(feature = "ripemd-160")]
@@ -255,6 +256,7 @@ pub enum Algorithm {
     ESKeccakKR,
     ESBlake2b,
     ESBlake2bK,
+    BLS12381G2,
     #[doc(hidden)]
     AleoTestnet1Signature,
     // Per the specs it should only be `none` but `None` is kept for backwards compatibility
@@ -337,16 +339,35 @@ impl JWK {
         crate::aleo::generate_private_key_jwk().map_err(Error::AleoGeneratePrivateKey)
     }
 
+    //#[cfg(feature = "bbs")]
+    pub fn generate_bls12381_2020() -> Result<JWK, Error> {
+        let (pk, sk) = Issuer::new_keys(100).unwrap();
+        let pk_bytes = pk.to_bytes_compressed_form();
+        let sk_bytes = sk.to_bytes_compressed_form().to_vec();
+
+        let params = Params::OKP(OctetParams {
+            curve: "Bls12381G2".to_string(),
+            public_key: Base64urlUInt(pk_bytes),
+            private_key: Some(Base64urlUInt(sk_bytes)),
+        });
+
+        Ok(JWK::from(params))
+    }
+
     pub fn get_algorithm(&self) -> Option<Algorithm> {
         if let Some(algorithm) = self.algorithm {
             return Some(algorithm);
         }
         match &self.params {
             Params::RSA(_) => {
+                println!("algorithm: rsa");
                 return Some(Algorithm::PS256);
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
                 return Some(Algorithm::EdDSA);
+            }
+            Params::OKP(okp_params) if okp_params.curve == "Bls12381G2" => {
+                return Some(Algorithm::BLS12381G2);
             }
             #[cfg(feature = "aleo")]
             Params::OKP(okp_params) if okp_params.curve == crate::aleo::OKP_CURVE => {
