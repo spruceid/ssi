@@ -1,6 +1,5 @@
 use super::super::*;
 use crate::eip712::TypedData;
-use async_trait::async_trait;
 use serde_json::Value;
 use ssi_dids::did_resolve::{resolve_vm, DIDResolver};
 use ssi_json_ld::ContextLoader;
@@ -8,14 +7,10 @@ use ssi_jwk::{ECParams, Params as JWKParams, JWK};
 use std::collections::HashMap as Map;
 
 pub struct Eip712Signature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for Eip712Signature2021 {
-    async fn sign(
-        &self,
+impl Eip712Signature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -23,7 +18,7 @@ impl ProofSuite for Eip712Signature2021 {
         use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
-            ..Proof::new("Eip712Signature2021")
+            ..Proof::new(ProofSuiteType::Eip712Signature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -46,18 +41,15 @@ impl ProofSuite for Eip712Signature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
-        _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
-            ..Proof::new("Eip712Signature2021")
+            ..Proof::new(ProofSuiteType::Eip712Signature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -70,18 +62,7 @@ impl ProofSuite for Eip712Signature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -138,15 +119,10 @@ impl ProofSuite for Eip712Signature2021 {
 }
 
 pub struct EthereumEip712Signature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for EthereumEip712Signature2021 {
-    async fn sign(
-        &self,
+impl EthereumEip712Signature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
-        _context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
@@ -161,7 +137,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         }
         let mut proof = Proof {
             context: serde_json::json!(ssi_json_ld::EIP712SIG_V1_CONTEXT),
-            ..Proof::new("EthereumEip712Signature2021")
+            ..Proof::new(ProofSuiteType::EthereumEip712Signature2021)
                 .with_options(options)
                 .with_properties(props)
         };
@@ -183,13 +159,9 @@ impl ProofSuite for EthereumEip712Signature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
-        _context_loader: &mut ContextLoader,
-        _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let mut props = extra_proof_properties.clone();
@@ -201,7 +173,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         }
         let proof = Proof {
             context: serde_json::json!(ssi_json_ld::EIP712SIG_V1_CONTEXT),
-            ..Proof::new("EthereumEip712Signature2021")
+            ..Proof::new(ProofSuiteType::EthereumEip712Signature2021)
                 .with_options(options)
                 .with_properties(props)
         };
@@ -213,22 +185,10 @@ impl ProofSuite for EthereumEip712Signature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-        _context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_hex = proof
             .proof_value
@@ -278,14 +238,10 @@ impl ProofSuite for EthereumEip712Signature2021 {
 }
 
 pub struct EthereumPersonalSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for EthereumPersonalSignature2021 {
-    async fn sign(
-        &self,
+impl EthereumPersonalSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -293,7 +249,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EPSIG_CONTEXT.clone()]),
-            ..Proof::new("EthereumPersonalSignature2021")
+            ..Proof::new(ProofSuiteType::EthereumPersonalSignature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -316,18 +272,15 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
-        _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([EPSIG_CONTEXT.clone()]),
-            ..Proof::new("EthereumPersonalSignature2021")
+            ..Proof::new(ProofSuiteType::EthereumPersonalSignature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -342,18 +295,7 @@ impl ProofSuite for EthereumPersonalSignature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,

@@ -909,9 +909,7 @@ impl Credential {
 
     pub fn is_zkp(&self) -> bool {
         match &self.proof {
-            Some(proofs) => proofs
-                .into_iter()
-                .any(|proof| proof.type_.contains(&"CLSignature2019".to_string())),
+            Some(proofs) => proofs.into_iter().any(|proof| proof.type_.is_zkp()),
             _ => false,
         }
     }
@@ -1815,7 +1813,7 @@ pub(crate) mod tests {
     use ssi_dids::did_resolve::DereferencingInputMetadata;
     use ssi_dids::{example::DIDExample, VerificationMethodMap};
     use ssi_json_ld::urdna2015;
-    use ssi_ldp::{suites::*, ProofSuite};
+    use ssi_ldp::{ProofSuite, ProofSuiteType};
 
     #[test]
     fn numeric_date() {
@@ -2302,7 +2300,12 @@ pub(crate) mod tests {
         };
         let sig = ssi_jws::sign_bytes(algorithm, signing_input, &key).unwrap();
         let sig_b64 = base64::encode_config(sig, base64::URL_SAFE_NO_PAD);
-        let proof = preparation.complete(&sig_b64).await.unwrap();
+        let proof = preparation
+            .proof
+            .type_
+            .complete(&preparation, &sig_b64)
+            .await
+            .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -2438,7 +2441,10 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     async fn bad_vc(vc_str: &str, context_loader: &mut ContextLoader) {
-        let vc = Credential::from_json(vc_str).unwrap();
+        let vc = match Credential::from_json(vc_str) {
+            Ok(vc) => vc,
+            Err(_) => return,
+        };
         let result = vc.verify(None, &DIDExample, context_loader).await;
         println!("{:#?}", result);
         assert!(!result.errors.is_empty());
@@ -3120,7 +3126,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             n_proofs += 1;
             let resolver = ExampleResolver;
             let mut context_loader = ssi_json_ld::ContextLoader::default();
-            let warnings = EcdsaSecp256k1RecoverySignature2020
+            let warnings = ProofSuiteType::EcdsaSecp256k1RecoverySignature2020
                 .verify(proof, &vc, &resolver, &mut context_loader)
                 .await
                 .unwrap();
@@ -3189,7 +3195,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         };
         use ssi_dids::{Document, PrimaryDIDURL};
         use ssi_jwk::{Algorithm, Base64urlUInt, OctetParams, Params as JWKParams};
-        use ssi_ldp::{suites::Ed25519Signature2020, ProofSuite};
+        use ssi_ldp::{ProofSuite, ProofSuiteType};
         #[async_trait]
         impl DIDResolver for ED2020ExampleResolver {
             async fn resolve(
@@ -3252,7 +3258,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         println!("{}", serde_json::to_string(&vc).unwrap());
         // reissue VC
-        let new_proof = Ed25519Signature2020
+        let new_proof = ProofSuiteType::Ed25519Signature2020
             .sign(
                 &vc,
                 &issue_options,
@@ -3266,12 +3272,12 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         println!("{}", serde_json::to_string(&new_proof).unwrap());
 
         // check new VC proof and original proof
-        Ed25519Signature2020
+        ProofSuiteType::Ed25519Signature2020
             .verify(&new_proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
         let orig_proof = vc.proof.iter().flatten().next().unwrap();
-        Ed25519Signature2020
+        ProofSuiteType::Ed25519Signature2020
             .verify(orig_proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
@@ -3286,7 +3292,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             challenge: Some("123".to_string()),
             ..Default::default()
         };
-        let new_proof = Ed25519Signature2020
+        let new_proof = ProofSuiteType::Ed25519Signature2020
             .sign(
                 &vp,
                 &vp_issue_options,
@@ -3300,19 +3306,19 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         println!("{}", serde_json::to_string(&new_proof).unwrap());
 
         // check new VP proof and original proof
-        Ed25519Signature2020
+        ProofSuiteType::Ed25519Signature2020
             .verify(&new_proof, &vp, &resolver, &mut context_loader)
             .await
             .unwrap();
         let orig_proof = vp.proof.iter().flatten().next().unwrap();
-        Ed25519Signature2020
+        ProofSuiteType::Ed25519Signature2020
             .verify(orig_proof, &vp, &resolver, &mut context_loader)
             .await
             .unwrap();
 
         // Try using prepare/complete
         let pk_jwk = sk_jwk.to_public();
-        let prep = Ed25519Signature2020
+        let prep = ProofSuiteType::Ed25519Signature2020
             .prepare(
                 &vp,
                 &vp_issue_options,
@@ -3329,8 +3335,11 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         };
         let sig = ssi_jws::sign_bytes(Algorithm::EdDSA, signing_input_bytes, &sk_jwk).unwrap();
         let sig_mb = multibase::encode(multibase::Base::Base58Btc, sig);
-        let completed_proof = Ed25519Signature2020.complete(prep, &sig_mb).await.unwrap();
-        Ed25519Signature2020
+        let completed_proof = ProofSuiteType::Ed25519Signature2020
+            .complete(&prep, &sig_mb)
+            .await
+            .unwrap();
+        ProofSuiteType::Ed25519Signature2020
             .verify(&completed_proof, &vp, &resolver, &mut context_loader)
             .await
             .unwrap();
@@ -3400,7 +3409,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 proof_purpose: Some(ProofPurpose::AssertionMethod),
                 ..Default::default()
             };
-            let proof = AleoSignature2021
+            let proof = ProofSuiteType::AleoSignature2021
                 .sign(
                     &vc,
                     &vc_issue_options,
@@ -3424,7 +3433,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // Verify VC
         let proof = vc.proof.iter().flatten().next().unwrap();
-        let warnings = AleoSignature2021
+        let warnings = ProofSuiteType::AleoSignature2021
             .verify(proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
