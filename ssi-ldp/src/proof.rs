@@ -20,15 +20,17 @@ macro_rules! assert_local {
     };
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+// TODO use enum to separate betwen JWS and LD proofs?
+// TODO create generics type to allow users to provide their own proof suite that implements ProofSuite
 pub struct Proof {
     #[serde(rename = "@context")]
     // TODO: use consistent types for context
     #[serde(default, skip_serializing_if = "Value::is_null")]
     pub context: Value,
     #[serde(rename = "type")]
-    pub type_: String,
+    pub type_: ProofSuiteType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof_purpose: Option<ProofPurpose>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -55,10 +57,20 @@ pub struct Proof {
 }
 
 impl Proof {
-    pub fn new(type_: &str) -> Self {
+    pub fn new(type_: ProofSuiteType) -> Self {
         Self {
-            type_: type_.to_string(),
-            ..Self::default()
+            type_,
+            context: Value::default(),
+            proof_purpose: None,
+            proof_value: None,
+            challenge: None,
+            creator: None,
+            verification_method: None,
+            created: None,
+            domain: None,
+            nonce: None,
+            jws: None,
+            property_set: None,
         }
     }
 
@@ -180,7 +192,7 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "type")]
     /// The type of the proof. Default is an appropriate proof type corresponding to the verification method.
-    pub type_: Option<String>,
+    pub type_: Option<ProofSuiteType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The URI of the verificationMethod used for the proof. If omitted a default
     /// assertionMethod will be used.
@@ -277,34 +289,23 @@ fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Erro
             None,
         )
         .ok_or(Error::MissingType)?;
-    let type_iri = match type_triple.object {
-        rdf::Object::IRIRef(rdf::IRIRef(ref iri)) => iri,
+    let type_iri = match &type_triple.object {
+        rdf::Object::IRIRef(rdf::IRIRef(iri)) => iri,
         _ => {
             return Err(Error::JsonLd(JsonLdError::UnexpectedTriple(
                 type_triple.clone(),
             )))
         }
     };
-    match (proof.type_.as_str(), type_iri.as_str()) {
-        ("RsaSignature2018", "https://w3id.org/security#RsaSignature2018") => (),
-        ("Ed25519Signature2018", "https://w3id.org/security#Ed25519Signature2018") => (),
-        ("Ed25519Signature2020", "https://w3id.org/security#Ed25519Signature2020") => (),
-        ("EcdsaSecp256k1Signature2019", "https://w3id.org/security#EcdsaSecp256k1Signature2019") => (),
-        ("EcdsaSecp256r1Signature2019", "https://w3id.org/security#EcdsaSecp256r1Signature2019") => (),
-        ("EcdsaSecp256k1RecoverySignature2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020") => (),
-        ("EcdsaSecp256k1RecoverySignature2020", "https://w3id.org/security#EcdsaSecp256k1RecoverySignature2020") => (),
-        ("JsonWebSignature2020", "https://w3id.org/security#JsonWebSignature2020") => (),
-        ("EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021") => (),
-        ("EthereumPersonalSignature2021", "https://w3id.org/security#EthereumPersonalSignature2021") => (),
-        ("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
-        ("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021", "https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021") => (),
-        ("Eip712Signature2021", "https://w3id.org/security#Eip712Signature2021") => (),
-        ("TezosSignature2021", "https://w3id.org/security#TezosSignature2021") => (),
-        ("TezosJcsSignature2021", "https://w3id.org/security#TezosJcsSignature2021") => (),
-        ("AleoSignature2021", "https://w3id.org/security#AleoSignature2021") => (),
-        ("SolanaSignature2021", "https://w3id.org/security#SolanaSignature2021") => (),
-        _ => return Err(Error::JsonLd(JsonLdError::UnexpectedTriple(type_triple.clone()))),
-    };
+    if !proof
+        .type_
+        .associated_contexts()
+        .contains(&type_iri.as_str())
+    {
+        return Err(Error::JsonLd(JsonLdError::UnexpectedTriple(
+            type_triple.clone(),
+        )));
+    }
     let proof_id = &type_triple.subject;
 
     graph_ref.match_iri_property(

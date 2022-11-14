@@ -546,8 +546,8 @@ pub fn prepare_detached_unencoded_payload(
     Ok((header, signing_input))
 }
 
-pub fn complete_sign_unencoded_payload(header: Header, sig_b64: &str) -> Result<String, Error> {
-    let header_b64 = base64_encode_json(&header)?;
+pub fn complete_sign_unencoded_payload(header: &Header, sig_b64: &str) -> Result<String, Error> {
+    let header_b64 = base64_encode_json(header)?;
     let jws = header_b64 + ".." + sig_b64;
     Ok(jws)
 }

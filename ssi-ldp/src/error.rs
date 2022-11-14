@@ -26,8 +26,8 @@ pub enum Error {
     UnsupportedNonDIDIssuer(String),
     #[error("Missing proof purpose")]
     MissingProofPurpose,
-    #[error("Linked Data Proof type not implemented")]
-    ProofTypeNotImplemented,
+    #[error("Linked Data Proof type not implemented or not enabled by feature")]
+    ProofTypeNotSupported,
     #[error("Unsupported curve")]
     UnsupportedCurve,
     #[error("Missing type")]

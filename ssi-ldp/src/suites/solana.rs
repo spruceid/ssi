@@ -1,5 +1,4 @@
 use super::super::*;
-use async_trait::async_trait;
 use serde_json::Value;
 use ssi_dids::did_resolve::{resolve_vm, DIDResolver};
 use ssi_json_ld::ContextLoader;
@@ -7,21 +6,17 @@ use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
 use std::collections::HashMap as Map;
 
 pub struct SolanaSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for SolanaSignature2021 {
-    async fn sign(
-        &self,
+impl SolanaSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         let mut proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
-            ..Proof::new("SolanaSignature2021")
+            ..Proof::new(ProofSuiteType::SolanaSignature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -34,18 +29,15 @@ impl ProofSuite for SolanaSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
-        _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
-            ..Proof::new("SolanaSignature2021")
+            ..Proof::new(ProofSuiteType::SolanaSignature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -59,17 +51,7 @@ impl ProofSuite for SolanaSignature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
+    pub(crate) async fn verify(
         &self,
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
