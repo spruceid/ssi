@@ -74,6 +74,13 @@ pub enum ProofSuiteType {
     #[cfg(feature = "secp256r1")]
     EcdsaSecp256r1Signature2019,
     CLSignature2019,
+    #[cfg(feature = "test")]
+    NonJwsProof,
+    #[cfg(feature = "test")]
+    #[serde(rename = "ex:AnonCredPresentationProofv1")]
+    AnonCredPresentationProofv1,
+    #[serde(rename = "ex:AnonCredDerivedCredentialv1")]
+    AnonCredDerivedCredentialv1,
 }
 
 pub enum SignatureType {
@@ -85,42 +92,42 @@ impl ProofSuiteType {
     pub fn signature_type(&self) -> SignatureType {
         match self {
             #[cfg(feature = "rsa")]
-            ProofSuiteType::RsaSignature2018 => SignatureType::JWS,
+            Self::RsaSignature2018 => SignatureType::JWS,
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2018 => SignatureType::JWS,
+            Self::Ed25519Signature2018 => SignatureType::JWS,
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2020 => SignatureType::LD,
+            Self::Ed25519Signature2020 => SignatureType::LD,
             #[cfg(feature = "tezos")]
-            ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
-                SignatureType::JWS
-            }
+            Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => SignatureType::JWS,
             #[cfg(feature = "tezos")]
-            ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
-                SignatureType::JWS
-            }
+            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => SignatureType::JWS,
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1Signature2019 => SignatureType::JWS,
+            Self::EcdsaSecp256k1Signature2019 => SignatureType::JWS,
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1RecoverySignature2020 => SignatureType::JWS,
+            Self::EcdsaSecp256k1RecoverySignature2020 => SignatureType::JWS,
             #[cfg(feature = "eip")]
-            ProofSuiteType::Eip712Signature2021 => SignatureType::LD,
+            Self::Eip712Signature2021 => SignatureType::LD,
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumPersonalSignature2021 => SignatureType::LD,
+            Self::EthereumPersonalSignature2021 => SignatureType::LD,
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumEip712Signature2021 => SignatureType::LD,
+            Self::EthereumEip712Signature2021 => SignatureType::LD,
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosSignature2021 => SignatureType::LD,
+            Self::TezosSignature2021 => SignatureType::LD,
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosJcsSignature2021 => SignatureType::LD,
+            Self::TezosJcsSignature2021 => SignatureType::LD,
             #[cfg(feature = "solana")]
-            ProofSuiteType::SolanaSignature2021 => SignatureType::LD,
+            Self::SolanaSignature2021 => SignatureType::LD,
             #[cfg(feature = "aleo")]
-            ProofSuiteType::AleoSignature2021 => SignatureType::LD,
+            Self::AleoSignature2021 => SignatureType::LD,
             #[cfg(feature = "w3c")]
-            ProofSuiteType::JsonWebSignature2020 => SignatureType::JWS,
+            Self::JsonWebSignature2020 => SignatureType::JWS,
             #[cfg(feature = "secp256r1")]
-            ProofSuiteType::EcdsaSecp256r1Signature2019 => SignatureType::JWS,
-            ProofSuiteType::CLSignature2019 => todo!(),
+            Self::EcdsaSecp256r1Signature2019 => SignatureType::JWS,
+            Self::CLSignature2019 => todo!(),
+            #[cfg(feature = "test")]
+            Self::NonJwsProof
+            | Self::AnonCredPresentationProofv1
+            | Self::AnonCredDerivedCredentialv1 => todo!(),
         }
     }
 
@@ -128,44 +135,47 @@ impl ProofSuiteType {
     pub(crate) fn associated_contexts(&self) -> &[&str] {
         match self {
 #[cfg(feature = "rsa")]
-ProofSuiteType::RsaSignature2018 => &["https://w3id.org/security#RsaSignature2018"],
+Self::RsaSignature2018 => &["https://w3id.org/security#RsaSignature2018"],
 #[cfg(feature = "ed25519")]
-ProofSuiteType::Ed25519Signature2018 => &["https://w3id.org/security#Ed25519Signature2018"],
+Self::Ed25519Signature2018 => &["https://w3id.org/security#Ed25519Signature2018"],
 #[cfg(feature = "ed25519")]
-ProofSuiteType::Ed25519Signature2020 => &["https://w3id.org/security#Ed25519Signature2020"],
+Self::Ed25519Signature2020 => &["https://w3id.org/security#Ed25519Signature2020"],
 #[cfg(feature = "tezos")]
-ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
     &["https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"]
 }
 #[cfg(feature = "tezos")]
-ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
     &["https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021"]
 }
 #[cfg(feature = "secp256k1")]
-ProofSuiteType::EcdsaSecp256k1Signature2019 => &["https://w3id.org/security#EcdsaSecp256k1Signature2019"],
+Self::EcdsaSecp256k1Signature2019 => &["https://w3id.org/security#EcdsaSecp256k1Signature2019"],
 #[cfg(feature = "secp256k1")]
-ProofSuiteType::EcdsaSecp256k1RecoverySignature2020 => {
+Self::EcdsaSecp256k1RecoverySignature2020 => {
     &["https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020"]
 }
 #[cfg(feature = "eip")]
-ProofSuiteType::Eip712Signature2021 => &["https://w3id.org/security#Eip712Signature2021"],
+Self::Eip712Signature2021 => &["https://w3id.org/security#Eip712Signature2021"],
 #[cfg(feature = "eip")]
-ProofSuiteType::EthereumPersonalSignature2021 => &["https://w3id.org/security#EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021"],
+Self::EthereumPersonalSignature2021 => &["https://w3id.org/security#EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021"],
 #[cfg(feature = "eip")]
-ProofSuiteType::EthereumEip712Signature2021 => &[],
+Self::EthereumEip712Signature2021 => &[],
 #[cfg(feature = "tezos")]
-ProofSuiteType::TezosSignature2021 => &["https://w3id.org/security#TezosSignature2021"],
+Self::TezosSignature2021 => &["https://w3id.org/security#TezosSignature2021"],
 #[cfg(feature = "tezos")]
-ProofSuiteType::TezosJcsSignature2021 => &["https://w3id.org/security#TezosJcsSignature2021"],
+Self::TezosJcsSignature2021 => &["https://w3id.org/security#TezosJcsSignature2021"],
 #[cfg(feature = "solana")]
-ProofSuiteType::SolanaSignature2021 => &["https://w3id.org/security#SolanaSignature2021"],
+Self::SolanaSignature2021 => &["https://w3id.org/security#SolanaSignature2021"],
 #[cfg(feature = "aleo")]
-ProofSuiteType::AleoSignature2021 => &["https://w3id.org/security#AleoSignature2021"],
+Self::AleoSignature2021 => &["https://w3id.org/security#AleoSignature2021"],
 #[cfg(feature = "w3c")]
-ProofSuiteType::JsonWebSignature2020 => &["https://w3id.org/security#JsonWebSignature2020"],
+Self::JsonWebSignature2020 => &["https://w3id.org/security#JsonWebSignature2020"],
 #[cfg(feature = "secp256r1")]
-ProofSuiteType::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1Signature2019"],
-            ProofSuiteType::CLSignature2019 => todo!(),
+Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1Signature2019"],
+            Self::CLSignature2019 => todo!(),
+            #[cfg(feature = "test")]
+            Self::NonJwsProof |
+            Self::AnonCredPresentationProofv1 | Self::AnonCredDerivedCredentialv1 => todo!(),
         }
     }
 
@@ -283,7 +293,7 @@ ProofSuiteType::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#Ecds
     }
 
     pub fn is_zkp(&self) -> bool {
-        matches!(self, ProofSuiteType::CLSignature2019)
+        matches!(self, Self::CLSignature2019)
     }
 }
 
@@ -301,7 +311,7 @@ impl ProofSuite for ProofSuiteType {
     ) -> Result<Proof, Error> {
         match self {
             #[cfg(feature = "rsa")]
-            ProofSuiteType::RsaSignature2018 => {
+            Self::RsaSignature2018 => {
                 sign(
                     document,
                     options,
@@ -314,7 +324,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2018 => {
+            Self::Ed25519Signature2018 => {
                 sign(
                     document,
                     options,
@@ -327,7 +337,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2020 => {
+            Self::Ed25519Signature2020 => {
                 sign_nojws(
                     document,
                     options,
@@ -341,7 +351,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+            Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
                 Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
                     document,
                     options,
@@ -352,7 +362,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
                 P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::sign(
                     document,
                     options,
@@ -363,7 +373,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1Signature2019 => {
+            Self::EcdsaSecp256k1Signature2019 => {
                 sign(
                     document,
                     options,
@@ -376,7 +386,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1RecoverySignature2020 => {
+            Self::EcdsaSecp256k1RecoverySignature2020 => {
                 EcdsaSecp256k1RecoverySignature2020
                     .sign(
                         document,
@@ -389,7 +399,7 @@ impl ProofSuite for ProofSuiteType {
                     .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::Eip712Signature2021 => {
+            Self::Eip712Signature2021 => {
                 Eip712Signature2021::sign(
                     document,
                     options,
@@ -400,7 +410,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumPersonalSignature2021 => {
+            Self::EthereumPersonalSignature2021 => {
                 EthereumPersonalSignature2021::sign(
                     document,
                     options,
@@ -411,12 +421,12 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumEip712Signature2021 => {
+            Self::EthereumEip712Signature2021 => {
                 EthereumEip712Signature2021::sign(document, options, key, extra_proof_properties)
                     .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosSignature2021 => {
+            Self::TezosSignature2021 => {
                 TezosSignature2021::sign(
                     document,
                     options,
@@ -427,7 +437,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosJcsSignature2021 => {
+            Self::TezosJcsSignature2021 => {
                 TezosJcsSignature2021::sign(
                     document,
                     options,
@@ -438,7 +448,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "solana")]
-            ProofSuiteType::SolanaSignature2021 => {
+            Self::SolanaSignature2021 => {
                 SolanaSignature2021::sign(
                     document,
                     options,
@@ -449,7 +459,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "aleo")]
-            ProofSuiteType::AleoSignature2021 => {
+            Self::AleoSignature2021 => {
                 AleoSignature2021::sign(
                     document,
                     options,
@@ -460,7 +470,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "w3c")]
-            ProofSuiteType::JsonWebSignature2020 => {
+            Self::JsonWebSignature2020 => {
                 JsonWebSignature2020::sign(
                     document,
                     options,
@@ -471,7 +481,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256r1")]
-            ProofSuiteType::EcdsaSecp256r1Signature2019 => {
+            Self::EcdsaSecp256r1Signature2019 => {
                 sign(
                     document,
                     options,
@@ -483,7 +493,11 @@ impl ProofSuite for ProofSuiteType {
                 )
                 .await
             }
-            ProofSuiteType::CLSignature2019 => todo!(),
+            Self::CLSignature2019 => todo!(),
+            #[cfg(feature = "test")]
+            Self::NonJwsProof
+            | Self::AnonCredPresentationProofv1
+            | Self::AnonCredDerivedCredentialv1 => todo!(),
         }
     }
 
@@ -498,7 +512,7 @@ impl ProofSuite for ProofSuiteType {
     ) -> Result<ProofPreparation, Error> {
         match self {
             #[cfg(feature = "rsa")]
-            ProofSuiteType::RsaSignature2018 => {
+            Self::RsaSignature2018 => {
                 prepare(
                     document,
                     options,
@@ -511,7 +525,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2018 => {
+            Self::Ed25519Signature2018 => {
                 prepare(
                     document,
                     options,
@@ -524,7 +538,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2020 => {
+            Self::Ed25519Signature2020 => {
                 prepare_nojws(
                     document,
                     options,
@@ -538,7 +552,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+            Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
                 Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
                     document,
                     options,
@@ -549,7 +563,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
                 P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::prepare(
                     document,
                     options,
@@ -560,7 +574,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1Signature2019 => {
+            Self::EcdsaSecp256k1Signature2019 => {
                 prepare(
                     document,
                     options,
@@ -573,7 +587,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1RecoverySignature2020 => {
+            Self::EcdsaSecp256k1RecoverySignature2020 => {
                 EcdsaSecp256k1RecoverySignature2020
                     .prepare(
                         document,
@@ -586,7 +600,7 @@ impl ProofSuite for ProofSuiteType {
                     .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::Eip712Signature2021 => {
+            Self::Eip712Signature2021 => {
                 Eip712Signature2021::prepare(
                     document,
                     options,
@@ -596,7 +610,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumPersonalSignature2021 => {
+            Self::EthereumPersonalSignature2021 => {
                 EthereumPersonalSignature2021::prepare(
                     document,
                     options,
@@ -606,12 +620,12 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumEip712Signature2021 => {
+            Self::EthereumEip712Signature2021 => {
                 EthereumEip712Signature2021::prepare(document, options, extra_proof_properties)
                     .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosSignature2021 => {
+            Self::TezosSignature2021 => {
                 TezosSignature2021::prepare(
                     document,
                     options,
@@ -622,7 +636,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosJcsSignature2021 => {
+            Self::TezosJcsSignature2021 => {
                 TezosJcsSignature2021::prepare(
                     document,
                     options,
@@ -632,7 +646,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "solana")]
-            ProofSuiteType::SolanaSignature2021 => {
+            Self::SolanaSignature2021 => {
                 SolanaSignature2021::prepare(
                     document,
                     options,
@@ -642,7 +656,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "aleo")]
-            ProofSuiteType::AleoSignature2021 => {
+            Self::AleoSignature2021 => {
                 AleoSignature2021::prepare(
                     document,
                     options,
@@ -652,7 +666,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "w3c")]
-            ProofSuiteType::JsonWebSignature2020 => {
+            Self::JsonWebSignature2020 => {
                 JsonWebSignature2020::prepare(
                     document,
                     options,
@@ -663,7 +677,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256r1")]
-            ProofSuiteType::EcdsaSecp256r1Signature2019 => {
+            Self::EcdsaSecp256r1Signature2019 => {
                 prepare(
                     document,
                     options,
@@ -675,7 +689,11 @@ impl ProofSuite for ProofSuiteType {
                 )
                 .await
             }
-            ProofSuiteType::CLSignature2019 => todo!(),
+            Self::CLSignature2019 => todo!(),
+            #[cfg(feature = "test")]
+            Self::NonJwsProof
+            | Self::AnonCredPresentationProofv1
+            | Self::AnonCredDerivedCredentialv1 => todo!(),
         }
     }
 
@@ -688,19 +706,15 @@ impl ProofSuite for ProofSuiteType {
     ) -> Result<VerificationWarnings, Error> {
         match self {
             #[cfg(feature = "rsa")]
-            ProofSuiteType::RsaSignature2018 => {
-                verify(proof, document, resolver, context_loader).await
-            }
+            Self::RsaSignature2018 => verify(proof, document, resolver, context_loader).await,
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2018 => {
-                verify(proof, document, resolver, context_loader).await
-            }
+            Self::Ed25519Signature2018 => verify(proof, document, resolver, context_loader).await,
             #[cfg(feature = "ed25519")]
-            ProofSuiteType::Ed25519Signature2020 => {
+            Self::Ed25519Signature2020 => {
                 verify_nojws(proof, document, resolver, context_loader, Algorithm::EdDSA).await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+            Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
                 Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
                     proof,
                     document,
@@ -710,7 +724,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
                 P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021::verify(
                     proof,
                     document,
@@ -720,55 +734,59 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1Signature2019 => {
+            Self::EcdsaSecp256k1Signature2019 => {
                 verify(proof, document, resolver, context_loader).await
             }
             #[cfg(feature = "secp256k1")]
-            ProofSuiteType::EcdsaSecp256k1RecoverySignature2020 => {
+            Self::EcdsaSecp256k1RecoverySignature2020 => {
                 EcdsaSecp256k1RecoverySignature2020
                     .verify(proof, document, resolver, context_loader)
                     .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::Eip712Signature2021 => {
+            Self::Eip712Signature2021 => {
                 Eip712Signature2021::verify(proof, document, resolver, context_loader).await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumPersonalSignature2021 => {
+            Self::EthereumPersonalSignature2021 => {
                 EthereumPersonalSignature2021::verify(proof, document, resolver, context_loader)
                     .await
             }
             #[cfg(feature = "eip")]
-            ProofSuiteType::EthereumEip712Signature2021 => {
+            Self::EthereumEip712Signature2021 => {
                 EthereumEip712Signature2021::verify(proof, document, resolver).await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosSignature2021 => {
+            Self::TezosSignature2021 => {
                 TezosSignature2021::verify(proof, document, resolver, context_loader).await
             }
             #[cfg(feature = "tezos")]
-            ProofSuiteType::TezosJcsSignature2021 => {
+            Self::TezosJcsSignature2021 => {
                 TezosJcsSignature2021::verify(proof, document, resolver).await
             }
             #[cfg(feature = "solana")]
-            ProofSuiteType::SolanaSignature2021 => {
+            Self::SolanaSignature2021 => {
                 SolanaSignature2021
                     .verify(proof, document, resolver, context_loader)
                     .await
             }
             #[cfg(feature = "aleo")]
-            ProofSuiteType::AleoSignature2021 => {
+            Self::AleoSignature2021 => {
                 AleoSignature2021::verify(proof, document, resolver, context_loader).await
             }
             #[cfg(feature = "w3c")]
-            ProofSuiteType::JsonWebSignature2020 => {
+            Self::JsonWebSignature2020 => {
                 JsonWebSignature2020::verify(proof, document, resolver, context_loader).await
             }
             #[cfg(feature = "secp256r1")]
-            ProofSuiteType::EcdsaSecp256r1Signature2019 => {
+            Self::EcdsaSecp256r1Signature2019 => {
                 verify(proof, document, resolver, context_loader).await
             }
-            ProofSuiteType::CLSignature2019 => todo!(),
+            Self::CLSignature2019 => todo!(),
+            #[cfg(feature = "test")]
+            Self::NonJwsProof
+            | Self::AnonCredPresentationProofv1
+            | Self::AnonCredDerivedCredentialv1 => todo!(),
         }
     }
 
