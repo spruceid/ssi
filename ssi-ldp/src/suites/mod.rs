@@ -79,6 +79,7 @@ pub enum ProofSuiteType {
     #[cfg(feature = "test")]
     #[serde(rename = "ex:AnonCredPresentationProofv1")]
     AnonCredPresentationProofv1,
+    #[cfg(feature = "test")]
     #[serde(rename = "ex:AnonCredDerivedCredentialv1")]
     AnonCredDerivedCredentialv1,
 }
