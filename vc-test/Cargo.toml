@@ -9,6 +9,7 @@ publish = false
 
 [dependencies]
 ssi = { version = "0.4", path = "../", features = ["example-http-issuer"] }
+ssi-ldp = { version = "0.1", path = "../ssi-ldp", default-features = false, features = ["test"] }
 async-std = { version = "1.9", features = ["attributes"] }
 serde_json = "1.0"
 base64 = "0.12"
