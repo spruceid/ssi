@@ -8,7 +8,6 @@ mod cacao;
 pub mod revocation;
 
 use cacao::BindingDelegation;
-use ssi_core::uri::URIOrString;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
@@ -241,7 +240,7 @@ pub struct Presentation {
     #[serde(rename = "@context")]
     pub context: Contexts,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<URIOrString>,
+    pub id: Option<StringOrURI>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -391,10 +390,25 @@ impl TryFrom<String> for StringOrURI {
         }
     }
 }
+impl TryFrom<&str> for StringOrURI {
+    type Error = Error;
+    fn try_from(string: &str) -> Result<Self, Self::Error> {
+        string.to_string().try_into()
+    }
+}
 
 impl From<URI> for StringOrURI {
     fn from(uri: URI) -> Self {
         StringOrURI::URI(uri)
+    }
+}
+
+impl From<StringOrURI> for String {
+    fn from(id: StringOrURI) -> Self {
+        match id {
+            StringOrURI::URI(uri) => uri.into(),
+            StringOrURI::String(s) => s,
+        }
     }
 }
 
@@ -1147,7 +1161,7 @@ impl Presentation {
             vp.holder = Some(issuer_uri);
         }
         if let Some(id) = claims.jwt_id {
-            vp.id = Some(id.into());
+            vp.id = Some(id.try_into()?);
         }
         Ok(vp)
     }
@@ -2784,7 +2798,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // Issue Presentation with Credential
         let mut vp = Presentation {
             context: Contexts::Many(vec![Context::URI(URI::String(DEFAULT_CONTEXT.to_string()))]),
-            id: Some("http://example.org/presentations/3731".into()),
+            id: Some("http://example.org/presentations/3731".try_into().unwrap()),
             type_: OneOrMany::One("VerifiablePresentation".to_string()),
             verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
             proof: None,
