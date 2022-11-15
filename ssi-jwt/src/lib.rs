@@ -52,6 +52,7 @@ pub fn decode_unverified<Claims: DeserializeOwned>(jwt: &str) -> Result<Claims, 
 ///     +-2^53 / (1000000 * 60 * 60 * 24 * 365.25) ~= +-285,
 /// which is centered around the Unix epoch start date Jan 1, 1970, 00:00:00 UTC, giving
 /// the years 1685 to 2255.
+// TODO https://docs.rs/hifitime/latest/hifitime/
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, PartialOrd)]
 pub struct NumericDate(f64);
 
@@ -141,7 +142,9 @@ impl From<NumericDate> for DateTime<Utc> {
     fn from(nd: NumericDate) -> Self {
         let (whole_seconds, fractional_nanoseconds) =
             nd.into_whole_seconds_and_fractional_nanoseconds();
-        Utc.timestamp(whole_seconds, fractional_nanoseconds)
+        // `timestamp` (deprecated) was already doing an unwrap
+        Utc.timestamp_opt(whole_seconds, fractional_nanoseconds)
+            .unwrap()
     }
 }
 
