@@ -53,7 +53,7 @@ pub struct Credential {
     #[serde(rename = "@context")]
     pub context: Contexts,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<URI>,
+    pub id: Option<StringOrURI>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
     pub credential_subject: OneOrMany<CredentialSubject>,
@@ -282,7 +282,7 @@ pub enum CredentialOrJWT {
     JWT(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 #[serde(try_from = "String")]
 pub enum StringOrURI {
@@ -583,8 +583,7 @@ impl Credential {
             }
         }
         if let Some(id) = claims.jwt_id {
-            let uri = URI::try_from(id)?;
-            vc.id = Some(uri);
+            vc.id = Some(id.try_into()?);
         }
         Ok(vc)
     }

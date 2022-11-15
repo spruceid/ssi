@@ -10,8 +10,8 @@ pub enum URI {
 
 #[derive(thiserror::Error, Debug)]
 pub enum URIParseErr {
-    #[error("Invalid URI")]
-    InvalidFormat,
+    #[error("Invalid URI: {0}")]
+    InvalidFormat(String),
 }
 
 impl From<URI> for String {
@@ -27,7 +27,7 @@ impl std::convert::TryFrom<String> for URI {
         if uri.contains(':') {
             Ok(URI::String(uri))
         } else {
-            Err(URIParseErr::InvalidFormat)
+            Err(URIParseErr::InvalidFormat(uri))
         }
     }
 }
