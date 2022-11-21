@@ -36,3 +36,4 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 difference = "2.0"
+hex = "0.4"

@@ -1,7 +1,6 @@
 use async_recursion::async_recursion;
 use chrono::DateTime;
 use serde::Deserialize;
-use serde_bytes::Bytes;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::convert::TryInto;
@@ -401,6 +400,9 @@ pub async fn truage_jsonld_to_cborld(
             for map in embedded_transform_map {
                 transform_maps.push(map.clone());
             }
+        } else if value.is_number() {
+            let val = vec![value.as_u64().unwrap() as u8];
+            transform_map.insert(key_encoded.clone(), val);
         }
     }
     transform_maps.push(transform_map.clone());
@@ -418,22 +420,26 @@ pub async fn encode(document: Value) -> Vec<u8> {
     let level_three_object_2 = result.pop().unwrap();
 
     let mut compressed_credential_subject_array: Vec<u8> = vec![];
-    let map_indicator2: u8 = (level_three_object_2.len() + 1 + 160).try_into().unwrap();
+    let map_indicator2: u8 = (level_three_object_2.len() + 160).try_into().unwrap();
     compressed_credential_subject_array.push(map_indicator2);
     for (key, mut value) in level_three_object_2 {
         let mut prefix = vec![24, key];
         let mut suffix = vec![];
         if key == 138 {
-            suffix = vec![88, 83];
+            suffix = vec![88, value.len() as u8];
             suffix.append(&mut value);
+        } else if key == 148 {
+            if value == vec![65] {
+                prefix = vec![24, key, 24];
+                suffix = value;
+            } else if value == vec![21] {
+                suffix = value;
+            }
         } else {
             suffix = value;
         }
-        //to do: add overage = 21 properly
-        let mut appendix = vec![24, 148, 21];
         compressed_credential_subject_array.append(&mut prefix);
         compressed_credential_subject_array.append(&mut suffix);
-        compressed_credential_subject_array.append(&mut appendix);
     }
 
     //hacking together the map structure
@@ -466,7 +472,7 @@ pub async fn encode(document: Value) -> Vec<u8> {
 
     let mut compressed_vc_array: Vec<u8> = vec![];
     let map_indicator3: u8 = (level_two.len() + 160).try_into().unwrap();
-    compressed_vc_array.push(129);
+    // compressed_vc_array.push(129);
     compressed_vc_array.push(map_indicator3);
     for (key, mut value) in level_two {
         let mut prefix = vec![24, key];
@@ -496,7 +502,7 @@ pub async fn encode(document: Value) -> Vec<u8> {
         compressed_vc_array.append(&mut suffix);
     }
 
-    level_one.insert(125, compressed_vc_array);
+    level_one.insert(124, compressed_vc_array);
 
     let mut final_result: Vec<u8> = vec![];
     let mut cbor_indicator: Vec<u8> = vec![217, 5, 1];
@@ -505,16 +511,24 @@ pub async fn encode(document: Value) -> Vec<u8> {
     final_result.push(map_indicator4);
 
     for (key, value) in level_one {
-        //println!("level_one_entry key: {:?}, value: {:?}", key, value);
+        // println!("level_one_entry key: {:?}, value: {:?}", key, value);
 
         let mut prefix = vec![];
         let mut suffix = vec![];
-        if key == 1 {
+        if key == 0 {
+            prefix = vec![key];
+            suffix = value;
+        } else if key == 1 {
             prefix = vec![key, 129];
             suffix = value;
         } else if key == 112 {
             prefix = vec![24, key, 130, 3, 80];
             suffix = value;
+        } else if key == 116 {
+            prefix = vec![24, key];
+            for val in value {
+                suffix.append(&mut vec![24, val])
+            }
         } else if key == 117 {
             prefix = vec![24, key, 129];
             for val in value {
@@ -524,6 +538,7 @@ pub async fn encode(document: Value) -> Vec<u8> {
             prefix = vec![24, key];
             suffix = value;
         }
+        // println!("prefix: {:?}, suffix: {:?}\n\n", prefix, suffix);
 
         final_result.append(&mut prefix);
         final_result.append(&mut suffix);
@@ -539,17 +554,105 @@ mod tests {
 
     #[async_std::test]
     async fn test_general() {
-        let doc: Value = serde_json::from_str(
-            r#"{
-                "@context": [
-                    "https://www.w3.org/2018/credentials/v1"
-                ],
+        let cmp_hex = hex::decode("d90501a300111874186e187ca801831116141870820350188e8450269e11ebb545d3692cf353981872a51874189618b61a610efcda18be18c418c058417abc243faceeb32327cf8afe87f7ef7d743983c588ef3d06c59f14914f0ea096d836f6fe8202c07f79c8aff0f664d276d37f170eeb742e425334fd0824af26e60c18c2831904015822ed01597d5ac5de5cdb08efcc29850df0d3fc935190b86eabbeb5eb06884db6a3aeec5822ed01597d5ac5de5cdb08efcc29850df0d3fc935190b86eabbeb5eb06884db6a3aeec187582186c1882189ea2188a58537ad90501a401150904074a7ad90501a2011605184108583b7a0000abd6420d628c532176ef0dd720df748248b808d4b9425c8f45ab44b5029feaca278d4fcd2d48cdf617fdac0f99681757fc8de74afda52e2418941518a21a60d4e4f718a41a605b9af718a8821904015822ed01597d5ac5de5cdb08efcc29850df0d3fc935190b86eabbeb5eb06884db6a3aeec").unwrap();
+
+        let doc: Value = serde_json::json!({
+          "@context": "https://www.w3.org/2018/credentials/v1",
+          "type": "VerifiablePresentation",
+          "verifiableCredential": {
+            "@context": [
+              "https://www.w3.org/2018/credentials/v1",
+              "https://w3id.org/age/v1",
+              "https://w3id.org/security/suites/ed25519-2020/v1"
+            ],
+            "id": "urn:uuid:188e8450-269e-11eb-b545-d3692cf35398",
+            "type": [
+              "VerifiableCredential",
+              "OverAgeTokenCredential"
+            ],
+            "issuer": "did:key:z6MkkUbCFazdoducKf8SUye7cAxuicMdDBhXKWuTEuGA3jQF",
+            "issuanceDate": "2021-03-24T20:03:03Z",
+            "expirationDate": "2021-06-24T20:03:03Z",
+            "credentialSubject": {
+              "overAge": 21,
+              "concealedIdToken": "zo58FV8vqzY2ZqLT4fSaVhe7CsdBKsUikBMbKridqSyc7LceLmgWcNTeHm2gfvgjuNjrVif1G2A5EKx2eyNkSu5ZBc6gNnjF8ZkV3P8dPrX8o46SF"
+            },
+            "proof": {
+              "type": "Ed25519Signature2020",
+              "created": "2021-08-07T21:36:26Z",
+              "verificationMethod": "did:key:z6MkkUbCFazdoducKf8SUye7cAxuicMdDBhXKWuTEuGA3jQF#z6MkkUbCFazdoducKf8SUye7cAxuicMdDBhXKWuTEuGA3jQF",
+              "proofPurpose": "assertionMethod",
+              "proofValue": "z4mAs9uHU16jR4xwPcbhHyRUc6BbaiJQE5MJwn3PCWkRXsriK9AMrQQMbjzG9XXFPNgngmQXHKUz23WRSu9jSxPCF"
             }
-            "#,
-        )
-        .unwrap();
+          }
+        });
 
         let cborld_encoded = encode(doc).await;
-        assert_eq!(cborld_encoded.len(), 384);
+
+        // println!("OURS HEX = {}", hex::encode(cborld_encoded.clone()));
+        // println!("LEN={}|OURS={:?}", cborld_encoded.len(), cborld_encoded);
+        // println!("LEN={}|THEM={:?}", cmp_hex.len(), cmp_hex);
+
+        // if cborld_encoded.len() == cmp_hex.len() {
+        //     for (i, v) in cmp_hex.iter().enumerate() {
+        //         let cmp = cborld_encoded[i];
+        //         if cmp != *v {
+        //             println!("DIFF at [{}] expected {}; got {}", i, v, cmp);
+        //         }
+        //     }
+        // }
+        assert_eq!(cborld_encoded, cmp_hex);
+    }
+
+    #[async_std::test]
+    async fn test_app() {
+        let cmp_hex = hex::decode("d90501a300111874186e187ca8018311161418708203509f5ff197d6d44a3da68234fc799667431872a51874189618b61a637bbeed18be18c418c058417a1d84ac2b75c2ccfaf8e57cc7bc94df9b7314291a43eb0d57ead4dfdf2f0575a76046c510e889196afef3e949692262fde8dbfc5b525f72f9126c4e0fec1b460418c2831904015822ed0191fb716a4a661ec5fb6436b3f6225ebfc10a7eda60d2b4bb5e6fb3ecfbb1207f5822ed0191fb716a4a661ec5fb6436b3f6225ebfc10a7eda60d2b4bb5e6fb3ecfbb1207f187582186c1882189ea2188a58587ad90501a40015186a1864186c4b7ad90501a20016187c1841186e583b7a00009a3e130c62d700e40a8388a3a3ac4f8df1aed0e596d32ebdc528e223443e9a1ccb24fbc19480ec9ce03937e4548b5cc12a9c2d0634ed3fc01894184118a21a63f508ec18a41a637bbeec18a8821904015822ed0191fb716a4a661ec5fb6436b3f6225ebfc10a7eda60d2b4bb5e6fb3ecfbb1207f").unwrap();
+
+        let doc: Value = serde_json::json!({
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "type": "VerifiablePresentation",
+            "verifiableCredential": {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://w3id.org/age/v1",
+                    "https://w3id.org/security/suites/ed25519-2020/v1"
+                ],
+                "id": "urn:uuid:9f5ff197-d6d4-4a3d-a682-34fc79966743",
+                "type": [
+                    "VerifiableCredential",
+                    "OverAgeTokenCredential"
+                ],
+                "issuer": "did:key:z6MkpH7YDw3LBmqTmUzifCBe999t8DatvWnpxSgYQn9UEeyc",
+                "issuanceDate": "2022-11-21T18:09:48Z",
+                "expirationDate": "2023-02-21T18:09:48Z",
+                "credentialSubject": {
+                    "overAge": 65,
+                    "concealedIdToken": "zPwe8eWs7Gv9pfQ2UL6y17BfCNYFx2fiHGqChnf4jK5wdtH6EgeBM6jNshNYvBYkZjudjGWyEyi5zjBVBkMtdgN7V7AKnL5BSGcxi25KpGk6KQDP9mRKHfWw"
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": "2022-11-21T18:09:49Z",
+                    "verificationMethod": "did:key:z6MkpH7YDw3LBmqTmUzifCBe999t8DatvWnpxSgYQn9UEeyc#z6MkpH7YDw3LBmqTmUzifCBe999t8DatvWnpxSgYQn9UEeyc",
+                    "proofPurpose": "assertionMethod",
+                    "proofValue": "zbEKA8bqX3cYWJ5cYEQztNy9m3pR1L3QyDxoKcu7jXWyWz8NzKvbtpeWFnzReLAoWD2exshvto1fxbf7H7H6Vfsh"
+                }
+            }
+        });
+
+        let cborld_encoded = encode(doc).await;
+
+        // println!("OURS HEX = {}", hex::encode(cborld_encoded.clone()));
+        // println!("LEN={}|OURS={:?}", cborld_encoded.len(), cborld_encoded);
+        // println!("LEN={}|THEM={:?}", cmp_hex.len(), cmp_hex);
+
+        // if cborld_encoded.len() == cmp_hex.len() {
+        //     for (i, v) in cmp_hex.iter().enumerate() {
+        //         let cmp = cborld_encoded[i];
+        //         if cmp != *v {
+        //             println!("DIFF at [{}] expected {}; got {}", i, v, cmp);
+        //         }
+        //     }
+        // }
+        assert_eq!(cborld_encoded, cmp_hex);
     }
 }
