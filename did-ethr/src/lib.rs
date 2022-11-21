@@ -212,10 +212,11 @@ impl DIDResolver for DIDEthr {
             "blockchainAccountId".to_string(),
             Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
         );
-        context.insert(
-            "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-            Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-        );
+        // <MAM> - removed context doc supporting #controller-style DID doc
+        // context.insert(
+        //     "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        //     Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
+        // );
         context.insert(
             "Eip712Method2021".to_string(),
             Value::String("https://w3id.org/security#Eip712Method2021".to_string()),
@@ -228,23 +229,25 @@ impl DIDResolver for DIDEthr {
                 reference: chain_id.to_string(),
             },
         };
-        let vm_didurl = DIDURL {
-            did: did.to_string(),
-            fragment: Some("controller".to_string()),
-            ..Default::default()
-        };
+        // <MAM> - removed DIDURL supporting #controller-style DID doc
+        // let vm_didurl = DIDURL {
+        //     did: did.to_string(),
+        //     fragment: Some("controller".to_string()),
+        //     ..Default::default()
+        // };
         let eip712vm_didurl = DIDURL {
             did: did.to_string(),
             fragment: Some("Eip712Method2021".to_string()),
             ..Default::default()
         };
-        let vm = VerificationMethod::Map(VerificationMethodMap {
-            id: vm_didurl.to_string(),
-            type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-            controller: did.to_string(),
-            blockchain_account_id: Some(blockchain_account_id.to_string()),
-            ..Default::default()
-        });
+        // <MAM> - removed #controller-style VerificationMethod from DID doc
+        // let vm = VerificationMethod::Map(VerificationMethodMap {
+        //     id: vm_didurl.to_string(),
+        //     type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
+        //     controller: did.to_string(),
+        //     blockchain_account_id: Some(blockchain_account_id.to_string()),
+        //     ..Default::default()
+        // });
         let eip712vm = VerificationMethod::Map(VerificationMethodMap {
             id: eip712vm_didurl.to_string(),
             type_: "Eip712Method2021".to_string(),
@@ -260,14 +263,18 @@ impl DIDResolver for DIDEthr {
             ]),
             id: did.to_string(),
             authentication: Some(vec![
-                VerificationMethod::DIDURL(vm_didurl.clone()),
+                // <MAM> - removed #controller-style VerificationMethod from DID doc
+                // VerificationMethod::DIDURL(vm_didurl.clone()),
                 VerificationMethod::DIDURL(eip712vm_didurl.clone()),
             ]),
             assertion_method: Some(vec![
-                VerificationMethod::DIDURL(vm_didurl),
+                // <MAM> - removed #controller-style VerificationMethod from DID doc
+                // VerificationMethod::DIDURL(vm_didurl),
                 VerificationMethod::DIDURL(eip712vm_didurl),
             ]),
-            verification_method: Some(vec![vm, eip712vm]),
+            // <MAM> - removed #controller-style VerificationMethod from DID doc
+            verification_method: Some(vec![//vm, 
+                eip712vm]),
             ..Default::default()
         };
 
@@ -353,6 +360,22 @@ mod tests {
         eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
+            // <MAM> - removed the following:
+            //  (from verificationMethod array)
+            // {
+            //     "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
+            //     "type": "EcdsaSecp256k1RecoveryMethod2020",
+            //     "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+            //     "blockchainAccountId": "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
+            //   }, 
+            //
+            //  (from authentication array)
+            // "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
+            //  (from assertionMethod array)
+            // "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
+
+
+
             json!({
               "@context": [
                 "https://www.w3.org/ns/did/v1",
@@ -364,22 +387,15 @@ mod tests {
               ],
               "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
               "verificationMethod": [{
-                "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
-                "type": "EcdsaSecp256k1RecoveryMethod2020",
-                "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
-                "blockchainAccountId": "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
-              }, {
                 "id": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021",
                 "type": "Eip712Method2021",
                 "controller": "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a",
                 "blockchainAccountId": "eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"
               }],
               "authentication": [
-                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
                 "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021"
               ],
               "assertionMethod": [
-                "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#controller",
                 "did:ethr:0xb9c5714089478a327f09197987f16f9e5d936e8a#Eip712Method2021"
               ]
             })
@@ -407,8 +423,9 @@ mod tests {
 
     #[tokio::test]
     async fn credential_prove_verify_did_ethr() {
-        eprintln!("with EcdsaSecp256k1RecoveryMethod2020...");
-        credential_prove_verify_did_ethr2(false).await;
+        // <MAM> - disabled EcdsaSec verification
+        // eprintln!("with EcdsaSecp256k1RecoveryMethod2020...");
+        // credential_prove_verify_did_ethr2(false).await;
         eprintln!("with Eip712Method2021...");
         credential_prove_verify_did_ethr2(true).await;
     }

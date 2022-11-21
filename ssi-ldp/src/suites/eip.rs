@@ -242,6 +242,7 @@ impl ProofSuite for EthereumEip712Signature2021 {
         match &vm.type_[..] {
             "EcdsaSecp256k1VerificationKey2019" => (),
             "EcdsaSecp256k1RecoveryMethod2020" => (),
+            "Eip712Method2021" => (),
             _ => return Err(Error::VerificationMethodMismatch),
         };
         if !sig_hex.starts_with("0x") {
