@@ -14,6 +14,7 @@ const TOR_SOCKS_PORT: usize = 9050;
 ///
 /// [Specification](https://blockchaincommons.github.io/did-method-onion/)
 #[non_exhaustive]
+#[derive(Clone)]
 pub struct DIDOnion {
     pub proxy_url: String,
 }
