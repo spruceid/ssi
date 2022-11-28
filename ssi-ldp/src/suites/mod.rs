@@ -18,7 +18,7 @@ use eip::*;
 #[cfg(feature = "secp256k1")]
 use secp256k1::*;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 #[cfg(feature = "solana")]
 use solana::*;
 use ssi_core::uri::URI;
@@ -28,6 +28,7 @@ use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::VerificationWarnings;
 #[cfg(feature = "tezos")]
 use tezos::*;
+use thiserror::Error;
 #[cfg(feature = "w3c")]
 use w3c::*;
 
@@ -37,7 +38,7 @@ use crate::{
 };
 
 use async_trait::async_trait;
-use std::collections::HashMap as Map;
+use std::{collections::HashMap as Map, str::FromStr};
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub enum ProofSuiteType {
@@ -82,6 +83,17 @@ pub enum ProofSuiteType {
     #[cfg(feature = "test")]
     #[serde(rename = "ex:AnonCredDerivedCredentialv1")]
     AnonCredDerivedCredentialv1,
+}
+
+// #[derive(Debug, Error)]
+// #[error(transparent)]
+// pub struct ParseProofSuiteError(#[from] ErrorRepr);
+impl FromStr for ProofSuiteType {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_value(json!(format!("{s}")))
+    }
 }
 
 pub enum SignatureType {

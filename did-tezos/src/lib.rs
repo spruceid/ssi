@@ -25,7 +25,7 @@ mod explorer;
 /// did:tz DID Method
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DIDTz {
     tzkt_url: Option<String>,
 }

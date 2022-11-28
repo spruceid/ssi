@@ -590,7 +590,7 @@ pub enum DIDMethodError {
 /// Registries](https://www.w3.org/TR/did-spec-registries/#did-methods).
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-pub trait DIDMethod: Sync {
+pub trait DIDMethod: Sync + Send {
     /// Get the DID method's name.
     ///
     /// `method-name` in [DID Syntax](https://w3c.github.io/did-core/#did-syntax).

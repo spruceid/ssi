@@ -1404,6 +1404,7 @@ impl<S: Sidetree> HTTPSidetreeDIDResolver<S> {
 }
 
 /// Sidetree DID Method client implementation
+#[derive(Clone)]
 pub struct SidetreeClient<S: Sidetree> {
     pub resolver: Option<HTTPSidetreeDIDResolver<S>>,
     pub endpoint: Option<String>,
