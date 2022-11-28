@@ -28,7 +28,6 @@ use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::VerificationWarnings;
 #[cfg(feature = "tezos")]
 use tezos::*;
-use thiserror::Error;
 #[cfg(feature = "w3c")]
 use w3c::*;
 
