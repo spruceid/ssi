@@ -305,8 +305,10 @@ mod tests {
         let mut vc: Credential = Credential::from_json_unsigned(vc_str).unwrap();
         let key_str = include_str!("../../tests/ed25519-2020-10-18.json");
         let key: JWK = serde_json::from_str(key_str).unwrap();
-        let mut issue_options = LinkedDataProofOptions::default();
-        issue_options.verification_method = Some(URI::String("did:web:localhost#key1".to_string()));
+        let issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String("did:web:localhost#key1".to_string())),
+            ..Default::default()
+        };
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let proof = vc
             .generate_proof(&key, &issue_options, &DIDWeb, &mut context_loader)

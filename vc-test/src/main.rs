@@ -105,9 +105,9 @@ async fn main() {
             (true, "--jwt-decode") => jwt_decode = true,
             (true, _) => panic!("Unexpected option '{}'", arg),
             (false, _) => {
-                if cmd == None {
+                if cmd.is_none() {
                     cmd = Option::Some(arg);
-                } else if filename == None {
+                } else if filename.is_none() {
                     filename = Option::Some(arg);
                 } else {
                     panic!("Unexpected argument '{}'", arg);
@@ -115,7 +115,7 @@ async fn main() {
             }
         }
     }
-    if cmd == None || filename == None {
+    if cmd.is_none() || filename.is_none() {
         return usage();
     }
 

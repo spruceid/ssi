@@ -53,7 +53,7 @@ pub struct Credential {
     #[serde(rename = "@context")]
     pub context: Contexts,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<URI>,
+    pub id: Option<StringOrURI>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
     pub credential_subject: OneOrMany<CredentialSubject>,
@@ -240,7 +240,7 @@ pub struct Presentation {
     #[serde(rename = "@context")]
     pub context: Contexts,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<URI>,
+    pub id: Option<StringOrURI>,
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -282,7 +282,7 @@ pub enum CredentialOrJWT {
     JWT(String),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 #[serde(try_from = "String")]
 pub enum StringOrURI {
@@ -296,6 +296,9 @@ pub struct JWTClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "exp")]
     pub expiration_time: Option<NumericDate>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "iat")]
+    pub issuance_date: Option<NumericDate>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "iss")]
     pub issuer: Option<StringOrURI>,
@@ -387,10 +390,25 @@ impl TryFrom<String> for StringOrURI {
         }
     }
 }
+impl TryFrom<&str> for StringOrURI {
+    type Error = Error;
+    fn try_from(string: &str) -> Result<Self, Self::Error> {
+        string.to_string().try_into()
+    }
+}
 
 impl From<URI> for StringOrURI {
     fn from(uri: URI) -> Self {
         StringOrURI::URI(uri)
+    }
+}
+
+impl From<StringOrURI> for String {
+    fn from(id: StringOrURI) -> Self {
+        match id {
+            StringOrURI::URI(uri) => uri.into(),
+            StringOrURI::String(s) => s,
+        }
     }
 }
 
@@ -534,7 +552,15 @@ impl Credential {
                 return Err(Error::InvalidIssuer);
             }
         }
-        if let Some(nbf) = claims.not_before {
+        if let Some(iat) = claims.issuance_date {
+            let iat_date_time: LocalResult<DateTime<Utc>> = iat.into();
+            if let Some(time) = iat_date_time.latest() {
+                vc.issuance_date = Some(VCDateTime {
+                    date_time: time.into(),
+                    use_z: true,
+                })
+            }
+        } else if let Some(nbf) = claims.not_before {
             let nbf_date_time: LocalResult<DateTime<Utc>> = nbf.into();
             if let Some(time) = nbf_date_time.latest() {
                 vc.issuance_date = Some(VCDateTime {
@@ -557,8 +583,7 @@ impl Credential {
             }
         }
         if let Some(id) = claims.jwt_id {
-            let uri = URI::try_from(id)?;
-            vc.id = Some(uri);
+            vc.id = Some(id.try_into()?);
         }
         Ok(vc)
     }
@@ -1098,7 +1123,7 @@ impl LinkedDataDocument for Credential {
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
-        Ok(serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(self)?)
     }
 
     fn get_issuer(&self) -> Option<&str> {
@@ -1135,8 +1160,7 @@ impl Presentation {
             vp.holder = Some(issuer_uri);
         }
         if let Some(id) = claims.jwt_id {
-            let uri = URI::try_from(id)?;
-            vp.id = Some(uri);
+            vp.id = Some(id.try_into()?);
         }
         Ok(vp)
     }
@@ -1580,7 +1604,7 @@ impl Presentation {
         for holder_binding in self.holder_binding.iter().flatten() {
             match &holder_binding {
                 #[cfg(test)]
-                HolderBinding::ExampleHolderBinding2022 { to, from } => {
+                HolderBinding::ExampleHolderBinding2022 { to, from: _ } => {
                     // TODO: error if term does not expand to expected IRI
                     // TODO: check proof signed by binding.from
                     if self.holder.is_none() || Some(to) != self.holder.as_ref() {
@@ -1698,7 +1722,7 @@ impl LinkedDataDocument for Presentation {
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
-        Ok(serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(self)?)
     }
 
     fn get_issuer(&self) -> Option<&str> {
@@ -2773,9 +2797,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // Issue Presentation with Credential
         let mut vp = Presentation {
             context: Contexts::Many(vec![Context::URI(URI::String(DEFAULT_CONTEXT.to_string()))]),
-            id: Some(URI::String(
-                "http://example.org/presentations/3731".to_string(),
-            )),
+            id: Some("http://example.org/presentations/3731".try_into().unwrap()),
             type_: OneOrMany::One("VerifiablePresentation".to_string()),
             verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
             proof: None,
@@ -3325,7 +3347,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         struct ExampleResolver;
         const EXAMPLE_DID: &str = "did:example:aleovm2021";
-        const EXAMPLE_DOC: &'static str = include_str!("../../tests/lds-aleo2021-issuer0.jsonld");
+        const EXAMPLE_DOC: &str = include_str!("../../tests/lds-aleo2021-issuer0.jsonld");
         #[async_trait]
         impl DIDResolver for ExampleResolver {
             async fn resolve(
@@ -3389,7 +3411,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
                 )
                 .await
                 .unwrap();
-            credential.add_proof(proof.clone());
+            credential.add_proof(proof);
             vc = credential;
 
             use std::fs::File;
@@ -3397,13 +3419,13 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             let outfile = File::create("tests/lds-aleo2021-vc0.jsonld").unwrap();
             let mut output_writer = BufWriter::new(outfile);
             serde_json::to_writer_pretty(&mut output_writer, &vc).unwrap();
-            output_writer.write(b"\n").unwrap();
+            output_writer.write_all(b"\n").unwrap();
         }
 
         // Verify VC
         let proof = vc.proof.iter().flatten().next().unwrap();
         let warnings = AleoSignature2021
-            .verify(&proof, &vc, &resolver, &mut context_loader)
+            .verify(proof, &vc, &resolver, &mut context_loader)
             .await
             .unwrap();
         assert!(warnings.is_empty());

@@ -942,7 +942,7 @@ impl DIDResolver for HTTPDIDResolver {
                     },
                     None,
                     None,
-                )
+                );
             }
         };
         let client = match Client::builder().build() {
@@ -988,7 +988,7 @@ impl DIDResolver for HTTPDIDResolver {
                 }
             })),
         }
-        .unwrap_or_else(|| "".to_string());
+        .unwrap_or_default();
         let res_result_representation = match resp.bytes().await {
             Ok(bytes) => bytes.to_vec(),
             Err(err) => {
@@ -1088,7 +1088,7 @@ impl DIDResolver for HTTPDIDResolver {
                     DereferencingMetadata::from_error(ERROR_INVALID_DID),
                     Content::Null,
                     ContentMetadata::default(),
-                ))
+                ));
             }
         };
         let client = match Client::builder().build() {
@@ -1148,7 +1148,7 @@ impl DIDResolver for HTTPDIDResolver {
                 }
             })),
         }
-        .unwrap_or_else(|| "".to_string());
+        .unwrap_or_default();
         let deref_result_bytes = match resp.bytes().await {
             Ok(bytes) => bytes.to_vec(),
             Err(err) => {

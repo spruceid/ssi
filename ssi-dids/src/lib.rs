@@ -644,21 +644,22 @@ pub trait DIDMethod: Sync {
 }
 
 /// A collection of DID methods that can be used as a single [DID resolver][DIDResolver].
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct DIDMethods<'a> {
     /// Collection of DID methods by method id.
-    pub methods: HashMap<&'a str, &'a dyn DIDMethod>,
+    pub methods: HashMap<&'a str, Box<dyn DIDMethod>>,
 }
 
+#[allow(clippy::borrowed_box)]
 impl<'a> DIDMethods<'a> {
     /// Add a DID method to the set. Returns the previous one set for the given method name, if any.
-    pub fn insert(&mut self, method: &'a dyn DIDMethod) -> Option<&'a dyn DIDMethod> {
+    pub fn insert(&mut self, method: Box<dyn DIDMethod>) -> Option<Box<dyn DIDMethod>> {
         let name = method.name();
         self.methods.insert(name, method)
     }
 
     /// Get a DID method from the set.
-    pub fn get(&self, method_name: &str) -> Option<&&'a dyn DIDMethod> {
+    pub fn get(&self, method_name: &str) -> Option<&Box<dyn DIDMethod>> {
         self.methods.get(method_name)
     }
 
@@ -668,7 +669,8 @@ impl<'a> DIDMethods<'a> {
     }
 
     /// Get DID method to handle a given DID.
-    pub fn get_method(&self, did: &str) -> Result<&&'a dyn DIDMethod, &'static str> {
+    // TODO use DID type
+    pub fn get_method(&self, did: &str) -> Result<&Box<dyn DIDMethod>, &'static str> {
         let mut parts = did.split(':');
         if parts.next() != Some("did") {
             return Err(ERROR_INVALID_DID);
@@ -926,6 +928,9 @@ impl FromStr for DIDURL {
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
         let mut parts = didurl.splitn(2, '#');
         let before_fragment = parts.next().unwrap().to_string();
+        if before_fragment.is_empty() {
+            return Err(Error::DIDURL);
+        }
         let fragment = parts.next().map(|x| x.to_owned());
         let primary_did_url = PrimaryDIDURL::try_from(before_fragment)?;
         Ok(Self {
@@ -1176,7 +1181,7 @@ impl DocumentBuilder {
     fn validate(&self) -> Result<(), Error> {
         // validate is called before defaults are assigned.
         // None means default will be used.
-        if self.id == None || self.id == Some("".to_string()) {
+        if self.id.is_none() || self.id == Some("".to_string()) {
             return Err(Error::MissingDocumentId);
         }
         if let Some(ref context) = self.context {

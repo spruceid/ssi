@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(try_from = "String")]
@@ -9,8 +10,8 @@ pub enum URI {
 
 #[derive(thiserror::Error, Debug)]
 pub enum URIParseErr {
-    #[error("Invalid URI")]
-    InvalidFormat,
+    #[error("Invalid URI: {0}")]
+    InvalidFormat(String),
 }
 
 impl From<URI> for String {
@@ -26,7 +27,7 @@ impl std::convert::TryFrom<String> for URI {
         if uri.contains(':') {
             Ok(URI::String(uri))
         } else {
-            Err(URIParseErr::InvalidFormat)
+            Err(URIParseErr::InvalidFormat(uri))
         }
     }
 }
@@ -40,7 +41,7 @@ impl URI {
     }
 }
 
-impl core::str::FromStr for URI {
+impl FromStr for URI {
     type Err = URIParseErr;
     fn from_str(uri: &str) -> Result<Self, Self::Err> {
         URI::try_from(String::from(uri))

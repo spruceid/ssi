@@ -499,9 +499,7 @@ mod tests {
                 DEFAULT_CONTEXT.to_string(),
             ))]),
 
-            id: Some(URI::String(
-                "http://example.org/presentations/3731".to_string(),
-            )),
+            id: Some("http://example.org/presentations/3731".try_into().unwrap()),
             type_: OneOrMany::One("VerifiablePresentation".to_string()),
             verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
             proof: None,

@@ -166,7 +166,7 @@ impl LinkedDataDocument for Proof {
     }
 
     fn to_value(&self) -> Result<Value, Error> {
-        Ok(serde_json::to_value(&self)?)
+        Ok(serde_json::to_value(self)?)
     }
 }
 

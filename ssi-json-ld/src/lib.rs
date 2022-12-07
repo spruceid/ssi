@@ -157,6 +157,8 @@ pub const ZCAP_V1_CONTEXT: &str = "https://w3id.org/zcap/v1";
 pub const CACAO_ZCAP_V1_CONTEXT: &str = "https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json";
 pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: &str =
     "https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json";
+pub const DID_CONFIGURATION_V0_0_CONTEXT: &str =
+    "https://identity.foundation/.well-known/contexts/did-configuration-v0.0.jsonld";
 
 lazy_static::lazy_static! {
     pub static ref CREDENTIALS_V1_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
@@ -339,6 +341,12 @@ lazy_static::lazy_static! {
         let iri = Iri::new(JFF_VC_EDU_PLUGFEST_2022_CONTEXT).unwrap();
         RemoteDocument::new(doc, iri)
     };
+    pub static ref DID_CONFIGURATION_V0_0_CONTEXT_DOCUMENT: RemoteDocument<JsonValue> = {
+        let jsonld = ssi_contexts::DID_CONFIGURATION_V0_0;
+        let doc = json::parse(jsonld).unwrap();
+        let iri = Iri::new(DID_CONFIGURATION_V0_0_CONTEXT).unwrap();
+        RemoteDocument::new(doc, iri)
+    };
 }
 
 #[derive(Clone)]
@@ -393,6 +401,9 @@ impl Loader for StaticLoader {
                 CACAO_ZCAP_V1_CONTEXT => Ok(CACAO_ZCAP_V1_CONTEXT_DOCUMENT.clone()),
                 JFF_VC_EDU_PLUGFEST_2022_CONTEXT => {
                     Ok(JFF_VC_EDU_PLUGFEST_2022_CONTEXT_DOCUMENT.clone())
+                }
+                DID_CONFIGURATION_V0_0_CONTEXT => {
+                    Ok(DID_CONFIGURATION_V0_0_CONTEXT_DOCUMENT.clone())
                 }
                 _ => Err(json_ld::ErrorCode::LoadingDocumentFailed.into()),
             }
@@ -1421,7 +1432,7 @@ pub fn object_to_rdf(
         _ => None,
     } {
         value = JsonValue::String(value_bool.to_string());
-        if datatype == None {
+        if datatype.is_none() {
             datatype = Some("http://www.w3.org/2001/XMLSchema#boolean");
         }
     } else if let Some(num) = value.as_number() {
@@ -1447,7 +1458,7 @@ pub fn object_to_rdf(
             }
             let num: String = num_vec.iter().collect();
             value = JsonValue::String(num);
-            if datatype == None {
+            if datatype.is_none() {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#double");
             }
         } else {
@@ -1458,11 +1469,11 @@ pub fn object_to_rdf(
                 format!("{:.0}", num_f64)
             };
             value = JsonValue::String(num);
-            if datatype == None {
+            if datatype.is_none() {
                 datatype = Some("http://www.w3.org/2001/XMLSchema#integer");
             }
         }
-    } else if datatype == None {
+    } else if datatype.is_none() {
         // 12
         datatype = Some(match item.language.is_some() {
             true => "http://www.w3.org/1999/02/22-rdf-syntax-ns#langString",
@@ -1484,7 +1495,7 @@ pub fn object_to_rdf(
     if let (Some(direction), Some(rdf_direction)) = (item.direction, options.rdf_direction.as_ref())
     {
         // 13.1
-        let language = language.unwrap_or_else(|| "".to_string());
+        let language = language.unwrap_or_default();
         let direction = match direction.as_str() {
             Some(direction) => direction,
             None => return Err(Error::ExpectedString),

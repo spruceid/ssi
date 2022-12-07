@@ -27,5 +27,5 @@ impl Sidetree for ION {
 
     const SIGNATURE_ALGORITHM: Algorithm = Algorithm::ES256K;
     const METHOD: &'static str = "ion";
-    const NETWORK: Option<&'static str> = Some("test");
+    const NETWORK: Option<&'static str> = None;
 }

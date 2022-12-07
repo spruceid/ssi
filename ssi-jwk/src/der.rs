@@ -103,10 +103,7 @@ impl ToASN1 for RSAPrivateKey {
     type Error = ASN1EncodeErr;
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         let multiprime = self.other_prime_infos.is_some();
-        let version = Integer(BigInt::new(
-            Sign::Plus,
-            vec![if multiprime { 1 } else { 0 }],
-        ));
+        let version = Integer(BigInt::new(Sign::Plus, vec![u32::from(multiprime)]));
         Ok(vec![ASN1Block::Sequence(
             0,
             [

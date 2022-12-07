@@ -201,9 +201,11 @@ pub(crate) mod tests {
                 }
             }))
             .unwrap();
-            let mut vc_issue_options = LinkedDataProofOptions::default();
-            vc_issue_options.verification_method = Some(URI::String(iss_vm.to_string()));
-            vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
+            let vc_issue_options = LinkedDataProofOptions {
+                verification_method: Some(URI::String(iss_vm.to_string())),
+                proof_purpose: Some(ProofPurpose::AssertionMethod),
+                ..Default::default()
+            };
             let mut context_loader = ssi_json_ld::ContextLoader::default();
             let proof = credential
                 .generate_proof(iss_key, &vc_issue_options, &DIDExample, &mut context_loader)
@@ -253,10 +255,12 @@ pub(crate) mod tests {
             vc.map(|v| ssi_core::one_or_many::OneOrMany::One(CredentialOrJWT::Credential(v)));
 
         let mut context_loader = ssi_json_ld::ContextLoader::default();
-        let mut vp_issue_options = LinkedDataProofOptions::default();
-        vp_issue_options.verification_method = Some(URI::String(presenter.1.to_string()));
-        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        vp_issue_options.checks = None;
+        let vp_issue_options = LinkedDataProofOptions {
+            verification_method: Some(URI::String(presenter.1.to_string())),
+            proof_purpose: Some(ProofPurpose::Authentication),
+            checks: None,
+            ..Default::default()
+        };
         let vp_proof = match vp
             .generate_proof(
                 presenter.2,
