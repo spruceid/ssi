@@ -7,6 +7,7 @@ use sidetree::{is_secp256k1, Sidetree, SidetreeClient, SidetreeError};
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
+#[derive(Clone)]
 pub struct ION;
 
 /// did:ion Method

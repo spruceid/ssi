@@ -1,5 +1,4 @@
 use super::super::*;
-use async_trait::async_trait;
 use serde_json::Value;
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_dids::did_resolve::{resolve_vm, DIDResolver};
@@ -13,14 +12,10 @@ const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz1` addresses.
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
-    async fn sign(
-        &self,
+impl Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -41,18 +36,16 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+            ..Proof::new(ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
         sign_proof(document, proof, key, Algorithm::EdBlake2b, context_loader).await
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -67,23 +60,14 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            ..Proof::new("Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+            ..Proof::new(ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
         prepare_proof(document, proof, Algorithm::EdBlake2b, context_loader).await
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        complete(preparation, signature).await
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -112,14 +96,10 @@ impl ProofSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz3` addresses.
 pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
-    async fn sign(
-        &self,
+impl P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -139,18 +119,16 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+            ..Proof::new(ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
         sign_proof(document, proof, key, Algorithm::ESBlake2b, context_loader).await
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -165,23 +143,14 @@ impl ProofSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
         // It needs custom JSON_LD context too.
         let proof = Proof {
             context: TZ_CONTEXT.clone(),
-            ..Proof::new("P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+            ..Proof::new(ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
         prepare_proof(document, proof, Algorithm::ESBlake2b, context_loader).await
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        complete(preparation, signature).await
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -248,14 +217,10 @@ async fn micheline_from_document_and_options_jcs(
 }
 
 pub struct TezosSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for TezosSignature2021 {
-    async fn sign(
-        &self,
+impl TezosSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -268,7 +233,7 @@ impl ProofSuite for TezosSignature2021 {
             .insert("publicKeyJwk".to_string(), jwk_value);
         let mut proof = Proof {
             context: TZVM_CONTEXT.clone(),
-            ..Proof::new("TezosSignature2021")
+            ..Proof::new(ProofSuiteType::TezosSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
@@ -289,11 +254,9 @@ impl ProofSuite for TezosSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -307,7 +270,7 @@ impl ProofSuite for TezosSignature2021 {
 
         let proof = Proof {
             context: TZVM_CONTEXT.clone(),
-            ..Proof::new("TezosSignature2021")
+            ..Proof::new(ProofSuiteType::TezosSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
@@ -323,18 +286,7 @@ impl ProofSuite for TezosSignature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
@@ -392,14 +344,10 @@ impl ProofSuite for TezosSignature2021 {
 }
 
 pub struct TezosJcsSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for TezosJcsSignature2021 {
-    async fn sign(
-        &self,
+impl TezosJcsSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -413,7 +361,7 @@ impl ProofSuite for TezosJcsSignature2021 {
             .insert("publicKeyMultibase".to_string(), Value::String(pkmb));
         let mut proof = Proof {
             context: TZJCSVM_CONTEXT.clone(),
-            ..Proof::new("TezosJcsSignature2021")
+            ..Proof::new(ProofSuiteType::TezosJcsSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
@@ -434,12 +382,9 @@ impl ProofSuite for TezosJcsSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
-        _context_loader: &mut ContextLoader,
         public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
@@ -454,7 +399,7 @@ impl ProofSuite for TezosJcsSignature2021 {
 
         let proof = Proof {
             context: TZJCSVM_CONTEXT.clone(),
-            ..Proof::new("TezosJcsSignature2021")
+            ..Proof::new(ProofSuiteType::TezosJcsSignature2021)
                 .with_options(options)
                 .with_properties(props)
         };
@@ -469,22 +414,10 @@ impl ProofSuite for TezosJcsSignature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
-        _context_loader: &mut ContextLoader,
     ) -> Result<VerificationWarnings, Error> {
         let sig_bs58 = proof
             .proof_value

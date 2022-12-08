@@ -1,5 +1,4 @@
 use super::super::*;
-use async_trait::async_trait;
 use serde_json::Value;
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_dids::did_resolve::{resolve_vm, DIDResolver};
@@ -60,14 +59,10 @@ use std::collections::HashMap as Map;
 /// [caip-aleo-chain-ref]: https://github.com/ChainAgnostic/CAIPs/pull/84
 /// [testnet1]: https://developer.aleo.org/testnet/getting_started/overview/
 pub struct AleoSignature2021;
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl ProofSuite for AleoSignature2021 {
-    async fn sign(
-        &self,
+impl AleoSignature2021 {
+    pub(crate) async fn sign(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
@@ -79,7 +74,7 @@ impl ProofSuite for AleoSignature2021 {
             } else {
                 serde_json::json!([ALEOVM_CONTEXT.clone()])
             },
-            ..Proof::new("AleoSignature2021")
+            ..Proof::new(ProofSuiteType::AleoSignature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -90,18 +85,15 @@ impl ProofSuite for AleoSignature2021 {
         Ok(proof)
     }
 
-    async fn prepare(
-        &self,
+    pub(crate) async fn prepare(
         document: &(dyn LinkedDataDocument + Sync),
         options: &LinkedDataProofOptions,
-        _resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
-        _public_key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<ProofPreparation, Error> {
         let proof = Proof {
             context: serde_json::json!([SOLVM_CONTEXT.clone()]),
-            ..Proof::new("AleoSignature2021")
+            ..Proof::new(ProofSuiteType::AleoSignature2021)
                 .with_options(options)
                 .with_properties(extra_proof_properties)
         };
@@ -113,18 +105,7 @@ impl ProofSuite for AleoSignature2021 {
         })
     }
 
-    async fn complete(
-        &self,
-        preparation: ProofPreparation,
-        signature: &str,
-    ) -> Result<Proof, Error> {
-        let mut proof = preparation.proof;
-        proof.proof_value = Some(signature.to_string());
-        Ok(proof)
-    }
-
-    async fn verify(
-        &self,
+    pub(crate) async fn verify(
         proof: &Proof,
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,

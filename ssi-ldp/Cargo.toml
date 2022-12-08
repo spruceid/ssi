@@ -24,6 +24,7 @@ aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 solana = []
 
 example-http-issuer = []
+test = []
 
 [dependencies]
 thiserror = "1.0"

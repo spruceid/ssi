@@ -679,7 +679,7 @@ mod tests {
     use serde_json::{from_str, from_value, json};
     use ssi_core::one_or_many::OneOrMany;
     use ssi_jwk::Algorithm;
-    use ssi_ldp::{Proof, ProofSuite};
+    use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
     fn test_generate(jwk_value: Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();
@@ -1101,7 +1101,7 @@ mod tests {
         eprintln!("sig: {}", sig);
 
         // Complete issuance
-        let proof = proof_suite.complete(prep, &sig).await.unwrap();
+        let proof = proof_suite.complete(&prep, &sig).await.unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
@@ -1178,7 +1178,7 @@ mod tests {
             .await
             .unwrap();
         let sig = sign_tezos(&prep, algorithm, &key);
-        let vp_proof = proof_suite.complete(prep, &sig).await.unwrap();
+        let vp_proof = proof_suite.complete(&prep, &sig).await.unwrap();
         vp.add_proof(vp_proof);
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
         vp.validate().unwrap();
@@ -1250,7 +1250,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
+            &ProofSuiteType::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1262,7 +1262,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi_ldp::Eip712Signature2021,
+            &ProofSuiteType::Eip712Signature2021,
             None,
             None,
         )
@@ -1274,7 +1274,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi_ldp::EthereumPersonalSignature2021,
+            &ProofSuiteType::EthereumPersonalSignature2021,
             None,
             None,
         )
@@ -1370,7 +1370,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi_ldp::EthereumEip712Signature2021,
+            &ProofSuiteType::EthereumEip712Signature2021,
             Some(eip712_domain),
             Some(vp_eip712_domain),
         )
@@ -1382,7 +1382,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ssi_ldp::Eip712Signature2021,
+            &ProofSuiteType::Eip712Signature2021,
             None,
             None,
         )
@@ -1396,7 +1396,7 @@ mod tests {
             other_key_ed25519.clone(),
             "tz",
             "#blockchainAccountId",
-            &ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            &ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             None,
             None,
         )
@@ -1423,7 +1423,7 @@ mod tests {
             other_key_p256.clone(),
             "tz",
             "#blockchainAccountId",
-            &ssi_ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            &ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             None,
             None,
         )
@@ -1437,7 +1437,7 @@ mod tests {
             other_key_ed25519.clone(),
             "sol",
             "#controller",
-            &ssi_ldp::Ed25519Signature2018,
+            &ProofSuiteType::Ed25519Signature2018,
             None,
             None,
         )
@@ -1461,7 +1461,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "btc",
             "#blockchainAccountId",
-            &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
+            &ProofSuiteType::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1473,7 +1473,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "doge",
             "#blockchainAccountId",
-            &ssi_ldp::EcdsaSecp256k1RecoverySignature2020,
+            &ProofSuiteType::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1488,7 +1488,7 @@ mod tests {
             other_key_ed25519.clone(),
             "tz",
             "#TezosMethod2021",
-            &ssi_ldp::TezosSignature2021,
+            &ProofSuiteType::TezosSignature2021,
         )
         .await;
         key_ed25519.algorithm = Some(Algorithm::EdDSA);
@@ -1516,7 +1516,7 @@ mod tests {
             other_key_p256.clone(),
             "tz",
             "#TezosMethod2021",
-            &ssi_ldp::TezosSignature2021,
+            &ProofSuiteType::TezosSignature2021,
         )
         .await;
         key_p256.algorithm = Some(Algorithm::ES256);

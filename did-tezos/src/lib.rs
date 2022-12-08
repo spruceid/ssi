@@ -25,7 +25,7 @@ mod explorer;
 /// did:tz DID Method
 ///
 /// [Specification](https://github.com/spruceid/did-tezos/)
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct DIDTz {
     tzkt_url: Option<String>,
 }
@@ -563,6 +563,7 @@ mod tests {
     use ssi_dids::did_resolve::ResolutionInputMetadata;
     use ssi_dids::ServiceEndpoint;
     use ssi_jws::encode_sign;
+    use ssi_ldp::{ProofSuite, ProofSuiteType};
     use std::collections::BTreeMap as Map;
 
     const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
@@ -856,8 +857,7 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
-        use ssi_ldp::ProofSuite;
-        let proof_bad = ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        let proof_bad = ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
@@ -1052,8 +1052,7 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_ed25519().unwrap();
-        use ssi_ldp::ProofSuite;
-        let proof_bad = ssi_ldp::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        let proof_bad = ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
@@ -1520,8 +1519,7 @@ mod tests {
         // Check that proof JWK must match proof verificationMethod
         let mut vc_wrong_key = vc_no_proof.clone();
         let other_key = JWK::generate_p256().unwrap();
-        use ssi_ldp::ProofSuite;
-        let proof_bad = ssi_ldp::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        let proof_bad = ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
             .sign(
                 &vc_no_proof,
                 &issue_options,
