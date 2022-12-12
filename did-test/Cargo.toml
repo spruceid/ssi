@@ -9,12 +9,12 @@ publish = false
 
 [dependencies]
 ssi-dids = { version = "0.1", path = "../ssi-dids" }
-did-method-key = { version = "0.1", path = "../did-key", default-features = false, features = ["secp256k1", "secp256r1"] }
-did-tz = { version = "0.1", path = "../did-tezos", default-features = false }
-did-pkh = { version = "0.1", path = "../did-pkh", default-features = false }
-did-web = { version = "0.1", path = "../did-web", default-features = false }
-did-webkey = { version = "0.1", path = "../did-webkey", default-features = false }
-did-onion = { version = "0.1", path = "../did-onion", default-features = false }
+did-method-key = { version = "0.2", path = "../did-key", default-features = false, features = ["secp256k1", "secp256r1"] }
+did-tz = { version = "0.2", path = "../did-tezos", default-features = false }
+did-pkh = { version = "0.2", path = "../did-pkh", default-features = false }
+did-web = { version = "0.2", path = "../did-web", default-features = false }
+did-webkey = { version = "0.2", path = "../did-webkey", default-features = false }
+did-onion = { version = "0.2", path = "../did-onion", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 base64 = "0.12"
