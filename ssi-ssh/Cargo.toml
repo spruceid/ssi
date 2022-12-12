@@ -2,8 +2,12 @@
 name = "ssi-ssh"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of SSH related functionalities for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-ssh/"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = ["secp256r1"]
 secp256r1 = ["ssi-jwk/secp256r1"]

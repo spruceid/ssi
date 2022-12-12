@@ -2,8 +2,12 @@
 name = "ssi-jws"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of JWS for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-jws/"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
 ## enable secp256k1 signatures

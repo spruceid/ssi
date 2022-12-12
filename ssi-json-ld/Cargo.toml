@@ -2,6 +2,11 @@
 name = "ssi-json-ld"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of JSON-LD algorithms for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-json-ld/"
 
 [dependencies]
 thiserror = "1.0"

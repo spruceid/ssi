@@ -2,8 +2,11 @@
 name = "ssi-core"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Core types and traits for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-core/"
 
 [dependencies]
 thiserror = "1.0"
