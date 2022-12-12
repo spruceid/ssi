@@ -104,3 +104,6 @@ serde_json = "1.0"
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
+
+[workspace.metadata.release]
+tag-prefix = "{{crate_name}}/"
