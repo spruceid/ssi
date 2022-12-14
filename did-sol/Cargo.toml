@@ -1,6 +1,6 @@
 [package]
 name = "did-sol"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"

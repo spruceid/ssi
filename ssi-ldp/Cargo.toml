@@ -2,8 +2,11 @@
 name = "ssi-ldp"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of Linked Data Proofs for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-ldp/"
 
 [features]
 default = ["eip", "tezos", "w3c", "solana"]
@@ -47,7 +50,7 @@ ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
 ssi-jws = { path = "../ssi-jws", version = "0.1"}
 ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true}
 ssi-caips = { path = "../ssi-caips", version = "0.1" }
-ssi-contexts = { version = "0.1.3", path = "../contexts" }
+ssi-contexts = { version = "0.1.4", path = "../contexts" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }

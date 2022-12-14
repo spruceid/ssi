@@ -2,8 +2,12 @@
 name = "ssi-caips"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of CAIPS for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-caips/"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [features]
 default = ["eip", "ripemd-160", "ssi-jwk/secp256k1"]
 eip = ["ssi-jwk/eip"]

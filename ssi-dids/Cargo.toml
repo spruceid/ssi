@@ -2,6 +2,11 @@
 name = "ssi-dids"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Core types and traits for DIDs for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-dids/"
 
 [features]
 http = ["reqwest", "percent-encoding"]

@@ -2,6 +2,11 @@
 name = "ssi-jwk"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of JWK for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-jwk/"
 
 [features]
 default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
@@ -26,8 +31,6 @@ eip = ["ssi-crypto/keccak", "k256/keccak256", "secp256k1"]
 tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
 
 ring = ["dep:ring"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 num-bigint = "0.4"

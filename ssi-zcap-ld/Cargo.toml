@@ -2,6 +2,11 @@
 name = "ssi-zcap-ld"
 version = "0.1.0"
 edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of ZCAP-LD for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-zcap-ld/"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
