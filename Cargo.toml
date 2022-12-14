@@ -106,4 +106,7 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [workspace.metadata.release]
+sign-tag = true
 tag-prefix = "{{crate_name}}/"
+tag-message = "Release {{crate_name}} version {{version}}."
+pre-release-commit-message = "Release"
