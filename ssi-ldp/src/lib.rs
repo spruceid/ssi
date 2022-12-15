@@ -231,7 +231,7 @@ fn use_epsig(key: &JWK) -> bool {
 // verify that it is correct for the given issuer and proof purpose.
 pub async fn ensure_or_pick_verification_relationship(
     options: &mut LinkedDataProofOptions,
-    document: &dyn LinkedDataDocument,
+    document: &(dyn LinkedDataDocument + Sync),
     key: &JWK,
     resolver: &dyn DIDResolver,
 ) -> Result<(), Error> {
