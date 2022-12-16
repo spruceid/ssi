@@ -1354,6 +1354,7 @@ impl Document {
 }
 
 /// Some example functionality.
+#[cfg(feature = "example")]
 pub mod example {
     use crate::did_resolve::{
         DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata,
@@ -1362,14 +1363,14 @@ pub mod example {
     use crate::{DIDMethod, Document};
     use async_trait::async_trait;
 
-    const DOC_JSON_FOO: &str = include_str!("../../tests/did-example-foo.json");
-    const DOC_JSON_BAR: &str = include_str!("../../tests/did-example-bar.json");
-    const DOC_JSON_12345: &str = include_str!("../../tests/did-example-12345.json");
-    const DOC_JSON_AABB: &str = include_str!("../../tests/lds-eip712-issuer.json");
+    const DOC_JSON_FOO: &str = include_str!("../tests/did-example-foo.json");
+    const DOC_JSON_BAR: &str = include_str!("../tests/did-example-bar.json");
+    const DOC_JSON_12345: &str = include_str!("../tests/did-example-12345.json");
+    const DOC_JSON_AABB: &str = include_str!("../tests/lds-eip712-issuer.json");
 
     // For vc-test-suite
-    const DOC_JSON_TEST_ISSUER: &str = include_str!("../../tests/did-example-test-issuer.json");
-    const DOC_JSON_TEST_HOLDER: &str = include_str!("../../tests/did-example-test-holder.json");
+    const DOC_JSON_TEST_ISSUER: &str = include_str!("../tests/did-example-test-issuer.json");
+    const DOC_JSON_TEST_HOLDER: &str = include_str!("../tests/did-example-test-holder.json");
 
     /// An implementation of `did:example`.
     ///

@@ -10,6 +10,7 @@ documentation = "https://docs.rs/ssi-dids/"
 
 [features]
 http = ["reqwest", "percent-encoding"]
+example = []
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

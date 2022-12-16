@@ -22,3 +22,4 @@ ssi-ldp = { path = "../ssi-ldp", version = "0.1", default-features = false }
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
 ssi-ldp = { path = "../ssi-ldp", version = "0.1", default-features = false, features = ["ed25519"] }
+ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
