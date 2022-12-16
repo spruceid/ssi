@@ -44,3 +44,4 @@ keccak-hash = { version = "0.7" }
 serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto" }
 ssi-ldp = { path = "../ssi-ldp", features = ["aleo"] }
+ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
