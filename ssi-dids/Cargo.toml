@@ -47,7 +47,7 @@ hyper = { version = "0.14", features = [
     "http1",
     "stream",
 ] }
-ssi-jwk = { path = "../ssi-jwk", version = "*", default-features = false, features = ["secp256k1"] }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["secp256k1"] }
 
 [package.metadata.docs.rs]
 all-features = true
