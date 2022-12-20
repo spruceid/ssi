@@ -76,10 +76,10 @@ impl BlankNodeComponents for Quad {
             labels.push((label.as_blank_id_ref(), BlankIdPosition::Subject))
         }
         if let rdf_types::Object::Blank(label) = &self.2 {
-            labels.push((&label, BlankIdPosition::Object))
+            labels.push((label, BlankIdPosition::Object))
         }
         if let Some(rdf_types::GraphLabel::Blank(label)) = &self.3 {
-            labels.push((&label, BlankIdPosition::Graph))
+            labels.push((label, BlankIdPosition::Graph))
         }
         labels
     }
@@ -167,8 +167,7 @@ pub fn hash_first_degree_quads(
     // 5
     let joined_nquads = nquads.join("");
     let nquads_digest = sha256(joined_nquads.as_bytes());
-    let hash_hex = digest_to_lowerhex(&nquads_digest);
-    hash_hex
+    digest_to_lowerhex(&nquads_digest)
 }
 
 /// <https://www.w3.org/TR/rdf-canon/>
@@ -311,7 +310,7 @@ impl<'a, Q: Iterator<Item = &'a Quad>> Iterator for NormalizedQuads<'a, Q> {
                 let canonical_identifier = self
                     .normalization_state
                     .canonical_issuer
-                    .find_issued_identifier(&label)
+                    .find_issued_identifier(label)
                     .unwrap();
                 *label = canonical_identifier.to_owned();
             }
@@ -505,8 +504,7 @@ pub fn hash_related_blank_node(
     input += &identifier;
     // 5
     let digest = sha256(input.as_bytes());
-    let hash_hex = digest_to_lowerhex(&digest);
-    hash_hex
+    digest_to_lowerhex(&digest)
 }
 
 #[cfg(test)]
