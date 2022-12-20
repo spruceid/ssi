@@ -320,7 +320,7 @@ impl DIDResolver for DIDWebKey {
             };
         let doc = Document {
             context: ssi_dids::Contexts::One(ssi_dids::Context::URI(
-                ssi_dids::DEFAULT_CONTEXT.to_string(),
+                ssi_dids::DEFAULT_CONTEXT.into(),
             )),
             id: did.to_string(),
             verification_method: Some(vm_maps),
