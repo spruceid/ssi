@@ -14,7 +14,7 @@ async-std = { version = "1.9", features = ["attributes"] }
 json-ld = "0.10.0"
 iref = "^2.0.3"
 static-iref = "2"
-rdf-types = "0.12.10"
+rdf-types = "0.12.12"
 locspan = "0.7.13"
 json-syntax = "0.8.18"
 futures = "0.3"

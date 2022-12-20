@@ -7,6 +7,7 @@ use std::fmt;
 pub struct MissingChosenIssuer;
 
 use rdf_types::BlankId;
+use rdf_types::QuadRef;
 use rdf_types::{BlankIdBuf, Quad};
 
 use ssi_crypto::hashes::sha256::sha256;
@@ -40,22 +41,40 @@ impl fmt::Display for BlankIdPosition {
     }
 }
 
-pub trait BlankNodeComponents {
-    fn blank_node_components(&self) -> Vec<&BlankId>;
+pub trait BlankNodeComponents<'a> {
+    fn blank_node_components(&self) -> Vec<&'a BlankId>;
 
-    fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf>;
-
-    fn blank_node_components_with_position(&self) -> Vec<(&BlankId, BlankIdPosition)>;
+    fn blank_node_components_with_position(&self) -> Vec<(&'a BlankId, BlankIdPosition)>;
 }
 
-impl BlankNodeComponents for Quad {
-    fn blank_node_components(&self) -> Vec<&BlankId> {
+pub trait BlankNodeComponentsMut {
+    fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf>;
+}
+
+impl<'a> BlankNodeComponents<'a> for QuadRef<'a> {
+    fn blank_node_components(&self) -> Vec<&'a BlankId> {
         self.blank_node_components_with_position()
             .into_iter()
             .map(|(label, _position)| label)
             .collect()
     }
 
+    fn blank_node_components_with_position(&self) -> Vec<(&'a BlankId, BlankIdPosition)> {
+        let mut labels = Vec::new();
+        if let rdf_types::Subject::Blank(label) = self.0 {
+            labels.push((label, BlankIdPosition::Subject))
+        }
+        if let rdf_types::Object::Blank(label) = self.2 {
+            labels.push((label, BlankIdPosition::Object))
+        }
+        if let Some(rdf_types::GraphLabel::Blank(label)) = self.3 {
+            labels.push((label, BlankIdPosition::Graph))
+        }
+        labels
+    }
+}
+
+impl BlankNodeComponentsMut for Quad {
     fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf> {
         let mut labels: Vec<&mut BlankIdBuf> = Vec::new();
         if let rdf_types::Subject::Blank(label) = &mut self.0 {
@@ -69,26 +88,12 @@ impl BlankNodeComponents for Quad {
         }
         labels
     }
-
-    fn blank_node_components_with_position(&self) -> Vec<(&BlankId, BlankIdPosition)> {
-        let mut labels = Vec::new();
-        if let rdf_types::Subject::Blank(label) = &self.0 {
-            labels.push((label.as_blank_id_ref(), BlankIdPosition::Subject))
-        }
-        if let rdf_types::Object::Blank(label) = &self.2 {
-            labels.push((label, BlankIdPosition::Object))
-        }
-        if let Some(rdf_types::GraphLabel::Blank(label)) = &self.3 {
-            labels.push((label, BlankIdPosition::Graph))
-        }
-        labels
-    }
 }
 
 /// <https://www.w3.org/TR/rdf-canon/#normalization-state>
 #[derive(Debug, Clone)]
 pub struct NormalizationState<'a> {
-    pub blank_node_to_quads: Map<&'a BlankId, Vec<&'a Quad>>,
+    pub blank_node_to_quads: Map<&'a BlankId, Vec<QuadRef<'a>>>,
     pub hash_to_blank_nodes: Map<String, Vec<&'a BlankId>>,
     pub canonical_issuer: IdentifierIssuer,
 }
@@ -148,7 +153,7 @@ pub fn hash_first_degree_quads(
         // 3
         for quad in quads {
             // 3.1
-            let mut quad: Quad = (*quad).clone();
+            let mut quad: Quad = quad.into_owned();
             // 3.1.1
             for label in quad.blank_node_components_mut() {
                 // 3.1.1.1
@@ -171,7 +176,9 @@ pub fn hash_first_degree_quads(
 }
 
 /// <https://www.w3.org/TR/rdf-canon/>
-pub fn normalize<'a, Q: IntoIterator<Item = &'a Quad>>(quads: Q) -> NormalizedQuads<'a, Q::IntoIter>
+pub fn normalize<'a, Q: IntoIterator<Item = QuadRef<'a>>>(
+    quads: Q,
+) -> NormalizedQuads<'a, Q::IntoIter>
 where
     Q::IntoIter: Clone,
 {
@@ -299,13 +306,13 @@ pub struct NormalizedQuads<'a, Q> {
     normalization_state: NormalizationState<'a>,
 }
 
-impl<'a, Q: Iterator<Item = &'a Quad>> Iterator for NormalizedQuads<'a, Q> {
+impl<'a, Q: Iterator<Item = QuadRef<'a>>> Iterator for NormalizedQuads<'a, Q> {
     type Item = Quad;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.quads.next().map(|quad| {
             // 7.1
-            let mut quad_copy = quad.clone();
+            let mut quad_copy = quad.into_owned();
             for label in quad_copy.blank_node_components_mut() {
                 let canonical_identifier = self
                     .normalization_state
@@ -476,7 +483,7 @@ pub fn hash_n_degree_quads(
 pub fn hash_related_blank_node(
     normalization_state: &mut NormalizationState,
     related: &BlankId,
-    quad: &Quad,
+    quad: QuadRef,
     issuer: &mut IdentifierIssuer,
     position: BlankIdPosition,
 ) -> String {
@@ -549,7 +556,8 @@ mod tests {
                 .map(Meta::into_value)
                 .map(Quad::strip_all_but_predicate)
                 .collect();
-            let normalized = normalize(&stripped_dataset).into_nquads();
+            let normalized =
+                normalize(stripped_dataset.iter().map(Quad::as_quad_ref)).into_nquads();
             if &normalized == &expected_str {
                 passed += 1;
             } else {
