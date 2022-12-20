@@ -25,7 +25,7 @@ pub const SECURITY_V1_CONTEXT: Iri = iri!("https://w3id.org/security/v1");
 pub const SECURITY_V2_CONTEXT: Iri = iri!("https://w3id.org/security/v2");
 pub const SCHEMA_ORG_CONTEXT: Iri = iri!("https://schema.org/");
 pub const DID_V1_CONTEXT: Iri = iri!("https://www.w3.org/ns/did/v1");
-pub const DID_V1_CONTEXT_NO_WWW: &str = "https://w3.org/ns/did/v1";
+pub const DID_V1_CONTEXT_NO_WWW: Iri = iri!("https://w3.org/ns/did/v1");
 pub const W3ID_DID_V1_CONTEXT: Iri = iri!("https://w3id.org/did/v1");
 pub const DID_RESOLUTION_V1_CONTEXT: Iri = iri!("https://w3id.org/did-resolution/v1");
 pub const DIF_ESRS2020_CONTEXT: Iri = iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
@@ -420,7 +420,7 @@ impl Loader<IriBuf, Span> for ContextLoader {
                     .await
                     .get(url.as_str())
                     .cloned()
-                    .ok_or_else(|| UnknownContext(url))
+                    .ok_or(UnknownContext(url))
             } else {
                 Err(UnknownContext(url))
             }
