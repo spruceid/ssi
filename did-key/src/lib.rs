@@ -197,16 +197,15 @@ impl DIDResolver for DIDKey {
             && data[1] == DID_KEY_BLS12381_G2_PREFIX[1]
         {
             {
-                // TODO improve this error message
-                // TODO add this back in, maybe accepting length suitable for ursa's
-                // BBS+ implementation
-                /*if data.len() - 2 != 96 {
+                // A BBS+ public key may have more than one generator; hence, the length may
+                // exceed 96
+                if data.len() - 2 < 96 {
                     return (
                         ResolutionMetadata::from_error(ERROR_INVALID_DID),
                         None,
                         None,
                     );
-                }*/
+                }
                 vm_type = "Bls12381G2Key2020".to_string();
                 vm_type_iri = "https://w3id.org/security#Bls12381G2Key2020".to_string();
                 // https://datatracker.ietf.org/doc/html/draft-denhartog-pairing-curves-jose-cose-00#section-3.1.3

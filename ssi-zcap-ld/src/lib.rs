@@ -87,7 +87,7 @@ where
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
-                let mut result = proof.verify(self, resolver, context_loader).await;
+                let mut result = proof.verify(self, resolver, context_loader, None).await;
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityDelegation) {
                     result.errors.push("Incorrect Proof Purpose".into());
                 };
@@ -307,7 +307,7 @@ where
         match &self.proof {
             None => VerificationResult::error("No applicable proof"),
             Some(proof) => {
-                let mut result = proof.verify(self, resolver, context_loader).await;
+                let mut result = proof.verify(self, resolver, context_loader, None).await;
                 if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
                     result.errors.push("Incorrect Proof Purpose".into());
                 };

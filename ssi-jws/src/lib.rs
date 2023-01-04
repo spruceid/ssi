@@ -73,6 +73,25 @@ fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
 
+pub fn create_bbs_sig_input(payload: &JWSPayload) -> Vec<SignatureMessage> {
+    let mut messages: Vec<SignatureMessage> = Vec::new();
+    messages.push(SignatureMessage::hash(payload.header.as_bytes()));
+    messages.push(SignatureMessage::hash(payload.sigopts_digest.as_ref()));
+
+    for i in 0..payload.messages.len() {
+        let message = payload.messages[i].as_bytes();
+        messages.push(SignatureMessage::hash(message));
+    }
+
+    let mut num_messages = payload.messages.len() + 2;
+    while num_messages < 100 {
+        // todo 100 is hardcoded; use config
+        messages.push(SignatureMessage::hash(b""));
+        num_messages += 1;
+    }
+    messages
+}
+
 pub fn sign_bytes_v2(
     algorithm: Algorithm,
     key: &JWK,
@@ -82,22 +101,7 @@ pub fn sign_bytes_v2(
         JWKParams::OKP(okp) => {
             match algorithm {
                 Algorithm::BLS12381G2 => {
-                    let mut messages: Vec<SignatureMessage> = Vec::new();
-                    messages.push(SignatureMessage::hash(payload.header.as_bytes()));
-                    let sigopts_str = base64::encode(&payload.sigopts_digest);
-                    messages.push(SignatureMessage::hash(payload.sigopts_digest.as_ref()));
-
-                    for i in 0..payload.messages.len() {
-                        let message = payload.messages[i].as_bytes();
-                        messages.push(SignatureMessage::hash(message));
-                    }
-
-                    let mut num_messages = payload.messages.len() + 2;
-                    while num_messages < 100 {
-                        // todo 100 is hardcoded; use config
-                        messages.push(SignatureMessage::hash(b""));
-                        num_messages += 1;
-                    }
+                    let messages = create_bbs_sig_input(payload);
 
                     let Base64urlUInt(pk_bytes) = &okp.public_key;
                     let Base64urlUInt(sk_bytes) = okp.private_key.as_ref().unwrap();
@@ -171,11 +175,10 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             use blake2::digest::{consts::U32, Digest};
             if algorithm != Algorithm::EdDSA
                 && algorithm != Algorithm::EdBlake2b
-                && algorithm != Algorithm::BLS12381G2
             {
                 return Err(Error::UnsupportedAlgorithm);
             }
-            if okp.curve != *"Ed25519" && okp.curve != *"Bls12381G2" {
+            if okp.curve != *"Ed25519" {
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }
             let hash = match algorithm {
@@ -184,33 +187,17 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     .to_vec(),
                 _ => data.to_vec(),
             };
-
-            match algorithm {
-                Algorithm::BLS12381G2 => {
-                    let messages = vec![SignatureMessage::hash(data)];
-
-                    let Base64urlUInt(pk_bytes) = &okp.public_key;
-                    let Base64urlUInt(sk_bytes) = okp.private_key.as_ref().unwrap();
-                    let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
-                    let sk = bbs::prelude::SecretKey::try_from(sk_bytes.as_slice()).unwrap();
-
-                    let signature = Signature::new(messages.as_slice(), &sk, &pk).unwrap();
-                    signature.to_bytes_compressed_form().to_vec()
-                }
-                _ => {
-                    #[cfg(feature = "ring")]
-                    {
-                        let key_pair = ring::signature::Ed25519KeyPair::try_from(okp)?;
-                        key_pair.sign(&hash).as_ref().to_vec()
-                    }
-                    // TODO: SymmetricParams
-                    #[cfg(all(feature = "ed25519", not(feature = "ring")))]
-                    {
-                        let keypair = ed25519_dalek::Keypair::try_from(okp)?;
-                        use ed25519_dalek::Signer;
-                        keypair.sign(&hash).to_bytes().to_vec()
-                    }
-                }
+            #[cfg(feature = "ring")]
+            {
+                let key_pair = ring::signature::Ed25519KeyPair::try_from(okp)?;
+                key_pair.sign(&hash).as_ref().to_vec()
+            }
+            // TODO: SymmetricParams
+            #[cfg(all(feature = "ed25519", not(feature = "ring")))]
+            {
+                let keypair = ed25519_dalek::Keypair::try_from(okp)?;
+                use ed25519_dalek::Signer;
+                keypair.sign(&hash).to_bytes().to_vec()
             }
         }
         #[allow(unused)]
@@ -319,6 +306,88 @@ pub fn sign_bytes_b64_v2(
     Ok(sig_b64)
 }
 
+pub fn verify_payload(
+    algorithm: Algorithm,
+    key: &JWK,
+    payload: &JWSPayload,
+    signature: &[u8],
+    disclosed_message_indices: &[usize],
+    nonce: Option<&String>,
+) -> Result<VerificationWarnings, Error> {
+    // todo ensure algorithm is bbs
+    let mut warnings = VerificationWarnings::default();
+
+    match algorithm {
+        Algorithm::BLS12381G2 => (),
+        _ => {
+            return Err(Error::UnsupportedAlgorithm);
+        }
+    }
+
+    match &key.params {
+        JWKParams::OKP(okp) => {
+            match nonce {
+                Some(n) => {
+                    let proof = SignatureProof::try_from(signature).unwrap(); // todo error handling
+
+                    let Base64urlUInt(pk_bytes) = &okp.public_key;
+                    let issuer_pk = PublicKey::try_from(pk_bytes.as_slice()).unwrap();
+                    let proof_request = Verifier::new_proof_request(disclosed_message_indices, &issuer_pk).unwrap();
+                    let proof_nonce_bytes = base64::decode(n).unwrap();
+                    assert!(proof_nonce_bytes.len() == 32);
+                    let mut proof_nonce_bytes_sized: [u8; 32] = [0; 32];
+                    proof_nonce_bytes_sized.clone_from_slice(proof_nonce_bytes.as_slice());
+                    let proof_nonce = ProofNonce::from(proof_nonce_bytes_sized);
+
+                    for i in 0..payload.messages.len() {
+                        let m = payload.messages[i].as_str();
+                    }
+
+                    let result = Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
+                    match result {
+                        Ok(message_hashes) => {
+                            for i in 0..message_hashes.len() {
+                                let revealed_hash = message_hashes[i];
+                                let message_index = disclosed_message_indices[i] - 2; // -2 because first two messages are header and sigopts
+                                let target_hash = SignatureMessage::hash(payload.messages[message_index].as_str());
+                                if revealed_hash != target_hash {
+                                    return Err(Error::InvalidSignature);
+                                }
+                            }
+                        },
+                        Err(_) => {
+                            return Err(Error::InvalidSignature);
+                        }
+                    }
+                },
+                None => {
+                    if signature.len() != 112 {
+                        return Err(Error::InvalidSignature);
+                    } else {
+                        let mut signature_sized: [u8; 112] = [0; 112];
+                        signature_sized.clone_from_slice(signature);
+                        let bbs_sig = bbs::prelude::Signature::from(&signature_sized);
+
+                        let messages = create_bbs_sig_input(payload);
+                        let Base64urlUInt(pk_bytes) = &okp.public_key;
+                        let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
+                        let result = bbs_sig.verify(messages.as_slice(), &pk).unwrap();
+
+                        if !result {
+                            return Err(Error::InvalidSignature);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            return Err(Error::UnsupportedAlgorithm);
+        }
+    }
+
+    Ok(warnings)
+}
+
 pub fn verify_bytes_warnable(
     algorithm: Algorithm,
     data: &[u8],
@@ -379,7 +448,8 @@ pub fn verify_bytes_warnable(
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
             use blake2::digest::{consts::U32, Digest};
-            if okp.curve != *"Ed25519" && okp.curve != *"Bls12381G2" {
+            // todo error if BLS12-381 G2
+            if okp.curve != *"Ed25519" {
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }
             let hash = match algorithm {
@@ -388,46 +458,23 @@ pub fn verify_bytes_warnable(
                     .to_vec(),
                 _ => data.to_vec(),
             };
-            match algorithm {
-                Algorithm::BLS12381G2 => match &key.params {
-                    JWKParams::OKP(okp) => {
-                        if signature.len() != 112 {
-                            return Err(Error::InvalidSignature);
-                        }
-                        let mut signature_sized: [u8; 112] = [0; 112];
-                        signature_sized.clone_from_slice(signature);
-                        let bbs_sig = bbs::prelude::Signature::from(&signature_sized);
-
-                        let messages = vec![SignatureMessage::hash(hash)];
-                        let Base64urlUInt(pk_bytes) = &okp.public_key;
-                        let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
-                        let result = bbs_sig.verify(messages.as_slice(), &pk).unwrap();
-                        if !result {
-                            return Err(Error::InvalidSignature);
-                        }
-                    }
-                    _ => (),
-                },
-                _ => {
-                    #[cfg(feature = "ring")]
-                    {
-                        use ring::signature::UnparsedPublicKey;
-                        let verification_algorithm = &ring::signature::ED25519;
-                        let public_key =
-                            UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
-                        public_key.verify(&hash, signature)?;
-                    }
-                    #[cfg(feature = "ed25519")]
-                    {
-                        use ed25519_dalek::Verifier;
-                        let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
-                        let signature = ed25519_dalek::Signature::from_bytes(signature)
-                            .map_err(ssi_jwk::Error::from)?;
-                        public_key
-                            .verify(&hash, &signature)
-                            .map_err(ssi_jwk::Error::from)?;
-                    }
-                }
+            #[cfg(feature = "ring")]
+            {
+                use ring::signature::UnparsedPublicKey;
+                let verification_algorithm = &ring::signature::ED25519;
+                let public_key =
+                    UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
+                public_key.verify(&hash, signature)?;
+            }
+            #[cfg(feature = "ed25519")]
+            {
+                use ed25519_dalek::Verifier;
+                let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
+                let signature = ed25519_dalek::Signature::from_bytes(signature)
+                    .map_err(ssi_jwk::Error::from)?;
+                public_key
+                    .verify(&hash, &signature)
+                    .map_err(ssi_jwk::Error::from)?;
             }
         }
         #[allow(unused)]

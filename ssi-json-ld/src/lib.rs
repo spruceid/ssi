@@ -2,7 +2,6 @@
 
 use std::collections::{BTreeMap as Map, HashMap};
 use std::convert::TryFrom;
-use std::f32::consts::E;
 use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -651,8 +650,6 @@ pub fn generate_node_map(
     active_property: Option<&str>,
     list: Option<&mut JsonValue>,
     blank_node_id_generator: &mut BlankNodeIdentifierGenerator,
-    depth: i32,
-    path: &mut Vec<String>,
 ) -> Result<(), Error> {
     let mut null: JsonValue = JsonValue::Null;
     let list = list.unwrap_or(&mut null);
@@ -669,8 +666,6 @@ pub fn generate_node_map(
                     active_property,
                     Some(list),
                     blank_node_id_generator,
-                    depth + 1,
-                    path,
                 )?;
             }
             return Ok(());
@@ -774,8 +769,6 @@ pub fn generate_node_map(
             active_property,
             Some(&mut result),
             blank_node_id_generator,
-            depth + 1,
-            path,
         )?;
         if list.is_null() {
             // 5.3
@@ -981,8 +974,6 @@ pub fn generate_node_map(
                         Some(property),
                         None,
                         blank_node_id_generator,
-                        depth + 1,
-                        path,
                     )?;
                 }
             }
@@ -1001,8 +992,6 @@ pub fn generate_node_map(
                 None,
                 None,
                 blank_node_id_generator,
-                depth + 1,
-                path,
             )?;
         }
         // 6.11
@@ -1015,8 +1004,6 @@ pub fn generate_node_map(
                 None,
                 None,
                 blank_node_id_generator,
-                depth + 1,
-                path,
             )?;
         }
         // 6.12
@@ -1026,7 +1013,6 @@ pub fn generate_node_map(
             .collect();
         element_property_values.sort_by(|(property1, _), (property2, _)| property1.cmp(property2));
         for (property_str, value) in element_property_values {
-            path.push(property_str.clone());
             blank_node_id_generator.path.push(property_str.clone());
 
             // 6.12.1
@@ -1052,8 +1038,6 @@ pub fn generate_node_map(
                 node.insert(property_str, JsonValue::new_array());
             }
             // 6.12.3
-            // only want to add to the stack on this call right here
-            // test with a println
             generate_node_map(
                 value,
                 node_map,
@@ -1062,8 +1046,6 @@ pub fn generate_node_map(
                 Some(property_str),
                 None,
                 blank_node_id_generator,
-                depth + 1,
-                path,
             )?;
             blank_node_id_generator.path.pop();
         }
@@ -1860,7 +1842,6 @@ pub async fn json_to_dataset<T>(
 where
     T: Loader<Document = JsonValue> + std::marker::Send + Sync,
 {
-    //println!("ssi-json-ld, lib.rs, json_to_dataset");
     let options = options.unwrap_or(&DEFAULT_JSON_LD_OPTIONS);
     let expanded_doc = expand_json(json, more_contexts_json, lax, Some(options), loader).await?;
     let mut node_map = Map::new();
@@ -1872,7 +1853,6 @@ where
     };
 
     for object in expanded_doc {
-        let mut path: Vec<String> = Vec::new();
         generate_node_map(
             object,
             &mut node_map,
@@ -1881,8 +1861,6 @@ where
             None,
             None,
             &mut blank_node_id_generator,
-            0,
-            &mut path,
         )?;
     }
     let mut dataset = DataSet::default();

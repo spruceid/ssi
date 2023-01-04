@@ -360,7 +360,6 @@ impl JWK {
         }
         match &self.params {
             Params::RSA(_) => {
-                println!("algorithm: rsa");
                 return Some(Algorithm::PS256);
             }
             Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {

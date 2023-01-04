@@ -669,6 +669,7 @@ impl Credential {
             checks,
             eip712_domain,
             type_,
+            nonce
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -852,7 +853,7 @@ impl Credential {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vc, resolver, context_loader).await;
+            let mut result = proof.verify(&vc, resolver, context_loader, None).await;
             results.append(&mut result);
             if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -975,6 +976,10 @@ impl Credential {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> VerificationResult {
+        let nonce = match options.as_ref() {
+            Some(ldp_options) => ldp_options.nonce.clone(),
+            None => None
+        };
         let checks = options
             .as_ref()
             .and_then(|opts| opts.checks.clone())
@@ -989,10 +994,11 @@ impl Credential {
             return VerificationResult::error("No applicable proof");
             // TODO: say why, e.g. expired
         }
+
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader).await;
+            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref()).await;
             results.append(&mut result);
             if result.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1214,6 +1220,7 @@ impl Presentation {
             checks,
             eip712_domain,
             type_,
+            nonce,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1397,7 +1404,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vp, resolver, context_loader).await;
+            let mut result = proof.verify(&vp, resolver, context_loader, None).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return (Some(vp), result);
@@ -1570,7 +1577,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader).await;
+            let mut result = proof.verify(self, resolver, context_loader, None).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -1821,27 +1828,6 @@ fn jwt_matches(
     true
 }
 
-fn print_elements(v: &Value, selectors: &Vec<&str>) {
-    match v {
-        Value::Null => println!("null"),
-        Value::Bool(x) => println!("bool({})", x),
-        Value::Number(x) => println!("number({})", x),
-        Value::String(x) => println!("string({})", x),
-        Value::Array(x) => {
-            println!("array");
-            for i in 0..x.len() {
-                print_elements(&x[i], selectors);
-            }
-        }
-        Value::Object(x) => {
-            for (k, v) in x {
-                println!("key = {}", k);
-                print_elements(v, selectors);
-            }
-        }
-    }
-}
-
 fn select_fields(subject: &CredentialSubject, selectors: &[String]) -> Map<String, Value> {
     let mut selected = Map::new();
 
@@ -1917,45 +1903,6 @@ pub async fn derive_credential(
     derived_credential.add_proof(proof);
 
     Ok(derived_credential)
-}
-
-pub async fn derive_credential_old(
-    document: &Credential,
-    context_loader: &mut ContextLoader,
-    selectors: &Vec<&str>,
-) {
-    let derived_credential = document.clone();
-
-    use ssi_json_ld::rdf::{IRIRef, Predicate, Statement};
-
-    let dataset = document
-        .to_dataset_for_signing(None, context_loader)
-        .await
-        .unwrap();
-    let statements = dataset.statements();
-    let mut selected_statements: Vec<Statement> = Vec::new();
-
-    for i in 0..statements.len() {
-        let predicate = &statements[i].predicate;
-        match predicate {
-            Predicate::IRIRef(iri_ref) => {
-                let IRIRef(text) = iri_ref;
-
-                for j in 0..selectors.len() {
-                    let simple_selector = "/".to_owned() + selectors[j];
-                    if text.ends_with(&simple_selector) {
-                        selected_statements.push(statements[i].clone());
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    for i in 0..selected_statements.len() {
-        let text = String::from(&selected_statements[i]);
-        eprintln!("selected statement: {}", &text);
-    }
 }
 
 #[cfg(test)]

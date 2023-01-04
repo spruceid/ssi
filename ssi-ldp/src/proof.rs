@@ -54,6 +54,8 @@ pub struct Proof {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
+    #[serde(default)]
+    pub disclosed_messages: Option<Vec<usize>>,
 }
 
 impl Proof {
@@ -71,6 +73,7 @@ impl Proof {
             nonce: None,
             jws: None,
             property_set: None,
+            disclosed_messages: None,
         }
     }
 
@@ -144,8 +147,9 @@ impl Proof {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
     ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver, context_loader)
+        LinkedDataProofs::verify(self, document, resolver, context_loader, nonce)
             .await
             .into()
     }
@@ -172,15 +176,17 @@ impl LinkedDataDocument for Proof {
             None => None,
         };
 
-        let stable_blank_node_labels = match copy.type_.as_str() {
-            "BbsBlsSignatureProof2020" => true,
+        let stable_blank_node_labels = match copy.type_ {
+            ProofSuiteType::BbsBlsSignatureProof2020 => true,
             _ => false,
         };
+
+        let lax = stable_blank_node_labels;
 
         let dataset = json_to_dataset(
             &json,
             more_contexts.as_ref(),
-            false,
+            lax,
             None,
             context_loader,
             stable_blank_node_labels,
@@ -220,6 +226,9 @@ pub struct LinkedDataProofOptions {
     /// The challenge of the proof.
     pub challenge: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The nonce of the proof.
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// The domain of the proof.
     pub domain: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -244,6 +253,7 @@ impl Default for LinkedDataProofOptions {
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
             type_: None,
+            nonce: None,
         }
     }
 }

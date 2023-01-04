@@ -179,6 +179,7 @@ pub trait ProofSuite {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
     ) -> Result<VerificationWarnings, Error>;
 }
 
@@ -334,6 +335,8 @@ impl LinkedDataProofs {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         let mut options = options.clone();
+
+        // todo re-enable this
         //ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         // Use type property if present
         let suite = if let Some(ref type_) = options.type_ {
@@ -394,10 +397,11 @@ impl LinkedDataProofs {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
     ) -> Result<VerificationWarnings, Error> {
         let suite = &proof.type_;
         suite
-            .verify(proof, document, resolver, context_loader)
+            .verify(proof, document, resolver, context_loader, nonce)
             .await
     }
 }
@@ -446,14 +450,12 @@ pub async fn generate_bbs_signature_pok(
         .ok_or(Error::MissingVerificationMethod)?
         .as_str();
 
-    // this is where the JWK is coming from
     let key = ssi_dids::did_resolve::resolve_key(verification_method, did_resolver).await?;
 
     use ssi_jwk::Params as JWKParams;
     let pk = match &key.params {
         JWKParams::OKP(okp) => {
             let Base64urlUInt(pk_bytes) = &okp.public_key;
-            eprintln!("signature pok, pk bytes: {}", base64::encode(pk_bytes));
             PublicKey::try_from(pk_bytes.as_slice()).unwrap()
         }
         _ => unimplemented!(),
@@ -464,8 +466,6 @@ pub async fn generate_bbs_signature_pok(
     let mut context_loader = ssi_json_ld::ContextLoader::default();
     let payload = to_jws_payload_v2(document, &proof_without_jws, &mut context_loader).await?;
     let (header, header_str) = ssi_jws::generate_header(Algorithm::BLS12381G2, &key).unwrap();
-    eprintln!("Header: {}", &header_str);
-    eprintln!("Signature with header: {}", signature_with_header);
 
     let start_index = signature_with_header.find("..").unwrap() + 2; // +2 for ..; todo: switch to ok_or
     let signature_str = &signature_with_header[start_index..];
@@ -484,11 +484,12 @@ pub async fn generate_bbs_signature_pok(
 
     let mut proof_messages: Vec<ProofMessage> = Vec::new();
     proof_messages.push(bbs::pm_hidden!(header_str.as_bytes()));
-    let sigopts_str = base64::encode(&payload.sigopts_digest);
     proof_messages.push(bbs::pm_hidden!(payload.sigopts_digest.as_ref()));
 
     let mut revealed_message_indices = Vec::new();
     for i in 0..payload.messages.len() {
+        let message_index = i + 2;
+
         let message_bytes = payload.messages[i].as_bytes();
 
         let mut disclose = false;
@@ -503,7 +504,7 @@ pub async fn generate_bbs_signature_pok(
         }
 
         if disclose {
-            revealed_message_indices.push(i);
+            revealed_message_indices.push(message_index);
             let pm = bbs::pm_revealed!(message_bytes);
             proof_messages.push(pm);
         } else {
@@ -527,15 +528,16 @@ pub async fn generate_bbs_signature_pok(
     challenge_bytes.extend_from_slice(pok.to_bytes().as_slice());
     let nonce_bytes = base64::decode(nonce).unwrap();
     challenge_bytes.extend_from_slice(nonce_bytes.as_slice());
-    eprintln!("size of challenge bytes: {}", challenge_bytes.len());
     let challenge = ProofChallenge::hash(&challenge_bytes);
 
     let bbs_proof = Prover::generate_signature_pok(pok, &challenge).unwrap();
     let bbs_proof_bytes = bbs_proof.to_bytes_compressed_form();
     let bbs_proof_str = base64::encode_config(bbs_proof_bytes.as_slice(), base64::URL_SAFE_NO_PAD);
+    let proof_str = header_str.clone() + ".." + bbs_proof_str.as_str();
 
     let mut proof_with_new_sig = proof.clone();
-    proof_with_new_sig.jws = Some(bbs_proof_str);
+    proof_with_new_sig.jws = Some(proof_str);  // todo: change to proof/proofValue
+    proof_with_new_sig.disclosed_messages = Some(revealed_message_indices);
     Ok(proof_with_new_sig)
 }
 
@@ -562,11 +564,6 @@ async fn to_jws_payload_v2(
         .await?;
     let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
     let doc_normalized = doc_dataset_normalized.to_nquads_vec()?;
-
-    for i in 0..doc_normalized.len() {
-        eprintln!("n-quad: {} {}", &i, doc_normalized[i].as_str());
-    }
-
     payload.messages = doc_normalized;
 
     Ok(payload)
@@ -587,7 +584,6 @@ async fn sign(
             return Err(Error::JWS(ssi_jws::Error::AlgorithmMismatch));
         }
     }
-    let options_str = serde_json::to_string(options).unwrap();
     let proof = Proof::new(type_)
         .with_options(options)
         .with_properties(extra_proof_properties);
@@ -642,7 +638,6 @@ async fn sign_nojws(
     if !document_has_context(document, context_uri)? {
         proof.context = serde_json::json!([context_uri]);
     }
-
     let message = to_jws_payload(document, &proof, context_loader).await?;
     let sig = ssi_jws::sign_bytes(algorithm, &message, key)?;
     let sig_multibase = multibase::encode(multibase::Base::Base58Btc, sig);
@@ -754,6 +749,39 @@ async fn verify_nojws(
     Ok(ssi_jws::verify_bytes_warnable(
         algorithm, &message, &key, &sig,
     )?)
+}
+
+async fn verify_bbs_proof(
+    proof: &Proof,
+    document: &(dyn LinkedDataDocument + Sync),
+    resolver: &dyn DIDResolver,
+    context_loader: &mut ContextLoader,
+    algorithm: Algorithm,
+    nonce: Option<&String>,
+) -> Result<VerificationWarnings, Error> {
+    let proof_value = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+    let start_index = proof_value.find("..").unwrap() + 2;
+    let sig_str = &proof_value[start_index..];
+    let sig = base64::decode_config(&sig_str, base64::URL_SAFE_NO_PAD).unwrap();
+
+    let verification_method = proof
+        .verification_method
+        .as_ref()
+        .ok_or(Error::MissingVerificationMethod)?;
+    let key = resolve_key(verification_method, resolver).await?;
+    let mut payload = to_jws_payload_v2(document, &proof, context_loader).await?;
+    let (_, header_b64) = ssi_jws::generate_header(algorithm, &key)?;
+    payload.header = header_b64;
+
+    let mut disclosed_message_indices = Vec::new();
+    match proof.disclosed_messages.as_ref() {
+        Some(message_indices) => {
+            disclosed_message_indices.extend_from_slice(message_indices.as_slice());
+        },
+        None => (),
+    };
+
+    Ok(ssi_jws::verify_payload(algorithm, &key, &payload, sig.as_slice(), disclosed_message_indices.as_slice(), nonce)?)
 }
 
 // Check if a linked data document has a given URI in its @context array.

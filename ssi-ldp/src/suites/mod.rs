@@ -33,7 +33,7 @@ use w3c::*;
 
 use crate::{
     prepare, prepare_nojws, sign, sign_nojws, use_eip712sig, use_epsig, verify, verify_nojws,
-    Error, LinkedDataDocument, LinkedDataProofOptions, Proof, ProofPreparation, ProofSuite,
+    Error, LinkedDataDocument, LinkedDataProofOptions, Proof, ProofPreparation, ProofSuite, verify_bbs_proof,
 };
 
 use async_trait::async_trait;
@@ -82,6 +82,7 @@ pub enum ProofSuiteType {
     #[cfg(feature = "test")]
     #[serde(rename = "ex:AnonCredDerivedCredentialv1")]
     AnonCredDerivedCredentialv1,
+    BbsBlsSignatureProof2020,
 }
 
 // #[derive(Debug, Error)]
@@ -140,6 +141,7 @@ impl ProofSuiteType {
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
             | Self::AnonCredDerivedCredentialv1 => todo!(),
+            Self::BbsBlsSignatureProof2020 => SignatureType::JWS,
         }
     }
 
@@ -188,6 +190,7 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
             #[cfg(feature = "test")]
             Self::NonJwsProof |
             Self::AnonCredPresentationProofv1 | Self::AnonCredDerivedCredentialv1 => todo!(),
+            Self::BbsBlsSignatureProof2020 => &["https://w3id.org/security#BbsBlsSignatureProof2020"],
         }
     }
 
@@ -299,12 +302,14 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
                         )))
                     }
                 }
-            }
+            },
+            Algorithm::BLS12381G2 => Self::BbsBlsSignatureProof2020,
             _ => return Err(Error::ProofTypeNotSupported),
         })
     }
 
     pub fn is_zkp(&self) -> bool {
+        // todo probably need to make a change here as well
         matches!(self, Self::CLSignature2019)
     }
 }
@@ -510,6 +515,17 @@ impl ProofSuite for ProofSuiteType {
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
             | Self::AnonCredDerivedCredentialv1 => todo!(),
+            Self::BbsBlsSignatureProof2020 => {
+                sign(
+                    document,
+                    options,
+                    context_loader,
+                    key,
+                    self.clone(),
+                    Algorithm::BLS12381G2,
+                    extra_proof_properties,
+                ).await
+            }
         }
     }
 
@@ -702,6 +718,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             Self::CLSignature2019 => todo!(),
+            Self::BbsBlsSignatureProof2020 => todo!(),
             #[cfg(feature = "test")]
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
@@ -715,6 +732,7 @@ impl ProofSuite for ProofSuiteType {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
     ) -> Result<VerificationWarnings, Error> {
         match self {
             #[cfg(feature = "rsa")]
@@ -795,6 +813,9 @@ impl ProofSuite for ProofSuiteType {
                 verify(proof, document, resolver, context_loader).await
             }
             Self::CLSignature2019 => todo!(),
+            Self::BbsBlsSignatureProof2020 => {
+                verify_bbs_proof(proof, document, resolver, context_loader, Algorithm::BLS12381G2, nonce).await
+            },
             #[cfg(feature = "test")]
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
