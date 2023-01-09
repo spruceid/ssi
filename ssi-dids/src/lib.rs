@@ -91,25 +91,25 @@ impl From<VerificationRelationship> for String {
 }
 
 impl VerificationRelationship {
-    pub fn to_iri(&self) -> &'static str {
+    pub fn to_iri(&self) -> Iri<'static> {
         match self {
             VerificationRelationship::Authentication => {
-                "https://w3id.org/security#authenticationMethod"
+                iri!("https://w3id.org/security#authenticationMethod")
             }
             VerificationRelationship::AssertionMethod => {
-                "https://w3id.org/security#assertionMethod"
+                iri!("https://w3id.org/security#assertionMethod")
             }
             VerificationRelationship::KeyAgreement => {
-                "https://w3id.org/security#keyAgreementMethod"
+                iri!("https://w3id.org/security#keyAgreementMethod")
             }
             VerificationRelationship::ContractAgreement => {
-                "https://w3id.org/security#contractAgreementMethod"
+                iri!("https://w3id.org/security#contractAgreementMethod")
             }
             VerificationRelationship::CapabilityInvocation => {
-                "https://w3id.org/security#capabilityInvocationMethod"
+                iri!("https://w3id.org/security#capabilityInvocationMethod")
             }
             VerificationRelationship::CapabilityDelegation => {
-                "https://w3id.org/security#capabilityDelegationMethod"
+                iri!("https://w3id.org/security#capabilityDelegationMethod")
             }
         }
     }

@@ -306,6 +306,12 @@ pub struct NormalizedQuads<'a, Q> {
     normalization_state: NormalizationState<'a>,
 }
 
+impl<'a, Q: Iterator<Item = QuadRef<'a>>> NormalizedQuads<'a, Q> {
+    pub fn into_nquads(self) -> String {
+        IntoNQuads::into_nquads(self)
+    }
+}
+
 impl<'a, Q: Iterator<Item = QuadRef<'a>>> Iterator for NormalizedQuads<'a, Q> {
     type Item = Quad;
 
@@ -573,7 +579,7 @@ mod tests {
 /// Quad iterator extension to produce an N-Quads document.
 ///
 /// See <https://www.w3.org/TR/n-quads/>.
-trait IntoNQuads {
+pub trait IntoNQuads {
     fn into_nquads(self) -> String;
 }
 
@@ -593,7 +599,7 @@ where
 }
 
 /// Wrapper to display an RDF Quad as an N-Quads statement.
-pub struct NQuadsStatement<'a>(&'a Quad);
+pub struct NQuadsStatement<'a>(pub &'a Quad);
 
 impl<'a> fmt::Display for NQuadsStatement<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -5,6 +5,8 @@ use std::collections::HashMap as Map;
 use async_trait::async_trait;
 use chrono::prelude::*;
 pub mod proof;
+use iref::{Iri, IriBuf};
+use static_iref::iri;
 pub use proof::{Check, LinkedDataProofOptions, Proof};
 pub mod error;
 pub use error::Error;
@@ -12,9 +14,12 @@ pub mod context;
 pub mod soltx;
 pub use context::Context;
 
+pub type HashDataset = grdf::HashDataset<rdf_types::Subject, IriBuf, rdf_types::Object, rdf_types::GraphLabel>;
+
 #[cfg(feature = "eip")]
 pub mod eip712;
 
+use rdf_types::QuadRef;
 // use crate::did::{VerificationMethod, VerificationMethodMap};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -22,7 +27,7 @@ use ssi_core::uri::URI;
 use ssi_crypto::hashes::sha256::sha256;
 use ssi_dids::did_resolve::{resolve_key, DIDResolver};
 use ssi_dids::VerificationRelationship as ProofPurpose;
-use ssi_json_ld::{rdf::DataSet, urdna2015, ContextLoader};
+use ssi_json_ld::{urdna2015, ContextLoader};
 use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
 use ssi_jws::Header;
 
@@ -140,7 +145,7 @@ pub trait LinkedDataDocument {
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, Error>;
+    ) -> Result<HashDataset, Error>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -412,10 +417,8 @@ async fn to_jws_payload(
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
-    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
-    let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
-    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
+    let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads();
+    let sigopts_normalized = urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from)).into_nquads();
     let sigopts_digest = sha256(sigopts_normalized.as_bytes());
     let doc_digest = sha256(doc_normalized.as_bytes());
     let data = [
@@ -467,7 +470,7 @@ async fn sign_nojws(
     key: &JWK,
     type_: ProofSuiteType,
     algorithm: Algorithm,
-    context_uri: &str,
+    context_uri: Iri<'_>,
     extra_proof_properties: Option<Map<String, Value>>,
 ) -> Result<Proof, Error> {
     if let Some(key_algorithm) = key.algorithm {
@@ -532,7 +535,7 @@ async fn prepare_nojws(
     public_key: &JWK,
     type_: ProofSuiteType,
     algorithm: Algorithm,
-    context_uri: &str,
+    context_uri: Iri<'_>,
     extra_proof_properties: Option<Map<String, Value>>,
 ) -> Result<ProofPreparation, Error> {
     if let Some(key_algorithm) = public_key.algorithm {
@@ -597,19 +600,20 @@ async fn verify_nojws(
 // Check if a linked data document has a given URI in its @context array.
 fn document_has_context(
     document: &(dyn LinkedDataDocument + Sync),
-    context_uri: &str,
+    context_uri: Iri,
 ) -> Result<bool, Error> {
     let contexts_string = document.get_contexts()?.ok_or(Error::MissingContext)?;
     let contexts: ssi_core::one_or_many::OneOrMany<Context> =
         serde_json::from_str(&contexts_string)?;
     Ok(contexts
         .into_iter()
-        .any(|c| matches!(c, Context::URI(URI::String(u)) if u == context_uri)))
+        .any(|c| matches!(c, Context::URI(URI::String(u)) if u == context_uri.as_str())))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rdf_types::BlankIdBuf;
     use ssi_dids::example::DIDExample;
     use ssi_json_ld::CREDENTIALS_V1_CONTEXT;
 
@@ -618,26 +622,21 @@ mod tests {
     #[async_trait]
     impl LinkedDataDocument for ExampleDocument {
         fn get_contexts(&self) -> Result<Option<String>, Error> {
-            Ok(Some(serde_json::to_string(CREDENTIALS_V1_CONTEXT)?))
+            Ok(Some(serde_json::to_string(&CREDENTIALS_V1_CONTEXT)?))
         }
         async fn to_dataset_for_signing(
             &self,
             _parent: Option<&(dyn LinkedDataDocument + Sync)>,
             _context_loader: &mut ContextLoader,
-        ) -> Result<DataSet, Error> {
-            use ssi_json_ld::rdf;
-            let mut dataset = DataSet::default();
-            let statement = rdf::Statement {
-                subject: rdf::Subject::BlankNodeLabel(rdf::BlankNodeLabel("_:c14n0".to_string())),
-                predicate: rdf::Predicate::IRIRef(rdf::IRIRef(
-                    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-                )),
-                object: rdf::Object::IRIRef(rdf::IRIRef(
-                    "http://example.org/vocab#Foo".to_string(),
-                )),
-                graph_label: None,
-            };
-            dataset.add_statement(statement);
+        ) -> Result<HashDataset, Error> {
+            let mut dataset = HashDataset::default();
+            let statement = rdf_types::Quad(
+                rdf_types::Subject::Blank(BlankIdBuf::from_suffix("c14n0").unwrap()),
+                iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type").to_owned(),
+                rdf_types::Object::Iri(iri!("http://example.org/vocab#Foo").to_owned()),
+                None
+            );
+            dataset.insert(statement);
             Ok(dataset)
         }
 
