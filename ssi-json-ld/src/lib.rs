@@ -3,12 +3,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+pub mod rdf;
 pub mod urdna2015;
 
 use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 use json_ld::Loader;
+pub use json_ld::{expansion::Policy as ExpansionPolicy, syntax, Options, RemoteDocumentReference};
 use json_syntax::Parse;
 use locspan::{Meta, Span};
 use rdf_types::IriVocabularyMut;
@@ -16,6 +18,14 @@ use static_iref::iri;
 use thiserror::Error;
 
 pub type RemoteDocument = json_ld::RemoteDocument<IriBuf, Span>;
+
+pub type ToRdfError<
+    E = UnknownContext,
+    C = json_ld::loader::ContextLoaderError<
+        UnknownContext,
+        Meta<json_ld::loader::ExtractContextError<Span>, Span>,
+    >,
+> = json_ld::ToRdfError<Span, E, C>;
 
 pub const CREDENTIALS_V1_CONTEXT: Iri = iri!("https://www.w3.org/2018/credentials/v1");
 pub const CREDENTIALS_EXAMPLES_V1_CONTEXT: Iri =
@@ -217,7 +227,8 @@ macro_rules! iri_match {
 
 /// Error raised when an unknown context is loaded with [`StaticLoader`] or
 /// [`ContextLoader`].
-#[derive(Debug)]
+#[derive(thiserror::Error, Debug)]
+#[error("Unknown context: {0}")]
 pub struct UnknownContext(IriBuf);
 
 #[derive(Clone)]
@@ -427,4 +438,36 @@ impl Loader<IriBuf, Span> for ContextLoader {
         }
         .boxed()
     }
+}
+
+/// Converts the input JSON-LD document into an RDF dataset.
+pub async fn json_to_dataset<L>(
+    json: json_ld::syntax::MetaValue<Span>,
+    loader: &mut L,
+    mut options: Options<IriBuf, Span>,
+) -> Result<rdf::DataSet, Box<ToRdfError<L::Error, L::ContextError>>>
+where
+    L: json_ld::Loader<IriBuf, Span> + json_ld::ContextLoader<IriBuf, Span> + Send + Sync,
+    L::Output: Into<json_ld::syntax::Value<Span>>,
+    L::Error: Send,
+    L::Context: Into<json_ld::syntax::context::Value<Span>>,
+    L::ContextError: Send,
+{
+    use json_ld::JsonLdProcessor;
+    options.produce_generalized_rdf = false;
+    let doc = json_ld::RemoteDocument::new(None, None, json);
+    let mut generator =
+        rdf_types::generator::Blank::new_with_prefix("b".to_string()).with_default_metadata();
+    let mut to_rdf = doc
+        .to_rdf_using(&mut generator, loader, options)
+        .await
+        .map_err(Box::new)?;
+    Ok(to_rdf
+        .cloned_quads()
+        .map(|q| {
+            // Since `produce_generalized_rdf` is set to `false`, it is guaranteed
+            // each predicate is an IRI.
+            q.map_predicate(|p| p.into_iri().unwrap())
+        })
+        .collect())
 }

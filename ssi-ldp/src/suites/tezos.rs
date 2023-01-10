@@ -190,7 +190,8 @@ async fn micheline_from_document_and_options(
         .await?;
     let doc_dataset_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from));
     let doc_normalized = doc_dataset_normalized.into_nquads();
-    let sigopts_dataset_normalized = urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from));
+    let sigopts_dataset_normalized =
+        urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from));
     let sigopts_normalized = sigopts_dataset_normalized.into_nquads();
     let msg = ["", &sigopts_normalized, &doc_normalized].join("\n");
     let data = ssi_tzkey::encode_tezos_signed_message(&msg)?;
@@ -202,9 +203,7 @@ async fn micheline_from_document_and_options_jcs(
     proof: &Proof,
 ) -> Result<Vec<u8>, Error> {
     let mut doc_value = document.to_value()?;
-    let doc_obj = doc_value
-        .as_object_mut()
-        .ok_or(Error::ExpectedJsonObject)?;
+    let doc_obj = doc_value.as_object_mut().ok_or(Error::ExpectedJsonObject)?;
     let mut proof_value = serde_json::to_value(proof)?;
     let proof_obj = proof_value
         .as_object_mut()

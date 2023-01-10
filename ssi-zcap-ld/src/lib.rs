@@ -4,9 +4,12 @@ use std::convert::TryFrom;
 pub mod error;
 pub use error::Error;
 
+use iref::{Iri, IriBuf};
 use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
-use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader, SECURITY_V2_CONTEXT};
+use ssi_json_ld::{
+    json_to_dataset, rdf::DataSet, ContextLoader, RemoteDocumentReference, SECURITY_V2_CONTEXT,
+};
 use ssi_jwk::JWK;
 use ssi_ldp::{
     Check, Context, Error as LdpError, LinkedDataDocument, LinkedDataProofOptions,
@@ -17,7 +20,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-const DEFAULT_CONTEXT: &str = SECURITY_V2_CONTEXT;
+const DEFAULT_CONTEXT: Iri = SECURITY_V2_CONTEXT;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -217,12 +220,23 @@ where
     ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
-        let json = serde_json::to_string(&copy)?;
-        let more_contexts = match parent {
-            Some(parent) => parent.get_contexts()?,
-            None => None,
-        };
-        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
+        let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
+        Ok(json_to_dataset(
+            json,
+            context_loader,
+            ssi_json_ld::Options {
+                expand_context: parent
+                    .map(LinkedDataDocument::get_contexts)
+                    .transpose()?
+                    .flatten()
+                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                // VC HTTP API Test Suite expect properties to not be silently dropped.
+                // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
+                expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,
+                ..Default::default()
+            },
+        )
+        .await?)
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
@@ -373,12 +387,23 @@ where
     ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
-        let json = serde_json::to_string(&copy)?;
-        let more_contexts = match parent {
-            Some(parent) => parent.get_contexts()?,
-            None => None,
-        };
-        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
+        let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
+        Ok(json_to_dataset(
+            json,
+            context_loader,
+            ssi_json_ld::Options {
+                expand_context: parent
+                    .map(LinkedDataDocument::get_contexts)
+                    .transpose()?
+                    .flatten()
+                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                // VC HTTP API Test Suite expect properties to not be silently dropped.
+                // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
+                expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,
+                ..Default::default()
+            },
+        )
+        .await?)
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
@@ -405,7 +430,7 @@ pub enum Contexts {
 
 impl Default for Contexts {
     fn default() -> Self {
-        Self::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
+        Self::One(Context::URI(URI::String(DEFAULT_CONTEXT.to_string())))
     }
 }
 
@@ -417,7 +442,7 @@ impl TryFrom<OneOrMany<Context>> for Contexts {
             Some(Context::URI(URI::String(uri))) => uri,
             Some(Context::Object(_)) => return Err(LdpError::InvalidContext),
         };
-        if first_uri != DEFAULT_CONTEXT {
+        if first_uri != DEFAULT_CONTEXT.into_str() {
             return Err(LdpError::InvalidContext);
         }
         Ok(match context {
@@ -457,7 +482,7 @@ mod tests {
         let zcap: Delegation<(), ()> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
-            Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
+            Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.to_string())))
         );
         assert_eq!(
             zcap.id,
@@ -485,7 +510,7 @@ mod tests {
         let zcap: Invocation<DefaultProps<AC>> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
             zcap.context,
-            Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.into())))
+            Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.to_string())))
         );
         assert_eq!(
             zcap.id,

@@ -38,7 +38,6 @@ static-iref = "2.0"
 rdf-types = "0.12.15"
 grdf = "0.15.3"
 json-syntax = { version = "0.9", features = ["serde"] }
-json-ld = "0.11.0"
 locspan = "0.7.13"
 bs58 = { version = "0.4", features = ["check"] }
 serde = { version = "1.0", features = ["derive"] }

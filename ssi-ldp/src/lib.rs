@@ -6,15 +6,13 @@ use async_trait::async_trait;
 use chrono::prelude::*;
 pub mod proof;
 use iref::{Iri, IriBuf};
-use static_iref::iri;
 pub use proof::{Check, LinkedDataProofOptions, Proof};
+use static_iref::iri;
 pub mod error;
 pub use error::Error;
 pub mod context;
 pub mod soltx;
 pub use context::Context;
-
-pub type HashDataset = grdf::HashDataset<rdf_types::Subject, IriBuf, rdf_types::Object, rdf_types::GraphLabel>;
 
 #[cfg(feature = "eip")]
 pub mod eip712;
@@ -27,7 +25,7 @@ use ssi_core::uri::URI;
 use ssi_crypto::hashes::sha256::sha256;
 use ssi_dids::did_resolve::{resolve_key, DIDResolver};
 use ssi_dids::VerificationRelationship as ProofPurpose;
-use ssi_json_ld::{urdna2015, ContextLoader};
+use ssi_json_ld::{rdf::DataSet, urdna2015, ContextLoader};
 use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
 use ssi_jws::Header;
 
@@ -145,7 +143,7 @@ pub trait LinkedDataDocument {
         &self,
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
-    ) -> Result<HashDataset, Error>;
+    ) -> Result<DataSet, Error>;
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
@@ -418,7 +416,8 @@ async fn to_jws_payload(
         .to_dataset_for_signing(None, context_loader)
         .await?;
     let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads();
-    let sigopts_normalized = urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from)).into_nquads();
+    let sigopts_normalized =
+        urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from)).into_nquads();
     let sigopts_digest = sha256(sigopts_normalized.as_bytes());
     let doc_digest = sha256(doc_normalized.as_bytes());
     let data = [
@@ -628,13 +627,13 @@ mod tests {
             &self,
             _parent: Option<&(dyn LinkedDataDocument + Sync)>,
             _context_loader: &mut ContextLoader,
-        ) -> Result<HashDataset, Error> {
-            let mut dataset = HashDataset::default();
+        ) -> Result<DataSet, Error> {
+            let mut dataset = DataSet::default();
             let statement = rdf_types::Quad(
                 rdf_types::Subject::Blank(BlankIdBuf::from_suffix("c14n0").unwrap()),
                 iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type").to_owned(),
                 rdf_types::Object::Iri(iri!("http://example.org/vocab#Foo").to_owned()),
-                None
+                None,
             );
             dataset.insert(statement);
             Ok(dataset)

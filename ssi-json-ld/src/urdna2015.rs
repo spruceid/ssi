@@ -1,4 +1,3 @@
-use std::borrow::Borrow;
 use std::collections::BTreeMap as Map;
 use std::collections::HashSet;
 use std::fmt;
@@ -11,6 +10,9 @@ use rdf_types::QuadRef;
 use rdf_types::{BlankIdBuf, Quad};
 
 use ssi_crypto::hashes::sha256::sha256;
+
+use crate::rdf::IntoNQuads;
+use crate::rdf::NQuadsStatement;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BlankIdPosition {
@@ -573,36 +575,5 @@ mod tests {
         }
         assert!(total > 0);
         assert_eq!(passed, total);
-    }
-}
-
-/// Quad iterator extension to produce an N-Quads document.
-///
-/// See <https://www.w3.org/TR/n-quads/>.
-pub trait IntoNQuads {
-    fn into_nquads(self) -> String;
-}
-
-impl<Q: IntoIterator> IntoNQuads for Q
-where
-    Q::Item: Borrow<Quad>,
-{
-    fn into_nquads(self) -> String {
-        let mut lines = self
-            .into_iter()
-            .map(|quad| NQuadsStatement(quad.borrow()).to_string())
-            .collect::<Vec<String>>();
-        lines.sort();
-        lines.dedup();
-        lines.join("")
-    }
-}
-
-/// Wrapper to display an RDF Quad as an N-Quads statement.
-pub struct NQuadsStatement<'a>(pub &'a Quad);
-
-impl<'a> fmt::Display for NQuadsStatement<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{} .", self.0)
     }
 }

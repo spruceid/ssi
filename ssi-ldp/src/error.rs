@@ -51,6 +51,8 @@ pub enum Error {
     JWS(#[from] ssi_jws::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    ToRdfError(#[from] Box<ssi_json_ld::ToRdfError>),
     #[error("Expected a JSON object")]
     ExpectedJsonObject,
     #[error(transparent)]
@@ -87,7 +89,7 @@ pub enum Error {
     #[error("Expected CAIP-2 namespace '{0}' but found '{1}'")]
     UnexpectedCAIP2Namespace(String, String),
     #[error(transparent)]
-    InconsistentProof(#[from] ProofInconsistency),
+    InconsistentProof(#[from] Box<ProofInconsistency>),
 }
 
 impl From<ssi_jwk::Error> for Error {
