@@ -157,13 +157,10 @@ impl<F, A> Ucan<F, A> {
             UcanCodec::Raw(r) => r.clone(),
             UcanCodec::DagJson => [
                 base64::encode_config(
-                    &DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?,
+                    DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?,
                     base64::URL_SAFE_NO_PAD,
                 ),
-                base64::encode_config(
-                    &DagJsonCodec.encode(&self.payload)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
+                base64::encode_config(DagJsonCodec.encode(&self.payload)?, base64::URL_SAFE_NO_PAD),
                 base64::encode_config(&self.signature, base64::URL_SAFE_NO_PAD),
             ]
             .join("."),
@@ -293,10 +290,10 @@ impl<F, A> Payload<F, A> {
             algorithm,
             [
                 base64::encode_config(
-                    &DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
+                    DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
                     base64::URL_SAFE_NO_PAD,
                 ),
-                base64::encode_config(&DagJsonCodec.encode(&self)?, base64::URL_SAFE_NO_PAD),
+                base64::encode_config(DagJsonCodec.encode(&self)?, base64::URL_SAFE_NO_PAD),
             ]
             .join(".")
             .as_bytes(),
