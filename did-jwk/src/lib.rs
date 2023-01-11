@@ -137,8 +137,7 @@ impl DIDMethod for DIDJWK {
             return None;
         };
 
-        let did =
-            "did:jwk:".to_string() + &multibase::encode(multibase::Base::Base64Url, &jwk)[1..];
+        let did = "did:jwk:".to_string() + &multibase::encode(multibase::Base::Base64Url, jwk)[1..];
         Some(did)
     }
 
