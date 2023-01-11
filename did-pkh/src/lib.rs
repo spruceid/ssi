@@ -596,7 +596,7 @@ fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<Blockchain
     let pk_bs58 = match key.params {
         Params::OKP(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
             "aleo",
-            &params.public_key.0.to_base32(),
+            params.public_key.0.to_base32(),
             bech32::Variant::Bech32m,
         )
         .unwrap(),
