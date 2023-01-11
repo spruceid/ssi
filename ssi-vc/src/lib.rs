@@ -8,11 +8,11 @@ mod cacao;
 pub mod revocation;
 
 use cacao::BindingDelegation;
-use iref::IriBuf;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
-use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader, RemoteDocumentReference};
+use ssi_json_ld::parse_ld_context;
+use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
 use ssi_jwk::{JWTKeys, JWK};
 use ssi_jws::Header;
 pub use ssi_jwt::NumericDate;
@@ -1122,7 +1122,9 @@ impl LinkedDataDocument for Credential {
                     .map(LinkedDataDocument::get_contexts)
                     .transpose()?
                     .flatten()
-                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                    .as_deref()
+                    .map(parse_ld_context)
+                    .transpose()?,
                 // VC HTTP API Test Suite expect properties to not be silently dropped.
                 // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
                 expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,
@@ -1732,7 +1734,9 @@ impl LinkedDataDocument for Presentation {
                     .map(LinkedDataDocument::get_contexts)
                     .transpose()?
                     .flatten()
-                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                    .as_deref()
+                    .map(parse_ld_context)
+                    .transpose()?,
                 // VC HTTP API Test Suite expect properties to not be silently dropped.
                 // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
                 expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,

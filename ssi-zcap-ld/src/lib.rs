@@ -4,11 +4,11 @@ use std::convert::TryFrom;
 pub mod error;
 pub use error::Error;
 
-use iref::{Iri, IriBuf};
+use iref::Iri;
 use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
 use ssi_json_ld::{
-    json_to_dataset, rdf::DataSet, ContextLoader, RemoteDocumentReference, SECURITY_V2_CONTEXT,
+    json_to_dataset, parse_ld_context, rdf::DataSet, ContextLoader, SECURITY_V2_CONTEXT,
 };
 use ssi_jwk::JWK;
 use ssi_ldp::{
@@ -229,7 +229,9 @@ where
                     .map(LinkedDataDocument::get_contexts)
                     .transpose()?
                     .flatten()
-                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                    .as_deref()
+                    .map(parse_ld_context)
+                    .transpose()?,
                 // VC HTTP API Test Suite expect properties to not be silently dropped.
                 // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
                 expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,
@@ -396,7 +398,9 @@ where
                     .map(LinkedDataDocument::get_contexts)
                     .transpose()?
                     .flatten()
-                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                    .as_deref()
+                    .map(parse_ld_context)
+                    .transpose()?,
                 // VC HTTP API Test Suite expect properties to not be silently dropped.
                 // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
                 expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,

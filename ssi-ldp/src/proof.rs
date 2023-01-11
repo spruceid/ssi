@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_dids::did_resolve::DIDResolver;
 use ssi_dids::VerificationRelationship as ProofPurpose;
-use ssi_json_ld::{json_to_dataset, ContextLoader, RemoteDocumentReference};
+use ssi_json_ld::{json_to_dataset, parse_ld_context, ContextLoader};
 
 const RDF_TYPE: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 const RDF_NIL: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil");
@@ -181,7 +181,9 @@ impl LinkedDataDocument for Proof {
                     .map(LinkedDataDocument::get_contexts)
                     .transpose()?
                     .flatten()
-                    .map(|iri| RemoteDocumentReference::Iri(IriBuf::new(&iri).unwrap())),
+                    .as_deref()
+                    .map(parse_ld_context)
+                    .transpose()?,
                 // VC HTTP API Test Suite expect properties to not be silently dropped.
                 // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
                 expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,

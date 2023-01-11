@@ -53,6 +53,8 @@ pub enum Error {
     Json(#[from] serde_json::Error),
     #[error(transparent)]
     ToRdfError(#[from] Box<ssi_json_ld::ToRdfError>),
+    #[error(transparent)]
+    InvalidJsonLdContext(#[from] ssi_json_ld::ContextError),
     #[error("Expected a JSON object")]
     ExpectedJsonObject,
     #[error(transparent)]

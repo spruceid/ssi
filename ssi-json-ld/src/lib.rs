@@ -9,8 +9,8 @@ pub mod urdna2015;
 use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
-use json_ld::Loader;
 pub use json_ld::{expansion::Policy as ExpansionPolicy, syntax, Options, RemoteDocumentReference};
+use json_ld::{syntax::TryFromJson, Loader};
 use json_syntax::Parse;
 use locspan::{Meta, Span};
 use rdf_types::IriVocabularyMut;
@@ -438,6 +438,29 @@ impl Loader<IriBuf, Span> for ContextLoader {
         }
         .boxed()
     }
+}
+
+pub type RemoteContext =
+    json_ld::RemoteDocument<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
+pub type RemoteContextReference =
+    RemoteDocumentReference<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
+
+#[derive(Debug, thiserror::Error)]
+pub enum ContextError {
+    #[error("Invalid JSON: {0}")]
+    InvalidJson(#[from] json_syntax::parse::MetaError<Span>),
+
+    #[error("Invalid JSON-LD context: {0}")]
+    InvalidContext(#[from] Meta<json_ld::syntax::context::InvalidContext, Span>),
+}
+
+/// Parse a JSON-LD context.
+pub fn parse_ld_context(content: &str) -> Result<RemoteContextReference, ContextError> {
+    let json = json_syntax::Value::parse_str(content, |span| span)?;
+    let context = json_ld::syntax::context::Value::try_from_json(json)?;
+    Ok(RemoteContextReference::Loaded(RemoteContext::new(
+        None, None, context,
+    )))
 }
 
 /// Converts the input JSON-LD document into an RDF dataset.
