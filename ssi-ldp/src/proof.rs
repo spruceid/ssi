@@ -2,7 +2,6 @@ use std::collections::HashMap as Map;
 use std::{convert::TryFrom, str::FromStr};
 
 use chrono::prelude::*;
-use grdf::GraphTake;
 
 use super::*;
 
@@ -352,7 +351,11 @@ fn verify_proof_consistency(
     let graph_ref = dataset.default_graph_mut();
 
     let type_triple = graph_ref
-        .take_match(rdf_types::Triple(None, Some(RDF_TYPE.as_str()), None))
+        .take_match::<rdf_types::Subject, _, rdf_types::Object>(rdf_types::Triple(
+            None,
+            Some(&RDF_TYPE),
+            None,
+        ))
         .ok_or(ProofInconsistency::MissingType)?;
 
     let type_iri = type_triple
@@ -468,7 +471,7 @@ fn verify_proof_consistency(
 /// RDF graph extension adding utility methods on proof graphs.
 trait ProofGraph:
     grdf::Graph<Subject = rdf_types::Subject, Predicate = IriBuf, Object = rdf_types::Object>
-    + grdf::GraphTake<rdf_types::Subject, str, rdf_types::Object>
+    + for<'a> grdf::GraphTake<rdf_types::Subject, Iri<'a>, rdf_types::Object>
 {
     /// Take any statement of the form `s p o` for the given `s` and `p`
     /// and call `object_predicate(Some(o))`.
@@ -479,7 +482,7 @@ trait ProofGraph:
         p: Iri,
         object_predicate: impl FnOnce(&mut Self, Option<Self::Object>) -> Result<(), E>,
     ) -> Result<(), E> {
-        match self.take_match(rdf_types::Triple(Some(s), Some(p.as_str()), None)) {
+        match self.take_match(rdf_types::Triple(Some(s), Some(&p), None)) {
             Some(rdf_types::Triple(_, _, o)) => object_predicate(self, Some(o)),
             None => object_predicate(self, None),
         }
@@ -574,7 +577,7 @@ trait ProofGraph:
                         Some(id) => {
                             match this.take_match(rdf_types::Triple(
                                 Some(&id),
-                                Some(RDF_FIRST.as_str()),
+                                Some(&RDF_FIRST),
                                 None,
                             )) {
                                 Some(rdf_types::Triple(_, _, first)) => {
@@ -589,7 +592,7 @@ trait ProofGraph:
 
                                     match this.take_match(rdf_types::Triple(
                                         Some(&id),
-                                        Some(RDF_REST.as_str()),
+                                        Some(&RDF_REST),
                                         None,
                                     )) {
                                         Some(rdf_types::Triple(_, _, rest)) => {
