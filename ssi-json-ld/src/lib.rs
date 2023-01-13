@@ -9,7 +9,7 @@ pub mod urdna2015;
 use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
-pub use json_ld::{expansion::Policy as ExpansionPolicy, syntax, Options, RemoteDocumentReference};
+pub use json_ld::{syntax, Options, RemoteDocumentReference};
 use json_ld::{syntax::TryFromJson, Loader};
 use json_syntax::Parse;
 use locspan::{Meta, Span};
@@ -17,8 +17,10 @@ use rdf_types::IriVocabularyMut;
 use static_iref::iri;
 use thiserror::Error;
 
+/// Remote JSON-LD document.
 pub type RemoteDocument = json_ld::RemoteDocument<IriBuf, Span>;
 
+/// Error raised by the `json_to_dataset` function.
 pub type ToRdfError<
     E = UnknownContext,
     C = json_ld::loader::ContextLoaderError<
@@ -440,8 +442,11 @@ impl Loader<IriBuf, Span> for ContextLoader {
     }
 }
 
+/// Remote JSON-LD context document.
 pub type RemoteContext =
     json_ld::RemoteDocument<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
+
+/// Remote JSON-LD context document reference.
 pub type RemoteContextReference =
     RemoteDocumentReference<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
 
@@ -464,10 +469,16 @@ pub fn parse_ld_context(content: &str) -> Result<RemoteContextReference, Context
 }
 
 /// Converts the input JSON-LD document into an RDF dataset.
+///
+/// The input document will be expanded with the given `expand_context` with
+/// the [`Strict`] expansion policy as required by the [VC HTTP API Test Suite].
+///
+/// [`Strict`]: json_ld::expansion::Policy::Strict
+/// [VC HTTP API Test Suite]: https://github.com/w3c-ccg/vc-api-test-suite
 pub async fn json_to_dataset<L>(
     json: json_ld::syntax::MetaValue<Span>,
     loader: &mut L,
-    mut options: Options<IriBuf, Span>,
+    expand_context: Option<RemoteContextReference>,
 ) -> Result<rdf::DataSet, Box<ToRdfError<L::Error, L::ContextError>>>
 where
     L: json_ld::Loader<IriBuf, Span> + json_ld::ContextLoader<IriBuf, Span> + Send + Sync,
@@ -477,7 +488,15 @@ where
     L::ContextError: Send,
 {
     use json_ld::JsonLdProcessor;
-    options.produce_generalized_rdf = false;
+
+    let options = Options {
+        expand_context,
+        // VC HTTP API Test Suite expect properties to not be silently dropped.
+        // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
+        expansion_policy: json_ld::expansion::Policy::Strict,
+        ..Default::default()
+    };
+
     let doc = json_ld::RemoteDocument::new(None, None, json);
     let mut generator =
         rdf_types::generator::Blank::new_with_prefix("b".to_string()).with_default_metadata();

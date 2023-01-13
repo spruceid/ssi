@@ -175,19 +175,13 @@ impl LinkedDataDocument for Proof {
         let dataset = json_to_dataset(
             json,
             context_loader,
-            ssi_json_ld::Options {
-                expand_context: parent
-                    .map(LinkedDataDocument::get_contexts)
-                    .transpose()?
-                    .flatten()
-                    .as_deref()
-                    .map(parse_ld_context)
-                    .transpose()?,
-                // VC HTTP API Test Suite expect properties to not be silently dropped.
-                // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
-                expansion_policy: ssi_json_ld::ExpansionPolicy::Strict,
-                ..Default::default()
-            },
+            parent
+                .map(LinkedDataDocument::get_contexts)
+                .transpose()?
+                .flatten()
+                .as_deref()
+                .map(parse_ld_context)
+                .transpose()?,
         )
         .await?;
 
