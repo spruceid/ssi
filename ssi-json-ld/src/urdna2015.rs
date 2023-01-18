@@ -1,25 +1,112 @@
 use std::collections::BTreeMap as Map;
 use std::collections::HashSet;
+use std::fmt;
 
-use crate::error::Error;
-use crate::rdf::{BlankNodeLabel, DataSet, Predicate, Statement};
+#[derive(Debug)]
+pub struct MissingChosenIssuer;
+
+use rdf_types::BlankId;
+use rdf_types::QuadRef;
+use rdf_types::{BlankIdBuf, Quad};
+
 use ssi_crypto::hashes::sha256::sha256;
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#normalization-state>
+use crate::rdf::IntoNQuads;
+use crate::rdf::NQuadsStatement;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BlankIdPosition {
+    Subject,
+    Object,
+    Graph,
+}
+
+impl BlankIdPosition {
+    pub fn into_char(self) -> char {
+        match self {
+            Self::Subject => 's',
+            Self::Object => 'o',
+            Self::Graph => 'g',
+        }
+    }
+}
+
+impl From<BlankIdPosition> for char {
+    fn from(p: BlankIdPosition) -> Self {
+        p.into_char()
+    }
+}
+
+impl fmt::Display for BlankIdPosition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.into_char().fmt(f)
+    }
+}
+
+pub trait BlankNodeComponents<'a> {
+    fn blank_node_components(&self) -> Vec<&'a BlankId>;
+
+    fn blank_node_components_with_position(&self) -> Vec<(&'a BlankId, BlankIdPosition)>;
+}
+
+pub trait BlankNodeComponentsMut {
+    fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf>;
+}
+
+impl<'a> BlankNodeComponents<'a> for QuadRef<'a> {
+    fn blank_node_components(&self) -> Vec<&'a BlankId> {
+        self.blank_node_components_with_position()
+            .into_iter()
+            .map(|(label, _position)| label)
+            .collect()
+    }
+
+    fn blank_node_components_with_position(&self) -> Vec<(&'a BlankId, BlankIdPosition)> {
+        let mut labels = Vec::new();
+        if let rdf_types::Subject::Blank(label) = self.0 {
+            labels.push((label, BlankIdPosition::Subject))
+        }
+        if let rdf_types::Object::Blank(label) = self.2 {
+            labels.push((label, BlankIdPosition::Object))
+        }
+        if let Some(rdf_types::GraphLabel::Blank(label)) = self.3 {
+            labels.push((label, BlankIdPosition::Graph))
+        }
+        labels
+    }
+}
+
+impl BlankNodeComponentsMut for Quad {
+    fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf> {
+        let mut labels: Vec<&mut BlankIdBuf> = Vec::new();
+        if let rdf_types::Subject::Blank(label) = &mut self.0 {
+            labels.push(label)
+        }
+        if let rdf_types::Object::Blank(label) = &mut self.2 {
+            labels.push(label)
+        }
+        if let Some(rdf_types::GraphLabel::Blank(label)) = &mut self.3 {
+            labels.push(label)
+        }
+        labels
+    }
+}
+
+/// <https://www.w3.org/TR/rdf-canon/#normalization-state>
 #[derive(Debug, Clone)]
 pub struct NormalizationState<'a> {
-    pub blank_node_to_quads: Map<&'a str, Vec<&'a Statement>>,
-    pub hash_to_blank_nodes: Map<String, Vec<&'a str>>,
+    pub blank_node_to_quads: Map<&'a BlankId, Vec<QuadRef<'a>>>,
+    pub hash_to_blank_nodes: Map<String, Vec<&'a BlankId>>,
     pub canonical_issuer: IdentifierIssuer,
 }
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#dfn-identifier-issuer>  
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#blank-node-identifier-issuer-state>
+/// <https://www.w3.org/TR/rdf-canon/#dfn-identifier-issuer>  
+/// <https://www.w3.org/TR/rdf-canon/#blank-node-identifier-issuer-state>
 #[derive(Debug, Clone)]
 pub struct IdentifierIssuer {
     pub identifier_prefix: String,
     pub identifier_counter: u64,
-    pub issued_identifiers_list: Vec<(String, String)>,
+    pub issued_identifiers_list: Vec<(BlankIdBuf, BlankIdBuf)>,
 }
 
 impl IdentifierIssuer {
@@ -30,7 +117,7 @@ impl IdentifierIssuer {
             issued_identifiers_list: Vec::new(),
         }
     }
-    pub fn find_issued_identifier(&self, existing_identifier: &str) -> Option<&str> {
+    pub fn find_issued_identifier(&self, existing_identifier: &BlankId) -> Option<&BlankId> {
         // TODO(optimize): index issued_identifiers_list by existing_identifier
         self.issued_identifiers_list
             .iter()
@@ -52,12 +139,12 @@ fn digest_to_lowerhex(digest: &[u8]) -> String {
         .collect::<String>()
 }
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#hash-first-degree-quads>
+/// <https://www.w3.org/TR/rdf-canon/#hash-1d-quads>
 pub fn hash_first_degree_quads(
     normalization_state: &mut NormalizationState,
-    reference_blank_node_identifier: &str,
-) -> Result<String, Error> {
-    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-1
+    reference_blank_node_identifier: &BlankId,
+) -> String {
+    // https://www.w3.org/TR/rdf-canon/#algorithm-1
     // 1
     let mut nquads: Vec<String> = Vec::new();
     // 2
@@ -68,17 +155,17 @@ pub fn hash_first_degree_quads(
         // 3
         for quad in quads {
             // 3.1
-            let mut quad: Statement = (*quad).clone();
+            let mut quad: Quad = quad.into_owned();
             // 3.1.1
             for label in quad.blank_node_components_mut() {
                 // 3.1.1.1
-                label.0 = if label.0 == reference_blank_node_identifier {
-                    "_:a".to_string()
+                *label = if label == reference_blank_node_identifier {
+                    BlankIdBuf::from_suffix("a").unwrap()
                 } else {
-                    "_:z".to_string()
+                    BlankIdBuf::from_suffix("z").unwrap()
                 };
             }
-            let nquad = String::from(&quad);
+            let nquad = NQuadsStatement(&quad).to_string();
             nquads.push(nquad);
         }
     }
@@ -87,13 +174,17 @@ pub fn hash_first_degree_quads(
     // 5
     let joined_nquads = nquads.join("");
     let nquads_digest = sha256(joined_nquads.as_bytes());
-    let hash_hex = digest_to_lowerhex(&nquads_digest);
-    Ok(hash_hex)
+    digest_to_lowerhex(&nquads_digest)
 }
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/>
-pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
-    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm
+/// <https://www.w3.org/TR/rdf-canon/>
+pub fn normalize<'a, Q: IntoIterator<Item = QuadRef<'a>>>(
+    quads: Q,
+) -> NormalizedQuads<'a, Q::IntoIter>
+where
+    Q::IntoIter: Clone,
+{
+    // https://www.w3.org/TR/rdf-canon/#algorithm
     // 1
     let mut normalization_state = NormalizationState {
         blank_node_to_quads: Map::new(),
@@ -101,19 +192,19 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
         canonical_issuer: IdentifierIssuer::new("_:c14n".to_string()),
     };
     // 2
-    let input_dataset_quads = input_dataset.statements();
-    for quad in input_dataset_quads.iter() {
+    let quads = quads.into_iter();
+    for quad in quads.clone() {
         // 2.1
         for blank_node_identifier in quad.blank_node_components() {
             normalization_state
                 .blank_node_to_quads
-                .entry(&blank_node_identifier.0)
+                .entry(blank_node_identifier)
                 .or_insert_with(Vec::new)
                 .push(quad);
         }
     }
     // 3
-    let mut non_normalized_identifiers: HashSet<&str> = normalization_state
+    let mut non_normalized_identifiers: HashSet<&BlankId> = normalization_state
         .blank_node_to_quads
         .keys()
         .cloned()
@@ -129,7 +220,7 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
         // 5.3
         for identifier in non_normalized_identifiers.iter() {
             // 5.3.1
-            let hash = hash_first_degree_quads(&mut normalization_state, identifier)?;
+            let hash = hash_first_degree_quads(&mut normalization_state, identifier);
             // 5.3.2
             normalization_state
                 .hash_to_blank_nodes
@@ -150,7 +241,7 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
                 None => continue,
             };
             // note: canonical issuer is not passed
-            issue_identifier(&mut normalization_state.canonical_issuer, identifier)?;
+            issue_identifier(&mut normalization_state.canonical_issuer, identifier);
             // 5.4.3
             non_normalized_identifiers.remove(identifier);
             // 5.4.4
@@ -180,13 +271,16 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
                 // 6.2.2
                 let mut temporary_issuer = IdentifierIssuer::new("_:b".to_string());
                 // 6.2.3
-                issue_identifier(&mut temporary_issuer, identifier)?;
+                issue_identifier(&mut temporary_issuer, identifier);
                 // 6.2.4
-                hash_path_list.push(hash_n_degree_quads(
-                    &mut normalization_state,
-                    identifier,
-                    &mut temporary_issuer,
-                )?);
+                hash_path_list.push(
+                    hash_n_degree_quads(
+                        &mut normalization_state,
+                        identifier,
+                        &mut temporary_issuer,
+                    )
+                    .unwrap(),
+                );
             }
             // 6.3
             hash_path_list.sort_by(|a, b| a.hash.cmp(&b.hash));
@@ -197,68 +291,87 @@ pub fn normalize(input_dataset: &DataSet) -> Result<DataSet, Error> {
                     issue_identifier(
                         &mut normalization_state.canonical_issuer,
                         &existing_identifier,
-                    )?;
+                    );
                 }
             }
         }
     }
     // 7
-    let mut normalized_dataset = DataSet::default();
-    for quad in input_dataset_quads.iter() {
-        // 7.1
-        let mut quad_copy = quad.clone();
-        for label in quad_copy.blank_node_components_mut() {
-            let canonical_identifier = match normalization_state
-                .canonical_issuer
-                .find_issued_identifier(&label.0)
-            {
-                Some(id) => id,
-                None => return Err(Error::MissingIdentifier),
-            };
-            label.0 = canonical_identifier.to_string();
-        }
-        // 7.2
-        normalized_dataset.add_statement(quad_copy);
+    NormalizedQuads {
+        quads,
+        normalization_state,
     }
-    // 8
-    Ok(normalized_dataset)
 }
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#issue-identifier-algorithm>
+pub struct NormalizedQuads<'a, Q> {
+    quads: Q,
+    normalization_state: NormalizationState<'a>,
+}
+
+impl<'a, Q: Iterator<Item = QuadRef<'a>>> NormalizedQuads<'a, Q> {
+    pub fn into_nquads(self) -> String {
+        IntoNQuads::into_nquads(self)
+    }
+}
+
+impl<'a, Q: Iterator<Item = QuadRef<'a>>> Iterator for NormalizedQuads<'a, Q> {
+    type Item = Quad;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.quads.next().map(|quad| {
+            // 7.1
+            let mut quad_copy = quad.into_owned();
+            for label in quad_copy.blank_node_components_mut() {
+                let canonical_identifier = self
+                    .normalization_state
+                    .canonical_issuer
+                    .find_issued_identifier(label)
+                    .unwrap();
+                *label = canonical_identifier.to_owned();
+            }
+            // 7.2
+            quad_copy
+        })
+    }
+}
+
+/// <https://www.w3.org/TR/rdf-canon/#issue-identifier-algorithm>
 pub fn issue_identifier(
     identifier_issuer: &mut IdentifierIssuer,
-    existing_identifier: &str,
-) -> Result<String, Error> {
-    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-0
+    existing_identifier: &BlankId,
+) -> BlankIdBuf {
+    // https://www.w3.org/TR/rdf-canon/#algorithm-0
     // 1
     if let Some(id) = identifier_issuer.find_issued_identifier(existing_identifier) {
-        return Ok(id.to_string());
+        return id.to_owned();
     }
     // 2
-    let issued_identifier = identifier_issuer.identifier_prefix.to_owned()
-        + &identifier_issuer.identifier_counter.to_string();
+    let issued_identifier = BlankIdBuf::new(
+        identifier_issuer.identifier_prefix.to_owned()
+            + &identifier_issuer.identifier_counter.to_string(),
+    )
+    .unwrap();
     // 3
-    identifier_issuer.issued_identifiers_list.push((
-        issued_identifier.to_string(),
-        existing_identifier.to_string(),
-    ));
+    identifier_issuer
+        .issued_identifiers_list
+        .push((issued_identifier.clone(), existing_identifier.to_owned()));
     // 4
     identifier_issuer.identifier_counter += 1;
     // 5
-    Ok(issued_identifier)
+    issued_identifier
 }
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#hash-n-degree-quads>
+/// <https://www.w3.org/TR/rdf-canon/#hash-n-degree-quads>
 pub fn hash_n_degree_quads(
     normalization_state: &mut NormalizationState,
-    identifier: &str,
+    identifier: &BlankId,
     issuer: &mut IdentifierIssuer,
-) -> Result<HashNDegreeQuadsOutput, Error> {
+) -> Result<HashNDegreeQuadsOutput, MissingChosenIssuer> {
     let mut issuer = issuer;
-    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-3
+    // https://www.w3.org/TR/rdf-canon/#algorithm-3
     let mut issuer_tmp: IdentifierIssuer;
     // 1
-    let mut hash_to_related_blank_nodes: Map<String, Vec<&BlankNodeLabel>> = Map::new();
+    let mut hash_to_related_blank_nodes: Map<String, Vec<&BlankId>> = Map::new();
     // 2
     if let Some(quads) = normalization_state
         .blank_node_to_quads
@@ -271,15 +384,15 @@ pub fn hash_n_degree_quads(
             // 3.1
             for (component, position) in quad.blank_node_components_with_position() {
                 // Not checking for predicate since that cannot be a blank node identifier anyway
-                if component.0 != identifier {
+                if component != identifier {
                     // 3.1.1
                     let hash = hash_related_blank_node(
                         normalization_state,
-                        &component.0,
+                        component,
                         quad,
                         issuer,
                         position,
-                    )?;
+                    );
                     // 3.1.2
                     hash_to_related_blank_nodes
                         .entry(hash)
@@ -307,24 +420,24 @@ pub fn hash_n_degree_quads(
             // 5.4.2
             let mut path = String::new();
             // 5.4.3
-            let mut recursion_list: Vec<String> = Vec::new();
+            let mut recursion_list: Vec<BlankIdBuf> = Vec::new();
             // 5.4.4
             for related in permutation {
                 // 5.4.4.1
                 if let Some(canonical_identifier) = normalization_state
                     .canonical_issuer
-                    .find_issued_identifier(&related.0)
+                    .find_issued_identifier(related)
                     .as_ref()
                 {
-                    recursion_list.push(canonical_identifier.to_string());
+                    recursion_list.push((*canonical_identifier).to_owned());
                 // 5.4.4.2
                 } else {
                     // 5.4.4.2.1
-                    if issuer_copy.find_issued_identifier(&related.0).is_none() {
-                        recursion_list.push(related.0.to_string());
+                    if issuer_copy.find_issued_identifier(related).is_none() {
+                        recursion_list.push(related.to_owned());
                     }
                     // 5.4.4.2.2
-                    path += &issue_identifier(&mut issuer_copy, &related.0)?;
+                    path += &issue_identifier(&mut issuer_copy, related);
                 }
                 // 5.4.4.3
                 if !chosen_path.is_empty() && path.len() >= chosen_path.len() && path > chosen_path
@@ -337,7 +450,7 @@ pub fn hash_n_degree_quads(
                 // 5.4.5.1
                 let result = hash_n_degree_quads(normalization_state, &related, &mut issuer_copy)?;
                 // 5.4.5.2
-                path.push_str(&issue_identifier(&mut issuer_copy, &related)?);
+                path.push_str(&issue_identifier(&mut issuer_copy, &related));
                 // 5.4.5.3
                 path.push('<');
                 path.push_str(&result.hash);
@@ -361,7 +474,7 @@ pub fn hash_n_degree_quads(
         // 5.6
         issuer_tmp = match chosen_issuer {
             Some(issuer) => issuer,
-            None => return Err(Error::MissingChosenIssuer),
+            None => return Err(MissingChosenIssuer),
         };
         issuer = &mut issuer_tmp;
     }
@@ -374,15 +487,15 @@ pub fn hash_n_degree_quads(
     })
 }
 
-/// <https://json-ld.github.io/rdf-dataset-canonicalization/spec/#hash-related-blank-node>
+/// <https://www.w3.org/TR/rdf-canon/#hash-related-blank-node>
 pub fn hash_related_blank_node(
     normalization_state: &mut NormalizationState,
-    related: &str,
-    quad: &Statement,
+    related: &BlankId,
+    quad: QuadRef,
     issuer: &mut IdentifierIssuer,
-    position: char,
-) -> Result<String, Error> {
-    // https://json-ld.github.io/rdf-dataset-canonicalization/spec/#algorithm-2
+    position: BlankIdPosition,
+) -> String {
+    // https://www.w3.org/TR/rdf-canon/#algorithm-2
     // 1
     let identifier = match normalization_state
         .canonical_issuer
@@ -391,28 +504,29 @@ pub fn hash_related_blank_node(
         Some(id) => id.to_string(),
         None => match issuer.find_issued_identifier(related) {
             Some(id) => id.to_string(),
-            None => hash_first_degree_quads(normalization_state, related)?,
+            None => hash_first_degree_quads(normalization_state, related),
         },
     };
     // 2
     let mut input = position.to_string();
     // 3
-    if position != 'g' {
-        let Predicate::IRIRef(ref predicate) = quad.predicate;
+    if position != BlankIdPosition::Graph {
         input.push('<');
-        input.push_str(&predicate.0);
+        input.push_str(quad.predicate().as_str());
         input.push('>');
     }
     // 4
     input += &identifier;
     // 5
     let digest = sha256(input.as_bytes());
-    let hash_hex = digest_to_lowerhex(&digest);
-    Ok(hash_hex)
+    digest_to_lowerhex(&digest)
 }
 
 #[cfg(test)]
 mod tests {
+    use locspan::Meta;
+    use nquads_syntax::Parse;
+
     use super::*;
 
     #[test]
@@ -420,7 +534,6 @@ mod tests {
     fn normalization_test_suite() {
         use std::fs::{self};
         use std::path::PathBuf;
-        use std::str::FromStr;
         let case = std::env::args().nth(2);
         // Example usage to run a single test case:
         //   cargo test normalization_test_suite -- test022
@@ -444,9 +557,15 @@ mod tests {
             let in_file_name = num.to_string() + "-in.nq";
             path.set_file_name(PathBuf::from(in_file_name));
             let in_str = fs::read_to_string(&path).unwrap();
-            let dataset = DataSet::from_str(&in_str).unwrap();
-            let dataset_normalized = normalize(&dataset).unwrap();
-            let normalized = dataset_normalized.to_nquads().unwrap();
+            let dataset = nquads_syntax::Document::parse_str(&in_str, |span| span).unwrap();
+            let stripped_dataset: Vec<_> = dataset
+                .into_value()
+                .into_iter()
+                .map(Meta::into_value)
+                .map(Quad::strip_all_but_predicate)
+                .collect();
+            let normalized =
+                normalize(stripped_dataset.iter().map(Quad::as_quad_ref)).into_nquads();
             if &normalized == &expected_str {
                 passed += 1;
             } else {

@@ -128,7 +128,7 @@ impl DIDResolver for DIDSol {
 
         let doc = Document {
             context: Contexts::Many(vec![
-                Context::URI(DEFAULT_CONTEXT.to_string()),
+                Context::URI(DEFAULT_CONTEXT.into()),
                 Context::Object(context),
             ]),
             id: did.to_string(),

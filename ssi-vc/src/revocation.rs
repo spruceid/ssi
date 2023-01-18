@@ -342,7 +342,7 @@ impl CredentialStatus for RevocationList2020Status {
         };
         if !credential
             .context
-            .contains_uri(REVOCATION_LIST_2020_V1_CONTEXT)
+            .contains_uri(REVOCATION_LIST_2020_V1_CONTEXT.into_str())
         {
             // TODO: support JSON-LD credentials defining the terms elsewhere.
             return result.with_error(format!(
@@ -472,7 +472,10 @@ impl CredentialStatus for StatusList2021Entry {
                 return result.with_error("Credential is missing issuer".to_string());
             }
         };
-        if !credential.context.contains_uri(STATUS_LIST_2021_V1_CONTEXT) {
+        if !credential
+            .context
+            .contains_uri(STATUS_LIST_2021_V1_CONTEXT.into_str())
+        {
             // TODO: support JSON-LD credentials defining the terms elsewhere.
             return result.with_error(format!(
                 "Missing expected context URI {} for credential using StatusList2021",
@@ -737,10 +740,10 @@ impl TryFrom<Credential> for RevocationList2020Credential {
     fn try_from(credential: Credential) -> Result<Self, Self::Error> {
         if !credential
             .context
-            .contains_uri(REVOCATION_LIST_2020_V1_CONTEXT)
+            .contains_uri(REVOCATION_LIST_2020_V1_CONTEXT.into_str())
         {
             return Err(CredentialConversionError::MissingContext(
-                REVOCATION_LIST_2020_V1_CONTEXT,
+                REVOCATION_LIST_2020_V1_CONTEXT.into_str(),
             ));
         }
         if !credential
@@ -781,9 +784,12 @@ impl TryFrom<RevocationList2020Credential> for Credential {
 impl TryFrom<Credential> for StatusList2021Credential {
     type Error = CredentialConversionError;
     fn try_from(credential: Credential) -> Result<Self, Self::Error> {
-        if !credential.context.contains_uri(STATUS_LIST_2021_V1_CONTEXT) {
+        if !credential
+            .context
+            .contains_uri(STATUS_LIST_2021_V1_CONTEXT.into_str())
+        {
             return Err(CredentialConversionError::MissingContext(
-                STATUS_LIST_2021_V1_CONTEXT,
+                STATUS_LIST_2021_V1_CONTEXT.into_str(),
             ));
         }
         if !credential

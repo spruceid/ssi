@@ -1,3 +1,5 @@
+use crate::proof::ProofInconsistency;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     #[error("Missing Algorithm")]
@@ -48,9 +50,13 @@ pub enum Error {
     #[error(transparent)]
     JWS(#[from] ssi_jws::Error),
     #[error(transparent)]
-    JsonLd(#[from] ssi_json_ld::Error),
-    #[error(transparent)]
     Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    ToRdfError(#[from] Box<ssi_json_ld::ToRdfError>),
+    #[error(transparent)]
+    InvalidJsonLdContext(#[from] ssi_json_ld::ContextError),
+    #[error("Expected a JSON object")]
+    ExpectedJsonObject,
     #[error(transparent)]
     BlockchainAccountIdParse(#[from] ssi_caips::caip10::BlockchainAccountIdParseError),
     #[error(transparent)]
@@ -84,6 +90,8 @@ pub enum Error {
     UnexpectedAleoNetwork(String, String),
     #[error("Expected CAIP-2 namespace '{0}' but found '{1}'")]
     UnexpectedCAIP2Namespace(String, String),
+    #[error(transparent)]
+    InconsistentProof(#[from] Box<ProofInconsistency>),
 }
 
 impl From<ssi_jwk::Error> for Error {

@@ -360,10 +360,11 @@ async fn string_from_document_and_options(
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
-    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
-    let doc_normalized = doc_dataset_normalized.to_nquads()?;
-    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
-    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
+    let doc_dataset_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from));
+    let doc_normalized = doc_dataset_normalized.into_nquads();
+    let sigopts_dataset_normalized =
+        urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from));
+    let sigopts_normalized = sigopts_dataset_normalized.into_nquads();
     let msg = sigopts_normalized + "\n" + &doc_normalized;
     Ok(msg)
 }

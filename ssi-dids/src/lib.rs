@@ -7,7 +7,10 @@
 //! [did-core]: https://www.w3.org/TR/did-core/
 
 use derive_builder::Builder;
+use iref::Iri;
+use iref::IriRefBuf;
 use ssi_caips::caip10::BlockchainAccountId;
+use static_iref::iri;
 use std::collections::BTreeMap as Map;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -88,25 +91,25 @@ impl From<VerificationRelationship> for String {
 }
 
 impl VerificationRelationship {
-    pub fn to_iri(&self) -> &'static str {
+    pub fn to_iri(&self) -> Iri<'static> {
         match self {
             VerificationRelationship::Authentication => {
-                "https://w3id.org/security#authenticationMethod"
+                iri!("https://w3id.org/security#authenticationMethod")
             }
             VerificationRelationship::AssertionMethod => {
-                "https://w3id.org/security#assertionMethod"
+                iri!("https://w3id.org/security#assertionMethod")
             }
             VerificationRelationship::KeyAgreement => {
-                "https://w3id.org/security#keyAgreementMethod"
+                iri!("https://w3id.org/security#keyAgreementMethod")
             }
             VerificationRelationship::ContractAgreement => {
-                "https://w3id.org/security#contractAgreementMethod"
+                iri!("https://w3id.org/security#contractAgreementMethod")
             }
             VerificationRelationship::CapabilityInvocation => {
-                "https://w3id.org/security#capabilityInvocationMethod"
+                iri!("https://w3id.org/security#capabilityInvocationMethod")
             }
             VerificationRelationship::CapabilityDelegation => {
-                "https://w3id.org/security#capabilityDelegationMethod"
+                iri!("https://w3id.org/security#capabilityDelegationMethod")
             }
         }
     }
@@ -126,15 +129,15 @@ use serde_json::Value;
 // @TODO `id` must be URI
 
 /// URI [required](https://www.w3.org/TR/did-core/#production-0) as the first value of the `@context` property for a DID Document in JSON-LD representation.
-pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/ns/did/v1";
+pub const DEFAULT_CONTEXT: Iri = iri!("https://www.w3.org/ns/did/v1");
 
 /// Aliases for the [default required DID document context URI][DEFAULT_CONTEXT]. Allowed for compatibility reasons. [DEFAULT_CONTEXT][] should be used instead.
-pub const DEFAULT_CONTEXT_NO_WWW: &str = ssi_json_ld::DID_V1_CONTEXT_NO_WWW;
-pub const ALT_DEFAULT_CONTEXT: &str = ssi_json_ld::W3ID_DID_V1_CONTEXT;
+pub const DEFAULT_CONTEXT_NO_WWW: Iri = ssi_json_ld::DID_V1_CONTEXT_NO_WWW;
+pub const ALT_DEFAULT_CONTEXT: Iri = ssi_json_ld::W3ID_DID_V1_CONTEXT;
 
 /// DID Core v0.11 context URI. Allowed for legacy
 /// reasons. The [v1.0 context URI][DEFAULT_CONTEXT] should be used instead.
-pub const V0_11_CONTEXT: &str = "https://w3id.org/did/v0.11";
+pub const V0_11_CONTEXT: Iri = iri!("https://w3id.org/did/v0.11");
 
 // @TODO parsed data structs for DID and DIDURL
 #[allow(clippy::upper_case_acronyms)]
@@ -283,7 +286,7 @@ pub struct Document {
 #[serde(untagged)]
 pub enum Context {
     /// Context referenced by a URL.
-    URI(String),
+    URI(IriRefBuf),
     /// [Embedded context](https://www.w3.org/TR/json-ld11/#dfn-embedded-context).
     Object(Map<String, Value>),
 }
@@ -1150,7 +1153,7 @@ impl TryFrom<OneOrMany<Context>> for Contexts {
     fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
         let first_uri = match context.first() {
             None => return Err(Error::MissingContext),
-            Some(Context::URI(uri)) => uri,
+            Some(Context::URI(uri)) => uri.as_iri_ref(),
             Some(Context::Object(_)) => return Err(Error::InvalidContext),
         };
         if first_uri != DEFAULT_CONTEXT
@@ -1196,7 +1199,7 @@ impl DocumentBuilder {
                 }
             };
             let first_uri = match first_context {
-                Context::URI(uri) => uri,
+                Context::URI(uri) => uri.as_iri_ref(),
                 Context::Object(_) => return Err(Error::InvalidContext),
             };
             if first_uri != DEFAULT_CONTEXT
@@ -1222,7 +1225,7 @@ pub(crate) fn merge_context(dest_opt: &mut Option<Value>, source: &Contexts) {
     };
     for context in source {
         let value = match context {
-            Context::URI(uri) => Value::String(uri),
+            Context::URI(uri) => Value::String(uri.into_string()),
             Context::Object(hash_map) => {
                 let serde_map = hash_map
                     .into_iter()
@@ -1247,7 +1250,7 @@ impl Document {
     /// `@context`][DEFAULT_CONTEXT].
     pub fn new(id: &str) -> Document {
         Document {
-            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_string())),
+            context: Contexts::One(Context::URI(DEFAULT_CONTEXT.to_owned().into())),
             id: String::from(id),
             also_known_as: None,
             controller: None,
@@ -1490,7 +1493,7 @@ mod tests {
     fn build_document_invalid_context() {
         let id = "did:test:deadbeefcafe";
         let doc = DocumentBuilder::default()
-            .context(Contexts::One(Context::URI("example:bad".to_string())))
+            .context(Contexts::One(Context::URI("example:bad".parse().unwrap())))
             .id(id)
             .build()
             .unwrap();

@@ -67,7 +67,8 @@ impl AleoSignature2021 {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        let has_context = document_has_context(document, "TODO:uploadAleoVMContextSomewhere")?;
+        let has_context =
+            document_has_context(document, iri!("TODO:uploadAleoVMContextSomewhere"))?;
         let mut proof = Proof {
             context: if has_context {
                 Value::Null

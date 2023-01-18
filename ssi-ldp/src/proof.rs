@@ -9,7 +9,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_dids::did_resolve::DIDResolver;
 use ssi_dids::VerificationRelationship as ProofPurpose;
-use ssi_json_ld::{json_to_dataset, ContextLoader, Error as JsonLdError};
+use ssi_json_ld::{json_to_dataset, parse_ld_context, ContextLoader};
+
+const RDF_TYPE: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
+const RDF_NIL: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#nil");
+const RDF_FIRST: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#first");
+const RDF_REST: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#rest");
 
 #[macro_export]
 macro_rules! assert_local {
@@ -166,13 +171,20 @@ impl LinkedDataDocument for Proof {
         let mut copy = self.clone();
         copy.jws = None;
         copy.proof_value = None;
-        let json = serde_json::to_string(&copy)?;
-        let more_contexts = match parent {
-            Some(parent) => parent.get_contexts()?,
-            None => None,
-        };
-        let dataset =
-            json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?;
+        let json = json_syntax::to_value_with(copy, Default::default).unwrap();
+        let dataset = json_to_dataset(
+            json,
+            context_loader,
+            parent
+                .map(LinkedDataDocument::get_contexts)
+                .transpose()?
+                .flatten()
+                .as_deref()
+                .map(parse_ld_context)
+                .transpose()?,
+        )
+        .await?;
+
         verify_proof_consistency(self, &dataset)?;
         Ok(dataset)
     }
@@ -275,102 +287,490 @@ impl From<Check> for String {
     }
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum ProofInconsistency {
+    /// RDF statement object does not match value.
+    #[error(
+        "RDF statement object does not match value. Predicate: {0}. Expected: {1}. Actual: {2}"
+    )]
+    ObjectMismatch(IriBuf, String, String),
+
+    /// Missing RDF statement object.
+    #[error("Missing RDF statement object. Predicate: {0}. Expected value: {1}")]
+    ExpectedObject(IriBuf, String),
+
+    /// Unexpected RDF statement object.
+    #[error("Unexpected RDF statement object. Predicate: {0}. Value: {1}")]
+    UnexpectedObject(IriBuf, String),
+
+    /// List item mismatch.
+    #[error("List item mismatch. Value in RDF: {0}. Value in JSON: {1}")]
+    ListItemMismatch(String, String),
+
+    /// Invalid RDF list.
+    #[error("Invalid list")]
+    InvalidList,
+
+    /// Unexpected end of list.
+    #[error("Unexpected end of list")]
+    UnexpectedEndOfList,
+
+    /// Expected end of list.
+    #[error("Expected end of list")]
+    ExpectedEndOfList,
+
+    /// Missing RDF type.
+    #[error("Missing type")]
+    MissingType,
+
+    /// Invalid RDF type value.
+    #[error("Invalid type value")]
+    InvalidType,
+
+    /// Missing associated context.
+    #[error("Missing associated context: {0}")]
+    MissingAssociatedContext(IriBuf),
+
+    /// Unexpected RDF triple.
+    #[error("Unexpected triple {0:?}")]
+    UnexpectedTriple(Box<rdf_types::Triple>),
+}
+
 /// Verify alignment of proof options in JSON with RDF terms
-fn verify_proof_consistency(proof: &Proof, dataset: &DataSet) -> Result<(), Error> {
-    use ssi_json_ld::rdf;
-    let mut graph_ref = dataset.default_graph.as_ref();
+fn verify_proof_consistency(
+    proof: &Proof,
+    dataset: &DataSet,
+) -> Result<(), Box<ProofInconsistency>> {
+    let mut dataset = dataset.clone();
+    let graph_ref = dataset.default_graph_mut();
 
     let type_triple = graph_ref
-        .take(
+        .take_match::<rdf_types::Subject, _, rdf_types::Object>(rdf_types::Triple(
             None,
-            Some(&rdf::Predicate::IRIRef(rdf::IRIRef(
-                "http://www.w3.org/1999/02/22-rdf-syntax-ns#type".to_string(),
-            ))),
+            Some(&RDF_TYPE),
             None,
-        )
-        .ok_or(Error::MissingType)?;
-    let type_iri = match &type_triple.object {
-        rdf::Object::IRIRef(rdf::IRIRef(iri)) => iri,
-        _ => {
-            return Err(Error::JsonLd(JsonLdError::UnexpectedTriple(
-                type_triple.clone(),
-            )))
-        }
-    };
+        ))
+        .ok_or(ProofInconsistency::MissingType)?;
+
+    let type_iri = type_triple
+        .object()
+        .as_iri()
+        .ok_or(ProofInconsistency::InvalidType)?;
+
     if !proof
         .type_
         .associated_contexts()
         .contains(&type_iri.as_str())
     {
-        return Err(Error::JsonLd(JsonLdError::UnexpectedTriple(
-            type_triple.clone(),
+        return Err(Box::new(ProofInconsistency::MissingAssociatedContext(
+            type_iri.clone(),
         )));
     }
-    let proof_id = &type_triple.subject;
 
-    graph_ref.match_iri_property(
+    let proof_id = type_triple.subject();
+
+    graph_ref.take_object_and_assert_eq_iri(
         proof_id,
-        "https://w3id.org/security#proofPurpose",
+        iri!("https://w3id.org/security#proofPurpose"),
         proof.proof_purpose.as_ref().map(|pp| pp.to_iri()),
     )?;
-    graph_ref.match_iri_property(
+
+    // FIXME: this only works under the (false) assumption that
+    // `verificationMethod` is always an IRI.
+    // See: https://www.w3.org/TR/did-core/#did-document-properties
+    graph_ref.take_object_and_assert_eq_iri(
         proof_id,
-        "https://w3id.org/security#verificationMethod",
-        proof.verification_method.as_deref(),
+        iri!("https://w3id.org/security#verificationMethod"),
+        proof
+            .verification_method
+            .as_ref()
+            .map(|m| Iri::new(m).unwrap()),
     )?;
-    graph_ref.match_iri_or_string_property(
+
+    graph_ref.take_object_and_assert_eq_iri_or_str(
         proof_id,
-        "https://w3id.org/security#challenge",
+        iri!("https://w3id.org/security#challenge"),
         proof.challenge.as_deref(),
     )?;
-    graph_ref.match_iri_or_string_property(
+
+    graph_ref.take_object_and_assert_eq_iri_or_str(
         proof_id,
-        "https://w3id.org/security#domain",
+        iri!("https://w3id.org/security#domain"),
         proof.domain.as_deref(),
     )?;
-    graph_ref.match_date_property(
+
+    graph_ref.take_object_and_assert_eq_date(
         proof_id,
-        "http://purl.org/dc/terms/created",
+        iri!("http://purl.org/dc/terms/created"),
         proof.created.as_ref(),
     )?;
-    graph_ref.match_json_property(
+
+    graph_ref.take_object_and_assert_eq_json(
         proof_id,
-        "https://w3id.org/security#publicKeyJwk",
+        iri!("https://w3id.org/security#publicKeyJwk"),
         proof
             .property_set
             .as_ref()
             .and_then(|cc| cc.get("publicKeyJwk")),
     )?;
-    graph_ref.match_multibase_property(
+
+    graph_ref.take_object_and_assert_eq_multibase(
         proof_id,
-        "https://w3id.org/security#publicKeyMultibase",
+        iri!("https://w3id.org/security#publicKeyMultibase"),
         proof
             .property_set
             .as_ref()
-            .and_then(|cc| cc.get("publicKeyMultibase")),
+            .and_then(|cc| cc.get("publicKeyMultibase"))
+            .and_then(|cap| cap.as_str()),
     )?;
-    graph_ref.match_iri_property(
+
+    graph_ref.take_object_and_assert_eq_iri(
         proof_id,
-        "https://w3id.org/security#capability",
+        iri!("https://w3id.org/security#capability"),
         proof
             .property_set
             .as_ref()
             .and_then(|cc| cc.get("capability"))
-            .and_then(|cap| cap.as_str()),
+            .and_then(|cap| cap.as_str())
+            .map(|cap| Iri::new(cap).unwrap()),
     )?;
-    graph_ref.match_list_property(
+
+    graph_ref.take_object_and_assert_eq_list(
         proof_id,
-        "https://w3id.org/security#capabilityChain",
+        iri!("https://w3id.org/security#capabilityChain"),
         proof
             .property_set
             .as_ref()
-            .and_then(|cc| cc.get("capabilityChain")),
+            .and_then(|cc| cc.get("capabilityChain"))
+            .map(|cc| cc.as_array().unwrap().iter()),
+        |item, expected| match expected.as_str() {
+            Some(e) => match (item, Iri::new(e)) {
+                (rdf_types::Term::Iri(iri), Ok(expected)) => *iri == expected,
+                _ => false,
+            },
+            None => false,
+        },
     )?;
 
     // Disallow additional unexpected statements
-    if let Some(triple) = graph_ref.triples.into_iter().next() {
-        return Err(Error::JsonLd(JsonLdError::UnexpectedTriple(triple.clone())));
+    if let Some(rdf_types::Triple(s, p, o)) = graph_ref.triples().next() {
+        return Err(Box::new(ProofInconsistency::UnexpectedTriple(Box::new(
+            rdf_types::Triple(s.clone(), p.clone(), o.clone()),
+        ))));
     }
 
     Ok(())
+}
+
+/// RDF graph extension adding utility methods on proof graphs.
+trait ProofGraph:
+    grdf::Graph<Subject = rdf_types::Subject, Predicate = IriBuf, Object = rdf_types::Object>
+    + for<'a> grdf::GraphTake<rdf_types::Subject, Iri<'a>, rdf_types::Object>
+{
+    /// Take any statement of the form `s p o` for the given `s` and `p`
+    /// and call `object_predicate(Some(o))`.
+    /// If no statement has the form `s p o`, call `object_predicate(None)`.
+    fn take_object_and_assert<E>(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        object_predicate: impl FnOnce(&mut Self, Option<Self::Object>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        match self.take_match(rdf_types::Triple(Some(s), Some(&p), None)) {
+            Some(rdf_types::Triple(_, _, o)) => object_predicate(self, Some(o)),
+            None => object_predicate(self, None),
+        }
+    }
+
+    /// When `expected_o` is `Some(iri)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is equal to `iri` according to `eq`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq<V: ToString>(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<V>,
+        eq: impl FnOnce(&Self::Object, &V) -> bool,
+    ) -> Result<(), Box<ProofInconsistency>> {
+        self.take_object_and_assert(s, p, |_, o| match (o, expected_o) {
+            (Some(o), Some(expected)) => {
+                if eq(&o, &expected) {
+                    Ok(())
+                } else {
+                    Err(Box::new(ProofInconsistency::ObjectMismatch(
+                        p.to_owned(),
+                        expected.to_string(),
+                        o.to_string(),
+                    )))
+                }
+            }
+            (None, None) => Ok(()),
+            (None, Some(expected_iri)) => Err(Box::new(ProofInconsistency::ExpectedObject(
+                p.to_owned(),
+                expected_iri.to_string(),
+            ))),
+            (Some(o), None) => Err(Box::new(ProofInconsistency::UnexpectedObject(
+                p.to_owned(),
+                o.to_string(),
+            ))),
+        })
+    }
+
+    /// When `expected_o` is `Some(json)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is equal to the JSON array value `json`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq_list<I: Iterator>(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<I>,
+        eq: impl Fn(&Self::Object, &I::Item) -> bool,
+    ) -> Result<(), Box<ProofInconsistency>>
+    where
+        I::Item: ToString,
+    {
+        fn format_list<I: Iterator>(list: I) -> String
+        where
+            I::Item: ToString,
+        {
+            let mut expected_string = "[".to_string();
+
+            for (i, item) in list.enumerate() {
+                if i > 0 {
+                    expected_string.push(',');
+                }
+
+                expected_string.push_str(&item.to_string());
+            }
+
+            expected_string.push(']');
+            expected_string
+        }
+
+        self.take_object_and_assert(s, p, |this, o| match (o, expected_o) {
+            (Some(o), Some(expected)) => {
+                let mut head = match o {
+                    rdf_types::Term::Iri(i) if i == RDF_NIL => None,
+                    rdf_types::Term::Iri(i) => Some(rdf_types::Subject::Iri(i)),
+                    rdf_types::Term::Blank(b) => Some(rdf_types::Subject::Blank(b)),
+                    rdf_types::Term::Literal(l) => {
+                        return Err(Box::new(ProofInconsistency::ObjectMismatch(
+                            p.to_owned(),
+                            l.to_string(),
+                            format_list(expected),
+                        )))
+                    }
+                };
+
+                for expected_item in expected {
+                    match head.take() {
+                        Some(id) => {
+                            match this.take_match(rdf_types::Triple(
+                                Some(&id),
+                                Some(&RDF_FIRST),
+                                None,
+                            )) {
+                                Some(rdf_types::Triple(_, _, first)) => {
+                                    if !eq(&first, &expected_item) {
+                                        return Err(Box::new(
+                                            ProofInconsistency::ListItemMismatch(
+                                                first.to_string(),
+                                                expected_item.to_string(),
+                                            ),
+                                        ));
+                                    }
+
+                                    match this.take_match(rdf_types::Triple(
+                                        Some(&id),
+                                        Some(&RDF_REST),
+                                        None,
+                                    )) {
+                                        Some(rdf_types::Triple(_, _, rest)) => {
+                                            head = match rest {
+                                                rdf_types::Term::Iri(i) if i == RDF_NIL => None,
+                                                rdf_types::Term::Iri(i) => {
+                                                    Some(rdf_types::Subject::Iri(i))
+                                                }
+                                                rdf_types::Term::Blank(b) => {
+                                                    Some(rdf_types::Subject::Blank(b))
+                                                }
+                                                rdf_types::Term::Literal(_) => {
+                                                    return Err(Box::new(
+                                                        ProofInconsistency::InvalidList,
+                                                    ))
+                                                }
+                                            };
+                                        }
+                                        None => {
+                                            return Err(Box::new(ProofInconsistency::InvalidList))
+                                        }
+                                    }
+                                }
+                                None => return Err(Box::new(ProofInconsistency::InvalidList)),
+                            }
+                        }
+                        None => return Err(Box::new(ProofInconsistency::UnexpectedEndOfList)),
+                    }
+                }
+
+                if head.is_some() {
+                    return Err(Box::new(ProofInconsistency::ExpectedEndOfList));
+                }
+
+                Ok(())
+            }
+            (None, None) => Ok(()),
+            (None, Some(expected)) => Err(Box::new(ProofInconsistency::ExpectedObject(
+                p.to_owned(),
+                format_list(expected),
+            ))),
+            (Some(o), None) => Err(Box::new(ProofInconsistency::UnexpectedObject(
+                p.to_owned(),
+                o.to_string(),
+            ))),
+        })
+    }
+
+    /// When `expected_o` is `Some(iri)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is equal to `iri`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq_iri(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<Iri>,
+    ) -> Result<(), Box<ProofInconsistency>>;
+
+    /// When `expected_o` is `Some(str)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is an IRI or string literal equal to `str`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq_iri_or_str(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&str>,
+    ) -> Result<(), Box<ProofInconsistency>>;
+
+    /// When `expected_o` is `Some(date)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is equal to `date`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq_date(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&DateTime<Utc>>,
+    ) -> Result<(), Box<ProofInconsistency>>;
+
+    /// When `expected_o` is `Some(str)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is equal to the multibase-encoded string `str`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq_multibase(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&str>,
+    ) -> Result<(), Box<ProofInconsistency>>;
+
+    /// When `expected_o` is `Some(json)`.
+    /// take any statement of the form `s p o` for the given `s` and `p`
+    /// and checks that `o` is equal to the JSON value `json`.
+    /// When `expected_o` is `None`,
+    /// checks that no statement has the form `s p o`.
+    fn take_object_and_assert_eq_json(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&serde_json::Value>,
+    ) -> Result<(), Box<ProofInconsistency>>;
+}
+
+impl ProofGraph for grdf::HashGraph<rdf_types::Subject, IriBuf, rdf_types::Object> {
+    fn take_object_and_assert_eq_iri(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<Iri>,
+    ) -> Result<(), Box<ProofInconsistency>> {
+        self.take_object_and_assert_eq(s, p, expected_o, |o, expected_iri| match o {
+            rdf_types::Object::Iri(iri) => iri == expected_iri,
+            _ => false,
+        })
+    }
+
+    fn take_object_and_assert_eq_iri_or_str(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&str>,
+    ) -> Result<(), Box<ProofInconsistency>> {
+        self.take_object_and_assert_eq(s, p, expected_o, |o, expected| match o {
+            rdf_types::Object::Iri(iri) => iri.as_str() == *expected,
+            rdf_types::Object::Literal(rdf_types::Literal::String(s)) => s.as_str() == *expected,
+            _ => false,
+        })
+    }
+
+    fn take_object_and_assert_eq_date(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&DateTime<Utc>>,
+    ) -> Result<(), Box<ProofInconsistency>> {
+        self.take_object_and_assert_eq(s, p, expected_o, |o, expected| match o {
+            rdf_types::Object::Literal(rdf_types::Literal::TypedString(date, ty))
+                if *ty == iri!("http://www.w3.org/2001/XMLSchema#dateTime") =>
+            {
+                match DateTime::parse_from_rfc3339(date.as_str()) {
+                    Ok(date) => date == **expected,
+                    _ => false,
+                }
+            }
+            _ => false,
+        })
+    }
+
+    fn take_object_and_assert_eq_multibase(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&str>,
+    ) -> Result<(), Box<ProofInconsistency>> {
+        self.take_object_and_assert_eq(s, p, expected_o, |o, expected| match o {
+            rdf_types::Object::Literal(rdf_types::Literal::TypedString(s, ty)) => {
+                *ty == iri!("https://w3id.org/security#multibase") && s.as_str() == *expected
+            }
+            _ => false,
+        })
+    }
+
+    fn take_object_and_assert_eq_json(
+        &mut self,
+        s: &Self::Subject,
+        p: Iri,
+        expected_o: Option<&serde_json::Value>,
+    ) -> Result<(), Box<ProofInconsistency>> {
+        self.take_object_and_assert_eq(s, p, expected_o, |o, expected| match o {
+            rdf_types::Object::Literal(rdf_types::Literal::TypedString(json, ty))
+                if *ty == iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON") =>
+            {
+                match serde_json::from_str::<serde_json::Value>(json) {
+                    Ok(json) => json == **expected,
+                    _ => false,
+                }
+            }
+            _ => false,
+        })
+    }
 }

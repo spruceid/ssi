@@ -209,10 +209,10 @@ pub enum Content {
 }
 
 #[cfg(feature = "http")]
-fn get_first_context_uri(value: &Value) -> Option<&str> {
+fn get_first_context_uri(value: &Value) -> Option<iref::IriRef> {
     match value.get("@context")? {
-        Value::Array(ref vec) => vec.get(0)?.as_str(),
-        Value::String(ref string) => Some(string.as_str()),
+        Value::Array(vec) => vec.get(0)?.as_str().and_then(|v| iref::IriRef::new(v).ok()),
+        Value::String(string) => iref::IriRef::new(string).ok(),
         _ => None,
     }
 }
@@ -1029,7 +1029,7 @@ impl DIDResolver for HTTPDIDResolver {
         };
 
         let first_context_uri = get_first_context_uri(&value);
-        if first_context_uri == Some(DID_RESOLUTION_V1_CONTEXT) {
+        if first_context_uri == Some(DID_RESOLUTION_V1_CONTEXT.as_iri_ref()) {
             // Detect DID Resolution Result that didn't have specific media type.
             return transform_resolution_result(serde_json::from_value(value));
         }

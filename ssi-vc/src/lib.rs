@@ -11,6 +11,7 @@ use cacao::BindingDelegation;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
 use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
+use ssi_json_ld::parse_ld_context;
 use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
 use ssi_jwk::{JWTKeys, JWK};
 use ssi_jws::Header;
@@ -1112,12 +1113,19 @@ impl LinkedDataDocument for Credential {
     ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
-        let json = serde_json::to_string(&copy)?;
-        let more_contexts = match parent {
-            Some(parent) => parent.get_contexts()?,
-            None => None,
-        };
-        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
+        let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
+        Ok(json_to_dataset(
+            json,
+            context_loader,
+            parent
+                .map(LinkedDataDocument::get_contexts)
+                .transpose()?
+                .flatten()
+                .as_deref()
+                .map(parse_ld_context)
+                .transpose()?,
+        )
+        .await?)
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
@@ -1711,12 +1719,19 @@ impl LinkedDataDocument for Presentation {
     ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
         copy.proof = None;
-        let json = serde_json::to_string(&copy)?;
-        let more_contexts = match parent {
-            Some(parent) => parent.get_contexts()?,
-            None => None,
-        };
-        Ok(json_to_dataset(&json, more_contexts.as_ref(), false, None, context_loader).await?)
+        let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
+        Ok(json_to_dataset(
+            json,
+            context_loader,
+            parent
+                .map(LinkedDataDocument::get_contexts)
+                .transpose()?
+                .flatten()
+                .as_deref()
+                .map(parse_ld_context)
+                .transpose()?,
+        )
+        .await?)
     }
 
     fn to_value(&self) -> Result<Value, LdpError> {
@@ -2370,8 +2385,8 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .to_dataset_for_signing(Some(&parent), &mut context_loader)
             .await
             .unwrap();
-        let proof_dataset_normalized = urdna2015::normalize(&proof_dataset).unwrap();
-        let proof_urdna2015 = proof_dataset_normalized.to_nquads().unwrap();
+        let proof_dataset_normalized = urdna2015::normalize(proof_dataset.quads().map(Into::into));
+        let proof_urdna2015 = proof_dataset_normalized.into_nquads();
         eprintln!("proof:\n{}", proof_urdna2015);
         eprintln!("expected:\n{}", urdna2015_expected);
         assert_eq!(proof_urdna2015, urdna2015_expected);
@@ -2405,8 +2420,9 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .to_dataset_for_signing(None, &mut context_loader)
             .await
             .unwrap();
-        let credential_dataset_normalized = urdna2015::normalize(&credential_dataset).unwrap();
-        let credential_urdna2015 = credential_dataset_normalized.to_nquads().unwrap();
+        let credential_dataset_normalized =
+            urdna2015::normalize(credential_dataset.quads().map(Into::into));
+        let credential_urdna2015 = credential_dataset_normalized.into_nquads();
         eprintln!("credential:\n{}", credential_urdna2015);
         eprintln!("expected:\n{}", urdna2015_expected);
         assert_eq!(credential_urdna2015, urdna2015_expected);

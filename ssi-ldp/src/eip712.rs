@@ -5,13 +5,14 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 use keccak_hash::keccak;
+use rdf_types::QuadRef;
 use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use thiserror::Error;
 
 use crate::{LinkedDataDocument, Proof};
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
-use ssi_json_ld::ContextLoader;
+use ssi_json_ld::{rdf::NQuadsStatement, ContextLoader};
 
 static EMPTY_32: [u8; 32] = [0; 32];
 
@@ -116,10 +117,6 @@ pub enum TypedDataConstructionError {
     DocumentToDataset(String),
     #[error("Unable to convert proof to data set: {0}")]
     ProofToDataset(String),
-    #[error("Unable to normalize document: {0}")]
-    NormalizeDocument(String),
-    #[error("Unable to normalize proof: {0}")]
-    NormalizeProof(String),
 }
 
 #[derive(Error, Debug)]
@@ -709,20 +706,20 @@ impl TypedData {
             .to_dataset_for_signing(None, context_loader)
             .await
             .map_err(|e| TypedDataConstructionError::DocumentToDataset(e.to_string()))?;
-        let doc_dataset_normalized = crate::urdna2015::normalize(&doc_dataset)
-            .map_err(|e| TypedDataConstructionError::NormalizeDocument(e.to_string()))?;
-        let mut doc_statements_normalized = doc_dataset_normalized.statements();
+        let doc_dataset_normalized =
+            crate::urdna2015::normalize(doc_dataset.quads().map(QuadRef::from));
+        let mut doc_statements_normalized: Vec<_> = doc_dataset_normalized.collect();
         #[allow(clippy::redundant_closure)]
-        doc_statements_normalized.sort_by_cached_key(|x| String::from(x));
+        doc_statements_normalized.sort_by_cached_key(|x| NQuadsStatement(x).to_string());
         let sigopts_dataset = proof
             .to_dataset_for_signing(Some(document), context_loader)
             .await
             .map_err(|e| TypedDataConstructionError::ProofToDataset(e.to_string()))?;
-        let sigopts_dataset_normalized = crate::urdna2015::normalize(&sigopts_dataset)
-            .map_err(|e| TypedDataConstructionError::NormalizeProof(e.to_string()))?;
-        let mut sigopts_statements_normalized = sigopts_dataset_normalized.statements();
+        let sigopts_dataset_normalized =
+            crate::urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from));
+        let mut sigopts_statements_normalized: Vec<_> = sigopts_dataset_normalized.collect();
         #[allow(clippy::redundant_closure)]
-        sigopts_statements_normalized.sort_by_cached_key(|x| String::from(x));
+        sigopts_statements_normalized.sort_by_cached_key(|x| NQuadsStatement(x).to_string());
 
         let types = Types {
             eip712_domain: StructType(vec![MemberVariable {
@@ -749,15 +746,17 @@ impl TypedData {
             .into_iter()
             .collect(),
         };
-        use ssi_json_ld::rdf::Statement;
-        fn encode_statement(statement: Statement) -> EIP712Value {
+
+        fn encode_statement(rdf_types::Quad(s, p, o, g): rdf_types::Quad) -> EIP712Value {
+            use rdf_types::RdfDisplay;
+
             let mut terms = vec![
-                EIP712Value::String(String::from(&statement.subject)),
-                EIP712Value::String(String::from(&statement.predicate)),
-                EIP712Value::String(String::from(&statement.object)),
+                EIP712Value::String(s.rdf_display().to_string()),
+                EIP712Value::String(p.rdf_display().to_string()),
+                EIP712Value::String(o.rdf_display().to_string()),
             ];
-            if let Some(graph_label) = statement.graph_label.as_ref() {
-                terms.push(EIP712Value::String(String::from(graph_label)));
+            if let Some(graph_label) = g {
+                terms.push(EIP712Value::String(graph_label.rdf_display().to_string()));
             }
             EIP712Value::Array(terms)
         }
@@ -1604,7 +1603,7 @@ mod tests {
     };
     use ssi_dids::Document;
 
-    use crate::LinkedDataProofOptions;
+    use crate::{DataSet, LinkedDataProofOptions};
     use ssi_core::uri::URI;
     use ssi_dids::VerificationRelationship as ProofPurpose;
 
@@ -1663,7 +1662,7 @@ mod tests {
             &self,
             _parent: Option<&(dyn LinkedDataDocument + Sync)>,
             _context_loader: &mut ContextLoader,
-        ) -> Result<ssi_json_ld::rdf::DataSet, crate::error::Error> {
+        ) -> Result<DataSet, crate::error::Error> {
             todo!();
         }
 

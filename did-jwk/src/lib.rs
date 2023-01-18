@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use static_iref::iref;
 
 use ssi_dids::{
     did_resolve::{
@@ -86,8 +87,8 @@ impl DIDResolver for DIDJWK {
         };
         let doc = Document {
             context: Contexts::Many(vec![
-                Context::URI(DEFAULT_CONTEXT.to_string()),
-                Context::URI("https://w3id.org/security/suites/jws-2020/v1".to_string()),
+                Context::URI(DEFAULT_CONTEXT.into()),
+                Context::URI(iref!("https://w3id.org/security/suites/jws-2020/v1").to_owned()),
             ]),
             id: did.to_string(),
             verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
@@ -136,8 +137,7 @@ impl DIDMethod for DIDJWK {
             return None;
         };
 
-        let did =
-            "did:jwk:".to_string() + &multibase::encode(multibase::Base::Base64Url, &jwk)[1..];
+        let did = "did:jwk:".to_string() + &multibase::encode(multibase::Base::Base64Url, jwk)[1..];
         Some(did)
     }
 

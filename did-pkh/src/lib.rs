@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
+use static_iref::iref;
 use std::collections::BTreeMap;
 use std::str::FromStr;
 
@@ -110,7 +111,7 @@ async fn resolve_tezos(did: &str, account_address: String, reference: &str) -> R
 
     let doc = Document {
         context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::URI(DEFAULT_CONTEXT.into()),
             Context::Object(context),
         ]),
         id: did.to_string(),
@@ -188,7 +189,7 @@ async fn resolve_eip155(
     */
     let doc = Document {
         context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::URI(DEFAULT_CONTEXT.into()),
             Context::Object(context),
         ]),
         id: did.to_string(),
@@ -289,7 +290,7 @@ async fn resolve_solana(did: &str, account_address: String, reference: &str) -> 
     });
     let doc = Document {
         context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::URI(DEFAULT_CONTEXT.into()),
             Context::Object(context),
         ]),
         id: did.to_string(),
@@ -353,7 +354,7 @@ async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> 
     );
     let doc = Document {
         context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
+            Context::URI(DEFAULT_CONTEXT.into()),
             Context::Object(context),
         ]),
         id: did.to_string(),
@@ -408,8 +409,8 @@ async fn resolve_aleo(did: &str, account_address: String, reference: &str) -> Re
     });
     let doc = Document {
         context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.to_string()),
-            Context::URI("https://w3id.org/security/suites/blockchain-2021/v1".to_string()),
+            Context::URI(DEFAULT_CONTEXT.into()),
+            Context::URI(iref!("https://w3id.org/security/suites/blockchain-2021/v1").to_owned()),
         ]),
         id: did.to_string(),
         verification_method: Some(vec![vm]),
@@ -595,7 +596,7 @@ fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<Blockchain
     let pk_bs58 = match key.params {
         Params::OKP(ref params) if params.curve == "AleoTestnet1Key" => bech32::encode(
             "aleo",
-            &params.public_key.0.to_base32(),
+            params.public_key.0.to_base32(),
             bech32::Variant::Bech32m,
         )
         .unwrap(),
