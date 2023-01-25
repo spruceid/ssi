@@ -552,19 +552,36 @@ async fn to_jws_payload_v2(
         sigopts_digest: [0; 32],
     };
 
+    let canonicalize_blank_node_labels = match proof.type_ {
+        ProofSuiteType::BbsBlsSignatureProof2020 => false,
+        _ => true,
+    };
+
     let sigopts_dataset = proof
         .to_dataset_for_signing(Some(document), context_loader)
         .await?;
-    let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
-    let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
-    payload.sigopts_digest = sha256(sigopts_normalized.as_bytes());
+
+    if canonicalize_blank_node_labels {
+        let sigopts_dataset_normalized = urdna2015::normalize(&sigopts_dataset)?;
+        let sigopts_normalized = sigopts_dataset_normalized.to_nquads()?;
+        payload.sigopts_digest = sha256(sigopts_normalized.as_bytes());
+    } else {
+        let sigopts_nquads = sigopts_dataset.to_nquads()?;
+        payload.sigopts_digest = sha256(sigopts_nquads.as_bytes());
+    }
 
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
-    let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
-    let doc_normalized = doc_dataset_normalized.to_nquads_vec()?;
-    payload.messages = doc_normalized;
+
+    if canonicalize_blank_node_labels {
+        let doc_dataset_normalized = urdna2015::normalize(&doc_dataset)?;
+        let doc_normalized = doc_dataset_normalized.to_nquads_vec()?;
+        payload.messages = doc_normalized;
+    } else {
+        let nquads_vec = doc_dataset.to_nquads_vec()?;
+        payload.messages = nquads_vec;
+    }
 
     Ok(payload)
 }

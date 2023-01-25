@@ -339,20 +339,41 @@ pub fn verify_payload(
                     proof_nonce_bytes_sized.clone_from_slice(proof_nonce_bytes.as_slice());
                     let proof_nonce = ProofNonce::from(proof_nonce_bytes_sized);
 
-                    for i in 0..payload.messages.len() {
-                        let m = payload.messages[i].as_str();
-                    }
-
                     let result = Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
                     match result {
                         Ok(message_hashes) => {
-                            for i in 0..message_hashes.len() {
-                                let revealed_hash = message_hashes[i];
-                                let message_index = disclosed_message_indices[i] - 2; // -2 because first two messages are header and sigopts
-                                let target_hash = SignatureMessage::hash(payload.messages[message_index].as_str());
+                            let mut i = 0;
+                            let mut credential_subject_id = "";
+                            while i < payload.messages.len() {
+                                let m = payload.messages[i].as_str();
+                                if m.contains("<https://www.w3.org/2018/credentials#credentialSubject>") {
+                                    let m_parts: Vec<&str> = m.split(" ").collect();
+                                    credential_subject_id = m_parts[2];
+                                    break;
+                                }
+                                i += 1;
+                            }
+                            assert!(credential_subject_id != "", "credentialSubject node not found");
+
+                            let mut first_claim_found = false;
+                            while i < payload.messages.len() {
+                                let m = payload.messages[i].as_str();
+                                if m.starts_with(credential_subject_id) {
+                                    first_claim_found = true;
+                                    break;
+                                }
+                                i += 1;
+                            }
+                            assert!(first_claim_found, "No claims in derived credential");
+
+                            for j in 0..message_hashes.len() {
+                                let revealed_hash = message_hashes[j];
+                                let target_hash = SignatureMessage::hash(payload.messages[i].as_bytes());
                                 if revealed_hash != target_hash {
                                     return Err(Error::InvalidSignature);
                                 }
+
+                                i += 1;
                             }
                         },
                         Err(_) => {

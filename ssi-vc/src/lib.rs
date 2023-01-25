@@ -1117,6 +1117,7 @@ impl LinkedDataDocument for Credential {
         context_loader: &mut ContextLoader,
     ) -> Result<DataSet, LdpError> {
         let mut copy = self.clone();
+
         copy.proof = None;
         let json = serde_json::to_string(&copy)?;
         let more_contexts = match parent {
@@ -1129,7 +1130,7 @@ impl LinkedDataDocument for Credential {
             false,
             None,
             context_loader,
-            false,
+            true,
         )
         .await?)
     }

@@ -177,7 +177,9 @@ impl LinkedDataDocument for Proof {
         };
 
         let stable_blank_node_labels = match copy.type_ {
-            ProofSuiteType::BbsBlsSignatureProof2020 => true,
+            ProofSuiteType::BbsBlsSignatureProof2020 => {
+                true
+            },
             _ => false,
         };
 
