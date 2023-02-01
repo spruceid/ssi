@@ -38,13 +38,18 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
         None => ".well-known".to_string(),
     };
     // Use http for localhost, for testing purposes.
-    let proto = if domain_name == "localhost" {
+    let proto = if domain_name.starts_with("localhost") {
         "http"
     } else {
         "https"
     };
     #[allow(unused_mut)]
-    let mut url = format!("{}://{}/{}/did.json", proto, domain_name, path);
+    let mut url = format!(
+        "{}://{}/{}/did.json",
+        proto,
+        domain_name.replace("%3A", ":"),
+        path
+    );
     #[cfg(test)]
     PROXY.with(|proxy| {
         if let Some(ref proxy) = *proxy.borrow() {
@@ -128,8 +133,8 @@ impl DIDResolver for DIDWeb {
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!(
-                        "Error sending HTTP request : {}",
-                        err
+                        "Error sending HTTP request ({}): {}",
+                        url, err
                     )),
                     Vec::new(),
                     None,
