@@ -671,7 +671,8 @@ impl Credential {
             checks,
             eip712_domain,
             type_,
-            nonce
+            nonce,
+            disclosed_message_indices,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -860,7 +861,7 @@ impl Credential {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vc, resolver, context_loader, None).await;
+            let mut result = proof.verify(&vc, resolver, context_loader, None, Vec::new()).await;
             results.append(&mut result);
             if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -987,6 +988,10 @@ impl Credential {
             Some(ldp_options) => ldp_options.nonce.clone(),
             None => None
         };
+        let disclosed_message_indices = match options.as_ref() {
+            Some(ldp_options) => ldp_options.disclosed_message_indices.clone(),
+            None => Some(Vec::new())
+        };
         let checks = options
             .as_ref()
             .and_then(|opts| opts.checks.clone())
@@ -1005,7 +1010,7 @@ impl Credential {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref()).await;
+            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref(), disclosed_message_indices.clone().unwrap()).await;
             results.append(&mut result);
             if result.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1123,6 +1128,7 @@ impl LinkedDataDocument for Credential {
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
     ) -> Result<DataSet, LdpError> {
+        eprintln!("to_dataset_for_signing, impl LinkedDataDocument for Credential");
         let mut copy = self.clone();
 
         copy.proof = None;
@@ -1229,6 +1235,7 @@ impl Presentation {
             eip712_domain,
             type_,
             nonce,
+            disclosed_message_indices,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1417,7 +1424,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vp, resolver, context_loader, None).await;
+            let mut result = proof.verify(&vp, resolver, context_loader, None, Vec::new()).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return (Some(vp), result);
@@ -1590,7 +1597,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader, None).await;
+            let mut result = proof.verify(self, resolver, context_loader, None, Vec::new()).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;

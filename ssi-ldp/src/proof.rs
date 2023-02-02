@@ -59,8 +59,6 @@ pub struct Proof {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
-    #[serde(default)]
-    pub disclosed_messages: Option<Vec<usize>>,
 }
 
 impl Proof {
@@ -78,7 +76,6 @@ impl Proof {
             nonce: None,
             jws: None,
             property_set: None,
-            disclosed_messages: None,
         }
     }
 
@@ -153,8 +150,9 @@ impl Proof {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         nonce: Option<&String>,
+        disclosed_message_indices: Vec<usize>,
     ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver, context_loader, nonce)
+        LinkedDataProofs::verify(self, document, resolver, context_loader, nonce, disclosed_message_indices)
             .await
             .into()
     }
@@ -225,6 +223,8 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The nonce of the proof.
     pub nonce: Option<String>,
+    /// Indices of disclosed messages
+    pub disclosed_message_indices: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The domain of the proof.
     pub domain: Option<String>,
@@ -251,6 +251,7 @@ impl Default for LinkedDataProofOptions {
             eip712_domain: None,
             type_: None,
             nonce: None,
+            disclosed_message_indices: Some(Vec::new()),
         }
     }
 }

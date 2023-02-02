@@ -733,6 +733,7 @@ impl ProofSuite for ProofSuiteType {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         nonce: Option<&String>,
+        disclosed_message_indices: Vec<usize>,
     ) -> Result<VerificationWarnings, Error> {
         match self {
             #[cfg(feature = "rsa")]
@@ -814,7 +815,7 @@ impl ProofSuite for ProofSuiteType {
             }
             Self::CLSignature2019 => todo!(),
             Self::BbsBlsSignatureProof2020 => {
-                verify_bbs_proof(proof, document, resolver, context_loader, Algorithm::BLS12381G2, nonce).await
+                verify_bbs_proof(proof, document, resolver, context_loader, Algorithm::BLS12381G2, nonce, disclosed_message_indices).await
             },
             #[cfg(feature = "test")]
             Self::NonJwsProof

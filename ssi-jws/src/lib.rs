@@ -342,6 +342,7 @@ pub fn verify_payload(
                     let result = Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
                     match result {
                         Ok(message_hashes) => {
+                            eprintln!("Signature pok check passes");
                             let mut i = 0;
                             let mut credential_subject_id = "";
                             while i < payload.messages.len() {
@@ -377,6 +378,7 @@ pub fn verify_payload(
                             }
                         },
                         Err(_) => {
+                            eprintln!("Signature pok check did not pass");
                             return Err(Error::InvalidSignature);
                         }
                     }
