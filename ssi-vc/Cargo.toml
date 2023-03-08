@@ -1,6 +1,6 @@
 [package]
 name = "ssi-vc"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -26,9 +26,9 @@ ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1" }
-ssi-dids = { path = "../ssi-dids", version = "0.1" }
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.1", default-features = false }
-ssi-ldp = { path = "../ssi-ldp", version = "0.1", default-features = false }
+ssi-dids = { path = "../ssi-dids", version = "0.1.1" }
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.2", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", version = "0.2", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }

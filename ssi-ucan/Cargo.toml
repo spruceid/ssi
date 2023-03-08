@@ -1,6 +1,6 @@
 [package]
 name = "ssi-ucan"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -17,7 +17,7 @@ base64 = "0.12"
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
-ssi-dids = { path = "../ssi-dids", version = "0.1" }
+ssi-dids = { path = "../ssi-dids", version = "0.1.1" }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  }
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}

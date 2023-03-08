@@ -1,6 +1,6 @@
 [package]
 name = "ssi-ldp"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -49,7 +49,7 @@ k256 = { version = "0.11", optional = true, features = ["ecdsa"] }
 p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
 keccak-hash = { version = "0.7", optional = true }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.1"}
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.2"}
 ssi-core = { path = "../ssi-core", version = "0.1"}
 ssi-dids = { path = "../ssi-dids", version = "0.1"}
 ssi-crypto = { path = "../ssi-crypto", version = "0.1"}

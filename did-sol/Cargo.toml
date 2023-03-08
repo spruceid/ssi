@@ -1,6 +1,6 @@
 [package]
 name = "did-sol"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -23,7 +23,7 @@ bs58 = { version = "0.4", features = ["check"] }
 
 [dev-dependencies]
 ssi-vc = { path = "../ssi-vc", version = "0.1", default-features = false }
-ssi-ldp = { path = "../ssi-ldp", version = "0.1", default-features = false, features = ["tezos", "w3c", "solana"] }
+ssi-ldp = { path = "../ssi-ldp", version = "0.2", default-features = false, features = ["tezos", "w3c", "solana"] }
 ssi-core = { path = "../ssi-core", version = "0.1", default-features = false }
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.1", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.2", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }
