@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [c4a2051] Fix and clean up features (#479)
 - [adc604d] Fix missing ssi-ldp tezos feature (#480)
 - [19a177d] Fix JWK/JWS `none` alg casing (#485)
+- [bb4f1a4] Fix test docs and gate it behind feature (#497)
 
 ### Other
 - [4d6ffc0] Update DID method crates for ssi v0.4
@@ -72,6 +73,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [758348f] Use enum for proof suites (#489)
 - [d5002e5] Release chores (#493)
 - [b828864] Require Sync for dyn Document (#495)
+- [7f3264c] Generate changelog automatically (#496)
+- [3e7bebc] Upgrade `json-ld`. (#500)
 
 ### Removed
 - [8b44f0f] Remove JsonWebSignature2020 RSA key length check
@@ -79,6 +82,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [bd244df] Remove PassthroughDigest and update crypto dependencies (#385)
 - [7c7bd2b] Remove unused DecodeError (#482)
 - [80be3ef] Remove openssl (#484)
+- [b5bd02a] Remove wildcard dev dependency version (#498)
+- [5392658] Remove wildcard dev dependency version (#499)
 
 ## [0.4.0] - 2022-03-02
 
