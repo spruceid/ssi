@@ -1,5 +1,5 @@
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 use chrono::{prelude::*, Duration, LocalResult};
 use ssi_jwk::{Algorithm, JWK};
@@ -53,7 +53,21 @@ pub fn decode_unverified<Claims: DeserializeOwned>(jwt: &str) -> Result<Claims, 
 /// which is centered around the Unix epoch start date Jan 1, 1970, 00:00:00 UTC, giving
 /// the years 1685 to 2255.
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, PartialOrd)]
-pub struct NumericDate(f64);
+pub struct NumericDate(#[serde(serialize_with = "interop_serialize")] f64);
+
+/// As many JWT libraries only accept integers, this serializer aims for a
+/// middle ground by serializing a date as an integer if it does not have
+/// fractional seconds. Otherwise a trailing `.0` is always present.
+fn interop_serialize<S>(x: &f64, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    if x.fract() != 0.0 {
+        s.serialize_f64(*x)
+    } else {
+        s.serialize_i64(*x as i64)
+    }
+}
 
 #[derive(thiserror::Error, Debug)]
 pub enum NumericDateConversionError {

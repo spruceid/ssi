@@ -471,7 +471,7 @@ pub fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
 
-// deprecated in favor of Credential::generate_jwt and Presentation::generate_jwt
+#[deprecated = "deprecated in favor of Credential::generate_jwt and Presentation::generate_jwt"]
 fn jwt_encode(claims: &JWTClaims, keys: &JWTKeys) -> Result<String, Error> {
     let jwk: &JWK = if let Some(rs256_key) = &keys.rs256_private_key {
         rs256_key
@@ -638,6 +638,7 @@ impl Credential {
         Ok(ssi_jwt::encode_unsigned(&claims)?)
     }
 
+    #[allow(deprecated)]
     #[deprecated(note = "Use generate_jwt")]
     pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {
         let claims = JWTClaims {
@@ -1182,6 +1183,7 @@ impl Presentation {
         })
     }
 
+    #[allow(deprecated)]
     #[deprecated(note = "Use generate_jwt")]
     pub fn encode_sign_jwt(&self, keys: &JWTKeys, aud: &str) -> Result<String, Error> {
         let claims = JWTClaims {
@@ -2769,6 +2771,51 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", vres);
         assert_ne!(vres.errors.len(), 0);
+    }
+
+    #[async_std::test]
+    async fn interop_jwt_vc() {
+        use time::{
+            ext::NumericalDuration, format_description::well_known::Rfc3339, OffsetDateTime,
+        };
+        let vc = json!({
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "id": "http://example.org/credentials/3731",
+            "type": ["VerifiableCredential"],
+            "issuer": "did:example:placeholder",
+            "issuanceDate": "2020-08-19T21:41:50Z",
+            "expirationDate": (OffsetDateTime::now_utc() + (52*10).weeks()).replace_nanosecond(0).unwrap().format(&Rfc3339).unwrap(),
+            "credentialSubject": {
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            }
+        });
+        let mut vc: Credential = serde_json::from_value(vc).unwrap();
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+        let mut vc_issue_options = LinkedDataProofOptions::default();
+        let vc_issuer_key = "did:example:foo".to_string();
+        let vc_issuer_vm = "did:example:foo#key1".to_string();
+        vc.issuer = Some(Issuer::URI(URI::String(vc_issuer_key.to_string())));
+        vc_issue_options.verification_method = Some(URI::String(vc_issuer_vm));
+        vc_issue_options.proof_purpose = Some(ProofPurpose::AssertionMethod);
+        vc_issue_options.checks = None;
+        vc_issue_options.created = None;
+        let vc_jwt = vc
+            .generate_jwt(Some(&key), &vc_issue_options, &DIDExample)
+            .await
+            .unwrap();
+        let verifier = josekit::jws::PS256
+            .verifier_from_jwk(&josekit::jwk::Jwk::from_bytes(JWK_JSON).unwrap())
+            .unwrap();
+        josekit::jwt::decode_with_verifier(vc_jwt, &verifier).unwrap();
+    }
+
+    #[async_std::test]
+    async fn verify_old_jwt_vc_decimal_timestamp() {
+        let vc_jwt = "eyJhbGciOiJQUzI1NiIsImtpZCI6ImRpZDpleGFtcGxlOmZvbyNrZXkxIn0.eyJleHAiOjE5OTUyNjczOTcuMTI1ODg4LCJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJuYmYiOjE1OTc4NzMzMTAuMCwianRpIjoiaHR0cDovL2V4YW1wbGUub3JnL2NyZWRlbnRpYWxzLzM3MzEiLCJzdWIiOiJkaWQ6ZXhhbXBsZTpkMjNkZDY4N2E3ZGM2Nzg3NjQ2ZjJlYjk4ZDAiLCJ2YyI6eyJAY29udGV4dCI6Imh0dHBzOi8vd3d3LnczLm9yZy8yMDE4L2NyZWRlbnRpYWxzL3YxIiwiaWQiOiJodHRwOi8vZXhhbXBsZS5vcmcvY3JlZGVudGlhbHMvMzczMSIsInR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiXSwiY3JlZGVudGlhbFN1YmplY3QiOnsiaWQiOiJkaWQ6ZXhhbXBsZTpkMjNkZDY4N2E3ZGM2Nzg3NjQ2ZjJlYjk4ZDAifSwiaXNzdWVyIjoiZGlkOmV4YW1wbGU6Zm9vIiwiaXNzdWFuY2VEYXRlIjoiMjAyMC0wOC0xOVQyMTo0MTo1MFoiLCJleHBpcmF0aW9uRGF0ZSI6IjIwMzMtMDMtMjRUMDg6NTY6MzcuMTI1ODg4WiJ9fQ.qCOIRr090plGC2SYQeTMuasErurjGeCbHNjkfospByWHxadk-8oz6P6beH03Adafu0I-7xrpEIxmC-KfHynAuEBCpjHMYh0rY2nGHX1sH530DE9O1FOK2IXtvScPKLzCv6v25qIUydzJZY9MnuoO879iowDgMgSAkDzjl8ZXnKpG3_dvoATrVpjP4FeC5m2JVJTMnOIKfehy9ZeFzilb9VcGmprWGWB_e2BJJ_wnLfxorVbGmS7QvTsARuUn_jPxrq_JPf9UZqwGb_wMwN7KG1VJRBuGix9ltf-KNwXI-Qm-9ZabYHub9n0Q3AHTDO78Lr4Or1PuiGq-QNQLtSVb5Q";
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let vc_verification_result =
+            Credential::verify_jwt(vc_jwt, None, &DIDExample, &mut context_loader).await;
+        assert!(vc_verification_result.errors.is_empty());
     }
 
     #[async_std::test]
