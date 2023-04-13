@@ -12,91 +12,105 @@ keywords = ["ssi", "did", "vc", "vp", "jsonld"]
 exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
 [features]
-default = ["w3c", "ripemd-160", "eip", "tezos"]
+# default = ["w3c", "ripemd-160", "eip", "tezos"]
 
-w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
-## enable secp256k1 signatures
-secp256k1 = ["ssi-ldp/secp256k1"]
-## enable secp256r1 (p256) signatures
-secp256r1 = ["ssi-ldp/secp256r1"]
-## enable secp384r1 (p384) signatures
-secp384r1 = ["ssi-ldp/secp384r1"]
-## enable ed25519 (EdDSA) signatures
-ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
-## enable RSA signatures
-rsa = ["ssi-ldp/rsa"]
-## enable ripemd hashes
-ripemd-160 = ["ssi-jwk/ripemd-160"]
-## enable bbs
-bbs = ["ssi-crypto/bbs"]
+# w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
+# ## enable secp256k1 signatures
+# secp256k1 = ["ssi-ldp/secp256k1"]
+# ## enable secp256r1 (p256) signatures
+# secp256r1 = ["ssi-ldp/secp256r1"]
+# ## enable secp384r1 (p384) signatures
+# secp384r1 = ["ssi-ldp/secp384r1"]
+# ## enable ed25519 (EdDSA) signatures
+# ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
+# ## enable RSA signatures
+# rsa = ["ssi-ldp/rsa"]
+# ## enable ripemd hashes
+# ripemd-160 = ["ssi-jwk/ripemd-160"]
+# ## enable bbs
+# bbs = ["ssi-crypto/bbs"]
 
-## enable aleo ecosystem signatures
-aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
-## enable ethereum style signatures
-eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
-## enable tezos style signatures
-tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
-## enable LDPs from the Solana Ecosystem
-solana = ["ssi-ldp/solana"]
+# ## enable aleo ecosystem signatures
+# aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
+# ## enable ethereum style signatures
+# eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
+# ## enable tezos style signatures
+# tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
+# ## enable LDPs from the Solana Ecosystem
+# solana = ["ssi-ldp/solana"]
 
-## Use the Ring crate for crypto operations
-ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
+# ## Use the Ring crate for crypto operations
+# ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
 
-http-did = ["ssi-dids/http"]
-example-http-issuer = ["ssi-ldp/example-http-issuer"]
+# http-did = ["ssi-dids/http"]
+# example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
-# Backward compatibility features
-ed25519-dalek = ["ed25519"]
-keccak = ["eip"]
-sha = ["rsa"]
+# # Backward compatibility features
+# ed25519-dalek = ["ed25519"]
+# keccak = ["eip"]
+# sha = ["rsa"]
 
 [dependencies]
-ssi-jwk = { path = "./ssi-jwk", version = "0.1.1", default-features = false }
-ssi-json-ld = { path = "./ssi-json-ld", version = "0.2.2", default-features = false }
-ssi-core = { path = "./ssi-core", version = "0.1" }
-ssi-dids = { path = "./ssi-dids", version = "0.1" }
-ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
-ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
-ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
-ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
-ssi-ldp = { path = "./ssi-ldp", version = "0.3.0", default-features = false }
-ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
-ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
-ssi-vc = { path = "./ssi-vc", version = "0.2.0" }
-ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1.2" }
-ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
-ssi-sd-jwt = { path = "./ssi-sd-jwt", version = "0.1" }
+# ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
+# ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
+# ssi-core = { path = "./ssi-core", version = "0.1" }
+# ssi-dids = { path = "./ssi-dids", version = "0.1" }
+# ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
+# ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
+# ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
+# ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
+# ssi-ldp = { path = "./ssi-ldp", version = "0.2", default-features = false }
+# ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
+# ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
+ssi-vc.workspace = true
+# ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
+# ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
+# ssi-sd-jwt = { path = "./ssi-sd-jwt", version = "0.1" }
 
 [workspace]
 members = [
-  "did-tezos",
-  "did-jwk",
-  "did-key",
-  "did-web",
-  "did-ethr",
-  "did-sol",
-  "did-pkh",
-  "did-onion",
-  "did-ion",
-  "did-webkey",
-  "vc-test",
-  "did-test",
-  "ssi-caips",
-  "ssi-jwk",
-  "ssi-core",
+  # "did-tezos",
+  # "did-jwk",
+  # "did-key",
+  # "did-web",
+  # "did-ethr",
+  # "did-sol",
+  # "did-pkh",
+  # "did-onion",
+  # "did-ion",
+  # "did-webkey",
+  # "vc-test",
+  # "did-test",
+  # "ssi-caips",
+  # "ssi-jwk",
+  # "ssi-core",
   "ssi-crypto",
-  "ssi-json-ld",
-  "ssi-dids",
-  "ssi-jws",
-  "ssi-jwt",
-  "ssi-sd-jwt",
-  "ssi-tzkey",
-  "ssi-ssh",
-  "ssi-ldp",
-  "ssi-ucan",
+  # "ssi-json-ld",
+  # "ssi-dids",
+  # "ssi-jws",
+  # "ssi-jwt",
+  # "ssi-sd-jwt",
+  # "ssi-tzkey",
+  # "ssi-ssh",
+  # "ssi-ucan",
+  "ssi-rdf",
   "ssi-vc",
-  "ssi-zcap-ld"
+  "ssi-ldp",
+  # "ssi-zcap-ld"
 ]
+
+[workspace.dependencies]
+ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
+ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
+ssi-vc = { path = "./ssi-vc", version = "0.2" }
+iref = "2.2.3"
+static-iref = "2"
+rdf-types = "0.14.4"
+grdf = "0.18.0"
+locspan = "0.7.13"
+nquads-syntax = "0.12.0"
+treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
+treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
