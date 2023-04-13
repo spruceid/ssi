@@ -1,3 +1,4 @@
+//! URDNA2015 canonicalization algorithm implementation.
 use std::collections::BTreeMap as Map;
 use std::collections::HashSet;
 use std::fmt;
@@ -6,13 +7,12 @@ use std::fmt;
 pub struct MissingChosenIssuer;
 
 use rdf_types::BlankId;
-use rdf_types::QuadRef;
-use rdf_types::{BlankIdBuf, Quad};
+use rdf_types::Id;
+use rdf_types::{BlankIdBuf, Quad, QuadRef};
 
 use ssi_crypto::hashes::sha256::sha256;
 
-use crate::rdf::IntoNQuads;
-use crate::rdf::NQuadsStatement;
+use crate::{IntoNQuads, NQuadsStatement};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BlankIdPosition {
@@ -66,7 +66,7 @@ impl<'a> BlankNodeComponents<'a> for QuadRef<'a> {
         if let rdf_types::Subject::Blank(label) = self.0 {
             labels.push((label, BlankIdPosition::Subject))
         }
-        if let rdf_types::Object::Blank(label) = self.2 {
+        if let rdf_types::Object::Id(Id::Blank(label)) = self.2 {
             labels.push((label, BlankIdPosition::Object))
         }
         if let Some(rdf_types::GraphLabel::Blank(label)) = self.3 {
@@ -82,7 +82,7 @@ impl BlankNodeComponentsMut for Quad {
         if let rdf_types::Subject::Blank(label) = &mut self.0 {
             labels.push(label)
         }
-        if let rdf_types::Object::Blank(label) = &mut self.2 {
+        if let rdf_types::Object::Id(Id::Blank(label)) = &mut self.2 {
             labels.push(label)
         }
         if let Some(rdf_types::GraphLabel::Blank(label)) = &mut self.3 {

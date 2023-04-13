@@ -1,4 +1,8 @@
+//! Resource Description Framework (RDF) utilities, including the URDNA2015
+//! canonicalization algorithm.
 use std::{borrow::Borrow, fmt};
+
+pub mod urdna2015;
 
 use iref::IriBuf;
 use rdf_types::Quad;
