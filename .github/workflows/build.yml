@@ -1,19 +1,24 @@
 name: ci
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
 
 jobs:
   build-and-lint:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout SSI Library
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: true
-    
+
     - name: Install Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -31,7 +36,7 @@ jobs:
       run: cargo build --workspace
 
     - name: Clippy
-      run: RUSTFLAGS="-Dwarnings" cargo clippy --workspace
+      run: cargo clippy --workspace
 
     - name: Test vc-test-suite
       run: |
@@ -53,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout SSI Library
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         submodules: true
 
