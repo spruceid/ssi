@@ -107,12 +107,10 @@ impl DIDResolver for DIDOnion {
             reqwest::header::HeaderValue::from_static(USER_AGENT),
         );
 
-        let mut client_builder = reqwest::Client::builder().default_headers(headers);
+        let client_builder = reqwest::Client::builder().default_headers(headers);
         #[cfg(not(target_arch = "wasm32"))]
-        match reqwest::Proxy::all(&self.proxy_url) {
-            Ok(proxy) => {
-                client_builder = client_builder.proxy(proxy);
-            }
+        let client_builder = match reqwest::Proxy::all(&self.proxy_url) {
+            Ok(proxy) => client_builder.proxy(proxy),
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!("Error constructing proxy: {}", err)),
