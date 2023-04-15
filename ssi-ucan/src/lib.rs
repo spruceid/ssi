@@ -7,13 +7,12 @@ use libipld::{
     serde::{from_ipld, to_ipld},
     Block, Cid, Ipld,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{
     base64::{Base64, UrlSafe},
     serde_as, DisplayFromStr,
 };
-use ssi_core::uri::URI;
 use ssi_dids::{
     did_resolve::{dereference, Content, DIDResolver},
     Document, Resource, VerificationMethod, VerificationMethodMap,
@@ -21,10 +20,11 @@ use ssi_dids::{
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
 use ssi_jwt::NumericDate;
-use std::{
-    fmt::Display,
-    io::{Read, Seek, Write},
-};
+use std::collections::BTreeMap;
+use std::io::{Read, Seek, Write};
+
+pub use ucan_capabilities_object;
+use ucan_capabilities_object::Capabilities;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = JsonValue, A = JsonValue> {
@@ -50,6 +50,8 @@ impl Default for UcanCodec {
         Self::DagJson
     }
 }
+
+const VERSION_STRING: &str = "0.2.0";
 
 impl<F, A> Ucan<F, A> {
     pub async fn verify_signature(&self, resolver: &dyn DIDResolver) -> Result<(), Error>
@@ -114,8 +116,8 @@ impl<F, A> Ucan<F, A> {
 
     pub fn decode(jwt: &str) -> Result<Self, Error>
     where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
+        F: for<'a> Deserialize<'a>,
+        A: for<'a> Deserialize<'a>,
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
         let (payload, codec): (Payload<F, A>, UcanCodec) =
@@ -132,7 +134,7 @@ impl<F, A> Ucan<F, A> {
         }
 
         match parts.header.additional_parameters.get("ucv") {
-            Some(JsonValue::String(v)) if v == "0.9.0" => (),
+            Some(JsonValue::String(v)) if v == VERSION_STRING => (),
             _ => return Err(Error::MissingUCANHeaderField("ucv: 0.9.0")),
         }
 
@@ -187,8 +189,8 @@ impl<F, A> Ucan<F, A> {
 
     pub fn from_block<S>(block: &Block<S>) -> Result<Self, IpldError>
     where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
+        F: for<'a> Deserialize<'a>,
+        A: for<'a> Deserialize<'a>,
         S: libipld::store::StoreParams,
         S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
         Ipld: Decode<S::Codecs>,
@@ -230,24 +232,25 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Payload<F = JsonValue, A = JsonValue> {
+pub struct Payload<F, A> {
     #[serde(rename = "iss")]
     pub issuer: String,
     #[serde(rename = "aud")]
     pub audience: String,
     #[serde(rename = "nbf", skip_serializing_if = "Option::is_none")]
     pub not_before: Option<NumericDate>,
+    // no expiration should serialize to null in JSON
     #[serde(rename = "exp")]
-    pub expiration: NumericDate,
+    pub expiration: Option<NumericDate>,
     #[serde(rename = "nnc", skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
     #[serde(rename = "fct", skip_serializing_if = "Option::is_none")]
     pub facts: Option<Vec<F>>,
-    #[serde_as(as = "Vec<DisplayFromStr>")]
-    #[serde(rename = "prf")]
-    pub proof: Vec<Cid>,
-    #[serde(rename = "att")]
-    pub attenuation: Vec<Capability<A>>,
+    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
+    #[serde(rename = "prf", skip_serializing_if = "Option::is_none")]
+    pub proof: Option<Vec<Cid>>,
+    #[serde(rename = "cap")]
+    pub capabilities: Capabilities<A>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -261,15 +264,13 @@ pub enum TimeInvalid {
 impl<F, A> Payload<F, A> {
     pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
         let t = time.unwrap_or_else(now);
-        match (self.not_before, t > self.expiration.as_seconds()) {
-            (_, true) => Err(TimeInvalid::TooLate),
+        match (self.not_before, self.expiration) {
+            (_, Some(exp)) if t >= exp.as_seconds() => Err(TimeInvalid::TooLate),
             (Some(nbf), _) if t < nbf.as_seconds() => Err(TimeInvalid::TooEarly),
             _ => Ok(()),
         }
     }
 
-    // NOTE IntoIter::new is deprecated, but into_iter() returns references until we move to 2021 edition
-    #[allow(deprecated)]
     pub fn sign(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
     where
         F: Serialize,
@@ -278,10 +279,11 @@ impl<F, A> Payload<F, A> {
         let header = Header {
             algorithm,
             type_: Some("JWT".to_string()),
-            additional_parameters: std::array::IntoIter::new([(
+            additional_parameters: [(
                 "ucv".to_string(),
-                serde_json::Value::String("0.9.0".to_string()),
-            )])
+                serde_json::Value::String(VERSION_STRING.to_string()),
+            )]
+            .into_iter()
             .collect(),
             ..Default::default()
         };
@@ -307,94 +309,6 @@ impl<F, A> Payload<F, A> {
             codec: UcanCodec::DagJson,
         })
     }
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-#[serde(untagged)]
-pub enum UcanResource {
-    Proof(#[serde_as(as = "DisplayFromStr")] UcanProofRef),
-    URI(URI),
-}
-
-impl Display for UcanResource {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match &self {
-            Self::Proof(p) => write!(f, "{p}"),
-            Self::URI(u) => write!(f, "{u}"),
-        }
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct UcanProofRef(pub Cid);
-
-impl Display for UcanProofRef {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "ucan:{}", self.0)
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum ProofRefParseErr {
-    #[error("Missing ucan prefix")]
-    Format,
-    #[error("Invalid Cid reference")]
-    ParseCid(#[from] libipld::cid::Error),
-}
-
-impl std::str::FromStr for UcanProofRef {
-    type Err = ProofRefParseErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(UcanProofRef(
-            s.strip_prefix("ucan:")
-                .map(Cid::from_str)
-                .ok_or(ProofRefParseErr::Format)??,
-        ))
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct UcanScope {
-    pub namespace: String,
-    pub capability: String,
-}
-
-impl std::fmt::Display for UcanScope {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}/{}", self.namespace, self.capability)
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum UcanScopeParseErr {
-    #[error("Missing namespace")]
-    Namespace,
-}
-
-impl std::str::FromStr for UcanScope {
-    type Err = UcanScopeParseErr;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (ns, cap) = s.split_once('/').ok_or(UcanScopeParseErr::Namespace)?;
-        Ok(UcanScope {
-            namespace: ns.to_string(),
-            capability: cap.to_string(),
-        })
-    }
-}
-
-/// 3.2.5 A JSON capability MUST include the with and can fields and
-/// MAY have additional fields needed to describe the capability
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct Capability<A = JsonValue> {
-    pub with: UcanResource,
-    #[serde_as(as = "DisplayFromStr")]
-    pub can: UcanScope,
-    #[serde(rename = "nb", skip_serializing_if = "Option::is_none")]
-    pub additional_fields: Option<A>,
 }
 
 fn now() -> f64 {
@@ -490,47 +404,49 @@ mod ipld_encoding {
     use super::*;
 
     #[derive(Serialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonUcanRef<'a, F = JsonValue, A = JsonValue> {
+    pub struct DagJsonUcanRef<'a, F, A> {
         header: &'a Header,
         payload: DagJsonPayloadRef<'a, F, A>,
         signature: &'a [u8],
     }
 
     #[derive(Deserialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonUcan<F = JsonValue, A = JsonValue> {
+    pub struct DagJsonUcan<F, A> {
         header: Header,
         payload: DagJsonPayload<F, A>,
         signature: Vec<u8>,
     }
 
     #[derive(Serialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonPayloadRef<'a, F = JsonValue, A = JsonValue> {
+    pub struct DagJsonPayloadRef<'a, F, A> {
         pub iss: &'a str,
         pub aud: &'a str,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nbf: &'a Option<NumericDate>,
-        pub exp: &'a NumericDate,
+        pub exp: &'a Option<NumericDate>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nnc: &'a Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub fct: &'a Option<Vec<F>>,
-        pub prf: &'a Vec<Cid>,
-        pub att: &'a Vec<Capability<A>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub prf: &'a Option<Vec<Cid>>,
+        pub cap: &'a Capabilities<A>,
     }
 
     #[derive(Deserialize, Clone, PartialEq, Debug)]
-    pub struct DagJsonPayload<F = JsonValue, A = JsonValue> {
+    pub struct DagJsonPayload<F, A> {
         pub iss: String,
         pub aud: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nbf: Option<NumericDate>,
-        pub exp: NumericDate,
+        pub exp: Option<NumericDate>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nnc: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub fct: Option<Vec<F>>,
-        pub prf: Vec<Cid>,
-        pub att: Vec<Capability<A>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub prf: Option<Vec<Cid>>,
+        pub cap: Capabilities<A>,
     }
 
     impl<F, A> Encode<DagJsonCodec> for Ucan<F, A>
@@ -545,8 +461,8 @@ mod ipld_encoding {
 
     impl<F, A> Decode<DagJsonCodec> for Ucan<F, A>
     where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
+        F: for<'a> Deserialize<'a>,
+        A: for<'a> Deserialize<'a>,
     {
         fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
             let u: ipld_encoding::DagJsonUcan<F, A> = from_ipld(Ipld::decode(c, r)?)?;
@@ -566,8 +482,8 @@ mod ipld_encoding {
 
     impl<F, A> Decode<DagJsonCodec> for Payload<F, A>
     where
-        F: DeserializeOwned,
-        A: DeserializeOwned,
+        F: for<'a> Deserialize<'a>,
+        A: for<'a> Deserialize<'a>,
     {
         fn decode<R: Read + Seek>(c: DagJsonCodec, r: &mut R) -> Result<Self, IpldError> {
             let p: ipld_encoding::DagJsonPayload<F, A> = from_ipld(Ipld::decode(c, r)?)?;
@@ -606,7 +522,7 @@ mod ipld_encoding {
                 nnc: &p.nonce,
                 fct: &p.facts,
                 prf: &p.proof,
-                att: &p.attenuation,
+                cap: &p.capabilities,
             }
         }
     }
@@ -621,7 +537,7 @@ mod ipld_encoding {
                 nonce: p.nnc,
                 facts: p.fct,
                 proof: p.prf,
-                attenuation: p.att,
+                capabilities: p.cap,
             }
         }
     }
