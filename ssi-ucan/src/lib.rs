@@ -27,7 +27,7 @@ pub use ucan_capabilities_object;
 use ucan_capabilities_object::Capabilities;
 
 #[derive(Clone, PartialEq, Debug)]
-pub struct Ucan<F = JsonValue, A = JsonValue> {
+pub struct Ucan<F = BTreeMap<String, JsonValue>, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
     pub signature: Vec<u8>,
@@ -244,12 +244,19 @@ pub struct Payload<F, A> {
     #[serde(rename = "nnc", skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
     #[serde(rename = "fct", skip_serializing_if = "Option::is_none")]
-    pub facts: Option<Vec<F>>,
+    pub facts: Option<Facts<F>>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[serde(rename = "prf", skip_serializing_if = "Option::is_none")]
     pub proof: Option<Vec<Cid>>,
     #[serde(rename = "cap")]
     pub capabilities: Capabilities<A>,
+}
+
+// F MUST de/serialize to a map type, so we are just wrapping and flattening it
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub struct Facts<F> {
+    #[serde(flatten)]
+    pub inner: F,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -426,7 +433,7 @@ mod ipld_encoding {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nnc: &'a Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub fct: &'a Option<Vec<F>>,
+        pub fct: &'a Option<Facts<F>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub prf: &'a Option<Vec<Cid>>,
         pub cap: &'a Capabilities<A>,
@@ -442,7 +449,7 @@ mod ipld_encoding {
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nnc: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
-        pub fct: Option<Vec<F>>,
+        pub fct: Option<Facts<F>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub prf: Option<Vec<Cid>>,
         pub cap: Capabilities<A>,
