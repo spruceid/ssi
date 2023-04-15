@@ -17,11 +17,11 @@ base64 = "0.12"
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
-ssi-dids = { path = "../ssi-dids", version = "0.1.1" }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  }
-libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}
-
+libipld = { version = "0.16", default-features = false, features = ["dag-json", "derive", "serde-codec"]}
+ucan-capabilities-object = { "version" = "0.1", path = "../../ucan-capabilities" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
