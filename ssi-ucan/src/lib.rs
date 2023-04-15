@@ -169,12 +169,11 @@ impl<F, A> Ucan<F, A> {
         })
     }
 
-    pub fn to_block<S, H>(&self, hash: H) -> Result<Block<S>, IpldError>
+    pub fn to_block<S>(&self, hash: impl Into<S::Hashes>) -> Result<Block<S>, IpldError>
     where
         F: Serialize,
         A: Serialize,
         S: libipld::store::StoreParams,
-        H: Into<S::Hashes>,
         S::Codecs: From<DagJsonCodec> + From<libipld::raw::RawCodec>,
     {
         match &self.codec {
