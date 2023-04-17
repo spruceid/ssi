@@ -23,8 +23,8 @@ use ssi_jwt::NumericDate;
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, Write};
 
-pub use ucan_capabilities_object;
-use ucan_capabilities_object::Capabilities;
+use capabilities::Capabilities;
+pub use ucan_capabilities_object as capabilities;
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = BTreeMap<String, JsonValue>, A = JsonValue> {
@@ -54,13 +54,8 @@ impl Default for UcanCodec {
 const VERSION_STRING: &str = "0.2.0";
 
 impl<F, A> Ucan<F, A> {
-    pub async fn verify_signature(&self, resolver: &dyn DIDResolver) -> Result<(), Error>
-    where
-        F: Serialize + Send,
-        A: Serialize + Send,
-    {
-        // extract or deduce signing key
-        let key: JWK = match (
+    pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
+        match (
             self.payload.issuer.get(..4),
             self.payload.issuer.get(4..8),
             &self.header.jwk,
@@ -71,7 +66,7 @@ impl<F, A> Ucan<F, A> {
             // did:pkh without fragment
             (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
                 match_key_with_did_pkh(jwk, &d)?;
-                jwk.clone()
+                Ok(jwk.clone())
             }
             // did:pkh with fragment
             (
@@ -81,7 +76,7 @@ impl<F, A> Ucan<F, A> {
                 Content::Object(Resource::VerificationMethod(vm)),
             ) => {
                 match_key_with_vm(jwk, &vm)?;
-                jwk.clone()
+                Ok(jwk.clone())
             }
             // did:key without fragment
             (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
@@ -94,24 +89,35 @@ impl<F, A> Ucan<F, A> {
                     _ => None,
                 })
                 .ok_or(Error::VerificationMethodMismatch)?
-                .get_jwk()?,
+                .get_jwk()
+                .map_err(Error::from),
             // general case, did with fragment
             (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
-                vm.get_jwk()?
+                Ok(vm.get_jwk()?)
             }
-            _ => return Err(Error::VerificationMethodMismatch),
-        };
+            _ => Err(Error::VerificationMethodMismatch),
+        }
+    }
 
-        Ok(verify_bytes(
-            self.header.algorithm,
-            self.encode()?
-                .rsplit_once('.')
+    pub async fn verify_and_decode(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
+    where
+        F: for<'a> Deserialize<'a>,
+        A: for<'a> Deserialize<'a>,
+    {
+        let ucan = Self::decode(jwt)?;
+        let jwk = ucan.get_verification_key(resolver).await?;
+
+        verify_bytes(
+            ucan.header.algorithm,
+            jwt.rsplit_once('.')
                 .ok_or(ssi_jws::Error::InvalidJWS)?
                 .0
                 .as_bytes(),
-            &key,
-            &self.signature,
-        )?)
+            &jwk,
+            &ucan.signature,
+        )?;
+
+        Ok(ucan)
     }
 
     pub fn decode(jwt: &str) -> Result<Self, Error>
@@ -135,7 +141,7 @@ impl<F, A> Ucan<F, A> {
 
         match parts.header.additional_parameters.get("ucv") {
             Some(JsonValue::String(v)) if v == VERSION_STRING => (),
-            _ => return Err(Error::MissingUCANHeaderField("ucv: 0.9.0")),
+            _ => return Err(Error::MissingUCANHeaderField("ucv: 0.2.0")),
         }
 
         if !payload.audience.starts_with("did:") {
@@ -236,17 +242,21 @@ pub struct Payload<F, A> {
     pub issuer: String,
     #[serde(rename = "aud")]
     pub audience: String,
-    #[serde(rename = "nbf", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nbf", skip_serializing_if = "Option::is_none", default)]
     pub not_before: Option<NumericDate>,
     // no expiration should serialize to null in JSON
     #[serde(rename = "exp")]
     pub expiration: Option<NumericDate>,
-    #[serde(rename = "nnc", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "nnc", skip_serializing_if = "Option::is_none", default)]
     pub nonce: Option<String>,
-    #[serde(rename = "fct", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "fct",
+        skip_serializing_if = "Option::is_none",
+        default = "Option::default"
+    )]
     pub facts: Option<Facts<F>>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-    #[serde(rename = "prf", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "prf", skip_serializing_if = "Option::is_none", default)]
     pub proof: Option<Vec<Cid>>,
     #[serde(rename = "cap")]
     pub capabilities: Capabilities<A>,
