@@ -26,6 +26,7 @@ use std::collections::BTreeMap;
 use capabilities::Capabilities;
 pub use ucan_capabilities_object as capabilities;
 
+/// A deserialized UCAN
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = BTreeMap<String, JsonValue>, A = JsonValue> {
     header: Header,
@@ -45,6 +46,7 @@ impl<F, A> Ucan<F, A> {
     pub fn signature(&self) -> &[u8] {
         &self.signature
     }
+    /// Extract or resolve the JWK used to issue this UCAN
     pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
         match (
             self.payload.issuer.get(..4),
@@ -90,6 +92,11 @@ impl<F, A> Ucan<F, A> {
         }
     }
 
+    /// Decode the UCAN and verify it's signature
+    ///
+    /// This method will resolve the DID of the issuer and verify the signature
+    /// using their public key. This method works over a JWT as the original
+    /// encoding is not retained by the UCAN struct.
     pub async fn verify_and_decode(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
     where
         F: for<'a> Deserialize<'a>,
@@ -111,6 +118,7 @@ impl<F, A> Ucan<F, A> {
         Ok(ucan)
     }
 
+    /// Decode the UCAN
     pub fn decode(jwt: &str) -> Result<Self, Error>
     where
         F: for<'a> Deserialize<'a>,
@@ -139,6 +147,8 @@ impl<F, A> Ucan<F, A> {
         })
     }
 
+    /// Encode the UCAN in canonicalized form, by encoding the JWS segments
+    /// as JCS/DAG-JSON
     pub fn encode_as_canonicalized_jwt(&self) -> Result<String, Error>
     where
         F: Serialize,
@@ -159,6 +169,9 @@ impl<F, A> Ucan<F, A> {
     }
 }
 
+/// Calculate the canonical CID of a UCAN
+///
+/// This function does not verify that the given string is a valid UCAN.
 pub fn canonical_cid(jwt: &str) -> Cid {
     Cid::new_v1(0x55, Code::Sha2_256.digest(jwt.as_bytes()))
 }
@@ -186,6 +199,7 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
     .verify(key)?)
 }
 
+/// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F, A> {
@@ -205,19 +219,12 @@ pub struct Payload<F, A> {
         skip_serializing_if = "Option::is_none",
         default = "Option::default"
     )]
-    pub facts: Option<Facts<F>>,
+    pub facts: Option<BTreeMap<String, F>>,
     #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[serde(rename = "prf", skip_serializing_if = "Option::is_none", default)]
     pub proof: Option<Vec<Cid>>,
     #[serde(rename = "cap")]
     pub capabilities: Capabilities<A>,
-}
-
-// F MUST de/serialize to a map type, so we are just wrapping and flattening it
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Facts<F> {
-    #[serde(flatten)]
-    pub inner: F,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -229,6 +236,7 @@ pub enum TimeInvalid {
 }
 
 impl<F, A> Payload<F, A> {
+    /// Validate the time bounds of the UCAN
     pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
         let t = time.unwrap_or_else(now);
         match (self.not_before, self.expiration) {
@@ -238,6 +246,9 @@ impl<F, A> Payload<F, A> {
         }
     }
 
+    /// Sign the payload with the given key and optional custom header claims
+    ///
+    /// This will use the canonical form of the UCAN for signing
     pub fn sign_canonicalized(
         self,
         algorithm: Algorithm,
