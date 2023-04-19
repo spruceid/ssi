@@ -4,7 +4,6 @@ mod ed25519_signature_2020;
 
 use chrono::NaiveDateTime;
 pub use ed25519_signature_2020::Ed25519Signature2020;
-use iref::Iri;
 use rdf_types::Quad;
 use treeldr_rust_prelude::iref::IriBuf;
 
@@ -45,7 +44,7 @@ pub struct ProofOptions<T, M = IriBuf, P = IriBuf> {
 /// - `T`: proof type value type.
 /// - `M`: verification method type. Represents the IRI to the verification
 /// method.
-/// - `P`: proof purpose.
+/// - `P`: proof purpose type. Represents the IRI to the proof purpose.
 pub struct DataIntegrityProof<T, M = IriBuf, P = IriBuf> {
     /// Proof type.
     pub type_: T,
@@ -111,10 +110,10 @@ pub trait Signer {
     fn sign(&self, algorithm: Algorithm, bytes: &[u8]) -> Vec<u8>;
 }
 
-pub trait SignerProvider {
+pub trait SignerProvider<M> {
     type Signer: Signer;
 
-    fn get_signer(&self, method: Iri) -> Self::Signer;
+    fn get_signer(&self, method: &M) -> Self::Signer;
 }
 
 /// Verifier.
@@ -128,19 +127,19 @@ pub trait Verifier {
 ///
 /// The implementor is in charge of retrieve verification methods as described
 /// in <https://w3c.github.io/vc-data-integrity/#retrieve-verification-method>.
-pub trait VerifierProvider {
+pub trait VerifierProvider<M> {
     /// Verifier type.
     type Verifier: Verifier;
 
     /// Retrieve the verifier identified by the given verification `method`.
-    fn get_verifier(&self, method: Iri) -> Self::Verifier;
+    fn get_verifier(&self, method: &M) -> Self::Verifier;
 }
 
 /// Cryptographic suite.
 ///
 /// The type parameter `T` is the type of documents on which the suite can be
 /// applied.
-pub trait CryptographicSuite<T> {
+pub trait CryptographicSuite<T, M> {
     /// Execution context.
     type Context;
 
@@ -178,20 +177,20 @@ pub trait CryptographicSuite<T> {
     fn generate_proof(
         &self,
         data: Self::Hashed,
-        signer_provider: impl SignerProvider,
+        signer_provider: impl SignerProvider<M>,
         params: Self::ProofParameters,
     ) -> Self::Proof;
 
     fn verify_proof(
         &self,
-        verifier_provider: impl VerifierProvider,
+        verifier_provider: impl VerifierProvider<M>,
         data: Self::Hashed,
         proof: &Self::Proof,
     ) -> Result<(), InvalidProof>;
 }
 
 /// LD cryptographic suite.
-pub trait LinkedDataCryptographicSuite {
+pub trait LinkedDataCryptographicSuite<M> {
     type TransformationParameters;
     type Transformed;
 
@@ -215,20 +214,22 @@ pub trait LinkedDataCryptographicSuite {
     fn generate_proof(
         &self,
         data: Self::Hashed,
-        signer_provider: impl SignerProvider,
+        signer_provider: impl SignerProvider<M>,
         options: Self::ProofParameters,
     ) -> Self::Proof;
 
     fn verify_proof(
         &self,
-        verifier_provider: impl VerifierProvider,
+        verifier_provider: impl VerifierProvider<M>,
         data: Self::Hashed,
         proof: &Self::Proof,
     ) -> Result<(), InvalidProof>;
 }
 
 /// Any LD cryptographic suite is a cryptographic suite working on LD documents.
-impl<S: LinkedDataCryptographicSuite, T: LinkedDataCredential> CryptographicSuite<T> for S {
+impl<M, S: LinkedDataCryptographicSuite<M>, T: LinkedDataCredential> CryptographicSuite<T, M>
+    for S
+{
     type Context = T::Context;
 
     type TransformationParameters = S::TransformationParameters;
@@ -257,7 +258,7 @@ impl<S: LinkedDataCryptographicSuite, T: LinkedDataCredential> CryptographicSuit
     fn generate_proof(
         &self,
         data: Self::Hashed,
-        signer_provider: impl SignerProvider,
+        signer_provider: impl SignerProvider<M>,
         params: Self::ProofParameters,
     ) -> Self::Proof {
         self.generate_proof(data, signer_provider, params)
@@ -265,7 +266,7 @@ impl<S: LinkedDataCryptographicSuite, T: LinkedDataCredential> CryptographicSuit
 
     fn verify_proof(
         &self,
-        verifier_provider: impl VerifierProvider,
+        verifier_provider: impl VerifierProvider<M>,
         data: Self::Hashed,
         proof: &Self::Proof,
     ) -> Result<(), InvalidProof> {

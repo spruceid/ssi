@@ -11,18 +11,20 @@ use super::{
 };
 
 /// Ed25519Signature2020 signature type.
-pub struct Ed25519Signature2020<M = IriBuf, P = IriBuf>(PhantomData<(M, P)>);
+pub struct Ed25519Signature2020<P = IriBuf>(PhantomData<P>);
 
-impl<M, P> Clone for Ed25519Signature2020<M, P> {
+impl<P> Clone for Ed25519Signature2020<P> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M, P> Copy for Ed25519Signature2020<M, P> {}
+impl<P> Copy for Ed25519Signature2020<P> {}
 
-impl<M, P> Ed25519Signature2020<M, P> {
-    pub fn proof_configuration(options: &ProofOptions<Self, M, P>) -> ProofConfiguration<Self, M, P>
+impl<P> Ed25519Signature2020<P> {
+    pub fn proof_configuration<M>(
+        options: &ProofOptions<Self, M, P>,
+    ) -> ProofConfiguration<Self, M, P>
     where
         M: Clone,
         P: Clone,
@@ -37,15 +39,15 @@ impl<M, P> Ed25519Signature2020<M, P> {
     }
 }
 
-impl<M, P> super::LinkedDataCryptographicSuite for Ed25519Signature2020<M, P> {
+impl<M, P> super::LinkedDataCryptographicSuite<M> for Ed25519Signature2020<P> {
     type TransformationParameters = TransformationOptions<Self>;
     type Transformed = String;
 
-    type HashParameters = ProofConfiguration<Self>;
+    type HashParameters = ProofConfiguration<Self, M, P>;
     type Hashed = [u8; 64];
 
-    type ProofParameters = ProofOptions<Self>;
-    type Proof = DataIntegrityProof<Self>;
+    type ProofParameters = ProofOptions<Self, M, P>;
+    type Proof = DataIntegrityProof<Self, M, P>;
 
     /// Transformation algorithm.
     fn transform<C: LinkedDataCredential>(
@@ -58,7 +60,11 @@ impl<M, P> super::LinkedDataCryptographicSuite for Ed25519Signature2020<M, P> {
     }
 
     /// Hashing algorithm.
-    fn hash(&self, data: String, proof_configuration: ProofConfiguration<Self>) -> Self::Hashed {
+    fn hash(
+        &self,
+        data: String,
+        proof_configuration: ProofConfiguration<Self, M, P>,
+    ) -> Self::Hashed {
         let transformed_document_hash = ssi_crypto::hashes::sha256::sha256(data.as_bytes());
         let proof_config_hash: [u8; 32] = ssi_crypto::hashes::sha256::sha256(
             proof_configuration.quads().into_nquads().as_bytes(),
@@ -72,10 +78,10 @@ impl<M, P> super::LinkedDataCryptographicSuite for Ed25519Signature2020<M, P> {
     fn generate_proof(
         &self,
         data: Self::Hashed,
-        signer_provider: impl SignerProvider,
-        options: ProofOptions<Self>,
+        signer_provider: impl SignerProvider<M>,
+        options: ProofOptions<Self, M, P>,
     ) -> Self::Proof {
-        let signer = signer_provider.get_signer(options.verification_method.as_iri());
+        let signer = signer_provider.get_signer(&options.verification_method);
         let sig = signer.sign(Algorithm::EdDSA, &data);
         let sig_multibase = multibase::encode(multibase::Base::Base58Btc, sig);
 
@@ -84,11 +90,11 @@ impl<M, P> super::LinkedDataCryptographicSuite for Ed25519Signature2020<M, P> {
 
     fn verify_proof(
         &self,
-        verifier_provider: impl VerifierProvider,
+        verifier_provider: impl VerifierProvider<M>,
         data: Self::Hashed,
         proof: &Self::Proof,
     ) -> Result<(), InvalidProof> {
-        let verifier = verifier_provider.get_verifier(proof.verification_method.as_iri());
+        let verifier = verifier_provider.get_verifier(&proof.verification_method);
         let proof_bytes = multibase::decode(&proof.proof_value)
             .map_err(|_| InvalidProof)?
             .1;
