@@ -11,21 +11,22 @@ documentation = "https://docs.rs/ssi-json-ld/"
 [dependencies]
 thiserror = "1.0"
 async-std = { version = "1.9", features = ["attributes"] }
-json-ld = "0.12.1"
+json-ld = "0.14.0"
 iref.workspace = true
-static-iref = "2"
-rdf-types = "0.12.15"
-locspan = "0.7.13"
+static-iref.workspace = true
+rdf-types.workspace = true
+locspan.workspace = true
 json-syntax = "0.9"
 futures = "0.3"
 lazy_static = "1.4"
 combination = "0.1"
-grdf = "0.16.2"
+grdf.workspace = true
 ssi-contexts = { version = "0.1.5", path = "../contexts/" }
-ssi-crypto = { path = "../ssi-crypto", version = "0.1" }
+ssi-crypto.workspace = true
+ssi-rdf.workspace = true
 
 [dev-dependencies]
 difference = "2.0"
-nquads-syntax = "0.10.0"
+nquads-syntax.workspace = true
 serde_json = "1.0.95"
 tokio = { version = "1.27.0", features = ["rt", "macros"] }

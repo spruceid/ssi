@@ -1,5 +1,5 @@
 //! Verifiable Credentials Data Model v1.1 implementation.
-//! 
+//!
 //! This library provides Rust types for the Verifiable Credentials Data Model.
 //! Proof mechanism are defined as extensions of this data model.
 //! The `ssi` library collection provides two proof mechanisms:

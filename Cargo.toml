@@ -1,75 +1,75 @@
-[package]
-name = "ssi"
-version = "0.7.0"
-authors = ["Spruce Systems, Inc."]
-edition = "2021"
-license = "Apache-2.0"
-description = "Core library for Verifiable Credentials and Decentralized Identifiers."
-repository = "https://github.com/spruceid/ssi/"
-documentation = "https://docs.rs/ssi/"
-keywords = ["ssi", "did", "vc", "vp", "jsonld"]
+# [package]
+# name = "ssi"
+# version = "0.7.0"
+# authors = ["Spruce Systems, Inc."]
+# edition = "2021"
+# license = "Apache-2.0"
+# description = "Core library for Verifiable Credentials and Decentralized Identifiers."
+# repository = "https://github.com/spruceid/ssi/"
+# documentation = "https://docs.rs/ssi/"
+# keywords = ["ssi", "did", "vc", "vp", "jsonld"]
 
-exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
+# exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
-[features]
-# default = ["w3c", "ripemd-160", "eip", "tezos"]
+# [features]
+# # default = ["w3c", "ripemd-160", "eip", "tezos"]
 
-# w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
-# ## enable secp256k1 signatures
-# secp256k1 = ["ssi-ldp/secp256k1"]
-# ## enable secp256r1 (p256) signatures
-# secp256r1 = ["ssi-ldp/secp256r1"]
-# ## enable secp384r1 (p384) signatures
-# secp384r1 = ["ssi-ldp/secp384r1"]
-# ## enable ed25519 (EdDSA) signatures
-# ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
-# ## enable RSA signatures
-# rsa = ["ssi-ldp/rsa"]
-# ## enable ripemd hashes
-# ripemd-160 = ["ssi-jwk/ripemd-160"]
-# ## enable bbs
-# bbs = ["ssi-crypto/bbs"]
+# # w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
+# # ## enable secp256k1 signatures
+# # secp256k1 = ["ssi-ldp/secp256k1"]
+# # ## enable secp256r1 (p256) signatures
+# # secp256r1 = ["ssi-ldp/secp256r1"]
+# # ## enable secp384r1 (p384) signatures
+# # secp384r1 = ["ssi-ldp/secp384r1"]
+# # ## enable ed25519 (EdDSA) signatures
+# # ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
+# # ## enable RSA signatures
+# # rsa = ["ssi-ldp/rsa"]
+# # ## enable ripemd hashes
+# # ripemd-160 = ["ssi-jwk/ripemd-160"]
+# # ## enable bbs
+# # bbs = ["ssi-crypto/bbs"]
 
-# ## enable aleo ecosystem signatures
-# aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
-# ## enable ethereum style signatures
-# eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
-# ## enable tezos style signatures
-# tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
-# ## enable LDPs from the Solana Ecosystem
-# solana = ["ssi-ldp/solana"]
+# # ## enable aleo ecosystem signatures
+# # aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
+# # ## enable ethereum style signatures
+# # eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
+# # ## enable tezos style signatures
+# # tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
+# # ## enable LDPs from the Solana Ecosystem
+# # solana = ["ssi-ldp/solana"]
 
-# ## Use the Ring crate for crypto operations
-# ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
+# # ## Use the Ring crate for crypto operations
+# # ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
 
-# http-did = ["ssi-dids/http"]
-# example-http-issuer = ["ssi-ldp/example-http-issuer"]
+# # http-did = ["ssi-dids/http"]
+# # example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
-# # Backward compatibility features
-# ed25519-dalek = ["ed25519"]
-# keccak = ["eip"]
-# sha = ["rsa"]
+# # # Backward compatibility features
+# # ed25519-dalek = ["ed25519"]
+# # keccak = ["eip"]
+# # sha = ["rsa"]
 
-[dependencies]
-# ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
-# ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
-# ssi-core = { path = "./ssi-core", version = "0.1" }
-# ssi-dids = { path = "./ssi-dids", version = "0.1" }
-# ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
-# ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
-# ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
-# ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
-# ssi-ldp = { path = "./ssi-ldp", version = "0.2", default-features = false }
-# ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
-# ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
-ssi-vc.workspace = true
-# ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
-# ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
+# [dependencies]
+# # ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
+# # ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
+# # ssi-core = { path = "./ssi-core", version = "0.1" }
+# # ssi-dids = { path = "./ssi-dids", version = "0.1" }
+# # ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
+# # ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
+# # ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
+# # ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
+# # ssi-ldp = { path = "./ssi-ldp", version = "0.2", default-features = false }
+# # ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
+# # ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
+# ssi-vc.workspace = true
+# # ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
+# # ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
 
 [workspace]
 members = [
   # "did-tezos",
-  # "did-jwk",
+  "did-jwk",
   # "did-key",
   # "did-web",
   # "did-ethr",
@@ -86,7 +86,7 @@ members = [
   "ssi-crypto",
   # "ssi-json-ld",
   # "ssi-dids",
-  # "ssi-jws",
+  "ssi-jws",
   # "ssi-jwt",
   # "ssi-tzkey",
   # "ssi-ssh",
@@ -99,73 +99,77 @@ members = [
 
 [workspace.dependencies]
 ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
+ssi-jwk = { path = "./ssi-jwk", version = "0.1" }
+ssi-jws = { path = "./ssi-jws", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
+chrono = "0.4.24"
 iref = "2.2.3"
 static-iref = "2"
-rdf-types = "0.14.4"
+rdf-types = "0.14.5"
 grdf = "0.18.0"
 locspan = "0.7.13"
 nquads-syntax = "0.12.0"
+multibase = "0.9.1"
 treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
 treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
 
-[dev-dependencies]
-async-std = { version = "1.9", features = ["attributes"] }
-uuid = { version = "0.8", features = ["v4", "serde"] }
-serde_json = "1.0"
-ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["example"] }
+# [dev-dependencies]
+# async-std = { version = "1.9", features = ["attributes"] }
+# uuid = { version = "0.8", features = ["v4", "serde"] }
+# serde_json = "1.0"
+# ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["example"] }
 
-[package.metadata.docs.rs]
-all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+# [package.metadata.docs.rs]
+# all-features = true
+# rustdoc-args = ["--cfg", "docsrs"]
 
-# $cargo release
-[workspace.metadata.release]
-sign-tag = true
-tag-prefix = "{{crate_name}}/"
-tag-message = "Release {{crate_name}} version {{version}}."
-pre-release-commit-message = "Release"
+# # $cargo release
+# [workspace.metadata.release]
+# sign-tag = true
+# tag-prefix = "{{crate_name}}/"
+# tag-message = "Release {{crate_name}} version {{version}}."
+# pre-release-commit-message = "Release"
 
-# $git-cliff --config Cargo.toml > CHANGELOG.md
-[workspace.metadata.git-cliff.changelog]
-header = """
-# Changelog
-All notable changes to this project will be documented in this file.
+# # $git-cliff --config Cargo.toml > CHANGELOG.md
+# [workspace.metadata.git-cliff.changelog]
+# header = """
+# # Changelog
+# All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+# The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+# and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-"""
-body = """
-{% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-{% else %}\
-    ## [Unreleased]
-{% endif %}\
-{% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | upper_first }}\
-    {% for commit in commits %}
-        - [{{ commit.id | truncate(length=7, end="") }}] {{ commit.message }}\
-    {% endfor %}
-{% endfor %}\n
-"""
-trim = true
-[workspace.metadata.git-cliff.git]
-commit_preprocessors = [
-  { pattern = "\\n.*", replace = ""},
-]
-conventional_commits = false
-filter_unconventional = false
-commit_parsers = [
-  { message = "^[aA]dd( |ed)", group = "Added"},
-  { message = "^[fF]ix", group = "Fixed"},
-  { message = "^[cC]hange", group = "Changed"},
-  { message = "^[mM]ove", group = "Changed"},
-  { message = "^[rR]estructure", group = "Changed"},
-  { message = "^[rR]efactor", group = "Changed"},
-  { message = "^[rR]emove", group = "Removed"},
-  { message = ".*", group = "Other"},
-]
-# filter_commits = false
-tag_pattern = "v[0-9]*"
+# """
+# body = """
+# {% if version %}\
+#     ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+# {% else %}\
+#     ## [Unreleased]
+# {% endif %}\
+# {% for group, commits in commits | group_by(attribute="group") %}
+#     ### {{ group | upper_first }}\
+#     {% for commit in commits %}
+#         - [{{ commit.id | truncate(length=7, end="") }}] {{ commit.message }}\
+#     {% endfor %}
+# {% endfor %}\n
+# """
+# trim = true
+# [workspace.metadata.git-cliff.git]
+# commit_preprocessors = [
+#   { pattern = "\\n.*", replace = ""},
+# ]
+# conventional_commits = false
+# filter_unconventional = false
+# commit_parsers = [
+#   { message = "^[aA]dd( |ed)", group = "Added"},
+#   { message = "^[fF]ix", group = "Fixed"},
+#   { message = "^[cC]hange", group = "Changed"},
+#   { message = "^[mM]ove", group = "Changed"},
+#   { message = "^[rR]estructure", group = "Changed"},
+#   { message = "^[rR]efactor", group = "Changed"},
+#   { message = "^[rR]emove", group = "Removed"},
+#   { message = ".*", group = "Other"},
+# ]
+# # filter_commits = false
+# tag_pattern = "v[0-9]*"
