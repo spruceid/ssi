@@ -61,8 +61,8 @@ sha3 = { version = "0.10.8", optional = true }
 rsa = { version = "0.6", optional = true }
 rand = { version = "0.8", optional = true }
 ring = { version = "0.16", optional = true }
-ssi-crypto = { path = "../ssi-crypto", version = "0.1" }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1" }
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

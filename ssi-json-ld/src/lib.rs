@@ -3,9 +3,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub mod rdf;
-pub mod urdna2015;
-
 use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
@@ -506,7 +503,7 @@ pub async fn json_to_dataset<L>(
     json: json_ld::syntax::MetaValue<Span>,
     loader: &mut L,
     expand_context: Option<RemoteContextReference>,
-) -> Result<rdf::DataSet, Box<ToRdfError<L::Error, L::ContextError>>>
+) -> Result<ssi_rdf::DataSet, Box<ToRdfError<L::Error, L::ContextError>>>
 where
     L: json_ld::Loader<IriBuf, Span> + json_ld::ContextLoader<IriBuf, Span> + Send + Sync,
     L::Output: Into<json_ld::syntax::Value<Span>>,

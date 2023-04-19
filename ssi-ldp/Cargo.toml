@@ -11,11 +11,18 @@ documentation = "https://docs.rs/ssi-ldp/"
 [dependencies]
 rdf-types.workspace = true
 treeldr-rust-prelude.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-vc.workspace = true
+chrono.workspace = true
+multibase.workspace = true
+iref.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
+treeldr-rust-macros.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
