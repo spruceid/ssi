@@ -18,8 +18,51 @@ pub mod schema {
     #[prefix("http://www.w3.org/2001/XMLSchema#")]
     pub mod xsd {}
 
-    #[prefix("https://w3.org/2018/credentials#")]
+    #[prefix("https://www.w3.org/2018/credentials#")]
     pub mod cred {}
 }
 
 pub use schema::cred::*;
+use treeldr_rust_prelude::locspan::Meta;
+
+pub trait AttachProof<P>: Sized {
+    fn with_proof(self, proof: P) -> Verifiable<Self, P> {
+        Verifiable::new(self, proof)
+    }
+}
+
+impl<C, P> AttachProof<P> for C {}
+
+/// Linked Data Credential with proof.
+pub struct Verifiable<C, P> {
+    credential: C,
+    proof: P,
+}
+
+impl<C, P> Verifiable<C, P> {
+    pub fn new(credential: C, proof: P) -> Self {
+        Self { credential, proof }
+    }
+
+    pub fn credential(&self) -> &C {
+        &self.credential
+    }
+
+    pub fn proof(&self) -> &P {
+        &self.proof
+    }
+}
+
+impl<N, C: treeldr_rust_prelude::IntoJsonLd<N>, P: treeldr_rust_prelude::IntoJsonLd<N>>
+    treeldr_rust_prelude::IntoJsonLd<N> for Verifiable<C, P>
+{
+    fn into_json_ld(self, namespace: &N) -> json_ld::syntax::Value<()> {
+        let mut json_ld = self.credential.into_json_ld(namespace);
+        let proof = self.proof.into_json_ld(namespace);
+        json_ld
+            .as_object_mut()
+            .unwrap()
+            .insert(Meta("proof".into(), ()), Meta(proof, ()));
+        json_ld
+    }
+}

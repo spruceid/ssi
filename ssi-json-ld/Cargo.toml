@@ -11,7 +11,7 @@ documentation = "https://docs.rs/ssi-json-ld/"
 [dependencies]
 thiserror = "1.0"
 async-std = { version = "1.9", features = ["attributes"] }
-json-ld = "0.14.0"
+json-ld.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 rdf-types.workspace = true

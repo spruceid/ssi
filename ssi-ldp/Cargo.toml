@@ -19,10 +19,12 @@ ssi-vc.workspace = true
 chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
 treeldr-rust-macros.workspace = true
+static-iref.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

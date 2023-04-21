@@ -7,7 +7,7 @@ pub use ed25519_signature_2020::Ed25519Signature2020;
 use rdf_types::Quad;
 use treeldr_rust_prelude::iref::IriBuf;
 
-use crate::LinkedDataCredential;
+use crate::{LinkedDataCredential, ProofValidity, SignerProvider, VerifierProvider};
 
 pub struct TransformationOptions<T> {
     pub type_: T,
@@ -25,10 +25,11 @@ pub struct ProofConfiguration<T, M = IriBuf, P = IriBuf> {
 impl<T, M, P> ProofConfiguration<T, M, P> {
     /// Returns the quads of the proof configuration, in canonical form.
     pub fn quads(&self) -> Vec<Quad> {
-        todo!()
+        todo!("proof configuration quads")
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ProofOptions<T, M = IriBuf, P = IriBuf> {
     pub type_: T,
     pub cryptosuite: Option<String>,
@@ -37,14 +38,37 @@ pub struct ProofOptions<T, M = IriBuf, P = IriBuf> {
     pub proof_purpose: P,
 }
 
+impl<T, M, P> ProofOptions<T, M, P> {
+    pub fn new(
+        type_: T,
+        cryptosuite: Option<String>,
+        created: NaiveDateTime,
+        verification_method: M,
+        proof_purpose: P,
+    ) -> Self {
+        Self {
+            type_,
+            cryptosuite,
+            created,
+            verification_method,
+            proof_purpose,
+        }
+    }
+}
+
 /// Data Integrity Proof.
 ///
 /// # Type parameters
 ///
 /// - `T`: proof type value type.
 /// - `M`: verification method type. Represents the IRI to the verification
-/// method.
-/// - `P`: proof purpose type. Represents the IRI to the proof purpose.
+/// method. By default it is `IriBuf`, meaning that any IRI can be represented,
+/// but some application may choose to restrict the supported methods.
+/// - `P`: proof purpose type. Represents the IRI to the proof purpose. By
+/// default it is `IriBuf`, meaning that any IRI can be represented, but some
+/// application may choose to restrict the supported proof purposes.
+// TODO: Is there an official set of proof purposes defined somewhere? In which
+// case `P` might by superfluous.
 pub struct DataIntegrityProof<T, M = IriBuf, P = IriBuf> {
     /// Proof type.
     pub type_: T,
@@ -96,52 +120,23 @@ impl<T, M, P> DataIntegrityProof<T, M, P> {
     }
 }
 
-/// Error raised when a proof verification fails.
-pub struct InvalidProof;
-
-pub enum Algorithm {
-    /// Edwards-Curve Digital Signature Algorithm ([RFC8032]).
-    ///
-    /// [RFC8032]: <https://www.rfc-editor.org/rfc/rfc8032>
-    EdDSA,
-}
-
-pub trait Signer {
-    fn sign(&self, algorithm: Algorithm, bytes: &[u8]) -> Vec<u8>;
-}
-
-pub trait SignerProvider<M> {
-    type Signer: Signer;
-
-    fn get_signer(&self, method: &M) -> Self::Signer;
-}
-
-/// Verifier.
-pub trait Verifier {
-    /// Verify the given `signed_bytes`, signed using the given `algorithm`,
-    /// against the input `unsigned_bytes`.
-    fn verify(&self, algorithm: Algorithm, unsigned_bytes: &[u8], signed_bytes: &[u8]) -> bool;
-}
-
-/// Verifier provider.
-///
-/// The implementor is in charge of retrieve verification methods as described
-/// in <https://w3c.github.io/vc-data-integrity/#retrieve-verification-method>.
-pub trait VerifierProvider<M> {
-    /// Verifier type.
-    type Verifier: Verifier;
-
-    /// Retrieve the verifier identified by the given verification `method`.
-    fn get_verifier(&self, method: &M) -> Self::Verifier;
+pub trait CryptographicSuiteInput<T, M, C>: CryptographicSuite<M> {
+    /// Transformation algorithm.
+    fn transform(
+        &self,
+        context: &mut C,
+        data: &T,
+        params: Self::TransformationParameters,
+    ) -> Result<Self::Transformed, Self::Error>;
 }
 
 /// Cryptographic suite.
 ///
 /// The type parameter `T` is the type of documents on which the suite can be
 /// applied.
-pub trait CryptographicSuite<T, M> {
-    /// Execution context.
-    type Context;
+pub trait CryptographicSuite<M> {
+    /// Error that can be raised by the suite.
+    type Error;
 
     /// Transformation algorithm parameters.
     type TransformationParameters;
@@ -163,113 +158,53 @@ pub trait CryptographicSuite<T, M> {
     /// Return type of the proof generation algorithm.
     type Proof;
 
-    /// Transformation algorithm.
-    fn transform(
-        &self,
-        context: &mut Self::Context,
-        data: T,
-        params: Self::TransformationParameters,
-    ) -> Self::Transformed;
-
     /// Hashing algorithm.
-    fn hash(&self, data: Self::Transformed, params: Self::HashParameters) -> Self::Hashed;
+    fn hash(
+        &self,
+        data: Self::Transformed,
+        params: Self::HashParameters,
+    ) -> Result<Self::Hashed, Self::Error>;
 
     fn generate_proof(
         &self,
         data: Self::Hashed,
-        signer_provider: impl SignerProvider<M>,
+        signer_provider: &impl SignerProvider<M>,
         params: Self::ProofParameters,
-    ) -> Self::Proof;
+    ) -> Result<Self::Proof, Self::Error>;
 
     fn verify_proof(
         &self,
-        verifier_provider: impl VerifierProvider<M>,
         data: Self::Hashed,
+        verifier_provider: &impl VerifierProvider<M>,
         proof: &Self::Proof,
-    ) -> Result<(), InvalidProof>;
+    ) -> Result<ProofValidity, Self::Error>;
 }
 
 /// LD cryptographic suite.
-pub trait LinkedDataCryptographicSuite<M> {
-    type TransformationParameters;
-    type Transformed;
-
-    type HashParameters;
-    type Hashed;
-
-    type ProofParameters;
-    type Proof;
-
+pub trait LinkedDataCryptographicSuite<M, C>: CryptographicSuite<M> {
     /// Transformation algorithm.
-    fn transform<C: LinkedDataCredential>(
+    fn transform<T: LinkedDataCredential<C>>(
         &self,
-        context: &mut C::Context,
-        data: C,
+        context: &mut C,
+        data: &T,
         options: Self::TransformationParameters,
-    ) -> Self::Transformed;
-
-    /// Hashing algorithm.
-    fn hash(&self, data: Self::Transformed, options: Self::HashParameters) -> Self::Hashed;
-
-    fn generate_proof(
-        &self,
-        data: Self::Hashed,
-        signer_provider: impl SignerProvider<M>,
-        options: Self::ProofParameters,
-    ) -> Self::Proof;
-
-    fn verify_proof(
-        &self,
-        verifier_provider: impl VerifierProvider<M>,
-        data: Self::Hashed,
-        proof: &Self::Proof,
-    ) -> Result<(), InvalidProof>;
+    ) -> Result<Self::Transformed, Self::Error>;
 }
 
 /// Any LD cryptographic suite is a cryptographic suite working on LD documents.
-impl<M, S: LinkedDataCryptographicSuite<M>, T: LinkedDataCredential> CryptographicSuite<T, M>
-    for S
+impl<
+        M,
+        C,
+        S: CryptographicSuite<M> + LinkedDataCryptographicSuite<M, C>,
+        T: LinkedDataCredential<C>,
+    > CryptographicSuiteInput<T, M, C> for S
 {
-    type Context = T::Context;
-
-    type TransformationParameters = S::TransformationParameters;
-    type Transformed = S::Transformed;
-
-    type HashParameters = S::HashParameters;
-    type Hashed = S::Hashed;
-
-    type ProofParameters = S::ProofParameters;
-    type Proof = S::Proof;
-
     fn transform(
         &self,
-        context: &mut Self::Context,
-        data: T,
+        context: &mut C,
+        data: &T,
         params: Self::TransformationParameters,
-    ) -> Self::Transformed {
+    ) -> Result<Self::Transformed, Self::Error> {
         self.transform(context, data, params)
-    }
-
-    /// Hashing algorithm.
-    fn hash(&self, data: Self::Transformed, options: Self::HashParameters) -> Self::Hashed {
-        self.hash(data, options)
-    }
-
-    fn generate_proof(
-        &self,
-        data: Self::Hashed,
-        signer_provider: impl SignerProvider<M>,
-        params: Self::ProofParameters,
-    ) -> Self::Proof {
-        self.generate_proof(data, signer_provider, params)
-    }
-
-    fn verify_proof(
-        &self,
-        verifier_provider: impl VerifierProvider<M>,
-        data: Self::Hashed,
-        proof: &Self::Proof,
-    ) -> Result<(), InvalidProof> {
-        self.verify_proof(verifier_provider, data, proof)
     }
 }
