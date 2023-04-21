@@ -235,7 +235,7 @@ pub struct RefreshService {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Presentation {
     #[serde(rename = "@context")]
@@ -260,7 +260,7 @@ pub struct Presentation {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum HolderBinding {
     #[cfg(test)]
