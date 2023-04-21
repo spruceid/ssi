@@ -105,14 +105,16 @@ ssi-jwk = { path = "./ssi-jwk", version = "0.1" }
 ssi-jws = { path = "./ssi-jws", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
+thiserror = "1.0.40"
 chrono = "0.4.24"
 iref = "2.2.3"
 static-iref = "2"
-rdf-types = "0.14.5"
+rdf-types = "0.14.7"
 grdf = "0.18.0"
 locspan = "0.7.13"
 nquads-syntax = "0.12.0"
 multibase = "0.9.1"
+json-ld = "0.14.0"
 treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
 treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
 
