@@ -9,7 +9,7 @@ pub mod revocation;
 
 use cacao::BindingDelegation;
 pub use ssi_core::{one_or_many::OneOrMany, uri::URI};
-use ssi_dids::did_resolve::DIDResolver;
+use ssi_dids::did_resolve::{resolve_key, DIDResolver};
 pub use ssi_dids::VerificationRelationship as ProofPurpose;
 use ssi_json_ld::parse_ld_context;
 use ssi_json_ld::{json_to_dataset, rdf::DataSet, ContextLoader};
@@ -700,6 +700,11 @@ impl Credential {
         let algorithm = if let Some(jwk) = jwk {
             jwk.get_algorithm()
                 .ok_or(Error::LDP(LdpError::MissingAlgorithm))?
+        } else if let Some(ref vm) = verification_method {
+            resolve_key(&vm.to_string(), resolver)
+                .await?
+                .get_algorithm()
+                .unwrap_or_default()
         } else {
             ssi_jwk::Algorithm::None
         };
@@ -841,7 +846,7 @@ impl Credential {
                 }
                 Err(err) => results
                     .errors
-                    .push(format!("Unable to filter proofs: {}", err)),
+                    .push(format!("Unable to verify signature: {}", err)),
             }
             return (Some(vc), results);
         }
@@ -1245,6 +1250,11 @@ impl Presentation {
         let algorithm = if let Some(jwk) = jwk {
             jwk.get_algorithm()
                 .ok_or(Error::LDP(LdpError::MissingAlgorithm))?
+        } else if let Some(ref vm) = verification_method {
+            resolve_key(&vm.to_string(), resolver)
+                .await?
+                .get_algorithm()
+                .unwrap_or_default()
         } else {
             ssi_jwk::Algorithm::None
         };
@@ -1830,6 +1840,7 @@ pub(crate) mod tests {
     use ssi_dids::did_resolve::DereferencingInputMetadata;
     use ssi_dids::{example::DIDExample, VerificationMethodMap};
     use ssi_json_ld::urdna2015;
+    use ssi_jws::sign_bytes_b64;
     use ssi_ldp::{ProofSuite, ProofSuiteType};
 
     #[test]
@@ -2142,6 +2153,57 @@ pub(crate) mod tests {
         .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
+    }
+
+    #[async_std::test]
+    async fn generate_unsigned_jwt() {
+        let key: JWK = serde_json::from_str(JWK_JSON).unwrap();
+        let vc_str = r###"{
+            "@context": [
+                "https://www.w3.org/2018/credentials/v1",
+                "https://www.w3.org/2018/credentials/examples/v1"
+            ],
+            "id": "http://example.org/credentials/192783",
+            "type": "VerifiableCredential",
+            "issuer": "did:example:foo",
+            "issuanceDate": "2020-08-25T11:26:53Z",
+            "credentialSubject": {
+                "id": "did:example:a6c78986cc36418b95a22d7f736",
+                "spouse": "Example Person"
+            }
+        }"###;
+        let vc = Credential {
+            expiration_date: Some(VCDateTime::from(Utc::now() + chrono::Duration::weeks(1))),
+            ..serde_json::from_str(vc_str).unwrap()
+        };
+        let aud = "did:example:90336644520443d28ba78beb949".to_string();
+        let options = LinkedDataProofOptions {
+            domain: Some(aud),
+            checks: None,
+            created: None,
+            verification_method: Some(URI::String("did:example:foo#key1".to_string())),
+            ..Default::default()
+        };
+        let unsigned_jwt_vc = vc.generate_jwt(None, &options, &DIDExample).await.unwrap();
+        let signature = sign_bytes_b64(
+            key.get_algorithm().unwrap(),
+            unsigned_jwt_vc.trim_end_matches('.').as_bytes(),
+            &key,
+        )
+        .unwrap();
+        let signed_jwt = [unsigned_jwt_vc, signature].join("");
+
+        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let (vc1_opt, verification_result) = Credential::decode_verify_jwt(
+            &signed_jwt,
+            Some(options.clone()),
+            &DIDExample,
+            &mut context_loader,
+        )
+        .await;
+        assert_eq!(vec![String::new(); 0], verification_result.errors);
+        let vc1 = vc1_opt.unwrap();
+        assert_eq!(vc.id, vc1.id);
     }
 
     #[async_std::test]
