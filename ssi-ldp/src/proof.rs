@@ -25,7 +25,7 @@ macro_rules! assert_local {
     };
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 // TODO use enum to separate betwen JWS and LD proofs?
 // TODO create generics type to allow users to provide their own proof suite that implements ProofSuite

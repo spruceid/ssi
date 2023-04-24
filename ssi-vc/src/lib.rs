@@ -48,7 +48,7 @@ pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
 // work around https://github.com/w3c/vc-test-suite/issues/103
 pub const ALT_DEFAULT_CONTEXT: &str = "https://w3.org/2018/credentials/v1";
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Credential {
     #[serde(rename = "@context")]
@@ -87,7 +87,7 @@ pub struct Credential {
 /// RFC3339 date-time as used in VC Data Model
 /// <https://www.w3.org/TR/vc-data-model/#issuance-date>
 /// <https://www.w3.org/TR/vc-data-model/#expiration>
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(try_from = "String")]
 #[serde(into = "String")]
@@ -98,7 +98,7 @@ pub struct VCDateTime {
     use_z: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 #[serde(try_from = "OneOrMany<Context>")]
 pub enum Contexts {
@@ -106,7 +106,7 @@ pub enum Contexts {
     Many(Vec<Context>),
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CredentialSubject {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -132,7 +132,7 @@ impl CredentialSubject {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Issuer {
     URI(URI),
@@ -155,7 +155,7 @@ impl Issuer {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectWithId {
     pub id: URI,
@@ -164,7 +164,7 @@ pub struct ObjectWithId {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct TermsOfUse {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -175,7 +175,7 @@ pub struct TermsOfUse {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Evidence {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -186,7 +186,7 @@ pub struct Evidence {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Status {
     pub id: URI,
@@ -215,7 +215,7 @@ pub trait CredentialStatus: Sync {
     ) -> VerificationResult;
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Schema {
     pub id: URI,
@@ -225,7 +225,7 @@ pub struct Schema {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RefreshService {
     pub id: URI,
@@ -235,7 +235,7 @@ pub struct RefreshService {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Presentation {
     #[serde(rename = "@context")]
@@ -260,7 +260,7 @@ pub struct Presentation {
     pub property_set: Option<Map<String, Value>>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(tag = "type")]
 pub enum HolderBinding {
     #[cfg(test)]
@@ -275,7 +275,7 @@ pub enum HolderBinding {
     Unknown,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 #[allow(clippy::large_enum_variant)]
 pub enum CredentialOrJWT {

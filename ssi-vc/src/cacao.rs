@@ -13,7 +13,7 @@ use siwe_recap::{extract_capabilities, verify_statement, Error as ReCapError};
 use std::convert::TryInto;
 use thiserror::Error;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum BindingDelegation {
     Base64Block(String),
