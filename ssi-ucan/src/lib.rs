@@ -28,7 +28,7 @@ pub use ucan_capabilities_object as capabilities;
 
 /// A deserialized UCAN
 #[derive(Clone, PartialEq, Debug)]
-pub struct Ucan<F = BTreeMap<String, JsonValue>, A = JsonValue> {
+pub struct Ucan<F = JsonValue, A = JsonValue> {
     header: Header,
     payload: Payload<F, A>,
     signature: Vec<u8>,
@@ -202,7 +202,7 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
 /// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Payload<F, A> {
+pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "iss")]
     pub issuer: String,
     #[serde(rename = "aud")]
@@ -397,15 +397,9 @@ mod tests {
             serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-valid.json")).unwrap();
 
         for case in cases {
-            let ucan = match Ucan::decode(&case.token) {
-                Ok(u) => u,
-                Err(e) => Err(e).unwrap(),
-            };
-
-            match ucan.verify_signature(DIDKey.to_resolver()).await {
-                Err(e) => Err(e).unwrap(),
-                _ => {}
-            };
+            let ucan = Ucan::verify_and_decode(&case.token, DIDKey.to_resolver())
+                .await
+                .unwrap();
 
             assert_eq!(ucan.payload, case.assertions.payload);
             assert_eq!(ucan.header, case.assertions.header);
@@ -420,7 +414,9 @@ mod tests {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
                     if u.payload.validate_time(None).is_ok()
-                        && u.verify_signature(DIDKey.to_resolver()).await.is_ok()
+                        && Ucan::<JsonValue>::verify_and_decode(&case.token, DIDKey.to_resolver())
+                            .await
+                            .is_ok()
                     {
                         assert!(false, "{}", case.comment);
                     }
@@ -433,8 +429,9 @@ mod tests {
     #[async_std::test]
     async fn basic() {
         let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
-        let u = Ucan::<JsonValue>::decode(case).unwrap();
-        u.verify_signature(DIDKey.to_resolver()).await.unwrap();
+        Ucan::<JsonValue>::verify_and_decode(case, DIDKey.to_resolver())
+            .await
+            .unwrap();
     }
 
     #[derive(Deserialize)]
