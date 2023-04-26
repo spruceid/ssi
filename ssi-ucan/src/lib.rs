@@ -97,7 +97,7 @@ impl<F, A> Ucan<F, A> {
     /// This method will resolve the DID of the issuer and verify the signature
     /// using their public key. This method works over a JWT as the original
     /// encoding is not retained by the UCAN struct.
-    pub async fn verify_and_decode(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
+    pub async fn decode_and_verify(jwt: &str, resolver: &dyn DIDResolver) -> Result<Self, Error>
     where
         F: for<'a> Deserialize<'a>,
         A: for<'a> Deserialize<'a>,
@@ -397,7 +397,7 @@ mod tests {
             serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-valid.json")).unwrap();
 
         for case in cases {
-            let ucan = Ucan::verify_and_decode(&case.token, DIDKey.to_resolver())
+            let ucan = Ucan::decode_and_verify(&case.token, DIDKey.to_resolver())
                 .await
                 .unwrap();
 
@@ -414,7 +414,7 @@ mod tests {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
                     if u.payload.validate_time(None).is_ok()
-                        && Ucan::<JsonValue>::verify_and_decode(&case.token, DIDKey.to_resolver())
+                        && Ucan::<JsonValue>::decode_and_verify(&case.token, DIDKey.to_resolver())
                             .await
                             .is_ok()
                     {
@@ -429,7 +429,7 @@ mod tests {
     #[async_std::test]
     async fn basic() {
         let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
-        Ucan::<JsonValue>::verify_and_decode(case, DIDKey.to_resolver())
+        Ucan::<JsonValue>::decode_and_verify(case, DIDKey.to_resolver())
             .await
             .unwrap();
     }
