@@ -2,38 +2,111 @@
 
 mod ed25519_signature_2020;
 
-use chrono::NaiveDateTime;
+use std::hash::Hash;
+
 pub use ed25519_signature_2020::Ed25519Signature2020;
-use rdf_types::Quad;
-use treeldr_rust_prelude::iref::IriBuf;
+use rdf_types::{BlankIdBuf, Id, Literal, Object, Quad, Subject, VocabularyMut};
+use treeldr_rust_prelude::json_ld;
+use treeldr_rust_prelude::{
+    iref::{Iri, IriBuf},
+    locspan::{Meta, Stripped},
+    static_iref::iri,
+};
 
 use crate::{LinkedDataCredential, ProofValidity, SignerProvider, VerifierProvider};
 
+pub trait Type {
+    fn iri(&self) -> Iri;
+
+    fn cryptographic_suite(&self) -> Option<&str>;
+}
+
+pub trait VerificationMethod {
+    fn iri(&self) -> Iri;
+}
+
+impl VerificationMethod for IriBuf {
+    fn iri(&self) -> Iri {
+        self.as_iri()
+    }
+}
+
+pub trait ProofPurpose {
+    fn iri(&self) -> Iri;
+}
+
+impl ProofPurpose for IriBuf {
+    fn iri(&self) -> Iri {
+        self.as_iri()
+    }
+}
+
 pub struct TransformationOptions<T> {
     pub type_: T,
-    pub cryptosuite: Option<String>,
 }
 
 pub struct ProofConfiguration<T, M = IriBuf, P = IriBuf> {
     pub type_: T,
-    pub cryptosuite: Option<String>,
-    pub created: NaiveDateTime,
+    pub created: ssi_vc::schema::xsd::layout::DateTime,
     pub verification_method: M,
     pub proof_purpose: P,
 }
 
-impl<T, M, P> ProofConfiguration<T, M, P> {
+impl<T: Type, M: VerificationMethod, P: ProofPurpose> ProofConfiguration<T, M, P> {
     /// Returns the quads of the proof configuration, in canonical form.
     pub fn quads(&self) -> Vec<Quad> {
-        todo!("proof configuration quads")
+        let mut result: Vec<Quad> = Vec::new();
+
+        let subject = Subject::Blank(BlankIdBuf::from_suffix("proofConfiguration").unwrap());
+
+        result.push(Quad(
+            subject.clone(),
+            iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type").to_owned(),
+            Object::Id(Id::Iri(self.type_.iri().to_owned())),
+            None,
+        ));
+
+        if let Some(crypto_suite) = self.type_.cryptographic_suite() {
+            result.push(Quad(
+                subject.clone(),
+                iri!("https://w3id.org/security#cryptosuite").to_owned(),
+                Object::Literal(Literal::String(crypto_suite.to_string())),
+                None,
+            ));
+        }
+
+        result.push(Quad(
+            subject.clone(),
+            iri!("http://purl.org/dc/terms/created").to_owned(),
+            Object::Literal(Literal::TypedString(
+                self.created.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                iri!("http://www.w3.org/2001/XMLSchema#dateTime").to_owned(),
+            )),
+            None,
+        ));
+
+        result.push(Quad(
+            subject.clone(),
+            iri!("https://w3id.org/security#verificationMethod").to_owned(),
+            Object::Id(Id::Iri(self.verification_method.iri().to_owned())),
+            None,
+        ));
+
+        result.push(Quad(
+            subject,
+            iri!("https://w3id.org/security#proofPurpose").to_owned(),
+            Object::Id(Id::Iri(self.proof_purpose.iri().to_owned())),
+            None,
+        ));
+
+        ssi_rdf::urdna2015::normalize(result.iter().map(Quad::as_quad_ref)).collect()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct ProofOptions<T, M = IriBuf, P = IriBuf> {
     pub type_: T,
-    pub cryptosuite: Option<String>,
-    pub created: NaiveDateTime,
+    pub created: ssi_vc::schema::xsd::layout::DateTime,
     pub verification_method: M,
     pub proof_purpose: P,
 }
@@ -41,14 +114,12 @@ pub struct ProofOptions<T, M = IriBuf, P = IriBuf> {
 impl<T, M, P> ProofOptions<T, M, P> {
     pub fn new(
         type_: T,
-        cryptosuite: Option<String>,
-        created: NaiveDateTime,
+        created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: M,
         proof_purpose: P,
     ) -> Self {
         Self {
             type_,
-            cryptosuite,
             created,
             verification_method,
             proof_purpose,
@@ -71,13 +142,12 @@ impl<T, M, P> ProofOptions<T, M, P> {
 // case `P` might by superfluous.
 pub struct DataIntegrityProof<T, M = IriBuf, P = IriBuf> {
     /// Proof type.
+    ///
+    /// Also includes the cryptographic suite variant.
     pub type_: T,
 
-    /// Cryptographic suite name.
-    pub cryptosuite: Option<String>,
-
     /// Date and time of creation.
-    pub created: NaiveDateTime,
+    pub created: ssi_vc::schema::xsd::layout::DateTime,
 
     /// Verification method.
     pub verification_method: M,
@@ -85,7 +155,7 @@ pub struct DataIntegrityProof<T, M = IriBuf, P = IriBuf> {
     /// Proof purpose.
     pub proof_purpose: P,
 
-    /// Proof value.
+    /// Multi-base encoded proof value.
     pub proof_value: String,
 }
 
@@ -93,7 +163,6 @@ impl<T, M, P> DataIntegrityProof<T, M, P> {
     pub fn from_options(options: ProofOptions<T, M, P>, proof_value: String) -> Self {
         Self::new(
             options.type_,
-            options.cryptosuite,
             options.created,
             options.verification_method,
             options.proof_purpose,
@@ -103,20 +172,166 @@ impl<T, M, P> DataIntegrityProof<T, M, P> {
 
     pub fn new(
         type_: T,
-        cryptosuite: Option<String>,
-        created: NaiveDateTime,
+        created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: M,
         proof_purpose: P,
         proof_value: String,
     ) -> Self {
         Self {
             type_,
-            cryptosuite,
             created,
             verification_method,
             proof_purpose,
             proof_value,
         }
+    }
+}
+
+impl<T: Type, M: VerificationMethod, P: ProofPurpose, V: VocabularyMut>
+    treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V> for DataIntegrityProof<T, M, P>
+where
+    V::Iri: Eq + Hash,
+    V::BlankId: Eq + Hash,
+{
+    fn into_json_ld_object_meta(
+        self,
+        vocabulary: &mut V,
+        meta: (),
+    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, ()> {
+        let mut node = json_ld::Node::new();
+
+        node.type_entry_or_default((), ()).push(Meta(
+            json_ld::Id::iri(vocabulary.insert(self.type_.iri())),
+            (),
+        ));
+
+        let properties = node.properties_mut();
+
+        if let Some(crypto_suite) = self.type_.cryptographic_suite() {
+            properties.insert(
+                Meta(
+                    json_ld::Id::iri(
+                        vocabulary.insert(iri!("https://w3id.org/security#cryptosuite")),
+                    ),
+                    (),
+                ),
+                Meta(
+                    json_ld::Indexed::new(
+                        json_ld::Object::Value(json_ld::Value::Literal(
+                            json_ld::object::Literal::String(
+                                json_ld::object::LiteralString::Inferred(crypto_suite.to_string()),
+                            ),
+                            None,
+                        )),
+                        None,
+                    ),
+                    (),
+                ),
+            );
+        }
+
+        properties.insert(
+            Meta(
+                json_ld::Id::iri(vocabulary.insert(iri!("http://purl.org/dc/terms/created"))),
+                (),
+            ),
+            Meta(
+                json_ld::Indexed::new(
+                    json_ld::Object::Value(json_ld::Value::Literal(
+                        json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                            self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+                        )),
+                        Some(vocabulary.insert(iri!("http://www.w3.org/2001/XMLSchema#dateTime"))),
+                    )),
+                    None,
+                ),
+                (),
+            ),
+        );
+
+        properties.insert(
+            Meta(
+                json_ld::Id::iri(
+                    vocabulary.insert(iri!("https://w3id.org/security#verificationMethod")),
+                ),
+                (),
+            ),
+            Meta(
+                json_ld::Indexed::new(
+                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
+                        json_ld::syntax::Entry::new(
+                            (),
+                            Meta(
+                                json_ld::Id::iri(vocabulary.insert(self.verification_method.iri())),
+                                (),
+                            ),
+                        ),
+                    ))),
+                    None,
+                ),
+                (),
+            ),
+        );
+
+        properties.insert(
+            Meta(
+                json_ld::Id::iri(vocabulary.insert(iri!("https://w3id.org/security#proofPurpose"))),
+                (),
+            ),
+            Meta(
+                json_ld::Indexed::new(
+                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
+                        json_ld::syntax::Entry::new(
+                            (),
+                            Meta(
+                                json_ld::Id::iri(vocabulary.insert(self.proof_purpose.iri())),
+                                (),
+                            ),
+                        ),
+                    ))),
+                    None,
+                ),
+                (),
+            ),
+        );
+
+        properties.insert(
+            Meta(
+                json_ld::Id::iri(vocabulary.insert(iri!("https://w3id.org/security#proofValue"))),
+                (),
+            ),
+            Meta(
+                json_ld::Indexed::new(
+                    json_ld::Object::Value(json_ld::Value::Literal(
+                        json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                            self.proof_value.to_string(),
+                        )),
+                        Some(vocabulary.insert(iri!("https://w3id.org/security#multibase"))),
+                    )),
+                    None,
+                ),
+                (),
+            ),
+        );
+
+        let mut graph = json_ld::Node::new();
+        graph.set_graph(Some(json_ld::syntax::Entry::new(
+            (),
+            Meta(
+                [Stripped(Meta(
+                    json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
+                    (),
+                ))]
+                .into_iter()
+                .collect(),
+                (),
+            ),
+        )));
+
+        Meta(
+            json_ld::Indexed::new(json_ld::Object::Node(Box::new(graph)), None),
+            meta,
+        )
     }
 }
 
