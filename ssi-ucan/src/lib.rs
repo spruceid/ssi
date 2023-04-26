@@ -46,6 +46,9 @@ impl<F, A> Ucan<F, A> {
     pub fn signature(&self) -> &[u8] {
         &self.signature
     }
+    pub fn into_inner(self) -> (Header, Payload<F, A>, Vec<u8>) {
+        (self.header, self.payload, self.signature)
+    }
     /// Extract or resolve the JWK used to issue this UCAN
     pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
         match (
