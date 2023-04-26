@@ -12,3 +12,5 @@ documentation = "https://docs.rs/ssi-vc/"
 treeldr-rust-macros.workspace = true
 treeldr-rust-prelude.workspace = true
 json-ld.workspace = true
+iref.workspace = true
+static-iref.workspace = true

@@ -2,13 +2,17 @@ use std::marker::PhantomData;
 
 use iref::IriBuf;
 use ssi_rdf::IntoNQuads;
+use treeldr_rust_prelude::static_iref::iri;
 
 use crate::{
     Algorithm, LinkedDataCredential, ProofValidity, SignParams, Signer, SignerProvider, Verifier,
     VerifierProvider, VerifyParams,
 };
 
-use super::{DataIntegrityProof, ProofConfiguration, ProofOptions, TransformationOptions};
+use super::{
+    DataIntegrityProof, ProofConfiguration, ProofOptions, ProofPurpose, TransformationOptions,
+    VerificationMethod,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -45,7 +49,6 @@ impl<M, P> Ed25519Signature2020<M, P> {
     {
         ProofConfiguration {
             type_: options.type_,
-            cryptosuite: options.cryptosuite.clone(),
             created: options.created,
             verification_method: options.verification_method.clone(),
             proof_purpose: options.proof_purpose.clone(),
@@ -53,7 +56,20 @@ impl<M, P> Ed25519Signature2020<M, P> {
     }
 }
 
-impl<M, P, C> super::LinkedDataCryptographicSuite<M, C> for Ed25519Signature2020<M, P> {
+impl<M, P> super::Type for Ed25519Signature2020<M, P> {
+    fn iri(&self) -> iref::Iri {
+        //iri!("https://w3id.org/security#Ed25519Signature2020")
+        iri!("https://w3id.org/security#DataIntegrityProof")
+    }
+
+    fn cryptographic_suite(&self) -> Option<&str> {
+        Some("eddsa-2022")
+    }
+}
+
+impl<M: VerificationMethod, P: ProofPurpose, C> super::LinkedDataCryptographicSuite<M, C>
+    for Ed25519Signature2020<M, P>
+{
     /// Transformation algorithm.
     fn transform<T: LinkedDataCredential<C>>(
         &self,
@@ -65,7 +81,9 @@ impl<M, P, C> super::LinkedDataCryptographicSuite<M, C> for Ed25519Signature2020
     }
 }
 
-impl<M, P> super::CryptographicSuite<M> for Ed25519Signature2020<M, P> {
+impl<M: VerificationMethod, P: ProofPurpose> super::CryptographicSuite<M>
+    for Ed25519Signature2020<M, P>
+{
     type Error = Error;
 
     type TransformationParameters = TransformationOptions<Self>;
@@ -122,17 +140,14 @@ impl<M, P> super::CryptographicSuite<M> for Ed25519Signature2020<M, P> {
     }
 }
 
-impl<M: Clone, P: Clone> SignParams<M, Ed25519Signature2020<M, P>>
-    for ProofOptions<Ed25519Signature2020<M, P>, M, P>
+impl<M: Clone + VerificationMethod, P: Clone + ProofPurpose>
+    SignParams<M, Ed25519Signature2020<M, P>> for ProofOptions<Ed25519Signature2020<M, P>, M, P>
 {
     fn transform_params(
         &self,
     ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::TransformationParameters
     {
-        TransformationOptions {
-            type_: self.type_,
-            cryptosuite: self.cryptosuite.clone(),
-        }
+        TransformationOptions { type_: self.type_ }
     }
 
     fn hash_params(
@@ -148,17 +163,14 @@ impl<M: Clone, P: Clone> SignParams<M, Ed25519Signature2020<M, P>>
     }
 }
 
-impl<M: Clone, P: Clone> VerifyParams<M, Ed25519Signature2020<M, P>>
-    for ProofOptions<Ed25519Signature2020<M, P>, M, P>
+impl<M: Clone + VerificationMethod, P: Clone + ProofPurpose>
+    VerifyParams<M, Ed25519Signature2020<M, P>> for ProofOptions<Ed25519Signature2020<M, P>, M, P>
 {
     fn transform_params(
         &self,
     ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::TransformationParameters
     {
-        TransformationOptions {
-            type_: self.type_,
-            cryptosuite: self.cryptosuite.clone(),
-        }
+        TransformationOptions { type_: self.type_ }
     }
 
     fn into_hash_params(

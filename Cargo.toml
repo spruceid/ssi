@@ -112,9 +112,9 @@ grdf = "0.18.0"
 locspan = "0.7.13"
 nquads-syntax = "0.12.0"
 multibase = "0.9.1"
-json-ld = "0.14.0"
-treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
-treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "timothee-haudebourg/issue123" }
+json-ld = "0.14.1"
+treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", rev = "6259ef4645df59ae8507ac9fb5bc20547a3e717d" }
+treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", rev = "6259ef4645df59ae8507ac9fb5bc20547a3e717d" }
 
 # [dev-dependencies]
 # async-std = { version = "1.9", features = ["attributes"] }
