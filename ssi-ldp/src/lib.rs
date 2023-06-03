@@ -648,6 +648,17 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
     rewritten
 }
 
+pub async fn to_nquads(
+    document: &(dyn LinkedDataDocument + Sync),
+    context_loader: &mut ContextLoader,
+) -> Result<Vec<String>, Error> {
+    let doc_dataset = document
+        .to_dataset_for_signing(None, context_loader)
+        .await?;
+    let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
+    Ok(doc_normalized)
+}
+
 async fn to_jws_payload_v2(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,

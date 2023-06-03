@@ -223,6 +223,7 @@ pub struct LinkedDataProofOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     /// The nonce of the proof.
     pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// Indices of disclosed messages
     pub disclosed_message_indices: Option<Vec<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]

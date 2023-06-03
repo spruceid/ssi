@@ -984,6 +984,7 @@ impl Credential {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> VerificationResult {
+        // this is the entrypoint called by didkit
         let nonce = match options.as_ref() {
             Some(ldp_options) => ldp_options.nonce.clone(),
             None => None
@@ -1095,6 +1096,27 @@ impl Credential {
         }
         result.checks.push(Check::Status);
         result
+    }
+
+    pub async fn get_nquad_positions(&self, selectors: &Vec<String>, context_loader: &mut ContextLoader) -> Result<Vec<u32>, Error> {
+        let nquads = ssi_ldp::to_nquads(self, context_loader).await?;
+        let mut positions = Vec::new();
+        let mut index: u32 = 2;
+        for nq in nquads.iter() {
+            let split: Vec<&str> = nq.split(" ").collect();
+            let middle = split[1];
+
+            for s in selectors.iter() {
+                let suffix = "/".to_owned() + s + ">";
+                if middle.ends_with(suffix.as_str()) {
+                    positions.push(index);
+                    break;
+                }
+            }
+
+            index += 1;
+        }
+        Ok(positions)
     }
 }
 

@@ -357,6 +357,8 @@ pub fn verify_payload(
                             assert!(credential_subject_id != "", "credentialSubject node not found");
 
                             let mut first_claim_found = false;
+
+                            i = 0;
                             while i < payload.messages.len() {
                                 let m = payload.messages[i].as_str();
                                 if m.starts_with(credential_subject_id) {
@@ -368,9 +370,11 @@ pub fn verify_payload(
                             assert!(first_claim_found, "No claims in derived credential");
 
                             for j in 0..message_hashes.len() {
+                                //eprintln!("Checking hash for {}: ", payload.messages[i].as_str());
                                 let revealed_hash = message_hashes[j];
                                 let target_hash = SignatureMessage::hash(payload.messages[i].as_bytes());
                                 if revealed_hash != target_hash {
+                                    //eprintln!("Hashes do not match");
                                     return Err(Error::InvalidSignature);
                                 }
 
