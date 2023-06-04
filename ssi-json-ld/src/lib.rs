@@ -487,8 +487,6 @@ where
     L::Context: Into<json_ld::syntax::context::Value<Span>>,
     L::ContextError: Send,
 {
-    // todo remove print statements
-    eprintln!("json_to_dataset: enter");
     use json_ld::JsonLdProcessor;
 
     let options = Options {
@@ -502,13 +500,10 @@ where
     let doc = json_ld::RemoteDocument::new(None, None, json);
     let mut generator =
         rdf_types::generator::Blank::new_with_prefix("b".to_string()).with_default_metadata();
-    eprintln!("json_to_dataset: 1");
-    // this is likely the remote call
     let mut to_rdf = doc
         .to_rdf_using(&mut generator, loader, options)
         .await
         .map_err(Box::new)?;
-    eprintln!("json_to_dataset: 2");
     Ok(to_rdf
         .cloned_quads()
         .map(|q| {

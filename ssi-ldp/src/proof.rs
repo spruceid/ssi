@@ -173,7 +173,6 @@ impl LinkedDataDocument for Proof {
         let mut copy = self.clone();
         copy.jws = None;
         copy.proof_value = None;
-
         let json = json_syntax::to_value_with(copy, Default::default).unwrap();
         let dataset = json_to_dataset(
             json,
@@ -184,9 +183,10 @@ impl LinkedDataDocument for Proof {
                 .flatten()
                 .as_deref()
                 .map(parse_ld_context)
-                .transpose()?
+                .transpose()?,
         )
         .await?;
+
         verify_proof_consistency(self, &dataset)?;
         Ok(dataset)
     }

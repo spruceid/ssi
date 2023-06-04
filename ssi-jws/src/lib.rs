@@ -314,7 +314,6 @@ pub fn verify_payload(
     disclosed_message_indices: &[usize],
     nonce: Option<&String>,
 ) -> Result<VerificationWarnings, Error> {
-    // todo ensure algorithm is bbs
     let mut warnings = VerificationWarnings::default();
 
     match algorithm {
@@ -328,7 +327,7 @@ pub fn verify_payload(
         JWKParams::OKP(okp) => {
             match nonce {
                 Some(n) => {
-                    let proof = SignatureProof::try_from(signature).unwrap(); // todo error handling
+                    let proof = SignatureProof::try_from(signature).unwrap();
 
                     let Base64urlUInt(pk_bytes) = &okp.public_key;
                     let issuer_pk = PublicKey::try_from(pk_bytes.as_slice()).unwrap();
@@ -342,7 +341,7 @@ pub fn verify_payload(
                     let result = Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
                     match result {
                         Ok(message_hashes) => {
-                            eprintln!("Signature pok check passes");
+                            //eprintln!("Signature pok check passes");
                             let mut i = 0;
                             let mut credential_subject_id = "";
                             while i < payload.messages.len() {
@@ -374,7 +373,7 @@ pub fn verify_payload(
                                 let revealed_hash = message_hashes[j];
                                 let target_hash = SignatureMessage::hash(payload.messages[i].as_bytes());
                                 if revealed_hash != target_hash {
-                                    //eprintln!("Hashes do not match");
+                                    eprintln!("Hashes do not match");
                                     return Err(Error::InvalidSignature);
                                 }
 
@@ -475,7 +474,6 @@ pub fn verify_bytes_warnable(
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
             use blake2::digest::{consts::U32, Digest};
-            // todo error if BLS12-381 G2
             if okp.curve != *"Ed25519" {
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }

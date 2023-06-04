@@ -339,7 +339,6 @@ impl LinkedDataProofs {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        eprintln!("LinkedDataProofs::sign");
         let mut options = options.clone();
 
         // todo re-enable this
@@ -418,31 +417,26 @@ async fn to_jws_payload(
     proof: &Proof,
     context_loader: &mut ContextLoader,
 ) -> Result<Vec<u8>, Error> {
-    eprintln!("to_jws_payload: 0");
     let sigopts_dataset = proof
         .to_dataset_for_signing(Some(document), context_loader)
         .await?;
-    eprintln!("to_jws_payload: 1");
     // this line is the issue, never makes it to 2
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
-    eprintln!("to_jws_payload: 2");
     let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads();
-    eprintln!("to_jws_payload: 3");
     let sigopts_normalized =
         urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from)).into_nquads();
-    eprintln!("to_jws_payload: 4");
     let sigopts_digest = sha256(sigopts_normalized.as_bytes());
     let doc_digest = sha256(doc_normalized.as_bytes());
     let data = [
+        sigopts_digest.as_ref().to_vec(),
         doc_digest.as_ref().to_vec(),
     ]
     .concat();
     Ok(data)
 }
 
-// todo: refactor, may want to move this to ssi-jws
 pub async fn generate_bbs_signature_pok(
     document: &(dyn LinkedDataDocument + Sync),
     nonce: &str,
@@ -469,7 +463,9 @@ pub async fn generate_bbs_signature_pok(
             let Base64urlUInt(pk_bytes) = &okp.public_key;
             PublicKey::try_from(pk_bytes.as_slice()).unwrap()
         }
-        _ => unimplemented!(),
+        _ => {
+            return Err(Error::UnsupportedCurve);
+        }
     };
 
     let mut proof_without_jws = proof.clone();
@@ -580,7 +576,7 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
         let middle = split[1];
         let right = split[2];
         if right.starts_with("_:c") {
-            eprintln!("property={}, blank node label={}", middle, right);
+            //eprintln!("property={}, blank node label={}", middle, right);
             blank_node_props.insert(right.to_owned(), middle.to_owned());
             blank_node_parents.insert(right.to_owned(), left.to_owned());
         }
@@ -588,10 +584,7 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
 
     //eprintln!("properties map: {:?}", &blank_node_props);
     //eprintln!("parents map: {:?}", &blank_node_parents);
-    // at this point, we have properties and parents for each blank node label
 
-    // iterate through the n-quads and construct the substitutions
-    // key is n-quad, value is parent, either another n-quad or an identifier
     for (key, value) in blank_node_parents.iter() {
         //eprintln!("key: {}, value: {}", &key, &value);
 
@@ -615,7 +608,7 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
         let hash = sha256(path.as_bytes());
         let hash_string = base64::encode_config(hash.as_slice(), base64::URL_SAFE_NO_PAD);
         let new_blank_node_label = "_d:".to_owned() + hash_string.as_str();
-        eprintln!("key: {}, path: {:?}", key, new_blank_node_label.as_str());
+        //eprintln!("key: {}, path: {:?}", key, new_blank_node_label.as_str());
 
         assert!(!blank_node_subs.contains_key(key) || blank_node_subs[key] == new_blank_node_label, "This credential uses unsupported features. Please file an issue at https://github.com/spruceid/ssi/issues for assistance.");
         blank_node_subs.insert(key.to_owned(), new_blank_node_label);
@@ -700,7 +693,6 @@ async fn sign(
     algorithm: Algorithm,
     extra_proof_properties: Option<Map<String, Value>>,
 ) -> Result<Proof, Error> {
-    eprintln!("ssi-ldp, sign");
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm {
             return Err(Error::JWS(ssi_jws::Error::AlgorithmMismatch));
@@ -720,7 +712,6 @@ async fn sign_proof(
     algorithm: Algorithm,
     context_loader: &mut ContextLoader,
 ) -> Result<Proof, Error> {
-    eprintln!("sign_proof_v1");
     let message = to_jws_payload(document, &proof, context_loader).await?;
     let jws = ssi_jws::detached_sign_unencoded_payload(algorithm, &message, key)?;
     proof.jws = Some(jws);
@@ -734,7 +725,6 @@ async fn sign_proof_v2(
     algorithm: Algorithm,
     context_loader: &mut ContextLoader,
 ) -> Result<Proof, Error> {
-    eprintln!("sign_proof_v2");
     let mut jws_payload = to_jws_payload_v2(document, &proof, context_loader).await?;
     let jws = ssi_jws::detached_sign_unencoded_payload_v2(algorithm, &mut jws_payload, key)?;
     proof.jws = Some(jws);

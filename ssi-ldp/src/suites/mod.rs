@@ -82,6 +82,7 @@ pub enum ProofSuiteType {
     #[cfg(feature = "test")]
     #[serde(rename = "ex:AnonCredDerivedCredentialv1")]
     AnonCredDerivedCredentialv1,
+    #[cfg(feature = "bbsplus")]
     BbsBlsSignatureProof2020,
 }
 
@@ -141,6 +142,7 @@ impl ProofSuiteType {
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
             | Self::AnonCredDerivedCredentialv1 => todo!(),
+            #[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => SignatureType::JWS,
         }
     }
@@ -190,6 +192,7 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
             #[cfg(feature = "test")]
             Self::NonJwsProof |
             Self::AnonCredPresentationProofv1 | Self::AnonCredDerivedCredentialv1 => todo!(),
+            #[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => &["https://w3id.org/security#BbsBlsSignatureProof2020"],
         }
     }
@@ -309,8 +312,7 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
     }
 
     pub fn is_zkp(&self) -> bool {
-        // todo probably need to make a change here as well
-        matches!(self, Self::CLSignature2019)
+        matches!(self, Self::CLSignature2019) || matches!(self, Self::BbsBlsSignatureProof2020)
     }
 }
 
@@ -814,6 +816,7 @@ impl ProofSuite for ProofSuiteType {
                 verify(proof, document, resolver, context_loader).await
             }
             Self::CLSignature2019 => todo!(),
+            #[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => {
                 verify_bbs_proof(proof, document, resolver, context_loader, Algorithm::BLS12381G2, nonce, disclosed_message_indices).await
             },
