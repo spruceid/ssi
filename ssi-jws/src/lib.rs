@@ -311,7 +311,7 @@ pub fn verify_payload(
     key: &JWK,
     payload: &JWSPayload,
     signature: &[u8],
-    disclosed_message_indices: &[usize],
+    disclosed_message_indices: Option<&Vec<usize>>,
     nonce: Option<&String>,
 ) -> Result<VerificationWarnings, Error> {
     let mut warnings = VerificationWarnings::default();
@@ -331,7 +331,7 @@ pub fn verify_payload(
 
                     let Base64urlUInt(pk_bytes) = &okp.public_key;
                     let issuer_pk = PublicKey::try_from(pk_bytes.as_slice()).unwrap();
-                    let proof_request = Verifier::new_proof_request(disclosed_message_indices, &issuer_pk).unwrap();
+                    let proof_request = Verifier::new_proof_request(disclosed_message_indices.unwrap().as_slice(), &issuer_pk).unwrap();
                     let proof_nonce_bytes = base64::decode(n).unwrap();
                     assert!(proof_nonce_bytes.len() == 32);
                     let mut proof_nonce_bytes_sized: [u8; 32] = [0; 32];
@@ -368,8 +368,12 @@ pub fn verify_payload(
                             }
                             assert!(first_claim_found, "No claims in derived credential");
 
+                            /*for nq in payload.messages.iter() {
+                                eprintln!("Message: {}", nq);
+                            }*/
+
                             for j in 0..message_hashes.len() {
-                                //eprintln!("Checking hash for {}: ", payload.messages[i].as_str());
+                                //eprintln!("Checking hash for: {}", payload.messages[i].as_str());
                                 let revealed_hash = message_hashes[j];
                                 let target_hash = SignatureMessage::hash(payload.messages[i].as_bytes());
                                 if revealed_hash != target_hash {
@@ -390,6 +394,11 @@ pub fn verify_payload(
                     if signature.len() != 112 {
                         return Err(Error::InvalidSignature);
                     } else {
+                        match disclosed_message_indices {
+                            Some(_) => return Err(Error::NonceNotProvided),
+                            None => (),
+                        }
+
                         let mut signature_sized: [u8; 112] = [0; 112];
                         signature_sized.clone_from_slice(signature);
                         let bbs_sig = bbs::prelude::Signature::from(&signature_sized);

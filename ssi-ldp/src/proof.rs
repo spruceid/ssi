@@ -150,7 +150,7 @@ impl Proof {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         nonce: Option<&String>,
-        disclosed_message_indices: Vec<usize>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> VerificationResult {
         LinkedDataProofs::verify(self, document, resolver, context_loader, nonce, disclosed_message_indices)
             .await
@@ -252,7 +252,7 @@ impl Default for LinkedDataProofOptions {
             eip712_domain: None,
             type_: None,
             nonce: None,
-            disclosed_message_indices: Some(Vec::new()),
+            disclosed_message_indices: None,
         }
     }
 }

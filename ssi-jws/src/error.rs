@@ -46,6 +46,8 @@ pub enum Error {
     UnexpectedSignatureLength(usize, usize),
     #[error("Invalid signature")]
     InvalidSignature,
+    #[error("Messages positions given without nonce")]
+    NonceNotProvided
 }
 
 #[cfg(feature = "ring")]

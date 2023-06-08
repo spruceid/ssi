@@ -861,7 +861,7 @@ impl Credential {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vc, resolver, context_loader, None, Vec::new()).await;
+            let mut result = proof.verify(&vc, resolver, context_loader, None, None).await;
             results.append(&mut result);
             if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -984,14 +984,13 @@ impl Credential {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
     ) -> VerificationResult {
-        // this is the entrypoint called by didkit
         let nonce = match options.as_ref() {
             Some(ldp_options) => ldp_options.nonce.clone(),
             None => None
         };
         let disclosed_message_indices = match options.as_ref() {
             Some(ldp_options) => ldp_options.disclosed_message_indices.clone(),
-            None => Some(Vec::new())
+            None => None
         };
         let checks = options
             .as_ref()
@@ -1011,7 +1010,7 @@ impl Credential {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref(), disclosed_message_indices.clone().unwrap()).await;
+            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref(), disclosed_message_indices.as_ref()).await;
             results.append(&mut result);
             if result.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1150,9 +1149,7 @@ impl LinkedDataDocument for Credential {
         parent: Option<&(dyn LinkedDataDocument + Sync)>,
         context_loader: &mut ContextLoader,
     ) -> Result<DataSet, LdpError> {
-        eprintln!("to_dataset_for_signing, impl LinkedDataDocument for Credential");
         let mut copy = self.clone();
-
         copy.proof = None;
         let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
         Ok(json_to_dataset(
@@ -1164,7 +1161,7 @@ impl LinkedDataDocument for Credential {
                 .flatten()
                 .as_deref()
                 .map(parse_ld_context)
-                .transpose()?
+                .transpose()?,
         )
         .await?)
     }
@@ -1446,7 +1443,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vp, resolver, context_loader, None, Vec::new()).await;
+            let mut result = proof.verify(&vp, resolver, context_loader, None, None).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return (Some(vp), result);
@@ -1619,7 +1616,7 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader, None, Vec::new()).await;
+            let mut result = proof.verify(self, resolver, context_loader, None, None).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -1874,10 +1871,11 @@ fn select_fields(subject: &CredentialSubject, selectors: &[String]) -> Map<Strin
 
     match &subject.property_set {
         Some(properties) => {
-            for (k, v) in properties {
+            'outer: for (k, v) in properties {
                 for i in 0..selectors.len() {
                     if k.as_str() == selectors[i].as_str() {
                         selected.insert(k.clone(), v.clone());
+                        continue 'outer
                     }
                 }
             }
@@ -1885,6 +1883,7 @@ fn select_fields(subject: &CredentialSubject, selectors: &[String]) -> Map<Strin
         None => (),
     }
 
+    //eprintln!("Selected properties: {:?}", &selected);
     selected
 }
 
@@ -1894,10 +1893,6 @@ pub async fn derive_credential(
     selectors: &[String],
     did_resolver: &dyn DIDResolver,
 ) -> Result<Credential, Error> {
-    use bbs::prelude::*;
-    use ssi_jwk::{Base64urlUInt, OctetParams, Params as JWKParams, JWK};
-    use ssi_ldp::error::Error;
-
     let mut derived_credential = document.clone();
 
     let proofs = derived_credential.proof.unwrap();
@@ -1933,11 +1928,6 @@ pub async fn derive_credential(
         }
     }
 
-    // can generate a signature POK here
-    // todo do not hardcode type, may need to be something different because not the same proof type as original credential
-    // todo may need to add proof options and so on
-    // todo revealed message indices
-    // make sure to pass in the orignal document, which has all the messages
     let proof =
         ssi_ldp::generate_bbs_signature_pok(document, proof_nonce, &proof, did_resolver, selectors)
             .await?;

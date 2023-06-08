@@ -184,7 +184,7 @@ pub trait ProofSuite {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         nonce: Option<&String>,
-        disclosed_message_indices: Vec<usize>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> Result<VerificationWarnings, Error>;
 }
 
@@ -403,7 +403,7 @@ impl LinkedDataProofs {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         nonce: Option<&String>,
-        disclosed_message_indices: Vec<usize>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> Result<VerificationWarnings, Error> {
         let suite = &proof.type_;
         suite
@@ -873,7 +873,7 @@ async fn verify_bbs_proof(
     context_loader: &mut ContextLoader,
     algorithm: Algorithm,
     nonce: Option<&String>,
-    disclosed_message_indices: Vec<usize>,
+    disclosed_message_indices: Option<&Vec<usize>>,
 ) -> Result<VerificationWarnings, Error> {
     let proof_value = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let start_index = proof_value.find("..").unwrap() + 2;
@@ -889,7 +889,7 @@ async fn verify_bbs_proof(
     let (_, header_b64) = ssi_jws::generate_header(algorithm, &key)?;
     payload.header = header_b64;
 
-    Ok(ssi_jws::verify_payload(algorithm, &key, &payload, sig.as_slice(), disclosed_message_indices.as_slice(), nonce)?)
+    Ok(ssi_jws::verify_payload(algorithm, &key, &payload, sig.as_slice(), disclosed_message_indices, nonce)?)
 }
 
 // Check if a linked data document has a given URI in its @context array.

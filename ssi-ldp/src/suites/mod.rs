@@ -82,7 +82,7 @@ pub enum ProofSuiteType {
     #[cfg(feature = "test")]
     #[serde(rename = "ex:AnonCredDerivedCredentialv1")]
     AnonCredDerivedCredentialv1,
-    #[cfg(feature = "bbsplus")]
+    //#[cfg(feature = "bbsplus")]
     BbsBlsSignatureProof2020,
 }
 
@@ -142,7 +142,7 @@ impl ProofSuiteType {
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
             | Self::AnonCredDerivedCredentialv1 => todo!(),
-            #[cfg(feature = "bbsplus")]
+            //#[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => SignatureType::JWS,
         }
     }
@@ -192,7 +192,7 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
             #[cfg(feature = "test")]
             Self::NonJwsProof |
             Self::AnonCredPresentationProofv1 | Self::AnonCredDerivedCredentialv1 => todo!(),
-            #[cfg(feature = "bbsplus")]
+            //#[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => &["https://w3id.org/security#BbsBlsSignatureProof2020"],
         }
     }
@@ -306,6 +306,7 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
                     }
                 }
             },
+            //#[cfg(feature = "bbsplus")]
             Algorithm::BLS12381G2 => Self::BbsBlsSignatureProof2020,
             _ => return Err(Error::ProofTypeNotSupported),
         })
@@ -517,6 +518,7 @@ impl ProofSuite for ProofSuiteType {
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1
             | Self::AnonCredDerivedCredentialv1 => todo!(),
+            //#[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => {
                 sign(
                     document,
@@ -720,6 +722,7 @@ impl ProofSuite for ProofSuiteType {
                 .await
             }
             Self::CLSignature2019 => todo!(),
+            //#[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => todo!(),
             #[cfg(feature = "test")]
             Self::NonJwsProof
@@ -735,7 +738,7 @@ impl ProofSuite for ProofSuiteType {
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
         nonce: Option<&String>,
-        disclosed_message_indices: Vec<usize>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> Result<VerificationWarnings, Error> {
         match self {
             #[cfg(feature = "rsa")]
@@ -816,7 +819,7 @@ impl ProofSuite for ProofSuiteType {
                 verify(proof, document, resolver, context_loader).await
             }
             Self::CLSignature2019 => todo!(),
-            #[cfg(feature = "bbsplus")]
+            //#[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => {
                 verify_bbs_proof(proof, document, resolver, context_loader, Algorithm::BLS12381G2, nonce, disclosed_message_indices).await
             },
