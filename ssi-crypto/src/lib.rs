@@ -1,13 +1,11 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+mod algorithm;
 pub mod hashes;
+mod signature;
 pub mod signatures;
+mod verification;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        let result = 2 + 2;
-        assert_eq!(result, 4);
-    }
-}
+pub use algorithm::*;
+pub use signature::*;
+pub use verification::*;

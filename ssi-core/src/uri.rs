@@ -39,6 +39,12 @@ impl URI {
             URI::String(string) => string.as_str(),
         }
     }
+
+    pub fn into_string(self) -> String {
+        match self {
+            Self::String(s) => s,
+        }
+    }
 }
 
 impl FromStr for URI {

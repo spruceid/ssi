@@ -1,5 +1,5 @@
 [package]
-name = "ssi-ldp"
+name = "ssi-vc-ldp"
 version = "0.3.2"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
@@ -9,6 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-ldp/"
 
 [dependencies]
+async-trait.workspace = true
 rdf-types.workspace = true
 treeldr-rust-prelude.workspace = true
 ssi-crypto.workspace = true
@@ -20,6 +21,7 @@ chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true
 thiserror.workspace = true
+static-iref.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

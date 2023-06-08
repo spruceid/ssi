@@ -1,62 +1,71 @@
 use std::marker::PhantomData;
 
 use iref::IriBuf;
+use ssi_crypto::{Algorithm, Signer, Verifier, VerifierProvider};
 use ssi_rdf::IntoNQuads;
+use ssi_vc::ProofValidity;
 use treeldr_rust_prelude::static_iref::iri;
 
 use crate::{
-    Algorithm, LinkedDataCredential, ProofValidity, SignParams, Signer, SignerProvider, Verifier,
-    VerifierProvider, VerifyParams,
+    LinkedDataCredential, Proof, ProofConfiguration, ProofOptions, SignParams, SignerProvider,
 };
 
-use super::{
-    DataIntegrityProof, ProofConfiguration, ProofOptions, ProofPurpose, TransformationOptions,
-    VerificationMethod,
-};
+use super::{TransformationOptions, VerificationMethod, VerificationParameters};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    UnsupportedAlgorithm(ssi_crypto::UnsupportedAlgorithm),
+
+    #[error("unknown verification method")]
+    UnknownVerificationMethod,
+
     #[error("proof decoding failed")]
     ProofDecodingFailed,
 }
 
-/// Ed25519Signature2020 signature type.
-pub struct Ed25519Signature2020<M = IriBuf, P = IriBuf>(PhantomData<(M, P)>);
+impl From<ssi_crypto::UnsupportedAlgorithm> for Error {
+    fn from(value: ssi_crypto::UnsupportedAlgorithm) -> Self {
+        Self::UnsupportedAlgorithm(value)
+    }
+}
 
-impl<M, P> Default for Ed25519Signature2020<M, P> {
+/// Ed25519Signature2020 signature type.
+pub struct Ed25519Signature2020<M = IriBuf>(PhantomData<M>);
+
+impl<M> Default for Ed25519Signature2020<M> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<M, P> Clone for Ed25519Signature2020<M, P> {
+impl<M> Clone for Ed25519Signature2020<M> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<M, P> Copy for Ed25519Signature2020<M, P> {}
+impl<M> Copy for Ed25519Signature2020<M> {}
 
-impl<M, P> Ed25519Signature2020<M, P> {
+impl<M> Ed25519Signature2020<M> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn proof_configuration(options: &ProofOptions<Self, M, P>) -> ProofConfiguration<Self, M, P>
+    pub fn proof_configuration(options: &ProofOptions<Self, M>) -> ProofConfiguration<Self, M>
     where
         M: Clone,
-        P: Clone,
     {
         ProofConfiguration {
             type_: options.type_,
             created: options.created,
             verification_method: options.verification_method.clone(),
-            proof_purpose: options.proof_purpose.clone(),
+            proof_purpose: options.proof_purpose,
         }
     }
 }
 
-impl<M, P> super::Type for Ed25519Signature2020<M, P> {
+impl<M> super::Type for Ed25519Signature2020<M> {
     fn iri(&self) -> iref::Iri {
         //iri!("https://w3id.org/security#Ed25519Signature2020")
         iri!("https://w3id.org/security#DataIntegrityProof")
@@ -67,8 +76,8 @@ impl<M, P> super::Type for Ed25519Signature2020<M, P> {
     }
 }
 
-impl<M: VerificationMethod, P: ProofPurpose, C> super::LinkedDataCryptographicSuite<M, C>
-    for Ed25519Signature2020<M, P>
+impl<M: VerificationMethod, C> super::LinkedDataCryptographicSuite<M, C>
+    for Ed25519Signature2020<M>
 {
     /// Transformation algorithm.
     fn transform<T: LinkedDataCredential<C>>(
@@ -81,25 +90,28 @@ impl<M: VerificationMethod, P: ProofPurpose, C> super::LinkedDataCryptographicSu
     }
 }
 
-impl<M: VerificationMethod, P: ProofPurpose> super::CryptographicSuite<M>
-    for Ed25519Signature2020<M, P>
+impl<M: Clone + VerificationMethod> super::VerifiableCryptographicSuite<M>
+    for Ed25519Signature2020<M>
 {
+    type VerificationParameters = ProofOptions<Self, M>;
+}
+
+impl<M: VerificationMethod> super::CryptographicSuite<M> for Ed25519Signature2020<M> {
     type Error = Error;
 
     type TransformationParameters = TransformationOptions<Self>;
     type Transformed = String;
 
-    type HashParameters = ProofConfiguration<Self, M, P>;
+    type HashParameters = ProofConfiguration<Self, M>;
     type Hashed = [u8; 64];
 
-    type ProofParameters = ProofOptions<Self, M, P>;
-    type Proof = DataIntegrityProof<Self, M, P>;
+    type ProofParameters = ProofOptions<Self, M>;
 
     /// Hashing algorithm.
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfiguration<Self, M, P>,
+        proof_configuration: ProofConfiguration<Self, M>,
     ) -> Result<Self::Hashed, Self::Error> {
         let transformed_document_hash = ssi_crypto::hashes::sha256::sha256(data.as_bytes());
         let proof_config_hash: [u8; 32] = ssi_crypto::hashes::sha256::sha256(
@@ -115,67 +127,70 @@ impl<M: VerificationMethod, P: ProofPurpose> super::CryptographicSuite<M>
         &self,
         data: Self::Hashed,
         signer_provider: &impl SignerProvider<M>,
-        options: ProofOptions<Self, M, P>,
-    ) -> Result<Self::Proof, Self::Error> {
+        options: ProofOptions<Self, M>,
+    ) -> Result<Proof<Self, M>, Self::Error> {
         let signer = signer_provider.get_signer(&options.verification_method);
-        let sig = signer.sign(Algorithm::EdDSA, &data);
+        let sig = signer.sign(Algorithm::EdDSA, &data)?;
         let sig_multibase = multibase::encode(multibase::Base::Base58Btc, sig);
 
-        Ok(DataIntegrityProof::from_options(options, sig_multibase))
+        Ok(Proof::from_options(options, sig_multibase))
     }
 
     fn verify_proof(
         &self,
         data: Self::Hashed,
         verifier_provider: &impl VerifierProvider<M>,
-        proof: &Self::Proof,
+        proof: &Proof<Self, M>,
     ) -> Result<ProofValidity, Self::Error> {
-        let verifier = verifier_provider.get_verifier(&proof.verification_method);
+        let verifier = verifier_provider
+            .get_verifier(&proof.verification_method)
+            .ok_or(Error::UnknownVerificationMethod)?;
         let proof_bytes = multibase::decode(&proof.proof_value)
             .map_err(|_| Error::ProofDecodingFailed)?
             .1;
         Ok(verifier
-            .verify(Algorithm::EdDSA, &data, &proof_bytes)
+            .verify(Algorithm::EdDSA, &data, &proof_bytes)?
             .into())
     }
 }
 
-impl<M: Clone + VerificationMethod, P: Clone + ProofPurpose>
-    SignParams<M, Ed25519Signature2020<M, P>> for ProofOptions<Ed25519Signature2020<M, P>, M, P>
+impl<M: Clone + VerificationMethod> SignParams<M, Ed25519Signature2020<M>>
+    for ProofOptions<Ed25519Signature2020<M>, M>
 {
     fn transform_params(
         &self,
-    ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::TransformationParameters
-    {
+    ) -> <Ed25519Signature2020<M> as super::CryptographicSuite<M>>::TransformationParameters {
         TransformationOptions { type_: self.type_ }
     }
 
     fn hash_params(
         &self,
-    ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::HashParameters {
+    ) -> <Ed25519Signature2020<M> as super::CryptographicSuite<M>>::HashParameters {
         Ed25519Signature2020::proof_configuration(self)
     }
 
     fn into_proof_params(
         self,
-    ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::ProofParameters {
+    ) -> <Ed25519Signature2020<M> as super::CryptographicSuite<M>>::ProofParameters {
         self
     }
 }
 
-impl<M: Clone + VerificationMethod, P: Clone + ProofPurpose>
-    VerifyParams<M, Ed25519Signature2020<M, P>> for ProofOptions<Ed25519Signature2020<M, P>, M, P>
+impl<M: Clone + VerificationMethod>
+    VerificationParameters<
+        TransformationOptions<Ed25519Signature2020<M>>,
+        ProofConfiguration<Ed25519Signature2020<M>, M>,
+    > for ProofOptions<Ed25519Signature2020<M>, M>
 {
-    fn transform_params(
+    fn transformation_parameters(
         &self,
-    ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::TransformationParameters
-    {
+    ) -> <Ed25519Signature2020<M> as super::CryptographicSuite<M>>::TransformationParameters {
         TransformationOptions { type_: self.type_ }
     }
 
-    fn into_hash_params(
+    fn into_hash_parameters(
         self,
-    ) -> <Ed25519Signature2020<M, P> as super::CryptographicSuite<M>>::HashParameters {
+    ) -> <Ed25519Signature2020<M> as super::CryptographicSuite<M>>::HashParameters {
         Ed25519Signature2020::proof_configuration(&self)
     }
 }

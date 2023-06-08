@@ -7,7 +7,20 @@
 //!   - Data Integrity Proofs, defined by the `ssi-ldp` library.
 use std::hash::Hash;
 
+use iref::Iri;
+use ssi_crypto::VerifierProvider;
 use treeldr_rust_macros::tldr;
+use treeldr_rust_prelude::{
+    locspan::Meta,
+    rdf_types::{IntoId, Namespace, VocabularyMut},
+};
+
+pub mod datatype;
+pub mod decode;
+mod verification;
+
+pub use decode::Decoder;
+pub use verification::*;
 
 #[tldr("ssi-vc/src/schema.ttl")]
 pub mod schema {
@@ -25,10 +38,6 @@ pub mod schema {
 }
 
 pub use schema::cred::*;
-use treeldr_rust_prelude::{
-    locspan::Meta,
-    rdf_types::{IntoId, Namespace, VocabularyMut},
-};
 
 pub trait AttachProof<P>: Sized {
     fn with_proof(self, proof: P) -> Verifiable<Self, P> {
@@ -38,11 +47,19 @@ pub trait AttachProof<P>: Sized {
 
 impl<C, P> AttachProof<P> for C {}
 
-/// Linked Data Credential with proof.
+/// Verifiable credential.
 pub struct Verifiable<C, P> {
+    /// Credential.
     credential: C,
+
+    /// Credential proof.
     proof: P,
 }
+
+const VERIFIABLE_CREDENTIAL_IRI: Iri<'static> =
+    static_iref::iri!("https://www.w3.org/2018/credentials#VerifiableCredential");
+const PROOF_IRI: Iri<'static> = static_iref::iri!("https://w3id.org/security#proof");
+const PROOF_VALUE_IRI: Iri<'static> = static_iref::iri!("https://w3id.org/security#proofValue");
 
 impl<C, P> Verifiable<C, P> {
     pub fn new(credential: C, proof: P) -> Self {
@@ -62,6 +79,18 @@ impl<C, P> Verifiable<C, P> {
             credential: f(self.credential),
             proof: self.proof,
         }
+    }
+}
+
+impl<C: VerifiableWith<P>, P> Verifiable<C, P> {
+    pub fn verify(
+        &self,
+        context: &mut impl verification::Context<C, P>,
+        verifiers: &impl VerifierProvider<C::Method>,
+        parameters: C::Parameters,
+    ) -> Result<ProofValidity, C::Error> {
+        self.credential
+            .verify_with(context, verifiers, &self.proof, parameters)
     }
 }
 
@@ -86,17 +115,13 @@ where
 
         if let Some(node) = json_ld.as_node_mut() {
             node.type_entry_or_default((), ()).push(Meta(
-                json_ld::Id::iri(namespace.insert(static_iref::iri!(
-                    "https://www.w3.org/2018/credentials#VerifiableCredential"
-                ))),
+                json_ld::Id::iri(namespace.insert(VERIFIABLE_CREDENTIAL_IRI)),
                 (),
             ));
 
             node.properties_mut().insert(
                 Meta(
-                    json_ld::Id::Valid(json_ld::ValidId::Iri(
-                        namespace.insert(static_iref::iri!("https://w3id.org/security#proof")),
-                    )),
+                    json_ld::Id::Valid(json_ld::ValidId::Iri(namespace.insert(PROOF_IRI))),
                     (),
                 ),
                 proof,
