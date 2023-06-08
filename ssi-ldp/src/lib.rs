@@ -341,8 +341,7 @@ impl LinkedDataProofs {
     ) -> Result<Proof, Error> {
         let mut options = options.clone();
 
-        // todo re-enable this
-        //ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
+        ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         // Use type property if present
         let suite = if let Some(ref type_) = options.type_ {
             type_.clone()
