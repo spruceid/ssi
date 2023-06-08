@@ -268,6 +268,34 @@ impl Default for Algorithm {
     }
 }
 
+impl TryFrom<Algorithm> for ssi_crypto::Algorithm {
+    type Error = ssi_crypto::UnsupportedAlgorithm;
+
+    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
+        match value {
+            Algorithm::HS256 => Ok(Self::HS256),
+            Algorithm::HS384 => Ok(Self::HS384),
+            Algorithm::HS512 => Ok(Self::HS512),
+            Algorithm::RS256 => Ok(Self::RS256),
+            Algorithm::RS384 => Ok(Self::RS384),
+            Algorithm::RS512 => Ok(Self::RS512),
+            Algorithm::PS256 => Ok(Self::PS256),
+            Algorithm::PS384 => Ok(Self::PS384),
+            Algorithm::PS512 => Ok(Self::PS512),
+            Algorithm::EdDSA => Ok(Self::EdDSA),
+            Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
+            Algorithm::ES256 => Ok(Self::ES256),
+            Algorithm::ES384 => Ok(Self::ES384),
+            Algorithm::ES256K => Ok(Self::ES256K),
+            Algorithm::ES256KR => Ok(Self::ES256KR),
+            Algorithm::ESKeccakKR => Ok(Self::ESKeccakKR),
+            Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
+            Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
+            _ => Err(ssi_crypto::UnsupportedAlgorithm),
+        }
+    }
+}
+
 impl JWK {
     #[cfg(any(feature = "ed25519"))]
     pub fn generate_ed25519() -> Result<JWK, Error> {

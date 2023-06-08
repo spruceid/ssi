@@ -17,7 +17,7 @@ keccak = ["keccak-hash"]
 ring = ["dep:ring"]
 
 [dependencies]
-thiserror = "1.0"
+thiserror.workspace = true
 sha2 = { version = "0.10" }
 ring = { version = "0.16", optional = true }
 k256 = { version = "0.11", optional = true, features = ["ecdsa"] }

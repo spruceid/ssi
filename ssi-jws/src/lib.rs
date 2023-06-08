@@ -6,13 +6,112 @@ pub mod error;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+use std::ops::Deref;
 
 pub type VerificationWarnings = Vec<String>;
 
 // RFC 7515 - JSON Web Signature (JWS)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
+
+/// JWS in compact serialized form.
+#[repr(transparent)]
+pub struct CompactJWS([u8]);
+
+impl CompactJWS {
+    /// Creates a new compact JWS.
+    pub unsafe fn new_unchecked(data: &[u8]) -> &Self {
+        std::mem::transmute(data)
+    }
+
+    fn header_end(&self) -> usize {
+        self.0.iter().position(|b| *b == b'.').unwrap()
+    }
+
+    fn signature_start(&self) -> usize {
+        self.0.len() - self.0.iter().rev().position(|b| *b == b'.').unwrap()
+    }
+
+    fn payload_start(&self) -> usize {
+        self.header_end() + 1
+    }
+
+    fn payload_end(&self) -> usize {
+        self.signature_start() - 1
+    }
+
+    /// Returns the Base64 encoded header.
+    pub fn header(&self) -> &[u8] {
+        &self.0[..self.header_end()]
+    }
+
+    pub fn decode_header(&self) -> Result<Header, Error> {
+        Header::decode(self.header())
+    }
+
+    /// Returns the Base64 encoded payload.
+    pub fn payload(&self) -> &[u8] {
+        &self.0[self.payload_start()..self.payload_end()]
+    }
+
+    /// Decode the payload bytes.
+    ///
+    /// The header is necessary to know how the payload is encoded.
+    pub fn decode_payload(&self, header: &Header) -> Result<Cow<[u8]>, Error> {
+        if header.base64urlencode_payload.unwrap_or(true) {
+            Ok(Cow::Owned(base64::decode_config(
+                self.payload(),
+                base64::URL_SAFE_NO_PAD,
+            )?))
+        } else {
+            Ok(Cow::Borrowed(self.payload()))
+        }
+    }
+
+    /// Returns the Base64 encoded signature.
+    pub fn signature(&self) -> &[u8] {
+        &self.0[self.signature_start()..]
+    }
+
+    pub fn decode_signature(&self) -> Result<Vec<u8>, Error> {
+        Ok(base64::decode_config(
+            self.signature(),
+            base64::URL_SAFE_NO_PAD,
+        )?)
+    }
+
+    /// Returns the signing bytes.
+    ///
+    /// It is the concatenation of the Base64 encoded headers, a period '.' and
+    /// the Base64 encoded payload.
+    pub fn signing_bytes(&self) -> &[u8] {
+        &self.0[..self.payload_end()]
+    }
+}
+
+/// JWS in compact serialized form.
+pub struct CompactJWSBuf(Vec<u8>);
+
+impl CompactJWSBuf {
+    pub fn as_compact_jws(&self) -> &CompactJWS {
+        unsafe { CompactJWS::new_unchecked(&self.0) }
+    }
+
+    pub fn into_signing_bytes(mut self) -> Vec<u8> {
+        self.0.truncate(self.payload_end()); // remove the signature.
+        self.0
+    }
+}
+
+impl Deref for CompactJWSBuf {
+    type Target = CompactJWS;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_compact_jws()
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Header {
@@ -65,6 +164,14 @@ pub struct Header {
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     #[serde(flatten)]
     pub additional_parameters: BTreeMap<String, serde_json::Value>,
+}
+
+impl Header {
+    /// Decode a JWS Protected Header.
+    pub fn decode(base_64: &[u8]) -> Result<Self, Error> {
+        let header_json = base64::decode_config(base_64, base64::URL_SAFE_NO_PAD)?;
+        Ok(serde_json::from_slice(&header_json)?)
+    }
 }
 
 fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
@@ -619,14 +726,11 @@ pub fn decode_jws_parts(
     signature_b64: &str,
 ) -> Result<DecodedJWS, Error> {
     let signature = base64::decode_config(signature_b64, base64::URL_SAFE_NO_PAD)?;
-    let header_json = base64::decode_config(header_b64, base64::URL_SAFE_NO_PAD)?;
-    let header: Header = serde_json::from_slice(&header_json)?;
-    let payload_vec;
+    let header = Header::decode(header_b64.as_bytes())?;
     let payload = if header.base64urlencode_payload.unwrap_or(true) {
-        payload_vec = base64::decode_config(payload_enc, base64::URL_SAFE_NO_PAD)?;
-        payload_vec.as_slice()
+        base64::decode_config(payload_enc, base64::URL_SAFE_NO_PAD)?
     } else {
-        payload_enc
+        payload_enc.to_vec()
     };
     for name in header.critical.iter().flatten() {
         match name.as_str() {
@@ -640,7 +744,7 @@ pub fn decode_jws_parts(
     Ok(DecodedJWS {
         header,
         signing_input,
-        payload: payload.to_vec(),
+        payload,
         signature,
     })
 }

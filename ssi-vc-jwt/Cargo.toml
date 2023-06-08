@@ -1,12 +1,12 @@
 [package]
-name = "ssi-jwt"
+name = "ssi-vc-jwt"
 version = "0.1.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
-description = "Implementation of JWT for the ssi library."
+description = "Implementation of JWT Verifiable Credentials for the ssi library."
 repository = "https://github.com/spruceid/ssi/"
-documentation = "https://docs.rs/ssi-jwt/"
+documentation = "https://docs.rs/ssi-vc-jwt/"
 
 [dependencies]
 thiserror = "1.0"
@@ -14,10 +14,18 @@ async-trait.workspace = true
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 json-syntax = { workspace = true, features = ["serde"] }
+locspan.workspace = true
+rdf-types.workspace = true
+json-ld.workspace = true
 ssi-core.workspace = true
+ssi-crypto.workspace = true
 ssi-jwk = { workspace = true, default-features = false }
 ssi-jws = { workspace = true, default-features = false }
+ssi-jwt.workspace = true
+ssi-vc.workspace = true
 serde_with = "2.3.2"
+
+treeldr-rust-prelude.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
