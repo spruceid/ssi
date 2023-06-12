@@ -47,7 +47,7 @@ pub enum Error {
     #[error("Invalid signature")]
     InvalidSignature,
     #[error("Messages positions given without nonce")]
-    NonceNotProvided
+    NonceNotProvided,
 }
 
 #[cfg(feature = "ring")]

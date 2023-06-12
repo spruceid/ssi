@@ -671,8 +671,8 @@ impl Credential {
             checks,
             eip712_domain,
             type_,
-            nonce,
-            disclosed_message_indices,
+            nonce: _,
+            disclosed_message_indices: _,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -861,7 +861,9 @@ impl Credential {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vc, resolver, context_loader, None, None).await;
+            let mut result = proof
+                .verify(&vc, resolver, context_loader, None, None)
+                .await;
             results.append(&mut result);
             if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -986,11 +988,11 @@ impl Credential {
     ) -> VerificationResult {
         let nonce = match options.as_ref() {
             Some(ldp_options) => ldp_options.nonce.clone(),
-            None => None
+            None => None,
         };
         let disclosed_message_indices = match options.as_ref() {
             Some(ldp_options) => ldp_options.disclosed_message_indices.clone(),
-            None => None
+            None => None,
         };
         let checks = options
             .as_ref()
@@ -1010,7 +1012,15 @@ impl Credential {
         let mut results = VerificationResult::new();
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader, nonce.as_ref(), disclosed_message_indices.as_ref()).await;
+            let mut result = proof
+                .verify(
+                    self,
+                    resolver,
+                    context_loader,
+                    nonce.as_ref(),
+                    disclosed_message_indices.as_ref(),
+                )
+                .await;
             results.append(&mut result);
             if result.errors.is_empty() {
                 results.checks.push(Check::Proof);
@@ -1097,12 +1107,16 @@ impl Credential {
         result
     }
 
-    pub async fn get_nquad_positions(&self, selectors: &Vec<String>, context_loader: &mut ContextLoader) -> Result<Vec<u32>, Error> {
+    pub async fn get_nquad_positions(
+        &self,
+        selectors: &[String],
+        context_loader: &mut ContextLoader,
+    ) -> Result<Vec<u32>, Error> {
         let nquads = ssi_ldp::to_nquads(self, context_loader).await?;
         let mut positions = Vec::new();
         let mut index: u32 = 2;
         for nq in nquads.iter() {
-            let split: Vec<&str> = nq.split(" ").collect();
+            let split: Vec<&str> = nq.split(' ').collect();
             let middle = split[1];
 
             for s in selectors.iter() {
@@ -1253,8 +1267,8 @@ impl Presentation {
             checks,
             eip712_domain,
             type_,
-            nonce,
-            disclosed_message_indices,
+            nonce: _,
+            disclosed_message_indices: _,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1443,7 +1457,9 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(&vp, resolver, context_loader, None, None).await;
+            let mut result = proof
+                .verify(&vp, resolver, context_loader, None, None)
+                .await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return (Some(vp), result);
@@ -1616,7 +1632,9 @@ impl Presentation {
         }
         // Try verifying each proof until one succeeds
         for proof in proofs {
-            let mut result = proof.verify(self, resolver, context_loader, None, None).await;
+            let mut result = proof
+                .verify(self, resolver, context_loader, None, None)
+                .await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
                 return result;
@@ -1872,10 +1890,10 @@ fn select_fields(subject: &CredentialSubject, selectors: &[String]) -> Map<Strin
     match &subject.property_set {
         Some(properties) => {
             'outer: for (k, v) in properties {
-                for i in 0..selectors.len() {
-                    if k.as_str() == selectors[i].as_str() {
+                for s in selectors {
+                    if k.as_str() == s {
                         selected.insert(k.clone(), v.clone());
-                        continue 'outer
+                        continue 'outer;
                     }
                 }
             }
@@ -1916,10 +1934,10 @@ pub async fn derive_credential(
         OneOrMany::Many(subjects) => {
             let mut new_subjects: Vec<CredentialSubject> = Vec::new();
 
-            for i in 0..subjects.len() {
-                let selected_fields = select_fields(&subjects[i], selectors);
+            for s in subjects {
+                let selected_fields = select_fields(s, selectors);
 
-                let mut new_subject = subjects[i].clone();
+                let mut new_subject = s.clone();
                 new_subject.property_set = Some(selected_fields);
                 new_subjects.push(new_subject);
             }
@@ -3356,7 +3374,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             let resolver = ExampleResolver;
             let mut context_loader = ssi_json_ld::ContextLoader::default();
             let warnings = ProofSuiteType::EcdsaSecp256k1RecoverySignature2020
-                .verify(proof, &vc, &resolver, &mut context_loader)
+                .verify(proof, &vc, &resolver, &mut context_loader, None, None)
                 .await
                 .unwrap();
             assert!(warnings.is_empty());
@@ -3502,12 +3520,12 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // check new VC proof and original proof
         ProofSuiteType::Ed25519Signature2020
-            .verify(&new_proof, &vc, &resolver, &mut context_loader)
+            .verify(&new_proof, &vc, &resolver, &mut context_loader, None, None)
             .await
             .unwrap();
         let orig_proof = vc.proof.iter().flatten().next().unwrap();
         ProofSuiteType::Ed25519Signature2020
-            .verify(orig_proof, &vc, &resolver, &mut context_loader)
+            .verify(orig_proof, &vc, &resolver, &mut context_loader, None, None)
             .await
             .unwrap();
 
@@ -3536,12 +3554,12 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
         // check new VP proof and original proof
         ProofSuiteType::Ed25519Signature2020
-            .verify(&new_proof, &vp, &resolver, &mut context_loader)
+            .verify(&new_proof, &vp, &resolver, &mut context_loader, None, None)
             .await
             .unwrap();
         let orig_proof = vp.proof.iter().flatten().next().unwrap();
         ProofSuiteType::Ed25519Signature2020
-            .verify(orig_proof, &vp, &resolver, &mut context_loader)
+            .verify(orig_proof, &vp, &resolver, &mut context_loader, None, None)
             .await
             .unwrap();
 
@@ -3569,7 +3587,14 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await
             .unwrap();
         ProofSuiteType::Ed25519Signature2020
-            .verify(&completed_proof, &vp, &resolver, &mut context_loader)
+            .verify(
+                &completed_proof,
+                &vp,
+                &resolver,
+                &mut context_loader,
+                None,
+                None,
+            )
             .await
             .unwrap();
     }
@@ -3663,7 +3688,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // Verify VC
         let proof = vc.proof.iter().flatten().next().unwrap();
         let warnings = ProofSuiteType::AleoSignature2021
-            .verify(proof, &vc, &resolver, &mut context_loader)
+            .verify(proof, &vc, &resolver, &mut context_loader, None, None)
             .await
             .unwrap();
         assert!(warnings.is_empty());

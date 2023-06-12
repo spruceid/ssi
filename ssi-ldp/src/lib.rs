@@ -406,7 +406,14 @@ impl LinkedDataProofs {
     ) -> Result<VerificationWarnings, Error> {
         let suite = &proof.type_;
         suite
-            .verify(proof, document, resolver, context_loader, nonce, disclosed_message_indices)
+            .verify(
+                proof,
+                document,
+                resolver,
+                context_loader,
+                nonce,
+                disclosed_message_indices,
+            )
             .await
     }
 }
@@ -471,7 +478,7 @@ pub async fn generate_bbs_signature_pok(
     proof_without_jws.jws = None;
     let mut context_loader = ssi_json_ld::ContextLoader::default();
     let payload = to_jws_payload_v2(document, &proof_without_jws, &mut context_loader).await?;
-    let (header, header_str) = ssi_jws::generate_header(Algorithm::BLS12381G2, &key).unwrap();
+    let (_header, header_str) = ssi_jws::generate_header(Algorithm::BLS12381G2, &key).unwrap();
 
     let start_index = signature_with_header.find("..").unwrap() + 2; // +2 for ..; todo: switch to ok_or
     let signature_str = &signature_with_header[start_index..];
@@ -483,9 +490,7 @@ pub async fn generate_bbs_signature_pok(
         signature_byte_vec.len()
     );
     let mut signature_bytes: [u8; 112] = [0; 112];
-    for i in 0..112 {
-        signature_bytes[i] = signature_byte_vec[i];
-    }
+    signature_bytes[..112].copy_from_slice(&signature_byte_vec[..112]);
     let signature = Signature::from(&signature_bytes);
 
     let mut proof_messages: Vec<ProofMessage> = Vec::new();
@@ -499,8 +504,7 @@ pub async fn generate_bbs_signature_pok(
         let message_bytes = payload.messages[i].as_bytes();
 
         let mut disclose = false;
-        for j in 0..selectors.len() {
-            let s = selectors[j].as_str();
+        for s in selectors {
             let m = payload.messages[i].as_str();
             let needle = format!("/{}>", s);
             if m.contains(needle.as_str()) {
@@ -539,14 +543,14 @@ pub async fn generate_bbs_signature_pok(
     let bbs_proof = Prover::generate_signature_pok(pok, &challenge).unwrap();
     let bbs_proof_bytes = bbs_proof.to_bytes_compressed_form();
     let bbs_proof_str = base64::encode_config(bbs_proof_bytes.as_slice(), base64::URL_SAFE_NO_PAD);
-    let proof_str = header_str.clone() + ".." + bbs_proof_str.as_str();
+    let proof_str = header_str + ".." + bbs_proof_str.as_str();
 
     let mut proof_with_new_sig = proof.clone();
-    proof_with_new_sig.jws = Some(proof_str);  // todo: change to proof/proofValue
+    proof_with_new_sig.jws = Some(proof_str); // todo: change to proof/proofValue
     Ok(proof_with_new_sig)
 }
 
-fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
+fn rename_blank_node_labels(orig: &[String]) -> Vec<String> {
     use std::collections::HashMap;
 
     // hash maps for properties, parents, and substitutions
@@ -557,10 +561,10 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
     let mut root_node: Option<&str> = None;
 
     for nq in orig.iter() {
-        let split: Vec<&str> = nq.split(" ").collect();
+        let split: Vec<&str> = nq.split(' ').collect();
         let left = split[0];
         let middle = split[1];
-        let right = split[2];
+        let _right = split[2];
 
         if middle.ends_with("/credentials#credentialSubject>") {
             root_node = Some(left);
@@ -570,7 +574,7 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
     blank_node_subs.insert(root_node.unwrap().to_owned(), "_d:0".to_owned());
 
     for nq in orig.iter() {
-        let split: Vec<&str> = nq.split(" ").collect();
+        let split: Vec<&str> = nq.split(' ').collect();
         let left = split[0];
         let middle = split[1];
         let right = split[2];
@@ -584,7 +588,7 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
     //eprintln!("properties map: {:?}", &blank_node_props);
     //eprintln!("parents map: {:?}", &blank_node_parents);
 
-    for (key, value) in blank_node_parents.iter() {
+    for (key, _value) in blank_node_parents.iter() {
         //eprintln!("key: {}, value: {}", &key, &value);
 
         let mut path = String::from("");
@@ -616,7 +620,7 @@ fn rename_blank_node_labels(orig: &Vec<String>) -> Vec<String> {
     let mut rewritten: Vec<String> = Vec::new();
 
     for nq in orig.iter() {
-        let split: Vec<&str> = nq.split(" ").collect();
+        let split: Vec<&str> = nq.split(' ').collect();
         let mut left = split[0];
         let middle = split[1];
         let mut right = split[2];
@@ -647,7 +651,8 @@ pub async fn to_nquads(
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
-    let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
+    let doc_normalized =
+        urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
     Ok(doc_normalized)
 }
 
@@ -671,7 +676,8 @@ async fn to_jws_payload_v2(
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
-    let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
+    let doc_normalized =
+        urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
     payload.messages = rename_blank_node_labels(&doc_normalized);
 
     /*
@@ -877,18 +883,25 @@ async fn verify_bbs_proof(
     let proof_value = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
     let start_index = proof_value.find("..").unwrap() + 2;
     let sig_str = &proof_value[start_index..];
-    let sig = base64::decode_config(&sig_str, base64::URL_SAFE_NO_PAD).unwrap();
+    let sig = base64::decode_config(sig_str, base64::URL_SAFE_NO_PAD).unwrap();
 
     let verification_method = proof
         .verification_method
         .as_ref()
         .ok_or(Error::MissingVerificationMethod)?;
     let key = resolve_key(verification_method, resolver).await?;
-    let mut payload = to_jws_payload_v2(document, &proof, context_loader).await?;
+    let mut payload = to_jws_payload_v2(document, proof, context_loader).await?;
     let (_, header_b64) = ssi_jws::generate_header(algorithm, &key)?;
     payload.header = header_b64;
 
-    Ok(ssi_jws::verify_payload(algorithm, &key, &payload, sig.as_slice(), disclosed_message_indices, nonce)?)
+    Ok(ssi_jws::verify_payload(
+        algorithm,
+        &key,
+        &payload,
+        sig.as_slice(),
+        disclosed_message_indices,
+        nonce,
+    )?)
 }
 
 // Check if a linked data document has a given URI in its @context array.

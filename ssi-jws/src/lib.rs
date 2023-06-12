@@ -97,24 +97,18 @@ pub fn sign_bytes_v2(
     key: &JWK,
     payload: &JWSPayload,
 ) -> Result<Vec<u8>, Error> {
-    match &key.params {
-        JWKParams::OKP(okp) => {
-            match algorithm {
-                Algorithm::BLS12381G2 => {
-                    let messages = create_bbs_sig_input(payload);
+    if let JWKParams::OKP(okp) = &key.params {
+        if let Algorithm::BLS12381G2 = algorithm {
+            let messages = create_bbs_sig_input(payload);
 
-                    let Base64urlUInt(pk_bytes) = &okp.public_key;
-                    let Base64urlUInt(sk_bytes) = okp.private_key.as_ref().unwrap();
-                    let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
-                    let sk = bbs::prelude::SecretKey::try_from(sk_bytes.as_slice()).unwrap();
+            let Base64urlUInt(pk_bytes) = &okp.public_key;
+            let Base64urlUInt(sk_bytes) = okp.private_key.as_ref().unwrap();
+            let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
+            let sk = bbs::prelude::SecretKey::try_from(sk_bytes.as_slice()).unwrap();
 
-                    let signature = Signature::new(messages.as_slice(), &sk, &pk).unwrap();
-                    return Ok(signature.to_bytes_compressed_form().to_vec());
-                }
-                _ => (),
-            }
+            let signature = Signature::new(messages.as_slice(), &sk, &pk).unwrap();
+            return Ok(signature.to_bytes_compressed_form().to_vec());
         }
-        _ => (),
     }
 
     let messages_str = payload.messages.join("");
@@ -126,7 +120,7 @@ pub fn generate_proof_nonce() -> String {
     let proof_nonce = Verifier::generate_proof_nonce();
     let proof_nonce_bytes = proof_nonce.to_bytes_compressed_form();
     let proof_nonce_str = base64::encode(proof_nonce_bytes.as_ref());
-    return proof_nonce_str;
+    proof_nonce_str
 }
 
 pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8>, Error> {
@@ -173,9 +167,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         #[cfg(any(feature = "ring", feature = "ed25519"))]
         JWKParams::OKP(okp) => {
             use blake2::digest::{consts::U32, Digest};
-            if algorithm != Algorithm::EdDSA
-                && algorithm != Algorithm::EdBlake2b
-            {
+            if algorithm != Algorithm::EdDSA && algorithm != Algorithm::EdBlake2b {
                 return Err(Error::UnsupportedAlgorithm);
             }
             if okp.curve != *"Ed25519" {
@@ -314,7 +306,7 @@ pub fn verify_payload(
     disclosed_message_indices: Option<&Vec<usize>>,
     nonce: Option<&String>,
 ) -> Result<VerificationWarnings, Error> {
-    let mut warnings = VerificationWarnings::default();
+    let warnings = VerificationWarnings::default();
 
     match algorithm {
         Algorithm::BLS12381G2 => (),
@@ -331,14 +323,19 @@ pub fn verify_payload(
 
                     let Base64urlUInt(pk_bytes) = &okp.public_key;
                     let issuer_pk = PublicKey::try_from(pk_bytes.as_slice()).unwrap();
-                    let proof_request = Verifier::new_proof_request(disclosed_message_indices.unwrap().as_slice(), &issuer_pk).unwrap();
+                    let proof_request = Verifier::new_proof_request(
+                        disclosed_message_indices.unwrap().as_slice(),
+                        &issuer_pk,
+                    )
+                    .unwrap();
                     let proof_nonce_bytes = base64::decode(n).unwrap();
                     assert!(proof_nonce_bytes.len() == 32);
                     let mut proof_nonce_bytes_sized: [u8; 32] = [0; 32];
                     proof_nonce_bytes_sized.clone_from_slice(proof_nonce_bytes.as_slice());
                     let proof_nonce = ProofNonce::from(proof_nonce_bytes_sized);
 
-                    let result = Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
+                    let result =
+                        Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
                     match result {
                         Ok(message_hashes) => {
                             //eprintln!("Signature pok check passes");
@@ -346,14 +343,19 @@ pub fn verify_payload(
                             let mut credential_subject_id = "";
                             while i < payload.messages.len() {
                                 let m = payload.messages[i].as_str();
-                                if m.contains("<https://www.w3.org/2018/credentials#credentialSubject>") {
-                                    let m_parts: Vec<&str> = m.split(" ").collect();
+                                if m.contains(
+                                    "<https://www.w3.org/2018/credentials#credentialSubject>",
+                                ) {
+                                    let m_parts: Vec<&str> = m.split(' ').collect();
                                     credential_subject_id = m_parts[2];
                                     break;
                                 }
                                 i += 1;
                             }
-                            assert!(credential_subject_id != "", "credentialSubject node not found");
+                            assert!(
+                                !credential_subject_id.is_empty(),
+                                "credentialSubject node not found"
+                            );
 
                             let mut first_claim_found = false;
 
@@ -372,10 +374,10 @@ pub fn verify_payload(
                                 eprintln!("Message: {}", nq);
                             }*/
 
-                            for j in 0..message_hashes.len() {
+                            for revealed_hash in message_hashes {
                                 //eprintln!("Checking hash for: {}", payload.messages[i].as_str());
-                                let revealed_hash = message_hashes[j];
-                                let target_hash = SignatureMessage::hash(payload.messages[i].as_bytes());
+                                let target_hash =
+                                    SignatureMessage::hash(payload.messages[i].as_bytes());
                                 if revealed_hash != target_hash {
                                     eprintln!("Hashes do not match");
                                     return Err(Error::InvalidSignature);
@@ -383,20 +385,19 @@ pub fn verify_payload(
 
                                 i += 1;
                             }
-                        },
+                        }
                         Err(_) => {
                             eprintln!("Signature pok check did not pass");
                             return Err(Error::InvalidSignature);
                         }
                     }
-                },
+                }
                 None => {
                     if signature.len() != 112 {
                         return Err(Error::InvalidSignature);
                     } else {
-                        match disclosed_message_indices {
-                            Some(_) => return Err(Error::NonceNotProvided),
-                            None => (),
+                        if disclosed_message_indices.is_some() {
+                            return Err(Error::NonceNotProvided);
                         }
 
                         let mut signature_sized: [u8; 112] = [0; 112];
@@ -496,8 +497,7 @@ pub fn verify_bytes_warnable(
             {
                 use ring::signature::UnparsedPublicKey;
                 let verification_algorithm = &ring::signature::ED25519;
-                let public_key =
-                    UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
+                let public_key = UnparsedPublicKey::new(verification_algorithm, &okp.public_key.0);
                 public_key.verify(&hash, signature)?;
             }
             #[cfg(feature = "ed25519")]
@@ -737,7 +737,7 @@ pub fn detached_sign_unencoded_payload_v2(
 ) -> Result<String, Error> {
     let (header, header_b64) = generate_header(algorithm, key)?;
     payload.header = header_b64;
-    let sig_b64 = sign_bytes_b64_v2(header.algorithm, &key, payload)?;
+    let sig_b64 = sign_bytes_b64_v2(header.algorithm, key, payload)?;
     let jws = payload.header.clone() + ".." + &sig_b64;
     Ok(jws)
 }

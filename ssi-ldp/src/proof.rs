@@ -152,9 +152,16 @@ impl Proof {
         nonce: Option<&String>,
         disclosed_message_indices: Option<&Vec<usize>>,
     ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver, context_loader, nonce, disclosed_message_indices)
-            .await
-            .into()
+        LinkedDataProofs::verify(
+            self,
+            document,
+            resolver,
+            context_loader,
+            nonce,
+            disclosed_message_indices,
+        )
+        .await
+        .into()
     }
 }
 

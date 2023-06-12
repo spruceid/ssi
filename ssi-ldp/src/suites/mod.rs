@@ -32,8 +32,9 @@ use tezos::*;
 use w3c::*;
 
 use crate::{
-    prepare, prepare_nojws, sign, sign_nojws, use_eip712sig, use_epsig, verify, verify_nojws,
-    Error, LinkedDataDocument, LinkedDataProofOptions, Proof, ProofPreparation, ProofSuite, verify_bbs_proof,
+    prepare, prepare_nojws, sign, sign_nojws, use_eip712sig, use_epsig, verify, verify_bbs_proof,
+    verify_nojws, Error, LinkedDataDocument, LinkedDataProofOptions, Proof, ProofPreparation,
+    ProofSuite,
 };
 
 use async_trait::async_trait;
@@ -305,7 +306,7 @@ Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1
                         )))
                     }
                 }
-            },
+            }
             //#[cfg(feature = "bbsplus")]
             Algorithm::BLS12381G2 => Self::BbsBlsSignatureProof2020,
             _ => return Err(Error::ProofTypeNotSupported),
@@ -528,7 +529,8 @@ impl ProofSuite for ProofSuiteType {
                     self.clone(),
                     Algorithm::BLS12381G2,
                     extra_proof_properties,
-                ).await
+                )
+                .await
             }
         }
     }
@@ -821,8 +823,17 @@ impl ProofSuite for ProofSuiteType {
             Self::CLSignature2019 => todo!(),
             //#[cfg(feature = "bbsplus")]
             Self::BbsBlsSignatureProof2020 => {
-                verify_bbs_proof(proof, document, resolver, context_loader, Algorithm::BLS12381G2, nonce, disclosed_message_indices).await
-            },
+                verify_bbs_proof(
+                    proof,
+                    document,
+                    resolver,
+                    context_loader,
+                    Algorithm::BLS12381G2,
+                    nonce,
+                    disclosed_message_indices,
+                )
+                .await
+            }
             #[cfg(feature = "test")]
             Self::NonJwsProof
             | Self::AnonCredPresentationProofv1

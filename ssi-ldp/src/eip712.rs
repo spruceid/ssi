@@ -1733,7 +1733,7 @@ mod tests {
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
-            .verify(&basic_doc, &resolver, &mut context_loader, None, Vec::new())
+            .verify(&basic_doc, &resolver, &mut context_loader, None, None)
             .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -1918,7 +1918,7 @@ mod tests {
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
-            .verify(&nested_doc, &resolver, &mut context_loader, None, Vec::new())
+            .verify(&nested_doc, &resolver, &mut context_loader, None, None)
             .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -1960,7 +1960,7 @@ mod tests {
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
-            .verify(&nested_doc, &resolver, &mut context_loader, None, Vec::new())
+            .verify(&nested_doc, &resolver, &mut context_loader, None, None)
             .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
@@ -2081,7 +2081,7 @@ mod tests {
         let resolver = MOCK_ETHR_DID_RESOLVER.clone();
         let mut context_loader = ssi_json_ld::ContextLoader::default();
         let verification_result = proof
-            .verify(&nested_doc, &resolver, &mut context_loader, None, Vec::new())
+            .verify(&nested_doc, &resolver, &mut context_loader, None, None)
             .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
