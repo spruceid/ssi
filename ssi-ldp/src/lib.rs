@@ -477,7 +477,8 @@ pub async fn generate_bbs_signature_pok(
     let mut proof_without_jws = proof.clone();
     proof_without_jws.jws = None;
     let mut context_loader = ssi_json_ld::ContextLoader::default();
-    let payload = to_jws_payload_v2(document, &proof_without_jws, &mut context_loader).await?;
+    let payload =
+        to_jws_payload_v2(document, &proof_without_jws, &mut context_loader, true).await?;
     let (_header, header_str) = ssi_jws::generate_header(Algorithm::BLS12381G2, &key).unwrap();
 
     let start_index = signature_with_header.find("..").unwrap() + 2; // +2 for ..; todo: switch to ok_or
@@ -660,6 +661,7 @@ async fn to_jws_payload_v2(
     document: &(dyn LinkedDataDocument + Sync),
     proof: &Proof,
     context_loader: &mut ContextLoader,
+    stable_blank_node_labels: bool,
 ) -> Result<JWSPayload, Error> {
     let mut payload = JWSPayload {
         header: String::new(),
@@ -678,7 +680,11 @@ async fn to_jws_payload_v2(
         .await?;
     let doc_normalized =
         urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
-    payload.messages = rename_blank_node_labels(&doc_normalized);
+    if stable_blank_node_labels {
+        payload.messages = rename_blank_node_labels(&doc_normalized);
+    } else {
+        payload.messages = doc_normalized;
+    }
 
     /*
     for message in payload.messages.iter() {
@@ -730,7 +736,9 @@ async fn sign_proof_v2(
     algorithm: Algorithm,
     context_loader: &mut ContextLoader,
 ) -> Result<Proof, Error> {
-    let mut jws_payload = to_jws_payload_v2(document, &proof, context_loader).await?;
+    let stable_blank_nodes = matches!(algorithm, Algorithm::BLS12381G2);
+    let mut jws_payload =
+        to_jws_payload_v2(document, &proof, context_loader, stable_blank_nodes).await?;
     let jws = ssi_jws::detached_sign_unencoded_payload_v2(algorithm, &mut jws_payload, key)?;
     proof.jws = Some(jws);
     Ok(proof)
@@ -890,7 +898,7 @@ async fn verify_bbs_proof(
         .as_ref()
         .ok_or(Error::MissingVerificationMethod)?;
     let key = resolve_key(verification_method, resolver).await?;
-    let mut payload = to_jws_payload_v2(document, proof, context_loader).await?;
+    let mut payload = to_jws_payload_v2(document, proof, context_loader, true).await?;
     let (_, header_b64) = ssi_jws::generate_header(algorithm, &key)?;
     payload.header = header_b64;
 

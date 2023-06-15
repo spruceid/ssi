@@ -113,7 +113,14 @@ pub fn sign_bytes_v2(
 
     let messages_str = payload.messages.join("");
     let messages_hash = sha256(messages_str.as_bytes());
-    sign_bytes(algorithm, &messages_hash, key)
+    let data = [
+        payload.header.as_bytes(),
+        b".",
+        payload.sigopts_digest.as_slice(),
+        messages_hash.as_slice(),
+    ]
+    .concat();
+    sign_bytes(algorithm, data.as_slice(), key)
 }
 
 pub fn generate_proof_nonce() -> String {
