@@ -146,44 +146,44 @@ impl ProofSuiteType {
     // TODO not sure why this check isn't covered by JSON-LD
     pub(crate) fn associated_contexts(&self) -> &[&str] {
         match self {
-#[cfg(feature = "rsa")]
-Self::RsaSignature2018 => &["https://w3id.org/security#RsaSignature2018"],
-#[cfg(feature = "ed25519")]
-Self::Ed25519Signature2018 => &["https://w3id.org/security#Ed25519Signature2018"],
-#[cfg(feature = "ed25519")]
-Self::Ed25519Signature2020 => &["https://w3id.org/security#Ed25519Signature2020"],
-#[cfg(feature = "tezos")]
-Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
-    &["https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"]
-}
-#[cfg(feature = "tezos")]
-Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
-    &["https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021"]
-}
-#[cfg(feature = "secp256k1")]
-Self::EcdsaSecp256k1Signature2019 => &["https://w3id.org/security#EcdsaSecp256k1Signature2019"],
-#[cfg(feature = "secp256k1")]
-Self::EcdsaSecp256k1RecoverySignature2020 => {
-    &["https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020"]
-}
-#[cfg(feature = "eip")]
-Self::Eip712Signature2021 => &["https://w3id.org/security#Eip712Signature2021"],
-#[cfg(feature = "eip")]
-Self::EthereumPersonalSignature2021 => &["https://w3id.org/security#EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021"],
-#[cfg(feature = "eip")]
-Self::EthereumEip712Signature2021 => &[],
-#[cfg(feature = "tezos")]
-Self::TezosSignature2021 => &["https://w3id.org/security#TezosSignature2021"],
-#[cfg(feature = "tezos")]
-Self::TezosJcsSignature2021 => &["https://w3id.org/security#TezosJcsSignature2021"],
-#[cfg(feature = "solana")]
-Self::SolanaSignature2021 => &["https://w3id.org/security#SolanaSignature2021"],
-#[cfg(feature = "aleo")]
-Self::AleoSignature2021 => &["https://w3id.org/security#AleoSignature2021"],
-#[cfg(feature = "w3c")]
-Self::JsonWebSignature2020 => &["https://w3id.org/security#JsonWebSignature2020"],
-#[cfg(feature = "secp256r1")]
-Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1Signature2019"],
+            #[cfg(feature = "rsa")]
+            Self::RsaSignature2018 => &["https://w3id.org/security#RsaSignature2018"],
+            #[cfg(feature = "ed25519")]
+            Self::Ed25519Signature2018 => &["https://w3id.org/security#Ed25519Signature2018"],
+            #[cfg(feature = "ed25519")]
+            Self::Ed25519Signature2020 => &["https://w3id.org/security#Ed25519Signature2020", "https://www.w3.org/ns/credentials/examples#Ed25519Signature2020"],
+            #[cfg(feature = "tezos")]
+            Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+                &["https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"]
+            }
+            #[cfg(feature = "tezos")]
+            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
+                &["https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021"]
+            }
+            #[cfg(feature = "secp256k1")]
+            Self::EcdsaSecp256k1Signature2019 => &["https://w3id.org/security#EcdsaSecp256k1Signature2019"],
+            #[cfg(feature = "secp256k1")]
+            Self::EcdsaSecp256k1RecoverySignature2020 => {
+                &["https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020"]
+            }
+            #[cfg(feature = "eip")]
+            Self::Eip712Signature2021 => &["https://w3id.org/security#Eip712Signature2021"],
+            #[cfg(feature = "eip")]
+            Self::EthereumPersonalSignature2021 => &["https://w3id.org/security#EthereumPersonalSignature2021", "https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021"],
+            #[cfg(feature = "eip")]
+            Self::EthereumEip712Signature2021 => &[],
+            #[cfg(feature = "tezos")]
+            Self::TezosSignature2021 => &["https://w3id.org/security#TezosSignature2021"],
+            #[cfg(feature = "tezos")]
+            Self::TezosJcsSignature2021 => &["https://w3id.org/security#TezosJcsSignature2021"],
+            #[cfg(feature = "solana")]
+            Self::SolanaSignature2021 => &["https://w3id.org/security#SolanaSignature2021"],
+            #[cfg(feature = "aleo")]
+            Self::AleoSignature2021 => &["https://w3id.org/security#AleoSignature2021"],
+            #[cfg(feature = "w3c")]
+            Self::JsonWebSignature2020 => &["https://w3id.org/security#JsonWebSignature2020"],
+            #[cfg(feature = "secp256r1")]
+            Self::EcdsaSecp256r1Signature2019 => &["https://w3id.org/security#EcdsaSecp256r1Signature2019"],
             Self::CLSignature2019 => todo!(),
             #[cfg(feature = "test")]
             Self::NonJwsProof |

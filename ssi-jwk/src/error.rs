@@ -122,6 +122,9 @@ pub enum Error {
     /// Unexpected multibase (multicodec) key prefix multicodec
     #[error("Unexpected multibase (multicodec) key prefix multicodec")]
     MultibaseKeyPrefix,
+    /// Error parsing or producing multibase
+    #[error(transparent)]
+    Multibase(#[from] multibase::Error),
 }
 
 #[cfg(feature = "ring")]

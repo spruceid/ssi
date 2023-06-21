@@ -1,0 +1,16 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/security/multikey/v1"
+  ],
+  "id": "https://vc.example/issuers/5678",
+  "assertionMethod": [
+    {
+      "@context": "https://w3id.org/security/multikey/v1",
+      "id": "https://vc.example/issuers/5678#z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+      "controller": "https://vc.example/issuers/5678",
+      "type": "Multikey",
+      "publicKeyMultibase": "z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2"
+    }
+  ]
+}

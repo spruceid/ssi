@@ -260,7 +260,7 @@ pub async fn ensure_or_pick_verification_relationship(
         // Allow some for testing purposes only.
         match issuer {
             #[cfg(feature = "example-http-issuer")]
-            "https://example.edu/issuers/14" => {
+            "https://example.edu/issuers/14" | "https://vc.example/issuers/5678" => {
                 // https://github.com/w3c/vc-test-suite/blob/cdc7835/test/vc-data-model-1.0/input/example-016-jwt.jsonld#L8
                 // We don't have a way to actually resolve this to anything. Just allow it for
                 // vc-test-suite for now.
