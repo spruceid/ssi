@@ -673,6 +673,7 @@ impl Credential {
             checks,
             eip712_domain,
             type_,
+            cryptosuite,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -685,6 +686,9 @@ impl Credential {
         }
         if type_.is_some() {
             return Err(Error::UnencodableOptionClaim("type".to_string()));
+        }
+        if cryptosuite.is_some() {
+            return Err(Error::UnencodableOptionClaim("cryptosuite".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -1223,6 +1227,7 @@ impl Presentation {
             checks,
             eip712_domain,
             type_,
+            cryptosuite,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1235,6 +1240,9 @@ impl Presentation {
         }
         if type_.is_some() {
             return Err(Error::UnencodableOptionClaim("type".to_string()));
+        }
+        if cryptosuite.is_some() {
+            return Err(Error::UnencodableOptionClaim("cryptosuite".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -3887,7 +3895,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
         // let signed_vc = include_str!(
         //     "../../tests/vc-di-eddsa/TestVectors/Ed25519Signature2020/signedEdSig.json"
         // );
-        // let signed_vc: Credential = serde_json::from_str(signed_vc).unwrap();
+        // let mut signed_vc: Credential = serde_json::from_str(signed_vc).unwrap();
         // let proofs = signed_vc.proof.unwrap();
         // let mut proof = proofs.first().unwrap().clone();
         // proof.context = serde_json::Value::String(
@@ -3928,6 +3936,56 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await
             .unwrap();
         assert!(proof.proof_value.is_some());
+        unsigned_vc.proof = Some(OneOrMany::One(proof));
+        let res = unsigned_vc
+            .verify(None, &DiEddsaResolver, &mut ContextLoader::default())
+            .await;
+        assert_eq!(res.errors, Vec::<String>::default());
+    }
+
+    #[async_std::test]
+    async fn vc_di_eddsa_dataintegrity() {
+        let signed_vc =
+            include_str!("../../tests/vc-di-eddsa/TestVectors/eddsa-2022/signedDataInt.json");
+        let signed_vc: Credential = serde_json::from_str(signed_vc).unwrap();
+        let res = signed_vc
+            .verify(None, &DiEddsaResolver, &mut ContextLoader::default())
+            .await;
+        assert_eq!(res.errors, Vec::<String>::default());
+
+        let proofs = signed_vc.proof.unwrap();
+        let signed_proof = proofs.first().unwrap();
+
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct KeyPair {
+            private_key_multibase: String,
+        }
+
+        let unsigned_vc = include_str!("../../tests/vc-di-eddsa/TestVectors/unsigned.json");
+        let mut unsigned_vc: Credential = serde_json::from_str(unsigned_vc).unwrap();
+        let key: KeyPair = serde_json::from_str(include_str!(
+            "../../tests/vc-di-eddsa/TestVectors/keyPair.json"
+        ))
+        .unwrap();
+        let jwk = JWK::from_multicodec(&key.private_key_multibase).unwrap();
+        let proof = unsigned_vc
+        .generate_proof(
+            &jwk,
+            &LinkedDataProofOptions {
+                type_: Some(ProofSuiteType::DataIntegrityProof),
+                proof_purpose: Some(ProofPurpose::AssertionMethod),
+                verification_method: Some(URI::String("https://vc.example/issuers/5678#z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2".into())),
+                cryptosuite: Some("eddsa-2022".try_into().unwrap()),
+                ..Default::default()
+            },
+            &DiEddsaResolver,
+            &mut ContextLoader::default(),
+        )
+        .await
+        .unwrap();
+        assert!(proof.proof_value.is_some());
+        assert_eq!(proof.cryptosuite, signed_proof.cryptosuite);
         unsigned_vc.proof = Some(OneOrMany::One(proof));
         let res = unsigned_vc
             .verify(None, &DiEddsaResolver, &mut ContextLoader::default())
