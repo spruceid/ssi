@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_dids::did_resolve::{resolve_key, DIDResolver};
-use ssi_json_ld::ContextLoader;
+use ssi_json_ld::{ContextLoader, CREDENTIALS_V2_CONTEXT, W3ID_DATA_INTEGRITY_V1_CONTEXT};
 use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
 use ssi_jws::VerificationWarnings;
 
@@ -138,7 +138,6 @@ impl DataIntegrityProof {
             Some(c) => c.clone(),
         };
         let jwa = key.get_algorithm().ok_or(Error::MissingAlgorithm)?;
-        let context_uri = ssi_json_ld::CREDENTIALS_V2_CONTEXT; // DataIntegrityProof is part of the v2 context
         if let Some(key_algorithm) = key.algorithm {
             if key_algorithm != jwa {
                 return Err(Error::JWS(ssi_jws::Error::AlgorithmMismatch));
@@ -148,8 +147,10 @@ impl DataIntegrityProof {
             .with_options(options)
             .with_properties(extra_proof_properties);
         proof.cryptosuite = Some(cryptosuite.clone());
-        if !document_has_context(document, context_uri)? {
-            proof.context = serde_json::json!([context_uri]);
+        if !document_has_context(document, CREDENTIALS_V2_CONTEXT)?
+            && !document_has_context(document, W3ID_DATA_INTEGRITY_V1_CONTEXT)?
+        {
+            proof.context = serde_json::json!([W3ID_DATA_INTEGRITY_V1_CONTEXT]);
         }
         let message =
             Self::jws_payload(&cryptosuite, &jwa, &proof, document, context_loader).await?;
@@ -226,7 +227,10 @@ impl DataIntegrityProof {
         }
 
         let message = Self::jws_payload(cryptosuite, &jwa, proof, document, context_loader).await?;
-        let (_base, sig) = multibase::decode(proof_value)?;
+        let (base, sig) = multibase::decode(proof_value)?;
+        if base != multibase::Base::Base58Btc {
+            return Err(Error::ExpectedMultibaseZ);
+        }
         Ok(ssi_jws::verify_bytes_warnable(jwa, &message, &key, &sig)?)
     }
 }
