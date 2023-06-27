@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use async_trait::async_trait;
+use rstest::*;
 use serde::Deserialize;
 use ssi_dids::{
     did_resolve::{
@@ -9,8 +12,15 @@ use ssi_dids::{
 };
 use ssi_json_ld::ContextLoader;
 use ssi_jwk::JWK;
-use ssi_ldp::ProofSuiteType;
+use ssi_ldp::{dataintegrity::DataIntegrityCryptoSuite, ProofSuiteType};
 use ssi_vc::{Credential, LinkedDataProofOptions, OneOrMany, ProofPurpose, URI};
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct KeyPair {
+    public_key_multibase: String,
+    private_key_multibase: String,
+}
 
 struct DiResolver;
 
@@ -110,13 +120,6 @@ async fn vc_di_eddsa_ed25519signature2020() {
     //     .await;
     // assert_eq!(res.errors, Vec::<String>::default());
 
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct KeyPair {
-        // public_key_multibase: String,
-        private_key_multibase: String,
-    }
-
     let unsigned_vc = include_str!("../../tests/vc-di-eddsa/TestVectors/unsigned.json");
     let mut unsigned_vc: Credential = serde_json::from_str(unsigned_vc).unwrap();
     let key: KeyPair = serde_json::from_str(include_str!(
@@ -146,112 +149,115 @@ async fn vc_di_eddsa_ed25519signature2020() {
     assert_eq!(res.errors, Vec::<String>::default());
 }
 
-#[async_std::test]
-async fn vc_di_eddsa_dataintegrity() {
-    let signed_vc =
-        include_str!("../../tests/vc-di-eddsa/TestVectors/eddsa-2022/signedDataInt.json");
-    let signed_vc: Credential = serde_json::from_str(signed_vc).unwrap();
-    let res = signed_vc
-        .verify(None, &DiResolver, &mut ContextLoader::default())
-        .await;
-    assert_eq!(res.errors, Vec::<String>::default());
-
-    let proofs = signed_vc.proof.unwrap();
-    let signed_proof = proofs.first().unwrap();
-
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct KeyPair {
-        private_key_multibase: String,
-    }
-
-    let unsigned_vc = include_str!("../../tests/vc-di-eddsa/TestVectors/unsigned.json");
-    let mut unsigned_vc: Credential = serde_json::from_str(unsigned_vc).unwrap();
-    let key: KeyPair = serde_json::from_str(include_str!(
-        "../../tests/vc-di-eddsa/TestVectors/keyPair.json"
-    ))
-    .unwrap();
-    let jwk = JWK::from_multicodec(&key.private_key_multibase).unwrap();
-    let proof = unsigned_vc
-    .generate_proof(
-        &jwk,
-        &LinkedDataProofOptions {
-            type_: Some(ProofSuiteType::DataIntegrityProof),
-            proof_purpose: Some(ProofPurpose::AssertionMethod),
-            verification_method: Some(URI::String("https://vc.example/issuers/5678#z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2".into())),
-            cryptosuite: Some("eddsa-2022".try_into().unwrap()),
-            ..Default::default()
-        },
-        &DiResolver,
-        &mut ContextLoader::default(),
-    )
-    .await
-    .unwrap();
-    assert!(proof.proof_value.is_some());
-    assert_eq!(proof.cryptosuite, signed_proof.cryptosuite);
-    unsigned_vc.proof = Some(OneOrMany::One(proof));
-    let res = unsigned_vc
-        .verify(None, &DiResolver, &mut ContextLoader::default())
-        .await;
-    assert_eq!(res.errors, Vec::<String>::default());
+struct TestParams {
+    signed_vc: String,
+    unsigned_vc: String,
+    keypair: String,
+    cryptosuite: Option<DataIntegrityCryptoSuite>,
 }
 
-#[async_std::test]
-async fn vc_di_ecdsa_p256_dataintegrity() {
-    let signed_vc =
-        include_str!("../../tests/vc-di-ecdsa/TestVectors/ecdsa-2019-p256/signedECDSAP256.json");
-    let signed_vc: Credential = serde_json::from_str(signed_vc).unwrap();
-    let res = signed_vc
-        .verify(None, &DiResolver, &mut ContextLoader::default())
-        .await;
-    assert_eq!(res.errors, Vec::<String>::default());
-
-    let proofs = signed_vc.proof.unwrap();
-    let signed_proof = proofs.first().unwrap();
-
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct KeyPair {
-        private_key_multibase: String,
-    }
-
-    let unsigned_vc = include_str!("../../tests/vc-di-ecdsa/TestVectors/unsigned.json");
-    let mut unsigned_vc: Credential = serde_json::from_str(unsigned_vc).unwrap();
-    let key: KeyPair = serde_json::from_str(include_str!(
-        "../../tests/vc-di-ecdsa/TestVectors/p256KeyPair.json"
-    ))
-    .unwrap();
-    let jwk = JWK::from_multicodec(&key.private_key_multibase).unwrap();
-    let proof = unsigned_vc
-        .generate_proof(
-            &jwk,
-            &LinkedDataProofOptions {
-                type_: Some(ProofSuiteType::DataIntegrityProof),
-                proof_purpose: Some(ProofPurpose::AssertionMethod),
-                verification_method: Some(URI::String("https://vc.example/issuers/5678#zDnaepBuvsQ8cpsWrVKw8fbpGpvPeNSjVPTWoq6cRqaYzBKVP".into())),
-                // cryptosuite: Some("ecdsa-2022".try_into().unwrap()),
-                ..Default::default()
+#[fixture]
+fn test_cases() -> HashMap<String, TestParams> {
+    vec![
+        (
+            "eddsa2022".into(),
+            TestParams {
+                signed_vc: include_str!(
+                    "../../tests/vc-di-eddsa/TestVectors/eddsa-2022/signedDataInt.json"
+                )
+                .into(),
+                unsigned_vc: include_str!("../../tests/vc-di-eddsa/TestVectors/unsigned.json")
+                    .into(),
+                keypair: include_str!("../../tests/vc-di-eddsa/TestVectors/keyPair.json").into(),
+                cryptosuite: Some(DataIntegrityCryptoSuite::Eddsa2022),
             },
-            &DiResolver,
-            &mut ContextLoader::default(),
-        )
-        .await
-        .unwrap();
-    assert!(proof.proof_value.is_some());
-    assert_eq!(proof.cryptosuite, signed_proof.cryptosuite);
-    unsigned_vc.proof = Some(OneOrMany::One(proof));
-    let res = unsigned_vc
-        .verify(None, &DiResolver, &mut ContextLoader::default())
-        .await;
-    assert_eq!(res.errors, Vec::<String>::default());
+        ),
+        (
+            "jcseddsa2022".into(),
+            TestParams {
+                signed_vc: include_str!(
+                               "../../tests/vc-di-eddsa/TestVectors/jcs-eddsa-2022/signedJCS.json"
+                               )
+                    .into(),
+                    unsigned_vc: include_str!("../../tests/vc-di-eddsa/TestVectors/unsigned.json")
+                        .into(),
+                        keypair: include_str!("../../tests/vc-di-eddsa/TestVectors/keyPair.json").into(),
+                        cryptosuite: Some(DataIntegrityCryptoSuite::JcsEddsa2022),
+            },
+            ),
+        (
+            "ecdsa2019p256".into(),
+            TestParams {
+                signed_vc: include_str!(
+                    "../../tests/vc-di-ecdsa/TestVectors/ecdsa-2019-p256/signedECDSAP256.json"
+                )
+                .into(),
+                unsigned_vc: include_str!("../../tests/vc-di-ecdsa/TestVectors/unsigned.json")
+                    .into(),
+                keypair: include_str!("../../tests/vc-di-ecdsa/TestVectors/p256KeyPair.json")
+                    .into(),
+                cryptosuite: None,
+            },
+        ),
+        (
+            "jcsecdsa2019p256".into(),
+            TestParams {
+                signed_vc: include_str!(
+                    "../../tests/vc-di-ecdsa/TestVectors/jcs-ecdsa-2019-p256/signedJCSECDSAP256.json"
+                )
+                .into(),
+                unsigned_vc: include_str!("../../tests/vc-di-ecdsa/TestVectors/unsigned.json")
+                    .into(),
+                keypair: include_str!("../../tests/vc-di-ecdsa/TestVectors/p256KeyPair.json")
+                    .into(),
+                cryptosuite: Some(DataIntegrityCryptoSuite::JcsEcdsa2019),
+            },
+        ),
+        (
+            "ecdsa2019p384".into(),
+            TestParams {
+                signed_vc: include_str!(
+                    "../../tests/vc-di-ecdsa/TestVectors/ecdsa-2019-p384/signedECDSAP384.json"
+                )
+                .into(),
+                unsigned_vc: include_str!("../../tests/vc-di-ecdsa/TestVectors/unsigned.json")
+                    .into(),
+                keypair: include_str!("../../tests/vc-di-ecdsa/TestVectors/p384KeyPair.json")
+                    .into(),
+                cryptosuite: None,
+            },
+        ),
+        (
+            "jcsecdsa2019p384".into(),
+            TestParams {
+                signed_vc: include_str!(
+                    "../../tests/vc-di-ecdsa/TestVectors/jcs-ecdsa-2019-p384/signedJCSECDSAP384.json"
+                )
+                .into(),
+                unsigned_vc: include_str!("../../tests/vc-di-ecdsa/TestVectors/unsigned.json")
+                    .into(),
+                keypair: include_str!("../../tests/vc-di-ecdsa/TestVectors/p384KeyPair.json")
+                    .into(),
+                cryptosuite: Some(DataIntegrityCryptoSuite::JcsEcdsa2019),
+            },
+        ),
+    ]
+    .into_iter()
+    .collect()
 }
 
-#[ignore = "p384 requires the canon document/proof to be hashed with sha384 but it's defaulting to sha256"]
+#[rstest]
+#[case::eddsa2022("eddsa2022")]
+#[case::jcs_eddsa2022("jcseddsa2022")]
+#[case::ecdsa2019_p256("ecdsa2019p256")]
+#[case::jcs_ecdsa2019_p256("jcsecdsa2019p256")]
+// #[ignore = "p384 requires the canon document/proof to be hashed with sha384 but it's defaulting to sha256"]
+#[case::ecdsa2019_p384("ecdsa2019p384")]
+#[case::jcs_ecdsa2019_p384("jcsecdsa2019p384")]
 #[async_std::test]
-async fn vc_di_ecdsa_p384_dataintegrity() {
-    let signed_vc =
-        include_str!("../../tests/vc-di-ecdsa/TestVectors/ecdsa-2019-p384/signedECDSAP384.json");
-    let signed_vc: Credential = serde_json::from_str(signed_vc).unwrap();
+async fn vc_dataintegrity(#[case] name: String, test_cases: HashMap<String, TestParams>) {
+    let test_case = test_cases.get(&name).unwrap();
+    let signed_vc: Credential = serde_json::from_str(&test_case.signed_vc).unwrap();
     let res = signed_vc
         .verify(None, &DiResolver, &mut ContextLoader::default())
         .await;
@@ -260,18 +266,8 @@ async fn vc_di_ecdsa_p384_dataintegrity() {
     let proofs = signed_vc.proof.unwrap();
     let signed_proof = proofs.first().unwrap();
 
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct KeyPair {
-        private_key_multibase: String,
-    }
-
-    let unsigned_vc = include_str!("../../tests/vc-di-ecdsa/TestVectors/unsigned.json");
-    let mut unsigned_vc: Credential = serde_json::from_str(unsigned_vc).unwrap();
-    let key: KeyPair = serde_json::from_str(include_str!(
-        "../../tests/vc-di-ecdsa/TestVectors/p384KeyPair.json"
-    ))
-    .unwrap();
+    let mut unsigned_vc: Credential = serde_json::from_str(&test_case.unsigned_vc).unwrap();
+    let key: KeyPair = serde_json::from_str(&test_case.keypair).unwrap();
     let jwk = JWK::from_multicodec(&key.private_key_multibase).unwrap();
     let proof = unsigned_vc
         .generate_proof(
@@ -279,8 +275,11 @@ async fn vc_di_ecdsa_p384_dataintegrity() {
             &LinkedDataProofOptions {
                 type_: Some(ProofSuiteType::DataIntegrityProof),
                 proof_purpose: Some(ProofPurpose::AssertionMethod),
-                verification_method: Some(URI::String("https://vc.example/issuers/5678#z82LkuBieyGShVBhvtE2zoiD6Kma4tJGFtkAhxR5pfkp5QPw4LutoYWhvQCnGjdVn14kujQ".into())),
-                cryptosuite: Some("ecdsa-2022".try_into().unwrap()),
+                verification_method: Some(URI::String(format!(
+                    "https://vc.example/issuers/5678#{}",
+                    key.public_key_multibase
+                ))),
+                cryptosuite: test_case.cryptosuite.clone(),
                 ..Default::default()
             },
             &DiResolver,

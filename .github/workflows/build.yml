@@ -29,6 +29,8 @@ jobs:
         components: rustfmt, clippy
 
     - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
 
     - name: Fmt
       run: cargo fmt -- --check
@@ -73,6 +75,8 @@ jobs:
     - uses: taiki-e/install-action@cargo-hack
 
     - uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: "true"
 
     - name: Test each feature
       run: cargo hack test --each-feature --workspace --exclude ssi --exclude 'ssi-did-test' --exclude 'ssi-vc-test'  -- --test-threads=4

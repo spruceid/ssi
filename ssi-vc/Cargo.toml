@@ -48,3 +48,4 @@ ssi-ldp = { path = "../ssi-ldp", features = ["aleo", "example-http-issuer", "sec
 ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
 josekit = "0.8.2"
 time = "0.3.20"
+rstest = "0.17.0"
