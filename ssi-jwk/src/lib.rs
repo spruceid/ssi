@@ -476,7 +476,9 @@ impl JWK {
     pub fn from_vm_type(type_: &str, pk_bytes: Vec<u8>) -> Result<Self, Error> {
         match type_ {
             // TODO: check against IRIs when in JSON-LD
+            #[cfg(feature = "ed25519")]
             "Ed25519VerificationKey2018" => ed25519_parse(&pk_bytes),
+            #[cfg(feature = "ed25519")]
             "Ed25519VerificationKey2020" => match multicodec::decode(&pk_bytes) {
                 Ok((codec, pk)) => match codec {
                     multicodec::Codec::Ed25519Pub => ed25519_parse(&pk),

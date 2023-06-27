@@ -1,6 +1,5 @@
 #[cfg(feature = "aleo")]
 mod aleo;
-#[cfg(feature = "w3c")]
 pub mod dataintegrity;
 #[cfg(feature = "eip")]
 mod eip;
@@ -15,7 +14,6 @@ mod w3c;
 
 #[cfg(feature = "aleo")]
 use aleo::*;
-#[cfg(feature = "w3c")]
 use dataintegrity::*;
 #[cfg(feature = "eip")]
 use eip::*;
@@ -51,7 +49,6 @@ pub enum ProofSuiteType {
     Ed25519Signature2018,
     #[cfg(feature = "ed25519")]
     Ed25519Signature2020,
-    #[cfg(feature = "w3c")]
     DataIntegrityProof,
     #[cfg(feature = "tezos")]
     Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
@@ -115,7 +112,6 @@ impl ProofSuiteType {
             Self::Ed25519Signature2018 => SignatureType::JWS,
             #[cfg(feature = "ed25519")]
             Self::Ed25519Signature2020 => SignatureType::LD,
-            #[cfg(feature = "w3c")]
             Self::DataIntegrityProof => SignatureType::LD,
             #[cfg(feature = "tezos")]
             Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => SignatureType::JWS,
@@ -160,7 +156,6 @@ impl ProofSuiteType {
             Self::Ed25519Signature2018 => &["https://w3id.org/security#Ed25519Signature2018"],
             #[cfg(feature = "ed25519")]
             Self::Ed25519Signature2020 => &["https://w3id.org/security#Ed25519Signature2020", "https://www.w3.org/ns/credentials/examples#Ed25519Signature2020"],
-            #[cfg(feature = "w3c")]
             Self::DataIntegrityProof => &["https://w3id.org/security#DataIntegrityProof"],
             #[cfg(feature = "tezos")]
             Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 => {
@@ -372,7 +367,6 @@ impl ProofSuite for ProofSuiteType {
                 )
                 .await
             }
-            #[cfg(feature = "w3c")]
             Self::DataIntegrityProof => {
                 DataIntegrityProof::sign(
                     document,
@@ -584,7 +578,6 @@ impl ProofSuite for ProofSuiteType {
                 )
                 .await
             }
-            #[cfg(feature = "w3c")]
             Self::DataIntegrityProof => {
                 DataIntegrityProof::prepare(
                     document,
@@ -757,7 +750,6 @@ impl ProofSuite for ProofSuiteType {
             Self::Ed25519Signature2020 => {
                 verify_nojws(proof, document, resolver, context_loader, Algorithm::EdDSA).await
             }
-            #[cfg(feature = "w3c")]
             Self::DataIntegrityProof => {
                 DataIntegrityProof::verify(proof, document, resolver, context_loader).await
             }

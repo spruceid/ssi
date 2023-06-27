@@ -58,7 +58,6 @@ pub struct Proof {
     pub nonce: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<String>,
-    #[cfg(feature = "w3c")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cryptosuite: Option<dataintegrity::DataIntegrityCryptoSuite>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,7 +80,6 @@ impl Proof {
             nonce: None,
             jws: None,
             property_set: None,
-            #[cfg(feature = "w3c")]
             cryptosuite: None,
         }
     }
@@ -237,7 +235,6 @@ pub struct LinkedDataProofOptions {
     pub eip712_domain: Option<crate::eip712::ProofInfo>,
     #[cfg(not(feature = "eip"))]
     pub eip712_domain: Option<()>,
-    #[cfg(feature = "w3c")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cryptosuite: Option<DataIntegrityCryptoSuite>,
 }
@@ -253,7 +250,6 @@ impl Default for LinkedDataProofOptions {
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
             type_: None,
-            #[cfg(feature = "w3c")]
             cryptosuite: None,
         }
     }
