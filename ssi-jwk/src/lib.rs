@@ -524,6 +524,8 @@ impl JWK {
                 multicodec::Codec::P256Priv => p256_parse_private(&k),
                 #[cfg(feature = "secp384r1")]
                 multicodec::Codec::P384Pub => p384_parse(&k),
+                #[cfg(feature = "secp384r1")]
+                multicodec::Codec::P384Priv => p384_parse_private(&k),
                 _ => Err(Error::MultibaseKeyPrefix),
             },
             Err(_) => Err(Error::MultibaseKeyPrefix),
@@ -911,27 +913,9 @@ pub fn secp256k1_parse_private(data: &[u8]) -> Result<JWK, Error> {
 
 #[cfg(feature = "secp256r1")]
 pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
-    let (x, y) = match pk_bytes.len() {
-        33 | 64 | 65 => {
-            use p256::elliptic_curve::{sec1::ToEncodedPoint, PublicKey};
-            let encoded_point =
-                PublicKey::<p256::NistP256>::from_sec1_bytes(pk_bytes)?.to_encoded_point(false);
-            (
-                encoded_point.x().ok_or(Error::MissingPoint)?.to_vec(),
-                encoded_point.y().ok_or(Error::MissingPoint)?.to_vec(),
-            )
-        }
-        _ => {
-            return Err(Error::P256KeyLength(pk_bytes.len()));
-        }
-    };
+    let pk = p256::PublicKey::from_sec1_bytes(pk_bytes)?;
     let jwk = JWK {
-        params: Params::EC(ECParams {
-            curve: Some("P-256".to_string()),
-            x_coordinate: Some(Base64urlUInt(x)),
-            y_coordinate: Some(Base64urlUInt(y)),
-            ecc_private_key: None,
-        }),
+        params: Params::EC(ECParams::try_from(&pk)?),
         public_key_use: None,
         key_operations: None,
         algorithm: None,
@@ -944,9 +928,9 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
-#[cfg(feature = "secp256k1")]
+#[cfg(feature = "secp256r1")]
 fn p256_parse_private(data: &[u8]) -> Result<JWK, Error> {
-    let k = p256::SecretKey::from_sec1_der(data)?;
+    let k = p256::SecretKey::from_be_bytes(data)?;
     let jwk = JWK {
         params: Params::EC(ECParams::try_from(&k)?),
         public_key_use: None,
@@ -963,27 +947,26 @@ fn p256_parse_private(data: &[u8]) -> Result<JWK, Error> {
 
 #[cfg(feature = "secp384r1")]
 pub fn p384_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
-    let (x, y) = match pk_bytes.len() {
-        33 | 64 | 65 => {
-            use p384::elliptic_curve::{sec1::ToEncodedPoint, PublicKey};
-            let encoded_point =
-                PublicKey::<p384::NistP384>::from_sec1_bytes(pk_bytes)?.to_encoded_point(false);
-            (
-                encoded_point.x().ok_or(Error::MissingPoint)?.to_vec(),
-                encoded_point.y().ok_or(Error::MissingPoint)?.to_vec(),
-            )
-        }
-        _ => {
-            return Err(Error::P384KeyLength(pk_bytes.len()));
-        }
-    };
+    let pk = p384::PublicKey::from_sec1_bytes(pk_bytes)?;
     let jwk = JWK {
-        params: Params::EC(ECParams {
-            curve: Some("P-384".to_string()),
-            x_coordinate: Some(Base64urlUInt(x)),
-            y_coordinate: Some(Base64urlUInt(y)),
-            ecc_private_key: None,
-        }),
+        params: Params::EC(ECParams::try_from(&pk)?),
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
+}
+
+#[cfg(feature = "secp384r1")]
+fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
+    let k = p384::SecretKey::from_be_bytes(data)?;
+    let jwk = JWK {
+        params: Params::EC(ECParams::try_from(&k)?),
         public_key_use: None,
         key_operations: None,
         algorithm: None,
@@ -1272,6 +1255,24 @@ impl TryFrom<&p384::PublicKey> for ECParams {
             x_coordinate: Some(Base64urlUInt(x.to_vec())),
             y_coordinate: Some(Base64urlUInt(y.to_vec())),
             ecc_private_key: None,
+        })
+    }
+}
+
+#[cfg(feature = "secp384r1")]
+impl TryFrom<&p384::SecretKey> for ECParams {
+    type Error = Error;
+    fn try_from(k: &p384::SecretKey) -> Result<Self, Self::Error> {
+        let pk = k.public_key();
+        use p384::elliptic_curve::sec1::ToEncodedPoint;
+        let encoded_point = pk.to_encoded_point(false);
+        let x = encoded_point.x().ok_or(Error::MissingPoint)?;
+        let y = encoded_point.y().ok_or(Error::MissingPoint)?;
+        Ok(ECParams {
+            curve: Some("P-384".to_string()),
+            x_coordinate: Some(Base64urlUInt(x.to_vec())),
+            y_coordinate: Some(Base64urlUInt(y.to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
         })
     }
 }
