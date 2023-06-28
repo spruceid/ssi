@@ -226,6 +226,11 @@ impl DataIntegrityProof {
             ));
         }
 
+        // TODO must also match the VM relationship
+        if proof.proof_purpose.is_none() {
+            return Err(Error::MissingProofPurpose);
+        };
+
         let message = Self::jws_payload(cryptosuite, &jwa, proof, document, context_loader).await?;
         let (base, sig) = multibase::decode(proof_value)?;
         if base != multibase::Base::Base58Btc {
