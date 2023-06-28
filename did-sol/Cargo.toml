@@ -22,8 +22,8 @@ async-trait = "0.1"
 bs58 = { version = "0.4", features = ["check"] }
 
 [dev-dependencies]
-ssi-vc = { path = "../ssi-vc", version = "0.1", default-features = false }
-ssi-ldp = { path = "../ssi-ldp", version = "0.2", default-features = false, features = ["tezos", "w3c", "solana"] }
-ssi-core = { path = "../ssi-core", version = "0.1", default-features = false }
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.2", default-features = false }
+ssi-vc = { path = "../ssi-vc", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "w3c", "solana"] }
+ssi-core = { path = "../ssi-core", default-features = false }
+ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 tokio = { version = "1.0", features = ["macros"] }

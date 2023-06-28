@@ -1,6 +1,6 @@
 [package]
 name = "ssi-ldp"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -45,10 +45,11 @@ serde_json = "1.0"
 serde_jcs = "0.1"
 hex = "0.4"
 multibase = "0.8"
+sha2 = "0.10.7"
 k256 = { version = "0.11", optional = true, features = ["ecdsa"] }
 p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
 keccak-hash = { version = "0.7", optional = true }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1.1"}
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.2"}
 ssi-core = { path = "../ssi-core", version = "0.1"}
 ssi-dids = { path = "../ssi-dids", version = "0.1"}
@@ -56,7 +57,7 @@ ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
 ssi-jws = { path = "../ssi-jws", version = "0.1"}
 ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true}
 ssi-caips = { path = "../ssi-caips", version = "0.1" }
-ssi-contexts = { version = "0.1.4", path = "../contexts" }
+ssi-contexts = { version = "0.1.5", path = "../contexts" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }

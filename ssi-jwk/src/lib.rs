@@ -22,14 +22,14 @@ pub mod blakesig;
 
 pub mod der;
 
+mod multicodec;
+
 use der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
     RSAPublicKey, RSAPublicKeyFromASN1Error,
 };
 
 use serde::{Deserialize, Serialize};
-
-const MULTICODEC_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
 
 // RFC 7516 - JSON Web Encryption (JWE)
 // RFC 7517 - JSON Web Key (JWK)
@@ -474,32 +474,64 @@ impl JWK {
     }
 
     pub fn from_vm_type(type_: &str, pk_bytes: Vec<u8>) -> Result<Self, Error> {
-        Ok(match type_ {
+        match type_ {
             // TODO: check against IRIs when in JSON-LD
-            "Ed25519VerificationKey2018" => Self::from(Params::OKP(OctetParams {
-                curve: "Ed25519".to_string(),
-                public_key: Base64urlUInt(pk_bytes),
-                private_key: None,
-            })),
-            "Ed25519VerificationKey2020" => {
-                if pk_bytes.len() != 34 {
-                    return Err(Error::MultibaseKeyLength(34, pk_bytes.len()));
-                }
-                if pk_bytes[0..2] != MULTICODEC_ED25519_PREFIX {
-                    return Err(Error::MultibaseKeyPrefix);
-                }
-                Self::from(Params::OKP(OctetParams {
-                    curve: "Ed25519".to_string(),
-                    public_key: Base64urlUInt(pk_bytes[2..].to_owned()),
-                    private_key: None,
-                }))
-            }
+            #[cfg(feature = "ed25519")]
+            "Ed25519VerificationKey2018" => ed25519_parse(&pk_bytes),
+            #[cfg(feature = "ed25519")]
+            "Ed25519VerificationKey2020" => match multicodec::decode(&pk_bytes) {
+                Ok((codec, pk)) => match codec {
+                    multicodec::Codec::Ed25519Pub => ed25519_parse(&pk),
+                    _ => Err(Error::MultibaseKeyPrefix),
+                },
+                Err(_) => Err(Error::MultibaseKeyPrefix),
+            },
             #[cfg(feature = "secp256k1")]
             "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
-                secp256k1_parse(&pk_bytes)?
+                secp256k1_parse(&pk_bytes)
             }
-            _ => Err(Error::UnsupportedKeyType)?,
-        })
+            "Multikey" => match multicodec::decode(&pk_bytes) {
+                Ok((codec, pk)) => match codec {
+                    #[cfg(any(feature = "ed25519"))]
+                    multicodec::Codec::Ed25519Pub => ed25519_parse(&pk),
+                    #[cfg(feature = "secp256k1")]
+                    multicodec::Codec::Secp256k1Pub => secp256k1_parse(&pk),
+                    #[cfg(feature = "secp256r1")]
+                    multicodec::Codec::P256Pub => p256_parse(&pk),
+                    #[cfg(feature = "secp384r1")]
+                    multicodec::Codec::P384Pub => p384_parse(&pk),
+                    _ => Err(Error::MultibaseKeyPrefix),
+                },
+                Err(_) => Err(Error::MultibaseKeyPrefix),
+            },
+            _ => Err(Error::UnsupportedKeyType),
+        }
+    }
+
+    pub fn from_multicodec(multicodec: &str) -> Result<Self, Error> {
+        let bytes = multibase::decode(multicodec)?.1;
+        match multicodec::decode(&bytes) {
+            Ok((codec, k)) => match codec {
+                #[cfg(any(feature = "ed25519"))]
+                multicodec::Codec::Ed25519Pub => ed25519_parse(&k),
+                #[cfg(any(feature = "ed25519"))]
+                multicodec::Codec::Ed25519Priv => ed25519_parse_private(&k),
+                #[cfg(feature = "secp256k1")]
+                multicodec::Codec::Secp256k1Pub => secp256k1_parse(&k),
+                #[cfg(feature = "secp256k1")]
+                multicodec::Codec::Secp256k1Priv => secp256k1_parse_private(&k),
+                #[cfg(feature = "secp256r1")]
+                multicodec::Codec::P256Pub => p256_parse(&k),
+                #[cfg(feature = "secp256r1")]
+                multicodec::Codec::P256Priv => p256_parse_private(&k),
+                #[cfg(feature = "secp384r1")]
+                multicodec::Codec::P384Pub => p384_parse(&k),
+                #[cfg(feature = "secp384r1")]
+                multicodec::Codec::P384Priv => p384_parse_private(&k),
+                _ => Err(Error::MultibaseKeyPrefix),
+            },
+            Err(_) => Err(Error::MultibaseKeyPrefix),
+        }
     }
 }
 
@@ -827,6 +859,26 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
     }
 }
 
+#[cfg(feature = "ed25519")]
+pub fn ed25519_parse(data: &[u8]) -> Result<JWK, Error> {
+    let _ = ed25519_dalek::PublicKey::from_bytes(data)?;
+    Ok(JWK::from(Params::OKP(OctetParams {
+        curve: "Ed25519".to_string(),
+        public_key: Base64urlUInt(data.to_owned()),
+        private_key: None,
+    })))
+}
+
+#[cfg(feature = "ed25519")]
+fn ed25519_parse_private(data: &[u8]) -> Result<JWK, Error> {
+    let key = ed25519_dalek::SecretKey::from_bytes(data)?;
+    Ok(JWK::from(Params::OKP(OctetParams {
+        curve: "Ed25519".to_string(),
+        public_key: Base64urlUInt(ed25519_dalek::PublicKey::from(&key).as_bytes().to_vec()),
+        private_key: Some(Base64urlUInt(data.to_owned())),
+    })))
+}
+
 #[cfg(feature = "secp256k1")]
 pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
     let pk = k256::PublicKey::from_sec1_bytes(data)?;
@@ -844,29 +896,45 @@ pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
+#[cfg(feature = "secp256k1")]
+pub fn secp256k1_parse_private(data: &[u8]) -> Result<JWK, Error> {
+    let k = k256::SecretKey::from_sec1_der(data)?;
+    let jwk = JWK {
+        params: Params::EC(ECParams::try_from(&k)?),
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
+}
+
 #[cfg(feature = "secp256r1")]
 pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
-    let (x, y) = match pk_bytes.len() {
-        33 | 64 | 65 => {
-            use p256::elliptic_curve::{sec1::ToEncodedPoint, PublicKey};
-            let encoded_point =
-                PublicKey::<p256::NistP256>::from_sec1_bytes(pk_bytes)?.to_encoded_point(false);
-            (
-                encoded_point.x().ok_or(Error::MissingPoint)?.to_vec(),
-                encoded_point.y().ok_or(Error::MissingPoint)?.to_vec(),
-            )
-        }
-        _ => {
-            return Err(Error::P256KeyLength(pk_bytes.len()));
-        }
-    };
+    let pk = p256::PublicKey::from_sec1_bytes(pk_bytes)?;
     let jwk = JWK {
-        params: Params::EC(ECParams {
-            curve: Some("P-256".to_string()),
-            x_coordinate: Some(Base64urlUInt(x)),
-            y_coordinate: Some(Base64urlUInt(y)),
-            ecc_private_key: None,
-        }),
+        params: Params::EC(ECParams::try_from(&pk)?),
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
+}
+
+#[cfg(feature = "secp256r1")]
+fn p256_parse_private(data: &[u8]) -> Result<JWK, Error> {
+    let k = p256::SecretKey::from_be_bytes(data)?;
+    let jwk = JWK {
+        params: Params::EC(ECParams::try_from(&k)?),
         public_key_use: None,
         key_operations: None,
         algorithm: None,
@@ -881,27 +949,26 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
 
 #[cfg(feature = "secp384r1")]
 pub fn p384_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
-    let (x, y) = match pk_bytes.len() {
-        33 | 64 | 65 => {
-            use p384::elliptic_curve::{sec1::ToEncodedPoint, PublicKey};
-            let encoded_point =
-                PublicKey::<p384::NistP384>::from_sec1_bytes(pk_bytes)?.to_encoded_point(false);
-            (
-                encoded_point.x().ok_or(Error::MissingPoint)?.to_vec(),
-                encoded_point.y().ok_or(Error::MissingPoint)?.to_vec(),
-            )
-        }
-        _ => {
-            return Err(Error::P384KeyLength(pk_bytes.len()));
-        }
-    };
+    let pk = p384::PublicKey::from_sec1_bytes(pk_bytes)?;
     let jwk = JWK {
-        params: Params::EC(ECParams {
-            curve: Some("P-384".to_string()),
-            x_coordinate: Some(Base64urlUInt(x)),
-            y_coordinate: Some(Base64urlUInt(y)),
-            ecc_private_key: None,
-        }),
+        params: Params::EC(ECParams::try_from(&pk)?),
+        public_key_use: None,
+        key_operations: None,
+        algorithm: None,
+        key_id: None,
+        x509_url: None,
+        x509_certificate_chain: None,
+        x509_thumbprint_sha1: None,
+        x509_thumbprint_sha256: None,
+    };
+    Ok(jwk)
+}
+
+#[cfg(feature = "secp384r1")]
+fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
+    let k = p384::SecretKey::from_be_bytes(data)?;
+    let jwk = JWK {
+        params: Params::EC(ECParams::try_from(&k)?),
         public_key_use: None,
         key_operations: None,
         algorithm: None,
@@ -1123,6 +1190,25 @@ impl TryFrom<&k256::PublicKey> for ECParams {
     }
 }
 
+#[cfg(feature = "secp256k1")]
+impl TryFrom<&k256::SecretKey> for ECParams {
+    type Error = Error;
+    fn try_from(k: &k256::SecretKey) -> Result<Self, Self::Error> {
+        let pk = k.public_key();
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
+        let ec_points = pk.to_encoded_point(false);
+        let x = ec_points.x().ok_or(Error::MissingPoint)?;
+        let y = ec_points.y().ok_or(Error::MissingPoint)?;
+        Ok(ECParams {
+            // TODO according to https://tools.ietf.org/id/draft-jones-webauthn-secp256k1-00.html#rfc.section.2 it should be P-256K?
+            curve: Some("secp256k1".to_string()),
+            x_coordinate: Some(Base64urlUInt(x.to_vec())),
+            y_coordinate: Some(Base64urlUInt(y.to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
+        })
+    }
+}
+
 #[cfg(feature = "secp256r1")]
 impl TryFrom<&p256::PublicKey> for ECParams {
     type Error = Error;
@@ -1140,6 +1226,24 @@ impl TryFrom<&p256::PublicKey> for ECParams {
     }
 }
 
+#[cfg(feature = "secp256r1")]
+impl TryFrom<&p256::SecretKey> for ECParams {
+    type Error = Error;
+    fn try_from(k: &p256::SecretKey) -> Result<Self, Self::Error> {
+        let pk = k.public_key();
+        use p256::elliptic_curve::sec1::ToEncodedPoint;
+        let encoded_point = pk.to_encoded_point(false);
+        let x = encoded_point.x().ok_or(Error::MissingPoint)?;
+        let y = encoded_point.y().ok_or(Error::MissingPoint)?;
+        Ok(ECParams {
+            curve: Some("P-256".to_string()),
+            x_coordinate: Some(Base64urlUInt(x.to_vec())),
+            y_coordinate: Some(Base64urlUInt(y.to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
+        })
+    }
+}
+
 #[cfg(feature = "secp384r1")]
 impl TryFrom<&p384::PublicKey> for ECParams {
     type Error = Error;
@@ -1153,6 +1257,24 @@ impl TryFrom<&p384::PublicKey> for ECParams {
             x_coordinate: Some(Base64urlUInt(x.to_vec())),
             y_coordinate: Some(Base64urlUInt(y.to_vec())),
             ecc_private_key: None,
+        })
+    }
+}
+
+#[cfg(feature = "secp384r1")]
+impl TryFrom<&p384::SecretKey> for ECParams {
+    type Error = Error;
+    fn try_from(k: &p384::SecretKey) -> Result<Self, Self::Error> {
+        let pk = k.public_key();
+        use p384::elliptic_curve::sec1::ToEncodedPoint;
+        let encoded_point = pk.to_encoded_point(false);
+        let x = encoded_point.x().ok_or(Error::MissingPoint)?;
+        let y = encoded_point.y().ok_or(Error::MissingPoint)?;
+        Ok(ECParams {
+            curve: Some("P-384".to_string()),
+            x_coordinate: Some(Base64urlUInt(x.to_vec())),
+            y_coordinate: Some(Base64urlUInt(y.to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
         })
     }
 }

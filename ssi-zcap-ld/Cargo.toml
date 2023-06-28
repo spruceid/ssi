@@ -1,6 +1,6 @@
 [package]
 name = "ssi-zcap-ld"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -18,7 +18,7 @@ ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-dids = { path = "../ssi-dids", version = "0.1.1" }
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.2", default-features = false }
-ssi-ldp = { path = "../ssi-ldp", version = "0.2", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", version = "0.3.0", default-features = false }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

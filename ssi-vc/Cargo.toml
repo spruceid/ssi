@@ -1,6 +1,6 @@
 [package]
 name = "ssi-vc"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -24,11 +24,11 @@ multihash = { version = "0.16", default-features = false, features = ["blake3"] 
 iref = "2.2.2"
 ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-dids = { path = "../ssi-dids", version = "0.1.1" }
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.2", default-features = false }
-ssi-ldp = { path = "../ssi-ldp", version = "0.2", default-features = false }
+ssi-ldp = { path = "../ssi-ldp", version = "0.3.0", default-features = false }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
@@ -44,7 +44,8 @@ k256 = { version = "0.11", features = ["ecdsa"] }
 keccak-hash = { version = "0.7" }
 serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto" }
-ssi-ldp = { path = "../ssi-ldp", features = ["aleo"] }
+ssi-ldp = { path = "../ssi-ldp", features = ["aleo", "example-http-issuer", "secp384r1"] }
 ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
 josekit = "0.8.2"
 time = "0.3.20"
+rstest = "0.17.0"

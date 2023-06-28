@@ -7,6 +7,7 @@ use chrono::prelude::*;
 pub mod proof;
 use iref::{Iri, IriBuf};
 pub use proof::{Check, LinkedDataProofOptions, Proof};
+use sha2::{Digest, Sha384};
 use static_iref::iri;
 pub mod error;
 pub use error::Error;
@@ -260,7 +261,7 @@ pub async fn ensure_or_pick_verification_relationship(
         // Allow some for testing purposes only.
         match issuer {
             #[cfg(feature = "example-http-issuer")]
-            "https://example.edu/issuers/14" => {
+            "https://example.edu/issuers/14" | "https://vc.example/issuers/5678" => {
                 // https://github.com/w3c/vc-test-suite/blob/cdc7835/test/vc-data-model-1.0/input/example-016-jwt.jsonld#L8
                 // We don't have a way to actually resolve this to anything. Just allow it for
                 // vc-test-suite for now.
@@ -409,6 +410,16 @@ async fn to_jws_payload(
     proof: &Proof,
     context_loader: &mut ContextLoader,
 ) -> Result<Vec<u8>, Error> {
+    let (doc_normalized, sigopts_normalized) =
+        urdna2015_normalize(document, proof, context_loader).await?;
+    sha256_normalized(doc_normalized, sigopts_normalized)
+}
+
+async fn urdna2015_normalize(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: &Proof,
+    context_loader: &mut ContextLoader,
+) -> Result<(String, String), Error> {
     let sigopts_dataset = proof
         .to_dataset_for_signing(Some(document), context_loader)
         .await?;
@@ -418,6 +429,26 @@ async fn to_jws_payload(
     let doc_normalized = urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads();
     let sigopts_normalized =
         urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from)).into_nquads();
+    Ok((doc_normalized, sigopts_normalized))
+}
+
+// TODO not the best implementation
+async fn jcs_normalize(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: &Proof,
+) -> Result<(String, String), Error> {
+    let mut document = document.to_value()?;
+    let document = document.as_object_mut().unwrap();
+    document.remove("proof");
+    let doc_normalized = serde_jcs::to_string(&document)?;
+    let mut proof = proof.clone();
+    proof.jws = None;
+    proof.proof_value = None;
+    let sigopts_normalized = serde_jcs::to_string(&proof)?;
+    Ok((doc_normalized, sigopts_normalized))
+}
+
+fn sha256_normalized(doc_normalized: String, sigopts_normalized: String) -> Result<Vec<u8>, Error> {
     let sigopts_digest = sha256(sigopts_normalized.as_bytes());
     let doc_digest = sha256(doc_normalized.as_bytes());
     let data = [
@@ -425,6 +456,17 @@ async fn to_jws_payload(
         doc_digest.as_ref().to_vec(),
     ]
     .concat();
+    Ok(data)
+}
+
+// TODO refactor these functions into one that accepts the hasher
+fn sha384_normalized(doc_normalized: String, sigopts_normalized: String) -> Result<Vec<u8>, Error> {
+    let mut hasher = Sha384::new();
+    hasher.update(sigopts_normalized.as_bytes());
+    let sigopts_digest = hasher.finalize_reset();
+    hasher.update(doc_normalized.as_bytes());
+    let doc_digest = hasher.finalize();
+    let data = [sigopts_digest.to_vec(), doc_digest.to_vec()].concat();
     Ok(data)
 }
 

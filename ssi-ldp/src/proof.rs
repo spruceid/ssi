@@ -3,6 +3,8 @@ use std::{convert::TryFrom, str::FromStr};
 
 use chrono::prelude::*;
 
+use crate::dataintegrity::DataIntegrityCryptoSuite;
+
 use super::*;
 
 use serde::{Deserialize, Serialize};
@@ -57,6 +59,8 @@ pub struct Proof {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub cryptosuite: Option<dataintegrity::DataIntegrityCryptoSuite>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
 }
@@ -76,6 +80,7 @@ impl Proof {
             nonce: None,
             jws: None,
             property_set: None,
+            cryptosuite: None,
         }
     }
 
@@ -230,6 +235,8 @@ pub struct LinkedDataProofOptions {
     pub eip712_domain: Option<crate::eip712::ProofInfo>,
     #[cfg(not(feature = "eip"))]
     pub eip712_domain: Option<()>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cryptosuite: Option<DataIntegrityCryptoSuite>,
 }
 
 impl Default for LinkedDataProofOptions {
@@ -243,6 +250,7 @@ impl Default for LinkedDataProofOptions {
             checks: Some(vec![Check::Proof]),
             eip712_domain: None,
             type_: None,
+            cryptosuite: None,
         }
     }
 }
@@ -422,6 +430,16 @@ fn verify_proof_consistency(
             .as_ref()
             .and_then(|cc| cc.get("publicKeyMultibase"))
             .and_then(|cap| cap.as_str()),
+    )?;
+
+    graph_ref.take_object_and_assert_eq_iri_or_str(
+        proof_id,
+        iri!("https://w3id.org/security#cryptosuite"),
+        proof
+            .cryptosuite
+            .clone()
+            .map(|cc| cc.to_string())
+            .as_deref(),
     )?;
 
     graph_ref.take_object_and_assert_eq_iri(
