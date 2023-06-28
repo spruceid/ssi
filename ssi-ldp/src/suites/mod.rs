@@ -748,6 +748,10 @@ impl ProofSuite for ProofSuiteType {
             Self::Ed25519Signature2018 => verify(proof, document, resolver, context_loader).await,
             #[cfg(feature = "ed25519")]
             Self::Ed25519Signature2020 => {
+                // TODO must also match the VM relationship
+                if proof.proof_purpose.is_none() {
+                    return Err(Error::MissingProofPurpose);
+                };
                 verify_nojws(proof, document, resolver, context_loader, Algorithm::EdDSA).await
             }
             Self::DataIntegrityProof => {
