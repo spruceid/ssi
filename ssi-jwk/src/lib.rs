@@ -494,6 +494,7 @@ impl JWK {
     }
 
     pub fn from_vm_type(type_: &str, pk_bytes: Vec<u8>) -> Result<Self, Error> {
+        // todo need to add a match arm here
         Ok(match type_ {
             // TODO: check against IRIs when in JSON-LD
             "Ed25519VerificationKey2018" => Self::from(Params::OKP(OctetParams {
@@ -517,6 +518,13 @@ impl JWK {
             #[cfg(feature = "secp256k1")]
             "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
                 secp256k1_parse(&pk_bytes)?
+            }
+            "Bls12381G2Key2020" => {
+                Self::from(Params::OKP(OctetParams {
+                    curve: "Bls12381G2".to_string(),
+                    public_key: Base64urlUInt(pk_bytes[2..].to_owned()),
+                    private_key: None,
+                }))
             }
             _ => Err(Error::UnsupportedKeyType)?,
         })

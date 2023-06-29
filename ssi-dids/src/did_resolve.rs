@@ -1383,7 +1383,7 @@ pub async fn get_verification_methods_for_all(
                 Error::UnableToResolve(format!("Unable to get verification method ids: {:?}", e))
             })?;
         for id in vm_ids {
-            vm_ids_for_purpose.insert(id);
+            vm_ids_for_purpose.insert(id); // only insert here
         }
         // Find all verification method maps defined in the resolved DID document.
         for vm in doc
@@ -1404,7 +1404,9 @@ pub async fn get_verification_methods_for_all(
             }
         }
     }
+
     let mut vmms = HashMap::new();
+
     for id in vm_ids_for_purpose {
         let vmm = if let Some(vmm) = vmms_by_id.remove(&id) {
             vmm
@@ -1441,6 +1443,7 @@ pub async fn resolve_vm(
     if let Some(error) = res_meta.error {
         return Err(Error::DIDURLDereference(error));
     }
+    // ah, found the expectedobject, also could've just searched the code base for this error
     let vm = match object {
         Content::Object(Resource::VerificationMethod(vm)) => vm,
         Content::Null => return Err(Error::ResourceNotFound(verification_method.to_string())),
