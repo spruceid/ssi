@@ -1,25 +1,24 @@
-use async_trait::async_trait;
 use chrono::{DateTime, LocalResult, Utc};
 use json_ld::{
     context_processing::ProcessMeta, ContextLoader, JsonLdProcessor, Loader, RemoteDocument,
     ToRdfError,
 };
 use locspan::Meta;
-use rdf_types::{FromBlankId, FromIri, Namespace, VocabularyMut};
+use rdf_types::{
+    IdInterpretationMut, Interpret, IriVocabulary, LanguageTagVocabulary, TermInterpretationMut,
+    VocabularyMut,
+};
 use ssi_jws::{CompactJWSBuf, Header};
 use ssi_jwt::{JWTClaims, StringOrURI};
 use ssi_vc::{datatype::VCDateTime, Verifiable};
-use std::{hash::Hash, marker::PhantomData};
+use std::hash::Hash;
 use treeldr_rust_prelude::{iref::IriBuf, FromRdf, FromRdfError};
 
-use crate::{verification, Encoded, Proof};
-
-pub struct Decoder<C, L> {
-    loader: L,
-    c: PhantomData<C>,
-}
+use crate::{verification, Proof, VcJwt};
 
 pub enum Error<L, C> {
+    InvalidType(Option<String>),
+    InvalidContentType(Option<String>),
     MissingCredential,
     MissingCredentialSubject,
     CredentialIsNotAnObject,
@@ -29,6 +28,29 @@ pub enum Error<L, C> {
     InvalidSubject,
     Processing(ToRdfError<(), L, C>),
     FromRdf(FromRdfError),
+    Base64(ssi_jws::Base64DecodeError),
+    Json(serde_json::Error),
+}
+
+impl<L, C> From<ssi_jws::InvalidHeader> for Error<L, C> {
+    fn from(value: ssi_jws::InvalidHeader) -> Self {
+        match value {
+            ssi_jws::InvalidHeader::Base64(e) => Self::Base64(e),
+            ssi_jws::InvalidHeader::Json(e) => Self::Json(e),
+        }
+    }
+}
+
+impl<L, C> From<ssi_jws::Base64DecodeError> for Error<L, C> {
+    fn from(value: ssi_jws::Base64DecodeError) -> Self {
+        Self::Base64(value)
+    }
+}
+
+impl<L, C> From<serde_json::Error> for Error<L, C> {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Json(value)
+    }
 }
 
 impl<L, C> From<ToRdfError<(), L, C>> for Error<L, C> {
@@ -49,33 +71,54 @@ impl<L, C> From<InvalidId> for Error<L, C> {
     }
 }
 
-#[async_trait]
-impl<N, C, L> ssi_vc::Decoder<N, CompactJWSBuf> for Decoder<C, L>
-where
-    N: Namespace + VocabularyMut + Sync + Send,
-    N::Id: Eq + Hash + FromIri<Iri = N::Iri> + FromBlankId<BlankId = N::BlankId>,
-    N::Iri: Clone + Eq + Hash + Sync + Send,
-    N::BlankId: Clone + Eq + Hash + Sync + Send,
-    C: FromRdf<N, rdf_types::Literal<String, N::Iri>> + Send,
-    L: Loader<N::Iri, ()> + ContextLoader<N::Iri, ()> + Sync + Send,
-    L::Output: Into<json_syntax::Value>,
-    L::Context: ProcessMeta<N::Iri, N::BlankId, ()> + Into<json_ld::syntax::context::Value<()>>,
-    L::Error: Send,
-    L::ContextError: Send,
-{
-    type Credential = Encoded<C>;
-    type Proof = Proof;
-
-    type Error = Error<L::Error, L::ContextError>;
-
-    async fn decode(
-        &mut self,
-        namespace: &mut N,
+impl<C: Sync> VcJwt<C> {
+    /// Decode a Linked Data credential encoded as a JSON Web Token.
+    pub async fn decode_ld<V, I, L>(
+        vocabulary: &mut V,
+        interpretation: &mut I,
+        loader: &mut L,
         jws: CompactJWSBuf,
-    ) -> Result<ssi_vc::Verifiable<Self::Credential, Self::Proof>, Self::Error> {
-        let header = jws.decode_header().unwrap(); // TODO error.
-        let mut claims: JWTClaims =
-            serde_json::from_slice(&jws.decode_payload(&header).unwrap()).unwrap(); // TODO errors.
+    ) -> Result<ssi_vc::Verifiable<Self>, Error<L::Error, L::ContextError>>
+    where
+        V: VocabularyMut<
+                Type = rdf_types::literal::Type<
+                    <V as IriVocabulary>::Iri,
+                    <V as LanguageTagVocabulary>::LanguageTag,
+                >,
+                Value = String,
+            > + Sync
+            + Send,
+        V::Iri: Clone + Eq + Hash + Sync + Send,
+        V::BlankId: Clone + Eq + Hash + Sync + Send,
+        V::Literal: Clone,
+        I: TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
+        I::Resource: Eq + Hash + Sync + Send,
+        C: FromRdf<V, I> + Send,
+        L: Loader<V::Iri, ()> + ContextLoader<V::Iri, ()> + Sync + Send,
+        L::Output: Into<json_syntax::Value>,
+        L::Context: ProcessMeta<V::Iri, V::BlankId, ()> + Into<json_ld::syntax::context::Value<()>>,
+        L::Error: Send,
+        L::ContextError: Send,
+    {
+        let header = jws.decode_header()?;
+
+        // According to <https://www.w3.org/TR/vc-data-model/#json-web-token>
+        // the type, if present, must be set `JWT`.
+        // According to <https://w3c.github.io/vc-jwt/> the type must be
+        // `vc+ld+jwt`, with `cty` set to `vc+ld+json`.
+        match header.type_.as_deref() {
+            None | Some("JWT") => match header.content_type.as_deref() {
+                None | Some("vc+ld+json") => (),
+                Some(_) => return Err(Error::InvalidContentType(header.content_type)),
+            },
+            Some("vc+ld+jwt") => match header.content_type.as_deref() {
+                Some("vc+ld+json") => (),
+                _ => return Err(Error::InvalidContentType(header.content_type)),
+            },
+            Some(_) => return Err(Error::InvalidType(header.type_)),
+        }
+
+        let mut claims: JWTClaims = serde_json::from_slice(&jws.decode_payload(&header)?)?;
         let verification_method = build_verification_method(&header, &claims)?;
 
         match claims.verifiable_credential.take() {
@@ -87,42 +130,49 @@ where
                         .ok_or(Error::CredentialIsNotAnObject)?,
                 )?;
                 let mut generator = rdf_types::generator::Blank::new().with_default_metadata();
-                let document = RemoteDocument::<N::Iri, (), json_syntax::Value>::new(
+                let document = RemoteDocument::<V::Iri, (), json_syntax::Value>::new(
                     None,
                     None,
                     Meta(credential, ()),
                 );
                 let mut to_rdf = document
-                    .to_rdf_with(namespace, &mut generator, &mut self.loader)
+                    .to_rdf_with(vocabulary, &mut generator, loader)
                     .await?;
                 match to_rdf.document().objects().iter().next() {
-                    Some(object) => {
-                        match object.id() {
-                            Some(Meta(id, _)) => {
-                                let id: N::Id = import_id(id.clone())?;
-                                let dataset: treeldr_rust_prelude::grdf::HashDataset<
-                                    N::Id,
-                                    N::Id,
-                                    rdf_types::Object<N::Id, rdf_types::Literal<String, N::Iri>>,
-                                    N::Id,
-                                > = to_rdf.cloned_quads().map(import_valid_quad).collect();
+                    Some(object) => match object.id() {
+                        Some(Meta(id, _)) => {
+                            let id = interpret_id(interpretation, id.clone())?;
+                            let dataset: treeldr_rust_prelude::grdf::HashDataset<
+                                I::Resource,
+                                I::Resource,
+                                I::Resource,
+                                I::Resource,
+                            > = to_rdf
+                                .cloned_quads()
+                                .map(|quad| quad.interpret(interpretation))
+                                .collect();
 
-                                let subject = rdf_types::Object::Id(id);
-                                let credential =
-                                    C::from_rdf(namespace, &subject, dataset.default_graph())?;
-                                let proof = Proof::new(
-                                    header.algorithm,
-                                    jws.decode_signature().unwrap(), // TODO error.
-                                    verification_method,
-                                );
-                                Ok(Verifiable::new(
-                                    Encoded::new(credential, jws.into_signing_bytes()),
-                                    proof,
-                                ))
-                            }
-                            None => Err(Error::MissingCredentialSubject),
+                            let credential = C::from_rdf(
+                                vocabulary,
+                                interpretation,
+                                dataset.default_graph(),
+                                &id,
+                            )?;
+                            let proof = Proof::new(jws.decode_signature()?, verification_method);
+                            Ok(Verifiable::new(
+                                unsafe {
+                                    // SAFETY: because `jws` is well formed,
+                                    //         `jws.into_signing_bytes()` is
+                                    //         guaranteed to return valid
+                                    //         signing bytes to form a compact
+                                    //         JWS.
+                                    VcJwt::new_unchecked(credential, jws.into_signing_bytes())
+                                },
+                                proof,
+                            ))
                         }
-                    }
+                        None => Err(Error::MissingCredentialSubject),
+                    },
                     None => Err(Error::MissingCredentialSubject),
                 }
             }
@@ -133,60 +183,14 @@ where
 
 pub struct InvalidId(String);
 
-fn import_id<T>(id: json_ld::Id<T::Iri, T::BlankId>) -> Result<T, InvalidId>
-where
-    T: FromIri,
-    T: FromBlankId,
-{
+fn interpret_id<T, B, I: IdInterpretationMut<T, B>>(
+    interpretation: &mut I,
+    id: json_ld::Id<T, B>,
+) -> Result<I::Resource, InvalidId> {
     match id {
-        json_ld::Id::Valid(json_ld::ValidId::Iri(i)) => Ok(FromIri::from_iri(i)),
-        json_ld::Id::Valid(json_ld::ValidId::Blank(b)) => Ok(FromBlankId::from_blank(b)),
-        json_ld::Id::Invalid(id) => Err(InvalidId(id.clone())),
+        json_ld::Id::Valid(id) => Ok(interpretation.interpret_id(id)),
+        json_ld::Id::Invalid(id) => Err(InvalidId(id)),
     }
-}
-
-fn import_valid_id<T>(id: json_ld::ValidId<T::Iri, T::BlankId>) -> T
-where
-    T: FromIri,
-    T: FromBlankId,
-{
-    match id {
-        json_ld::ValidId::Iri(i) => FromIri::from_iri(i),
-        json_ld::ValidId::Blank(b) => FromBlankId::from_blank(b),
-    }
-}
-
-fn import_valid_term<T, L>(
-    value: rdf_types::Term<json_ld::ValidId<T::Iri, T::BlankId>, L>,
-) -> rdf_types::Term<T, L>
-where
-    T: FromIri,
-    T: FromBlankId,
-{
-    match value {
-        rdf_types::Term::Id(id) => rdf_types::Term::Id(import_valid_id(id)),
-        rdf_types::Term::Literal(l) => rdf_types::Term::Literal(l),
-    }
-}
-
-fn import_valid_quad<T, L>(
-    rdf_types::Quad(s, p, o, g): rdf_types::Quad<
-        json_ld::ValidId<T::Iri, T::BlankId>,
-        json_ld::ValidId<T::Iri, T::BlankId>,
-        rdf_types::Term<json_ld::ValidId<T::Iri, T::BlankId>, L>,
-        json_ld::ValidId<T::Iri, T::BlankId>,
-    >,
-) -> rdf_types::Quad<T, T, rdf_types::Term<T, L>, T>
-where
-    T: FromIri,
-    T: FromBlankId,
-{
-    rdf_types::Quad(
-        import_valid_id(s),
-        import_valid_id(p),
-        import_valid_term(o),
-        g.map(import_valid_id),
-    )
 }
 
 fn build_verification_method<L, C>(
@@ -230,8 +234,7 @@ fn add_claims_to_credential<L, C>(
                     .ok()
                     .flatten()
                     .map(Meta::value_mut)
-                    .map(json_syntax::Value::as_object_mut)
-                    .flatten()
+                    .and_then(json_syntax::Value::as_object_mut)
                 {
                     Some(issuer) => {
                         issuer.insert(
@@ -288,8 +291,7 @@ fn add_claims_to_credential<L, C>(
                     .ok()
                     .flatten()
                     .map(Meta::value_mut)
-                    .map(json_syntax::Value::as_object_mut)
-                    .flatten()
+                    .and_then(json_syntax::Value::as_object_mut)
                 {
                     Some(issuer) => {
                         issuer.insert(Meta("id".into(), ()), Meta(sub_uri.to_string().into(), ()));

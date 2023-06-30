@@ -1,34 +1,29 @@
-use ssi_crypto::Verifier;
-use ssi_vc::{ProofValidity, VerifiableWith, VerificationError};
+use async_trait::async_trait;
+use ssi_crypto::{ProofPurpose, VerificationError, Verifier};
+use ssi_vc::{ProofValidity, VerifiableWith};
 use treeldr_rust_prelude::iref::IriBuf;
 
-use crate::{Encoded, Proof};
+use crate::{Proof, VcJwt};
 
-impl<C> VerifiableWith<Proof> for Encoded<C> {
+#[async_trait]
+impl<C: Sync> VerifiableWith for VcJwt<C> {
+    type Proof = Proof;
     type Method = Method;
-    type Parameters = ();
-    type Transformed = ();
-    type Error = VerificationError;
 
-    fn verify_with(
+    async fn verify_with(
         &self,
-        _context: &mut impl ssi_vc::Context<Self, Proof>,
-        verifiers: &impl ssi_crypto::VerifierProvider<Self::Method>,
+        verifier: &impl Verifier<Self::Method>,
         proof: &Proof,
-        _parameters: Self::Parameters,
     ) -> Result<ProofValidity, VerificationError> {
-        match proof.algorithm {
-            ssi_jwk::Algorithm::None => Ok(ProofValidity::Valid),
-            algo => {
-                let algo = ssi_crypto::Algorithm::try_from(algo)?;
-                let verifier = verifiers
-                    .get_verifier(&proof.method)
-                    .ok_or(VerificationError::UnknownVerificationMethod)?;
-                Ok(verifier
-                    .verify(algo, self.signing_bytes(), &proof.signature)?
-                    .into())
-            }
-        }
+        Ok(verifier
+            .verify(
+                &proof.method,
+                ProofPurpose::AssertionMethod,
+                self.signing_bytes(),
+                &proof.signature,
+            )
+            .await?
+            .into())
     }
 }
 

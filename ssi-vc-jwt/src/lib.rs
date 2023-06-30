@@ -1,12 +1,14 @@
 use std::ops::Deref;
 
+use ssi_jws::{CompactJWS, InvalidCompactJWS};
+
 mod decode;
+mod encode;
+mod signing;
 pub mod verification;
 
-pub use decode::Decoder;
-
 /// Credential encoded as JWT signing bytes.
-pub struct Encoded<C> {
+pub struct VcJwt<C> {
     /// Credential data.
     credential: C,
 
@@ -14,8 +16,20 @@ pub struct Encoded<C> {
     signing_bytes: Vec<u8>,
 }
 
-impl<C> Encoded<C> {
-    pub fn new(credential: C, signing_bytes: Vec<u8>) -> Self {
+impl<C> VcJwt<C> {
+    pub fn new(credential: C, signing_bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+        if CompactJWS::check_signing_bytes(&signing_bytes) {
+            Ok(unsafe { Self::new_unchecked(credential, signing_bytes) })
+        } else {
+            Err(InvalidCompactJWS(signing_bytes))
+        }
+    }
+
+    /// # Safety
+    ///
+    /// The `signing_bytes` must form a valid compact JWS once concatenated with
+    /// a `.` followed by the signature bytes.
+    pub unsafe fn new_unchecked(credential: C, signing_bytes: Vec<u8>) -> Self {
         Self {
             credential,
             signing_bytes,
@@ -25,9 +39,13 @@ impl<C> Encoded<C> {
     pub fn signing_bytes(&self) -> &[u8] {
         &self.signing_bytes
     }
+
+    pub fn into_signing_bytes(self) -> Vec<u8> {
+        self.signing_bytes
+    }
 }
 
-impl<C> Deref for Encoded<C> {
+impl<C> Deref for VcJwt<C> {
     type Target = C;
 
     fn deref(&self) -> &Self::Target {
@@ -37,21 +55,16 @@ impl<C> Deref for Encoded<C> {
 
 /// JWS proof.
 pub struct Proof {
-    algorithm: ssi_jwk::Algorithm,
     signature: Vec<u8>,
     method: verification::Method,
 }
 
 impl Proof {
-    pub fn new(
-        algorithm: ssi_jwk::Algorithm,
-        signature: Vec<u8>,
-        method: verification::Method,
-    ) -> Self {
-        Self {
-            algorithm,
-            signature,
-            method,
-        }
+    pub fn new(signature: Vec<u8>, method: verification::Method) -> Self {
+        Self { signature, method }
+    }
+
+    pub fn into_signature(self) -> Vec<u8> {
+        self.signature
     }
 }
