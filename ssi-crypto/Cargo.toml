@@ -34,6 +34,9 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 zeroize = { version = "1.5", features = ["zeroize_derive"] }
 bs58 = { version = "0.4", features = ["check"], optional = true }
 digest = "0.9"
+iref.workspace = true
+static-iref.workspace = true
+async-trait.workspace = true
 
 [dev-dependencies]
 hex = "0.4"
