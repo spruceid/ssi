@@ -5,7 +5,66 @@ use std::{borrow::Borrow, fmt};
 pub mod urdna2015;
 
 use iref::IriBuf;
-use rdf_types::Quad;
+use rdf_types::{
+    ExportRefFromVocabulary, Interpretation, IriVocabulary, LanguageTagVocabulary, Quad,
+    ReverseTermInterpretation, Vocabulary,
+};
+
+/// Interpreted RDF dataset with an entry point.
+pub struct DatasetWithEntryPoint<'a, V, I: Interpretation> {
+    pub vocabulary: &'a V,
+    pub interpretation: &'a I,
+    pub dataset: grdf::HashDataset<I::Resource, I::Resource, I::Resource, I::Resource>,
+    pub entry_point: I::Resource,
+}
+
+impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
+    pub fn new(
+        vocabulary: &'a V,
+        interpretation: &'a I,
+        dataset: grdf::HashDataset<I::Resource, I::Resource, I::Resource, I::Resource>,
+        entry_point: I::Resource,
+    ) -> Self {
+        Self {
+            vocabulary,
+            interpretation,
+            dataset,
+            entry_point,
+        }
+    }
+
+    /// Returns the canonical form of the dataset, in the N-Quads format.
+    pub fn canonical_form(&self) -> String
+    where
+        V: Vocabulary<
+            Type = rdf_types::literal::Type<
+                <V as IriVocabulary>::Iri,
+                <V as LanguageTagVocabulary>::LanguageTag,
+            >,
+            Value = String,
+        >,
+        I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
+    {
+        // TODO: make sure that a blank node identifier is assigned to resources
+        //       without lexical representation.
+        let quads: Vec<Quad> = self
+            .dataset
+            .quads()
+            .flat_map(|quad| {
+                self.interpretation.quads_of(quad).map(|Quad(s, p, o, g)| {
+                    Quad(
+                        s.export_ref_from_vocabulary(self.vocabulary),
+                        self.vocabulary.iri(p).unwrap().to_owned(),
+                        o.export_ref_from_vocabulary(self.vocabulary),
+                        g.export_ref_from_vocabulary(self.vocabulary),
+                    )
+                })
+            })
+            .collect();
+
+        urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref())).into_nquads()
+    }
+}
 
 /// RDF DataSet produced form a JSON-LD document.
 pub type DataSet =
