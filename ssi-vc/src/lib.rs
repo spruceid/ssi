@@ -44,6 +44,7 @@ use serde_json::Value;
 // - Support more LD-proof types
 
 pub const DEFAULT_CONTEXT: &str = "https://www.w3.org/2018/credentials/v1";
+pub const DEFAULT_CONTEXT_V2: &str = "https://www.w3.org/ns/credentials/v2";
 
 // work around https://github.com/w3c/vc-test-suite/issues/103
 pub const ALT_DEFAULT_CONTEXT: &str = "https://w3.org/2018/credentials/v1";
@@ -336,7 +337,8 @@ impl TryFrom<OneOrMany<Context>> for Contexts {
             Some(Context::URI(URI::String(uri))) => uri,
             Some(Context::Object(_)) => return Err(LdpError::InvalidContext),
         };
-        if first_uri != DEFAULT_CONTEXT && first_uri != ALT_DEFAULT_CONTEXT {
+        if ![DEFAULT_CONTEXT, DEFAULT_CONTEXT_V2, ALT_DEFAULT_CONTEXT].contains(&first_uri.as_str())
+        {
             return Err(LdpError::InvalidContext);
         }
         Ok(match context {
@@ -671,6 +673,7 @@ impl Credential {
             checks,
             eip712_domain,
             type_,
+            cryptosuite,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -683,6 +686,9 @@ impl Credential {
         }
         if type_.is_some() {
             return Err(Error::UnencodableOptionClaim("type".to_string()));
+        }
+        if cryptosuite.is_some() {
+            return Err(Error::UnencodableOptionClaim("cryptosuite".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -1221,6 +1227,7 @@ impl Presentation {
             checks,
             eip712_domain,
             type_,
+            cryptosuite,
         } = options;
         if checks.is_some() {
             return Err(Error::UnencodableOptionClaim("checks".to_string()));
@@ -1233,6 +1240,9 @@ impl Presentation {
         }
         if type_.is_some() {
             return Err(Error::UnencodableOptionClaim("type".to_string()));
+        }
+        if cryptosuite.is_some() {
+            return Err(Error::UnencodableOptionClaim("cryptosuite".to_string()));
         }
         match proof_purpose {
             None => (),
@@ -1837,8 +1847,9 @@ pub(crate) mod tests {
     use super::*;
     use chrono::Duration;
     use serde_json::json;
-    use ssi_dids::did_resolve::DereferencingInputMetadata;
-    use ssi_dids::{example::DIDExample, VerificationMethodMap};
+    use ssi_dids::{
+        did_resolve::DereferencingInputMetadata, example::DIDExample, VerificationMethodMap,
+    };
     use ssi_json_ld::urdna2015;
     use ssi_jws::sign_bytes_b64;
     use ssi_ldp::{ProofSuite, ProofSuiteType};

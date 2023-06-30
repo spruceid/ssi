@@ -1,6 +1,6 @@
 [package]
 name = "ssi-contexts"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0 AND W3C-20150513 AND CC-BY-SA-3.0 AND BSD-3-Clause"

@@ -7,3 +7,9 @@
 [submodule "vc-test-suite"]
 	path = vc-test-suite
 	url = https://github.com/w3c/vc-test-suite
+[submodule "tests/vc-di-eddsa"]
+	path = tests/vc-di-eddsa
+	url = https://github.com/w3c/vc-di-eddsa.git
+[submodule "tests/vc-di-ecdsa"]
+	path = tests/vc-di-ecdsa
+	url = https://github.com/w3c/vc-di-ecdsa.git

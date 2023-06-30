@@ -92,6 +92,12 @@ pub enum Error {
     UnexpectedCAIP2Namespace(String, String),
     #[error(transparent)]
     InconsistentProof(#[from] Box<ProofInconsistency>),
+    #[error("Unsupported cryptosuite")]
+    UnsupportedCryptosuite,
+    #[error("Invalid cryptosuite type")]
+    InvalidCryptosuiteType,
+    #[error("Invalid cryptosuite, expected {0} but key supports {1}")]
+    UnexpectedCryptosuite(String, String),
 }
 
 impl From<ssi_jwk::Error> for Error {
