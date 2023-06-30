@@ -38,18 +38,25 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
 const VERSION_STRING: &str = "0.2.0";
 
 impl<F, A> Ucan<F, A> {
+    /// Get the Header of the UCAN
     pub fn header(&self) -> &Header {
         &self.header
     }
+
+    /// Get the Payload of the UCAN
     pub fn payload(&self) -> &Payload<F, A> {
         &self.payload
     }
+
+    /// Get the Signature of the UCAN
     pub fn signature(&self) -> &[u8] {
         &self.signature
     }
+
     pub fn into_inner(self) -> (Header, Payload<F, A>, Vec<u8>) {
         (self.header, self.payload, self.signature)
     }
+
     /// Extract or resolve the JWK used to issue this UCAN
     pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
         match (
@@ -275,16 +282,26 @@ impl<F, A> Payload<F, A> {
         F: Serialize,
         A: Serialize,
     {
-        let header = Header {
-            algorithm,
-            type_: Some("JWT".to_string()),
-            additional_parameters: [(
+        let header = if let Some(mut ch) = custom_header {
+            ch.algorithm = algorithm;
+            ch.type_ = Some("JWT".to_string());
+            ch.additional_parameters.insert(
                 "ucv".to_string(),
                 serde_json::Value::String(VERSION_STRING.to_string()),
-            )]
-            .into_iter()
-            .collect(),
-            ..custom_header.unwrap_or_default()
+            );
+            ch
+        } else {
+            Header {
+                algorithm,
+                type_: Some("JWT".to_string()),
+                additional_parameters: [(
+                    "ucv".to_string(),
+                    serde_json::Value::String(VERSION_STRING.to_string()),
+                )]
+                .into_iter()
+                .collect(),
+                ..Default::default()
+            }
         };
 
         let signature = sign_bytes(
@@ -404,7 +421,7 @@ impl UcanRevocation {
 mod tests {
     use super::*;
     use did_method_key::DIDKey;
-    use ssi_dids::DIDMethod;
+    use ssi_dids::{DIDMethod, Source};
 
     #[async_std::test]
     async fn valid() {
@@ -443,10 +460,21 @@ mod tests {
 
     #[async_std::test]
     async fn basic() {
-        let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
-        Ucan::<JsonValue>::decode_and_verify(case, DIDKey.to_resolver())
-            .await
+        let key = JWK::generate_ed25519().unwrap();
+        let iss = DIDKey.generate(&Source::Key(&key)).unwrap();
+        let aud = "did:example:123".to_string();
+        let payload = Payload::<JsonValue, JsonValue>::new(iss, aud);
+
+        let ucan = payload
+            .sign_canonicalized(Algorithm::EdDSA, &key, None)
             .unwrap();
+
+        Ucan::<JsonValue>::decode_and_verify(
+            &ucan.encode_as_canonicalized_jwt().unwrap(),
+            DIDKey.to_resolver(),
+        )
+        .await
+        .unwrap();
     }
 
     #[derive(Deserialize)]
