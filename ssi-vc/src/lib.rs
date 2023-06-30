@@ -8,24 +8,27 @@
 use std::hash::Hash;
 
 use iref::Iri;
-use ssi_crypto::VerifierProvider;
+use ssi_crypto::{VerificationError, Verifier};
 use treeldr_rust_macros::tldr;
-use treeldr_rust_prelude::{
-    locspan::Meta,
-    rdf_types::{IntoId, Namespace, VocabularyMut},
-};
+use treeldr_rust_prelude::{locspan::Meta, rdf_types::VocabularyMut};
 
 pub mod datatype;
-pub mod decode;
+pub mod linked_data;
 mod verification;
+pub mod vocab;
 
-pub use decode::Decoder;
 pub use verification::*;
 
-#[tldr("ssi-vc/src/schema.ttl")]
+pub const CREDENTIALS_V1_CONTEXT_IRI: Iri<'static> =
+    static_iref::iri!("https://www.w3.org/2018/credentials/v1");
+
+#[tldr("ssi-vc/src/schema/cred.ttl", "ssi-vc/src/schema/sec.ttl")]
 pub mod schema {
-    #[prefix("https://treeldr.org/")]
-    pub mod tldr {}
+    #[prefix("http://www.w3.org/2002/07/owl#")]
+    pub mod owl {}
+
+    #[prefix("http://www.w3.org/1999/02/22-rdf-syntax-ns#")]
+    pub mod rdf {}
 
     #[prefix("http://www.w3.org/2000/01/rdf-schema#")]
     pub mod rdfs {}
@@ -33,36 +36,29 @@ pub mod schema {
     #[prefix("http://www.w3.org/2001/XMLSchema#")]
     pub mod xsd {}
 
+    #[prefix("https://treeldr.org/")]
+    pub mod tldr {}
+
     #[prefix("https://www.w3.org/2018/credentials#")]
     pub mod cred {}
+
+    #[prefix("https://w3id.org/security#")]
+    pub mod sec {}
 }
 
 pub use schema::cred::*;
 
-pub trait AttachProof<P>: Sized {
-    fn with_proof(self, proof: P) -> Verifiable<Self, P> {
-        Verifiable::new(self, proof)
-    }
-}
-
-impl<C, P> AttachProof<P> for C {}
-
 /// Verifiable credential.
-pub struct Verifiable<C, P> {
+pub struct Verifiable<C: VerifiableWith> {
     /// Credential.
     credential: C,
 
     /// Credential proof.
-    proof: P,
+    proof: C::Proof,
 }
 
-const VERIFIABLE_CREDENTIAL_IRI: Iri<'static> =
-    static_iref::iri!("https://www.w3.org/2018/credentials#VerifiableCredential");
-const PROOF_IRI: Iri<'static> = static_iref::iri!("https://w3id.org/security#proof");
-const PROOF_VALUE_IRI: Iri<'static> = static_iref::iri!("https://w3id.org/security#proofValue");
-
-impl<C, P> Verifiable<C, P> {
-    pub fn new(credential: C, proof: P) -> Self {
+impl<C: VerifiableWith> Verifiable<C> {
+    pub fn new(credential: C, proof: C::Proof) -> Self {
         Self { credential, proof }
     }
 
@@ -70,58 +66,58 @@ impl<C, P> Verifiable<C, P> {
         &self.credential
     }
 
-    pub fn proof(&self) -> &P {
+    pub fn proof(&self) -> &C::Proof {
         &self.proof
     }
 
-    pub fn map<D>(self, f: impl FnOnce(C) -> D) -> Verifiable<D, P> {
-        Verifiable {
-            credential: f(self.credential),
-            proof: self.proof,
-        }
+    pub fn map<D: VerifiableWith>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> (D, D::Proof),
+    ) -> Verifiable<D> {
+        let (credential, proof) = f(self.credential, self.proof);
+
+        Verifiable { credential, proof }
     }
 }
 
-impl<C: VerifiableWith<P>, P> Verifiable<C, P> {
-    pub fn verify(
+impl<C: VerifiableWith> Verifiable<C> {
+    pub async fn verify(
         &self,
-        context: &mut impl verification::Context<C, P>,
-        verifiers: &impl VerifierProvider<C::Method>,
-        parameters: C::Parameters,
-    ) -> Result<ProofValidity, C::Error> {
-        self.credential
-            .verify_with(context, verifiers, &self.proof, parameters)
+        verifiers: &impl Verifier<C::Method>,
+    ) -> Result<ProofValidity, VerificationError> {
+        self.credential.verify_with(verifiers, &self.proof).await
     }
 }
 
-impl<
-        N: VocabularyMut,
-        C: treeldr_rust_prelude::IntoJsonLdObjectMeta<N>,
-        P: treeldr_rust_prelude::IntoJsonLdObjectMeta<N>,
-    > treeldr_rust_prelude::IntoJsonLdObjectMeta<N> for Verifiable<C, P>
+impl<V: VocabularyMut, I, C: VerifiableWith + treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I>>
+    treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I> for Verifiable<C>
 where
-    N: Namespace,
-    N::Id: IntoId<Iri = N::Iri, BlankId = N::BlankId>,
-    N::Iri: Eq + Hash,
-    N::BlankId: Eq + Hash,
+    V::Iri: Eq + Hash,
+    V::BlankId: Eq + Hash,
+    C::Proof: treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I>,
 {
     fn into_json_ld_object_meta(
         self,
-        namespace: &mut N,
+        vocabulary: &mut V,
+        interpretation: &I,
         meta: (),
-    ) -> json_ld::IndexedObject<N::Iri, N::BlankId, ()> {
-        let mut json_ld = self.credential.into_json_ld_object_meta(namespace, meta);
-        let proof = self.proof.into_json_ld_object_meta(namespace, ());
+    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, ()> {
+        let mut json_ld =
+            self.credential
+                .into_json_ld_object_meta(vocabulary, interpretation, meta);
+        let proof = self
+            .proof
+            .into_json_ld_object_meta(vocabulary, interpretation, ());
 
         if let Some(node) = json_ld.as_node_mut() {
             node.type_entry_or_default((), ()).push(Meta(
-                json_ld::Id::iri(namespace.insert(VERIFIABLE_CREDENTIAL_IRI)),
+                json_ld::Id::iri(vocabulary.insert(vocab::VERIFIABLE_CREDENTIAL)),
                 (),
             ));
 
             node.properties_mut().insert(
                 Meta(
-                    json_ld::Id::Valid(json_ld::ValidId::Iri(namespace.insert(PROOF_IRI))),
+                    json_ld::Id::Valid(json_ld::ValidId::Iri(vocabulary.insert(vocab::PROOF))),
                     (),
                 ),
                 proof,

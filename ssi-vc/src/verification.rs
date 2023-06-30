@@ -1,36 +1,28 @@
-use ssi_crypto::{UnsupportedAlgorithm, VerifierProvider};
+use async_trait::async_trait;
+use ssi_crypto::{VerificationError, Verifier};
 
-/// Credential verifiable with a proof of type `P`.
-pub trait VerifiableWith<P> {
+use crate::Verifiable;
+
+/// Credential verifiable with a proof of type `Self::Proof`.
+#[async_trait]
+pub trait VerifiableWith {
+    /// Proof type.
+    type Proof;
+
     /// Verification method.
     type Method;
 
-    /// Transformed credential.
-    type Transformed;
-
-    /// Verification parameters.
-    type Parameters;
-
-    type Error;
-
-    fn verify_with(
+    async fn verify_with(
         &self,
-        context: &mut impl Context<Self, P>,
-        verifiers: &impl VerifierProvider<Self::Method>,
-        proof: &P,
-        parameters: Self::Parameters,
-    ) -> Result<ProofValidity, Self::Error>;
+        verifiers: &impl Verifier<Self::Method>,
+        proof: &Self::Proof,
+    ) -> Result<ProofValidity, VerificationError>;
 
-    fn verify(
-        &self,
-        verifiers: &impl VerifierProvider<Self::Method>,
-        proof: &P,
-        parameters: Self::Parameters,
-    ) -> Result<ProofValidity, Self::Error>
+    fn with_proof(self, proof: Self::Proof) -> Verifiable<Self>
     where
-        Self: VerifiableWith<P, Transformed = ()>,
+        Self: Sized,
     {
-        self.verify_with(&mut (), verifiers, proof, parameters)
+        Verifiable::new(self, proof)
     }
 }
 
@@ -38,42 +30,6 @@ pub trait VerifiableWith<P> {
 #[derive(Debug, thiserror::Error)]
 #[error("invalid proof")]
 pub struct InvalidProof;
-
-#[derive(Debug, thiserror::Error)]
-pub enum VerificationError {
-    #[error(transparent)]
-    UnsupportedAlgorithm(UnsupportedAlgorithm),
-
-    #[error("unknown verification method")]
-    UnknownVerificationMethod,
-}
-
-impl From<UnsupportedAlgorithm> for VerificationError {
-    fn from(value: UnsupportedAlgorithm) -> Self {
-        Self::UnsupportedAlgorithm(value)
-    }
-}
-
-/// Verification context.
-pub trait Context<T: ?Sized + VerifiableWith<P>, P> {
-    fn transform(
-        &mut self,
-        value: &T,
-        proof: &P,
-        parameters: &T::Parameters,
-    ) -> Result<T::Transformed, T::Error>;
-}
-
-impl<T: ?Sized + VerifiableWith<P, Transformed = ()>, P> Context<T, P> for () {
-    fn transform(
-        &mut self,
-        _value: &T,
-        _proof: &P,
-        _parameters: &T::Parameters,
-    ) -> Result<(), T::Error> {
-        Ok(())
-    }
-}
 
 /// Result of a credential verification.
 pub enum ProofValidity {

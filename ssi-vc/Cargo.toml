@@ -10,9 +10,11 @@ documentation = "https://docs.rs/ssi-vc/"
 
 [dependencies]
 ssi-crypto.workspace = true
+ssi-rdf.workspace = true
 treeldr-rust-macros.workspace = true
 treeldr-rust-prelude.workspace = true
 json-ld.workspace = true
+rdf-types.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 async-trait.workspace = true
