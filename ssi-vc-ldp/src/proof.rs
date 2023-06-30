@@ -1,24 +1,44 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf};
-use rdf_types::{BlankIdBuf, Id, Literal, Object, Quad, Subject, VocabularyMut};
+use json_ld::rdf::{RDF_TYPE, XSD_STRING};
+use rdf_types::{
+    interpretation::ReverseIriInterpretation, BlankIdBuf, Id, IriVocabulary, Literal, Object, Quad,
+    Subject, VocabularyMut,
+};
+use ssi_crypto::ProofPurpose;
+use ssi_verification_methods::LinkedDataVerificationMethod;
 use static_iref::iri;
 use treeldr_rust_prelude::{
+    grdf::Graph,
     json_ld,
     locspan::{Meta, Stripped},
+    FromRdf, FromRdfError,
 };
 
-use crate::suite::{Type, VerificationMethod};
+use crate::CryptographicSuite;
+
+/// Any proof type.
+pub struct AnyType {
+    pub iri: IriBuf,
+    pub cryptographic_suite: Option<String>,
+}
+
+impl AnyType {
+    pub fn new(iri: IriBuf, cryptographic_suite: Option<String>) -> Self {
+        Self {
+            iri,
+            cryptographic_suite,
+        }
+    }
+}
 
 /// Data Integrity Proof.
 ///
 /// # Type parameters
 ///
 /// - `T`: proof type value type.
-/// - `M`: verification method type. Represents the IRI to the verification
-/// method. By default it is `IriBuf`, meaning that any IRI can be represented,
-/// but some application may choose to restrict the supported methods.
-pub struct Proof<T, M = IriBuf> {
+pub struct Proof<T: CryptographicSuite> {
     /// Proof type.
     ///
     /// Also includes the cryptographic suite variant.
@@ -28,17 +48,20 @@ pub struct Proof<T, M = IriBuf> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
 
     /// Verification method.
-    pub verification_method: M,
+    pub verification_method: T::VerificationMethod,
 
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
 
     /// Multi-base encoded proof value.
-    pub proof_value: String,
+    pub proof_value: ssi_vc::schema::sec::layout::Multibase,
 }
 
-impl<T, M> Proof<T, M> {
-    pub fn from_options(options: ProofOptions<T, M>, proof_value: String) -> Self {
+impl<T: CryptographicSuite> Proof<T> {
+    pub fn from_options(
+        options: ProofOptions<T>,
+        proof_value: ssi_vc::schema::sec::layout::Multibase,
+    ) -> Self {
         Self::new(
             options.type_,
             options.created,
@@ -51,9 +74,9 @@ impl<T, M> Proof<T, M> {
     pub fn new(
         type_: T,
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: M,
+        verification_method: T::VerificationMethod,
         proof_purpose: ProofPurpose,
-        proof_value: String,
+        proof_value: ssi_vc::schema::sec::layout::Multibase,
     ) -> Self {
         Self {
             type_,
@@ -63,17 +86,33 @@ impl<T, M> Proof<T, M> {
             proof_value,
         }
     }
+
+    pub fn suite(&self) -> &T {
+        &self.type_
+    }
 }
 
-impl<T: Type, M: VerificationMethod, V: VocabularyMut>
-    treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V> for Proof<T, M>
+pub const SEC_CRYPTOSUITE_IRI: Iri<'static> = iri!("https://w3id.org/security#cryptosuite");
+pub const SEC_VERIFICATION_METHOD_IRI: Iri<'static> =
+    iri!("https://w3id.org/security#verificationMethod");
+pub const SEC_PROOF_PURPOSE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofPurpose");
+pub const SEC_PROOF_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofValue");
+
+pub const DC_CREATED_IRI: Iri<'static> = iri!("http://purl.org/dc/terms/created");
+
+pub const XSD_DATETIME_IRI: Iri<'static> = iri!("http://www.w3.org/2001/XMLSchema#dateTime");
+
+impl<T: CryptographicSuite, V: VocabularyMut, I>
+    treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V, I> for Proof<T>
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
+    T::VerificationMethod: treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V, I>,
 {
     fn into_json_ld_object_meta(
         self,
         vocabulary: &mut V,
+        interpretation: &I,
         meta: (),
     ) -> json_ld::IndexedObject<V::Iri, V::BlankId, ()> {
         let mut node = json_ld::Node::new();
@@ -87,12 +126,7 @@ where
 
         if let Some(crypto_suite) = self.type_.cryptographic_suite() {
             properties.insert(
-                Meta(
-                    json_ld::Id::iri(
-                        vocabulary.insert(iri!("https://w3id.org/security#cryptosuite")),
-                    ),
-                    (),
-                ),
+                Meta(json_ld::Id::iri(vocabulary.insert(SEC_CRYPTOSUITE_IRI)), ()),
                 Meta(
                     json_ld::Indexed::new(
                         json_ld::Object::Value(json_ld::Value::Literal(
@@ -109,17 +143,14 @@ where
         }
 
         properties.insert(
-            Meta(
-                json_ld::Id::iri(vocabulary.insert(iri!("http://purl.org/dc/terms/created"))),
-                (),
-            ),
+            Meta(json_ld::Id::iri(vocabulary.insert(DC_CREATED_IRI)), ()),
             Meta(
                 json_ld::Indexed::new(
                     json_ld::Object::Value(json_ld::Value::Literal(
                         json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
                             self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
                         )),
-                        Some(vocabulary.insert(iri!("http://www.w3.org/2001/XMLSchema#dateTime"))),
+                        Some(vocabulary.insert(XSD_DATETIME_IRI)),
                     )),
                     None,
                 ),
@@ -129,31 +160,16 @@ where
 
         properties.insert(
             Meta(
-                json_ld::Id::iri(
-                    vocabulary.insert(iri!("https://w3id.org/security#verificationMethod")),
-                ),
+                json_ld::Id::iri(vocabulary.insert(SEC_VERIFICATION_METHOD_IRI)),
                 (),
             ),
-            Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
-                        json_ld::syntax::Entry::new(
-                            (),
-                            Meta(
-                                json_ld::Id::iri(vocabulary.insert(self.verification_method.iri())),
-                                (),
-                            ),
-                        ),
-                    ))),
-                    None,
-                ),
-                (),
-            ),
+            self.verification_method
+                .into_json_ld_object_meta(vocabulary, interpretation, ()),
         );
 
         properties.insert(
             Meta(
-                json_ld::Id::iri(vocabulary.insert(iri!("https://w3id.org/security#proofPurpose"))),
+                json_ld::Id::iri(vocabulary.insert(SEC_PROOF_PURPOSE_IRI)),
                 (),
             ),
             Meta(
@@ -174,10 +190,7 @@ where
         );
 
         properties.insert(
-            Meta(
-                json_ld::Id::iri(vocabulary.insert(iri!("https://w3id.org/security#proofValue"))),
-                (),
-            ),
+            Meta(json_ld::Id::iri(vocabulary.insert(SEC_PROOF_VALUE_IRI)), ()),
             Meta(
                 json_ld::Indexed::new(
                     json_ld::Object::Value(json_ld::Value::Literal(
@@ -213,23 +226,134 @@ where
     }
 }
 
-pub struct ProofConfiguration<T, M = IriBuf> {
+impl<T: CryptographicSuite + From<AnyType>, V: IriVocabulary, I> FromRdf<V, I> for Proof<T>
+where
+    I: ReverseIriInterpretation<Iri = V::Iri>,
+    ssi_vc::schema::xsd::layout::String: FromRdf<V, I>,
+    ssi_vc::schema::xsd::layout::DateTime: FromRdf<V, I>,
+    ssi_vc::schema::sec::layout::Multibase: FromRdf<V, I>,
+    T::VerificationMethod: FromRdf<V, I>,
+{
+    fn from_rdf<G>(
+        vocabulary: &V,
+        interpretation: &I,
+        graph: &G,
+        id: &I::Resource,
+    ) -> Result<Self, treeldr_rust_prelude::FromRdfError>
+    where
+        G: Graph<Subject = I::Resource, Predicate = I::Resource, Object = I::Resource>,
+    {
+        let mut type_ = None;
+        let mut crypto_suite = None;
+        let mut created = None;
+        let mut verification_method = None;
+        let mut proof_purpose = None;
+        let mut proof_value = None;
+
+        for (p, objects) in graph.predicates(id) {
+            if let Some(p) = interpretation.iris_of(p).next() {
+                let p = vocabulary.iri(p).unwrap();
+
+                if p == RDF_TYPE {
+                    for o in objects {
+                        match interpretation.iris_of(o).next() {
+                            Some(iri) => {
+                                let ty = vocabulary.iri(iri).unwrap();
+                                type_ = Some(ty.to_owned())
+                            }
+                            None => return Err(FromRdfError::UnexpectedLiteralValue),
+                        }
+                    }
+                } else if p == SEC_CRYPTOSUITE_IRI {
+                    for o in objects {
+                        crypto_suite = Some(ssi_vc::schema::xsd::layout::String::from_rdf(
+                            vocabulary,
+                            interpretation,
+                            graph,
+                            o,
+                        )?);
+                    }
+                } else if p == DC_CREATED_IRI {
+                    for o in objects {
+                        created = Some(ssi_vc::schema::xsd::layout::DateTime::from_rdf(
+                            vocabulary,
+                            interpretation,
+                            graph,
+                            o,
+                        )?);
+                    }
+                } else if p == SEC_VERIFICATION_METHOD_IRI {
+                    for o in objects {
+                        verification_method = Some(T::VerificationMethod::from_rdf(
+                            vocabulary,
+                            interpretation,
+                            graph,
+                            o,
+                        )?);
+                    }
+                } else if p == SEC_PROOF_PURPOSE_IRI {
+                    for o in objects {
+                        match interpretation.iris_of(o).next() {
+                            Some(iri) => {
+                                let ty = vocabulary.iri(iri).unwrap();
+                                proof_purpose = Some(ty.to_owned())
+                            }
+                            None => return Err(FromRdfError::UnexpectedLiteralValue),
+                        }
+                    }
+                } else if p == SEC_PROOF_VALUE_IRI {
+                    for o in objects {
+                        proof_value = Some(ssi_vc::schema::sec::layout::Multibase::from_rdf(
+                            vocabulary,
+                            interpretation,
+                            graph,
+                            o,
+                        )?);
+                    }
+                }
+            }
+        }
+
+        let type_ = type_.ok_or(FromRdfError::UnexpectedType)?;
+        let created = created.ok_or(FromRdfError::MissingRequiredPropertyValue)?;
+        let verification_method =
+            verification_method.ok_or(FromRdfError::MissingRequiredPropertyValue)?;
+        let proof_purpose: ProofPurpose = proof_purpose
+            .ok_or(FromRdfError::MissingRequiredPropertyValue)?
+            .try_into()
+            .map_err(|_| todo!("invalid proof purpose"))?;
+        let proof_value = proof_value.ok_or(FromRdfError::MissingRequiredPropertyValue)?;
+
+        Ok(Self {
+            type_: AnyType::new(type_, crypto_suite).into(),
+            created,
+            verification_method,
+            proof_purpose,
+            proof_value,
+        })
+    }
+}
+
+pub struct ProofConfiguration<T: CryptographicSuite> {
     pub type_: T,
     pub created: ssi_vc::schema::xsd::layout::DateTime,
-    pub verification_method: M,
+    pub verification_method: T::VerificationMethod,
     pub proof_purpose: ProofPurpose,
 }
 
-impl<T: Type, M: VerificationMethod> ProofConfiguration<T, M> {
+impl<T: CryptographicSuite> ProofConfiguration<T> {
     /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads(&self) -> Vec<Quad> {
+    pub fn quads(&self) -> Vec<Quad>
+    where
+        T::VerificationMethod: LinkedDataVerificationMethod,
+    {
         let mut result: Vec<Quad> = Vec::new();
 
         let subject = Subject::Blank(BlankIdBuf::from_suffix("proofConfiguration").unwrap());
 
         result.push(Quad(
             subject.clone(),
-            iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type").to_owned(),
+            RDF_TYPE.to_owned(),
             Object::Id(Id::Iri(self.type_.iri().to_owned())),
             None,
         ));
@@ -237,32 +361,37 @@ impl<T: Type, M: VerificationMethod> ProofConfiguration<T, M> {
         if let Some(crypto_suite) = self.type_.cryptographic_suite() {
             result.push(Quad(
                 subject.clone(),
-                iri!("https://w3id.org/security#cryptosuite").to_owned(),
-                Object::Literal(Literal::String(crypto_suite.to_string())),
+                SEC_CRYPTOSUITE_IRI.to_owned(),
+                Object::Literal(Literal::new(
+                    crypto_suite.to_string(),
+                    rdf_types::literal::Type::Any(XSD_STRING.to_owned()),
+                )),
                 None,
             ));
         }
 
         result.push(Quad(
             subject.clone(),
-            iri!("http://purl.org/dc/terms/created").to_owned(),
-            Object::Literal(Literal::TypedString(
+            DC_CREATED_IRI.to_owned(),
+            Object::Literal(Literal::new(
                 self.created.format("%Y-%m-%dT%H:%M:%S").to_string(),
-                iri!("http://www.w3.org/2001/XMLSchema#dateTime").to_owned(),
+                rdf_types::literal::Type::Any(XSD_DATETIME_IRI.to_owned()),
             )),
             None,
         ));
 
+        let verification_method = self.verification_method.quads(&mut result);
+
         result.push(Quad(
             subject.clone(),
-            iri!("https://w3id.org/security#verificationMethod").to_owned(),
-            Object::Id(Id::Iri(self.verification_method.iri().to_owned())),
+            SEC_VERIFICATION_METHOD_IRI.to_owned(),
+            verification_method,
             None,
         ));
 
         result.push(Quad(
             subject,
-            iri!("https://w3id.org/security#proofPurpose").to_owned(),
+            SEC_PROOF_PURPOSE_IRI.to_owned(),
             Object::Id(Id::Iri(self.proof_purpose.iri().to_owned())),
             None,
         ));
@@ -272,18 +401,18 @@ impl<T: Type, M: VerificationMethod> ProofConfiguration<T, M> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProofOptions<T, M = IriBuf> {
+pub struct ProofOptions<T: CryptographicSuite> {
     pub type_: T,
     pub created: ssi_vc::schema::xsd::layout::DateTime,
-    pub verification_method: M,
+    pub verification_method: T::VerificationMethod,
     pub proof_purpose: ProofPurpose,
 }
 
-impl<T, M> ProofOptions<T, M> {
+impl<T: CryptographicSuite> ProofOptions<T> {
     pub fn new(
         type_: T,
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: M,
+        verification_method: T::VerificationMethod,
         proof_purpose: ProofPurpose,
     ) -> Self {
         Self {
@@ -291,40 +420,6 @@ impl<T, M> ProofOptions<T, M> {
             created,
             verification_method,
             proof_purpose,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ProofPurpose {
-    /// <https://w3id.org/security#assertionMethod>
-    AssertionMethod,
-
-    /// <https://w3id.org/security#authenticationMethod>
-    Authentication,
-
-    /// <https://w3id.org/security#capabilityInvocationMethod>
-    CapabilityInvocation,
-
-    /// <https://w3id.org/security#capabilityDelegationMethod>
-    CapabilityDelegation,
-
-    /// <https://w3id.org/security#keyAgreementMethod>
-    KeyAgreement,
-}
-
-impl ProofPurpose {
-    pub fn iri(&self) -> Iri<'static> {
-        match self {
-            Self::AssertionMethod => iri!("https://w3id.org/security#assertionMethod"),
-            Self::Authentication => iri!("https://w3id.org/security#authenticationMethod"),
-            Self::CapabilityInvocation => {
-                iri!("https://w3id.org/security#capabilityInvocationMethod")
-            }
-            Self::CapabilityDelegation => {
-                iri!("https://w3id.org/security#capabilityDelegationMethod")
-            }
-            Self::KeyAgreement => iri!("https://w3id.org/security#keyAgreementMethod"),
         }
     }
 }
