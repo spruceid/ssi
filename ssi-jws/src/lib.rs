@@ -3,6 +3,8 @@
 // TODO reinstate Error::MissingFeatures ?
 
 pub mod error;
+use base64::DecodeError;
+pub use base64::DecodeError as Base64DecodeError;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
@@ -21,9 +23,67 @@ pub type VerificationWarnings = Vec<String>;
 pub struct CompactJWS([u8]);
 
 impl CompactJWS {
-    /// Creates a new compact JWS.
+    pub fn new(data: &[u8]) -> Result<&Self, InvalidCompactJWS<&[u8]>> {
+        if Self::check(data) {
+            Ok(unsafe { Self::new_unchecked(data) })
+        } else {
+            Err(InvalidCompactJWS(data))
+        }
+    }
+
+    /// Creates a new compact JWS without checking the data.
+    ///
+    /// # Safety
+    ///
+    /// The input `data` must represent a valid compact JWS.
     pub unsafe fn new_unchecked(data: &[u8]) -> &Self {
         std::mem::transmute(data)
+    }
+
+    pub fn check(data: &[u8]) -> bool {
+        enum State {
+            Header,
+            Payload,
+            Signature,
+        }
+
+        let mut state = State::Header;
+
+        for &b in data {
+            match state {
+                State::Header => match b {
+                    b'.' => state = State::Payload,
+                    b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
+                    _ => return false,
+                },
+                State::Payload => {
+                    if b == b'.' {
+                        state = State::Signature
+                    }
+                }
+                State::Signature => {
+                    match b {
+                        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
+                        b'.' => (), // it was still the payload, not in base64.
+                        _ => state = State::Payload, // still the payload, not in base64.
+                    }
+                }
+            }
+        }
+
+        matches!(state, State::Signature)
+    }
+
+    pub fn check_signing_bytes(data: &[u8]) -> bool {
+        for &b in data {
+            match b {
+                b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
+                b'.' => return true,
+                _ => return false,
+            }
+        }
+
+        false
     }
 
     fn header_end(&self) -> usize {
@@ -47,7 +107,7 @@ impl CompactJWS {
         &self.0[..self.header_end()]
     }
 
-    pub fn decode_header(&self) -> Result<Header, Error> {
+    pub fn decode_header(&self) -> Result<Header, InvalidHeader> {
         Header::decode(self.header())
     }
 
@@ -59,7 +119,7 @@ impl CompactJWS {
     /// Decode the payload bytes.
     ///
     /// The header is necessary to know how the payload is encoded.
-    pub fn decode_payload(&self, header: &Header) -> Result<Cow<[u8]>, Error> {
+    pub fn decode_payload(&self, header: &Header) -> Result<Cow<[u8]>, DecodeError> {
         if header.base64urlencode_payload.unwrap_or(true) {
             Ok(Cow::Owned(base64::decode_config(
                 self.payload(),
@@ -75,11 +135,8 @@ impl CompactJWS {
         &self.0[self.signature_start()..]
     }
 
-    pub fn decode_signature(&self) -> Result<Vec<u8>, Error> {
-        Ok(base64::decode_config(
-            self.signature(),
-            base64::URL_SAFE_NO_PAD,
-        )?)
+    pub fn decode_signature(&self) -> Result<Vec<u8>, DecodeError> {
+        base64::decode_config(self.signature(), base64::URL_SAFE_NO_PAD)
     }
 
     /// Returns the signing bytes.
@@ -91,10 +148,53 @@ impl CompactJWS {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("invalid compact JWS")]
+pub struct InvalidCompactJWS<B>(pub B);
+
 /// JWS in compact serialized form.
 pub struct CompactJWSBuf(Vec<u8>);
 
 impl CompactJWSBuf {
+    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+        if CompactJWS::check(&bytes) {
+            Ok(Self(bytes))
+        } else {
+            Err(InvalidCompactJWS(bytes))
+        }
+    }
+
+    /// # Safety
+    ///
+    /// The input `bytes` must represent a valid compact JWS.
+    pub unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
+        Self(bytes)
+    }
+
+    pub fn from_signing_bytes_and_signature(
+        signing_bytes: Vec<u8>,
+        signature: Vec<u8>,
+    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+        let mut bytes = signing_bytes;
+        bytes.push(b'.');
+        bytes.extend(signature);
+        Self::new(bytes)
+    }
+
+    /// # Safety
+    ///
+    /// The input `signing_bytes` and `signature` must form a valid compact JWS
+    /// once concatenated with a `.`.
+    pub unsafe fn from_signing_bytes_and_signature_unchecked(
+        signing_bytes: Vec<u8>,
+        signature: Vec<u8>,
+    ) -> Self {
+        let mut bytes = signing_bytes;
+        bytes.push(b'.');
+        bytes.extend(signature);
+        Self::new_unchecked(bytes)
+    }
+
     pub fn as_compact_jws(&self) -> &CompactJWS {
         unsafe { CompactJWS::new_unchecked(&self.0) }
     }
@@ -166,11 +266,54 @@ pub struct Header {
     pub additional_parameters: BTreeMap<String, serde_json::Value>,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidHeader {
+    #[error(transparent)]
+    Base64(DecodeError),
+
+    #[error(transparent)]
+    Json(serde_json::Error),
+}
+
+impl From<DecodeError> for InvalidHeader {
+    fn from(value: DecodeError) -> Self {
+        InvalidHeader::Base64(value)
+    }
+}
+
+impl From<serde_json::Error> for InvalidHeader {
+    fn from(value: serde_json::Error) -> Self {
+        InvalidHeader::Json(value)
+    }
+}
+
 impl Header {
     /// Decode a JWS Protected Header.
-    pub fn decode(base_64: &[u8]) -> Result<Self, Error> {
+    pub fn decode(base_64: &[u8]) -> Result<Self, InvalidHeader> {
         let header_json = base64::decode_config(base_64, base64::URL_SAFE_NO_PAD)?;
         Ok(serde_json::from_slice(&header_json)?)
+    }
+
+    pub fn to_json_string(&self) -> String {
+        serde_json::to_string(self).unwrap()
+    }
+
+    pub fn encode(&self) -> Vec<u8> {
+        base64::encode_config(self.to_json_string(), base64::URL_SAFE_NO_PAD).into_bytes()
+    }
+
+    pub fn encode_signing_bytes(&self, payload: &[u8]) -> Vec<u8> {
+        let mut result = self.encode();
+        result.push(b'.');
+
+        if self.base64urlencode_payload.unwrap_or(true) {
+            let encoded_payload = base64::encode_config(payload, base64::URL_SAFE_NO_PAD);
+            result.extend(encoded_payload.into_bytes())
+        } else {
+            result.extend(payload)
+        }
+
+        result
     }
 }
 
