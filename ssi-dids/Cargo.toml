@@ -9,29 +9,25 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-dids/"
 
 [features]
+default = ["http"]
 http = ["reqwest", "percent-encoding"]
 example = []
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-verification-methods.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 serde_urlencoded = "0.7"
-async-trait = "0.1"
-thiserror = "1.0"
-anyhow = "1.0"
-derive_builder = "0.9"
-bs58 = { version = "0.4", features = ["check"] }
-hex = "0.4"
-multibase = "0.8"
+async-trait.workspace = true
+thiserror.workspace = true
+iref = { workspace = true, features = ["serde"] }
+static-iref.workspace = true
+
+# for the `http` feature.
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"], optional = true }
 percent-encoding = { version = "2.1", optional = true }
-iref = { version = "2.2.2", features = ["serde"] }
-static-iref = "2.0.0"
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.2" }
-ssi-core = { path = "../ssi-core", version = "0.1"}
-ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  }
-
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
