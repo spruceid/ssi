@@ -13,7 +13,7 @@ use serde_json::Value as JsonValue;
 use serde_with::{
     base64::{Base64, UrlSafe},
     formats::Unpadded,
-    serde_as, DisplayFromStr,
+    serde_as,
 };
 use ssi_dids::{
     did_resolve::{dereference, Content, DIDResolver},
@@ -204,7 +204,6 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
 }
 
 /// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
-#[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "iss")]
@@ -224,7 +223,6 @@ pub struct Payload<F = JsonValue, A = JsonValue> {
         default = "Option::default"
     )]
     pub facts: Option<BTreeMap<String, F>>,
-    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
     #[serde(rename = "prf", skip_serializing_if = "Option::is_none", default)]
     pub proof: Option<Vec<Cid>>,
     #[serde(rename = "cap")]
@@ -309,7 +307,6 @@ fn now() -> f64 {
 pub struct UcanRevocation {
     #[serde(rename = "iss")]
     pub issuer: String,
-    #[serde_as(as = "DisplayFromStr")]
     pub revoke: Cid,
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     pub challenge: Vec<u8>,
