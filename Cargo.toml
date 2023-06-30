@@ -85,13 +85,14 @@ members = [
   # "ssi-core",
   "ssi-crypto",
   # "ssi-json-ld",
-  # "ssi-dids",
+  "ssi-dids",
   "ssi-jws",
   "ssi-jwt",
   # "ssi-tzkey",
   # "ssi-ssh",
   # "ssi-ucan",
   "ssi-rdf",
+  "ssi-verification-methods",
   "ssi-vc",
   "ssi-vc-jwt",
   "ssi-vc-ldp",
@@ -101,26 +102,34 @@ members = [
 [workspace.dependencies]
 ssi-core = { path = "./ssi-core", version = "0.1" }
 ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
+ssi-verification-methods = { path = "./ssi-verification-methods", version = "0.1" }
 ssi-jwk = { path = "./ssi-jwk", version = "0.1" }
 ssi-jws = { path = "./ssi-jws", version = "0.1" }
 ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
+ssi-dids = { path = "./ssi-dids", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
 async-trait = "0.1.68"
 thiserror = "1.0.40"
 chrono = "0.4.24"
 iref = "2.2.3"
 static-iref = "2"
-rdf-types = "0.14.9"
-grdf = "0.18.0"
+rdf-types = "0.15.4"
+grdf = "0.19.0"
 locspan = "0.7.13"
 json-syntax = "0.9.4"
-nquads-syntax = "0.12.0"
+nquads-syntax = "0.13.0"
 multibase = "0.9.1"
-json-ld = "0.14.1"
+json-ld = "0.15"
 serde = "1.0"
-treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr" }
-treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr" }
+serde_json = "1.0"
+# treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr" }
+# treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr" }
+treeldr-rust-macros = { path = "/home/timothee/Projets/spruceid/treeldr/modules/rust/macros" }
+treeldr-rust-prelude = { path = "/home/timothee/Projets/spruceid/treeldr/modules/rust/prelude" }
+
+[patch.crates-io]
+rdf-types = { path = "/home/timothee/Projets/utils/rdf/rdf-types" }
 
 # [dev-dependencies]
 # async-std = { version = "1.9", features = ["attributes"] }
