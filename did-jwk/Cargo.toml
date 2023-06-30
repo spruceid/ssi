@@ -18,14 +18,16 @@ secp256r1 = ["ssi-jwk/secp256r1"]
 ed25519 = ["ssi-jwk/ed25519"]
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1" }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
-async-trait = "0.1"
+ssi-crypto.workspace = true
+ssi-dids.workspace = true
+ssi-jwk.workspace = true
+async-trait.workspace = true
 multibase = "0.8"
-serde_json = "1.0"
+serde_json.workspace = true
 serde_jcs = "0.1"
-iref = "2.2"
-static-iref = "2.0"
+iref.workspace = true
+static-iref.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
