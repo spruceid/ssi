@@ -429,7 +429,7 @@ mod tests {
     #[async_std::test]
     async fn valid() {
         let cases: Vec<ValidTestVector> =
-            serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-valid.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/ucan-v0.10.0-valid.json")).unwrap();
 
         for case in cases {
             let ucan = Ucan::decode_and_verify(&case.token, DIDKey.to_resolver())
@@ -444,7 +444,7 @@ mod tests {
     #[async_std::test]
     async fn invalid() {
         let cases: Vec<InvalidTestVector> =
-            serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-invalid.json")).unwrap();
+            serde_json::from_str(include_str!("../../tests/ucan-v0.10.0-invalid.json")).unwrap();
         for case in cases {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
@@ -466,18 +466,23 @@ mod tests {
         let key = JWK::generate_ed25519().unwrap();
         let iss = DIDKey.generate(&Source::Key(&key)).unwrap();
         let aud = "did:example:123".to_string();
-        let payload = Payload::<JsonValue, JsonValue>::new(iss, aud);
+        let mut payload = Payload::<JsonValue, JsonValue>::new(iss, aud);
+        payload.expiration = Some(NumericDate::try_from_seconds(now() + 60.0).unwrap());
+        payload.not_before = Some(NumericDate::try_from_seconds(now() - 60.0).unwrap());
+        payload
+            .capabilities
+            .with_action_convert("https://example.com/resource", "https/get", [])
+            .unwrap();
+        payload.proof = Some(vec![canonical_cid("hello")]);
 
         let ucan = payload
             .sign_canonicalized(Algorithm::EdDSA, &key, None)
             .unwrap();
 
-        Ucan::<JsonValue>::decode_and_verify(
-            &ucan.encode_as_canonicalized_jwt().unwrap(),
-            DIDKey.to_resolver(),
-        )
-        .await
-        .unwrap();
+        let encoded = ucan.encode_as_canonicalized_jwt().unwrap();
+        Ucan::<JsonValue>::decode_and_verify(&encoded, DIDKey.to_resolver())
+            .await
+            .unwrap();
     }
 
     #[derive(Deserialize)]
