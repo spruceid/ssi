@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{
     base64::{Base64, UrlSafe},
+    formats::Unpadded,
     serde_as, DisplayFromStr,
 };
 use ssi_dids::{
@@ -314,7 +315,7 @@ pub struct UcanRevocation {
     pub issuer: String,
     #[serde_as(as = "DisplayFromStr")]
     pub revoke: Cid,
-    #[serde_as(as = "Base64<UrlSafe>")]
+    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
     pub challenge: Vec<u8>,
 }
 
