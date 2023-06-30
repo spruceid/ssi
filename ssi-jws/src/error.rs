@@ -1,3 +1,5 @@
+use crate::InvalidHeader;
+
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
     /// Missing curve in JWK
@@ -46,6 +48,15 @@ pub enum Error {
     UnexpectedSignatureLength(usize, usize),
     #[error("Invalid signature")]
     InvalidSignature,
+}
+
+impl From<InvalidHeader> for Error {
+    fn from(value: InvalidHeader) -> Self {
+        match value {
+            InvalidHeader::Base64(e) => Self::Base64(e),
+            InvalidHeader::Json(e) => Self::Json(e),
+        }
+    }
 }
 
 #[cfg(feature = "ring")]
