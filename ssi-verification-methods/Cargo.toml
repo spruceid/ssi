@@ -1,0 +1,30 @@
+[package]
+name = "ssi-verification-methods"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verification methods implementation for ssi"
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-verification-methods/"
+
+[features]
+default = ["ed25519"]
+ed25519 = ["ed25519-dalek"]
+
+[dependencies]
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+json-syntax.workspace = { workspace = true, features = ["serde"] }
+async-trait.workspace = true
+iref.workspace = true
+static-iref.workspace = true
+rdf-types.workspace = true
+thiserror.workspace = true
+json-ld.workspace = true
+treeldr-rust-prelude.workspace = true
+
+ed25519-dalek = { version = "1", optional = true }
