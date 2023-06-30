@@ -9,6 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-ldp/"
 
 [dependencies]
+ssi-verification-methods.workspace = true
 async-trait.workspace = true
 rdf-types.workspace = true
 treeldr-rust-prelude.workspace = true
@@ -22,6 +23,8 @@ multibase.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
+json-ld.workspace = true
+grdf.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

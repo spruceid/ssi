@@ -1,29 +1,31 @@
-use ssi_crypto::VerifierProvider;
+use std::{future::Future, pin::Pin};
+
+use ssi_crypto::{VerificationError, Verifier};
 use ssi_vc::ProofValidity;
 
-use crate::{suite::VerificationParameters, DataIntegrity, Proof, VerifiableCryptographicSuite};
+use crate::{CryptographicSuite, DataIntegrity, Proof};
 
-impl<T, S, M> ssi_vc::VerifiableWith<Proof<S, M>> for DataIntegrity<T>
-where
-    S: VerifiableCryptographicSuite<M>,
-{
-    type Method = M;
+pub use method::{
+    Reference as MethodReference, ReferenceOrOwned as MethodReferenceOrOwned, VerificationMethod,
+};
+pub use ssi_verification_methods as method;
 
-    type Transformed = S::Transformed;
-    type Parameters = S::VerificationParameters;
+impl<T: Sync, S: CryptographicSuite> ssi_vc::VerifiableWith for DataIntegrity<T, S> {
+    type Proof = Proof<S>;
+    type Method = S::VerificationMethod;
 
-    type Error = S::Error;
-
-    fn verify_with(
-        &self,
-        context: &mut impl ssi_vc::Context<Self, Proof<S, M>>,
-        verifiers: &impl VerifierProvider<Self::Method>,
-        proof: &Proof<S, M>,
-        parameters: Self::Parameters,
-    ) -> Result<ProofValidity, S::Error> {
-        let transformed = context.transform(self, &proof, &parameters)?;
-        let suite = &proof.type_;
-        let hash = suite.hash(transformed, parameters.into_hash_parameters())?;
-        suite.verify_proof(hash, verifiers, &proof)
+    fn verify_with<'life0, 'life1, 'life2, 'async_trait>(
+        &'life0 self,
+        verifier: &'life1 (impl 'async_trait + Verifier<Self::Method>),
+        proof: &'life2 Self::Proof,
+    ) -> Pin<Box<dyn Future<Output = Result<ProofValidity, VerificationError>> + Send + 'async_trait>>
+    where
+        'life0: 'async_trait,
+        'life1: 'async_trait,
+        'life2: 'async_trait,
+        Self: 'async_trait,
+    {
+        let suite = proof.suite();
+        suite.verify_proof(&self.hash, verifier, proof)
     }
 }
