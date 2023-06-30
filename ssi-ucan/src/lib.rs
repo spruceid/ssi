@@ -238,6 +238,20 @@ pub enum TimeInvalid {
 }
 
 impl<F, A> Payload<F, A> {
+    /// Create a new UCAN payload
+    pub fn new(issuer: String, audience: String) -> Self {
+        Self {
+            issuer,
+            audience,
+            not_before: None,
+            expiration: None,
+            nonce: None,
+            facts: None,
+            proof: None,
+            capabilities: Capabilities::new(),
+        }
+    }
+
     /// Validate the time bounds of the UCAN
     pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
         let t = time.unwrap_or_else(now);
