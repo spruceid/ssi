@@ -218,6 +218,8 @@ pub struct Payload<F = JsonValue, A = JsonValue> {
     pub issuer: String,
     #[serde(rename = "aud")]
     pub audience: String,
+    #[serde(rename = "iat", skip_serializing_if = "Option::is_none", default)]
+    pub issued_at: Option<NumericDate>,
     #[serde(rename = "nbf", skip_serializing_if = "Option::is_none", default)]
     pub not_before: Option<NumericDate>,
     // no expiration should serialize to null in JSON
@@ -252,6 +254,7 @@ impl<F, A> Payload<F, A> {
         Self {
             issuer,
             audience,
+            issued_at: None,
             not_before: None,
             expiration: None,
             nonce: None,
