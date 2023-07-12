@@ -34,7 +34,7 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
     signature: Vec<u8>,
 }
 
-#[derive(Clone, PartialEq, Debug, SerializeDisplay, DeserializeFromStr)]
+#[derive(Clone, PartialEq, Debug, SerializeDisplay, DeserializeFromStr, Default)]
 struct SemanticVersion;
 
 impl std::fmt::Display for SemanticVersion {
