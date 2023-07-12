@@ -51,10 +51,10 @@ impl<F, A> Ucan<F, A> {
     /// Extract or resolve the JWK used to issue this UCAN
     pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
         match (
-            self.payload.issuer.get(..4),
-            self.payload.issuer.get(4..8),
+            self.payload.issuer().get(..4),
+            self.payload.issuer().get(4..8),
             &self.header.jwk,
-            dereference(resolver, &self.payload.issuer, &Default::default())
+            dereference(resolver, &self.payload.issuer(), &Default::default())
                 .await
                 .1,
         ) {
@@ -133,7 +133,7 @@ impl<F, A> Ucan<F, A> {
             return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
-        if !payload.audience.starts_with("did:") {
+        if !payload.audience().starts_with("did:") {
             return Err(Error::DIDURL);
         }
 
@@ -214,16 +214,19 @@ mod tests {
         let key = JWK::generate_ed25519().unwrap();
         let iss = DIDKey.generate(&Source::Key(&key)).unwrap();
         let aud = "did:example:123".to_string();
-        let mut payload = Payload::<JsonValue, JsonValue>::new(iss, aud);
-        payload.expiration = Some(now() + 60);
-        payload.not_before = Some(now() - 60);
+        let mut payload = Payload::<JsonValue, JsonValue>::builder(iss, aud);
         payload
-            .capabilities
+            .expiration(now() + 60)
+            .not_before(now() - 60)
+            .proof(vec![canonical_cid("hello")])
+            .capabilities()
             .with_action_convert("https://example.com/resource", "https/get", [])
             .unwrap();
-        payload.proof = Some(vec![canonical_cid("hello")]);
 
-        let ucan = payload.sign_canonicalized(Algorithm::EdDSA, &key).unwrap();
+        let ucan = payload
+            .build()
+            .sign_canonicalized(Algorithm::EdDSA, &key)
+            .unwrap();
 
         let encoded = ucan.encode_as_canonicalized_jwt().unwrap();
         Ucan::<JsonValue>::decode_and_verify(&encoded, DIDKey.to_resolver())
