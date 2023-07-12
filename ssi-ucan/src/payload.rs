@@ -79,7 +79,8 @@ impl<F, A> Payload<F, A> {
     {
         let header = Header {
             algorithm,
-            jwk: if self.issuer.starts_with("did:pkh:") {
+            type_: Some("JWT".to_string()),
+            jwk: if self.issuer().starts_with("did:pkh:") {
                 Some(key.to_public())
             } else {
                 None
