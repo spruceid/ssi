@@ -12,7 +12,7 @@ pub use ucan_capabilities_object as capabilities;
 
 /// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
 #[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, Hash)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "ucv")]
     semantic_version: SemanticVersion,
@@ -59,7 +59,9 @@ impl<F, A> Payload<F, A> {
         }
     }
 
-    /// Validate the time bounds of the UCAN
+    /// Validate the time bounds of the UCAN payload
+    ///
+    /// Passing `None` will use the current system time.
     pub fn validate_time<T: PartialOrd<u64>>(&self, time: Option<T>) -> Result<(), TimeInvalid> {
         match time {
             Some(t) => cmp_time(t, self.not_before, self.expiration),
@@ -67,7 +69,7 @@ impl<F, A> Payload<F, A> {
         }
     }
 
-    /// Sign the payload with the given key and optional custom header claims
+    /// Sign the payload with the given key and algorithm
     ///
     /// This will use the canonical form of the UCAN for signing
     pub fn sign_canonicalized(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
@@ -77,7 +79,6 @@ impl<F, A> Payload<F, A> {
     {
         let header = Header {
             algorithm,
-            type_: Some("JWT".to_string()),
             jwk: if self.issuer.starts_with("did:pkh:") {
                 Some(key.to_public())
             } else {
@@ -103,11 +104,26 @@ impl<F, A> Payload<F, A> {
             key,
         )?;
 
-        Ok(Ucan {
+        Ok(self.sign(header, signature))
+    }
+
+    /// Sign the payload with the given header and signature
+    ///
+    /// This will not ensure that the header and signature are valid for the payload and will
+    /// not canonicalize the payload before signing. All header fields except for `alg` and `jwk`
+    /// will be ignored.
+    pub fn sign(self, mut header: Header, signature: Vec<u8>) -> Ucan<F, A> {
+        header = Header {
+            algorithm: header.algorithm,
+            type_: Some("JWT".to_string()),
+            jwk: header.jwk,
+            ..Default::default()
+        };
+        Ucan {
             header,
             payload: self,
             signature,
-        })
+        }
     }
 }
 
