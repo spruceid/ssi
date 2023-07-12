@@ -13,7 +13,7 @@ use serde_json::Value as JsonValue;
 use serde_with::{
     base64::{Base64, UrlSafe},
     formats::Unpadded,
-    serde_as, DisplayFromStr,
+    serde_as, DeserializeFromStr, DisplayFromStr, SerializeDisplay,
 };
 use ssi_dids::{
     did_resolve::{dereference, Content, DIDResolver},
@@ -21,7 +21,6 @@ use ssi_dids::{
 };
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
-use ssi_jwt::NumericDate;
 use std::collections::BTreeMap;
 
 use capabilities::Capabilities;
@@ -35,7 +34,32 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
     signature: Vec<u8>,
 }
 
-const VERSION_STRING: &str = "0.2.0";
+#[derive(Clone, PartialEq, Debug, SerializeDisplay, DeserializeFromStr)]
+struct SemanticVersion;
+
+impl std::fmt::Display for SemanticVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "0.2.0")
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+enum VersionError {
+    #[error("Invalid version: expected 0.2.0, found {0}")]
+    InvalidVersion(String),
+}
+
+impl std::str::FromStr for SemanticVersion {
+    type Err = VersionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "0.2.0" {
+            Ok(Self)
+        } else {
+            Err(VersionError::InvalidVersion(s.to_string()))
+        }
+    }
+}
 
 impl<F, A> Ucan<F, A> {
     /// Get the Header of the UCAN
@@ -142,11 +166,6 @@ impl<F, A> Ucan<F, A> {
             return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
-        match parts.header.additional_parameters.get("ucv") {
-            Some(JsonValue::String(v)) if v == VERSION_STRING => (),
-            _ => return Err(Error::MissingUCANHeaderField("ucv: 0.2.0")),
-        }
-
         if !payload.audience.starts_with("did:") {
             return Err(Error::DIDURL);
         }
@@ -214,17 +233,19 @@ fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error>
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
+    #[serde(rename = "ucv")]
+    semantic_version: SemanticVersion,
     #[serde(rename = "iss")]
     pub issuer: String,
     #[serde(rename = "aud")]
     pub audience: String,
     #[serde(rename = "iat", skip_serializing_if = "Option::is_none", default)]
-    pub issued_at: Option<NumericDate>,
+    pub issued_at: Option<u64>,
     #[serde(rename = "nbf", skip_serializing_if = "Option::is_none", default)]
-    pub not_before: Option<NumericDate>,
+    pub not_before: Option<u64>,
     // no expiration should serialize to null in JSON
     #[serde(rename = "exp")]
-    pub expiration: Option<NumericDate>,
+    pub expiration: Option<u64>,
     #[serde(rename = "nnc", skip_serializing_if = "Option::is_none", default)]
     pub nonce: Option<String>,
     #[serde(
@@ -252,6 +273,7 @@ impl<F, A> Payload<F, A> {
     /// Create a new UCAN payload
     pub fn new(issuer: String, audience: String) -> Self {
         Self {
+            semantic_version: SemanticVersion,
             issuer,
             audience,
             issued_at: None,
@@ -265,48 +287,25 @@ impl<F, A> Payload<F, A> {
     }
 
     /// Validate the time bounds of the UCAN
-    pub fn validate_time(&self, time: Option<f64>) -> Result<(), TimeInvalid> {
-        let t = time.unwrap_or_else(now);
-        match (self.not_before, self.expiration) {
-            (_, Some(exp)) if t >= exp.as_seconds() => Err(TimeInvalid::TooLate),
-            (Some(nbf), _) if t < nbf.as_seconds() => Err(TimeInvalid::TooEarly),
-            _ => Ok(()),
+    pub fn validate_time<T: PartialOrd<u64>>(&self, time: Option<T>) -> Result<(), TimeInvalid> {
+        match time {
+            Some(t) => cmp_time(t, self.not_before, self.expiration),
+            None => cmp_time(now(), self.not_before, self.expiration),
         }
     }
 
     /// Sign the payload with the given key and optional custom header claims
     ///
     /// This will use the canonical form of the UCAN for signing
-    pub fn sign_canonicalized(
-        self,
-        algorithm: Algorithm,
-        key: &JWK,
-        custom_header: Option<Header>,
-    ) -> Result<Ucan<F, A>, Error>
+    pub fn sign_canonicalized(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
     where
         F: Serialize,
         A: Serialize,
     {
-        let header = if let Some(mut ch) = custom_header {
-            ch.algorithm = algorithm;
-            ch.type_ = Some("JWT".to_string());
-            ch.additional_parameters.insert(
-                "ucv".to_string(),
-                serde_json::Value::String(VERSION_STRING.to_string()),
-            );
-            ch
-        } else {
-            Header {
-                algorithm,
-                type_: Some("JWT".to_string()),
-                additional_parameters: [(
-                    "ucv".to_string(),
-                    serde_json::Value::String(VERSION_STRING.to_string()),
-                )]
-                .into_iter()
-                .collect(),
-                ..Default::default()
-            }
+        let header = Header {
+            algorithm,
+            type_: Some("JWT".to_string()),
+            ..Default::default()
         };
 
         let signature = sign_bytes(
@@ -334,8 +333,20 @@ impl<F, A> Payload<F, A> {
     }
 }
 
-fn now() -> f64 {
-    (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
+fn now() -> u64 {
+    chrono::prelude::Utc::now().timestamp() as u64
+}
+
+fn cmp_time<T: PartialOrd<u64>>(
+    t: T,
+    nbf: Option<u64>,
+    exp: Option<u64>,
+) -> Result<(), TimeInvalid> {
+    match (nbf, exp) {
+        (_, Some(exp)) if t >= exp => Err(TimeInvalid::TooLate),
+        (Some(nbf), _) if t < nbf => Err(TimeInvalid::TooEarly),
+        _ => Ok(()),
+    }
 }
 
 #[serde_as]
@@ -447,7 +458,7 @@ mod tests {
         for case in cases {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
-                    if u.payload.validate_time(None).is_ok()
+                    if u.payload.validate_time::<u64>(None).is_ok()
                         && Ucan::<JsonValue>::decode_and_verify(&case.token, DIDKey.to_resolver())
                             .await
                             .is_ok()
@@ -466,17 +477,15 @@ mod tests {
         let iss = DIDKey.generate(&Source::Key(&key)).unwrap();
         let aud = "did:example:123".to_string();
         let mut payload = Payload::<JsonValue, JsonValue>::new(iss, aud);
-        payload.expiration = Some(NumericDate::try_from_seconds(now() + 60.0).unwrap());
-        payload.not_before = Some(NumericDate::try_from_seconds(now() - 60.0).unwrap());
+        payload.expiration = Some(now() + 60);
+        payload.not_before = Some(now() - 60);
         payload
             .capabilities
             .with_action_convert("https://example.com/resource", "https/get", [])
             .unwrap();
         payload.proof = Some(vec![canonical_cid("hello")]);
 
-        let ucan = payload
-            .sign_canonicalized(Algorithm::EdDSA, &key, None)
-            .unwrap();
+        let ucan = payload.sign_canonicalized(Algorithm::EdDSA, &key).unwrap();
 
         let encoded = ucan.encode_as_canonicalized_jwt().unwrap();
         Ucan::<JsonValue>::decode_and_verify(&encoded, DIDKey.to_resolver())
