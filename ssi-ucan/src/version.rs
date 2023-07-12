@@ -4,7 +4,18 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Clone, PartialEq, Debug, SerializeDisplay, DeserializeFromStr, Default)]
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Debug,
+    SerializeDisplay,
+    DeserializeFromStr,
+    Default,
+)]
 pub struct SemanticVersion;
 
 impl Display for SemanticVersion {
