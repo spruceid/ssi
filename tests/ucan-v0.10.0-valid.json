@@ -1,61 +1,61 @@
 [
     {
-  "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuMi4wIn0.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnt9LCJleHAiOm51bGwsImlzcyI6ImRpZDprZXk6ejZNa2s2ZGhxZ1Izd1N3UmZzUzd0aGpCWGdjZFBkdDFNVVFGS2tlMld2YmtVY0JjIn0.HRiPiWC_vlp2ASSDGNS_qXSNDRg32Abj-dABOdlOFqfWcrIYs8sNs_hNx6jG4CgUXTAs09t5EdmlOeZHAsieDQ",
-    "assertions": {
-  "payload": {
-    "iss": "did:key:z6Mkk6dhqgR3wSwRfsS7thjBXgcdPdt1MUQFKke2WvbkUcBc",
-    "aud": "did:example:123",
-    "exp": null,
-    "cap": {}
-  },
-  "header": {
-    "alg": "EdDSA",
-    "typ": "JWT",
-    "ucv": "0.2.0"
-  }
-    }
-  },
+        "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnt9LCJleHAiOm51bGwsImlzcyI6ImRpZDprZXk6ejZNa24yQ0dudnlWRUN6aXNFQU5Ib2ZEbzNDMlFMdFV6MWt6bmhueUhtejd6S3VLIiwidWN2IjoiMC4yLjAifQ.KfsbfN8D5wh5Jciu7sFN8B_IfOVYsnjvX-6Ib1EQ-Kfa8n_ETrqoiGH1Vp7JvPUqaVOq8cd4WcudiUxsFLE7Cg",
+        "assertions": {
+            "payload": {
+                "ucv": "0.2.0",
+                "iss": "did:key:z6Mkn2CGnvyVECzisEANHofDo3C2QLtUz1kznhnyHmz7zKuK",
+                "aud": "did:example:123",
+                "exp": null,
+                "cap": {}
+            },
+            "header": {
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }
+        }
+    },
     {
-  "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuMi4wIn0.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnt9LCJleHAiOjE2ODgxMjk0NzguMDE4NDI1LCJpc3MiOiJkaWQ6a2V5Ono2TWtrNExMckppaW1HaDlyOWl6NVZURThTUUZwYUNBbnlKZHlibzZCNWtMWkI3cyIsIm5iZiI6MTY4ODEyOTM1OC4wMTg1NDU5fQ.n2tFQ7yLcWy9t5UdJBLePpxERY3m2CCbcgHpv9MbBIUKmFbm4e6XsR3LUnb2C7XQ60GOwJVhIY_QrOhExU8QCA",
-    "assertions": {
-  "payload": {
-    "iss": "did:key:z6Mkk4LLrJiimGh9r9iz5VTE8SQFpaCAnyJdybo6B5kLZB7s",
-    "aud": "did:example:123",
-    "nbf": 1688129358.0185459,
-    "exp": 1688129478.018425,
-    "cap": {}
-  },
-  "header": {
-    "alg": "EdDSA",
-    "typ": "JWT",
-    "ucv": "0.2.0"
-    }
-  }
-  },
+        "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnt9LCJleHAiOjE2ODkxNjAwMjcsImlzcyI6ImRpZDprZXk6ejZNa3JqZjZVVnIxTlRwTmFuWkZQZmROZ1V6aE53VGV1S0V6M2RNUjJOZm9meWZmIiwibmJmIjoxNjg5MTU5OTA3LCJ1Y3YiOiIwLjIuMCJ9.pPOWu9qchivhnUqNFhTD7sTSMLdUzGTzBeOl8nrlACHgrgKq5t00yI8vCaF6ykM533MOExI2vhcryiiH5MdtAQ",
+        "assertions": {
+            "payload": {
+                "ucv": "0.2.0",
+                "iss": "did:key:z6Mkrjf6UVr1NTpNanZFPfdNgUzhNwTeuKEz3dMR2Nfofyff",
+                "aud": "did:example:123",
+                "nbf": 1689159907,
+                "exp": 1689160027,
+                "cap": {}
+            },
+            "header": {
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }
+        }
+    },
     {
-  "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuMi4wIn0.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnsiaHR0cHM6Ly9leGFtcGxlLmNvbS9yZXNvdXJjZSI6eyJodHRwcy9nZXQiOlt7fV19fSwiZXhwIjoxNjg4MTI5NzQ2LjM3OTAwNjksImlzcyI6ImRpZDprZXk6ejZNa21ENDhmQ2ZFZ2R1MlpQYlhjQjJ5VjlRbW5NNEZxOGlqV0xRSFpEZHNKYTRpIiwibmJmIjoxNjg4MTI5NjI2LjM3OTIwNCwicHJmIjpbImJhZmtyZWlibTZqZzN1eDVxdW1oY24yYjNmbGMzdHl1NmRtbGI0eGE3dTViZjQ0eWVnbnJqaGM0eWVxIl19.Dr1eD479hhKq5P2ZFbcfwzxDdnANaIrGQ_-oZ8uzH75DPYat2jyL6Z0BYP0fbiimESn28QjLjC2fPjOJVZp1BA",
-    "assertions": {
-  "payload": {
-     "iss": "did:key:z6MkmD48fCfEgdu2ZPbXcB2yV9QmnM4Fq8ijWLQHZDdsJa4i",
-     "aud": "did:example:123",
-     "nbf": 1688129626.379204,
-     "exp": 1688129746.3790069,
-     "prf": [
-       "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq"
-     ],
-     "cap": {
-       "https://example.com/resource": {
-         "https/get": [
-           {}
-         ]
-       }
-     }
-  },
-  "header": {
-    "alg": "EdDSA",
-    "typ": "JWT",
-    "ucv": "0.2.0"
-  }
-  }
-}
-  ]
+        "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnsiaHR0cHM6Ly9leGFtcGxlLmNvbS9yZXNvdXJjZSI6eyJodHRwcy9nZXQiOlt7fV19fSwiZXhwIjoxNjg5MTYwMDU5LCJpc3MiOiJkaWQ6a2V5Ono2TWt1WHRkcWNKUFpYVW5TRHZ4RUQ4Zkp5THQxcGk4ODdtUXdiSDE3Mno5REtXUiIsIm5iZiI6MTY4OTE1OTkzOSwicHJmIjpbImJhZmtyZWlibTZqZzN1eDVxdW1oY24yYjNmbGMzdHl1NmRtbGI0eGE3dTViZjQ0eWVnbnJqaGM0eWVxIl0sInVjdiI6IjAuMi4wIn0.1NGP4X41R-hwnEJ-jM0iGLjQtbBx35KtqkmElCSzMB776P1hLKNGPmTmrSfb4G5uHnh24NkZm7oum98Mi3WDAA",
+        "assertions": {
+            "payload": {
+                "ucv": "0.2.0",
+                "iss": "did:key:z6MkuXtdqcJPZXUnSDvxED8fJyLt1pi887mQwbH172z9DKWR",
+                "aud": "did:example:123",
+                "nbf": 1689159939,
+                "exp": 1689160059,
+                "prf": [
+                    "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq"
+                ],
+                "cap": {
+                    "https://example.com/resource": {
+                        "https/get": [
+                            {}
+                        ]
+                    }
+                }
+            },
+            "header": {
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }
+        }
+    }
+]
