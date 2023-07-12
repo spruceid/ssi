@@ -1,30 +1,24 @@
-pub mod error;
+mod error;
+mod payload;
+mod revocation;
+mod util;
+mod version;
+
 pub use error::Error;
-use libipld::{
-    codec::Codec,
-    error::Error as IpldError,
-    json::DagJsonCodec,
-    multihash::{Code, MultihashDigest},
-    serde::to_ipld,
-    Cid,
-};
+pub use payload::{capabilities, Payload, TimeInvalid};
+pub use revocation::UcanRevocation;
+pub use util::canonical_cid;
+
+use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use serde_with::{
-    base64::{Base64, UrlSafe},
-    formats::Unpadded,
-    serde_as, DeserializeFromStr, DisplayFromStr, SerializeDisplay,
-};
 use ssi_dids::{
     did_resolve::{dereference, Content, DIDResolver},
-    Document, Resource, VerificationMethod, VerificationMethodMap,
+    Resource, VerificationMethod,
 };
-use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
-use std::collections::BTreeMap;
-
-use capabilities::Capabilities;
-pub use ucan_capabilities_object as capabilities;
+use ssi_jwk::JWK;
+use ssi_jws::{decode_jws_parts, split_jws, verify_bytes, Header};
+use util::{match_key_with_did_pkh, match_key_with_vm};
 
 /// A deserialized UCAN
 #[derive(Clone, PartialEq, Debug)]
@@ -32,33 +26,6 @@ pub struct Ucan<F = JsonValue, A = JsonValue> {
     header: Header,
     payload: Payload<F, A>,
     signature: Vec<u8>,
-}
-
-#[derive(Clone, PartialEq, Debug, SerializeDisplay, DeserializeFromStr, Default)]
-struct SemanticVersion;
-
-impl std::fmt::Display for SemanticVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "0.2.0")
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
-enum VersionError {
-    #[error("Invalid version: expected 0.2.0, found {0}")]
-    InvalidVersion(String),
-}
-
-impl std::str::FromStr for SemanticVersion {
-    type Err = VersionError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "0.2.0" {
-            Ok(Self)
-        } else {
-            Err(VersionError::InvalidVersion(s.to_string()))
-        }
-    }
 }
 
 impl<F, A> Ucan<F, A> {
@@ -199,246 +166,13 @@ impl<F, A> Ucan<F, A> {
     }
 }
 
-/// Calculate the canonical CID of a UCAN
-///
-/// This function does not verify that the given string is a valid UCAN.
-pub fn canonical_cid(jwt: &str) -> Cid {
-    Cid::new_v1(0x55, Code::Sha2_256.digest(jwt.as_bytes()))
-}
-
-fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
-    doc.verification_method
-        .iter()
-        .flatten()
-        .find_map(|vm| match vm {
-            VerificationMethod::Map(vm) if vm.blockchain_account_id.is_some() => {
-                Some(match_key_with_vm(key, vm))
-            }
-            _ => None,
-        })
-        .unwrap_or(Err(Error::VerificationMethodMismatch))
-}
-
-fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error> {
-    use std::str::FromStr;
-    Ok(ssi_caips::caip10::BlockchainAccountId::from_str(
-        vm.blockchain_account_id
-            .as_ref()
-            .ok_or(Error::VerificationMethodMismatch)?,
-    )?
-    .verify(key)?)
-}
-
-/// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
-pub struct Payload<F = JsonValue, A = JsonValue> {
-    #[serde(rename = "ucv")]
-    semantic_version: SemanticVersion,
-    #[serde(rename = "iss")]
-    pub issuer: String,
-    #[serde(rename = "aud")]
-    pub audience: String,
-    #[serde(rename = "iat", skip_serializing_if = "Option::is_none", default)]
-    pub issued_at: Option<u64>,
-    #[serde(rename = "nbf", skip_serializing_if = "Option::is_none", default)]
-    pub not_before: Option<u64>,
-    // no expiration should serialize to null in JSON
-    #[serde(rename = "exp")]
-    pub expiration: Option<u64>,
-    #[serde(rename = "nnc", skip_serializing_if = "Option::is_none", default)]
-    pub nonce: Option<String>,
-    #[serde(
-        rename = "fct",
-        skip_serializing_if = "Option::is_none",
-        default = "Option::default"
-    )]
-    pub facts: Option<BTreeMap<String, F>>,
-    #[serde_as(as = "Option<Vec<DisplayFromStr>>")]
-    #[serde(rename = "prf", skip_serializing_if = "Option::is_none", default)]
-    pub proof: Option<Vec<Cid>>,
-    #[serde(rename = "cap")]
-    pub capabilities: Capabilities<A>,
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum TimeInvalid {
-    #[error("UCAN not yet valid")]
-    TooEarly,
-    #[error("UCAN has expired")]
-    TooLate,
-}
-
-impl<F, A> Payload<F, A> {
-    /// Create a new UCAN payload
-    pub fn new(issuer: String, audience: String) -> Self {
-        Self {
-            semantic_version: SemanticVersion,
-            issuer,
-            audience,
-            issued_at: None,
-            not_before: None,
-            expiration: None,
-            nonce: None,
-            facts: None,
-            proof: None,
-            capabilities: Capabilities::new(),
-        }
-    }
-
-    /// Validate the time bounds of the UCAN
-    pub fn validate_time<T: PartialOrd<u64>>(&self, time: Option<T>) -> Result<(), TimeInvalid> {
-        match time {
-            Some(t) => cmp_time(t, self.not_before, self.expiration),
-            None => cmp_time(now(), self.not_before, self.expiration),
-        }
-    }
-
-    /// Sign the payload with the given key and optional custom header claims
-    ///
-    /// This will use the canonical form of the UCAN for signing
-    pub fn sign_canonicalized(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
-    where
-        F: Serialize,
-        A: Serialize,
-    {
-        let header = Header {
-            algorithm,
-            type_: Some("JWT".to_string()),
-            ..Default::default()
-        };
-
-        let signature = sign_bytes(
-            algorithm,
-            [
-                base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-                base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&self).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-            ]
-            .join(".")
-            .as_bytes(),
-            key,
-        )?;
-
-        Ok(Ucan {
-            header,
-            payload: self,
-            signature,
-        })
-    }
-}
-
-fn now() -> f64 {
-    (chrono::prelude::Utc::now()
-        .timestamp_nanos_opt()
-        .expect("value can not be represented in a timestamp with nanosecond precision.")
-        as f64)
-        / 1e+9_f64
-}
-
-fn cmp_time<T: PartialOrd<u64>>(
-    t: T,
-    nbf: Option<u64>,
-    exp: Option<u64>,
-) -> Result<(), TimeInvalid> {
-    match (nbf, exp) {
-        (_, Some(exp)) if t >= exp => Err(TimeInvalid::TooLate),
-        (Some(nbf), _) if t < nbf => Err(TimeInvalid::TooEarly),
-        _ => Ok(()),
-    }
-}
-
-#[serde_as]
-#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct UcanRevocation {
-    #[serde(rename = "iss")]
-    pub issuer: String,
-    #[serde_as(as = "DisplayFromStr")]
-    pub revoke: Cid,
-    #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
-    pub challenge: Vec<u8>,
-}
-
-impl UcanRevocation {
-    pub fn sign(
-        issuer: String,
-        revoke: Cid,
-        jwk: &JWK,
-        algorithm: Algorithm,
-    ) -> Result<Self, Error> {
-        Ok(Self {
-            issuer,
-            revoke,
-            challenge: sign_bytes(algorithm, format!("REVOKE:{revoke}").as_bytes(), jwk)?,
-        })
-    }
-    pub async fn verify_signature(
-        &self,
-        resolver: &dyn DIDResolver,
-        algorithm: Algorithm,
-        jwk: Option<&JWK>,
-    ) -> Result<(), Error> {
-        let key: JWK = match (
-            self.issuer.get(..4),
-            self.issuer.get(4..8),
-            jwk,
-            dereference(resolver, &self.issuer, &Default::default())
-                .await
-                .1,
-        ) {
-            // did:pkh without fragment
-            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(jwk, &d)?;
-                jwk.clone()
-            }
-            // did:pkh with fragment
-            (
-                Some("did:"),
-                Some("pkh:"),
-                Some(jwk),
-                Content::Object(Resource::VerificationMethod(vm)),
-            ) => {
-                match_key_with_vm(jwk, &vm)?;
-                jwk.clone()
-            }
-            // did:key without fragment
-            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
-                .verification_method
-                .iter()
-                .flatten()
-                .next()
-                .and_then(|v| match v {
-                    VerificationMethod::Map(vm) => Some(vm),
-                    _ => None,
-                })
-                .ok_or(Error::VerificationMethodMismatch)?
-                .get_jwk()?,
-            // general case, did with fragment
-            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
-                vm.get_jwk()?
-            }
-            _ => return Err(Error::VerificationMethodMismatch),
-        };
-
-        Ok(verify_bytes(
-            algorithm,
-            format!("REVOKE:{}", self.revoke).as_bytes(),
-            &key,
-            &self.challenge,
-        )?)
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::payload::now;
     use super::*;
     use did_method_key::DIDKey;
     use ssi_dids::{DIDMethod, Source};
+    use ssi_jwk::Algorithm;
 
     #[async_std::test]
     async fn valid() {
