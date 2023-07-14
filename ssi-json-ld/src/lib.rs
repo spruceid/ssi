@@ -80,6 +80,10 @@ pub const DID_CONFIGURATION_V0_0_CONTEXT: Iri =
     iri!("https://identity.foundation/.well-known/contexts/did-configuration-v0.0.jsonld");
 pub const JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT: Iri =
     iri!("https://purl.imsglobal.org/spec/ob/v3p0/context.json");
+pub const OB_V301_CONTEXT: Iri = iri!("https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.1.json");
+pub const OB_V3_EXTENSIONS_CONTEXT: Iri =
+    iri!("https://purl.imsglobal.org/spec/ob/v3p0/extensions.json");
+pub const CLR_V2_CONTEXT: Iri = iri!("https://purl.imsglobal.org/spec/clr/v2p0/context.json");
 
 /// Load a remote context from its static definition.
 fn load_static_context(iri: Iri, content: &str) -> RemoteDocument {
@@ -237,6 +241,18 @@ lazy_static::lazy_static! {
         JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT,
         ssi_contexts::JFF_VC_EDU_PLUGFEST_2022_2
     );
+    pub static ref OB_V301_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        OB_V301_CONTEXT,
+        ssi_contexts::OBV301,
+    );
+    pub static ref OB_V3_EXTENSIONS_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        OB_V3_EXTENSIONS_CONTEXT,
+        ssi_contexts::OBV3_EXTENSIONS,
+    );
+    pub static ref CLR_V2_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        CLR_V2_CONTEXT,
+        ssi_contexts::CLR_V2
+    );
 }
 
 macro_rules! iri_match {
@@ -325,6 +341,9 @@ impl Loader<IriBuf, Span> for StaticLoader {
                     JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
                         Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
                     },
+                    OB_V301_CONTEXT => Ok(OB_V301_CONTEXT_DOCUMENT.clone()),
+                    OB_V3_EXTENSIONS_CONTEXT => Ok(OB_V3_EXTENSIONS_CONTEXT_DOCUMENT.clone()),
+                    CLR_V2_CONTEXT => Ok(CLR_V2_CONTEXT_DOCUMENT.clone()),
                     _ as iri => Err(UnknownContext(iri))
                 }
             }
