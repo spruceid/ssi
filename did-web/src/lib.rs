@@ -47,7 +47,7 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
     let mut url = format!(
         "{}://{}/{}/did.json",
         proto,
-        domain_name.replace("%3A", ":"),
+        domain_name.replacen("%3A", ":", 1),
         path
     );
     #[cfg(test)]
@@ -210,6 +210,11 @@ mod tests {
         assert_eq!(
             did_web_url("did:web:example.com:u:bob").unwrap(),
             "https://example.com/u/bob/did.json"
+        );
+        // https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path-and-port
+        assert_eq!(
+            did_web_url("did:web:example.com%3A443:u:bob").unwrap(),
+            "https://example.com:443/u/bob/did.json"
         );
     }
 
