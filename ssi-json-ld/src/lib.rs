@@ -258,7 +258,7 @@ lazy_static::lazy_static! {
 macro_rules! iri_match {
     { match $input:ident { $($(#[$meta:meta])? $($id:ident)|* => $e:expr,)* _ as $default:ident => $de:expr } } => {
         match $input {
-            $($(#[$meta])? $input if $($input == $id)||* => $e),*
+            $($(#[$meta])? $input if $($input == $id)||* => $e),*,
             $default => $de
         }
     };
