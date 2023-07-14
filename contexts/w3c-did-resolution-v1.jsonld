@@ -39,6 +39,12 @@
     "canonicalId": {
       "@id": "https://w3id.org/did-resolution#canonicalId",
       "@type": "@id"
-    }
+    },
+
+    "content": "https://w3id.org/did-resolution#content",
+
+    "dereferencingMetadata": "https://w3id.org/did-resolution#dereferencingMetadata",
+
+    "contentMetadata": "https://w3id.org/did-resolution#contentMetadata"
   }
 }
