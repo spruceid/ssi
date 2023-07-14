@@ -1,0 +1,144 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://purl.imsglobal.org/spec/clr/v2p0/context.json",
+    "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.1.json",
+    "https://purl.imsglobal.org/spec/ob/v3p0/extensions.json",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://example.edu/credentials/3732",
+  "type": [
+    "VerifiableCredential",
+    "ClrCredential"
+  ],
+  "credentialSubject": {
+    "id": "urn:uuid:893c59e8-873e-4b86-a968-1238e12f3523",
+    "achievement": [
+      {
+        "creator": {
+          "id": "https://example.edu/issuers/565049",
+          "type": "Profile"
+        },
+        "criteria": {
+          "id": "https://example.edu/achievements/a7467ef6-56cb-11ec-bf63-0242ac130002/criteria"
+        },
+        "description": "Achievement 1",
+        "id": "urn:uuid:a7467ef6-56cb-11ec-bf63-0242ac130002",
+        "image": {
+          "id": "https://example.edu/achievements/sample.png",
+          "type": "Image"
+        },
+        "name": "Achievement 1",
+        "type": "Achievement"
+      },
+      {
+        "creator": {
+          "id": "https://example.edu/issuers/565049",
+          "type": "Profile"
+        },
+        "criteria": {
+          "id": "https://example.edu/achievements/dd887f0a-56cb-11ec-bf63-0242ac130002/criteria"
+        },
+        "description": "Achievement 2",
+        "id": "urn:uuid:dd887f0a-56cb-11ec-bf63-0242ac130002",
+        "image": {
+          "id": "https://example.edu/achievements/sample.png",
+          "type": "Image"
+        },
+        "name": "Achievement 2",
+        "type": "Achievement"
+      }
+    ],
+    "association": [
+      {
+        "associationType": "isParentOf",
+        "sourceId": "urn:uuid:a7467ef6-56cb-11ec-bf63-0242ac130002",
+        "targetId": "urn:uuid:dd887f0a-56cb-11ec-bf63-0242ac130002",
+        "type": "Association"
+      }
+    ],
+    "type": "ClrSubject",
+    "verifiableCredential": [
+      {
+        "@context": [
+          "https://www.w3.org/2018/credentials/v1",
+          "https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.1.json",
+          "https://purl.imsglobal.org/spec/ob/v3p0/extensions.json",
+          "https://w3id.org/security/data-integrity/v1"
+        ],
+        "credentialSchema": [
+          {
+            "id": "https://purl.imsglobal.org/spec/ob/v3p0/schema/json/ob_v3p0_achievementcredential_schema.json",
+            "type": "1EdTechJsonSchemaValidator2019"
+          }
+        ],
+        "credentialSubject": {
+          "achievement": {
+            "creator": {
+              "id": "https://example.edu/issuers/565049",
+              "type": "Profile"
+            },
+            "criteria": {
+              "id": "https://example.edu/achievements/a7467ef6-56cb-11ec-bf63-0242ac130002/criteria"
+            },
+            "description": "Achievement 1",
+            "id": "urn:uuid:a7467ef6-56cb-11ec-bf63-0242ac130002",
+            "image": {
+              "id": "https://example.edu/achievements/sample.png",
+              "type": "Image"
+            },
+            "name": "Achievement 1",
+            "type": "Achievement"
+          },
+          "id": "urn:uuid:d0068d6f-feff-4599-b8e6-e8a01908861a",
+          "type": "AchievementSubject"
+        },
+        "id": "urn:uuid:91537dba-56cb-11ec-bf63-0242ac130002",
+        "issuanceDate": "2023-07-14T20:07:57.523Z",
+        "issuer": {
+          "id": "did:example:foo",
+          "name": "Example University",
+          "type": "Profile"
+        },
+        "name": "Example University Degree",
+        "proof": {
+          "@context": [
+            "https://w3id.org/security/suites/jws-2020/v1"
+          ],
+          "created": "2023-07-14T20:07:57.524Z",
+          "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..T9gG59egUUfAUisGEYE2pZkxC9Tg8n_DHheSDKJTNpNE6n71r-skRdcHn4thmMCzW4KJqkY7qvuYSlnSlvFuPlnh-esBo6kJRb5BVzTNk8ibIzfQUfDTNn_CCtWLF5aF1a-jRu8ioPciSokv9QP_-aM3MEKE9Vyg2u9LI56LdkVm-iXxdME1jaGtJCI3LNpWScjxXRnsUurCrpZKkyZkPb8VK5KDCxaywSvG58_Y4SBU7eHarfoPJzT5AC6qS0zoRZTs-DuEpF6Hh1-Q1YEVCyO2zycgVQtpb7uVk430E7HiVkxVBOKEhJir21EEvdD8595jm7prWdtthf9JdAduzw",
+          "proofPurpose": "assertionMethod",
+          "type": "JsonWebSignature2020",
+          "verificationMethod": "did:example:foo#key1"
+        },
+        "type": [
+          "VerifiableCredential",
+          "AchievementCredential"
+        ]
+      }
+    ]
+  },
+  "issuer": {
+    "id": "did:example:foo",
+    "name": "Example University",
+    "type": "Profile"
+  },
+  "issuanceDate": "2023-07-14T20:11:10.687Z",
+  "proof": {
+    "@context": [
+      "https://w3id.org/security/suites/jws-2020/v1"
+    ],
+    "type": "JsonWebSignature2020",
+    "proofPurpose": "assertionMethod",
+    "verificationMethod": "did:example:foo#key1",
+    "created": "2023-07-14T20:11:10.688Z",
+    "jws": "eyJhbGciOiJQUzI1NiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..pGN1b3EpGHKYWfl_vqGYqMJXUtEC6Kyho2bQvPNjm15qUImrlO_hDDun1RjRvGatJsUEHPAvKVO6WeNK4l4XHo3DPT1R-caobnPonV6QazMuiRH_sqEAQufGXaM7MVfO1uOuW1PB6_xvathTbZri6dOzSH3xlocx3bcFCD8TpFCO7yIB-fFK5EA4P_Zn-EsOn8B7evhomDxG_m67-SuZC8Vqv6-OMDP7DpUTRlInCBC4wE7IuYXAWrSnSRdKCmu7qZjTIrbJ0NzWINfcxD9cZAEMiAbgsMUgNj8ElXypW86R6M7EslgYFbopZARUs9VG2wkS_6mCRQbR2Z8dIBS9Pg"
+  },
+  "credentialSchema": [
+    {
+      "id": "https://purl.imsglobal.org/spec/clr/v2p0/schema/json/clr_v2p0_clrcredential_schema.json",
+      "type": "1EdTechJsonSchemaValidator2019"
+    }
+  ],
+  "name": "Sample Transcript"
+}

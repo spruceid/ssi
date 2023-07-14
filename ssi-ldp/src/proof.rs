@@ -264,6 +264,7 @@ pub enum Check {
     #[serde(rename = "JWS")]
     JWS,
     Status,
+    Schema,
 }
 
 impl FromStr for Check {
@@ -273,6 +274,7 @@ impl FromStr for Check {
             "proof" => Ok(Self::Proof),
             "JWS" => Ok(Self::JWS),
             "credentialStatus" => Ok(Self::Status),
+            "credentialSchema" => Ok(Self::Schema),
             _ => Err(Error::UnsupportedCheck),
         }
     }
@@ -291,6 +293,7 @@ impl From<Check> for String {
             Check::Proof => "proof".to_string(),
             Check::JWS => "JWS".to_string(),
             Check::Status => "credentialStatus".to_string(),
+            Check::Schema => "credentialSchema".to_string(),
         }
     }
 }
