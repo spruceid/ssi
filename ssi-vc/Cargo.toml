@@ -47,6 +47,7 @@ serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto" }
 ssi-ldp = { path = "../ssi-ldp", features = ["aleo", "example-http-issuer", "secp384r1"] }
 ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
+ssi-contexts = { version = "0.1.5", path = "../contexts/" }
 josekit = "0.8.2"
 time = "0.3.20"
 rstest = "0.17.0"

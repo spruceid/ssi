@@ -1935,7 +1935,7 @@ pub(crate) mod tests {
     use ssi_dids::{
         did_resolve::DereferencingInputMetadata, example::DIDExample, VerificationMethodMap,
     };
-    use ssi_json_ld::urdna2015;
+    use ssi_json_ld::{urdna2015, CLR_V2_CONTEXT};
     use ssi_jws::sign_bytes_b64;
     use ssi_ldp::{ProofSuite, ProofSuiteType};
 
@@ -2937,7 +2937,17 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[async_std::test]
     async fn credential_schema() {
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let mut context_loader = ssi_json_ld::ContextLoader::default()
+            .with_context_map_from(
+                [(
+                    CLR_V2_CONTEXT.as_str().to_string(),
+                    ssi_contexts::CLR_V2.to_string(),
+                )]
+                .iter()
+                .cloned()
+                .collect(),
+            )
+            .unwrap();
         let mut options = LinkedDataProofOptions::default();
         options.checks = Some(vec![Check::Schema]);
 

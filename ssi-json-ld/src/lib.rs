@@ -343,7 +343,6 @@ impl Loader<IriBuf, Span> for StaticLoader {
                     },
                     OB_V301_CONTEXT => Ok(OB_V301_CONTEXT_DOCUMENT.clone()),
                     OB_V3_EXTENSIONS_CONTEXT => Ok(OB_V3_EXTENSIONS_CONTEXT_DOCUMENT.clone()),
-                    CLR_V2_CONTEXT => Ok(CLR_V2_CONTEXT_DOCUMENT.clone()),
                     _ as iri => Err(UnknownContext(iri))
                 }
             }
