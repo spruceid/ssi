@@ -1,6 +1,6 @@
 use crate::{Credential, CredentialSchema};
 use async_trait::async_trait;
-use boon::{Compiler, Draft, Schemas};
+use jsonschema::JSONSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_core::uri::URI;
@@ -53,20 +53,8 @@ impl CredentialSchema for OneEdTechJsonSchemaValidator2019 {
             }
         };
 
-        let mut schemas = Schemas::new();
-        let mut compiler = Compiler::new();
-
-        compiler.set_default_draft(Draft::V2019_09);
-
-        match compiler.add_resource(self.id.as_str(), credential_schema) {
-            Ok(_) => (),
-            Err(e) => {
-                return result.with_error(format!("Unable to add schema to compiler: {}", e));
-            }
-        }
-
-        let schema_index = match compiler.compile(self.id.as_str(), &mut schemas) {
-            Ok(index) => index,
+        let compiled = match JSONSchema::compile(&credential_schema) {
+            Ok(compiled_schema) => compiled_schema,
             Err(e) => {
                 return result.with_error(format!("Unable to compile schema: {}", e));
             }
@@ -79,10 +67,15 @@ impl CredentialSchema for OneEdTechJsonSchemaValidator2019 {
             }
         };
 
-        match schemas.validate(&value_credential, schema_index) {
+        match compiled.validate(&value_credential) {
             Ok(_) => (),
-            Err(e) => {
-                return result.with_error(format!("Schema validation error: {}", e));
+            Err(errors) => {
+                let error_string = errors
+                    .map(|error| format!("{} ({})", error, error.instance_path))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+
+                return result.with_error(format!("Schema validation error: {}", error_string));
             }
         }
 
