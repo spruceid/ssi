@@ -2962,6 +2962,40 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
     }
 
     #[async_std::test]
+    async fn invalid_credential_schema() {
+        let mut context_loader = ssi_json_ld::ContextLoader::default()
+            .with_context_map_from(
+                [(
+                    CLR_V2_CONTEXT.as_str().to_string(),
+                    ssi_contexts::CLR_V2.to_string(),
+                )]
+                .iter()
+                .cloned()
+                .collect(),
+            )
+            .unwrap();
+        let mut options = LinkedDataProofOptions::default();
+        options.checks = Some(vec![Check::Schema]);
+
+        let vc = Credential::from_json(include_str!("../../examples/vc-clr-invalid-schema.jsonld"))
+            .unwrap();
+        let result = vc
+            .verify(Some(options), &DIDExample, &mut context_loader)
+            .await;
+
+        println!("{:#?}", result);
+        assert!(!result.errors.is_empty());
+        assert!(
+            result
+                .errors
+                .iter()
+                .filter(|error| error.contains(&"Schema validation error"))
+                .count()
+                > 0
+        );
+    }
+
+    #[async_std::test]
     async fn interop_jwt_vc() {
         use time::{
             ext::NumericalDuration, format_description::well_known::Rfc3339, OffsetDateTime,
