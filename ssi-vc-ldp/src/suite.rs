@@ -19,9 +19,6 @@ pub struct TransformationOptions<T> {
 }
 
 /// Cryptographic suite.
-///
-/// The type parameter `T` is the type of documents on which the suite can be
-/// applied.
 #[async_trait]
 pub trait CryptographicSuite: Sync + Sized {
     /// Transformation algorithm parameters.
