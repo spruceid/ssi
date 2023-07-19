@@ -81,6 +81,7 @@ members = [
   # "vc-test",
   # "did-test",
   # "ssi-caips",
+  "ssi-multicodec",
   "ssi-jwk",
   # "ssi-core",
   "ssi-crypto",
@@ -101,10 +102,11 @@ members = [
 
 [workspace.dependencies]
 ssi-core = { path = "./ssi-core", version = "0.1" }
+ssi-multicodec = { path = "./ssi-multicodec", version = "0.1" }
 ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
 ssi-verification-methods = { path = "./ssi-verification-methods", version = "0.1" }
-ssi-jwk = { path = "./ssi-jwk", version = "0.1" }
-ssi-jws = { path = "./ssi-jws", version = "0.1" }
+ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
+ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
 ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
 ssi-dids = { path = "./ssi-dids", version = "0.1" }
@@ -123,13 +125,11 @@ multibase = "0.9.1"
 json-ld = "0.15"
 serde = "1.0"
 serde_json = "1.0"
-# treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr" }
-# treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr" }
-treeldr-rust-macros = { path = "/home/timothee/Projets/spruceid/treeldr/modules/rust/macros" }
-treeldr-rust-prelude = { path = "/home/timothee/Projets/spruceid/treeldr/modules/rust/prelude" }
+treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
+treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
 
 [patch.crates-io]
-rdf-types = { path = "/home/timothee/Projets/utils/rdf/rdf-types" }
+rdf-types = { git = "https://github.com/timothee-haudebourg/rdf-types.git", rev = "55a0826" }
 
 # [dev-dependencies]
 # async-std = { version = "1.9", features = ["attributes"] }

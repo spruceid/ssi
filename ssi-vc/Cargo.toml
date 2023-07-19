@@ -20,4 +20,4 @@ static-iref.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
-serde = { workspace = true, features = ["derive"]}
+serde = { workspace = true, features = ["derive"] }

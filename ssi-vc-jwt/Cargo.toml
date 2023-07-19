@@ -21,8 +21,8 @@ static-iref.workspace = true
 json-ld.workspace = true
 ssi-core.workspace = true
 ssi-crypto.workspace = true
-ssi-jwk = { workspace = true, default-features = false }
-ssi-jws = { workspace = true, default-features = false }
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
 ssi-jwt.workspace = true
 ssi-vc.workspace = true
 serde_with = "2.3.2"

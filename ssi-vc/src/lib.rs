@@ -13,7 +13,6 @@ use treeldr_rust_macros::tldr;
 use treeldr_rust_prelude::{locspan::Meta, rdf_types::VocabularyMut};
 
 pub mod datatype;
-pub mod linked_data;
 mod verification;
 pub mod vocab;
 

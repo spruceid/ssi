@@ -10,7 +10,14 @@ documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
 default = ["ed25519"]
+# enable ed25519 keys
 ed25519 = ["ed25519-dalek"]
+# enable secp256k1 keys
+secp256k1 = ["k256"]
+# enable secp256r1 (p256) keys
+secp256r1 = ["p256"]
+# enable secp384r1 (p384) keys
+secp384r1 = ["p384"]
 
 [dependencies]
 ssi-crypto.workspace = true
@@ -18,13 +25,18 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-json-syntax.workspace = { workspace = true, features = ["serde"] }
+json-syntax = { workspace = true, features = ["serde"] }
 async-trait.workspace = true
-iref.workspace = true
+iref = { workspace = true, features = ["serde"] }
 static-iref.workspace = true
 rdf-types.workspace = true
 thiserror.workspace = true
 json-ld.workspace = true
 treeldr-rust-prelude.workspace = true
+ssi-multicodec.workspace = true
+multibase.workspace = true
 
 ed25519-dalek = { version = "1", optional = true }
+k256 = { version = "0.11", optional = true, features = ["ecdsa"] }
+p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
+p384 = { version = "0.11", optional = true, features = ["ecdsa"] }
