@@ -1,17 +1,23 @@
 use std::hash::Hash;
 
+use async_trait::async_trait;
+use ed25519_dalek::Verifier;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
+use ssi_multicodec::MultiEncodedBuf;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
-use crate::{LinkedDataVerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI};
+use crate::{
+    ControllerProvider, LinkedDataVerificationMethod, VerificationMethod, CONTROLLER_IRI,
+    RDF_TYPE_IRI,
+};
 
 pub const MULTIBASE_IRI: Iri<'static> = iri!("https://w3id.org/security#multibase");
 
 pub const MULTIKEY_IRI: Iri<'static> = iri!("https://w3id.org/security#Multikey"); // TODO: find the definition in the specs.
 
-pub const MULTIKEY_TYPE: &'static str = "Multikey";
+pub const MULTIKEY_TYPE: &str = "Multikey";
 
 pub const PUBLIC_KEY_MULTIBASE_IRI: Iri<'static> =
     iri!("https://w3id.org/security#publicKeyMultibase");
@@ -29,6 +35,90 @@ pub struct Mulitkey {
 
     /// Public key.
     public_key_multibase: String,
+}
+
+#[async_trait]
+impl VerificationMethod for Mulitkey {
+    fn id(&self) -> Iri {
+        self.id.as_iri()
+    }
+
+    fn controller(&self) -> Iri {
+        self.controller.as_iri()
+    }
+
+    fn type_(&self) -> &str {
+        MULTIKEY_TYPE
+    }
+
+    async fn verify(
+        &self,
+        controllers: &impl ControllerProvider,
+        proof_purpose: ssi_crypto::ProofPurpose,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<bool, ssi_crypto::VerificationError> {
+        // Check proof purpose.
+        controllers
+            .ensure_allows_verification_method(
+                self.controller.as_iri(),
+                self.id.as_iri(),
+                proof_purpose,
+            )
+            .await?;
+
+        // Decode key.
+        let pk_multi_encoded = MultiEncodedBuf::new(
+            multibase::decode(&self.public_key_multibase)
+                .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?
+                .1,
+        )
+        .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+
+        let (pk_codec, pk_data) = pk_multi_encoded.parts();
+
+        match pk_codec {
+            #[cfg(any(feature = "ed25519"))]
+            ssi_multicodec::ED25519_PUB => {
+                let pk = ed25519_dalek::PublicKey::from_bytes(pk_data)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+                let signature = ed25519_dalek::Signature::from_bytes(signature)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
+                Ok(pk.verify(signing_bytes, &signature).is_ok())
+            }
+            #[cfg(feature = "secp256k1")]
+            ssi_multicodec::SECP256K1_PUB => {
+                let public_key = k256::PublicKey::from_sec1_bytes(pk_data)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+                let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
+                let signature = k256::ecdsa::Signature::try_from(signature)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
+
+                Ok(verifying_key.verify(signing_bytes, &signature).is_ok())
+            }
+            #[cfg(feature = "secp256r1")]
+            ssi_multicodec::P256_PUB => {
+                let public_key = p256::PublicKey::from_sec1_bytes(pk_data)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+                let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
+                let signature = p256::ecdsa::Signature::try_from(signature)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
+
+                Ok(verifying_key.verify(signing_bytes, &signature).is_ok())
+            }
+            #[cfg(feature = "secp384r1")]
+            ssi_multicodec::P384_PUB => {
+                let public_key = p384::PublicKey::from_sec1_bytes(pk_data)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+                let verifying_key = p384::ecdsa::VerifyingKey::from(public_key);
+                let signature = p384::ecdsa::Signature::try_from(signature)
+                    .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
+
+                Ok(verifying_key.verify(signing_bytes, &signature).is_ok())
+            }
+            _ => Err(ssi_crypto::VerificationError::InvalidKey),
+        }
+    }
 }
 
 impl LinkedDataVerificationMethod for Mulitkey {

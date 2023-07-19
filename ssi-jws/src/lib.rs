@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::convert::TryFrom;
 use std::ops::Deref;
 
 pub type VerificationWarnings = Vec<String>;
@@ -322,6 +321,7 @@ fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
 }
 
+#[allow(unreachable_code, unused_variables)]
 pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8>, Error> {
     let signature = match &key.params {
         #[cfg(feature = "ring")]
@@ -501,13 +501,13 @@ pub fn sign_bytes_b64(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<St
     Ok(sig_b64)
 }
 
+#[allow(unreachable_code, unused_variables, unused_mut)]
 pub fn verify_bytes_warnable(
     algorithm: Algorithm,
     data: &[u8],
     key: &JWK,
     signature: &[u8],
 ) -> Result<VerificationWarnings, Error> {
-    #[allow(unused_mut)]
     let mut warnings = VerificationWarnings::default();
     if let Some(key_algorithm) = key.algorithm {
         if key_algorithm != algorithm

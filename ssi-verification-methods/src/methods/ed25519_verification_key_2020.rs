@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use ed25519_dalek::Verifier;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
+use ssi_multicodec::MultiEncodedBuf;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
@@ -68,12 +69,23 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
                 proof_purpose,
             )
             .await?;
-        let pk_data: Vec<u8> = todo!();
-        let pk = ed25519_dalek::PublicKey::from_bytes(&pk_data)
-            .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
-        let signature = ed25519_dalek::Signature::from_bytes(signature)
-            .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
-        Ok(pk.verify(signing_bytes, &signature).is_ok())
+        let pk_multi_encoded = MultiEncodedBuf::new(
+            multibase::decode(&self.public_key_multibase)
+                .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?
+                .1,
+        )
+        .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+
+        let (pk_codec, pk_data) = pk_multi_encoded.parts();
+        if pk_codec == ssi_multicodec::ED25519_PUB {
+            let pk = ed25519_dalek::PublicKey::from_bytes(pk_data)
+                .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
+            let signature = ed25519_dalek::Signature::from_bytes(signature)
+                .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
+            Ok(pk.verify(signing_bytes, &signature).is_ok())
+        } else {
+            Err(ssi_crypto::VerificationError::InvalidKey)
+        }
     }
 }
 

@@ -2,6 +2,7 @@
 
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
+use ssi_multicodec::MultiEncoded;
 use std::convert::TryFrom;
 use std::result::Result;
 use zeroize::Zeroize;
@@ -21,8 +22,6 @@ pub mod eip155;
 pub mod blakesig;
 
 pub mod der;
-
-mod multicodec;
 
 use der::{
     BitString, Ed25519PrivateKey, Ed25519PublicKey, Integer, OctetString, RSAPrivateKey,
@@ -474,64 +473,27 @@ impl JWK {
         Ok(thumbprint)
     }
 
-    pub fn from_vm_type(type_: &str, pk_bytes: Vec<u8>) -> Result<Self, Error> {
-        match type_ {
-            // TODO: check against IRIs when in JSON-LD
-            #[cfg(feature = "ed25519")]
-            "Ed25519VerificationKey2018" => ed25519_parse(&pk_bytes),
-            #[cfg(feature = "ed25519")]
-            "Ed25519VerificationKey2020" => match multicodec::decode(&pk_bytes) {
-                Ok((codec, pk)) => match codec {
-                    multicodec::Codec::Ed25519Pub => ed25519_parse(&pk),
-                    _ => Err(Error::MultibaseKeyPrefix),
-                },
-                Err(_) => Err(Error::MultibaseKeyPrefix),
-            },
+    pub fn from_multicodec(multicodec: &MultiEncoded) -> Result<Self, Error> {
+        #[allow(unused_variables)]
+        let (codec, k) = multicodec.parts();
+        match codec {
+            #[cfg(any(feature = "ed25519"))]
+            ssi_multicodec::ED25519_PUB => ed25519_parse(k),
+            #[cfg(any(feature = "ed25519"))]
+            ssi_multicodec::ED25519_PRIV => ed25519_parse_private(k),
             #[cfg(feature = "secp256k1")]
-            "EcdsaSecp256k1VerificationKey2019" | "EcdsaSecp256k1RecoveryMethod2020" => {
-                secp256k1_parse(&pk_bytes)
-            }
-            "Multikey" => match multicodec::decode(&pk_bytes) {
-                Ok((codec, pk)) => match codec {
-                    #[cfg(feature = "ed25519")]
-                    multicodec::Codec::Ed25519Pub => ed25519_parse(&pk),
-                    #[cfg(feature = "secp256k1")]
-                    multicodec::Codec::Secp256k1Pub => secp256k1_parse(&pk),
-                    #[cfg(feature = "secp256r1")]
-                    multicodec::Codec::P256Pub => p256_parse(&pk),
-                    #[cfg(feature = "secp384r1")]
-                    multicodec::Codec::P384Pub => p384_parse(&pk),
-                    _ => Err(Error::MultibaseKeyPrefix),
-                },
-                Err(_) => Err(Error::MultibaseKeyPrefix),
-            },
-            _ => Err(Error::UnsupportedKeyType),
-        }
-    }
-
-    pub fn from_multicodec(multicodec: &str) -> Result<Self, Error> {
-        let bytes = multibase::decode(multicodec)?.1;
-        match multicodec::decode(&bytes) {
-            Ok((codec, k)) => match codec {
-                #[cfg(feature = "ed25519")]
-                multicodec::Codec::Ed25519Pub => ed25519_parse(&k),
-                #[cfg(feature = "ed25519")]
-                multicodec::Codec::Ed25519Priv => ed25519_parse_private(&k),
-                #[cfg(feature = "secp256k1")]
-                multicodec::Codec::Secp256k1Pub => secp256k1_parse(&k),
-                #[cfg(feature = "secp256k1")]
-                multicodec::Codec::Secp256k1Priv => secp256k1_parse_private(&k),
-                #[cfg(feature = "secp256r1")]
-                multicodec::Codec::P256Pub => p256_parse(&k),
-                #[cfg(feature = "secp256r1")]
-                multicodec::Codec::P256Priv => p256_parse_private(&k),
-                #[cfg(feature = "secp384r1")]
-                multicodec::Codec::P384Pub => p384_parse(&k),
-                #[cfg(feature = "secp384r1")]
-                multicodec::Codec::P384Priv => p384_parse_private(&k),
-                _ => Err(Error::MultibaseKeyPrefix),
-            },
-            Err(_) => Err(Error::MultibaseKeyPrefix),
+            ssi_multicodec::SECP256K1_PUB => secp256k1_parse(k),
+            #[cfg(feature = "secp256k1")]
+            ssi_multicodec::SECP256K1_PRIV => secp256k1_parse_private(k),
+            #[cfg(feature = "secp256r1")]
+            ssi_multicodec::P256_PUB => p256_parse(k),
+            #[cfg(feature = "secp256r1")]
+            ssi_multicodec::P256_PRIV => p256_parse_private(k),
+            #[cfg(feature = "secp384r1")]
+            ssi_multicodec::P384_PUB => p384_parse(k),
+            #[cfg(feature = "secp384r1")]
+            ssi_multicodec::P384_PRIV => p384_parse_private(k),
+            _ => Err(Error::MultibaseKeyPrefix),
         }
     }
 }
