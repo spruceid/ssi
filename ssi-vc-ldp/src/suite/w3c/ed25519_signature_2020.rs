@@ -28,10 +28,6 @@ pub use verification::method::Ed25519VerificationKey2020;
 pub struct Ed25519Signature2020;
 
 impl Ed25519Signature2020 {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn proof_configuration(options: &ProofOptions<Self>) -> ProofConfiguration<Self> {
         ProofConfiguration {
             type_: options.type_,
@@ -81,11 +77,9 @@ impl CryptographicSuite for Ed25519Signature2020 {
 
     fn iri(&self) -> iref::Iri {
         iri!("https://w3id.org/security#Ed25519Signature2020")
-        // iri!("https://w3id.org/security#DataIntegrityProof")
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
-        // Some("eddsa-2022")
         None
     }
 
@@ -112,7 +106,7 @@ impl CryptographicSuite for Ed25519Signature2020 {
             multibase::Base::Base58Btc,
             sig,
         ));
-        Ok(Proof::from_options(options, sig_multibase))
+        Ok(Proof::from_options(options, sig_multibase.into()))
     }
 
     async fn verify_proof(
@@ -121,7 +115,11 @@ impl CryptographicSuite for Ed25519Signature2020 {
         verifier: &impl Verifier<Self::VerificationMethod>,
         proof: &Proof<Self>,
     ) -> Result<ProofValidity, VerificationError> {
-        let proof_bytes = multibase::decode(proof.proof_value.as_str())
+        let proof_value = proof
+            .proof_value
+            .as_multibase()
+            .ok_or(VerificationError::InvalidProof)?;
+        let signature = multibase::decode(proof_value.as_str())
             .map_err(|_| VerificationError::InvalidProof)?
             .1;
         Ok(verifier
@@ -129,7 +127,7 @@ impl CryptographicSuite for Ed25519Signature2020 {
                 &proof.verification_method,
                 proof.proof_purpose,
                 data,
-                &proof_bytes,
+                &signature,
             )
             .await?
             .into())

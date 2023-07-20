@@ -2,6 +2,9 @@
 pub enum SignatureError {
     #[error("unknown verification method")]
     UnknownVerificationMethod,
+
+    #[error("internal signer error")]
+    InternalError,
 }
 
 pub trait Signer<M> {

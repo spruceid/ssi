@@ -22,6 +22,10 @@ impl<M> Reference<M> {
     pub fn into_iri(self) -> IriBuf {
         self.0
     }
+
+    pub fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
 }
 
 impl<M> fmt::Debug for Reference<M> {

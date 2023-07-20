@@ -23,12 +23,18 @@ pub use controller::*;
 pub use methods::*;
 pub use reference::*;
 
+#[cfg(feature = "ed25519")]
+pub use ed25519_dalek;
+
 /// IRI of the `rdf:type` property.
 pub(crate) const RDF_TYPE_IRI: Iri<'static> =
     iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
 
 /// IRI of the `rdf:JSON` datatype.
 pub(crate) const RDF_JSON: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON");
+
+/// IRI of the `xsd:string` datatype.
+pub(crate) const XSD_STRING: Iri<'static> = iri!("http://www.w3.org/2001/XMLSchema#string");
 
 /// IRI of the RDF property associated to the `controller` term found in a
 /// verification method.

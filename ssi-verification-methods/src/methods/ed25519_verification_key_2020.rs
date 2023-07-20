@@ -3,6 +3,7 @@ use std::hash::Hash;
 use async_trait::async_trait;
 use ed25519_dalek::Verifier;
 use iref::{Iri, IriBuf};
+use rand_core_0_5::{CryptoRng, RngCore};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use ssi_multicodec::MultiEncodedBuf;
 use static_iref::iri;
@@ -26,10 +27,10 @@ pub const ED25519_VERIFICATION_KEY_2020_TYPE: &str = "Ed25519VerificationKey2020
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Ed25519VerificationKey2020 {
     /// Key identifier.
-    id: IriBuf,
+    pub id: IriBuf,
 
     /// Controller of the verification method.
-    controller: IriBuf,
+    pub controller: IriBuf,
 
     /// Public key encoded according to [MULTICODEC] and formatted according to
     /// [MULTIBASE].
@@ -38,7 +39,39 @@ pub struct Ed25519VerificationKey2020 {
     /// two-byte prefix 0xed01 followed by the 32-byte public key data. The 34
     /// byte value is then encoded using base58-btc (z) as the prefix. Any other
     /// encoding MUST NOT be allowed.
-    public_key_multibase: String,
+    pub public_key_multibase: String,
+}
+
+impl Ed25519VerificationKey2020 {
+    pub fn generate_key_pair(
+        id: IriBuf,
+        controller: IriBuf,
+        csprng: &mut (impl RngCore + CryptoRng),
+    ) -> (Self, ed25519_dalek::SecretKey) {
+        let key = ed25519_dalek::Keypair::generate(csprng);
+        (
+            Self::from_public_key(id, controller, key.public),
+            key.secret,
+        )
+    }
+
+    pub fn from_public_key(
+        id: IriBuf,
+        controller: IriBuf,
+        public_key: ed25519_dalek::PublicKey,
+    ) -> Self {
+        let bytes = public_key.to_bytes();
+        let multi_encoded = MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, &bytes);
+
+        Self {
+            id,
+            controller,
+            public_key_multibase: multibase::encode(
+                multibase::Base::Base58Btc,
+                multi_encoded.as_bytes(),
+            ),
+        }
+    }
 }
 
 #[async_trait]

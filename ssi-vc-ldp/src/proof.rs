@@ -7,7 +7,7 @@ use rdf_types::{
     Subject, VocabularyMut,
 };
 use ssi_crypto::ProofPurpose;
-use ssi_verification_methods::LinkedDataVerificationMethod;
+use ssi_verification_methods::{LinkedDataVerificationMethod, MULTIBASE_IRI};
 use static_iref::iri;
 use treeldr_rust_prelude::{
     grdf::Graph,
@@ -53,15 +53,24 @@ pub struct Proof<T: CryptographicSuite> {
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
 
-    /// Multi-base encoded proof value.
-    pub proof_value: ssi_vc::schema::sec::layout::Multibase,
+    /// Proof value.
+    pub proof_value: ProofValue,
+}
+
+impl From<ssi_vc::schema::sec::layout::Multibase> for ProofValue {
+    fn from(value: ssi_vc::schema::sec::layout::Multibase) -> Self {
+        Self::Multibase(value)
+    }
+}
+
+impl From<ssi_jws::CompactJWSString> for ProofValue {
+    fn from(value: ssi_jws::CompactJWSString) -> Self {
+        Self::JWS(value)
+    }
 }
 
 impl<T: CryptographicSuite> Proof<T> {
-    pub fn from_options(
-        options: ProofOptions<T>,
-        proof_value: ssi_vc::schema::sec::layout::Multibase,
-    ) -> Self {
+    pub fn from_options(options: ProofOptions<T>, proof_value: ProofValue) -> Self {
         Self::new(
             options.type_,
             options.created,
@@ -76,7 +85,7 @@ impl<T: CryptographicSuite> Proof<T> {
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: T::VerificationMethod,
         proof_purpose: ProofPurpose,
-        proof_value: ssi_vc::schema::sec::layout::Multibase,
+        proof_value: ProofValue,
     ) -> Self {
         Self {
             type_,
@@ -92,11 +101,66 @@ impl<T: CryptographicSuite> Proof<T> {
     }
 }
 
+/// Proof value.
+///
+/// Modern cryptographic suites use the <https://w3id.org/security#proofValue>
+/// property to provide the proof value using a multibase encoding.
+/// However older cryptographic suites like `Ed25519Signature2018` may use
+/// different encoding, like [Detached Json Web Signatures][1].
+///
+/// [1]: <https://tools.ietf.org/html/rfc7797>
+pub enum ProofValue {
+    /// Standard multibase encoding using the
+    /// <https://w3id.org/security#proofValue> property.
+    ///
+    /// This this the official way of providing the proof value, but some older
+    /// cryptographic suites like `Ed25519Signature2018` may use different
+    /// means.
+    Multibase(ssi_vc::schema::sec::layout::Multibase),
+
+    /// Detached Json Web Signature using the deprecated
+    /// <https://w3id.org/security#jws> property.
+    ///
+    /// See: <https://tools.ietf.org/html/rfc7797>
+    JWS(ssi_jws::CompactJWSString),
+}
+
+impl ProofValue {
+    pub fn as_multibase(&self) -> Option<&ssi_vc::schema::sec::layout::Multibase> {
+        match self {
+            Self::Multibase(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn as_jws(&self) -> Option<&ssi_jws::CompactJWSString> {
+        match self {
+            Self::JWS(jws) => Some(jws),
+            _ => None,
+        }
+    }
+
+    pub fn into_multibase(self) -> Option<ssi_vc::schema::sec::layout::Multibase> {
+        match self {
+            Self::Multibase(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn into_jws(self) -> Option<ssi_jws::CompactJWSString> {
+        match self {
+            Self::JWS(jws) => Some(jws),
+            _ => None,
+        }
+    }
+}
+
 pub const SEC_CRYPTOSUITE_IRI: Iri<'static> = iri!("https://w3id.org/security#cryptosuite");
 pub const SEC_VERIFICATION_METHOD_IRI: Iri<'static> =
     iri!("https://w3id.org/security#verificationMethod");
 pub const SEC_PROOF_PURPOSE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofPurpose");
 pub const SEC_PROOF_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofValue");
+pub const SEC_JWS_IRI: Iri<'static> = iri!("https://w3id.org/security#jws");
 
 pub const DC_CREATED_IRI: Iri<'static> = iri!("http://purl.org/dc/terms/created");
 
@@ -189,21 +253,46 @@ where
             ),
         );
 
-        properties.insert(
-            Meta(json_ld::Id::iri(vocabulary.insert(SEC_PROOF_VALUE_IRI)), ()),
-            Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Value(json_ld::Value::Literal(
-                        json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                            self.proof_value.to_string(),
-                        )),
-                        Some(vocabulary.insert(iri!("https://w3id.org/security#multibase"))),
-                    )),
-                    None,
-                ),
-                (),
-            ),
-        );
+        match self.proof_value {
+            ProofValue::Multibase(proof_value) => {
+                properties.insert(
+                    Meta(json_ld::Id::iri(vocabulary.insert(SEC_PROOF_VALUE_IRI)), ()),
+                    Meta(
+                        json_ld::Indexed::new(
+                            json_ld::Object::Value(json_ld::Value::Literal(
+                                json_ld::object::Literal::String(
+                                    json_ld::object::LiteralString::Inferred(
+                                        proof_value.to_string(),
+                                    ),
+                                ),
+                                Some(vocabulary.insert(MULTIBASE_IRI)),
+                            )),
+                            None,
+                        ),
+                        (),
+                    ),
+                );
+            }
+            ProofValue::JWS(proof_value) => {
+                properties.insert(
+                    Meta(json_ld::Id::iri(vocabulary.insert(SEC_JWS_IRI)), ()),
+                    Meta(
+                        json_ld::Indexed::new(
+                            json_ld::Object::Value(json_ld::Value::Literal(
+                                json_ld::object::Literal::String(
+                                    json_ld::object::LiteralString::Inferred(
+                                        proof_value.into_string(),
+                                    ),
+                                ),
+                                Some(vocabulary.insert(XSD_STRING)),
+                            )),
+                            None,
+                        ),
+                        (),
+                    ),
+                );
+            }
+        }
 
         let mut graph = json_ld::Node::new();
         graph.set_graph(Some(json_ld::syntax::Entry::new(
@@ -303,12 +392,23 @@ where
                     }
                 } else if p == SEC_PROOF_VALUE_IRI {
                     for o in objects {
-                        proof_value = Some(ssi_vc::schema::sec::layout::Multibase::from_rdf(
-                            vocabulary,
-                            interpretation,
-                            graph,
-                            o,
-                        )?);
+                        proof_value = Some(ProofValue::Multibase(
+                            ssi_vc::schema::sec::layout::Multibase::from_rdf(
+                                vocabulary,
+                                interpretation,
+                                graph,
+                                o,
+                            )?,
+                        ));
+                    }
+                } else if p == SEC_JWS_IRI {
+                    for o in objects {
+                        let string = String::from_rdf(vocabulary, interpretation, graph, o)?;
+
+                        match ssi_jws::CompactJWSString::from_string(string) {
+                            Ok(jws) => proof_value = Some(ProofValue::JWS(jws)),
+                            Err(_) => return Err(FromRdfError::InvalidLexicalRepresentation),
+                        }
                     }
                 }
             }

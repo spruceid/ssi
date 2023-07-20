@@ -268,7 +268,7 @@ impl Default for Algorithm {
 }
 
 impl JWK {
-    #[cfg(any(feature = "ed25519"))]
+    #[cfg(feature = "ed25519")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         #[cfg(feature = "ring")]
         {
@@ -476,9 +476,9 @@ impl JWK {
         #[allow(unused_variables)]
         let (codec, k) = multicodec.parts();
         match codec {
-            #[cfg(any(feature = "ed25519"))]
+            #[cfg(feature = "ed25519")]
             ssi_multicodec::ED25519_PUB => ed25519_parse(k),
-            #[cfg(any(feature = "ed25519"))]
+            #[cfg(feature = "ed25519")]
             ssi_multicodec::ED25519_PRIV => ed25519_parse_private(k),
             #[cfg(feature = "secp256k1")]
             ssi_multicodec::SECP256K1_PUB => secp256k1_parse(k),
