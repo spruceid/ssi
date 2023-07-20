@@ -17,6 +17,12 @@ pub trait Controller {
     fn allows_verification_method(&self, id: Iri, proof_purposes: ProofPurposes) -> bool;
 }
 
+impl<'a, T: Controller> Controller for &'a T {
+    fn allows_verification_method(&self, id: Iri, proof_purposes: ProofPurposes) -> bool {
+        T::allows_verification_method(*self, id, proof_purposes)
+    }
+}
+
 /// Controller provider.
 ///
 /// A provider is in charge of retrieving the verification method controllers

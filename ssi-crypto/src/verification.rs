@@ -25,6 +25,10 @@ pub enum VerificationError {
     #[error("invalid key")]
     InvalidKey,
 
+    /// Key not found.
+    #[error("unknown key")]
+    UnknownKey,
+
     /// Cryptographic key is not used correctly.
     #[error("invalid use of key with <{0}>")]
     InvalidKeyUse(ProofPurpose),
@@ -94,6 +98,15 @@ macro_rules! proof_purposes {
             }
         }
 
+        impl BitOr<ProofPurpose> for ProofPurpose {
+            type Output = ProofPurposes;
+
+            fn bitor(self, other: Self) -> ProofPurposes {
+                let result: ProofPurposes = self.into();
+                result | other
+            }
+        }
+
         /// Set of proof purposes.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub struct ProofPurposes {
@@ -123,6 +136,10 @@ macro_rules! proof_purposes {
                         }
                     )*
                 }
+            }
+
+            pub fn contains_all(&self, p: Self) -> bool {
+                *self & p == p
             }
 
             pub fn insert(&mut self, p: ProofPurpose) {

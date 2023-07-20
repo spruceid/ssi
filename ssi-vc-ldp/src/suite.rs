@@ -8,10 +8,14 @@ use crate::Proof;
 
 mod dif;
 mod unspecified;
+
+#[cfg(feature = "w3c")]
 mod w3c;
 
 pub use dif::*;
 pub use unspecified::*;
+
+#[cfg(feature = "w3c")]
 pub use w3c::*;
 
 pub struct TransformationOptions<T> {
@@ -97,42 +101,43 @@ pub enum SuiteType {
     /// W3C RSA Signature Suite 2018.
     ///
     /// See: <https://w3c-ccg.github.io/lds-rsa2018/>
-    #[cfg(feature = "rsa")]
+    #[cfg(all(feature = "w3c", feature = "rsa"))]
     RsaSignature2018,
 
     /// W3C Ed25519 Signature 2018.
     ///
     /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/>
-    #[cfg(feature = "ed25519")]
+    #[cfg(all(feature = "w3c", feature = "ed25519"))]
     Ed25519Signature2018,
 
     /// W3C Ed25519 Signature 2020.
     ///
     /// See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-    #[cfg(feature = "ed25519")]
+    #[cfg(all(feature = "w3c", feature = "ed25519"))]
     Ed25519Signature2020,
 
-    // /// W3C EdDSA Cryptosuite v2022.
-    // ///
-    // /// See: <https://w3c.github.io/vc-di-eddsa/>
-    // #[cfg(feature = "ed25519")]
-    // EdSsa2022,
+    /// W3C EdDSA Cryptosuite v2022.
+    ///
+    /// See: <https://w3c.github.io/vc-di-eddsa/>
+    #[cfg(all(feature = "w3c", feature = "ed25519"))]
+    EdDsa2022,
+
     /// W3C Ecdsa Secp256k1 Signature 2019.
     ///
     /// See: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/>
-    #[cfg(feature = "secp256k1")]
+    #[cfg(all(feature = "w3c", feature = "secp256k1"))]
     EcdsaSecp256k1Signature2019,
 
     /// DIF Ecdsa Secp256k1 Recovery Signature 2019.
     ///
     /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
-    #[cfg(feature = "secp256k1")]
+    #[cfg(all(feature = "w3c", feature = "secp256k1"))]
     EcdsaSecp256k1RecoverySignature2020,
 
     /// W3C Ecdsa Secp256r1 Signature 2019.
     ///
     /// See: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1signature2019>
-    #[cfg(feature = "secp256r1")]
+    #[cfg(all(feature = "w3c", feature = "secp256r1"))]
     EcdsaSecp256r1Signature2019,
 
     /// W3C JSON Web Signature 2020.
@@ -144,7 +149,7 @@ pub enum SuiteType {
     /// W3C Ethereum EIP712 Signature 2021.
     ///
     /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
-    #[cfg(feature = "eip")]
+    #[cfg(all(feature = "w3c", feature = "eip"))]
     EthereumEip712Signature2021,
 
     /// Unspecified Ethereum Personal Signature 2021.
@@ -178,4 +183,27 @@ pub enum SuiteType {
     /// Unspecified Aleo Signature 2021.
     #[cfg(feature = "aleo")]
     AleoSignature2021,
+
+    /// Unknown suite type.
+    Unknown(String),
+}
+
+pub enum Suite {
+    /// W3C Ed25519 Signature 2018.
+    ///
+    /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/>
+    #[cfg(all(feature = "w3c", feature = "ed25519"))]
+    Ed25519Signature2018,
+
+    /// W3C Ed25519 Signature 2020.
+    ///
+    /// See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
+    #[cfg(all(feature = "w3c", feature = "ed25519"))]
+    Ed25519Signature2020,
+
+    /// W3C EdDSA Cryptosuite v2022.
+    ///
+    /// See: <https://w3c.github.io/vc-di-eddsa/>
+    #[cfg(all(feature = "w3c", feature = "ed25519"))]
+    EdDsa2022,
 }

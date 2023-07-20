@@ -8,6 +8,11 @@ description = "Verifiable Credential Data Integrity 1.0 implementation for the `
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-ldp/"
 
+[features]
+default = ["w3c", "ed25519"]
+w3c = []
+ed25519 = []
+
 [dependencies]
 ssi-verification-methods.workspace = true
 async-trait.workspace = true
@@ -30,6 +35,9 @@ grdf.workspace = true
 async-std = { version = "1.9", features = ["attributes"] }
 treeldr-rust-macros.workspace = true
 static-iref.workspace = true
+rand = "0.7"
+hashbrown = "0.13.0"
+iref = { workspace = true, features = ["hashbrown"] }
 
 [package.metadata.docs.rs]
 all-features = true

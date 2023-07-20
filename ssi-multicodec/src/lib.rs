@@ -52,6 +52,12 @@ impl MultiEncoded {
     pub fn data(&self) -> &[u8] {
         self.parts().1
     }
+
+    /// Returns the raw bytes, including the codec prefix.
+    #[inline(always)]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
 pub struct MultiEncodedBuf(Vec<u8>);
@@ -68,6 +74,15 @@ impl MultiEncodedBuf {
     pub fn new(bytes: Vec<u8>) -> Result<Self, Error> {
         unsigned_varint::decode::u64(&bytes)?;
         Ok(Self(bytes))
+    }
+
+    pub fn encode(codec: u64, bytes: &[u8]) -> Self {
+        let mut codec_buffer = [0u8; 10];
+        let encoded_codec = unsigned_varint::encode::u64(codec, &mut codec_buffer);
+        let mut result = Vec::with_capacity(encoded_codec.len() + bytes.len());
+        result.extend(encoded_codec);
+        result.extend(bytes);
+        Self(result)
     }
 
     /// Creates a new multi-encoded slice from the given `bytes` without
