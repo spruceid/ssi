@@ -48,23 +48,43 @@ pub enum VerificationError {
     #[error("unsupported key controller scheme `{0}`")]
     UnsupportedControllerScheme(String),
 
+    #[error("invalid verification method `{0}`")]
+    InvalidVerificationMethod(IriBuf),
+
     /// Verifier internal error.
     #[error("internal error: {0}")]
     InternalError(Box<dyn Send + std::error::Error>),
 }
 
+/// Verification method.
+pub trait VerificationMethod {
+    type Reference<'a>
+    where
+        Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_>;
+
+    type Signature;
+
+    type SignatureRef<'a>;
+
+    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_>;
+}
+
 /// Verifier.
 #[async_trait]
-pub trait Verifier<M>: Sync {
+pub trait Verifier<M: VerificationMethod>: Sync {
     /// Verify the given `signature`, signed using the given `algorithm`,
     /// against the input `signing_bytes`.
-    async fn verify(
+    async fn verify<'m: 'async_trait, 's: 'async_trait>(
         &self,
-        method: &M,
+        method: M::Reference<'m>,
         proof_purpose: ProofPurpose,
         signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<bool, VerificationError>;
+        signature: M::SignatureRef<'s>,
+    ) -> Result<bool, VerificationError>
+    where
+        M: 'async_trait;
 }
 
 macro_rules! proof_purposes {

@@ -317,7 +317,7 @@ impl CompactJWSString {
 
     pub fn from_signing_bytes_and_signature(
         signing_bytes: Vec<u8>,
-        signature: Vec<u8>,
+        signature: impl IntoIterator<Item = u8>,
     ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
         let mut bytes = signing_bytes;
         bytes.push(b'.');

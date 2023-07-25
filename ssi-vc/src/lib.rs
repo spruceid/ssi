@@ -24,25 +24,25 @@ pub const CREDENTIALS_V1_CONTEXT_IRI: Iri<'static> =
 #[tldr("ssi-vc/src/schema/cred.ttl", "ssi-vc/src/schema/sec.ttl")]
 pub mod schema {
     #[prefix("http://www.w3.org/2002/07/owl#")]
-    pub mod owl {}
+    pub use ssi_security::schema::owl;
 
     #[prefix("http://www.w3.org/1999/02/22-rdf-syntax-ns#")]
-    pub mod rdf {}
+    pub use ssi_security::schema::rdf;
 
     #[prefix("http://www.w3.org/2000/01/rdf-schema#")]
-    pub mod rdfs {}
+    pub use ssi_security::schema::rdfs;
 
     #[prefix("http://www.w3.org/2001/XMLSchema#")]
-    pub mod xsd {}
+    pub use ssi_security::schema::xsd;
 
     #[prefix("https://treeldr.org/")]
-    pub mod tldr {}
+    pub use ssi_security::schema::tldr;
+
+    #[prefix("https://w3id.org/security#")]
+    pub use ssi_security::schema::sec;
 
     #[prefix("https://www.w3.org/2018/credentials#")]
     pub mod cred {}
-
-    #[prefix("https://w3id.org/security#")]
-    pub mod sec {}
 }
 
 pub use schema::cred::*;

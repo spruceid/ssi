@@ -10,7 +10,7 @@ pub trait VerifiableWith {
     type Proof;
 
     /// Verification method.
-    type Method;
+    type Method: ssi_crypto::VerificationMethod;
 
     async fn verify_with(
         &self,

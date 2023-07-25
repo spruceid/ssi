@@ -94,6 +94,7 @@ members = [
   # "ssi-ucan",
   "ssi-rdf",
   "ssi-verification-methods",
+  "ssi-security",
   "ssi-vc",
   "ssi-vc-jwt",
   "ssi-vc-ldp",
@@ -110,6 +111,7 @@ ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
 ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
 ssi-dids = { path = "./ssi-dids", version = "0.1" }
+ssi-security = { path = "./ssi-security", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
 async-trait = "0.1.68"
 thiserror = "1.0.40"

@@ -1,15 +1,18 @@
 use std::hash::Hash;
 
 use async_trait::async_trait;
-use ed25519_dalek::Verifier;
+use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
+use serde::{Deserialize, Serialize};
+use ssi_crypto::{SignatureError, VerificationError};
+use ssi_jws::{CompactJWSStr, CompactJWSString};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ControllerProvider, LinkedDataVerificationMethod, VerificationMethod, CONTROLLER_IRI,
-    RDF_TYPE_IRI, XSD_STRING,
+    ControllerProvider, LinkedDataVerificationMethod, VerificationMethod, VerificationMethodRef,
+    CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
@@ -24,20 +27,92 @@ pub const PUBLIC_KEY_BASE_58_IRI: Iri<'static> = iri!("https://w3id.org/security
 /// Deprecated verification method for the `Ed25519Signature2018` suite.
 ///
 /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/#the-ed25519-key-format>
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "type", rename = "Ed25519VerificationKey2018")]
 pub struct Ed25519VerificationKey2018 {
     /// Key identifier.
-    id: IriBuf,
+    pub id: IriBuf,
 
     /// Controller of the verification method.
-    controller: IriBuf,
+    pub controller: IriBuf,
 
     /// Public key encoded in base58 using the same alphabet as Bitcoin
     /// addresses and IPFS hashes.
-    public_key_base58: String,
+    #[serde(rename = "publicKeyBase58")]
+    pub public_key_base58: String,
 }
 
-#[async_trait]
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidPublicKey {
+    #[error(transparent)]
+    Multibase(#[from] multibase::Error),
+
+    #[error(transparent)]
+    Ed25519(#[from] ed25519_dalek::SignatureError),
+}
+
+impl Ed25519VerificationKey2018 {
+    pub fn decode_public_key(&self) -> Result<ed25519_dalek::PublicKey, InvalidPublicKey> {
+        let pk_bytes = multibase::Base::Base58Btc.decode(&self.public_key_base58)?;
+        let pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes)?;
+        Ok(pk)
+    }
+
+    pub fn sign(
+        &self,
+        data: &[u8],
+        key_pair: &ed25519_dalek::Keypair,
+    ) -> Result<CompactJWSString, SignatureError> {
+        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::EdDSA, None);
+        let signing_bytes = header.encode_signing_bytes(data);
+        let signature = key_pair.sign(&signing_bytes);
+
+        Ok(ssi_jws::CompactJWSString::from_signing_bytes_and_signature(
+            signing_bytes,
+            signature.to_bytes(),
+        )
+        .unwrap())
+    }
+
+    pub fn try_import_signature(
+        signature: crate::Signature,
+    ) -> Result<CompactJWSString, VerificationError> {
+        match signature {
+            crate::Signature::JWS(jws) => Ok(jws),
+            _ => Err(VerificationError::InvalidSignature),
+        }
+    }
+
+    pub fn try_import_signature_ref(
+        signature: crate::SignatureRef,
+    ) -> Result<&CompactJWSStr, VerificationError> {
+        match signature {
+            crate::SignatureRef::JWS(jws) => Ok(jws),
+            _ => Err(VerificationError::InvalidSignature),
+        }
+    }
+
+    pub fn export_signature_ref(signature: &CompactJWSStr) -> crate::SignatureRef {
+        crate::SignatureRef::JWS(signature)
+    }
+}
+
+impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2018 {
+    type Reference<'a> = &'a Self;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+
+    type Signature = CompactJWSString;
+
+    type SignatureRef<'a> = &'a CompactJWSStr;
+
+    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
+        signature
+    }
+}
+
 impl VerificationMethod for Ed25519VerificationKey2018 {
     fn id(&self) -> Iri {
         self.id.as_iri()
@@ -47,17 +122,24 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
         self.controller.as_iri()
     }
 
+    fn expected_type() -> Option<String> {
+        Some(ED25519_VERIFICATION_KEY_2018_TYPE.to_string())
+    }
+
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2018_TYPE
     }
+}
 
-    async fn verify(
-        &self,
+#[async_trait]
+impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2018> for &'a Ed25519VerificationKey2018 {
+    async fn verify<'s: 'async_trait>(
+        self,
         controllers: &impl ControllerProvider,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<bool, ssi_crypto::VerificationError> {
+        jws: &'s CompactJWSStr,
+    ) -> Result<bool, VerificationError> {
         controllers
             .ensure_allows_verification_method(
                 self.controller.as_iri(),
@@ -66,12 +148,22 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
             )
             .await?;
 
-        let pk_bytes = multibase::Base::Base58Btc
-            .decode(&self.public_key_base58)
-            .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
-        let pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes)
-            .map_err(|_| ssi_crypto::VerificationError::InvalidKey)?;
-        let signature = ed25519_dalek::Signature::from_bytes(signature)
+        let (header, payload, signature_bytes) =
+            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+
+        if header.algorithm != ssi_jwk::Algorithm::EdDSA {
+            return Err(VerificationError::InvalidProof);
+        }
+
+        if payload.as_ref() != signing_bytes {
+            return Err(VerificationError::InvalidProof);
+        }
+
+        let pk = self
+            .decode_public_key()
+            .map_err(|_| VerificationError::InvalidKey)?;
+
+        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
             .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
         Ok(pk.verify(signing_bytes, &signature).is_ok())
     }
@@ -216,7 +308,7 @@ where
             json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
                 self.public_key_base58.clone(),
             )),
-            Some(vocabulary.insert(XSD_STRING)),
+            None,
         );
         node.insert(
             key_prop,

@@ -40,3 +40,19 @@ impl Method {
         Self { issuer, key_id }
     }
 }
+
+impl ssi_crypto::VerificationMethod for Method {
+    type Reference<'a> = &'a Self;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+
+    type Signature = Vec<u8>;
+
+    type SignatureRef<'a> = &'a [u8];
+
+    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
+        signature
+    }
+}

@@ -9,7 +9,7 @@ pub mod verification;
 
 pub use proof::*;
 pub use signing::*;
-pub use suite::CryptographicSuite;
+pub use suite::{CryptographicSuite, CryptographicSuiteInput};
 pub use verification::*;
 
 /// Data Integrity credential.
