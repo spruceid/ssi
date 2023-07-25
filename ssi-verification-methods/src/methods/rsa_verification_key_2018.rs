@@ -6,7 +6,6 @@ use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jwk::JWK;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
@@ -15,29 +14,25 @@ use crate::{
     PUBLIC_KEY_JWK_IRI, RDF_JSON, RDF_TYPE_IRI,
 };
 
-pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
+pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
 
-pub const JSON_WEB_KEY_2020_IRI: Iri<'static> = iri!("https://w3id.org/security#JsonWebKey2020");
+pub const RSA_VERIFICATION_KEY_2018_IRI: Iri<'static> =
+    iri!("https://w3id.org/security#RsaVerificationKey2018");
 
-/// JSON Web Key 2020 verification method.
+/// RSA verification key 2018.
 ///
-/// To be used with the [JSON Web Signature 2020][1] cryptographic suite.
+/// To be used with the [RSA Signature Suite 2018][1].
 ///
-/// See: <https://w3c-ccg.github.io/lds-jws2020/#json-web-key-2020>
+/// See: <https://www.w3.org/TR/did-spec-registries/#rsaverificationkey2018>
 ///
-/// [1]: <https://w3c-ccg.github.io/lds-jws2020>
+/// [1]: <https://w3c-ccg.github.io/lds-rsa2018/>
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "type", rename = "JsonWebKey2020")]
-pub struct JsonWebKey2020 {
+#[serde(tag = "type", rename = "RsaVerificationKey2018")]
+pub struct RsaVerificationKey2018 {
     /// Key identifier.
-    ///
-    /// Should be the JWK thumbprint calculated from the public key value
-    /// according to [RFC7638][rfc7638].
-    ///
-    /// [rfc7638]: <https://w3c-ccg.github.io/lds-jws2020/#bib-rfc7638>
     pub id: IriBuf,
 
-    /// Key controller.
+    /// Key crontroller.
     pub controller: IriBuf, // TODO: should be an URI.
 
     /// Public JSON Web Key.
@@ -45,70 +40,66 @@ pub struct JsonWebKey2020 {
     pub public_key: Box<JWK>,
 }
 
-impl JsonWebKey2020 {
-    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
-        let algorithm = secret_key
-            .algorithm
-            .ok_or(SignatureError::InvalidSecretKey)?;
-        let header = ssi_jws::Header::new_detached(algorithm, None);
+impl RsaVerificationKey2018 {
+    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<String, SignatureError> {
+        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
         let signing_bytes = header.encode_signing_bytes(data);
-        let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)
+        let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, &signing_bytes, secret_key)
             .map_err(|_| SignatureError::InvalidSecretKey)?;
-        Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
+        Ok(multibase::Base::Base64.encode(signature))
     }
 
-    pub fn try_import_signature(
-        signature: crate::Signature,
-    ) -> Result<CompactJWSString, VerificationError> {
+    pub fn try_import_signature(signature: crate::Signature) -> Result<String, VerificationError> {
         match signature {
-            crate::Signature::JWS(jws) => Ok(jws),
+            crate::Signature::Base64(s) => Ok(s),
             _ => Err(VerificationError::InvalidSignature),
         }
     }
 
     pub fn try_import_signature_ref(
         signature: crate::SignatureRef,
-    ) -> Result<&CompactJWSStr, VerificationError> {
+    ) -> Result<&str, VerificationError> {
         match signature {
-            crate::SignatureRef::JWS(jws) => Ok(jws),
+            crate::SignatureRef::Base64(s) => Ok(s),
             _ => Err(VerificationError::InvalidSignature),
         }
     }
 
-    pub fn export_signature_ref(signature: &CompactJWSStr) -> crate::SignatureRef {
-        crate::SignatureRef::JWS(signature)
+    pub fn export_signature_ref(signature: &str) -> crate::SignatureRef {
+        crate::SignatureRef::Base64(signature)
     }
 }
 
-impl ssi_crypto::VerificationMethod for JsonWebKey2020 {
+impl ssi_crypto::VerificationMethod for RsaVerificationKey2018 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
 
-    type Signature = CompactJWSString;
+    // Base64 signature.
+    type Signature = String;
 
-    type SignatureRef<'a> = &'a CompactJWSStr;
+    type SignatureRef<'a> = &'a str;
 
     fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
         signature
     }
 }
 
-impl VerificationMethod for JsonWebKey2020 {
+impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns the identifier of the key.
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
     fn expected_type() -> Option<String> {
-        Some(JSON_WEB_KEY_2020_TYPE.to_string())
+        Some(RSA_VERIFICATION_KEY_2018_TYPE.to_string())
     }
 
     /// Returns the type of the key.
     fn type_(&self) -> &str {
-        JSON_WEB_KEY_2020_TYPE
+        RSA_VERIFICATION_KEY_2018_TYPE
     }
 
     /// Returns an URI to the key controller.
@@ -118,14 +109,14 @@ impl VerificationMethod for JsonWebKey2020 {
 }
 
 #[async_trait]
-impl<'a> VerificationMethodRef<'a, JsonWebKey2020> for &'a JsonWebKey2020 {
+impl<'a> VerificationMethodRef<'a, RsaVerificationKey2018> for &'a RsaVerificationKey2018 {
     /// Verifies the given signature.
     async fn verify<'s: 'async_trait>(
         self,
         controllers: &impl crate::ControllerProvider,
         proof_purpose: ssi_crypto::ProofPurpose,
-        data: &[u8],
-        jws: &'s CompactJWSStr,
+        signing_bytes: &[u8],
+        signature: &'s str,
     ) -> Result<bool, VerificationError> {
         controllers
             .ensure_allows_verification_method(
@@ -135,32 +126,32 @@ impl<'a> VerificationMethodRef<'a, JsonWebKey2020> for &'a JsonWebKey2020 {
             )
             .await?;
 
-        let (_, payload, signature_bytes) =
-            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+        let signature_bytes = multibase::Base::Base64
+            .decode(signature)
+            .map_err(|_| VerificationError::InvalidProof)?;
 
-        if payload.as_ref() != data {
-            return Err(VerificationError::InvalidProof);
-        }
+        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
+        let jws_signing_bytes = header.encode_signing_bytes(&signing_bytes);
 
         match self.public_key.algorithm.as_ref() {
-            Some(a) => Ok(ssi_jws::verify_bytes(
-                *a,
-                jws.signing_bytes(),
+            Some(ssi_jwk::Algorithm::RS256) => Ok(ssi_jws::verify_bytes(
+                ssi_jwk::Algorithm::RS256,
+                &jws_signing_bytes,
                 &self.public_key,
                 &signature_bytes,
             )
             .is_ok()),
-            None => Err(ssi_crypto::VerificationError::InvalidKey),
+            _ => Err(ssi_crypto::VerificationError::InvalidKey),
         }
     }
 }
 
-impl LinkedDataVerificationMethod for JsonWebKey2020 {
+impl LinkedDataVerificationMethod for RsaVerificationKey2018 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {
         quads.push(Quad(
             Id::Iri(self.id.clone()),
             RDF_TYPE_IRI.into(),
-            Object::Id(Id::Iri(JSON_WEB_KEY_2020_IRI.into())),
+            Object::Id(Id::Iri(RSA_VERIFICATION_KEY_2018_IRI.into())),
             None,
         ));
 
@@ -185,7 +176,7 @@ impl LinkedDataVerificationMethod for JsonWebKey2020 {
     }
 }
 
-impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for JsonWebKey2020
+impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for RsaVerificationKey2018
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
@@ -200,7 +191,7 @@ where
     }
 }
 
-impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for JsonWebKey2020
+impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for RsaVerificationKey2018
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,

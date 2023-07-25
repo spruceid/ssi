@@ -2,24 +2,30 @@
 use async_trait::async_trait;
 use iref::Iri;
 use ssi_crypto::{SignatureError, Signer, VerificationError, Verifier};
+use ssi_rdf::IntoNQuads;
 use ssi_vc::ProofValidity;
+use ssi_verification_methods::LinkedDataVerificationMethod;
 
-use crate::Proof;
+use crate::{ProofConfiguration, ProofOptions, UntypedProof, UntypedProofRef};
 
+mod any;
 mod dif;
 mod unspecified;
 
 #[cfg(feature = "w3c")]
 mod w3c;
 
+pub use any::*;
 pub use dif::*;
 pub use unspecified::*;
 
 #[cfg(feature = "w3c")]
 pub use w3c::*;
 
-pub struct TransformationOptions<T> {
-    pub type_: T,
+#[derive(Debug, thiserror::Error)]
+pub enum HashError {
+    #[error("invalid verification method")]
+    InvalidVerificationMethod,
 }
 
 /// Cryptographic suite.
@@ -53,27 +59,31 @@ pub trait CryptographicSuite: Sync + Sized {
         Self::HashParameters,
     >;
 
-    type VerificationMethod: Sync;
+    type VerificationMethod: Sync + ssi_crypto::VerificationMethod;
 
     fn iri(&self) -> Iri;
 
     fn cryptographic_suite(&self) -> Option<&str>;
 
     /// Hashing algorithm.
-    fn hash(&self, data: Self::Transformed, params: Self::HashParameters) -> Self::Hashed;
+    fn hash(
+        &self,
+        data: Self::Transformed,
+        params: Self::HashParameters,
+    ) -> Result<Self::Hashed, HashError>;
 
     fn generate_proof(
         &self,
         data: &Self::Hashed,
         signer: &impl Signer<Self::VerificationMethod>,
         params: Self::ProofParameters,
-    ) -> Result<Proof<Self>, SignatureError>;
+    ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError>;
 
     async fn verify_proof(
         &self,
         data: &Self::Hashed,
         verifier: &impl Verifier<Self::VerificationMethod>,
-        proof: &Proof<Self>,
+        proof: UntypedProofRef<'_, Self::VerificationMethod>,
     ) -> Result<ProofValidity, VerificationError>;
 }
 
@@ -90,120 +100,88 @@ pub trait SigningParameters<T, H, P> {
     fn into_proof_parameters(self) -> P;
 }
 
+impl<M: Clone> SigningParameters<(), ProofConfiguration<M>, ProofOptions<M>> for ProofOptions<M> {
+    fn transformation_parameters(&self) {
+        ()
+    }
+
+    fn hash_parameters(&self) -> ProofConfiguration<M> {
+        self.to_proof_configuration()
+    }
+
+    fn into_proof_parameters(self) -> ProofOptions<M> {
+        self
+    }
+}
+
 pub trait VerificationParameters<T, H> {
     fn transformation_parameters(&self) -> T;
 
     fn into_hash_parameters(self) -> H;
 }
 
-/// Built-in Data Integrity cryptographic suites types.
-pub enum SuiteType {
-    /// W3C RSA Signature Suite 2018.
-    ///
-    /// See: <https://w3c-ccg.github.io/lds-rsa2018/>
-    #[cfg(all(feature = "w3c", feature = "rsa"))]
-    RsaSignature2018,
+impl<M: Clone> VerificationParameters<(), ProofConfiguration<M>> for ProofOptions<M> {
+    fn transformation_parameters(&self) {
+        ()
+    }
 
-    /// W3C Ed25519 Signature 2018.
-    ///
-    /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/>
-    #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    Ed25519Signature2018,
-
-    /// W3C Ed25519 Signature 2020.
-    ///
-    /// See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-    #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    Ed25519Signature2020,
-
-    /// W3C EdDSA Cryptosuite v2022.
-    ///
-    /// See: <https://w3c.github.io/vc-di-eddsa/>
-    #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    EdDsa2022,
-
-    /// W3C Ecdsa Secp256k1 Signature 2019.
-    ///
-    /// See: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/>
-    #[cfg(all(feature = "w3c", feature = "secp256k1"))]
-    EcdsaSecp256k1Signature2019,
-
-    /// DIF Ecdsa Secp256k1 Recovery Signature 2019.
-    ///
-    /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
-    #[cfg(all(feature = "w3c", feature = "secp256k1"))]
-    EcdsaSecp256k1RecoverySignature2020,
-
-    /// W3C Ecdsa Secp256r1 Signature 2019.
-    ///
-    /// See: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1signature2019>
-    #[cfg(all(feature = "w3c", feature = "secp256r1"))]
-    EcdsaSecp256r1Signature2019,
-
-    /// W3C JSON Web Signature 2020.
-    ///
-    /// See: <https://w3c-ccg.github.io/lds-jws2020/>
-    #[cfg(feature = "w3c")]
-    JsonWebSignature2020,
-
-    /// W3C Ethereum EIP712 Signature 2021.
-    ///
-    /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
-    #[cfg(all(feature = "w3c", feature = "eip"))]
-    EthereumEip712Signature2021,
-
-    /// Unspecified Ethereum Personal Signature 2021.
-    #[cfg(feature = "eip")]
-    EthereumPersonalSignature2021,
-
-    /// Unspecified Eip712 Signature 2021.
-    #[cfg(feature = "eip")]
-    Eip712Signature2021,
-
-    /// Unspecified Ed25519 BLAKE2B Digest Size 20 Base58 Check Encoded Signature 2021.
-    #[cfg(feature = "tezos")]
-    Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-
-    /// Unspecified P256 BLAKE2B Digest Size 20 Base58 Check Encoded Signature 2021.
-    #[cfg(feature = "tezos")]
-    P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-
-    /// Unspecified Tezos Signature 2021.
-    #[cfg(feature = "tezos")]
-    TezosSignature2021,
-
-    /// Unspecified Tezos Jcs Signature 2021.
-    #[cfg(feature = "tezos")]
-    TezosJcsSignature2021,
-
-    /// Unspecified Solana Signature 2021.
-    #[cfg(feature = "solana")]
-    SolanaSignature2021,
-
-    /// Unspecified Aleo Signature 2021.
-    #[cfg(feature = "aleo")]
-    AleoSignature2021,
-
-    /// Unknown suite type.
-    Unknown(String),
+    fn into_hash_parameters(self) -> ProofConfiguration<M> {
+        self.into_proof_configuration()
+    }
 }
 
-pub enum Suite {
-    /// W3C Ed25519 Signature 2018.
-    ///
-    /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/>
-    #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    Ed25519Signature2018,
+/// SHA256-based input hashing algorithm used by many cryptographic suites.
+fn sha256_hash<T: CryptographicSuite>(
+    data: &[u8],
+    suite: &T,
+    proof_configuration: ProofConfiguration<T::VerificationMethod>,
+) -> [u8; 64]
+where
+    T::VerificationMethod: LinkedDataVerificationMethod,
+{
+    let transformed_document_hash = ssi_crypto::hashes::sha256::sha256(data);
+    let proof_config_hash: [u8; 32] = ssi_crypto::hashes::sha256::sha256(
+        proof_configuration.quads(suite).into_nquads().as_bytes(),
+    );
+    let mut hash_data = [0u8; 64];
+    hash_data[..32].copy_from_slice(&transformed_document_hash);
+    hash_data[32..].copy_from_slice(&proof_config_hash);
+    hash_data
+}
 
-    /// W3C Ed25519 Signature 2020.
-    ///
-    /// See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-    #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    Ed25519Signature2020,
-
-    /// W3C EdDSA Cryptosuite v2022.
-    ///
-    /// See: <https://w3c.github.io/vc-di-eddsa/>
-    #[cfg(all(feature = "w3c", feature = "ed25519"))]
-    EdDsa2022,
+/// `CryptographicSuiteInput` trait implementation for RDF dataset inputs
+/// normalized using URDNA2015.
+///
+/// Many cryptographic suites take RDF datasets as input, then normalized with
+/// the URDNA2015 canonicalization algorithm. This macro is used to
+/// automatically write the `CryptographicSuiteInput` trait implementation.
+#[macro_export]
+macro_rules! impl_rdf_input_urdna2015 {
+    ($ty:ident) => {
+        impl<'a, V, I> $crate::CryptographicSuiteInput<ssi_rdf::DatasetWithEntryPoint<'a, V, I>>
+            for $ty
+        where
+            V: rdf_types::Vocabulary<
+                Type = rdf_types::literal::Type<
+                    <V as rdf_types::IriVocabulary>::Iri,
+                    <V as rdf_types::LanguageTagVocabulary>::LanguageTag,
+                >,
+                Value = String,
+            >,
+            I: rdf_types::ReverseTermInterpretation<
+                Iri = V::Iri,
+                BlankId = V::BlankId,
+                Literal = V::Literal,
+            >,
+        {
+            /// Transformation algorithm.
+            fn transform(
+                &self,
+                data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
+                _options: (),
+            ) -> Self::Transformed {
+                data.canonical_form()
+            }
+        }
+    };
 }

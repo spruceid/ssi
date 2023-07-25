@@ -13,17 +13,32 @@ use static_iref::iri;
 use treeldr_rust_prelude::{grdf, locspan::Meta, FromRdf, FromRdfError};
 
 use crate::{
-    suite::{CryptographicSuiteInput, VerificationParameters},
+    suite::{CryptographicSuiteInput, HashError, VerificationParameters},
     CryptographicSuite, DataIntegrity, Proof,
 };
 
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("missing credential")]
     MissingCredential,
+
+    #[error("missing proof")]
     MissingProof,
+
+    #[error("missing proof graph")]
     MissingProofGraph,
+
+    #[error("missing proof value")]
     MissingProofValue,
+
+    #[error("invalid proof")]
     InvalidProof(FromRdfError),
+
+    #[error("invalid credential")]
     InvalidCredential(FromRdfError),
+
+    #[error("hash failed: {0}")]
+    HashFailed(#[from] HashError),
 }
 
 type HashDataset<T> = grdf::HashDataset<T, T, T, T>;
@@ -128,7 +143,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
                                     .transform(data, params.transformation_parameters());
                                 let hashed = proof
                                     .suite()
-                                    .hash(transformed, params.into_hash_parameters());
+                                    .hash(transformed, params.into_hash_parameters())?;
 
                                 Ok(Verifiable::new(
                                     DataIntegrity::new(credential, hashed),

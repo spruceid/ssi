@@ -224,17 +224,14 @@ impl ssi_crypto::Signer<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyrin
         &self,
         method: &ReferenceOrOwned<Ed25519VerificationKey2020>,
         bytes: &[u8],
-    ) -> Result<Vec<u8>, ssi_crypto::SignatureError> {
+    ) -> Result<String, ssi_crypto::SignatureError> {
         let id = match method {
             ReferenceOrOwned::Owned(key) => key.id(),
             ReferenceOrOwned::Reference(id) => id.iri(),
         };
 
         match self.keys.get(&id) {
-            Some(key) => {
-                use ssi_verification_methods::ed25519_dalek::{Signature, Signer};
-                Ok(Signature::to_bytes(key.1.sign(bytes)).to_vec())
-            }
+            Some((method, key)) => Ok(method.sign(bytes, key)),
             None => Err(ssi_crypto::SignatureError::UnknownVerificationMethod),
         }
     }
@@ -259,7 +256,7 @@ impl ssi_crypto::Verifier<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyr
         method: &ReferenceOrOwned<Ed25519VerificationKey2020>,
         purpose: ssi_crypto::ProofPurpose,
         bytes: &[u8],
-        signature: &[u8],
+        signature: &str,
     ) -> Result<bool, ssi_crypto::VerificationError> {
         match method {
             ReferenceOrOwned::Owned(key) => {

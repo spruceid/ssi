@@ -12,6 +12,7 @@ use async_trait::async_trait;
 pub use did::*;
 pub use document::Document;
 pub use resolution::DIDResolver;
+use ssi_verification_methods::VerificationMethodRef;
 
 pub struct Provider<T> {
     resolver: T,
@@ -65,14 +66,19 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
+    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
+    for<'a> M::SignatureRef<'a>: Send,
 {
-    async fn verify(
+    async fn verify<'m, 's>(
         &self,
-        method: &ssi_verification_methods::Reference<M>,
+        method: ssi_verification_methods::ReferenceRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<bool, ssi_crypto::VerificationError> {
+        signature: M::SignatureRef<'s>,
+    ) -> Result<bool, ssi_crypto::VerificationError>
+    where
+        M: 'async_trait,
+    {
         if method.iri().scheme() == "did" {
             match DIDURL::new(method.iri().as_bytes()) {
                 Ok(url) => {
@@ -131,20 +137,31 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
+    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
+    for<'a> M::SignatureRef<'a>: Send,
 {
-    async fn verify(
+    async fn verify<'m: 'async_trait, 's: 'async_trait>(
         &self,
-        method: &ssi_verification_methods::ReferenceOrOwned<M>,
+        method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<bool, ssi_crypto::VerificationError> {
+        signature: M::SignatureRef<'s>,
+    ) -> Result<bool, ssi_crypto::VerificationError>
+    where
+        M: 'async_trait,
+    {
         match method {
-            ssi_verification_methods::ReferenceOrOwned::Reference(r) => {
-                self.verify(r, proof_purpose, signing_bytes, signature)
-                    .await
+            ssi_verification_methods::ReferenceOrOwnedRef::Reference(r) => {
+                <Self as ssi_crypto::Verifier<ssi_verification_methods::Reference<M>>>::verify(
+                    self,
+                    r,
+                    proof_purpose,
+                    signing_bytes,
+                    signature,
+                )
+                .await
             }
-            ssi_verification_methods::ReferenceOrOwned::Owned(m) => {
+            ssi_verification_methods::ReferenceOrOwnedRef::Owned(m) => {
                 // No need to dereference.
                 m.verify(self, proof_purpose, signing_bytes, signature)
                     .await

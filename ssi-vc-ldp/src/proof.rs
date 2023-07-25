@@ -7,7 +7,10 @@ use rdf_types::{
     Subject, VocabularyMut,
 };
 use ssi_crypto::ProofPurpose;
-use ssi_verification_methods::{LinkedDataVerificationMethod, MULTIBASE_IRI};
+use ssi_verification_methods::{
+    IntoAnyVerificationMethod, InvalidVerificationMethod, LinkedDataVerificationMethod, Signature,
+    SignatureRef, TryFromVerificationMethod, TryIntoVerificationMethod, MULTIBASE_IRI,
+};
 use static_iref::iri;
 use treeldr_rust_prelude::{
     grdf::Graph,
@@ -42,37 +45,53 @@ pub struct Proof<T: CryptographicSuite> {
     /// Proof type.
     ///
     /// Also includes the cryptographic suite variant.
-    pub type_: T,
+    type_: T,
 
+    /// Untyped proof.
+    untyped: UntypedProof<T::VerificationMethod>,
+}
+
+impl<T: CryptographicSuite> Proof<T> {
+    pub fn new(
+        type_: T,
+        created: ssi_vc::schema::xsd::layout::DateTime,
+        verification_method: T::VerificationMethod,
+        proof_purpose: ProofPurpose,
+        proof_value: Signature,
+    ) -> Self {
+        Self {
+            type_,
+            untyped: UntypedProof::new(created, verification_method, proof_purpose, proof_value),
+        }
+    }
+
+    pub fn suite(&self) -> &T {
+        &self.type_
+    }
+
+    pub fn untyped(&self) -> &UntypedProof<T::VerificationMethod> {
+        &self.untyped
+    }
+}
+
+/// Untyped Data Integrity Proof.
+pub struct UntypedProof<M> {
     /// Date and time of creation.
     pub created: ssi_vc::schema::xsd::layout::DateTime,
 
     /// Verification method.
-    pub verification_method: T::VerificationMethod,
+    pub verification_method: M,
 
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
 
     /// Proof value.
-    pub proof_value: ProofValue,
+    pub proof_value: Signature,
 }
 
-impl From<ssi_vc::schema::sec::layout::Multibase> for ProofValue {
-    fn from(value: ssi_vc::schema::sec::layout::Multibase) -> Self {
-        Self::Multibase(value)
-    }
-}
-
-impl From<ssi_jws::CompactJWSString> for ProofValue {
-    fn from(value: ssi_jws::CompactJWSString) -> Self {
-        Self::JWS(value)
-    }
-}
-
-impl<T: CryptographicSuite> Proof<T> {
-    pub fn from_options(options: ProofOptions<T>, proof_value: ProofValue) -> Self {
+impl<M> UntypedProof<M> {
+    pub fn from_options(options: ProofOptions<M>, proof_value: Signature) -> Self {
         Self::new(
-            options.type_,
             options.created,
             options.verification_method,
             options.proof_purpose,
@@ -81,14 +100,12 @@ impl<T: CryptographicSuite> Proof<T> {
     }
 
     pub fn new(
-        type_: T,
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: T::VerificationMethod,
+        verification_method: M,
         proof_purpose: ProofPurpose,
-        proof_value: ProofValue,
+        proof_value: Signature,
     ) -> Self {
         Self {
-            type_,
             created,
             verification_method,
             proof_purpose,
@@ -96,62 +113,91 @@ impl<T: CryptographicSuite> Proof<T> {
         }
     }
 
-    pub fn suite(&self) -> &T {
-        &self.type_
+    pub fn try_map_verification_method<N, E>(
+        self,
+        f: impl FnOnce(M) -> Result<N, E>,
+    ) -> Result<UntypedProof<N>, E> {
+        Ok(UntypedProof::new(
+            self.created,
+            f(self.verification_method)?,
+            self.proof_purpose,
+            self.proof_value,
+        ))
+    }
+
+    pub fn map_verification_method<N>(self, f: impl FnOnce(M) -> N) -> UntypedProof<N> {
+        UntypedProof::new(
+            self.created,
+            f(self.verification_method),
+            self.proof_purpose,
+            self.proof_value,
+        )
+    }
+
+    pub fn try_cast_verification_method<N>(
+        self,
+    ) -> Result<UntypedProof<N>, InvalidVerificationMethod>
+    where
+        M: TryIntoVerificationMethod<N>,
+    {
+        self.try_map_verification_method(M::try_into_verification_method)
+    }
+
+    pub fn into_typed<T: CryptographicSuite<VerificationMethod = M>>(self, type_: T) -> Proof<T> {
+        Proof {
+            type_,
+            untyped: self,
+        }
     }
 }
 
-/// Proof value.
-///
-/// Modern cryptographic suites use the <https://w3id.org/security#proofValue>
-/// property to provide the proof value using a multibase encoding.
-/// However older cryptographic suites like `Ed25519Signature2018` may use
-/// different encoding, like [Detached Json Web Signatures][1].
-///
-/// [1]: <https://tools.ietf.org/html/rfc7797>
-pub enum ProofValue {
-    /// Standard multibase encoding using the
-    /// <https://w3id.org/security#proofValue> property.
-    ///
-    /// This this the official way of providing the proof value, but some older
-    /// cryptographic suites like `Ed25519Signature2018` may use different
-    /// means.
-    Multibase(ssi_vc::schema::sec::layout::Multibase),
-
-    /// Detached Json Web Signature using the deprecated
-    /// <https://w3id.org/security#jws> property.
-    ///
-    /// See: <https://tools.ietf.org/html/rfc7797>
-    JWS(ssi_jws::CompactJWSString),
+impl<M: ssi_crypto::VerificationMethod> UntypedProof<M> {
+    pub fn as_proof_ref(&self) -> UntypedProofRef<M> {
+        UntypedProofRef {
+            created: &self.created,
+            verification_method: self.verification_method.as_reference(),
+            proof_purpose: self.proof_purpose,
+            proof_value: self.proof_value.as_reference(),
+        }
+    }
 }
 
-impl ProofValue {
-    pub fn as_multibase(&self) -> Option<&ssi_vc::schema::sec::layout::Multibase> {
-        match self {
-            Self::Multibase(m) => Some(m),
-            _ => None,
-        }
-    }
+impl<M: IntoAnyVerificationMethod> IntoAnyVerificationMethod for UntypedProof<M> {
+    type Output = UntypedProof<M::Output>;
 
-    pub fn as_jws(&self) -> Option<&ssi_jws::CompactJWSString> {
-        match self {
-            Self::JWS(jws) => Some(jws),
-            _ => None,
-        }
+    fn into_any_verification_method(self) -> Self::Output {
+        self.map_verification_method(M::into_any_verification_method)
     }
+}
 
-    pub fn into_multibase(self) -> Option<ssi_vc::schema::sec::layout::Multibase> {
-        match self {
-            Self::Multibase(m) => Some(m),
-            _ => None,
-        }
-    }
+/// Reference to an untyped proof.
+pub struct UntypedProofRef<'a, M: 'a + ssi_crypto::VerificationMethod> {
+    /// Date and time of creation.
+    pub created: &'a ssi_vc::schema::xsd::layout::DateTime,
 
-    pub fn into_jws(self) -> Option<ssi_jws::CompactJWSString> {
-        match self {
-            Self::JWS(jws) => Some(jws),
-            _ => None,
-        }
+    /// Verification method.
+    pub verification_method: M::Reference<'a>,
+
+    /// Proof purpose.
+    pub proof_purpose: ProofPurpose,
+
+    /// Proof value.
+    pub proof_value: SignatureRef<'a>,
+}
+
+impl<'a, M: 'a + ssi_crypto::VerificationMethod> UntypedProofRef<'a, M> {
+    pub fn try_cast_verification_method<N: 'a + ssi_crypto::VerificationMethod>(
+        self,
+    ) -> Result<UntypedProofRef<'a, N>, InvalidVerificationMethod>
+    where
+        N::Reference<'a>: TryFromVerificationMethod<M::Reference<'a>>,
+    {
+        Ok(UntypedProofRef {
+            created: self.created,
+            verification_method: self.verification_method.try_into_verification_method()?,
+            proof_purpose: self.proof_purpose,
+            proof_value: self.proof_value,
+        })
     }
 }
 
@@ -161,6 +207,7 @@ pub const SEC_VERIFICATION_METHOD_IRI: Iri<'static> =
 pub const SEC_PROOF_PURPOSE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofPurpose");
 pub const SEC_PROOF_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofValue");
 pub const SEC_JWS_IRI: Iri<'static> = iri!("https://w3id.org/security#jws");
+pub const SEC_SIGNATURE_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#signatureValue");
 
 pub const DC_CREATED_IRI: Iri<'static> = iri!("http://purl.org/dc/terms/created");
 
@@ -212,7 +259,10 @@ where
                 json_ld::Indexed::new(
                     json_ld::Object::Value(json_ld::Value::Literal(
                         json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                            self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+                            self.untyped
+                                .created
+                                .format("%Y-%m-%dT%H:%M:%S%:z")
+                                .to_string(),
                         )),
                         Some(vocabulary.insert(XSD_DATETIME_IRI)),
                     )),
@@ -227,8 +277,11 @@ where
                 json_ld::Id::iri(vocabulary.insert(SEC_VERIFICATION_METHOD_IRI)),
                 (),
             ),
-            self.verification_method
-                .into_json_ld_object_meta(vocabulary, interpretation, ()),
+            self.untyped.verification_method.into_json_ld_object_meta(
+                vocabulary,
+                interpretation,
+                (),
+            ),
         );
 
         properties.insert(
@@ -242,7 +295,9 @@ where
                         json_ld::syntax::Entry::new(
                             (),
                             Meta(
-                                json_ld::Id::iri(vocabulary.insert(self.proof_purpose.iri())),
+                                json_ld::Id::iri(
+                                    vocabulary.insert(self.untyped.proof_purpose.iri()),
+                                ),
                                 (),
                             ),
                         ),
@@ -253,8 +308,8 @@ where
             ),
         );
 
-        match self.proof_value {
-            ProofValue::Multibase(proof_value) => {
+        match self.untyped.proof_value {
+            Signature::Multibase(proof_value) => {
                 properties.insert(
                     Meta(json_ld::Id::iri(vocabulary.insert(SEC_PROOF_VALUE_IRI)), ()),
                     Meta(
@@ -273,7 +328,7 @@ where
                     ),
                 );
             }
-            ProofValue::JWS(proof_value) => {
+            Signature::JWS(proof_value) => {
                 properties.insert(
                     Meta(json_ld::Id::iri(vocabulary.insert(SEC_JWS_IRI)), ()),
                     Meta(
@@ -283,6 +338,26 @@ where
                                     json_ld::object::LiteralString::Inferred(
                                         proof_value.into_string(),
                                     ),
+                                ),
+                                Some(vocabulary.insert(XSD_STRING)),
+                            )),
+                            None,
+                        ),
+                        (),
+                    ),
+                );
+            }
+            Signature::Base64(proof_value) => {
+                properties.insert(
+                    Meta(
+                        json_ld::Id::iri(vocabulary.insert(SEC_SIGNATURE_VALUE_IRI)),
+                        (),
+                    ),
+                    Meta(
+                        json_ld::Indexed::new(
+                            json_ld::Object::Value(json_ld::Value::Literal(
+                                json_ld::object::Literal::String(
+                                    json_ld::object::LiteralString::Inferred(proof_value),
                                 ),
                                 Some(vocabulary.insert(XSD_STRING)),
                             )),
@@ -392,7 +467,7 @@ where
                     }
                 } else if p == SEC_PROOF_VALUE_IRI {
                     for o in objects {
-                        proof_value = Some(ProofValue::Multibase(
+                        proof_value = Some(Signature::Multibase(
                             ssi_vc::schema::sec::layout::Multibase::from_rdf(
                                 vocabulary,
                                 interpretation,
@@ -406,9 +481,14 @@ where
                         let string = String::from_rdf(vocabulary, interpretation, graph, o)?;
 
                         match ssi_jws::CompactJWSString::from_string(string) {
-                            Ok(jws) => proof_value = Some(ProofValue::JWS(jws)),
+                            Ok(jws) => proof_value = Some(Signature::JWS(jws)),
                             Err(_) => return Err(FromRdfError::InvalidLexicalRepresentation),
                         }
+                    }
+                } else if p == SEC_SIGNATURE_VALUE_IRI {
+                    for o in objects {
+                        let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
+                        proof_value = Some(Signature::Base64(value))
                     }
                 }
             }
@@ -424,29 +504,35 @@ where
             .map_err(|_| todo!("invalid proof purpose"))?;
         let proof_value = proof_value.ok_or(FromRdfError::MissingRequiredPropertyValue)?;
 
-        Ok(Self {
-            type_: AnyType::new(type_, crypto_suite).into(),
+        Ok(Self::new(
+            AnyType::new(type_, crypto_suite).into(),
             created,
             verification_method,
             proof_purpose,
             proof_value,
-        })
+        ))
     }
 }
 
-pub struct ProofConfiguration<T: CryptographicSuite> {
-    pub type_: T,
+pub struct ProofConfiguration<M> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
-    pub verification_method: T::VerificationMethod,
+    pub verification_method: M,
     pub proof_purpose: ProofPurpose,
 }
 
-impl<T: CryptographicSuite> ProofConfiguration<T> {
+impl<M: LinkedDataVerificationMethod> ProofConfiguration<M> {
+    pub fn try_cast_verification_method<N: TryFromVerificationMethod<M>>(
+        self,
+    ) -> Result<ProofConfiguration<N>, InvalidVerificationMethod> {
+        Ok(ProofConfiguration {
+            created: self.created,
+            verification_method: self.verification_method.try_into_verification_method()?,
+            proof_purpose: self.proof_purpose,
+        })
+    }
+
     /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads(&self) -> Vec<Quad>
-    where
-        T::VerificationMethod: LinkedDataVerificationMethod,
-    {
+    pub fn quads<T: CryptographicSuite>(&self, suite: &T) -> Vec<Quad> {
         let mut result: Vec<Quad> = Vec::new();
 
         let subject = Subject::Blank(BlankIdBuf::from_suffix("proofConfiguration").unwrap());
@@ -454,11 +540,11 @@ impl<T: CryptographicSuite> ProofConfiguration<T> {
         result.push(Quad(
             subject.clone(),
             RDF_TYPE.to_owned(),
-            Object::Id(Id::Iri(self.type_.iri().to_owned())),
+            Object::Id(Id::Iri(suite.iri().to_owned())),
             None,
         ));
 
-        if let Some(crypto_suite) = self.type_.cryptographic_suite() {
+        if let Some(crypto_suite) = suite.cryptographic_suite() {
             result.push(Quad(
                 subject.clone(),
                 SEC_CRYPTOSUITE_IRI.to_owned(),
@@ -501,25 +587,51 @@ impl<T: CryptographicSuite> ProofConfiguration<T> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProofOptions<T: CryptographicSuite> {
-    pub type_: T,
+pub struct ProofOptions<M> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
-    pub verification_method: T::VerificationMethod,
+    pub verification_method: M,
     pub proof_purpose: ProofPurpose,
 }
 
-impl<T: CryptographicSuite> ProofOptions<T> {
+impl<M> ProofOptions<M> {
     pub fn new(
-        type_: T,
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: T::VerificationMethod,
+        verification_method: M,
         proof_purpose: ProofPurpose,
     ) -> Self {
         Self {
-            type_,
             created,
             verification_method,
             proof_purpose,
         }
+    }
+
+    pub fn to_proof_configuration(&self) -> ProofConfiguration<M>
+    where
+        M: Clone,
+    {
+        ProofConfiguration {
+            created: self.created,
+            verification_method: self.verification_method.clone(),
+            proof_purpose: self.proof_purpose,
+        }
+    }
+
+    pub fn into_proof_configuration(self) -> ProofConfiguration<M> {
+        ProofConfiguration {
+            created: self.created,
+            verification_method: self.verification_method,
+            proof_purpose: self.proof_purpose,
+        }
+    }
+
+    pub fn try_cast_verification_method<N: TryFromVerificationMethod<M>>(
+        self,
+    ) -> Result<ProofOptions<N>, InvalidVerificationMethod> {
+        Ok(ProofOptions {
+            created: self.created,
+            verification_method: self.verification_method.try_into_verification_method()?,
+            proof_purpose: self.proof_purpose,
+        })
     }
 }

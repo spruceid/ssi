@@ -26,6 +26,6 @@ impl<T: Sync, S: CryptographicSuite> ssi_vc::VerifiableWith for DataIntegrity<T,
         Self: 'async_trait,
     {
         let suite = proof.suite();
-        suite.verify_proof(&self.hash, verifier, proof)
+        suite.verify_proof(&self.hash, verifier, proof.untyped().as_proof_ref())
     }
 }

@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-multicodec/"
 
 [dependencies]
-unsigned-varint = "0.7.1"
+unsigned-varint = { version = "0.7.1", features = ["std"] }
 
 [build-dependencies]
 csv = "1.2.2"
