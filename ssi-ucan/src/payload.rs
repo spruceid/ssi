@@ -13,6 +13,7 @@ pub use ucan_capabilities_object as capabilities;
 /// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug, Hash)]
+#[serde(deny_unknown_fields)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "ucv")]
     semantic_version: SemanticVersion,
