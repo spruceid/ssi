@@ -8,12 +8,13 @@ use serde::{Deserialize, Serialize};
 use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_security::{PUBLIC_KEY_HEX, PUBLIC_KEY_JWK};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    LinkedDataVerificationMethod, VerificationMethod, VerificationMethodRef, CONTROLLER_IRI,
-    PUBLIC_KEY_HEX_IRI, PUBLIC_KEY_JWK_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
+    signature, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
 };
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
@@ -42,7 +43,7 @@ pub enum InvalidPublicKey {
 impl PublicKey {
     pub fn jwk(&self) -> Result<Cow<JWK>, InvalidPublicKey> {
         match self {
-            Self::Jwk(jwk) => Ok(Cow::Borrowed(&*jwk)),
+            Self::Jwk(jwk) => Ok(Cow::Borrowed(jwk)),
             Self::Hex(hex_encoded) => {
                 let bytes = hex::decode(hex_encoded)?;
                 let pk = k256::PublicKey::from_sec1_bytes(&bytes)?;
@@ -96,28 +97,6 @@ impl EcdsaSecp256k1VerificationKey2019 {
             .map_err(|_| SignatureError::InvalidSecretKey)?;
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
-
-    pub fn try_import_signature(
-        signature: crate::Signature,
-    ) -> Result<CompactJWSString, VerificationError> {
-        match signature {
-            crate::Signature::JWS(jws) => Ok(jws),
-            _ => Err(VerificationError::InvalidSignature),
-        }
-    }
-
-    pub fn try_import_signature_ref(
-        signature: crate::SignatureRef,
-    ) -> Result<&CompactJWSStr, VerificationError> {
-        match signature {
-            crate::SignatureRef::JWS(jws) => Ok(jws),
-            _ => Err(VerificationError::InvalidSignature),
-        }
-    }
-
-    pub fn export_signature_ref(signature: &CompactJWSStr) -> crate::SignatureRef {
-        crate::SignatureRef::JWS(signature)
-    }
 }
 
 impl ssi_crypto::VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
@@ -127,13 +106,7 @@ impl ssi_crypto::VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
         self
     }
 
-    type Signature = CompactJWSString;
-
-    type SignatureRef<'a> = &'a CompactJWSStr;
-
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-        signature
-    }
+    type Signature = signature::Jws;
 }
 
 impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
@@ -142,8 +115,12 @@ impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
         self.id.as_iri()
     }
 
-    fn expected_type() -> Option<String> {
-        Some(ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE.to_string())
+    fn expected_type() -> Option<ExpectedType> {
+        Some(
+            ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE
+                .to_string()
+                .into(),
+        )
     }
 
     /// Returns the type of the key.
@@ -223,7 +200,7 @@ impl LinkedDataVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
             PublicKey::Jwk(jwk) => {
                 quads.push(Quad(
                     Id::Iri(self.id.clone()),
-                    PUBLIC_KEY_JWK_IRI.into(),
+                    PUBLIC_KEY_JWK.into(),
                     Object::Literal(Literal::new(
                         serde_json::to_string(jwk).unwrap(),
                         literal::Type::Any(RDF_JSON.into()),
@@ -234,7 +211,7 @@ impl LinkedDataVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
             PublicKey::Hex(hex) => {
                 quads.push(Quad(
                     Id::Iri(self.id.clone()),
-                    PUBLIC_KEY_HEX_IRI.into(),
+                    PUBLIC_KEY_HEX.into(),
                     Object::Literal(Literal::new(
                         hex.clone(),
                         literal::Type::Any(XSD_STRING.into()),
@@ -306,7 +283,7 @@ where
         match &self.public_key {
             PublicKey::Jwk(jwk) => {
                 let key_prop = Meta(
-                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_JWK_IRI))),
+                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_JWK))),
                     meta.clone(),
                 );
                 let key_value =
@@ -321,7 +298,7 @@ where
             }
             PublicKey::Hex(hex) => {
                 let key_prop = Meta(
-                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_HEX_IRI))),
+                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_HEX))),
                     meta.clone(),
                 );
                 let key_value = json_ld::Value::Literal(

@@ -49,10 +49,4 @@ impl ssi_crypto::VerificationMethod for Method {
     }
 
     type Signature = Vec<u8>;
-
-    type SignatureRef<'a> = &'a [u8];
-
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-        signature
-    }
 }

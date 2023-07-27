@@ -6,10 +6,11 @@ use rdf_types::{
     interpretation::ReverseIriInterpretation, BlankIdBuf, Id, IriVocabulary, Literal, Object, Quad,
     Subject, VocabularyMut,
 };
-use ssi_crypto::ProofPurpose;
+use ssi_crypto::{ProofPurpose, Signature};
+use ssi_security::MULTIBASE;
 use ssi_verification_methods::{
-    IntoAnyVerificationMethod, InvalidVerificationMethod, LinkedDataVerificationMethod, Signature,
-    SignatureRef, TryFromVerificationMethod, TryIntoVerificationMethod, MULTIBASE_IRI,
+    signature, IntoAnyVerificationMethod, InvalidVerificationMethod, LinkedDataVerificationMethod,
+    TryFromVerificationMethod, TryIntoVerificationMethod,
 };
 use static_iref::iri;
 use treeldr_rust_prelude::{
@@ -57,7 +58,7 @@ impl<T: CryptographicSuite> Proof<T> {
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: T::VerificationMethod,
         proof_purpose: ProofPurpose,
-        proof_value: Signature,
+        proof_value: signature::Any,
     ) -> Self {
         Self {
             type_,
@@ -86,11 +87,11 @@ pub struct UntypedProof<M> {
     pub proof_purpose: ProofPurpose,
 
     /// Proof value.
-    pub proof_value: Signature,
+    pub proof_value: signature::Any,
 }
 
 impl<M> UntypedProof<M> {
-    pub fn from_options(options: ProofOptions<M>, proof_value: Signature) -> Self {
+    pub fn from_options(options: ProofOptions<M>, proof_value: signature::Any) -> Self {
         Self::new(
             options.created,
             options.verification_method,
@@ -103,7 +104,7 @@ impl<M> UntypedProof<M> {
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: M,
         proof_purpose: ProofPurpose,
-        proof_value: Signature,
+        proof_value: signature::Any,
     ) -> Self {
         Self {
             created,
@@ -182,7 +183,7 @@ pub struct UntypedProofRef<'a, M: 'a + ssi_crypto::VerificationMethod> {
     pub proof_purpose: ProofPurpose,
 
     /// Proof value.
-    pub proof_value: SignatureRef<'a>,
+    pub proof_value: signature::AnyRef<'a>,
 }
 
 impl<'a, M: 'a + ssi_crypto::VerificationMethod> UntypedProofRef<'a, M> {
@@ -309,7 +310,7 @@ where
         );
 
         match self.untyped.proof_value {
-            Signature::Multibase(proof_value) => {
+            signature::Any::ProofValue(proof_value) => {
                 properties.insert(
                     Meta(json_ld::Id::iri(vocabulary.insert(SEC_PROOF_VALUE_IRI)), ()),
                     Meta(
@@ -317,10 +318,10 @@ where
                             json_ld::Object::Value(json_ld::Value::Literal(
                                 json_ld::object::Literal::String(
                                     json_ld::object::LiteralString::Inferred(
-                                        proof_value.to_string(),
+                                        proof_value.0.to_string(),
                                     ),
                                 ),
-                                Some(vocabulary.insert(MULTIBASE_IRI)),
+                                Some(vocabulary.insert(MULTIBASE)),
                             )),
                             None,
                         ),
@@ -328,7 +329,7 @@ where
                     ),
                 );
             }
-            Signature::JWS(proof_value) => {
+            signature::Any::Jws(proof_value) => {
                 properties.insert(
                     Meta(json_ld::Id::iri(vocabulary.insert(SEC_JWS_IRI)), ()),
                     Meta(
@@ -336,7 +337,7 @@ where
                             json_ld::Object::Value(json_ld::Value::Literal(
                                 json_ld::object::Literal::String(
                                     json_ld::object::LiteralString::Inferred(
-                                        proof_value.into_string(),
+                                        proof_value.0.into_string(),
                                     ),
                                 ),
                                 Some(vocabulary.insert(XSD_STRING)),
@@ -347,7 +348,7 @@ where
                     ),
                 );
             }
-            Signature::Base64(proof_value) => {
+            signature::Any::SignatureValue(proof_value) => {
                 properties.insert(
                     Meta(
                         json_ld::Id::iri(vocabulary.insert(SEC_SIGNATURE_VALUE_IRI)),
@@ -357,7 +358,7 @@ where
                         json_ld::Indexed::new(
                             json_ld::Object::Value(json_ld::Value::Literal(
                                 json_ld::object::Literal::String(
-                                    json_ld::object::LiteralString::Inferred(proof_value),
+                                    json_ld::object::LiteralString::Inferred(proof_value.0),
                                 ),
                                 Some(vocabulary.insert(XSD_STRING)),
                             )),
@@ -467,13 +468,14 @@ where
                     }
                 } else if p == SEC_PROOF_VALUE_IRI {
                     for o in objects {
-                        proof_value = Some(Signature::Multibase(
+                        proof_value = Some(signature::Any::ProofValue(
                             ssi_vc::schema::sec::layout::Multibase::from_rdf(
                                 vocabulary,
                                 interpretation,
                                 graph,
                                 o,
-                            )?,
+                            )?
+                            .into(),
                         ));
                     }
                 } else if p == SEC_JWS_IRI {
@@ -481,14 +483,14 @@ where
                         let string = String::from_rdf(vocabulary, interpretation, graph, o)?;
 
                         match ssi_jws::CompactJWSString::from_string(string) {
-                            Ok(jws) => proof_value = Some(Signature::JWS(jws)),
+                            Ok(jws) => proof_value = Some(signature::Any::Jws(jws.into())),
                             Err(_) => return Err(FromRdfError::InvalidLexicalRepresentation),
                         }
                     }
                 } else if p == SEC_SIGNATURE_VALUE_IRI {
                     for o in objects {
                         let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
-                        proof_value = Some(Signature::Base64(value))
+                        proof_value = Some(signature::Any::SignatureValue(value.into()))
                     }
                 }
             }

@@ -27,6 +27,7 @@ use ssi_jwk::{Params, JWK};
 use std::fmt;
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// A parsed [CAIP-10] blockchain account id as a string.
@@ -41,6 +42,43 @@ pub struct BlockchainAccountId {
     pub account_address: String,
     /// The `chain_id` part of a CAIP-10 string, parsed into a [ChainId] struct.
     pub chain_id: ChainId,
+}
+
+impl Serialize for BlockchainAccountId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let string = self.to_string();
+        serializer.serialize_str(&string)
+    }
+}
+
+impl<'de> Deserialize<'de> for BlockchainAccountId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = BlockchainAccountId;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                write!(formatter, "a blockchain account id")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                v.parse()
+                    .map_err(|_| E::invalid_value(serde::de::Unexpected::Str(v), &self))
+            }
+        }
+
+        deserializer.deserialize_str(Visitor)
+    }
 }
 
 /// Error resulting from attempting to [verify][BlockchainAccountId::verify] a blockchain account

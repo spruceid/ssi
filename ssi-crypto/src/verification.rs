@@ -56,19 +56,39 @@ pub enum VerificationError {
     InternalError(Box<dyn Send + std::error::Error>),
 }
 
-/// Verification method.
-pub trait VerificationMethod {
+impl From<std::convert::Infallible> for VerificationError {
+    fn from(_value: std::convert::Infallible) -> Self {
+        unreachable!()
+    }
+}
+
+/// Verification method signature type.
+pub trait Signature {
+    /// Reference to a signature.
     type Reference<'a>
     where
         Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_>;
+}
 
-    type Signature;
+impl Signature for Vec<u8> {
+    type Reference<'a> = &'a [u8] where Self: 'a;
 
-    type SignatureRef<'a>;
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
 
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_>;
+/// Verification method.
+pub trait VerificationMethod {
+    type Signature: Signature;
+
+    type Reference<'a>
+    where
+        Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_>;
 }
 
 /// Verifier.
@@ -81,7 +101,7 @@ pub trait Verifier<M: VerificationMethod>: Sync {
         method: M::Reference<'m>,
         proof_purpose: ProofPurpose,
         signing_bytes: &[u8],
-        signature: M::SignatureRef<'s>,
+        signature: <M::Signature as Signature>::Reference<'s>,
     ) -> Result<bool, VerificationError>
     where
         M: 'async_trait;

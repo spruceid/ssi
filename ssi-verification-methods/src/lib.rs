@@ -17,6 +17,7 @@ use static_iref::iri;
 mod controller;
 mod methods;
 mod reference;
+pub mod signature;
 
 pub use controller::*;
 pub use methods::*;
@@ -39,12 +40,25 @@ pub(crate) const XSD_STRING: Iri<'static> = iri!("http://www.w3.org/2001/XMLSche
 /// verification method.
 pub const CONTROLLER_IRI: Iri<'static> = iri!("https://w3id.org/security#controller");
 
+/// Expected verification method type.
+#[derive(Debug, Clone)]
+pub enum ExpectedType {
+    One(String),
+    Many(Vec<String>),
+}
+
+impl From<String> for ExpectedType {
+    fn from(value: String) -> Self {
+        Self::One(value)
+    }
+}
+
 /// Verification method.
 pub trait VerificationMethod: ssi_crypto::VerificationMethod {
     /// Identifier of the verification method.
     fn id(&self) -> Iri;
 
-    fn expected_type() -> Option<String>;
+    fn expected_type() -> Option<ExpectedType>;
 
     /// Returns the name of the verification method's type.
     fn type_(&self) -> &str;
@@ -57,11 +71,11 @@ pub trait VerificationMethod: ssi_crypto::VerificationMethod {
         controllers: &'a impl ControllerProvider,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &'a [u8],
-        signature: Self::SignatureRef<'s>,
+        signature: <Self::Signature as ssi_crypto::Signature>::Reference<'s>,
     ) -> Pin<Box<dyn 'f + Send + Future<Output = Result<bool, ssi_crypto::VerificationError>>>>
     where
         Self::Reference<'a>: Send + VerificationMethodRef<'a, Self>,
-        Self::SignatureRef<'s>: Send,
+        <Self::Signature as ssi_crypto::Signature>::Reference<'s>: Send,
     {
         let r = self.as_reference();
         r.verify(controllers, proof_purpose, signing_bytes, signature)
@@ -76,148 +90,12 @@ pub trait VerificationMethodRef<'a, M: 'a + ?Sized + VerificationMethod> {
         controllers: &impl ControllerProvider,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: M::SignatureRef<'s>,
+        signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>;
 }
 
 pub trait LinkedDataVerificationMethod {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object;
-}
-
-/// Signature value.
-///
-/// Modern cryptographic suites use the <https://w3id.org/security#proofValue>
-/// property to provide the proof value using a multibase encoding.
-/// However older cryptographic suites like `Ed25519Signature2018` may use
-/// different encoding, like [Detached Json Web Signatures][1].
-///
-/// [1]: <https://tools.ietf.org/html/rfc7797>
-pub enum Signature {
-    /// Standard multibase encoding using the
-    /// <https://w3id.org/security#proofValue> property.
-    ///
-    /// This this the official way of providing the proof value, but some older
-    /// cryptographic suites like `Ed25519Signature2018` may use different
-    /// means.
-    Multibase(ssi_security::layout::Multibase),
-
-    /// Detached Json Web Signature using the deprecated
-    /// <https://w3id.org/security#jws> property.
-    ///
-    /// See: <https://tools.ietf.org/html/rfc7797>
-    JWS(ssi_jws::CompactJWSString),
-
-    /// Detached Json Web Signature using the deprecated
-    /// <https://w3id.org/security#signatureValue> property.
-    Base64(String),
-}
-
-impl Signature {
-    pub fn as_multibase(&self) -> Option<&ssi_security::layout::Multibase> {
-        match self {
-            Self::Multibase(m) => Some(m),
-            _ => None,
-        }
-    }
-
-    pub fn as_jws(&self) -> Option<&ssi_jws::CompactJWSStr> {
-        match self {
-            Self::JWS(jws) => Some(jws),
-            _ => None,
-        }
-    }
-
-    pub fn as_base64(&self) -> Option<&str> {
-        match self {
-            Self::Base64(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn into_multibase(self) -> Option<ssi_security::layout::Multibase> {
-        match self {
-            Self::Multibase(m) => Some(m),
-            _ => None,
-        }
-    }
-
-    pub fn into_jws(self) -> Option<ssi_jws::CompactJWSString> {
-        match self {
-            Self::JWS(jws) => Some(jws),
-            _ => None,
-        }
-    }
-
-    pub fn into_base64(self) -> Option<String> {
-        match self {
-            Self::Base64(value) => Some(value),
-            _ => None,
-        }
-    }
-
-    pub fn as_reference(&self) -> SignatureRef {
-        match self {
-            Self::Multibase(m) => SignatureRef::Multibase(m),
-            Self::JWS(jws) => SignatureRef::JWS(jws),
-            Self::Base64(b) => SignatureRef::Base64(b),
-        }
-    }
-}
-
-impl From<ssi_security::layout::Multibase> for Signature {
-    fn from(value: ssi_security::layout::Multibase) -> Self {
-        Self::Multibase(value)
-    }
-}
-
-impl From<ssi_jws::CompactJWSString> for Signature {
-    fn from(value: ssi_jws::CompactJWSString) -> Self {
-        Self::JWS(value)
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum SignatureRef<'a> {
-    /// Standard multibase encoding using the
-    /// <https://w3id.org/security#proofValue> property.
-    ///
-    /// This this the official way of providing the proof value, but some older
-    /// cryptographic suites like `Ed25519Signature2018` may use different
-    /// means.
-    Multibase(&'a ssi_security::layout::Multibase),
-
-    /// Detached Json Web Signature using the deprecated
-    /// <https://w3id.org/security#jws> property.
-    ///
-    /// See: <https://tools.ietf.org/html/rfc7797>
-    JWS(&'a ssi_jws::CompactJWSStr),
-
-    /// Detached Json Web Signature using the deprecated
-    /// <https://w3id.org/security#signatureValue> property.
-    Base64(&'a str),
-}
-
-impl<'a> SignatureRef<'a> {
-    pub fn as_multibase(self) -> Option<&'a ssi_security::layout::Multibase> {
-        match self {
-            Self::Multibase(m) => Some(m),
-            _ => None,
-        }
-    }
-
-    pub fn as_jws(self) -> Option<&'a ssi_jws::CompactJWSStr> {
-        match self {
-            Self::JWS(jws) => Some(jws),
-            _ => None,
-        }
-    }
-
-    pub fn as_base64(self) -> Option<&'a str> {
-        match self {
-            Self::Base64(value) => Some(value),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error)]

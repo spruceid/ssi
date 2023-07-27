@@ -26,6 +26,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-vc.workspace = true
+ssi-security.workspace = true
 chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true

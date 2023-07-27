@@ -101,9 +101,7 @@ pub trait SigningParameters<T, H, P> {
 }
 
 impl<M: Clone> SigningParameters<(), ProofConfiguration<M>, ProofOptions<M>> for ProofOptions<M> {
-    fn transformation_parameters(&self) {
-        ()
-    }
+    fn transformation_parameters(&self) {}
 
     fn hash_parameters(&self) -> ProofConfiguration<M> {
         self.to_proof_configuration()
@@ -121,9 +119,7 @@ pub trait VerificationParameters<T, H> {
 }
 
 impl<M: Clone> VerificationParameters<(), ProofConfiguration<M>> for ProofOptions<M> {
-    fn transformation_parameters(&self) {
-        ()
-    }
+    fn transformation_parameters(&self) {}
 
     fn into_hash_parameters(self) -> ProofConfiguration<M> {
         self.into_proof_configuration()

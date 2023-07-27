@@ -10,5 +10,7 @@ documentation = "https://docs.rs/ssi-vc/"
 
 [dependencies]
 iref.workspace = true
+static-iref.workspace = true
 treeldr-rust-macros.workspace = true
 treeldr-rust-prelude.workspace = true
+serde.workspace = true
