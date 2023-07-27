@@ -4,13 +4,14 @@ use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::VerificationError;
 use ssi_multicodec::MultiEncodedBuf;
+use ssi_security::{MULTIBASE, PUBLIC_KEY_MULTIBASE};
 use static_iref::iri;
 use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    LinkedDataVerificationMethod, VerificationMethod, VerificationMethodRef, CONTROLLER_IRI,
-    MULTIBASE_IRI, PUBLIC_KEY_MULTIBASE_IRI, RDF_TYPE_IRI,
+    signature, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
@@ -79,30 +80,6 @@ impl EcdsaSecp256r1VerificationKey2019 {
 
         multibase::encode(multibase::Base::Base58Btc, signature.as_bytes())
     }
-
-    pub fn try_import_signature(
-        signature: crate::Signature,
-    ) -> Result<ssi_security::layout::Multibase, VerificationError> {
-        match signature {
-            crate::Signature::Multibase(s) => Ok(s),
-            _ => Err(VerificationError::InvalidSignature),
-        }
-    }
-
-    pub fn try_import_signature_ref(
-        signature: crate::SignatureRef,
-    ) -> Result<&ssi_security::layout::Multibase, VerificationError> {
-        match signature {
-            crate::SignatureRef::Multibase(s) => Ok(s),
-            _ => Err(VerificationError::InvalidSignature),
-        }
-    }
-
-    pub fn export_signature_ref(
-        signature: &ssi_security::layout::Multibase,
-    ) -> crate::SignatureRef {
-        crate::SignatureRef::Multibase(signature)
-    }
 }
 
 impl ssi_crypto::VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
@@ -112,13 +89,7 @@ impl ssi_crypto::VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
         self
     }
 
-    type Signature = ssi_security::layout::Multibase;
-
-    type SignatureRef<'a> = &'a ssi_security::layout::Multibase;
-
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-        signature
-    }
+    type Signature = signature::ProofValue;
 }
 
 impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
@@ -127,8 +98,12 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
         self.id.as_iri()
     }
 
-    fn expected_type() -> Option<String> {
-        Some(ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE.to_string())
+    fn expected_type() -> Option<ExpectedType> {
+        Some(
+            ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
+                .to_string()
+                .into(),
+        )
     }
 
     /// Returns the type of the key.
@@ -198,10 +173,10 @@ impl LinkedDataVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
 
         quads.push(Quad(
             Id::Iri(self.id.clone()),
-            PUBLIC_KEY_MULTIBASE_IRI.into(),
+            PUBLIC_KEY_MULTIBASE.into(),
             Object::Literal(Literal::new(
                 self.public_key_multibase.clone(),
-                literal::Type::Any(MULTIBASE_IRI.into()),
+                literal::Type::Any(MULTIBASE.into()),
             )),
             None,
         ));
@@ -266,14 +241,14 @@ where
         );
 
         let key_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_MULTIBASE_IRI))),
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_MULTIBASE))),
             meta.clone(),
         );
         let key_value = json_ld::Value::Literal(
             json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
                 self.public_key_multibase.clone(),
             )),
-            Some(vocabulary.insert(MULTIBASE_IRI)),
+            Some(vocabulary.insert(MULTIBASE)),
         );
         node.insert(
             key_prop,

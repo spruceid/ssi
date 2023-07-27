@@ -8,27 +8,27 @@ use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::VerificationError;
 use ssi_multicodec::MultiEncodedBuf;
+use ssi_security::{MULTIBASE, PUBLIC_KEY_MULTIBASE};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ControllerProvider, LinkedDataVerificationMethod, VerificationMethod, VerificationMethodRef,
-    CONTROLLER_IRI, MULTIBASE_IRI, PUBLIC_KEY_MULTIBASE_IRI, RDF_TYPE_IRI,
+    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI,
 };
 
-/// IRI of the Ed25519 Verification Key 2020 type.
-pub const ED25519_VERIFICATION_KEY_2020_IRI: Iri<'static> =
-    iri!("https://w3id.org/security#Ed25519VerificationKey2020");
+/// IRI of the Multikey type.
+pub const MULTIKEY_IRI: Iri<'static> = iri!("https://w3id.org/security#Multikey");
 
-/// Ed25519 Verification Key 2020 type name.
-pub const ED25519_VERIFICATION_KEY_2020_TYPE: &str = "Ed25519VerificationKey2020";
+/// Multikey type name.
+pub const MULTIKEY_TYPE: &str = "Multikey";
 
-/// Deprecated verification method for the `Ed25519Signature2020` suite.
+/// Multikey verification method.
 ///
-/// See: <https://w3c.github.io/vc-di-eddsa/#ed25519verificationkey2020>
+/// See: <https://www.w3.org/TR/vc-data-integrity/#multikey>
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "type", rename = "Ed25519VerificationKey2020")]
-pub struct Ed25519VerificationKey2020 {
+#[serde(tag = "type", rename = "Multikey")]
+pub struct Multikey {
     /// Key identifier.
     pub id: IriBuf,
 
@@ -61,7 +61,7 @@ pub enum InvalidPublicKey {
     Ed25519(#[from] ed25519_dalek::SignatureError),
 }
 
-impl Ed25519VerificationKey2020 {
+impl Multikey {
     pub fn generate_key_pair(
         id: IriBuf,
         controller: IriBuf,
@@ -109,33 +109,9 @@ impl Ed25519VerificationKey2020 {
         let signature = key_pair.sign(data);
         multibase::encode(multibase::Base::Base58Btc, signature)
     }
-
-    pub fn try_import_signature(
-        signature: crate::Signature,
-    ) -> Result<ssi_security::layout::Multibase, VerificationError> {
-        match signature {
-            crate::Signature::Multibase(s) => Ok(s),
-            _ => Err(VerificationError::InvalidSignature),
-        }
-    }
-
-    pub fn try_import_signature_ref(
-        signature: crate::SignatureRef,
-    ) -> Result<&ssi_security::layout::Multibase, VerificationError> {
-        match signature {
-            crate::SignatureRef::Multibase(s) => Ok(s),
-            _ => Err(VerificationError::InvalidSignature),
-        }
-    }
-
-    pub fn export_signature_ref(
-        signature: &ssi_security::layout::Multibase,
-    ) -> crate::SignatureRef {
-        crate::SignatureRef::Multibase(signature)
-    }
 }
 
-impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2020 {
+impl ssi_crypto::VerificationMethod for Multikey {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -143,16 +119,10 @@ impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2020 {
     }
 
     /// Base58 multibase-encoded signature bytes.
-    type Signature = ssi_security::layout::Multibase;
-
-    type SignatureRef<'a> = &'a ssi_security::layout::Multibase;
-
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-        signature
-    }
+    type Signature = signature::ProofValue;
 }
 
-impl VerificationMethod for Ed25519VerificationKey2020 {
+impl VerificationMethod for Multikey {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
@@ -161,17 +131,17 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
         self.controller.as_iri()
     }
 
-    fn expected_type() -> Option<String> {
-        Some(ED25519_VERIFICATION_KEY_2020_TYPE.to_string())
+    fn expected_type() -> Option<ExpectedType> {
+        Some(MULTIKEY_TYPE.to_string().into())
     }
 
     fn type_(&self) -> &str {
-        ED25519_VERIFICATION_KEY_2020_TYPE
+        MULTIKEY_TYPE
     }
 }
 
 #[async_trait]
-impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2020> for &'a Ed25519VerificationKey2020 {
+impl<'a> VerificationMethodRef<'a, Multikey> for &'a Multikey {
     async fn verify<'s: 'async_trait>(
         self,
         controllers: &impl ControllerProvider,
@@ -200,12 +170,12 @@ impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2020> for &'a Ed25519Ve
     }
 }
 
-impl LinkedDataVerificationMethod for Ed25519VerificationKey2020 {
+impl LinkedDataVerificationMethod for Multikey {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {
         quads.push(Quad(
             Id::Iri(self.id.clone()),
             RDF_TYPE_IRI.into(),
-            Object::Id(Id::Iri(ED25519_VERIFICATION_KEY_2020_IRI.into())),
+            Object::Id(Id::Iri(MULTIKEY_IRI.into())),
             None,
         ));
 
@@ -218,10 +188,10 @@ impl LinkedDataVerificationMethod for Ed25519VerificationKey2020 {
 
         quads.push(Quad(
             Id::Iri(self.id.clone()),
-            PUBLIC_KEY_MULTIBASE_IRI.into(),
+            PUBLIC_KEY_MULTIBASE.into(),
             Object::Literal(Literal::new(
                 self.public_key_multibase.clone(),
-                literal::Type::Any(MULTIBASE_IRI.into()),
+                literal::Type::Any(MULTIBASE.into()),
             )),
             None,
         ));
@@ -230,7 +200,7 @@ impl LinkedDataVerificationMethod for Ed25519VerificationKey2020 {
     }
 }
 
-impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for Ed25519VerificationKey2020
+impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for Multikey
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
@@ -269,14 +239,14 @@ where
         );
 
         let key_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_MULTIBASE_IRI))),
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_MULTIBASE))),
             meta.clone(),
         );
         let key_value = json_ld::Value::Literal(
             json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
                 self.public_key_multibase,
             )),
-            Some(vocabulary.insert(MULTIBASE_IRI)),
+            Some(vocabulary.insert(MULTIBASE)),
         );
         node.insert(
             key_prop,
@@ -293,7 +263,7 @@ where
     }
 }
 
-impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for Ed25519VerificationKey2020
+impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for Multikey
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
@@ -332,14 +302,14 @@ where
         );
 
         let key_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_MULTIBASE_IRI))),
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_MULTIBASE))),
             meta.clone(),
         );
         let key_value = json_ld::Value::Literal(
             json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
                 self.public_key_multibase.clone(),
             )),
-            Some(vocabulary.insert(MULTIBASE_IRI)),
+            Some(vocabulary.insert(MULTIBASE)),
         );
         node.insert(
             key_prop,

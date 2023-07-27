@@ -67,14 +67,14 @@ where
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
     for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
-    for<'a> M::SignatureRef<'a>: Send,
+    for<'a> <M::Signature as ssi_crypto::Signature>::Reference<'a>: Send,
 {
     async fn verify<'m, 's>(
         &self,
         method: ssi_verification_methods::ReferenceRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: M::SignatureRef<'s>,
+        signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>
     where
         M: 'async_trait,
@@ -138,14 +138,14 @@ where
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
     for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
-    for<'a> M::SignatureRef<'a>: Send,
+    for<'a> <M::Signature as ssi_crypto::Signature>::Reference<'a>: Send,
 {
     async fn verify<'m: 'async_trait, 's: 'async_trait>(
         &self,
         method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: M::SignatureRef<'s>,
+        signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>
     where
         M: 'async_trait,

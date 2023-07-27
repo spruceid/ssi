@@ -2,3 +2,10 @@
 
 mod ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021;
 mod p256_blake2b_digest_size20_base58_check_encoded_signature_2021;
+mod thezos_jcs_signature_2021;
+mod thezos_signature_2021;
+
+pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+pub use thezos_jcs_signature_2021::TezosJcsSignature2021;
+pub use thezos_signature_2021::TezosSignature2021;

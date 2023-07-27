@@ -6,14 +6,14 @@ use rdf_types::VocabularyMut;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    Any, IntoAnyVerificationMethod, LinkedDataVerificationMethod, TryFromVerificationMethod,
-    TryIntoVerificationMethod, VerificationMethod,
+    Any, ExpectedType, IntoAnyVerificationMethod, LinkedDataVerificationMethod,
+    TryFromVerificationMethod, TryIntoVerificationMethod, VerificationMethod,
 };
 
 /// Reference to a verification method.
 pub struct Reference<M> {
     iri: IriBuf,
-    expected_type: Option<String>,
+    expected_type: Option<ExpectedType>,
     m: PhantomData<M>,
 }
 
@@ -38,8 +38,8 @@ impl<M> Reference<M> {
         self.iri.as_str()
     }
 
-    pub fn expected_type(&self) -> Option<&str> {
-        self.expected_type.as_deref()
+    pub fn expected_type(&self) -> Option<&ExpectedType> {
+        self.expected_type.as_ref()
     }
 }
 
@@ -57,7 +57,7 @@ impl<M: VerificationMethod> Reference<M> {
             iri: self.iri.as_iri(),
             expected_type: self
                 .expected_type
-                .as_deref()
+                .as_ref()
                 .map(Cow::Borrowed)
                 .or_else(|| M::expected_type().map(Cow::Owned)),
             m: PhantomData,
@@ -133,18 +133,12 @@ impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Refer
     fn as_reference(&self) -> Self::Reference<'_> {
         ReferenceRef {
             iri: self.iri.as_iri(),
-            expected_type: self.expected_type.as_deref().map(Cow::Borrowed),
+            expected_type: self.expected_type.as_ref().map(Cow::Borrowed),
             m: PhantomData,
         }
     }
 
     type Signature = M::Signature;
-
-    type SignatureRef<'a> = M::SignatureRef<'a>;
-
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-        M::signature_reference(signature)
-    }
 }
 
 impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference<M> {
@@ -155,7 +149,7 @@ impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference
 
 pub struct ReferenceRef<'a, M> {
     iri: Iri<'a>,
-    expected_type: Option<Cow<'a, str>>,
+    expected_type: Option<Cow<'a, ExpectedType>>,
     m: PhantomData<M>,
 }
 
@@ -164,7 +158,7 @@ impl<'a, M> ReferenceRef<'a, M> {
         self.iri
     }
 
-    pub fn expected_type(&self) -> Option<&str> {
+    pub fn expected_type(&self) -> Option<&ExpectedType> {
         self.expected_type.as_deref()
     }
 }
@@ -207,7 +201,7 @@ impl<'a, M> fmt::Debug for ReferenceRef<'a, M> {
 impl<'a, M> Clone for ReferenceRef<'a, M> {
     fn clone(&self) -> Self {
         Self {
-            iri: self.iri.clone(),
+            iri: self.iri,
             expected_type: self.expected_type.clone(),
             m: PhantomData,
         }
@@ -319,12 +313,6 @@ impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Refer
     }
 
     type Signature = M::Signature;
-
-    type SignatureRef<'a> = M::SignatureRef<'a>;
-
-    fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-        M::signature_reference(signature)
-    }
 }
 
 impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for ReferenceOrOwned<M> {

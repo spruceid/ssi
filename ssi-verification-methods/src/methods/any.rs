@@ -1,10 +1,9 @@
 use std::hash::Hash;
 
+use crate::signature;
 use async_trait::async_trait;
 use rdf_types::VocabularyMut;
 use treeldr_rust_prelude::{AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
-
-use crate::{Signature, SignatureRef};
 
 macro_rules! any_verification_method {
 	{
@@ -61,13 +60,7 @@ macro_rules! any_verification_method {
 				}
 			}
 
-			type Signature = Signature;
-
-			type SignatureRef<'a> = SignatureRef<'a>;
-
-			fn signature_reference(signature: &Self::Signature) -> Self::SignatureRef<'_> {
-				signature.as_reference()
-			}
+			type Signature = signature::Any;
 		}
 
 		impl crate::VerificationMethod for Any {
@@ -87,7 +80,7 @@ macro_rules! any_verification_method {
 				}
 			}
 
-			fn expected_type() -> Option<String> {
+			fn expected_type() -> Option<crate::ExpectedType> {
 				None
 			}
 
@@ -135,7 +128,7 @@ macro_rules! any_verification_method {
 				controllers: &impl crate::ControllerProvider,
 				proof_purpose: ssi_crypto::ProofPurpose,
 				signing_bytes: &[u8],
-				signature: SignatureRef<'s>,
+				signature: signature::AnyRef<'s>,
 			) -> Result<bool, ssi_crypto::VerificationError> {
 				match self {
 					$(
@@ -143,7 +136,7 @@ macro_rules! any_verification_method {
 							controllers,
 							proof_purpose,
 							signing_bytes,
-							crate::$name::try_import_signature_ref(signature)?
+							signature.try_into()?
 						).await
 					),*
 				}
@@ -250,7 +243,7 @@ macro_rules! any_verification_method {
 					bytes: &[u8],
 				) -> Result<<crate::$name as ssi_crypto::VerificationMethod>::Signature, ssi_crypto::SignatureError> {
 					let method = Any::$name(method.clone());
-					Ok(crate::$name::try_import_signature(self.0.sign(&method, bytes)?).unwrap())
+					Ok(self.0.sign(&method, bytes)?.try_into().unwrap())
 				}
 			}
 
@@ -261,7 +254,7 @@ macro_rules! any_verification_method {
 					bytes: &[u8],
 				) -> Result<<crate::$name as ssi_crypto::VerificationMethod>::Signature, ssi_crypto::SignatureError> {
 					let method = method.clone().into_any();
-					Ok(crate::$name::try_import_signature(self.0.sign(&method, bytes)?).unwrap())
+					Ok(self.0.sign(&method, bytes)?.try_into().unwrap())
 				}
 			}
 
@@ -276,7 +269,7 @@ macro_rules! any_verification_method {
 						crate::ReferenceOrOwned::Reference(r) => crate::ReferenceOrOwned::Reference(r.clone().into_any())
 					};
 
-					Ok(crate::$name::try_import_signature(self.0.sign(&method, bytes)?).unwrap())
+					Ok(self.0.sign(&method, bytes)?.try_into().unwrap())
 				}
 			}
 
@@ -287,11 +280,10 @@ macro_rules! any_verification_method {
 					method: &'m crate::$name,
 					purpose: ssi_crypto::ProofPurpose,
 					bytes: &[u8],
-					signature: <crate::$name as ssi_crypto::VerificationMethod>::SignatureRef<'s>,
+					signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Signature>::Reference<'s>,
 				) -> Result<bool, ssi_crypto::VerificationError> {
 					let method = AnyRef::$name(method);
-					let signature = crate::$name::export_signature_ref(signature);
-					self.0.verify(method, purpose, bytes, signature).await
+					self.0.verify(method, purpose, bytes, signature.into()).await
 				}
 			}
 
@@ -302,10 +294,9 @@ macro_rules! any_verification_method {
 					method: crate::ReferenceRef<'m, crate::$name>,
 					purpose: ssi_crypto::ProofPurpose,
 					bytes: &[u8],
-					signature: <crate::$name as ssi_crypto::VerificationMethod>::SignatureRef<'s>,
+					signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Signature>::Reference<'s>,
 				) -> Result<bool, ssi_crypto::VerificationError> {
-					let signature = crate::$name::export_signature_ref(signature);
-					self.0.verify(method.as_any(), purpose, bytes, signature).await
+					self.0.verify(method.as_any(), purpose, bytes, signature.into()).await
 				}
 			}
 
@@ -316,20 +307,32 @@ macro_rules! any_verification_method {
 					method: crate::ReferenceOrOwnedRef<'m, crate::$name>,
 					purpose: ssi_crypto::ProofPurpose,
 					bytes: &[u8],
-					signature: <crate::$name as ssi_crypto::VerificationMethod>::SignatureRef<'s>
+					signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Signature>::Reference<'s>,
 				) -> Result<bool, ssi_crypto::VerificationError> {
 					let method = match method {
 						crate::ReferenceOrOwnedRef::Owned(m) => crate::ReferenceOrOwnedRef::Owned(AnyRef::$name(m)),
 						crate::ReferenceOrOwnedRef::Reference(r) => crate::ReferenceOrOwnedRef::Reference(r.as_any())
 					};
 
-					let signature = crate::$name::export_signature_ref(signature);
-					self.0.verify(method, purpose, bytes, signature).await
+					self.0.verify(method, purpose, bytes, signature.into()).await
 				}
 			}
 		)*
 	};
 }
+
+// pub struct Closed<T>(pub T);
+
+// impl<'a, S> ssi_crypto::Signer<Any> for S {
+// 	fn sign(
+// 		&self,
+// 		method: &crate::$name,
+// 		bytes: &[u8],
+// 	) -> Result<<crate::$name as ssi_crypto::VerificationMethod>::Signature, ssi_crypto::SignatureError> {
+// 		let method = Any::$name(method.clone());
+// 		Ok(crate::$name::try_import_signature(self.0.sign(&method, bytes)?).unwrap())
+// 	}
+// }
 
 any_verification_method! {
     /// Deprecated verification method for the `RsaSignature2018` suite.

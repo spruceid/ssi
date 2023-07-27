@@ -112,6 +112,7 @@ ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
 ssi-dids = { path = "./ssi-dids", version = "0.1" }
 ssi-security = { path = "./ssi-security", version = "0.1" }
+ssi-caips = { path = "./ssi-caips", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
 async-trait = "0.1.68"
 thiserror = "1.0.40"

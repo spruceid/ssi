@@ -1,6 +1,6 @@
 use ssi_crypto::{SignatureError, Signer, VerificationError, Verifier};
 use ssi_vc::ProofValidity;
-use ssi_verification_methods::{RsaVerificationKey2018, Signature};
+use ssi_verification_methods::RsaVerificationKey2018;
 use static_iref::iri;
 
 use crate::{
@@ -58,10 +58,7 @@ impl CryptographicSuite for RsaSignature2018 {
         options: ProofOptions<Self::VerificationMethod>,
     ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError> {
         let signature = signer.sign(&options.verification_method, data)?;
-        Ok(UntypedProof::from_options(
-            options,
-            Signature::Base64(signature),
-        ))
+        Ok(UntypedProof::from_options(options, signature.into()))
     }
 
     async fn verify_proof(
