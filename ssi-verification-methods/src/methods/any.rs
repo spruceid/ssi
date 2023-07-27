@@ -366,7 +366,9 @@ any_verification_method! {
     /// `Multikey`.
     Multikey,
 
-    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+
+    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 }
 
 pub struct AnySigner<'a, S>(pub &'a S);
