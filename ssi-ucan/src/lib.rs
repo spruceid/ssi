@@ -133,7 +133,24 @@ impl<F, A> Ucan<F, A> {
             return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
+        // header can only contain 'typ' and 'alg' fields
+        if parts.header
+            != (Header {
+                algorithm: parts.header.algorithm,
+                type_: Some("JWT".to_string()),
+                ..Default::default()
+            })
+        {
+            return Err(Error::InvalidHeaderEntries(parts.header));
+        };
+
+        // aud must be a DID
         if !payload.audience.starts_with("did:") {
+            return Err(Error::DIDURL);
+        }
+
+        // iss must be a DID
+        if !payload.issuer.starts_with("did:") {
             return Err(Error::DIDURL);
         }
 
