@@ -14,8 +14,16 @@ pub enum SignatureError {
     /// The verification method used to sign the key is invalid.
     #[error("invalid verification method")]
     InvalidVerificationMethod,
+
+    #[error("missing public key")]
+    MissingPublicKey,
 }
 
 pub trait Signer<M: VerificationMethod> {
-    fn sign(&self, method: &M, bytes: &[u8]) -> Result<M::Signature, SignatureError>;
+    fn sign(
+        &self,
+        context: M::Context<'_>,
+        method: &M,
+        bytes: &[u8],
+    ) -> Result<M::Signature, SignatureError>;
 }

@@ -17,6 +17,7 @@ impl<C: Sync> VerifiableWith for VcJwt<C> {
     ) -> Result<ProofValidity, VerificationError> {
         Ok(verifier
             .verify(
+                (),
                 &proof.method,
                 ProofPurpose::AssertionMethod,
                 self.signing_bytes(),
@@ -42,6 +43,8 @@ impl Method {
 }
 
 impl ssi_crypto::VerificationMethod for Method {
+    type Context<'c> = ();
+
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {

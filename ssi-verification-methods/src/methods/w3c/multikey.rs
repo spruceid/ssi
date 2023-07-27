@@ -13,8 +13,8 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI,
+    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, NoContext,
+    VerificationMethod, VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI,
 };
 
 /// IRI of the Multikey type.
@@ -112,6 +112,8 @@ impl Multikey {
 }
 
 impl ssi_crypto::VerificationMethod for Multikey {
+    type Context<'c> = NoContext;
+
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -142,9 +144,10 @@ impl VerificationMethod for Multikey {
 
 #[async_trait]
 impl<'a> VerificationMethodRef<'a, Multikey> for &'a Multikey {
-    async fn verify<'s: 'async_trait>(
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl ControllerProvider,
+        _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
         signature: &'s ssi_security::layout::Multibase,

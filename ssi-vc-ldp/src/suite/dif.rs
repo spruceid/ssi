@@ -3,7 +3,5 @@
 //!
 //! [dif]: https://identity.foundation/
 
-/// `EcdsaSecp256k1RecoverySignature2020` cryptographic suite.
-///
-/// See: https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/
-pub struct EcdsaSecp256k1RecoverySignature2020;
+mod ecdsa_secp256k1_recovery_signature_2020;
+pub use ecdsa_secp256k1_recovery_signature_2020::*;

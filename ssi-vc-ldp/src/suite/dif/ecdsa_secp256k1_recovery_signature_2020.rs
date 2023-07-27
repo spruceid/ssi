@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// `EcdsaSecp256k1RecoverySignature2020`.
-/// 
+///
 /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
 pub struct EcdsaSecp256k1RecoverySignature2020;
 
@@ -56,7 +56,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         signer: &impl Signer<Self::VerificationMethod>,
         options: ProofOptions<Self::VerificationMethod>,
     ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError> {
-        let jws = signer.sign(&options.verification_method, data)?;
+        let jws = signer.sign((), &options.verification_method, data)?;
         Ok(UntypedProof::from_options(options, jws.into()))
     }
 
@@ -72,7 +72,13 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
             .ok_or(VerificationError::InvalidProof)?;
 
         Ok(verifier
-            .verify(proof.verification_method, proof.proof_purpose, data, jws)
+            .verify(
+                (),
+                proof.verification_method,
+                proof.proof_purpose,
+                data,
+                jws,
+            )
             .await?
             .into())
     }

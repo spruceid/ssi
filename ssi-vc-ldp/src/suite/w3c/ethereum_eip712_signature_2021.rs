@@ -26,7 +26,11 @@ pub struct EthereumEip712Signature2021;
 impl_rdf_input_urdna2015!(EthereumEip712Signature2021);
 
 verification_method_union! {
-    pub enum VerificationMethod, VerificationMethodRef (signature::Jws) {
+    pub enum VerificationMethod, VerificationMethodRef
+    where
+        Signature = signature::Jws,
+        Context<'c> = ()
+    {
         JsonWebKey2020,
         EcdsaSecp256k1VerificationKey2019,
         EcdsaSecp256k1RecoveryMethod2020
@@ -72,7 +76,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
         signer: &impl Signer<Self::VerificationMethod>,
         options: ProofOptions<Self::VerificationMethod>,
     ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError> {
-        let signature = signer.sign(&options.verification_method, data)?;
+        let signature = signer.sign((), &options.verification_method, data)?;
         Ok(UntypedProof::from_options(options, signature.into()))
     }
 
@@ -89,6 +93,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
 
         Ok(verifier
             .verify(
+                (),
                 proof.verification_method,
                 proof.proof_purpose,
                 data,

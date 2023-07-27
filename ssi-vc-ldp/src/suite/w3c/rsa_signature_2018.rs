@@ -57,7 +57,7 @@ impl CryptographicSuite for RsaSignature2018 {
         signer: &impl Signer<Self::VerificationMethod>,
         options: ProofOptions<Self::VerificationMethod>,
     ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError> {
-        let signature = signer.sign(&options.verification_method, data)?;
+        let signature = signer.sign((), &options.verification_method, data)?;
         Ok(UntypedProof::from_options(options, signature.into()))
     }
 
@@ -74,6 +74,7 @@ impl CryptographicSuite for RsaSignature2018 {
 
         Ok(verifier
             .verify(
+                (),
                 proof.verification_method,
                 proof.proof_purpose,
                 data,

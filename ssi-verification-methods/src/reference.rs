@@ -128,6 +128,8 @@ impl<M> core::hash::Hash for Reference<M> {
 }
 
 impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Reference<M> {
+    type Context<'c> = M::Context<'c>;
+
     type Reference<'a> = ReferenceRef<'a, M> where Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -303,6 +305,8 @@ impl<M: VerificationMethod + Into<Any>> IntoAnyVerificationMethod for ReferenceO
 }
 
 impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for ReferenceOrOwned<M> {
+    type Context<'c> = M::Context<'c>;
+
     type Reference<'a> = ReferenceOrOwnedRef<'a, M> where Self: 'a;
 
     fn as_reference(&self) -> ReferenceOrOwnedRef<M> {
