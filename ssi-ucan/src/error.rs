@@ -10,6 +10,8 @@ pub enum Error {
     VerificationMethodMismatch,
     #[error("Missing UCAN field, expected: '{0}'")]
     MissingUCANHeaderField(&'static str),
+    #[error("Header contains invalid fields")]
+    InvalidHeaderEntries(ssi_jws::Header),
     #[error("Invalid DID URL")]
     DIDURL,
     #[error(transparent)]
