@@ -149,7 +149,7 @@ impl<C: Sync> VcJwt<C> {
         let signing_bytes = header.encode_signing_bytes(&payload);
 
         // Build proof.
-        let signature = signer.sign(&method, &signing_bytes)?;
+        let signature = signer.sign((), &method, &signing_bytes)?;
         let proof = Proof::new(signature, method);
 
         // Build non-verifiable JWT credential.

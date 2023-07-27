@@ -14,11 +14,13 @@ use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use static_iref::iri;
 
+mod context;
 mod controller;
 mod methods;
 mod reference;
 pub mod signature;
 
+pub use context::*;
 pub use controller::*;
 pub use methods::*;
 pub use reference::*;
@@ -66,9 +68,10 @@ pub trait VerificationMethod: ssi_crypto::VerificationMethod {
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Iri; // Should be an URI.
 
-    fn verify<'f, 'a: 'f, 's: 'f>(
+    fn verify<'f, 'a: 'f, 'c: 'f, 's: 'f>(
         &'a self,
         controllers: &'a impl ControllerProvider,
+        context: Self::Context<'c>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &'a [u8],
         signature: <Self::Signature as ssi_crypto::Signature>::Reference<'s>,
@@ -78,16 +81,23 @@ pub trait VerificationMethod: ssi_crypto::VerificationMethod {
         <Self::Signature as ssi_crypto::Signature>::Reference<'s>: Send,
     {
         let r = self.as_reference();
-        r.verify(controllers, proof_purpose, signing_bytes, signature)
+        r.verify(
+            controllers,
+            context,
+            proof_purpose,
+            signing_bytes,
+            signature,
+        )
     }
 }
 
 #[async_trait]
 pub trait VerificationMethodRef<'a, M: 'a + ?Sized + VerificationMethod> {
     /// Verifies the given `signing_bytes` against the `signature`.
-    async fn verify<'s: 'async_trait>(
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl ControllerProvider,
+        context: M::Context<'c>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
         signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,

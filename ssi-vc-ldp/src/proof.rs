@@ -7,7 +7,8 @@ use rdf_types::{
     Subject, VocabularyMut,
 };
 use ssi_crypto::{ProofPurpose, Signature};
-use ssi_security::MULTIBASE;
+use ssi_jwk::JWK;
+use ssi_security::{MULTIBASE, PUBLIC_KEY_JWK};
 use ssi_verification_methods::{
     signature, IntoAnyVerificationMethod, InvalidVerificationMethod, LinkedDataVerificationMethod,
     TryFromVerificationMethod, TryIntoVerificationMethod,
@@ -59,10 +60,17 @@ impl<T: CryptographicSuite> Proof<T> {
         verification_method: T::VerificationMethod,
         proof_purpose: ProofPurpose,
         proof_value: signature::Any,
+        context: ProofContext,
     ) -> Self {
         Self {
             type_,
-            untyped: UntypedProof::new(created, verification_method, proof_purpose, proof_value),
+            untyped: UntypedProof::new(
+                created,
+                verification_method,
+                proof_purpose,
+                proof_value,
+                context,
+            ),
         }
     }
 
@@ -73,6 +81,11 @@ impl<T: CryptographicSuite> Proof<T> {
     pub fn untyped(&self) -> &UntypedProof<T::VerificationMethod> {
         &self.untyped
     }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ProofContext {
+    pub public_key_jwk: Option<Box<JWK>>,
 }
 
 /// Untyped Data Integrity Proof.
@@ -88,6 +101,9 @@ pub struct UntypedProof<M> {
 
     /// Proof value.
     pub proof_value: signature::Any,
+
+    /// Proof context.
+    pub context: ProofContext,
 }
 
 impl<M> UntypedProof<M> {
@@ -97,6 +113,7 @@ impl<M> UntypedProof<M> {
             options.verification_method,
             options.proof_purpose,
             proof_value,
+            options.context,
         )
     }
 
@@ -105,12 +122,14 @@ impl<M> UntypedProof<M> {
         verification_method: M,
         proof_purpose: ProofPurpose,
         proof_value: signature::Any,
+        context: ProofContext,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
             proof_value,
+            context,
         }
     }
 
@@ -123,6 +142,7 @@ impl<M> UntypedProof<M> {
             f(self.verification_method)?,
             self.proof_purpose,
             self.proof_value,
+            self.context,
         ))
     }
 
@@ -132,6 +152,7 @@ impl<M> UntypedProof<M> {
             f(self.verification_method),
             self.proof_purpose,
             self.proof_value,
+            self.context,
         )
     }
 
@@ -159,6 +180,7 @@ impl<M: ssi_crypto::VerificationMethod> UntypedProof<M> {
             verification_method: self.verification_method.as_reference(),
             proof_purpose: self.proof_purpose,
             proof_value: self.proof_value.as_reference(),
+            context: &self.context,
         }
     }
 }
@@ -184,6 +206,9 @@ pub struct UntypedProofRef<'a, M: 'a + ssi_crypto::VerificationMethod> {
 
     /// Proof value.
     pub proof_value: signature::AnyRef<'a>,
+
+    /// Proof context.
+    pub context: &'a ProofContext,
 }
 
 impl<'a, M: 'a + ssi_crypto::VerificationMethod> UntypedProofRef<'a, M> {
@@ -198,6 +223,7 @@ impl<'a, M: 'a + ssi_crypto::VerificationMethod> UntypedProofRef<'a, M> {
             verification_method: self.verification_method.try_into_verification_method()?,
             proof_purpose: self.proof_purpose,
             proof_value: self.proof_value,
+            context: self.context,
         })
     }
 }
@@ -415,6 +441,8 @@ where
         let mut proof_purpose = None;
         let mut proof_value = None;
 
+        let mut context = ProofContext::default();
+
         for (p, objects) in graph.predicates(id) {
             if let Some(p) = interpretation.iris_of(p).next() {
                 let p = vocabulary.iri(p).unwrap();
@@ -492,6 +520,14 @@ where
                         let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
                         proof_value = Some(signature::Any::SignatureValue(value.into()))
                     }
+                } else if p == PUBLIC_KEY_JWK {
+                    for o in objects {
+                        let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
+                        let jwk: JWK = value
+                            .parse()
+                            .map_err(|_| FromRdfError::InvalidLexicalRepresentation)?;
+                        context.public_key_jwk = Some(Box::new(jwk))
+                    }
                 }
             }
         }
@@ -512,6 +548,7 @@ where
             verification_method,
             proof_purpose,
             proof_value,
+            context,
         ))
     }
 }
@@ -593,6 +630,7 @@ pub struct ProofOptions<M> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
     pub verification_method: M,
     pub proof_purpose: ProofPurpose,
+    pub context: ProofContext,
 }
 
 impl<M> ProofOptions<M> {
@@ -600,11 +638,13 @@ impl<M> ProofOptions<M> {
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: M,
         proof_purpose: ProofPurpose,
+        context: ProofContext,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
+            context,
         }
     }
 
@@ -634,6 +674,7 @@ impl<M> ProofOptions<M> {
             created: self.created,
             verification_method: self.verification_method.try_into_verification_method()?,
             proof_purpose: self.proof_purpose,
+            context: self.context,
         })
     }
 }

@@ -4,10 +4,17 @@ pub use any::*;
 mod w3c;
 pub use w3c::*;
 
+mod unspecified;
+pub use unspecified::*;
+
 #[macro_export]
 macro_rules! verification_method_union {
 	{
-		$vis:vis enum $name:ident, $ref_name:ident ($signature:ty) {
+		$vis:vis enum $name:ident, $ref_name:ident
+		where
+			Signature = $signature:ty,
+			Context<$context_lft:lifetime> = $context:ty
+		{
 			$(
 				$variant:ident
 			),*
@@ -28,6 +35,8 @@ macro_rules! verification_method_union {
 		}
 
 		impl ssi_crypto::VerificationMethod for $name {
+			type Context<$context_lft> = $context;
+
 			type Signature = $signature;
 
 			type Reference<'a> = $ref_name<'a>;
@@ -87,9 +96,10 @@ macro_rules! verification_method_union {
 
 		#[async_trait::async_trait]
 		impl<'a> $crate::VerificationMethodRef<'a, $name> for $ref_name<'a> {
-			async fn verify<'s: 'async_trait>(
+			async fn verify<$context_lft: 'async_trait, 's: 'async_trait>(
 				self,
 				controllers: &impl $crate::ControllerProvider,
+				context: $context,
 				proof_purpose: ssi_crypto::ProofPurpose,
 				data: &[u8],
 				signature: <$signature as ssi_crypto::Signature>::Reference<'s>,
@@ -98,7 +108,8 @@ macro_rules! verification_method_union {
 					$(
 						Self::$variant(m) => {
 							let signature = signature.try_into()?;
-							m.verify(controllers, proof_purpose, data, signature).await
+							let context = context.try_into()?;
+							m.verify(controllers, context, proof_purpose, data, signature).await
 						}
 					),*
 				}

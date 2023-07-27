@@ -3,8 +3,8 @@
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
-use std::convert::TryFrom;
 use std::result::Result;
+use std::{convert::TryFrom, str::FromStr};
 use zeroize::Zeroize;
 pub mod error;
 pub use error::Error;
@@ -77,6 +77,14 @@ pub struct JWK {
     pub x509_thumbprint_sha256: Option<Base64urlUInt>,
     #[serde(flatten)]
     pub params: Params,
+}
+
+impl FromStr for JWK {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]

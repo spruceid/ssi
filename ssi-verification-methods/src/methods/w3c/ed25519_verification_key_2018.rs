@@ -11,8 +11,8 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
+    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, NoContext,
+    VerificationMethod, VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
@@ -76,6 +76,8 @@ impl Ed25519VerificationKey2018 {
 }
 
 impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2018 {
+    type Context<'c> = NoContext;
+
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -105,9 +107,10 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
 
 #[async_trait]
 impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2018> for &'a Ed25519VerificationKey2018 {
-    async fn verify<'s: 'async_trait>(
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl ControllerProvider,
+        _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
         jws: &'s CompactJWSStr,

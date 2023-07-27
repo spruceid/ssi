@@ -13,7 +13,7 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
     VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
 };
 
@@ -100,6 +100,8 @@ impl EcdsaSecp256k1VerificationKey2019 {
 }
 
 impl ssi_crypto::VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
+    type Context<'c> = NoContext;
+
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -139,9 +141,10 @@ impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1VerificationKey2019>
     for &'a EcdsaSecp256k1VerificationKey2019
 {
     /// Verifies the given signature.
-    async fn verify<'s: 'async_trait>(
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl crate::ControllerProvider,
+        _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         data: &[u8],
         jws: &'s CompactJWSStr,

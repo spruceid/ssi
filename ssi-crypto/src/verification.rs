@@ -29,6 +29,10 @@ pub enum VerificationError {
     #[error("unknown key")]
     UnknownKey,
 
+    /// Missing public key.
+    #[error("missing public key")]
+    MissingPublicKey,
+
     /// Cryptographic key is not used correctly.
     #[error("invalid use of key with <{0}>")]
     InvalidKeyUse(ProofPurpose),
@@ -82,6 +86,12 @@ impl Signature for Vec<u8> {
 
 /// Verification method.
 pub trait VerificationMethod {
+    /// Context required by the verification method for the verification.
+    ///
+    /// The context is provided by the cryptographic suite. In most case,
+    /// no context is required (specified by the unit type `()`).
+    type Context<'c>;
+
     type Signature: Signature;
 
     type Reference<'a>
@@ -96,8 +106,9 @@ pub trait VerificationMethod {
 pub trait Verifier<M: VerificationMethod>: Sync {
     /// Verify the given `signature`, signed using the given `algorithm`,
     /// against the input `signing_bytes`.
-    async fn verify<'m: 'async_trait, 's: 'async_trait>(
+    async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
         &self,
+        context: M::Context<'c>,
         method: M::Reference<'m>,
         proof_purpose: ProofPurpose,
         signing_bytes: &[u8],

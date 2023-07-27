@@ -12,7 +12,7 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
     VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI,
 };
 
@@ -60,6 +60,8 @@ impl JsonWebKey2020 {
 }
 
 impl ssi_crypto::VerificationMethod for JsonWebKey2020 {
+    type Context<'c> = NoContext;
+
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -93,9 +95,10 @@ impl VerificationMethod for JsonWebKey2020 {
 #[async_trait]
 impl<'a> VerificationMethodRef<'a, JsonWebKey2020> for &'a JsonWebKey2020 {
     /// Verifies the given signature.
-    async fn verify<'s: 'async_trait>(
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl crate::ControllerProvider,
+        _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         data: &[u8],
         jws: &'s CompactJWSStr,

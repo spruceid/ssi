@@ -12,7 +12,7 @@ use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
     VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
 };
 
@@ -39,6 +39,8 @@ pub struct EcdsaSecp256k1RecoveryMethod2020 {
 }
 
 impl ssi_crypto::VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
+    type Context<'c> = NoContext;
+
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -93,9 +95,10 @@ impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1RecoveryMethod2020>
     for &'a EcdsaSecp256k1RecoveryMethod2020
 {
     /// Verifies the given signature.
-    async fn verify<'s: 'async_trait>(
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl crate::ControllerProvider,
+        _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         data: &[u8],
         jws: &'s CompactJWSStr,
