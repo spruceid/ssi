@@ -1,8 +1,6 @@
 use ssi_crypto::{SignatureError, Signer, VerificationError, Verifier};
 use ssi_vc::ProofValidity;
-use ssi_verification_methods::{
-    EcdsaSecp256k1RecoveryMethod2020, Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-};
+use ssi_verification_methods::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
 use static_iref::iri;
 
 use crate::{
@@ -15,10 +13,10 @@ use crate::{
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz1` addresses.
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 
-impl_rdf_input_urdna2015!(EcdsaSecp256k1RecoveryMethod2020);
+impl_rdf_input_urdna2015!(Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
 
 #[async_trait::async_trait]
-impl CryptographicSuite for EcdsaSecp256k1RecoveryMethod2020 {
+impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
     type TransformationParameters = ();
     type Transformed = String;
 

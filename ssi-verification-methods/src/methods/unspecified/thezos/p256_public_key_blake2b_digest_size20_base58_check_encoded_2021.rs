@@ -16,18 +16,18 @@ use crate::{
     VerificationMethod, VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
 };
 
-pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI: Iri<'static> =
-    iri!("https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
+pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI: Iri<'static> =
+    iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
 
-pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
-    "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
+pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
+    "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(
     tag = "type",
-    rename = "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+    rename = "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
 )]
-pub struct Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+pub struct P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     /// Key identifier.
     pub id: IriBuf,
 
@@ -39,7 +39,7 @@ pub struct Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     pub blockchain_account_id: ssi_caips::caip10::BlockchainAccountId,
 }
 
-impl Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     pub fn matches_public_key(&self, public_key: &JWK) -> Result<bool, VerificationError> {
         use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
         match self.blockchain_account_id.verify(public_key) {
@@ -52,7 +52,7 @@ impl Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     }
 }
 
-impl ssi_crypto::VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl ssi_crypto::VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     /// This suites needs the public key as context because it is not included
     /// in the verification method.
     ///
@@ -68,7 +68,7 @@ impl ssi_crypto::VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base5
     type Signature = signature::Jws;
 }
 
-impl VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
@@ -79,20 +79,20 @@ impl VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncode
 
     fn expected_type() -> Option<ExpectedType> {
         Some(
-            ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+            P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
                 .to_string()
                 .into(),
         )
     }
 
     fn type_(&self) -> &str {
-        ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+        P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
 }
 
 #[async_trait]
-impl<'a> VerificationMethodRef<'a, Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021>
-    for &'a Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+impl<'a> VerificationMethodRef<'a, P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021>
+    for &'a P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 {
     async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
@@ -113,7 +113,7 @@ impl<'a> VerificationMethodRef<'a, Ed25519PublicKeyBLAKE2BDigestSize20Base58Chec
         let (header, payload, signature_bytes) =
             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
 
-        if header.algorithm != ssi_jwk::Algorithm::EdBlake2b {
+        if header.algorithm != ssi_jwk::Algorithm::ESBlake2b {
             return Err(VerificationError::InvalidProof);
         }
 
@@ -126,7 +126,7 @@ impl<'a> VerificationMethodRef<'a, Ed25519PublicKeyBLAKE2BDigestSize20Base58Chec
         }
 
         Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::EdBlake2b,
+            ssi_jwk::Algorithm::ESBlake2b,
             jws.signing_bytes(),
             context.public_key_jwk,
             &signature_bytes,
@@ -135,13 +135,13 @@ impl<'a> VerificationMethodRef<'a, Ed25519PublicKeyBLAKE2BDigestSize20Base58Chec
     }
 }
 
-impl LinkedDataVerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl LinkedDataVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {
         quads.push(Quad(
             Id::Iri(self.id.clone()),
             RDF_TYPE_IRI.into(),
             Object::Id(Id::Iri(
-                ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI.into(),
+                P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI.into(),
             )),
             None,
         ));
@@ -168,7 +168,7 @@ impl LinkedDataVerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58C
 }
 
 impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M>
-    for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+    for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
@@ -232,7 +232,7 @@ where
 }
 
 impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M>
-    for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+    for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
