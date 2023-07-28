@@ -816,7 +816,7 @@ impl Credential {
         // TODO: error if any unconvertable claims
         // TODO: unify with verify function?
         let (proofs, matched_jwt) = match vc
-            .filter_proofs(options_opt, Some((&header, &claims)), resolver)
+            .filter_proofs(options_opt.clone(), Some((&header, &claims)), resolver)
             .await
         {
             Ok(matches) => matches,
@@ -827,34 +827,114 @@ impl Credential {
                 );
             }
         };
-        let verification_method = match header.key_id {
-            Some(kid) => kid,
+
+        let keys = match header.key_id {
+            // If "kid" field is specified, use that (original behavior of ssi)
+            Some(kid) => {
+                let key = match ssi_dids::did_resolve::resolve_key(&kid, resolver).await {
+                    Ok(key) => key,
+                    Err(err) => {
+                        return (
+                            None,
+                            VerificationResult::error(&format!(
+                                "Unable to resolve key for JWS: {}",
+                                err
+                            )),
+                        );
+                    }
+                };
+                vec![key]
+            }
+            // Otherwise, retrieve all keys from the DID document (ugh -- this is apparently required
+            // by the DID standard, but is sloppy and could lead to DoS attacks; arguably in the
+            // case where DIDs are being used, the kid field should be mandatory -- see
+            // https://www.w3.org/TR/vc-data-model/#jwt-encoding :
+            //      kid MAY be used if there are multiple keys associated with the issuer of the
+            //      JWT. The key discovery is out of the scope of this specification. For example,
+            //      the kid can refer to a key in a DID document, or can be the identifier of a
+            //      key inside a JWKS.
             None => {
-                return (None, VerificationResult::error("JWT header missing key id"));
-            }
-        };
-        let key = match ssi_dids::did_resolve::resolve_key(&verification_method, resolver).await {
-            Ok(key) => key,
-            Err(err) => {
-                return (
-                    None,
-                    VerificationResult::error(&format!("Unable to resolve key for JWS: {}", err)),
-                );
-            }
-        };
-        let mut results = VerificationResult::new();
-        if matched_jwt {
-            match ssi_jws::verify_bytes_warnable(header.algorithm, &signing_input, &key, &signature)
-            {
-                Ok(mut warnings) => {
-                    results.checks.push(Check::JWS);
-                    results.warnings.append(&mut warnings);
+                let proof_purpose = match options_opt.map(|options| options.proof_purpose) {
+                    Some(Some(proof_purpose)) => proof_purpose,
+                    Some(None) | None => ProofPurpose::AssertionMethod,
+                };
+                assert_eq!(proof_purpose, ProofPurpose::AssertionMethod, "sanity check");
+                let issuer = match claims.issuer {
+                    Some(StringOrURI::String(issuer)) => issuer,
+                    Some(StringOrURI::URI(URI::String(issuer))) => issuer,
+                    None => {
+                        return (None, VerificationResult::error("\"iss\" field missing"));
+                    }
+                };
+                //                 println!("Credential::decode_verify_jwt; issuer: {:?}", issuer);
+                // Resolve the DID document of the issuer and get all verification methods.
+                let vmms = match ssi_dids::did_resolve::get_verification_methods(
+                    &issuer,
+                    proof_purpose,
+                    resolver,
+                )
+                .await
+                {
+                    Ok(vmms) => vmms,
+                    Err(err) => {
+                        return (
+                            None,
+                            VerificationResult::error(&format!(
+                                "failed to get verification methods for DID {}; {}",
+                                issuer, err
+                            )),
+                        );
+                    }
+                };
+                //                 println!("Credential::decode_verify_jwt; vmms: {:?}", vmms);
+                let mut keys = Vec::new();
+                for (vmm_id, vmm) in vmms {
+                    let key = match vmm.get_jwk() {
+                        Ok(key) => key,
+                        Err(err) => {
+                            return (
+                                None,
+                                VerificationResult::error(&format!(
+                                    "failed to get JWK from verification method {}; {}",
+                                    vmm_id, err
+                                )),
+                            );
+                        }
+                    };
+                    keys.push(key);
                 }
-                Err(err) => results
-                    .errors
-                    .push(format!("Unable to verify signature: {}", err)),
+                keys
             }
-            return (Some(vc), results);
+        };
+
+        let mut results = VerificationResult::new();
+
+        if checks.contains(&Check::Status) {
+            results.append(&mut vc.check_status(resolver, context_loader).await);
+        }
+
+        // Try each key to see if it verifies the VC.
+        for key in keys {
+            //             println!("Credential::decode_verify_jwt; attempting to verify JWT using key: {:?}", key);
+            if matched_jwt {
+                match ssi_jws::verify_bytes_warnable(
+                    header.algorithm,
+                    &signing_input,
+                    &key,
+                    &signature,
+                ) {
+                    Ok(mut warnings) => {
+                        results.checks.push(Check::JWS);
+                        results.warnings.append(&mut warnings);
+                    }
+                    Err(_) => {
+                        // An error occurred here, so try the next key.
+                        break;
+                    }
+                }
+                //                 println!("Credential::decode_verify_jwt; returning using key: {:?}", key);
+                return (Some(vc), results);
+            }
         }
         // No JWS verified: try to verify a proof.
         if proofs.is_empty() {
@@ -872,10 +952,14 @@ impl Credential {
                 break;
             };
         }
-        if checks.contains(&Check::Status) {
-            results.append(&mut vc.check_status(resolver, context_loader).await);
+        // If we didn't return, then it was an error.
+        {
+            results
+                .errors
+                .push("Unable to verify signature".to_string());
+            //             println!("Presentation::decode_verify_jwt; returning error because no keys verified the JWT");
+            (Some(vc), results)
         }
-        (Some(vc), results)
     }
 
     pub fn validate_unsigned(&self) -> Result<(), Error> {
@@ -1367,11 +1451,10 @@ impl Presentation {
                 VerificationResult::error(&format!("Invalid VP: {}", err)),
             );
         }
-        let mut results = VerificationResult::new();
         // TODO: error if any unconvertable claims
         // TODO: unify with verify function?
         let (proofs, matched_jwt) = match vp
-            .filter_proofs(options_opt, Some((&header, &claims)), resolver)
+            .filter_proofs(options_opt.clone(), Some((&header, &claims)), resolver)
             .await
         {
             Ok(matches) => matches,
@@ -1382,51 +1465,137 @@ impl Presentation {
                 );
             }
         };
-        let verification_method = match header.key_id {
-            Some(kid) => kid,
+        let keys = match header.key_id {
+            // If "kid" field is specified, use that (original behavior of ssi)
+            Some(kid) => {
+                let key = match ssi_dids::did_resolve::resolve_key(&kid, resolver).await {
+                    Ok(key) => key,
+                    Err(err) => {
+                        return (
+                            None,
+                            VerificationResult::error(&format!(
+                                "Unable to resolve key for JWS: {}",
+                                err
+                            )),
+                        );
+                    }
+                };
+                vec![key]
+            }
+            // Otherwise, retrieve all keys from the DID document (ugh -- this is apparently required
+            // by the DID standard, but is sloppy and could lead to DoS attacks; arguably in the
+            // case where DIDs are being used, the kid field should be mandatory -- see
+            // https://www.w3.org/TR/vc-data-model/#jwt-encoding :
+            //      kid MAY be used if there are multiple keys associated with the issuer of the
+            //      JWT. The key discovery is out of the scope of this specification. For example,
+            //      the kid can refer to a key in a DID document, or can be the identifier of a
+            //      key inside a JWKS.
             None => {
-                return (None, VerificationResult::error("JWT header missing key id"));
-            }
-        };
-        let key = match ssi_dids::did_resolve::resolve_key(&verification_method, resolver).await {
-            Ok(key) => key,
-            Err(err) => {
-                return (
-                    None,
-                    VerificationResult::error(&format!("Unable to resolve key for JWS: {}", err)),
-                );
-            }
-        };
-        if matched_jwt {
-            match ssi_jws::verify_bytes_warnable(header.algorithm, &signing_input, &key, &signature)
-            {
-                Ok(mut warnings) => {
-                    results.checks.push(Check::JWS);
-                    results.warnings.append(&mut warnings);
+                let proof_purpose = match options_opt.map(|options| options.proof_purpose) {
+                    Some(Some(proof_purpose)) => proof_purpose,
+                    Some(None) | None => ProofPurpose::Authentication,
+                };
+                assert_eq!(proof_purpose, ProofPurpose::Authentication, "sanity check");
+                let issuer = match claims.issuer {
+                    Some(StringOrURI::String(issuer)) => issuer,
+                    Some(StringOrURI::URI(URI::String(issuer))) => issuer,
+                    None => {
+                        return (None, VerificationResult::error("\"iss\" field missing"));
+                    }
+                };
+                //                 println!("Presentation::decode_verify_jwt; issuer: {:?}", issuer);
+                // Resolve the DID document of the issuer and get all verification methods.
+                let vmms = match ssi_dids::did_resolve::get_verification_methods(
+                    &issuer,
+                    proof_purpose,
+                    resolver,
+                )
+                .await
+                {
+                    Ok(vmms) => vmms,
+                    Err(err) => {
+                        return (
+                            None,
+                            VerificationResult::error(&format!(
+                                "failed to get verification methods for DID {}; {}",
+                                issuer, err
+                            )),
+                        );
+                    }
+                };
+                //                 println!("Presentation::decode_verify_jwt; vmms: {:?}", vmms);
+                let mut keys = Vec::new();
+                for (vmm_id, vmm) in vmms {
+                    let key = match vmm.get_jwk() {
+                        Ok(key) => key,
+                        Err(err) => {
+                            return (
+                                None,
+                                VerificationResult::error(&format!(
+                                    "failed to get JWK from verification method {}; {}",
+                                    vmm_id, err
+                                )),
+                            );
+                        }
+                    };
+                    keys.push(key);
                 }
-                Err(err) => results
-                    .errors
-                    .push(format!("Unable to filter proofs: {}", err)),
+                keys
             }
-            return (Some(vp), results);
+        };
+
+        let mut results = VerificationResult::new();
+
+        // Try each key to see if it verifies the VP.
+        for key in keys {
+            //             println!("Presentation::decode_verify_jwt; attempting to verify JWT using key: {:?}", key);
+            if matched_jwt {
+                match ssi_jws::verify_bytes_warnable(
+                    header.algorithm,
+                    &signing_input,
+                    &key,
+                    &signature,
+                ) {
+                    Ok(mut warnings) => {
+                        results.checks.push(Check::JWS);
+                        results.warnings.append(&mut warnings);
+                    }
+                    Err(_) => {
+                        // An error occurred here, so try the next key.
+                        break;
+                    }
+                }
+                //                 println!("Presentation::decode_verify_jwt; returning using key: {:?}", key);
+                return (Some(vp), results);
+            }
         }
         // No JWS verified: try to verify a proof.
         if proofs.is_empty() {
+            //             println!("Presentation::decode_verify_jwt; returning error because no proofs");
             return (
                 None,
                 VerificationResult::error("No applicable JWS or proof"),
             );
         }
         // Try verifying each proof until one succeeds
-        for proof in proofs {
+        for proof in proofs.iter() {
             let mut result = proof.verify(&vp, resolver, context_loader).await;
             if result.errors.is_empty() {
                 result.checks.push(Check::Proof);
+                //                 println!("Presentation::decode_verify_jwt; returning using key: {:?}", key);
                 return (Some(vp), result);
-            };
-            results.append(&mut result);
+            } else {
+                // An error occurred, so try the next key.
+            }
         }
-        (Some(vp), results)
+        // If we didn't return, then it was an error.
+        {
+            results
+                .errors
+                .push("Unable to verify signature".to_string());
+            //             println!("Presentation::decode_verify_jwt; returning error because no keys verified the JWT");
+            (Some(vp), results)
+        }
     }
 
     pub async fn verify_jwt(
