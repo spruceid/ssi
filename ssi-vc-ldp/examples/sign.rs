@@ -9,7 +9,7 @@ use ssi_crypto::{ProofPurpose, ProofPurposes};
 use ssi_vc_ldp::{suite::Ed25519Signature2020, DataIntegrity};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ReferenceOrOwned,
-    VerificationMethod,
+    ReferenceOrOwnedRef, VerificationMethod,
 };
 use static_iref::{iref, iri};
 use treeldr_rust_macros::tldr;
@@ -82,7 +82,6 @@ async fn main() {
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
     let proof_options = ssi_vc_ldp::ProofOptions::new(
-        Ed25519Signature2020,
         Utc::now(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::AssertionMethod,
@@ -224,14 +223,15 @@ impl ssi_crypto::Signer<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyrin
         &self,
         method: &ReferenceOrOwned<Ed25519VerificationKey2020>,
         bytes: &[u8],
-    ) -> Result<String, ssi_crypto::SignatureError> {
+    ) -> Result<((), ssi_verification_methods::signature::ProofValue), ssi_crypto::SignatureError>
+    {
         let id = match method {
             ReferenceOrOwned::Owned(key) => key.id(),
             ReferenceOrOwned::Reference(id) => id.iri(),
         };
 
         match self.keys.get(&id) {
-            Some((method, key)) => Ok(method.sign(bytes, key)),
+            Some((method, key)) => Ok(((), method.sign(bytes, key))),
             None => Err(ssi_crypto::SignatureError::UnknownVerificationMethod),
         }
     }
@@ -251,23 +251,24 @@ impl ControllerProvider for Keyring {
 
 #[async_trait::async_trait]
 impl ssi_crypto::Verifier<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyring {
-    async fn verify(
+    async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
         &self,
-        method: &ReferenceOrOwned<Ed25519VerificationKey2020>,
+        context: (),
+        method: ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>,
         purpose: ssi_crypto::ProofPurpose,
         bytes: &[u8],
-        signature: &str,
+        signature: &'s ssi_vc::schema::sec::layout::Multibase,
     ) -> Result<bool, ssi_crypto::VerificationError> {
         match method {
-            ReferenceOrOwned::Owned(key) => {
+            ReferenceOrOwnedRef::Owned(key) => {
                 // If we get here, this means the VC embeds the public key used
                 // to sign itself. It cannot really be trusted then.
                 // It would be safer to either throw an error or at least fetch
                 // the actual key using its id.
-                key.verify(self, purpose, bytes, signature).await
+                key.verify(self, context, purpose, bytes, signature).await
             }
-            ReferenceOrOwned::Reference(id) => match self.keys.get(&id.iri()) {
-                Some(key) => key.0.verify(self, purpose, bytes, signature).await,
+            ReferenceOrOwnedRef::Reference(id) => match self.keys.get(&id.iri()) {
+                Some(key) => key.0.verify(self, context, purpose, bytes, signature).await,
                 None => Err(ssi_crypto::VerificationError::UnknownKey),
             },
         }

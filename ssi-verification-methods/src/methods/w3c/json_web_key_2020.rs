@@ -59,14 +59,16 @@ impl JsonWebKey2020 {
     }
 }
 
-impl ssi_crypto::VerificationMethod for JsonWebKey2020 {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for JsonWebKey2020 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for JsonWebKey2020 {
+    type ProofContext = NoContext;
 
     type Signature = signature::Jws;
 }

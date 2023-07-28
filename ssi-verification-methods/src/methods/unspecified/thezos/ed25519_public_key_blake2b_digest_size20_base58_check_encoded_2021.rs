@@ -13,7 +13,8 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, PublicKeyJwkContext,
-    VerificationMethod, VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
+    PublicKeyJwkContextRef, VerificationMethod, VerificationMethodRef, CONTROLLER_IRI,
+    RDF_TYPE_IRI, XSD_STRING,
 };
 
 pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI: Iri<'static> =
@@ -52,18 +53,20 @@ impl Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     }
 }
 
-impl ssi_crypto::VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    /// This suites needs the public key as context because it is not included
-    /// in the verification method.
-    ///
-    /// The key is provided by the cryptographic suite.
-    type Context<'c> = PublicKeyJwkContext<'c>;
-
+impl ssi_crypto::Referencable for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+    /// This suites needs the public key as context because it is not included
+    /// in the verification method.
+    ///
+    /// The key is provided by the cryptographic suite.
+    type ProofContext = PublicKeyJwkContext;
 
     type Signature = signature::Jws;
 }
@@ -97,7 +100,7 @@ impl<'a> VerificationMethodRef<'a, Ed25519PublicKeyBLAKE2BDigestSize20Base58Chec
     async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl ControllerProvider,
-        context: PublicKeyJwkContext<'c>,
+        context: PublicKeyJwkContextRef<'c>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
         jws: &'s CompactJWSStr,

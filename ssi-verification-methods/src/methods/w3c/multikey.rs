@@ -111,14 +111,16 @@ impl Multikey {
     }
 }
 
-impl ssi_crypto::VerificationMethod for Multikey {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for Multikey {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for Multikey {
+    type ProofContext = NoContext;
 
     /// Base58 multibase-encoded signature bytes.
     type Signature = signature::ProofValue;

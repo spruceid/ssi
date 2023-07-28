@@ -6,12 +6,12 @@ use rdf_types::{
     interpretation::ReverseIriInterpretation, BlankIdBuf, Id, IriVocabulary, Literal, Object, Quad,
     Subject, VocabularyMut,
 };
-use ssi_crypto::{ProofPurpose, Signature};
-use ssi_jwk::JWK;
-use ssi_security::{MULTIBASE, PUBLIC_KEY_JWK};
+use ssi_crypto::{ProofPurpose, Referencable, VerificationError};
+use ssi_security::{CRYPTOSUITE, PROOF_PURPOSE, VERIFICATION_METHOD};
 use ssi_verification_methods::{
-    signature, IntoAnyVerificationMethod, InvalidVerificationMethod, LinkedDataVerificationMethod,
-    TryFromVerificationMethod, TryIntoVerificationMethod,
+    json_ld::FlattenIntoJsonLdNode, signature, AnyContext, IntoAnyVerificationMethod,
+    InvalidVerificationMethod, LinkedDataVerificationMethod, TryFromVerificationMethod,
+    TryIntoVerificationMethod,
 };
 use static_iref::iri;
 use treeldr_rust_prelude::{
@@ -59,8 +59,8 @@ impl<T: CryptographicSuite> Proof<T> {
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: T::VerificationMethod,
         proof_purpose: ProofPurpose,
-        proof_value: signature::Any,
-        context: ProofContext,
+        context: <T::VerificationMethod as ssi_crypto::VerificationMethod>::ProofContext,
+        signature: <T::VerificationMethod as ssi_crypto::VerificationMethod>::Signature,
     ) -> Self {
         Self {
             type_,
@@ -68,8 +68,8 @@ impl<T: CryptographicSuite> Proof<T> {
                 created,
                 verification_method,
                 proof_purpose,
-                proof_value,
                 context,
+                signature,
             ),
         }
     }
@@ -83,13 +83,8 @@ impl<T: CryptographicSuite> Proof<T> {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub struct ProofContext {
-    pub public_key_jwk: Option<Box<JWK>>,
-}
-
 /// Untyped Data Integrity Proof.
-pub struct UntypedProof<M> {
+pub struct UntypedProof<M: ssi_crypto::VerificationMethod> {
     /// Date and time of creation.
     pub created: ssi_vc::schema::xsd::layout::DateTime,
 
@@ -99,21 +94,25 @@ pub struct UntypedProof<M> {
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
 
-    /// Proof value.
-    pub proof_value: signature::Any,
-
     /// Proof context.
-    pub context: ProofContext,
+    pub context: M::ProofContext,
+
+    /// Proof value.
+    pub signature: M::Signature,
 }
 
-impl<M> UntypedProof<M> {
-    pub fn from_options(options: ProofOptions<M>, proof_value: signature::Any) -> Self {
+impl<M: ssi_crypto::VerificationMethod> UntypedProof<M> {
+    pub fn from_options(
+        options: ProofOptions<M>,
+        context: M::ProofContext,
+        signature: M::Signature,
+    ) -> Self {
         Self::new(
             options.created,
             options.verification_method,
             options.proof_purpose,
-            proof_value,
-            options.context,
+            context,
+            signature,
         )
     }
 
@@ -121,48 +120,72 @@ impl<M> UntypedProof<M> {
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: M,
         proof_purpose: ProofPurpose,
-        proof_value: signature::Any,
-        context: ProofContext,
+        context: M::ProofContext,
+        signature: M::Signature,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
-            proof_value,
             context,
+            signature,
         }
     }
 
-    pub fn try_map_verification_method<N, E>(
+    pub fn try_map_verification_method<N: ssi_crypto::VerificationMethod, E>(
         self,
-        f: impl FnOnce(M) -> Result<N, E>,
+        f: impl FnOnce(
+            M,
+            M::ProofContext,
+            M::Signature,
+        ) -> Result<(N, N::ProofContext, N::Signature), E>,
     ) -> Result<UntypedProof<N>, E> {
+        let (verification_method, context, signature) =
+            f(self.verification_method, self.context, self.signature)?;
+
         Ok(UntypedProof::new(
             self.created,
-            f(self.verification_method)?,
+            verification_method,
             self.proof_purpose,
-            self.proof_value,
-            self.context,
+            context,
+            signature,
         ))
     }
 
-    pub fn map_verification_method<N>(self, f: impl FnOnce(M) -> N) -> UntypedProof<N> {
+    pub fn map_verification_method<N: ssi_crypto::VerificationMethod>(
+        self,
+        f: impl FnOnce(M, M::ProofContext, M::Signature) -> (N, N::ProofContext, N::Signature),
+    ) -> UntypedProof<N> {
+        let (verification_method, context, signature) =
+            f(self.verification_method, self.context, self.signature);
+
         UntypedProof::new(
             self.created,
-            f(self.verification_method),
+            verification_method,
             self.proof_purpose,
-            self.proof_value,
-            self.context,
+            context,
+            signature,
         )
     }
 
-    pub fn try_cast_verification_method<N>(
+    pub fn try_cast_verification_method<N: ssi_crypto::VerificationMethod>(
         self,
-    ) -> Result<UntypedProof<N>, InvalidVerificationMethod>
+    ) -> Result<UntypedProof<N>, ProofCastError>
     where
         M: TryIntoVerificationMethod<N>,
+        M::ProofContext: TryInto<N::ProofContext>,
+        M::Signature: TryInto<N::Signature>,
     {
-        self.try_map_verification_method(M::try_into_verification_method)
+        self.try_map_verification_method(|m, context, signature| {
+            let n = m.try_into_verification_method()?;
+            let context = context
+                .try_into()
+                .map_err(|_| ProofCastError::ProofContext)?;
+            let signature = signature
+                .try_into()
+                .map_err(|_| ProofCastError::Signature)?;
+            Ok((n, context, signature))
+        })
     }
 
     pub fn into_typed<T: CryptographicSuite<VerificationMethod = M>>(self, type_: T) -> Proof<T> {
@@ -173,23 +196,71 @@ impl<M> UntypedProof<M> {
     }
 }
 
+pub trait ProofParameters<M: ssi_crypto::VerificationMethod> {
+    fn verification_method(&self) -> &M;
+
+    fn into_proof(self, context: M::ProofContext, signature: M::Signature) -> UntypedProof<M>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProofCastError {
+    #[error("invalid verification method `{0}`")]
+    VerificationMethod(IriBuf),
+
+    #[error("invalid proof context")]
+    ProofContext,
+
+    #[error("invalid signature")]
+    Signature,
+}
+
+impl From<InvalidVerificationMethod> for ProofCastError {
+    fn from(InvalidVerificationMethod(iri): InvalidVerificationMethod) -> Self {
+        Self::VerificationMethod(iri)
+    }
+}
+
+impl From<ProofCastError> for VerificationError {
+    fn from(value: ProofCastError) -> Self {
+        match value {
+            ProofCastError::VerificationMethod(iri) => {
+                VerificationError::InvalidVerificationMethod(iri)
+            }
+            ProofCastError::ProofContext => VerificationError::InvalidProofContext,
+            ProofCastError::Signature => VerificationError::InvalidSignature,
+        }
+    }
+}
+
 impl<M: ssi_crypto::VerificationMethod> UntypedProof<M> {
     pub fn as_proof_ref(&self) -> UntypedProofRef<M> {
         UntypedProofRef {
             created: &self.created,
             verification_method: self.verification_method.as_reference(),
             proof_purpose: self.proof_purpose,
-            proof_value: self.proof_value.as_reference(),
-            context: &self.context,
+            context: self.context.as_reference(),
+            signature: self.signature.as_reference(),
         }
     }
 }
 
-impl<M: IntoAnyVerificationMethod> IntoAnyVerificationMethod for UntypedProof<M> {
+impl<M> IntoAnyVerificationMethod for UntypedProof<M>
+where
+    M: ssi_crypto::VerificationMethod + IntoAnyVerificationMethod,
+    M::Output:
+        ssi_crypto::VerificationMethod<ProofContext = AnyContext, Signature = signature::Any>,
+    M::ProofContext: Into<AnyContext>,
+    M::Signature: Into<signature::Any>,
+{
     type Output = UntypedProof<M::Output>;
 
     fn into_any_verification_method(self) -> Self::Output {
-        self.map_verification_method(M::into_any_verification_method)
+        self.map_verification_method(|m, context, signature| {
+            let m = m.into_any_verification_method();
+            let context = context.into();
+            let signature = signature.into();
+            (m, context, signature)
+        })
     }
 }
 
@@ -204,41 +275,108 @@ pub struct UntypedProofRef<'a, M: 'a + ssi_crypto::VerificationMethod> {
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
 
-    /// Proof value.
-    pub proof_value: signature::AnyRef<'a>,
-
     /// Proof context.
-    pub context: &'a ProofContext,
+    pub context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'a>,
+
+    /// Signature.
+    pub signature: <M::Signature as ssi_crypto::Referencable>::Reference<'a>,
 }
 
 impl<'a, M: 'a + ssi_crypto::VerificationMethod> UntypedProofRef<'a, M> {
     pub fn try_cast_verification_method<N: 'a + ssi_crypto::VerificationMethod>(
         self,
-    ) -> Result<UntypedProofRef<'a, N>, InvalidVerificationMethod>
+    ) -> Result<UntypedProofRef<'a, N>, ProofCastError>
     where
         N::Reference<'a>: TryFromVerificationMethod<M::Reference<'a>>,
+        <N::ProofContext as ssi_crypto::Referencable>::Reference<'a>:
+            TryFrom<<M::ProofContext as ssi_crypto::Referencable>::Reference<'a>>,
+        <N::Signature as ssi_crypto::Referencable>::Reference<'a>:
+            TryFrom<<M::Signature as ssi_crypto::Referencable>::Reference<'a>>,
     {
         Ok(UntypedProofRef {
             created: self.created,
             verification_method: self.verification_method.try_into_verification_method()?,
             proof_purpose: self.proof_purpose,
-            proof_value: self.proof_value,
-            context: self.context,
+            context: self
+                .context
+                .try_into()
+                .map_err(|_| ProofCastError::ProofContext)?,
+            signature: self
+                .signature
+                .try_into()
+                .map_err(|_| ProofCastError::Signature)?,
         })
     }
 }
 
-pub const SEC_CRYPTOSUITE_IRI: Iri<'static> = iri!("https://w3id.org/security#cryptosuite");
-pub const SEC_VERIFICATION_METHOD_IRI: Iri<'static> =
-    iri!("https://w3id.org/security#verificationMethod");
-pub const SEC_PROOF_PURPOSE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofPurpose");
-pub const SEC_PROOF_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofValue");
-pub const SEC_JWS_IRI: Iri<'static> = iri!("https://w3id.org/security#jws");
-pub const SEC_SIGNATURE_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#signatureValue");
-
 pub const DC_CREATED_IRI: Iri<'static> = iri!("http://purl.org/dc/terms/created");
 
 pub const XSD_DATETIME_IRI: Iri<'static> = iri!("http://www.w3.org/2001/XMLSchema#dateTime");
+
+impl<M: ssi_crypto::VerificationMethod, V: VocabularyMut, I>
+    ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I> for UntypedProof<M>
+where
+    V::Iri: Eq + Hash,
+    V::BlankId: Eq + Hash,
+    M: treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V, I>,
+    M::ProofContext: ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>,
+    M::Signature: ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>,
+{
+    fn flatten_into_json_ld_node(
+        self,
+        vocabulary: &mut V,
+        interpretation: &I,
+        node: &mut json_ld::Node<V::Iri, V::BlankId>,
+    ) {
+        let properties = node.properties_mut();
+
+        properties.insert(
+            Meta(json_ld::Id::iri(vocabulary.insert(DC_CREATED_IRI)), ()),
+            Meta(
+                json_ld::Indexed::new(
+                    json_ld::Object::Value(json_ld::Value::Literal(
+                        json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                            self.created.format("%Y-%m-%dT%H:%M:%S%:z").to_string(),
+                        )),
+                        Some(vocabulary.insert(XSD_DATETIME_IRI)),
+                    )),
+                    None,
+                ),
+                (),
+            ),
+        );
+
+        properties.insert(
+            Meta(json_ld::Id::iri(vocabulary.insert(VERIFICATION_METHOD)), ()),
+            self.verification_method
+                .into_json_ld_object_meta(vocabulary, interpretation, ()),
+        );
+
+        properties.insert(
+            Meta(json_ld::Id::iri(vocabulary.insert(PROOF_PURPOSE)), ()),
+            Meta(
+                json_ld::Indexed::new(
+                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
+                        json_ld::syntax::Entry::new(
+                            (),
+                            Meta(
+                                json_ld::Id::iri(vocabulary.insert(self.proof_purpose.iri())),
+                                (),
+                            ),
+                        ),
+                    ))),
+                    None,
+                ),
+                (),
+            ),
+        );
+
+        self.context
+            .flatten_into_json_ld_node(vocabulary, interpretation, node);
+        self.signature
+            .flatten_into_json_ld_node(vocabulary, interpretation, node);
+    }
+}
 
 impl<T: CryptographicSuite, V: VocabularyMut, I>
     treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V, I> for Proof<T>
@@ -246,6 +384,10 @@ where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
     T::VerificationMethod: treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V, I>,
+    <T::VerificationMethod as ssi_crypto::VerificationMethod>::ProofContext:
+        ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>,
+    <T::VerificationMethod as ssi_crypto::VerificationMethod>::Signature:
+        ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>,
 {
     fn into_json_ld_object_meta(
         self,
@@ -264,7 +406,7 @@ where
 
         if let Some(crypto_suite) = self.type_.cryptographic_suite() {
             properties.insert(
-                Meta(json_ld::Id::iri(vocabulary.insert(SEC_CRYPTOSUITE_IRI)), ()),
+                Meta(json_ld::Id::iri(vocabulary.insert(CRYPTOSUITE)), ()),
                 Meta(
                     json_ld::Indexed::new(
                         json_ld::Object::Value(json_ld::Value::Literal(
@@ -280,121 +422,8 @@ where
             );
         }
 
-        properties.insert(
-            Meta(json_ld::Id::iri(vocabulary.insert(DC_CREATED_IRI)), ()),
-            Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Value(json_ld::Value::Literal(
-                        json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                            self.untyped
-                                .created
-                                .format("%Y-%m-%dT%H:%M:%S%:z")
-                                .to_string(),
-                        )),
-                        Some(vocabulary.insert(XSD_DATETIME_IRI)),
-                    )),
-                    None,
-                ),
-                (),
-            ),
-        );
-
-        properties.insert(
-            Meta(
-                json_ld::Id::iri(vocabulary.insert(SEC_VERIFICATION_METHOD_IRI)),
-                (),
-            ),
-            self.untyped.verification_method.into_json_ld_object_meta(
-                vocabulary,
-                interpretation,
-                (),
-            ),
-        );
-
-        properties.insert(
-            Meta(
-                json_ld::Id::iri(vocabulary.insert(SEC_PROOF_PURPOSE_IRI)),
-                (),
-            ),
-            Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
-                        json_ld::syntax::Entry::new(
-                            (),
-                            Meta(
-                                json_ld::Id::iri(
-                                    vocabulary.insert(self.untyped.proof_purpose.iri()),
-                                ),
-                                (),
-                            ),
-                        ),
-                    ))),
-                    None,
-                ),
-                (),
-            ),
-        );
-
-        match self.untyped.proof_value {
-            signature::Any::ProofValue(proof_value) => {
-                properties.insert(
-                    Meta(json_ld::Id::iri(vocabulary.insert(SEC_PROOF_VALUE_IRI)), ()),
-                    Meta(
-                        json_ld::Indexed::new(
-                            json_ld::Object::Value(json_ld::Value::Literal(
-                                json_ld::object::Literal::String(
-                                    json_ld::object::LiteralString::Inferred(
-                                        proof_value.0.to_string(),
-                                    ),
-                                ),
-                                Some(vocabulary.insert(MULTIBASE)),
-                            )),
-                            None,
-                        ),
-                        (),
-                    ),
-                );
-            }
-            signature::Any::Jws(proof_value) => {
-                properties.insert(
-                    Meta(json_ld::Id::iri(vocabulary.insert(SEC_JWS_IRI)), ()),
-                    Meta(
-                        json_ld::Indexed::new(
-                            json_ld::Object::Value(json_ld::Value::Literal(
-                                json_ld::object::Literal::String(
-                                    json_ld::object::LiteralString::Inferred(
-                                        proof_value.0.into_string(),
-                                    ),
-                                ),
-                                Some(vocabulary.insert(XSD_STRING)),
-                            )),
-                            None,
-                        ),
-                        (),
-                    ),
-                );
-            }
-            signature::Any::SignatureValue(proof_value) => {
-                properties.insert(
-                    Meta(
-                        json_ld::Id::iri(vocabulary.insert(SEC_SIGNATURE_VALUE_IRI)),
-                        (),
-                    ),
-                    Meta(
-                        json_ld::Indexed::new(
-                            json_ld::Object::Value(json_ld::Value::Literal(
-                                json_ld::object::Literal::String(
-                                    json_ld::object::LiteralString::Inferred(proof_value.0),
-                                ),
-                                Some(vocabulary.insert(XSD_STRING)),
-                            )),
-                            None,
-                        ),
-                        (),
-                    ),
-                );
-            }
-        }
+        self.untyped
+            .flatten_into_json_ld_node(vocabulary, interpretation, &mut node);
 
         let mut graph = json_ld::Node::new();
         graph.set_graph(Some(json_ld::syntax::Entry::new(
@@ -424,6 +453,8 @@ where
     ssi_vc::schema::xsd::layout::DateTime: FromRdf<V, I>,
     ssi_vc::schema::sec::layout::Multibase: FromRdf<V, I>,
     T::VerificationMethod: FromRdf<V, I>,
+    <T::VerificationMethod as ssi_crypto::VerificationMethod>::ProofContext: FromRdf<V, I>,
+    <T::VerificationMethod as ssi_crypto::VerificationMethod>::Signature: FromRdf<V, I>,
 {
     fn from_rdf<G>(
         vocabulary: &V,
@@ -439,9 +470,7 @@ where
         let mut created = None;
         let mut verification_method = None;
         let mut proof_purpose = None;
-        let mut proof_value = None;
-
-        let mut context = ProofContext::default();
+        // let mut proof_value = None;
 
         for (p, objects) in graph.predicates(id) {
             if let Some(p) = interpretation.iris_of(p).next() {
@@ -457,7 +486,7 @@ where
                             None => return Err(FromRdfError::UnexpectedLiteralValue),
                         }
                     }
-                } else if p == SEC_CRYPTOSUITE_IRI {
+                } else if p == CRYPTOSUITE {
                     for o in objects {
                         crypto_suite = Some(ssi_vc::schema::xsd::layout::String::from_rdf(
                             vocabulary,
@@ -475,7 +504,7 @@ where
                             o,
                         )?);
                     }
-                } else if p == SEC_VERIFICATION_METHOD_IRI {
+                } else if p == VERIFICATION_METHOD {
                     for o in objects {
                         verification_method = Some(T::VerificationMethod::from_rdf(
                             vocabulary,
@@ -484,7 +513,7 @@ where
                             o,
                         )?);
                     }
-                } else if p == SEC_PROOF_PURPOSE_IRI {
+                } else if p == PROOF_PURPOSE {
                     for o in objects {
                         match interpretation.iris_of(o).next() {
                             Some(iri) => {
@@ -493,40 +522,6 @@ where
                             }
                             None => return Err(FromRdfError::UnexpectedLiteralValue),
                         }
-                    }
-                } else if p == SEC_PROOF_VALUE_IRI {
-                    for o in objects {
-                        proof_value = Some(signature::Any::ProofValue(
-                            ssi_vc::schema::sec::layout::Multibase::from_rdf(
-                                vocabulary,
-                                interpretation,
-                                graph,
-                                o,
-                            )?
-                            .into(),
-                        ));
-                    }
-                } else if p == SEC_JWS_IRI {
-                    for o in objects {
-                        let string = String::from_rdf(vocabulary, interpretation, graph, o)?;
-
-                        match ssi_jws::CompactJWSString::from_string(string) {
-                            Ok(jws) => proof_value = Some(signature::Any::Jws(jws.into())),
-                            Err(_) => return Err(FromRdfError::InvalidLexicalRepresentation),
-                        }
-                    }
-                } else if p == SEC_SIGNATURE_VALUE_IRI {
-                    for o in objects {
-                        let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
-                        proof_value = Some(signature::Any::SignatureValue(value.into()))
-                    }
-                } else if p == PUBLIC_KEY_JWK {
-                    for o in objects {
-                        let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
-                        let jwk: JWK = value
-                            .parse()
-                            .map_err(|_| FromRdfError::InvalidLexicalRepresentation)?;
-                        context.public_key_jwk = Some(Box::new(jwk))
                     }
                 }
             }
@@ -540,7 +535,9 @@ where
             .ok_or(FromRdfError::MissingRequiredPropertyValue)?
             .try_into()
             .map_err(|_| todo!("invalid proof purpose"))?;
-        let proof_value = proof_value.ok_or(FromRdfError::MissingRequiredPropertyValue)?;
+
+        let proof_value = FromRdf::from_rdf(vocabulary, interpretation, graph, id)?;
+        let context = FromRdf::from_rdf(vocabulary, interpretation, graph, id)?;
 
         Ok(Self::new(
             AnyType::new(type_, crypto_suite).into(),
@@ -586,7 +583,7 @@ impl<M: LinkedDataVerificationMethod> ProofConfiguration<M> {
         if let Some(crypto_suite) = suite.cryptographic_suite() {
             result.push(Quad(
                 subject.clone(),
-                SEC_CRYPTOSUITE_IRI.to_owned(),
+                CRYPTOSUITE.to_owned(),
                 Object::Literal(Literal::new(
                     crypto_suite.to_string(),
                     rdf_types::literal::Type::Any(XSD_STRING.to_owned()),
@@ -609,14 +606,14 @@ impl<M: LinkedDataVerificationMethod> ProofConfiguration<M> {
 
         result.push(Quad(
             subject.clone(),
-            SEC_VERIFICATION_METHOD_IRI.to_owned(),
+            VERIFICATION_METHOD.to_owned(),
             verification_method,
             None,
         ));
 
         result.push(Quad(
             subject,
-            SEC_PROOF_PURPOSE_IRI.to_owned(),
+            PROOF_PURPOSE.to_owned(),
             Object::Id(Id::Iri(self.proof_purpose.iri().to_owned())),
             None,
         ));
@@ -626,25 +623,22 @@ impl<M: LinkedDataVerificationMethod> ProofConfiguration<M> {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProofOptions<M> {
+pub struct ProofOptions<M: ssi_crypto::VerificationMethod> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
     pub verification_method: M,
     pub proof_purpose: ProofPurpose,
-    pub context: ProofContext,
 }
 
-impl<M> ProofOptions<M> {
+impl<M: ssi_crypto::VerificationMethod> ProofOptions<M> {
     pub fn new(
         created: ssi_vc::schema::xsd::layout::DateTime,
         verification_method: M,
         proof_purpose: ProofPurpose,
-        context: ProofContext,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
-            context,
         }
     }
 
@@ -667,14 +661,29 @@ impl<M> ProofOptions<M> {
         }
     }
 
-    pub fn try_cast_verification_method<N: TryFromVerificationMethod<M>>(
+    pub fn try_cast_verification_method<
+        N: ssi_crypto::VerificationMethod + TryFromVerificationMethod<M>,
+    >(
         self,
     ) -> Result<ProofOptions<N>, InvalidVerificationMethod> {
         Ok(ProofOptions {
             created: self.created,
             verification_method: self.verification_method.try_into_verification_method()?,
             proof_purpose: self.proof_purpose,
-            context: self.context,
         })
+    }
+}
+
+impl<M: ssi_crypto::VerificationMethod> ProofParameters<M> for ProofOptions<M> {
+    fn verification_method(&self) -> &M {
+        &self.verification_method
+    }
+
+    fn into_proof(
+        self,
+        context: <M as ssi_crypto::VerificationMethod>::ProofContext,
+        signature: <M as ssi_crypto::VerificationMethod>::Signature,
+    ) -> UntypedProof<M> {
+        UntypedProof::from_options(self, context, signature)
     }
 }

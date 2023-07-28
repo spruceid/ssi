@@ -42,14 +42,16 @@ impl Method {
     }
 }
 
-impl ssi_crypto::VerificationMethod for Method {
-    type Context<'c> = ();
-
+impl ssi_crypto::Referencable for Method {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for Method {
+    type ProofContext = ();
 
     type Signature = Vec<u8>;
 }

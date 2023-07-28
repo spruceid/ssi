@@ -28,6 +28,18 @@ pub mod schema {
 
 pub use schema::sec::*;
 
+pub const CRYPTOSUITE: Iri<'static> = iri!("https://w3id.org/security#cryptosuite");
+
+pub const VERIFICATION_METHOD: Iri<'static> = iri!("https://w3id.org/security#verificationMethod");
+
+pub const PROOF_PURPOSE: Iri<'static> = iri!("https://w3id.org/security#proofPurpose");
+
+pub const PROOF_VALUE: Iri<'static> = iri!("https://w3id.org/security#proofValue");
+
+pub const JWS: Iri<'static> = iri!("https://w3id.org/security#jws");
+
+pub const SIGNATURE_VALUE: Iri<'static> = iri!("https://w3id.org/security#signatureValue");
+
 /// Multibase datatype.
 ///
 /// Range of the `publicKeyMultibase` property.

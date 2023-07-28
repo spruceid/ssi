@@ -127,9 +127,7 @@ impl<M> core::hash::Hash for Reference<M> {
     }
 }
 
-impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Reference<M> {
-    type Context<'c> = M::Context<'c>;
-
+impl<M> ssi_crypto::Referencable for Reference<M> {
     type Reference<'a> = ReferenceRef<'a, M> where Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -139,6 +137,10 @@ impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Refer
             m: PhantomData,
         }
     }
+}
+
+impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Reference<M> {
+    type ProofContext = M::ProofContext;
 
     type Signature = M::Signature;
 }
@@ -154,6 +156,7 @@ pub struct ReferenceRef<'a, M> {
     expected_type: Option<Cow<'a, ExpectedType>>,
     m: PhantomData<M>,
 }
+unsafe impl<'a, M> Send for ReferenceRef<'a, M> {}
 
 impl<'a, M> ReferenceRef<'a, M> {
     pub fn iri(&self) -> Iri {
@@ -304,9 +307,7 @@ impl<M: VerificationMethod + Into<Any>> IntoAnyVerificationMethod for ReferenceO
     }
 }
 
-impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for ReferenceOrOwned<M> {
-    type Context<'c> = M::Context<'c>;
-
+impl<M: ssi_crypto::VerificationMethod> ssi_crypto::Referencable for ReferenceOrOwned<M> {
     type Reference<'a> = ReferenceOrOwnedRef<'a, M> where Self: 'a;
 
     fn as_reference(&self) -> ReferenceOrOwnedRef<M> {
@@ -315,6 +316,10 @@ impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Refer
             Self::Owned(m) => ReferenceOrOwnedRef::Owned(m.as_reference()),
         }
     }
+}
+
+impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for ReferenceOrOwned<M> {
+    type ProofContext = M::ProofContext;
 
     type Signature = M::Signature;
 }

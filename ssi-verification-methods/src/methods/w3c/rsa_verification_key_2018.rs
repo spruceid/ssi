@@ -51,14 +51,16 @@ impl RsaVerificationKey2018 {
     }
 }
 
-impl ssi_crypto::VerificationMethod for RsaVerificationKey2018 {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for RsaVerificationKey2018 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for RsaVerificationKey2018 {
+    type ProofContext = NoContext;
 
     // Base64 signature.
     type Signature = signature::SignatureValueBuf;

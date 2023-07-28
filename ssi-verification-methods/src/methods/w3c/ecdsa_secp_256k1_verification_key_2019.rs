@@ -99,14 +99,16 @@ impl EcdsaSecp256k1VerificationKey2019 {
     }
 }
 
-impl ssi_crypto::VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for EcdsaSecp256k1VerificationKey2019 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
+    type ProofContext = NoContext;
 
     type Signature = signature::Jws;
 }

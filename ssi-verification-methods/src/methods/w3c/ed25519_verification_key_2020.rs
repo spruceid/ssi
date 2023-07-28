@@ -106,20 +106,23 @@ impl Ed25519VerificationKey2020 {
         }
     }
 
-    pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> String {
+    pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> signature::ProofValue {
         let signature = key_pair.sign(data);
-        multibase::encode(multibase::Base::Base58Btc, signature)
+        let encoded = multibase::encode(multibase::Base::Base58Btc, signature);
+        signature::ProofValue(ssi_security::layout::Multibase::new(encoded))
     }
 }
 
-impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2020 {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for Ed25519VerificationKey2020 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2020 {
+    type ProofContext = NoContext;
 
     /// Base58 multibase-encoded signature bytes.
     type Signature = signature::ProofValue;
