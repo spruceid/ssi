@@ -28,6 +28,13 @@ pub use reference::*;
 #[cfg(feature = "ed25519")]
 pub use ed25519_dalek;
 
+/// Export some JSON-LD traits.
+///
+/// This module should be a crate reexport in the future.
+pub mod json_ld;
+
+pub use treeldr_rust_prelude;
+
 /// IRI of the `rdf:type` property.
 pub(crate) const RDF_TYPE_IRI: Iri<'static> =
     iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
@@ -71,14 +78,14 @@ pub trait VerificationMethod: ssi_crypto::VerificationMethod {
     fn verify<'f, 'a: 'f, 'c: 'f, 's: 'f>(
         &'a self,
         controllers: &'a impl ControllerProvider,
-        context: Self::Context<'c>,
+        context: <Self::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &'a [u8],
-        signature: <Self::Signature as ssi_crypto::Signature>::Reference<'s>,
+        signature: <Self::Signature as ssi_crypto::Referencable>::Reference<'s>,
     ) -> Pin<Box<dyn 'f + Send + Future<Output = Result<bool, ssi_crypto::VerificationError>>>>
     where
         Self::Reference<'a>: Send + VerificationMethodRef<'a, Self>,
-        <Self::Signature as ssi_crypto::Signature>::Reference<'s>: Send,
+        <Self::Signature as ssi_crypto::Referencable>::Reference<'s>: Send,
     {
         let r = self.as_reference();
         r.verify(
@@ -97,10 +104,10 @@ pub trait VerificationMethodRef<'a, M: 'a + ?Sized + VerificationMethod> {
     async fn verify<'c: 'async_trait, 's: 'async_trait>(
         self,
         controllers: &impl ControllerProvider,
-        context: M::Context<'c>,
+        context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,
+        signature: <M::Signature as ssi_crypto::Referencable>::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>;
 }
 

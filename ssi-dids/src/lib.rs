@@ -66,17 +66,17 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
-    for<'a> M::Context<'a>: Send,
+    for<'a> <M::ProofContext as ssi_crypto::Referencable>::Reference<'a>: Send,
     for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
-    for<'a> <M::Signature as ssi_crypto::Signature>::Reference<'a>: Send,
+    for<'a> <M::Signature as ssi_crypto::Referencable>::Reference<'a>: Send,
 {
     async fn verify<'c, 'm, 's>(
         &self,
-        context: M::Context<'c>,
+        context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
         method: ssi_verification_methods::ReferenceRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,
+        signature: <M::Signature as ssi_crypto::Referencable>::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>
     where
         M: 'async_trait,
@@ -145,17 +145,17 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
-    for<'a> M::Context<'a>: Send,
+    for<'a> <M::ProofContext as ssi_crypto::Referencable>::Reference<'a>: Send,
     for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
-    for<'a> <M::Signature as ssi_crypto::Signature>::Reference<'a>: Send,
+    for<'a> <M::Signature as ssi_crypto::Referencable>::Reference<'a>: Send,
 {
     async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
         &self,
-        context: M::Context<'c>,
+        context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
         method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: <M::Signature as ssi_crypto::Signature>::Reference<'s>,
+        signature: <M::Signature as ssi_crypto::Referencable>::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>
     where
         M: 'async_trait,

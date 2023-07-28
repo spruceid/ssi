@@ -37,6 +37,9 @@ pub enum VerificationError {
     #[error("invalid use of key with <{0}>")]
     InvalidKeyUse(ProofPurpose),
 
+    #[error("invalid proof context")]
+    InvalidProofContext,
+
     #[error("invalid signature")]
     InvalidSignature,
 
@@ -66,17 +69,25 @@ impl From<std::convert::Infallible> for VerificationError {
     }
 }
 
-/// Verification method signature type.
-pub trait Signature {
-    /// Reference to a signature.
-    type Reference<'a>
+/// Type that can be converted some associated reference type.
+pub trait Referencable {
+    /// Reference type.
+    type Reference<'a>: Send
     where
         Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_>;
 }
 
-impl Signature for Vec<u8> {
+impl Referencable for () {
+    type Reference<'a> = ()
+        where
+            Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_> {}
+}
+
+impl Referencable for Vec<u8> {
     type Reference<'a> = &'a [u8] where Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -85,20 +96,15 @@ impl Signature for Vec<u8> {
 }
 
 /// Verification method.
-pub trait VerificationMethod {
+pub trait VerificationMethod: Referencable {
     /// Context required by the verification method for the verification.
     ///
     /// The context is provided by the cryptographic suite. In most case,
     /// no context is required (specified by the unit type `()`).
-    type Context<'c>;
+    type ProofContext: Referencable;
 
-    type Signature: Signature;
-
-    type Reference<'a>
-    where
-        Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_>;
+    /// Signature type.
+    type Signature: Referencable;
 }
 
 /// Verifier.
@@ -106,13 +112,13 @@ pub trait VerificationMethod {
 pub trait Verifier<M: VerificationMethod>: Sync {
     /// Verify the given `signature`, signed using the given `algorithm`,
     /// against the input `signing_bytes`.
-    async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
+    async fn verify<'c, 'm, 's>(
         &self,
-        context: M::Context<'c>,
+        context: <M::ProofContext as Referencable>::Reference<'c>,
         method: M::Reference<'m>,
         proof_purpose: ProofPurpose,
         signing_bytes: &[u8],
-        signature: <M::Signature as Signature>::Reference<'s>,
+        signature: <M::Signature as Referencable>::Reference<'s>,
     ) -> Result<bool, VerificationError>
     where
         M: 'async_trait;

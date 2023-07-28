@@ -75,14 +75,16 @@ impl Ed25519VerificationKey2018 {
     }
 }
 
-impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2018 {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for Ed25519VerificationKey2018 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2018 {
+    type ProofContext = NoContext;
 
     type Signature = signature::Jws;
 }

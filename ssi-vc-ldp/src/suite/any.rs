@@ -1,4 +1,6 @@
 use crate::{suite::HashError, verification, CryptographicSuite, ProofConfiguration, ProofOptions};
+use std::future::Future;
+use std::pin::Pin;
 
 macro_rules! crypto_suites {
     {
@@ -18,7 +20,7 @@ macro_rules! crypto_suites {
             ),*
         }
 
-        #[async_trait::async_trait]
+        // #[async_trait::async_trait]
         impl CryptographicSuite for Suite {
             type TransformationParameters = ();
             type Transformed = String;
@@ -90,23 +92,29 @@ macro_rules! crypto_suites {
                 }
             }
 
-            async fn verify_proof(
+            fn verify_proof<'async_trait, 'd: 'async_trait, 'v: 'async_trait, 'p: 'async_trait>(
                 &self,
-                data: &Self::Hashed,
-                verifier: &impl ssi_crypto::Verifier<Self::VerificationMethod>,
-                proof: crate::UntypedProofRef<'_, Self::VerificationMethod>,
-            ) -> Result<ssi_vc::ProofValidity, ssi_crypto::VerificationError> {
+                data: &'d Self::Hashed,
+                verifier: &'v impl ssi_crypto::Verifier<Self::VerificationMethod>,
+                proof: crate::UntypedProofRef<'p, Self::VerificationMethod>,
+            ) -> Pin<Box<dyn 'async_trait + Send + Future<Output = Result<ssi_vc::ProofValidity, ssi_crypto::VerificationError>>>>
+            where
+                Self::VerificationMethod: 'async_trait,
+                <Self::VerificationMethod as ssi_crypto::VerificationMethod>::ProofContext: 'async_trait,
+                <Self::VerificationMethod as ssi_crypto::VerificationMethod>::Signature: 'async_trait
+            {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
-                        Self::$name => {
+                        Self::$name => Box::pin(async move {
                             let verifier = ssi_verification_methods::AnyVerifier(verifier);
+                            let proof = proof.try_cast_verification_method()?;
                             super::$name.verify_proof(
                                 data,
                                 &verifier,
-                                proof.try_cast_verification_method()?
+                                proof
                             ).await
-                        }
+                        })
                     ),*
                 }
             }

@@ -34,6 +34,7 @@ thiserror.workspace = true
 static-iref.workspace = true
 json-ld.workspace = true
 grdf.workspace = true
+futures = "0.3"
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

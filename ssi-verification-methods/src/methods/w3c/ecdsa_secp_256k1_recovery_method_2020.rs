@@ -38,14 +38,16 @@ pub struct EcdsaSecp256k1RecoveryMethod2020 {
     pub public_key: PublicKey,
 }
 
-impl ssi_crypto::VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
-    type Context<'c> = NoContext;
-
+impl ssi_crypto::Referencable for EcdsaSecp256k1RecoveryMethod2020 {
     type Reference<'a> = &'a Self;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+}
+
+impl ssi_crypto::VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
+    type ProofContext = NoContext;
 
     type Signature = signature::Jws;
 }

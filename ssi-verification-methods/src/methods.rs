@@ -13,7 +13,7 @@ macro_rules! verification_method_union {
 		$vis:vis enum $name:ident, $ref_name:ident
 		where
 			Signature = $signature:ty,
-			Context<$context_lft:lifetime> = $context:ty
+			ProofContext = $context:ty
 		{
 			$(
 				$variant:ident
@@ -34,11 +34,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 
-		impl ssi_crypto::VerificationMethod for $name {
-			type Context<$context_lft> = $context;
-
-			type Signature = $signature;
-
+		impl ssi_crypto::Referencable for $name {
 			type Reference<'a> = $ref_name<'a>;
 
 			fn as_reference(&self) -> Self::Reference<'_> {
@@ -48,6 +44,12 @@ macro_rules! verification_method_union {
 					),*
 				}
 			}
+		}
+
+		impl ssi_crypto::VerificationMethod for $name {
+			type ProofContext = $context;
+
+			type Signature = $signature;
 		}
 
 		impl $crate::VerificationMethod for $name {
@@ -96,13 +98,13 @@ macro_rules! verification_method_union {
 
 		#[async_trait::async_trait]
 		impl<'a> $crate::VerificationMethodRef<'a, $name> for $ref_name<'a> {
-			async fn verify<$context_lft: 'async_trait, 's: 'async_trait>(
+			async fn verify<'c: 'async_trait, 's: 'async_trait>(
 				self,
 				controllers: &impl $crate::ControllerProvider,
-				context: $context,
+				context: <$context as ssi_crypto::Referencable>::Reference<'c>,
 				proof_purpose: ssi_crypto::ProofPurpose,
 				data: &[u8],
-				signature: <$signature as ssi_crypto::Signature>::Reference<'s>,
+				signature: <$signature as ssi_crypto::Referencable>::Reference<'s>,
 			) -> Result<bool, ssi_crypto::VerificationError> {
 				match self {
 					$(

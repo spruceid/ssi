@@ -22,8 +22,7 @@ pub enum SignatureError {
 pub trait Signer<M: VerificationMethod> {
     fn sign(
         &self,
-        context: M::Context<'_>,
         method: &M,
         bytes: &[u8],
-    ) -> Result<M::Signature, SignatureError>;
+    ) -> Result<(M::ProofContext, M::Signature), SignatureError>;
 }

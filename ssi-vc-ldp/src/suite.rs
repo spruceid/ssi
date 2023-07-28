@@ -1,12 +1,14 @@
 //! Cryptographic suites.
-use async_trait::async_trait;
+use std::{future::Future, pin::Pin};
+
+use futures::FutureExt;
 use iref::Iri;
 use ssi_crypto::{SignatureError, Signer, VerificationError, Verifier};
 use ssi_rdf::IntoNQuads;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::LinkedDataVerificationMethod;
 
-use crate::{ProofConfiguration, ProofOptions, UntypedProof, UntypedProofRef};
+use crate::{ProofConfiguration, ProofOptions, ProofParameters, UntypedProof, UntypedProofRef};
 
 mod any;
 mod dif;
@@ -29,7 +31,6 @@ pub enum HashError {
 }
 
 /// Cryptographic suite.
-#[async_trait]
 pub trait CryptographicSuite: Sync + Sized {
     /// Transformation algorithm parameters.
     type TransformationParameters;
@@ -41,10 +42,10 @@ pub trait CryptographicSuite: Sync + Sized {
     type HashParameters;
 
     /// Hashing algorithm result.
-    type Hashed: Sync;
+    type Hashed: Sync + AsRef<[u8]>;
 
     /// Proof generation algorithm parameters.
-    type ProofParameters;
+    type ProofParameters: ProofParameters<Self::VerificationMethod>;
 
     type SigningParameters: SigningParameters<
         Self::TransformationParameters,
@@ -77,14 +78,32 @@ pub trait CryptographicSuite: Sync + Sized {
         data: &Self::Hashed,
         signer: &impl Signer<Self::VerificationMethod>,
         params: Self::ProofParameters,
-    ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError>;
+    ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError> {
+        let (context, jws) = signer.sign(params.verification_method(), data.as_ref())?;
+        Ok(params.into_proof(context, jws))
+    }
 
-    async fn verify_proof(
+    fn verify_proof<'async_trait, 'd: 'async_trait, 'v: 'async_trait, 'p: 'async_trait>(
         &self,
-        data: &Self::Hashed,
-        verifier: &impl Verifier<Self::VerificationMethod>,
-        proof: UntypedProofRef<'_, Self::VerificationMethod>,
-    ) -> Result<ProofValidity, VerificationError>;
+        data: &'d Self::Hashed,
+        verifier: &'v impl Verifier<Self::VerificationMethod>,
+        proof: UntypedProofRef<'p, Self::VerificationMethod>,
+    ) -> Pin<Box<dyn 'async_trait + Send + Future<Output = Result<ProofValidity, VerificationError>>>>
+    where
+        Self::VerificationMethod: 'p,
+    {
+        Box::pin(
+            verifier
+                .verify(
+                    proof.context,
+                    proof.verification_method,
+                    proof.proof_purpose,
+                    data.as_ref(),
+                    proof.signature,
+                )
+                .map(|result| result.map(Into::into)),
+        )
+    }
 }
 
 pub trait CryptographicSuiteInput<T>: CryptographicSuite {
@@ -100,7 +119,9 @@ pub trait SigningParameters<T, H, P> {
     fn into_proof_parameters(self) -> P;
 }
 
-impl<M: Clone> SigningParameters<(), ProofConfiguration<M>, ProofOptions<M>> for ProofOptions<M> {
+impl<M: Clone + ssi_crypto::VerificationMethod>
+    SigningParameters<(), ProofConfiguration<M>, ProofOptions<M>> for ProofOptions<M>
+{
     fn transformation_parameters(&self) {}
 
     fn hash_parameters(&self) -> ProofConfiguration<M> {
@@ -118,7 +139,9 @@ pub trait VerificationParameters<T, H> {
     fn into_hash_parameters(self) -> H;
 }
 
-impl<M: Clone> VerificationParameters<(), ProofConfiguration<M>> for ProofOptions<M> {
+impl<M: Clone + ssi_crypto::VerificationMethod> VerificationParameters<(), ProofConfiguration<M>>
+    for ProofOptions<M>
+{
     fn transformation_parameters(&self) {}
 
     fn into_hash_parameters(self) -> ProofConfiguration<M> {
