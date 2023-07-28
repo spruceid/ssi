@@ -317,6 +317,7 @@ pub fn verify_bytes_warnable(
             {
                 use ed25519_dalek::Verifier;
                 let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
+                use k256::ecdsa::signature::Signature;
                 let signature = ed25519_dalek::Signature::from_bytes(signature)
                     .map_err(ssi_jwk::Error::from)?;
                 public_key
