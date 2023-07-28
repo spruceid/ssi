@@ -231,7 +231,8 @@ async fn report_method_web() {
     let supported_content_types = vec![TYPE_DID_LD_JSON.to_string()];
 
     let did = "did:web:demo.spruceid.com:2021:07:08";
-    let did_vector = did_method_vector(&did_web::DIDWeb, did).await;
+    let did_web_resolver = did_web::DIDWeb::new_with_default_http_client().unwrap();
+    let did_vector = did_method_vector(&did_web_resolver, did).await;
     did_vectors.insert(did.to_string(), did_vector);
 
     let dids = did_vectors.keys().cloned().collect();
@@ -537,19 +538,21 @@ async fn report_resolver_web() {
         executions: Vec::new(),
     };
 
+    let did_web_resolver = did_web::DIDWeb::new_with_default_http_client().unwrap();
+
     for did in &[
         "did:web:identity.foundation",
         "did:web:did.actor:nonexistent",
     ] {
         report
-            .resolve(&did_web::DIDWeb, did, &ResolutionInputMetadata::default())
+            .resolve(&did_web_resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
     {
         let did = &"did:web:identity.foundation";
         report
-            .resolve_representation(&did_web::DIDWeb, did, &ResolutionInputMetadata::default())
+            .resolve_representation(&did_web_resolver, did, &ResolutionInputMetadata::default())
             .await;
     }
 
@@ -709,6 +712,8 @@ async fn report_dereferencer_web() {
         executions: Vec::new(),
     };
 
+    let did_web_resolver = did_web::DIDWeb::new_with_default_http_client().unwrap();
+
     for did_url in &[
         "did:web:did.actor:nonexistent",
         "did:web:demo.spruceid.com:2021:07:14:service-example",
@@ -716,7 +721,7 @@ async fn report_dereferencer_web() {
     ] {
         report
             .dereference(
-                &did_web::DIDWeb,
+                &did_web_resolver,
                 did_url,
                 &DereferencingInputMetadata::default(),
             )

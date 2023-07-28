@@ -18,7 +18,42 @@ thread_local! {
 /// did:web Method
 ///
 /// [Specification](https://w3c-ccg.github.io/did-method-web/)
-pub struct DIDWeb;
+///
+/// DIDWeb struct has an HTTP client to use for DID resolution.  It's incredibly slow to create a new
+/// reqwest::Client, due to the overhead of loading the system's root certificates.  This HTTP client must
+/// be specified by constructing the DIDWeb instance using new_with_default_http_client (to use defaults)
+/// or DIDWeb::new_with_http_client if there is an specific reqwest::Client that should be reused.
+/// Note that this is the recommended approach to using reqwest::Client (see
+/// https://docs.rs/reqwest/latest/reqwest/struct.Client.html).
+pub struct DIDWeb {
+    http_client: reqwest::Client,
+}
+
+impl DIDWeb {
+    /// Create an instance of the DIDWeb resolver with a default HTTP client.  See also `DIDWeb::new_with_http_client`.
+    pub fn new_with_default_http_client() -> Result<Self, String> {
+        let mut headers = reqwest::header::HeaderMap::new();
+
+        headers.insert(
+            "User-Agent",
+            reqwest::header::HeaderValue::from_static(USER_AGENT),
+        );
+
+        let http_client = match reqwest::Client::builder().default_headers(headers).build() {
+            Ok(http_client) => http_client,
+            Err(err) => {
+                return Err(format!("Error building HTTP client: {}", err));
+            }
+        };
+
+        Ok(Self { http_client })
+    }
+    /// Create an instance of the DIDWeb resolver with a specific HTTP client.  See also
+    /// `DIDWeb::new_with_default_http_client`.
+    pub fn new_with_http_client(http_client: reqwest::Client) -> Self {
+        Self { http_client }
+    }
+}
 
 fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
     let mut parts = did.split(':').peekable();
@@ -107,28 +142,17 @@ impl DIDResolver for DIDWeb {
         };
         // TODO: https://w3c-ccg.github.io/did-method-web/#in-transit-security
 
-        let mut headers = reqwest::header::HeaderMap::new();
-
-        headers.insert(
-            "User-Agent",
-            reqwest::header::HeaderValue::from_static(USER_AGENT),
-        );
-
-        let client = match reqwest::Client::builder().default_headers(headers).build() {
-            Ok(c) => c,
-            Err(err) => {
-                return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
-                    Vec::new(),
-                    None,
-                )
-            }
-        };
         let accept = input_metadata
             .accept
             .clone()
             .unwrap_or_else(|| "application/json".to_string());
-        let resp = match client.get(&url).header("Accept", accept).send().await {
+        let resp = match self
+            .http_client
+            .get(&url)
+            .header("Accept", accept)
+            .send()
+            .await
+        {
             Ok(req) => req,
             Err(err) => {
                 return (
@@ -282,7 +306,8 @@ mod tests {
         PROXY.with(|proxy| {
             proxy.replace(Some(url));
         });
-        let (res_meta, doc_opt, _doc_meta) = DIDWeb
+        let did_web_resolver = DIDWeb::new_with_default_http_client().unwrap();
+        let (res_meta, doc_opt, _doc_meta) = did_web_resolver
             .resolve("did:web:localhost", &ResolutionInputMetadata::default())
             .await;
         assert_eq!(res_meta.error, None);
@@ -320,21 +345,24 @@ mod tests {
             ..Default::default()
         };
         let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let did_web_resolver = DIDWeb::new_with_default_http_client().unwrap();
         let proof = vc
-            .generate_proof(&key, &issue_options, &DIDWeb, &mut context_loader)
+            .generate_proof(&key, &issue_options, &did_web_resolver, &mut context_loader)
             .await
             .unwrap();
         println!("{}", serde_json::to_string_pretty(&proof).unwrap());
         vc.add_proof(proof);
         vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDWeb, &mut context_loader).await;
+        let verification_result = vc
+            .verify(None, &did_web_resolver, &mut context_loader)
+            .await;
         println!("{:#?}", verification_result);
         assert!(verification_result.errors.is_empty());
 
         // test that issuer property is used for verification
         vc.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
         assert!(!vc
-            .verify(None, &DIDWeb, &mut context_loader)
+            .verify(None, &did_web_resolver, &mut context_loader)
             .await
             .errors
             .is_empty());
