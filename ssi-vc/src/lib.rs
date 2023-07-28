@@ -416,7 +416,7 @@ impl From<StringOrURI> for String {
 }
 
 impl StringOrURI {
-    fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &str {
         match self {
             StringOrURI::URI(URI::String(string)) => string.as_str(),
             StringOrURI::String(string) => string.as_str(),
