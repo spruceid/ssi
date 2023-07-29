@@ -948,7 +948,7 @@ impl FromStr for PrimaryDIDURL {
     type Err = Error;
     fn from_str(didurl: &str) -> Result<Self, Self::Err> {
         // Allow non-DID URL for testing lds-ed25519-2020-issuer0
-        #[cfg(test)]
+        #[cfg(not(feature = "testing-lds-ed25519-2020-issuer0"))]
         if !didurl.starts_with("did:") {
             return Err(Error::DIDURL);
         }
