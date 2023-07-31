@@ -109,7 +109,7 @@ impl Ed25519VerificationKey2020 {
     pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> signature::ProofValue {
         let signature = key_pair.sign(data);
         let encoded = multibase::encode(multibase::Base::Base58Btc, signature);
-        signature::ProofValue(ssi_security::layout::Multibase::new(encoded))
+        signature::ProofValue(encoded)
     }
 }
 
@@ -154,7 +154,7 @@ impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2020> for &'a Ed25519Ve
         _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: &'s ssi_security::layout::Multibase,
+        signature: &'s str,
     ) -> Result<bool, VerificationError> {
         controllers
             .ensure_allows_verification_method(
@@ -164,7 +164,7 @@ impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2020> for &'a Ed25519Ve
             )
             .await?;
 
-        let signature_bytes = multibase::decode(signature.as_str())
+        let signature_bytes = multibase::decode(signature)
             .map_err(|_| VerificationError::InvalidProof)?
             .1;
 

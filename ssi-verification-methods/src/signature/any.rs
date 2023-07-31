@@ -33,7 +33,7 @@ signature_union! {
 }
 
 impl Any {
-    pub fn as_multibase(&self) -> Option<&ssi_security::layout::Multibase> {
+    pub fn as_proof_value(&self) -> Option<&str> {
         match self {
             Self::ProofValue(m) => Some(&m.0),
             _ => None,
@@ -54,7 +54,7 @@ impl Any {
         }
     }
 
-    pub fn into_multibase(self) -> Option<ssi_security::layout::Multibase> {
+    pub fn into_proof_value(self) -> Option<String> {
         match self {
             Self::ProofValue(m) => Some(m.0),
             _ => None,
@@ -77,7 +77,7 @@ impl Any {
 }
 
 impl<'a> AnyRef<'a> {
-    pub fn as_multibase(self) -> Option<&'a ssi_security::layout::Multibase> {
+    pub fn as_proof_value(self) -> Option<&'a str> {
         match self {
             Self::ProofValue(m) => Some(m),
             _ => None,

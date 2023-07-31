@@ -128,6 +128,7 @@ macro_rules! proof_purposes {
     ($($(#[$doc:meta])* $id:ident: $variant:ident = $iri:expr),*) => {
         /// Proof purposes.
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(serde::Serialize, serde::Deserialize)]
         pub enum ProofPurpose {
             $(
                 $(#[$doc])*
@@ -379,18 +380,23 @@ macro_rules! proof_purposes {
 
 proof_purposes! {
     /// <https://w3id.org/security#assertionMethod>
-    assertion_method: AssertionMethod = iri!("https://w3id.org/security#assertionMethod"),
+    #[serde(rename = "assertionMethod")]
+    assertion_method: Assertion = iri!("https://w3id.org/security#assertionMethod"),
 
     /// <https://w3id.org/security#authenticationMethod>
+    #[serde(rename = "authenticationMethod")]
     authentication: Authentication = iri!("https://w3id.org/security#authenticationMethod"),
 
     /// <https://w3id.org/security#capabilityInvocationMethod>
+    #[serde(rename = "capabilityInvocationMethod")]
     capability_invocation: CapabilityInvocation = iri!("https://w3id.org/security#capabilityInvocationMethod"),
 
     /// <https://w3id.org/security#capabilityDelegationMethod>
+    #[serde(rename = "capabilityDelegationMethod")]
     capability_delegation: CapabilityDelegation = iri!("https://w3id.org/security#capabilityDelegationMethod"),
 
     /// <https://w3id.org/security#keyAgreementMethod>
+    #[serde(rename = "keyAgreementMethod")]
     key_agreement: KeyAgreement = iri!("https://w3id.org/security#keyAgreementMethod")
 }
 

@@ -1,4 +1,5 @@
 use core::fmt;
+use serde::{Deserialize, Serialize};
 use std::{borrow::Cow, marker::PhantomData};
 
 use iref::{Iri, IriBuf};
@@ -127,6 +128,25 @@ impl<M> core::hash::Hash for Reference<M> {
     }
 }
 
+impl<M> Serialize for Reference<M> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.iri.serialize(serializer)
+    }
+}
+
+impl<'de, M> Deserialize<'de> for Reference<M> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let iri = IriBuf::deserialize(deserializer)?;
+        Ok(Self::new(iri))
+    }
+}
+
 impl<M> ssi_crypto::Referencable for Reference<M> {
     type Reference<'a> = ReferenceRef<'a, M> where Self: 'a;
 
@@ -240,7 +260,7 @@ impl<'a, M> core::hash::Hash for ReferenceRef<'a, M> {
 }
 
 /// Reference to a verification method.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum ReferenceOrOwned<M> {
     Reference(Reference<M>),
     Owned(M),

@@ -18,7 +18,7 @@ use crate::{
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum Error<T> {
     #[error("missing credential")]
     MissingCredential,
 
@@ -36,6 +36,9 @@ pub enum Error {
 
     #[error("invalid credential")]
     InvalidCredential(FromRdfError),
+
+    #[error("input transformation failed: {0}")]
+    Transform(T),
 
     #[error("hash failed: {0}")]
     HashFailed(#[from] HashError),
@@ -58,7 +61,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         interpretation: &'a mut I,
         mut input: json_ld::ExpandedDocument<V::Iri, V::BlankId, M>,
         params: S::VerificationParameters,
-    ) -> Result<Verifiable<Self>, Error>
+    ) -> Result<Verifiable<Self>, Error<S::TransformError>>
     where
         V: VocabularyMut<
             Type = rdf_types::literal::Type<
@@ -140,7 +143,8 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 
                                 let transformed = proof
                                     .suite()
-                                    .transform(data, params.transformation_parameters());
+                                    .transform(data, params.transformation_parameters())
+                                    .map_err(Error::Transform)?;
                                 let hashed = proof
                                     .suite()
                                     .hash(transformed, params.into_hash_parameters())?;

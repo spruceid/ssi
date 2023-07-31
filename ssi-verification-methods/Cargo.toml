@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
-default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1"]
+default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "thezos"]
 # enable RSA keys
 rsa = []
 # enable ed25519 keys
@@ -21,13 +21,16 @@ secp256r1 = ["p256"]
 # enable secp384r1 (p384) keys
 secp384r1 = ["p384"]
 
+thezos = ["ssi-tzkey"]
+
 [dependencies]
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-security.workspace = true
 ssi-caips.workspace = true
-serde.workspace = true
+ssi-tzkey = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-syntax = { workspace = true, features = ["serde"] }
 async-trait.workspace = true

@@ -9,12 +9,13 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-ldp/"
 
 [features]
-default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1"]
+default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "thezos"]
 w3c = []
 ed25519 = ["ssi-verification-methods/ed25519"]
 secp256k1 = ["ssi-verification-methods/secp256k1"]
 secp256r1 = ["ssi-verification-methods/secp256r1"]
 rsa = ["ssi-verification-methods/rsa"]
+thezos = ["serde_json", "serde_jcs", "ssi-tzkey"]
 
 [dependencies]
 ssi-verification-methods.workspace = true
@@ -27,6 +28,7 @@ ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-vc.workspace = true
 ssi-security.workspace = true
+ssi-tzkey = { workspace = true, optional = true }
 chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true
@@ -34,7 +36,12 @@ thiserror.workspace = true
 static-iref.workspace = true
 json-ld.workspace = true
 grdf.workspace = true
+serde = { workspace = true, features = ["derive"] }
 futures = "0.3"
+
+# only needed by non LD suites.
+serde_json = { workspace = true, optional = true }
+serde_jcs = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

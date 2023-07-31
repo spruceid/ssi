@@ -19,7 +19,7 @@ impl<C: Sync> VerifiableWith for VcJwt<C> {
             .verify(
                 (),
                 &proof.method,
-                ProofPurpose::AssertionMethod,
+                ProofPurpose::Assertion,
                 self.signing_bytes(),
                 &proof.signature,
             )

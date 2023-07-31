@@ -47,9 +47,7 @@ impl Referencable for PublicKeyJwkContext {
 
 impl From<PublicKeyJwkContext> for AnyContext {
     fn from(value: PublicKeyJwkContext) -> Self {
-        Self {
-            public_key_jwk: Some(value.public_key_jwk),
-        }
+        Self::PublicKeyJwk(value.public_key_jwk)
     }
 }
 
@@ -57,11 +55,11 @@ impl TryFrom<AnyContext> for PublicKeyJwkContext {
     type Error = ContextError;
 
     fn try_from(value: AnyContext) -> Result<Self, Self::Error> {
-        match value.public_key_jwk {
-            Some(jwk) => Ok(PublicKeyJwkContext {
+        match value {
+            AnyContext::PublicKeyJwk(jwk) => Ok(PublicKeyJwkContext {
                 public_key_jwk: jwk,
             }),
-            None => Err(ContextError::MissingPublicKey),
+            _ => Err(ContextError::MissingPublicKey),
         }
     }
 }
@@ -145,9 +143,7 @@ impl<'a> From<&'a JWK> for PublicKeyJwkContextRef<'a> {
 
 impl<'a> From<PublicKeyJwkContextRef<'a>> for AnyContextRef<'a> {
     fn from(value: PublicKeyJwkContextRef<'a>) -> Self {
-        Self {
-            public_key_jwk: Some(value.public_key_jwk),
-        }
+        Self::PublicKeyJwk(value.public_key_jwk)
     }
 }
 
@@ -155,11 +151,11 @@ impl<'a> TryFrom<AnyContextRef<'a>> for PublicKeyJwkContextRef<'a> {
     type Error = ContextError;
 
     fn try_from(value: AnyContextRef<'a>) -> Result<Self, Self::Error> {
-        match value.public_key_jwk {
-            Some(jwk) => Ok(Self {
+        match value {
+            AnyContextRef::PublicKeyJwk(jwk) => Ok(Self {
                 public_key_jwk: jwk,
             }),
-            None => Err(ContextError::MissingPublicKey),
+            _ => Err(ContextError::MissingPublicKey),
         }
     }
 }

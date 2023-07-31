@@ -13,9 +13,12 @@ use crate::{
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum Error<T> {
     #[error("missing credential")]
     MissingCredentialId,
+
+    #[error("input transformation failed: {0}")]
+    Transform(T),
 
     #[error("hash failed: {0}")]
     HashFailed(#[from] HashError),
@@ -34,7 +37,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         credential: C,
         suite: S,
         params: S::SigningParameters,
-    ) -> Result<Verifiable<Self>, Error>
+    ) -> Result<Verifiable<Self>, Error<S::TransformError>>
     where
         V: BlankIdVocabularyMut,
         I: TraversableInterpretation + ReverseTermInterpretationMut<BlankId = V::BlankId>,
@@ -68,7 +71,9 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         };
 
         // Apply the crypto suite.
-        let transformed = suite.transform(data, params.transformation_parameters());
+        let transformed = suite
+            .transform(data, params.transformation_parameters())
+            .map_err(Error::Transform)?;
         let hash = suite.hash(transformed, params.hash_parameters())?;
         let proof = suite.generate_proof(&hash, signer, params.into_proof_parameters())?;
 
