@@ -5,25 +5,25 @@ use ssi_security::{MULTIBASE, PROOF_VALUE};
 use treeldr_rust_prelude::{grdf::Graph, locspan::Meta, FromRdf, FromRdfError};
 
 /// `https://w3id.org/security#proofValue` signature value, multibase-encoded.
-pub struct ProofValue(pub ssi_security::layout::Multibase);
+pub struct ProofValue(pub String);
 
 impl ssi_crypto::Referencable for ProofValue {
-    type Reference<'a> = &'a ssi_security::layout::Multibase where Self: 'a;
+    type Reference<'a> = &'a str where Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_> {
         &self.0
     }
 }
 
-impl From<ssi_security::layout::Multibase> for ProofValue {
-    fn from(value: ssi_security::layout::Multibase) -> Self {
+impl From<String> for ProofValue {
+    fn from(value: String) -> Self {
         Self(value)
     }
 }
 
 impl<V: IriVocabulary, I: IriInterpretation<V::Iri>> FromRdf<V, I> for ProofValue
 where
-    ssi_security::layout::Multibase: FromRdf<V, I>,
+    String: FromRdf<V, I>,
 {
     fn from_rdf<G>(
         vocabulary: &V,
@@ -37,12 +37,7 @@ where
         if let Some(iri) = vocabulary.get(PROOF_VALUE) {
             if let Some(prop) = interpretation.iri_interpretation(&iri) {
                 if let Some(o) = graph.objects(id, &prop).next() {
-                    let value = ssi_security::layout::Multibase::from_rdf(
-                        vocabulary,
-                        interpretation,
-                        graph,
-                        o,
-                    )?;
+                    let value = String::from_rdf(vocabulary, interpretation, graph, o)?;
                     return Ok(Self(value));
                 }
             }

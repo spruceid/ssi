@@ -207,7 +207,7 @@ impl VerificationRelationships {
     pub fn proof_purpose(&self, purpose: ProofPurpose) -> &[verification_method::ValueOrReference] {
         match purpose {
             ProofPurpose::Authentication => &self.authentication,
-            ProofPurpose::AssertionMethod => &self.assertion_method,
+            ProofPurpose::Assertion => &self.assertion_method,
             ProofPurpose::KeyAgreement => &self.key_agreement,
             ProofPurpose::CapabilityInvocation => &self.capability_invocation,
             ProofPurpose::CapabilityDelegation => &self.capability_delegation,
@@ -258,7 +258,7 @@ impl VerificationRelationships {
             } else {
                 Vec::new()
             },
-            assertion_method: if proof_purposes.contains(ProofPurpose::AssertionMethod) {
+            assertion_method: if proof_purposes.contains(ProofPurpose::Assertion) {
                 vec![verification_method::ValueOrReference::Reference(
                     vm_reference,
                 )]

@@ -28,6 +28,9 @@ pub use w3c::*;
 pub enum HashError {
     #[error("invalid verification method")]
     InvalidVerificationMethod,
+
+    #[error("message is too long")]
+    TooLong,
 }
 
 /// Cryptographic suite.
@@ -107,8 +110,14 @@ pub trait CryptographicSuite: Sync + Sized {
 }
 
 pub trait CryptographicSuiteInput<T>: CryptographicSuite {
+    type TransformError;
+
     /// Transformation algorithm.
-    fn transform(&self, data: T, params: Self::TransformationParameters) -> Self::Transformed;
+    fn transform(
+        &self,
+        data: T,
+        params: Self::TransformationParameters,
+    ) -> Result<Self::Transformed, Self::TransformError>;
 }
 
 pub trait SigningParameters<T, H, P> {
@@ -193,13 +202,15 @@ macro_rules! impl_rdf_input_urdna2015 {
                 Literal = V::Literal,
             >,
         {
+            type TransformError = std::convert::Infallible;
+
             /// Transformation algorithm.
             fn transform(
                 &self,
                 data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
                 _options: (),
-            ) -> Self::Transformed {
-                data.canonical_form()
+            ) -> Result<Self::Transformed, Self::TransformError> {
+                Ok(data.canonical_form())
             }
         }
     };

@@ -1,3 +1,4 @@
+use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf};
@@ -550,6 +551,8 @@ where
     }
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProofConfiguration<M> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
     pub verification_method: M,

@@ -152,7 +152,7 @@ impl<'a> VerificationMethodRef<'a, Multikey> for &'a Multikey {
         _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: &'s ssi_security::layout::Multibase,
+        signature: &'s str,
     ) -> Result<bool, VerificationError> {
         controllers
             .ensure_allows_verification_method(
@@ -162,7 +162,7 @@ impl<'a> VerificationMethodRef<'a, Multikey> for &'a Multikey {
             )
             .await?;
 
-        let signature_bytes = multibase::decode(signature.as_str())
+        let signature_bytes = multibase::decode(signature)
             .map_err(|_| VerificationError::InvalidProof)?
             .1;
 

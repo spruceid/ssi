@@ -65,7 +65,7 @@ impl ssi_crypto::VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base5
     /// This suites needs the public key as context because it is not included
     /// in the verification method.
     ///
-    /// The key is provided by the cryptographic suite.
+    /// The key is provided by the proof.
     type ProofContext = PublicKeyJwkContext;
 
     type Signature = signature::Jws;

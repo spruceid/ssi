@@ -132,7 +132,7 @@ impl<'a> VerificationMethodRef<'a, EcdsaSecp256r1VerificationKey2019>
         _: NoContext,
         proof_purpose: ssi_crypto::ProofPurpose,
         data: &[u8],
-        signature: &'s ssi_security::layout::Multibase,
+        signature: &'s str,
     ) -> Result<bool, VerificationError> {
         use p256::ecdsa::signature::Verifier;
 
@@ -144,7 +144,7 @@ impl<'a> VerificationMethodRef<'a, EcdsaSecp256r1VerificationKey2019>
             )
             .await?;
 
-        let signature_bytes = multibase::decode(signature.as_str())
+        let signature_bytes = multibase::decode(signature)
             .map_err(|_| VerificationError::InvalidProof)?
             .1;
 

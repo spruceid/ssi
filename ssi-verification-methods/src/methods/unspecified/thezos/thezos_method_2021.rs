@@ -1,6 +1,26 @@
-use iref::IriBuf;
+use std::{borrow::Cow, hash::Hash};
+
+use async_trait::async_trait;
+use iref::{Iri, IriBuf};
+use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
+use ssi_crypto::VerificationError;
 use ssi_jwk::JWK;
+use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, PUBLIC_KEY_JWK};
+use static_iref::iri;
+use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
+
+use crate::{
+    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
+};
+
+mod context;
+pub use context::*;
+
+pub const THEZOS_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#TezosMethod2021");
+
+pub const THEZOS_METHOD_2021_TYPE: &str = "TezosMethod2021";
 
 /// `TezosMethod2021` Verification Method.
 ///
@@ -42,4 +62,313 @@ pub enum PublicKey {
 
     #[serde(rename = "blockchainAccountId")]
     BlockchainAccountId(ssi_caips::caip10::BlockchainAccountId),
+}
+
+impl PublicKey {
+    pub fn matches(&self, other: &JWK) -> Result<bool, VerificationError> {
+        use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
+        match self {
+            Self::Jwk(jwk) => Ok(jwk.equals_public(other)),
+            Self::BlockchainAccountId(id) => match id.verify(other) {
+                Err(VerifyError::UnknownChainId(_) | VerifyError::HashError(_)) => {
+                    Err(VerificationError::InvalidKey)
+                }
+                Err(VerifyError::KeyMismatch(_, _)) => Ok(false),
+                Ok(()) => Ok(true),
+            },
+        }
+    }
+
+    // pub fn sign(&self, data: &[u8]) {
+    // 	// let (header, payload, signature_bytes) =
+    //     //     jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+
+    //     // if !matches!(header.algorithm, Algorithm::EdBlake2b | Algorithm::ESBlake2b | Algorithm::ESBlake2bK) {
+    //     //     return Err(VerificationError::InvalidProof);
+    //     // }
+    // }
+}
+
+impl ssi_crypto::Referencable for TezosMethod2021 {
+    type Reference<'a> = &'a Self;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
+impl ssi_crypto::VerificationMethod for TezosMethod2021 {
+    /// This suites needs the public key as context because it is not included
+    /// in the verification method.
+    ///
+    /// The key is provided by the proof.
+    type ProofContext = Context;
+
+    type Signature = signature::ProofValue;
+}
+
+impl VerificationMethod for TezosMethod2021 {
+    fn id(&self) -> Iri {
+        self.id.as_iri()
+    }
+
+    fn controller(&self) -> Iri {
+        self.controller.as_iri()
+    }
+
+    fn expected_type() -> Option<ExpectedType> {
+        Some(THEZOS_METHOD_2021_TYPE.to_string().into())
+    }
+
+    fn type_(&self) -> &str {
+        THEZOS_METHOD_2021_TYPE
+    }
+}
+
+#[async_trait]
+impl<'a> VerificationMethodRef<'a, TezosMethod2021> for &'a TezosMethod2021 {
+    async fn verify<'c: 'async_trait, 's: 'async_trait>(
+        self,
+        controllers: &impl ControllerProvider,
+        context: ContextRef<'c>,
+        proof_purpose: ssi_crypto::ProofPurpose,
+        signing_bytes: &[u8],
+        proof_value_base58: &'s str,
+    ) -> Result<bool, VerificationError> {
+        controllers
+            .ensure_allows_verification_method(
+                self.controller.as_iri(),
+                self.id.as_iri(),
+                proof_purpose,
+            )
+            .await?;
+
+        let (algorithm, signature) = ssi_tzkey::decode_tzsig(proof_value_base58)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+
+        let key = match context.as_jwk()? {
+            Some(key) => {
+                if !self.public_key.matches(&key)? {
+                    return Err(VerificationError::InvalidProof);
+                }
+
+                key
+            }
+            None => match &self.public_key {
+                PublicKey::Jwk(key) => Cow::Borrowed(key.as_ref()),
+                _ => return Err(VerificationError::MissingPublicKey),
+            },
+        };
+
+        Ok(ssi_jws::verify_bytes(algorithm, signing_bytes, &key, &signature).is_ok())
+    }
+}
+
+impl LinkedDataVerificationMethod for TezosMethod2021 {
+    fn quads(&self, quads: &mut Vec<Quad>) -> Object {
+        quads.push(Quad(
+            Id::Iri(self.id.clone()),
+            RDF_TYPE_IRI.into(),
+            Object::Id(Id::Iri(THEZOS_METHOD_2021_IRI.into())),
+            None,
+        ));
+
+        quads.push(Quad(
+            Id::Iri(self.id.clone()),
+            CONTROLLER_IRI.into(),
+            Object::Id(Id::Iri(self.controller.clone())),
+            None,
+        ));
+
+        match &self.public_key {
+            PublicKey::Jwk(jwk) => {
+                quads.push(Quad(
+                    Id::Iri(self.id.clone()),
+                    PUBLIC_KEY_JWK.into(),
+                    Object::Literal(Literal::new(
+                        serde_json::to_string(jwk).unwrap(),
+                        literal::Type::Any(RDF_JSON.into()),
+                    )),
+                    None,
+                ));
+            }
+            PublicKey::BlockchainAccountId(account_id) => {
+                quads.push(Quad(
+                    Id::Iri(self.id.clone()),
+                    BLOCKCHAIN_ACCOUNT_ID.into(),
+                    Object::Literal(Literal::new(
+                        account_id.to_string(),
+                        literal::Type::Any(XSD_STRING.into()),
+                    )),
+                    None,
+                ));
+            }
+        }
+
+        rdf_types::Object::Id(rdf_types::Id::Iri(self.id.clone()))
+    }
+}
+
+impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for TezosMethod2021
+where
+    V::Iri: Eq + Hash,
+    V::BlankId: Eq + Hash,
+{
+    fn into_json_ld_object_meta(
+        self,
+        vocabulary: &mut V,
+        _interpretation: &I,
+        meta: M,
+    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
+        let mut node = json_ld::Node::with_id(json_ld::syntax::Entry::new(
+            meta.clone(),
+            Meta(
+                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.id.as_iri()))),
+                meta.clone(),
+            ),
+        ));
+
+        let controller_prop = Meta(
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(CONTROLLER_IRI))),
+            meta.clone(),
+        );
+        let controller_value = json_ld::Node::with_id(json_ld::syntax::Entry::new(
+            meta.clone(),
+            Meta(
+                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.controller.as_iri()))),
+                meta.clone(),
+            ),
+        ));
+        node.insert(
+            controller_prop,
+            Meta(
+                json_ld::Indexed::new(json_ld::Object::Node(Box::new(controller_value)), None),
+                meta.clone(),
+            ),
+        );
+
+        match self.public_key {
+            PublicKey::Jwk(jwk) => {
+                let key_prop = Meta(
+                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_JWK))),
+                    meta.clone(),
+                );
+                let key_value =
+                    json_ld::Value::Json(json_syntax::to_value_with(jwk, || meta.clone()).unwrap());
+                node.insert(
+                    key_prop,
+                    Meta(
+                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
+                        meta.clone(),
+                    ),
+                );
+            }
+            PublicKey::BlockchainAccountId(account_id) => {
+                let key_prop = Meta(
+                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
+                    meta.clone(),
+                );
+                let key_value = json_ld::Value::Literal(
+                    json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                        account_id.to_string(),
+                    )),
+                    None,
+                );
+                node.insert(
+                    key_prop,
+                    Meta(
+                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
+                        meta.clone(),
+                    ),
+                );
+            }
+        }
+
+        Meta(
+            json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
+            meta,
+        )
+    }
+}
+
+impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for TezosMethod2021
+where
+    V::Iri: Eq + Hash,
+    V::BlankId: Eq + Hash,
+{
+    fn as_json_ld_object_meta(
+        &self,
+        vocabulary: &mut V,
+        _interpretation: &I,
+        meta: M,
+    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
+        let mut node = json_ld::Node::with_id(json_ld::syntax::Entry::new(
+            meta.clone(),
+            Meta(
+                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.id.as_iri()))),
+                meta.clone(),
+            ),
+        ));
+
+        let controller_prop = Meta(
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(CONTROLLER_IRI))),
+            meta.clone(),
+        );
+        let controller_value = json_ld::Node::with_id(json_ld::syntax::Entry::new(
+            meta.clone(),
+            Meta(
+                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.controller.as_iri()))),
+                meta.clone(),
+            ),
+        ));
+        node.insert(
+            controller_prop,
+            Meta(
+                json_ld::Indexed::new(json_ld::Object::Node(Box::new(controller_value)), None),
+                meta.clone(),
+            ),
+        );
+
+        match &self.public_key {
+            PublicKey::Jwk(jwk) => {
+                let key_prop = Meta(
+                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_JWK))),
+                    meta.clone(),
+                );
+                let key_value =
+                    json_ld::Value::Json(json_syntax::to_value_with(jwk, || meta.clone()).unwrap());
+                node.insert(
+                    key_prop,
+                    Meta(
+                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
+                        meta.clone(),
+                    ),
+                );
+            }
+            PublicKey::BlockchainAccountId(account_id) => {
+                let key_prop = Meta(
+                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
+                    meta.clone(),
+                );
+                let key_value = json_ld::Value::Literal(
+                    json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                        account_id.to_string(),
+                    )),
+                    None,
+                );
+                node.insert(
+                    key_prop,
+                    Meta(
+                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
+                        meta.clone(),
+                    ),
+                );
+            }
+        }
+
+        Meta(
+            json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
+            meta,
+        )
+    }
 }
