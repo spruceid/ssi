@@ -1,7 +1,5 @@
 use std::hash::Hash;
 
-use crate::{signature, AnyContext, AnyContextRef};
-use async_trait::async_trait;
 use rdf_types::VocabularyMut;
 use treeldr_rust_prelude::{AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
@@ -47,24 +45,6 @@ macro_rules! any_verification_method {
 					),*
 				}
 			}
-		}
-
-		impl ssi_crypto::Referencable for Any {
-			type Reference<'a> = AnyRef<'a> where Self: 'a;
-
-			fn as_reference(&self) -> Self::Reference<'_> {
-				match self {
-					$(
-						Self::$name(m) => AnyRef::$name(m)
-					),*
-				}
-			}
-		}
-
-		impl ssi_crypto::VerificationMethod for Any {
-			type ProofContext = AnyContext;
-
-			type Signature = signature::Any;
 		}
 
 		impl crate::VerificationMethod for Any {
@@ -125,29 +105,27 @@ macro_rules! any_verification_method {
 			}
 		}
 
-		#[async_trait]
-		impl<'a> crate::VerificationMethodRef<'a, Any> for AnyRef<'a> {
-			async fn verify<'c: 'async_trait, 's: 'async_trait>(
-				self,
-				controllers: &impl crate::ControllerProvider,
-				context: AnyContextRef<'c>,
-				proof_purpose: ssi_crypto::ProofPurpose,
-				signing_bytes: &[u8],
-				signature: signature::AnyRef<'s>,
-			) -> Result<bool, ssi_crypto::VerificationError> {
-				match self {
-					$(
-						Self::$name(m) => m.verify(
-							controllers,
-							context.try_into()?,
-							proof_purpose,
-							signing_bytes,
-							signature.try_into()?
-						).await
-					),*
-				}
-			}
-		}
+		// #[async_trait]
+		// impl<'a> crate::VerificationMethodRef<'a, Any, signature::Any> for AnyRef<'a> {
+		// 	async fn verify<'s: 'async_trait>(
+		// 		self,
+		// 		controllers: &impl crate::ControllerProvider,
+		// 		proof_purpose: ssi_crypto::ProofPurpose,
+		// 		signing_bytes: &[u8],
+		// 		signature: signature::AnyRef<'s>,
+		// 	) -> Result<bool, ssi_crypto::VerificationError> {
+		// 		match self {
+		// 			$(
+		// 				Self::$name(m) => m.verify(
+		// 					controllers,
+		// 					proof_purpose,
+		// 					signing_bytes,
+		// 					signature.try_into()?
+		// 				).await
+		// 			),*
+		// 		}
+		// 	}
+		// }
 
 		impl crate::LinkedDataVerificationMethod for Any {
 			fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
@@ -242,93 +220,93 @@ macro_rules! any_verification_method {
 				}
 			}
 
-			impl<'a, S: ssi_crypto::Signer<Any>> ssi_crypto::Signer<crate::$name> for AnySigner<'a, S> {
-				fn sign(
-					&self,
-					method: &crate::$name,
-					bytes: &[u8],
-				) -> Result<(<crate::$name as ssi_crypto::VerificationMethod>::ProofContext, <crate::$name as ssi_crypto::VerificationMethod>::Signature), ssi_crypto::SignatureError> {
-					let method = Any::$name(method.clone());
-					let (context, signature) = self.0.sign(&method, bytes)?;
-					Ok((context.try_into().unwrap(), signature.try_into().unwrap()))
-				}
-			}
+			// impl<'a, S: ssi_crypto::Signer<Any>> ssi_crypto::Signer<crate::$name> for AnySigner<'a, S> {
+			// 	fn sign(
+			// 		&self,
+			// 		method: &crate::$name,
+			// 		bytes: &[u8],
+			// 	) -> Result<(<crate::$name as ssi_crypto::VerificationMethod>::Parameters, <crate::$name as ssi_crypto::VerificationMethod>::Signature), ssi_crypto::SignatureError> {
+			// 		let method = Any::$name(method.clone());
+			// 		let (context, signature) = self.0.sign(&method, bytes)?;
+			// 		Ok((context.try_into().unwrap(), signature.try_into().unwrap()))
+			// 	}
+			// }
 
-			impl<'a, S: ssi_crypto::Signer<crate::Reference<Any>>> ssi_crypto::Signer<crate::Reference<crate::$name>> for AnySigner<'a, S> {
-				fn sign(
-					&self,
-					method: &crate::Reference<crate::$name>,
-					bytes: &[u8],
-				) -> Result<(<crate::$name as ssi_crypto::VerificationMethod>::ProofContext, <crate::$name as ssi_crypto::VerificationMethod>::Signature), ssi_crypto::SignatureError> {
-					let method = method.clone().into_any();
-					let (context, signature) = self.0.sign(&method, bytes)?;
-					Ok((context.try_into().unwrap(), signature.try_into().unwrap()))
-				}
-			}
+			// impl<'a, S: ssi_crypto::Signer<crate::Reference<Any>>> ssi_crypto::Signer<crate::Reference<crate::$name>> for AnySigner<'a, S> {
+			// 	fn sign(
+			// 		&self,
+			// 		method: &crate::Reference<crate::$name>,
+			// 		bytes: &[u8],
+			// 	) -> Result<(<crate::$name as ssi_crypto::VerificationMethod>::Parameters, <crate::$name as ssi_crypto::VerificationMethod>::Signature), ssi_crypto::SignatureError> {
+			// 		let method = method.clone().into_any();
+			// 		let (context, signature) = self.0.sign(&method, bytes)?;
+			// 		Ok((context.try_into().unwrap(), signature.try_into().unwrap()))
+			// 	}
+			// }
 
-			impl<'a, S: ssi_crypto::Signer<crate::ReferenceOrOwned<Any>>> ssi_crypto::Signer<crate::ReferenceOrOwned<crate::$name>> for AnySigner<'a, S> {
-				fn sign(
-					&self,
-					method: &crate::ReferenceOrOwned<crate::$name>,
-					bytes: &[u8],
-				) -> Result<(<crate::$name as ssi_crypto::VerificationMethod>::ProofContext, <crate::$name as ssi_crypto::VerificationMethod>::Signature), ssi_crypto::SignatureError> {
-					let method = match method {
-						crate::ReferenceOrOwned::Owned(m) => crate::ReferenceOrOwned::Owned(Any::$name(m.clone())),
-						crate::ReferenceOrOwned::Reference(r) => crate::ReferenceOrOwned::Reference(r.clone().into_any())
-					};
+			// impl<'a, S: ssi_crypto::Signer<crate::ReferenceOrOwned<Any>>> ssi_crypto::Signer<crate::ReferenceOrOwned<crate::$name>> for AnySigner<'a, S> {
+			// 	fn sign(
+			// 		&self,
+			// 		method: &crate::ReferenceOrOwned<crate::$name>,
+			// 		bytes: &[u8],
+			// 	) -> Result<(<crate::$name as ssi_crypto::VerificationMethod>::Parameters, <crate::$name as ssi_crypto::VerificationMethod>::Signature), ssi_crypto::SignatureError> {
+			// 		let method = match method {
+			// 			crate::ReferenceOrOwned::Owned(m) => crate::ReferenceOrOwned::Owned(Any::$name(m.clone())),
+			// 			crate::ReferenceOrOwned::Reference(r) => crate::ReferenceOrOwned::Reference(r.clone().into_any())
+			// 		};
 
-					let (context, signature) = self.0.sign(&method, bytes)?;
-					Ok((context.try_into().unwrap(), signature.try_into().unwrap()))
-				}
-			}
+			// 		let (context, signature) = self.0.sign(&method, bytes)?;
+			// 		Ok((context.try_into().unwrap(), signature.try_into().unwrap()))
+			// 	}
+			// }
 
-			#[async_trait::async_trait]
-			impl<'a, S: ssi_crypto::Verifier<Any>> ssi_crypto::Verifier<crate::$name> for AnyVerifier<'a, S> {
-				async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
-					&self,
-					context: <<crate::$name as ssi_crypto::VerificationMethod>::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
-					method: &'m crate::$name,
-					purpose: ssi_crypto::ProofPurpose,
-					bytes: &[u8],
-					signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Referencable>::Reference<'s>,
-				) -> Result<bool, ssi_crypto::VerificationError> {
-					let method = AnyRef::$name(method);
-					self.0.verify(context.into(), method, purpose, bytes, signature.into()).await
-				}
-			}
+			// #[async_trait::async_trait]
+			// impl<'a, S: ssi_crypto::Verifier<Any>> ssi_crypto::Verifier<crate::$name> for AnyVerifier<'a, S> {
+			// 	async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
+			// 		&self,
+			// 		context: <<crate::$name as ssi_crypto::VerificationMethod>::Parameters as ssi_crypto::Referencable>::Reference<'c>,
+			// 		method: &'m crate::$name,
+			// 		purpose: ssi_crypto::ProofPurpose,
+			// 		bytes: &[u8],
+			// 		signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Referencable>::Reference<'s>,
+			// 	) -> Result<bool, ssi_crypto::VerificationError> {
+			// 		let method = AnyRef::$name(method);
+			// 		self.0.verify(context.into(), method, purpose, bytes, signature.into()).await
+			// 	}
+			// }
 
-			#[async_trait::async_trait]
-			impl<'a, S: ssi_crypto::Verifier<crate::Reference<Any>>> ssi_crypto::Verifier<crate::Reference<crate::$name>> for AnyVerifier<'a, S> {
-				async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
-					&self,
-					context: <<crate::$name as ssi_crypto::VerificationMethod>::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
-					method: crate::ReferenceRef<'m, crate::$name>,
-					purpose: ssi_crypto::ProofPurpose,
-					bytes: &[u8],
-					signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Referencable>::Reference<'s>,
-				) -> Result<bool, ssi_crypto::VerificationError> {
-					self.0.verify(context.into(), method.as_any(), purpose, bytes, signature.into()).await
-				}
-			}
+			// #[async_trait::async_trait]
+			// impl<'a, S: ssi_crypto::Verifier<crate::Reference<Any>>> ssi_crypto::Verifier<crate::Reference<crate::$name>> for AnyVerifier<'a, S> {
+			// 	async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
+			// 		&self,
+			// 		context: <<crate::$name as ssi_crypto::VerificationMethod>::Parameters as ssi_crypto::Referencable>::Reference<'c>,
+			// 		method: crate::ReferenceRef<'m, crate::$name>,
+			// 		purpose: ssi_crypto::ProofPurpose,
+			// 		bytes: &[u8],
+			// 		signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Referencable>::Reference<'s>,
+			// 	) -> Result<bool, ssi_crypto::VerificationError> {
+			// 		self.0.verify(context.into(), method.as_any(), purpose, bytes, signature.into()).await
+			// 	}
+			// }
 
-			#[async_trait::async_trait]
-			impl<'a, S: ssi_crypto::Verifier<crate::ReferenceOrOwned<Any>>> ssi_crypto::Verifier<crate::ReferenceOrOwned<crate::$name>> for AnyVerifier<'a, S> {
-				async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
-					&self,
-					context: <<crate::$name as ssi_crypto::VerificationMethod>::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
-					method: crate::ReferenceOrOwnedRef<'m, crate::$name>,
-					purpose: ssi_crypto::ProofPurpose,
-					bytes: &[u8],
-					signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Referencable>::Reference<'s>,
-				) -> Result<bool, ssi_crypto::VerificationError> {
-					let method = match method {
-						crate::ReferenceOrOwnedRef::Owned(m) => crate::ReferenceOrOwnedRef::Owned(AnyRef::$name(m)),
-						crate::ReferenceOrOwnedRef::Reference(r) => crate::ReferenceOrOwnedRef::Reference(r.as_any())
-					};
+			// #[async_trait::async_trait]
+			// impl<'a, S: ssi_crypto::Verifier<crate::ReferenceOrOwned<Any>>> ssi_crypto::Verifier<crate::ReferenceOrOwned<crate::$name>> for AnyVerifier<'a, S> {
+			// 	async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
+			// 		&self,
+			// 		context: <<crate::$name as ssi_crypto::VerificationMethod>::Parameters as ssi_crypto::Referencable>::Reference<'c>,
+			// 		method: crate::ReferenceOrOwnedRef<'m, crate::$name>,
+			// 		purpose: ssi_crypto::ProofPurpose,
+			// 		bytes: &[u8],
+			// 		signature: <<crate::$name as ssi_crypto::VerificationMethod>::Signature as ssi_crypto::Referencable>::Reference<'s>,
+			// 	) -> Result<bool, ssi_crypto::VerificationError> {
+			// 		let method = match method {
+			// 			crate::ReferenceOrOwnedRef::Owned(m) => crate::ReferenceOrOwnedRef::Owned(AnyRef::$name(m)),
+			// 			crate::ReferenceOrOwnedRef::Reference(r) => crate::ReferenceOrOwnedRef::Reference(r.as_any())
+			// 		};
 
-					self.0.verify(context.into(), method, purpose, bytes, signature.into()).await
-				}
-			}
+			// 		self.0.verify(context.into(), method, purpose, bytes, signature.into()).await
+			// 	}
+			// }
 		)*
 	};
 }

@@ -13,8 +13,8 @@ use static_iref::iri;
 use treeldr_rust_prelude::{grdf, locspan::Meta, FromRdf, FromRdfError};
 
 use crate::{
-    suite::{CryptographicSuiteInput, HashError, VerificationParameters},
-    CryptographicSuite, DataIntegrity, Proof,
+    suite::{CryptographicSuiteInput, HashError},
+    CryptographicSuite, DataIntegrity, Proof, ProofConfiguration,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -60,7 +60,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         generator: &mut impl json_ld::Generator<V, M>,
         interpretation: &'a mut I,
         mut input: json_ld::ExpandedDocument<V::Iri, V::BlankId, M>,
-        params: S::VerificationParameters,
+        params: ProofConfiguration<S::VerificationMethod>,
     ) -> Result<Verifiable<Self>, Error<S::TransformError>>
     where
         V: VocabularyMut<
@@ -143,11 +143,11 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 
                                 let transformed = proof
                                     .suite()
-                                    .transform(data, params.transformation_parameters())
+                                    .transform(data, &params)
                                     .map_err(Error::Transform)?;
                                 let hashed = proof
                                     .suite()
-                                    .hash(transformed, params.into_hash_parameters())?;
+                                    .hash(transformed, &params)?;
 
                                 Ok(Verifiable::new(
                                     DataIntegrity::new(credential, hashed),

@@ -1,20 +1,18 @@
 use std::hash::Hash;
 
-use async_trait::async_trait;
-use ed25519_dalek::{Signer, Verifier};
+use ed25519_dalek::Verifier;
 use iref::{Iri, IriBuf};
 use rand_core_0_5::{CryptoRng, RngCore};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::VerificationError;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{MULTIBASE, PUBLIC_KEY_MULTIBASE};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, NoContext,
-    VerificationMethod, VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI,
+    ExpectedType, LinkedDataVerificationMethod,
+    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError,
 };
 
 /// IRI of the Ed25519 Verification Key 2020 type.
@@ -106,26 +104,20 @@ impl Ed25519VerificationKey2020 {
         }
     }
 
-    pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> signature::ProofValue {
-        let signature = key_pair.sign(data);
-        let encoded = multibase::encode(multibase::Base::Base58Btc, signature);
-        signature::ProofValue(encoded)
+    // pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> signature::Multibase {
+    //     let signature = key_pair.sign(data);
+    //     let encoded = multibase::encode(multibase::Base::Base58Btc, signature);
+    //     signature::Multibase(encoded)
+    // }
+
+    pub fn verify_bytes(&self, data: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+        let pk = self
+            .decode_public_key()
+            .map_err(|_| VerificationError::InvalidKey)?;
+        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        Ok(pk.verify(data, &signature).is_ok())
     }
-}
-
-impl ssi_crypto::Referencable for Ed25519VerificationKey2020 {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-}
-
-impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2020 {
-    type ProofContext = NoContext;
-
-    /// Base58 multibase-encoded signature bytes.
-    type Signature = signature::ProofValue;
 }
 
 impl VerificationMethod for Ed25519VerificationKey2020 {
@@ -146,36 +138,30 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2020> for &'a Ed25519VerificationKey2020 {
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        signature: &'s str,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2020, signature::Multibase> for &'a Ed25519VerificationKey2020 {
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         signing_bytes: &[u8],
+//         signature: &'s str,
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let signature_bytes = multibase::decode(signature)
-            .map_err(|_| VerificationError::InvalidProof)?
-            .1;
+//         let signature_bytes = multibase::decode(signature)
+//             .map_err(|_| VerificationError::InvalidProof)?
+//             .1;
 
-        let pk = self
-            .decode_public_key()
-            .map_err(|_| VerificationError::InvalidKey)?;
-        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
-            .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
-        Ok(pk.verify(signing_bytes, &signature).is_ok())
-    }
-}
+//         self.verify_bytes(signing_bytes, &signature_bytes)
+//     }
+// }
 
 impl LinkedDataVerificationMethod for Ed25519VerificationKey2020 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

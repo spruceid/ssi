@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::VerificationError;
 use ssi_jwk::JWK;
 use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, PUBLIC_KEY_JWK};
 use static_iref::iri;
@@ -12,11 +11,11 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, VerificationError,
 };
 
-mod context;
-pub use context::*;
+// mod context;
+// pub use context::*;
 
 pub const THEZOS_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#TezosMethod2021");
 
@@ -89,24 +88,6 @@ impl PublicKey {
     // }
 }
 
-impl ssi_crypto::Referencable for TezosMethod2021 {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-}
-
-impl ssi_crypto::VerificationMethod for TezosMethod2021 {
-    /// This suites needs the public key as context because it is not included
-    /// in the verification method.
-    ///
-    /// The key is provided by the proof.
-    type ProofContext = Context;
-
-    type Signature = signature::ProofValue;
-}
-
 impl VerificationMethod for TezosMethod2021 {
     fn id(&self) -> Iri {
         self.id.as_iri()
@@ -125,44 +106,43 @@ impl VerificationMethod for TezosMethod2021 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, TezosMethod2021> for &'a TezosMethod2021 {
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl ControllerProvider,
-        context: ContextRef<'c>,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        proof_value_base58: &'s str,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, TezosMethod2021, signature::Base58PublicKeyJwkOrMultibase> for &'a TezosMethod2021 {
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         signing_bytes: &[u8],
+//         signature: signature::Base58PublicKeyJwkOrMultibaseRef<'s>
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let (algorithm, signature) = ssi_tzkey::decode_tzsig(proof_value_base58)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+//         let (algorithm, signature_bytes) = ssi_tzkey::decode_tzsig(signature.proof_value)
+//             .map_err(|_| VerificationError::InvalidSignature)?;
 
-        let key = match context.as_jwk()? {
-            Some(key) => {
-                if !self.public_key.matches(&key)? {
-                    return Err(VerificationError::InvalidProof);
-                }
+//         let key = match signature.public_key.map(|k| k.as_jwk()).transpose()? {
+//             Some(key) => {
+//                 if !self.public_key.matches(&key)? {
+//                     return Err(VerificationError::InvalidProof);
+//                 }
 
-                key
-            }
-            None => match &self.public_key {
-                PublicKey::Jwk(key) => Cow::Borrowed(key.as_ref()),
-                _ => return Err(VerificationError::MissingPublicKey),
-            },
-        };
+//                 key
+//             }
+//             None => match &self.public_key {
+//                 PublicKey::Jwk(key) => Cow::Borrowed(key.as_ref()),
+//                 _ => return Err(VerificationError::MissingPublicKey),
+//             },
+//         };
 
-        Ok(ssi_jws::verify_bytes(algorithm, signing_bytes, &key, &signature).is_ok())
-    }
-}
+//         Ok(ssi_jws::verify_bytes(algorithm, signing_bytes, &key, &signature_bytes).is_ok())
+//     }
+// }
 
 impl LinkedDataVerificationMethod for TezosMethod2021 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

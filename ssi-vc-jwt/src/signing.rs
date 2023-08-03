@@ -7,15 +7,15 @@ use json_ld::{
 use json_syntax::Print;
 use locspan::Meta;
 use rdf_types::VocabularyMut;
-use ssi_crypto::Signer;
 use ssi_vc::{vocab::VERIFIABLE_CREDENTIAL, Verifiable, CREDENTIALS_V1_CONTEXT_IRI};
+use ssi_verification_methods::{SignatureError, SignatureAlgorithm, Signer};
 
 use crate::{verification, Proof, VcJwt};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error<C> {
     #[error(transparent)]
-    Signature(#[from] ssi_crypto::SignatureError),
+    Signature(#[from] SignatureError),
 
     #[error("JSON-LD context loading failed")]
     ContextLoadingFailed(C),
@@ -51,13 +51,39 @@ pub struct LdOptions<I> {
     pub compaction_options: json_ld::compaction::Options,
 }
 
+/// Signature algorithm.
+pub struct VcJwtSignature;
+
+impl SignatureAlgorithm<verification::Method> for VcJwtSignature {
+    type Signature = Vec<u8>;
+
+    type Protocol = ();
+
+    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+        &self,
+        method: &verification::Method,
+        bytes: &[u8],
+        signer: &S
+    ) -> Result<Self::Signature, SignatureError> {
+        todo!()
+    }
+
+    fn verify(&self,
+        signature: &Self::Signature,
+        method: &verification::Method,
+        bytes: &[u8]
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        todo!()
+    }
+}
+
 impl<C: Sync> VcJwt<C> {
     /// Sign the given Linked Data credential.
     pub async fn sign_ld<V, I, L>(
         vocabulary: &mut V,
         interpretation: &I,
         loader: &mut L,
-        signer: &impl Signer<verification::Method>,
+        signer: &impl Signer<verification::Method, ()>,
         credential: C,
         method: verification::Method,
         options: LdOptions<V::Iri>,
@@ -149,7 +175,7 @@ impl<C: Sync> VcJwt<C> {
         let signing_bytes = header.encode_signing_bytes(&payload);
 
         // Build proof.
-        let ((), signature) = signer.sign(&method, &signing_bytes)?;
+        let signature = signer.sign(VcJwtSignature,&method, &signing_bytes)?;
         let proof = Proof::new(signature, method);
 
         // Build non-verifiable JWT credential.

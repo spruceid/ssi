@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use iref::Iri;
-use ssi_crypto::{ProofPurpose, ProofPurposes};
+
+use crate::{ProofPurposes, ProofPurpose, VerificationError};
 
 /// Verification method controller.
 ///
@@ -76,14 +77,14 @@ pub trait ControllerProvider: Sync {
         controller_id: Iri<'_>,
         method_id: Iri<'_>,
         proof_purpose: ProofPurpose,
-    ) -> Result<(), ssi_crypto::VerificationError> {
+    ) -> Result<(), VerificationError> {
         if self
             .allows_verification_method(controller_id, method_id, proof_purpose.into())
             .await?
         {
             Ok(())
         } else {
-            Err(ssi_crypto::VerificationError::InvalidKeyUse(proof_purpose))
+            Err(VerificationError::InvalidKeyUse(proof_purpose))
         }
     }
 }
@@ -110,7 +111,7 @@ pub enum ControllerError {
     InternalError(Box<dyn Send + std::error::Error>),
 }
 
-impl From<ControllerError> for ssi_crypto::VerificationError {
+impl From<ControllerError> for VerificationError {
     fn from(value: ControllerError) -> Self {
         match value {
             ControllerError::NotFound(id) => Self::KeyControllerNotFound(id),

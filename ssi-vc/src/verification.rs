@@ -1,20 +1,20 @@
 use async_trait::async_trait;
-use ssi_crypto::{VerificationError, Verifier};
+use ssi_verification_methods::{Verifier, VerificationError};
 
 use crate::Verifiable;
 
 /// Credential verifiable with a proof of type `Self::Proof`.
 #[async_trait]
 pub trait VerifiableWith {
+    /// Verification method.
+    type Method;
+
     /// Proof type.
     type Proof;
 
-    /// Verification method.
-    type Method: ssi_crypto::VerificationMethod;
-
     async fn verify_with(
         &self,
-        verifiers: &impl Verifier<Self::Method>,
+        verifier: &impl Verifier<Self::Method>,
         proof: &Self::Proof,
     ) -> Result<ProofValidity, VerificationError>;
 

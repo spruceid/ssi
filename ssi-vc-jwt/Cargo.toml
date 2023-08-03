@@ -21,6 +21,7 @@ static-iref.workspace = true
 json-ld.workspace = true
 ssi-core.workspace = true
 ssi-crypto.workspace = true
+ssi-verification-methods.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-jwt.workspace = true

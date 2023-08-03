@@ -67,10 +67,11 @@ pub fn eip55_checksum_addr(addr: &str) -> Result<String, Eip155Error> {
     Ok("0x".to_string() + &checksummed_addr)
 }
 
-pub fn prefix_personal_message(msg: &str) -> Vec<u8> {
-    let msg_bytes = msg.as_bytes();
-    let prefix = format!("\x19Ethereum Signed Message:\n{}", msg_bytes.len());
-    [prefix.as_bytes().to_vec(), msg_bytes.to_vec()].concat()
+pub fn prefix_personal_message<M: ?Sized + AsRef<[u8]>>(msg: &M) -> Vec<u8> {
+    let msg_bytes = msg.as_ref();
+    let mut prefix = format!("\x19Ethereum Signed Message:\n{}", msg_bytes.len()).into_bytes();
+    prefix.extend_from_slice(msg_bytes);
+    prefix
 }
 
 pub fn hash_personal_message(msg: &str) -> Vec<u8> {

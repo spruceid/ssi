@@ -8,22 +8,22 @@
 //! [`JsonWebKey2020`]: crate::JsonWebKey2020
 //! [`ssi-ldp`]: <https://github.com/spruceid/ssi/tree/main/ssi-ldp>
 //! [`ssi-dids`]: <https://github.com/spruceid/ssi/tree/main/ssi-dids>
-use std::{future::Future, pin::Pin};
-
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use static_iref::iri;
 
-mod context;
+// mod context;
 mod controller;
 mod methods;
 mod reference;
 pub mod signature;
+pub mod verification;
 
-pub use context::*;
+// pub use context::*;
 pub use controller::*;
 pub use methods::*;
 pub use reference::*;
+pub use signature::*;
+pub use verification::*;
 
 #[cfg(feature = "ed25519")]
 pub use ed25519_dalek;
@@ -63,7 +63,7 @@ impl From<String> for ExpectedType {
 }
 
 /// Verification method.
-pub trait VerificationMethod: ssi_crypto::VerificationMethod {
+pub trait VerificationMethod {
     /// Identifier of the verification method.
     fn id(&self) -> Iri;
 
@@ -75,72 +75,43 @@ pub trait VerificationMethod: ssi_crypto::VerificationMethod {
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Iri; // Should be an URI.
 
-    fn verify<'f, 'a: 'f, 'c: 'f, 's: 'f>(
-        &'a self,
-        controllers: &'a impl ControllerProvider,
-        context: <Self::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &'a [u8],
-        signature: <Self::Signature as ssi_crypto::Referencable>::Reference<'s>,
-    ) -> Pin<Box<dyn 'f + Send + Future<Output = Result<bool, ssi_crypto::VerificationError>>>>
-    where
-        Self::Reference<'a>: Send + VerificationMethodRef<'a, Self>,
-        <Self::Signature as ssi_crypto::Referencable>::Reference<'s>: Send,
-    {
-        let r = self.as_reference();
-        r.verify(
-            controllers,
-            context,
-            proof_purpose,
-            signing_bytes,
-            signature,
-        )
-    }
-}
-
-#[async_trait]
-pub trait VerificationMethodRef<'a, M: 'a + ?Sized + VerificationMethod> {
-    /// Verifies the given `signing_bytes` against the `signature`.
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl ControllerProvider,
-        context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        signature: <M::Signature as ssi_crypto::Referencable>::Reference<'s>,
-    ) -> Result<bool, ssi_crypto::VerificationError>;
+    // fn verify<'f, 'a: 'f, 's: 'f, S: ssi_crypto::Referencable>(
+    //     &'a self,
+    //     controllers: &'a impl ControllerProvider,
+    //     proof_purpose: ssi_crypto::ProofPurpose,
+    //     signing_bytes: &'a [u8],
+    //     signature: S::Reference<'s>,
+    // ) -> Pin<Box<dyn 'f + Send + Future<Output = Result<bool, ssi_crypto::VerificationError>>>>
+    // where
+    //     Self::Reference<'a>: Send + VerificationMethodRef<'a, Self, S>,
+    //     S::Reference<'s>: Send,
+    // {
+    //     let r = self.as_reference();
+    //     r.verify(
+    //         controllers,
+    //         proof_purpose,
+    //         signing_bytes,
+    //         signature,
+    //     )
+    // }
 }
 
 pub trait LinkedDataVerificationMethod {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object;
 }
 
+impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T {
+    fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
+        T::quads(*self, quads)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 #[error("invalid verification method `{0}`")]
 pub struct InvalidVerificationMethod(pub IriBuf);
 
-impl From<InvalidVerificationMethod> for ssi_crypto::VerificationError {
+impl From<InvalidVerificationMethod> for VerificationError {
     fn from(value: InvalidVerificationMethod) -> Self {
         Self::InvalidVerificationMethod(value.0)
     }
-}
-
-pub trait TryFromVerificationMethod<M>: Sized {
-    fn try_from_verification_method(method: M) -> Result<Self, InvalidVerificationMethod>;
-}
-
-pub trait TryIntoVerificationMethod<M>: Sized {
-    fn try_into_verification_method(self) -> Result<M, InvalidVerificationMethod>;
-}
-
-impl<T, M: TryFromVerificationMethod<T>> TryIntoVerificationMethod<M> for T {
-    fn try_into_verification_method(self) -> Result<M, InvalidVerificationMethod> {
-        M::try_from_verification_method(self)
-    }
-}
-
-pub trait IntoAnyVerificationMethod {
-    type Output;
-
-    fn into_any_verification_method(self) -> Self::Output;
 }

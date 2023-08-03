@@ -1,11 +1,12 @@
+use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
 use ssi_verification_methods::TezosMethod2021;
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::HashError, verification, CryptographicSuite,
-    ProofConfiguration, ProofOptions,
+    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite,
+    ProofConfiguration
 };
 
 /// Tezos signature suite based on URDNA2015.
@@ -35,21 +36,19 @@ pub struct TezosSignature2021;
 
 impl_rdf_input_urdna2015!(TezosSignature2021);
 
-#[async_trait::async_trait]
 impl CryptographicSuite for TezosSignature2021 {
-    type TransformationParameters = ();
     type Transformed = String;
-
-    type HashParameters = ProofConfiguration<Self::VerificationMethod>;
     type Hashed = Vec<u8>;
 
-    type ProofParameters = ProofOptions<Self::VerificationMethod>;
+    type VerificationMethod = TezosMethod2021;
 
-    type SigningParameters = ProofOptions<Self::VerificationMethod>;
+    type Signature = Signature;
 
-    type VerificationParameters = ProofOptions<Self::VerificationMethod>;
+    type SignatureProtocol = ();
 
-    type VerificationMethod = verification::MethodReferenceOrOwned<TezosMethod2021>;
+    type SignatureAlgorithm = SignatureAlgorithm;
+
+    type Options = ();
 
     fn iri(&self) -> iref::Iri {
         iri!("https://w3id.org/security#TezosSignature2021")
@@ -62,7 +61,7 @@ impl CryptographicSuite for TezosSignature2021 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfiguration<Self::VerificationMethod>,
+        proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
         let proof_quads = proof_configuration.quads(self).into_nquads();
         let message = format!("\n{data}\n{proof_quads}");
@@ -70,5 +69,47 @@ impl CryptographicSuite for TezosSignature2021 {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
         }
+    }
+
+    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
+        SignatureAlgorithm
+    }
+}
+
+pub struct Signature {
+    /// Base58-encoded signature.
+    pub proof_value: String,
+
+    /// Signing key.
+    pub public_key: Option<PublicKey>
+}
+
+pub enum PublicKey {
+    Jwk(Box<JWK>),
+    Multibase(String)
+}
+
+pub struct SignatureAlgorithm;
+
+impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
+    type Signature = Signature;
+
+    type Protocol = ();
+
+    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+            &self,
+            method: &TezosMethod2021,
+            bytes: &[u8],
+            signer: &S
+        ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        todo!()
+    }
+
+    fn verify(&self,
+            signature: &Self::Signature,
+            method: &TezosMethod2021,
+            bytes: &[u8]
+        ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        todo!()
     }
 }

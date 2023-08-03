@@ -1,9 +1,9 @@
 use async_trait::async_trait;
-use ssi_crypto::{ProofPurpose, VerificationError, Verifier};
 use ssi_vc::{ProofValidity, VerifiableWith};
+use ssi_verification_methods::{Verifier, ProofPurpose, VerificationError};
 use treeldr_rust_prelude::iref::IriBuf;
 
-use crate::{Proof, VcJwt};
+use crate::{Proof, VcJwt, signing::VcJwtSignature};
 
 #[async_trait]
 impl<C: Sync> VerifiableWith for VcJwt<C> {
@@ -17,7 +17,7 @@ impl<C: Sync> VerifiableWith for VcJwt<C> {
     ) -> Result<ProofValidity, VerificationError> {
         Ok(verifier
             .verify(
-                (),
+                VcJwtSignature,
                 &proof.method,
                 ProofPurpose::Assertion,
                 self.signing_bytes(),
@@ -40,18 +40,4 @@ impl Method {
     pub fn new(issuer: Option<IriBuf>, key_id: Option<String>) -> Self {
         Self { issuer, key_id }
     }
-}
-
-impl ssi_crypto::Referencable for Method {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-}
-
-impl ssi_crypto::VerificationMethod for Method {
-    type ProofContext = ();
-
-    type Signature = Vec<u8>;
 }

@@ -1,20 +1,17 @@
 use std::hash::Hash;
 
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::VerificationError;
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWSStr;
 use ssi_security::BLOCKCHAIN_ACCOUNT_ID;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, PublicKeyJwkContext,
-    PublicKeyJwkContextRef, VerificationMethod, VerificationMethodRef, CONTROLLER_IRI,
-    RDF_TYPE_IRI, XSD_STRING,
+    ExpectedType, LinkedDataVerificationMethod,
+    VerificationMethod, CONTROLLER_IRI,
+    RDF_TYPE_IRI, XSD_STRING, VerificationError,
 };
 
 pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI: Iri<'static> =
@@ -53,24 +50,6 @@ impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     }
 }
 
-impl ssi_crypto::Referencable for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-}
-
-impl ssi_crypto::VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    /// This suites needs the public key as context because it is not included
-    /// in the verification method.
-    ///
-    /// The key is provided by the proof.
-    type ProofContext = PublicKeyJwkContext;
-
-    type Signature = signature::Jws;
-}
-
 impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn id(&self) -> Iri {
         self.id.as_iri()
@@ -93,50 +72,49 @@ impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded20
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021>
-    for &'a P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
-{
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl ControllerProvider,
-        context: PublicKeyJwkContextRef<'c>,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        jws: &'s CompactJWSStr,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, signature::JwsPublicKeyJwk>
+//     for &'a P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+// {
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         signing_bytes: &[u8],
+//         signature: signature::JwsPublicKeyJwkRef<'s>
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let (header, payload, signature_bytes) =
-            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+//         let (header, payload, signature_bytes) =
+//             signature.jws.decode().map_err(|_| VerificationError::InvalidProof)?;
 
-        if header.algorithm != ssi_jwk::Algorithm::ESBlake2b {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if header.algorithm != ssi_jwk::Algorithm::ESBlake2b {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        if payload.as_ref() != signing_bytes {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if payload.as_ref() != signing_bytes {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        if !self.matches_public_key(context.public_key_jwk)? {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if !self.matches_public_key(signature.public_key_jwk)? {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::ESBlake2b,
-            jws.signing_bytes(),
-            context.public_key_jwk,
-            &signature_bytes,
-        )
-        .is_ok())
-    }
-}
+//         Ok(ssi_jws::verify_bytes(
+//             ssi_jwk::Algorithm::ESBlake2b,
+//             signature.jws.signing_bytes(),
+//             signature.public_key_jwk,
+//             &signature_bytes,
+//         )
+//         .is_ok())
+//     }
+// }
 
 impl LinkedDataVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

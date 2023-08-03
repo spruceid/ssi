@@ -1,5 +1,5 @@
-pub mod any;
-pub use any::*;
+// pub mod any;
+// pub use any::*;
 
 mod w3c;
 pub use w3c::*;
@@ -10,11 +10,7 @@ pub use unspecified::*;
 #[macro_export]
 macro_rules! verification_method_union {
 	{
-		$vis:vis enum $name:ident, $ref_name:ident
-		where
-			Signature = $signature:ty,
-			ProofContext = $context:ty
-		{
+		$vis:vis enum $name:ident {
 			$(
 				$variant:ident
 			),*
@@ -25,31 +21,6 @@ macro_rules! verification_method_union {
 			$(
 				$variant($variant)
 			),*
-		}
-
-		#[derive(Clone, Copy)]
-		$vis enum $ref_name<'a> {
-			$(
-				$variant(&'a $variant)
-			),*
-		}
-
-		impl ssi_crypto::Referencable for $name {
-			type Reference<'a> = $ref_name<'a>;
-
-			fn as_reference(&self) -> Self::Reference<'_> {
-				match self {
-					$(
-						Self::$variant(m) => $ref_name::$variant(m)
-					),*
-				}
-			}
-		}
-
-		impl ssi_crypto::VerificationMethod for $name {
-			type ProofContext = $context;
-
-			type Signature = $signature;
 		}
 
 		impl $crate::VerificationMethod for $name {
@@ -91,28 +62,6 @@ macro_rules! verification_method_union {
 				match self {
 					$(
 						Self::$variant(m) => m.controller()
-					),*
-				}
-			}
-		}
-
-		#[async_trait::async_trait]
-		impl<'a> $crate::VerificationMethodRef<'a, $name> for $ref_name<'a> {
-			async fn verify<'c: 'async_trait, 's: 'async_trait>(
-				self,
-				controllers: &impl $crate::ControllerProvider,
-				context: <$context as ssi_crypto::Referencable>::Reference<'c>,
-				proof_purpose: ssi_crypto::ProofPurpose,
-				data: &[u8],
-				signature: <$signature as ssi_crypto::Referencable>::Reference<'s>,
-			) -> Result<bool, ssi_crypto::VerificationError> {
-				match self {
-					$(
-						Self::$variant(m) => {
-							let signature = signature.try_into()?;
-							let context = context.try_into()?;
-							m.verify(controllers, context, proof_purpose, data, signature).await
-						}
 					),*
 				}
 			}

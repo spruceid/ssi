@@ -1,19 +1,17 @@
 use std::hash::Hash;
 
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jwk::JWK;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_jws::CompactJWSString;
 use ssi_security::PUBLIC_KEY_JWK;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, VerificationError,
 };
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
@@ -57,20 +55,19 @@ impl JsonWebKey2020 {
             .map_err(|_| SignatureError::InvalidSecretKey)?;
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
-}
 
-impl ssi_crypto::Referencable for JsonWebKey2020 {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
+    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+        match self.public_key.algorithm.as_ref() {
+            Some(a) => Ok(ssi_jws::verify_bytes(
+                *a,
+                data,
+                &self.public_key,
+                signature,
+            )
+            .is_ok()),
+            None => Err(VerificationError::InvalidKey),
+        }
     }
-}
-
-impl ssi_crypto::VerificationMethod for JsonWebKey2020 {
-    type ProofContext = NoContext;
-
-    type Signature = signature::Jws;
 }
 
 impl VerificationMethod for JsonWebKey2020 {
@@ -94,44 +91,34 @@ impl VerificationMethod for JsonWebKey2020 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, JsonWebKey2020> for &'a JsonWebKey2020 {
-    /// Verifies the given signature.
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl crate::ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        data: &[u8],
-        jws: &'s CompactJWSStr,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, JsonWebKey2020, signature::Jws> for &'a JsonWebKey2020 {
+//     /// Verifies the given signature.
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl crate::ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         data: &[u8],
+//         jws: &'s CompactJWSStr,
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let (_, payload, signature_bytes) =
-            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+//         let (_, payload, signature_bytes) =
+//             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
 
-        if payload.as_ref() != data {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if payload.as_ref() != data {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        match self.public_key.algorithm.as_ref() {
-            Some(a) => Ok(ssi_jws::verify_bytes(
-                *a,
-                jws.signing_bytes(),
-                &self.public_key,
-                &signature_bytes,
-            )
-            .is_ok()),
-            None => Err(ssi_crypto::VerificationError::InvalidKey),
-        }
-    }
-}
+//         self.verify_bytes(jws.signing_bytes(), &signature_bytes)
+//     }
+// }
 
 impl LinkedDataVerificationMethod for JsonWebKey2020 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

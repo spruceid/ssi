@@ -1,8 +1,6 @@
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::VerificationError;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{MULTIBASE, PUBLIC_KEY_MULTIBASE};
 use static_iref::iri;
@@ -10,8 +8,8 @@ use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
@@ -80,20 +78,20 @@ impl EcdsaSecp256r1VerificationKey2019 {
 
         multibase::encode(multibase::Base::Base58Btc, signature.as_bytes())
     }
-}
 
-impl ssi_crypto::Referencable for EcdsaSecp256r1VerificationKey2019 {
-    type Reference<'a> = &'a Self;
+    pub fn verify_bytes(&self, data: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+        use p256::ecdsa::signature::Verifier;
+        
+        let public_key = self
+            .decode_public_key()
+            .map_err(|_| VerificationError::InvalidKey)?;
+        let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
 
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
+        let signature = p256::ecdsa::Signature::try_from(signature_bytes)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+
+        Ok(verifying_key.verify(data, &signature).is_ok())
     }
-}
-
-impl ssi_crypto::VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
-    type ProofContext = NoContext;
-
-    type Signature = signature::ProofValue;
 }
 
 impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
@@ -121,44 +119,33 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, EcdsaSecp256r1VerificationKey2019>
-    for &'a EcdsaSecp256r1VerificationKey2019
-{
-    /// Verifies the given signature.
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl crate::ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        data: &[u8],
-        signature: &'s str,
-    ) -> Result<bool, VerificationError> {
-        use p256::ecdsa::signature::Verifier;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, EcdsaSecp256r1VerificationKey2019, signature::Multibase>
+//     for &'a EcdsaSecp256r1VerificationKey2019
+// {
+//     /// Verifies the given signature.
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl crate::ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         data: &[u8],
+//         signature: &'s str,
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+//         let signature_bytes = multibase::decode(signature)
+//             .map_err(|_| VerificationError::InvalidProof)?
+//             .1;
 
-        let signature_bytes = multibase::decode(signature)
-            .map_err(|_| VerificationError::InvalidProof)?
-            .1;
-
-        let public_key = self
-            .decode_public_key()
-            .map_err(|_| VerificationError::InvalidKey)?;
-        let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
-
-        let signature = p256::ecdsa::Signature::try_from(signature_bytes.as_slice())
-            .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
-
-        Ok(verifying_key.verify(data, &signature).is_ok())
-    }
-}
+//         self.verify_bytes(data, &signature_bytes)
+//     }
+// }
 
 impl LinkedDataVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

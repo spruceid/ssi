@@ -1,135 +1,71 @@
-mod any;
-mod jwk;
-mod proof_value;
-mod signature_value;
+// pub mod any;
+// mod jws;
+// mod jws_public_key_jwk;
+// pub mod base58_public_key_jwk_or_multibase;
+// mod multibase;
+// mod signature_value;
+// mod eip712;
 
-pub use any::*;
-pub use jwk::*;
-pub use proof_value::*;
-pub use signature_value::*;
+// pub use any::{Any, AnyRef};
+// pub use jws::*;
+// pub use jws_public_key_jwk::*;
+// pub use base58_public_key_jwk_or_multibase::{Base58PublicKeyJwkOrMultibase, Base58PublicKeyJwkOrMultibaseRef};
+// pub use self::multibase::*;
+// pub use signature_value::*;
+// pub use eip712::{Eip712Signature, Eip712SignatureRef};
 
-#[macro_export]
-macro_rules! signature_union {
-	{
-		$(#[$meta:meta])*
-		$vis:vis enum $name:ident, $ref_name:ident {
-			$(
-				$(#[$variant_meta:meta])*
-				$variant:ident($variant_ty:ty)
-			),*
-		}
-	} => {
-		$(#[$meta])*
-		$vis enum $name {
-			$(
-				$(#[$variant_meta])*
-				$variant($variant_ty)
-			),*
-		}
+use ssi_crypto::MessageSigner;
 
-		#[derive(Clone, Copy)]
-		$vis enum $ref_name<'a> {
-			$(
-				$(#[$variant_meta])*
-				$variant(<$variant_ty as ssi_crypto::Referencable>::Reference<'a>)
-			),*
-		}
+use crate::VerificationError;
 
-		impl ssi_crypto::Referencable for $name {
-			type Reference<'a> = $ref_name<'a> where Self: 'a;
+#[derive(Debug, thiserror::Error)]
+pub enum SignatureError {
+    #[error("unknown verification method")]
+    UnknownVerificationMethod,
 
-			fn as_reference(&self) -> Self::Reference<'_> {
-				match self {
-					$(
-						Self::$variant(m) => {
-							$ref_name::$variant(m.as_reference())
-						}
-					),*
-				}
-			}
-		}
+    #[error("invalid public key")]
+    InvalidPublicKey,
 
-		impl<V, I: rdf_types::Interpretation> $crate::treeldr_rust_prelude::FromRdf<V, I> for $name
-		where
-		$(
-			$variant_ty: $crate::treeldr_rust_prelude::FromRdf<V, I>
-		),*
-		{
-			fn from_rdf<G>(
-				vocabulary: &V,
-				interpretation: &I,
-				graph: &G,
-				id: &I::Resource,
-			) -> Result<Self, $crate::treeldr_rust_prelude::FromRdfError>
-			where
-				G: $crate::treeldr_rust_prelude::grdf::Graph<Subject = I::Resource, Predicate = I::Resource, Object = I::Resource>,
-			{
-				$(
-					match <$variant_ty as $crate::treeldr_rust_prelude::FromRdf<V, I>>::from_rdf(vocabulary, interpretation, graph, id) {
-						Ok(s) => return Ok(Self::$variant(s)),
-						Err($crate::treeldr_rust_prelude::FromRdfError::MissingRequiredPropertyValue) => (),
-						Err(e) => return Err(e)
-					}
-				)*
+    #[error("invalid secret key")]
+    InvalidSecretKey,
 
-				Err($crate::treeldr_rust_prelude::FromRdfError::MissingRequiredPropertyValue)
-			}
-		}
+    /// The verification method used to sign the key is invalid.
+    #[error("invalid verification method")]
+    InvalidVerificationMethod,
 
-		impl<V, I> $crate::json_ld::FlattenIntoJsonLdNode<V, I> for $name
-		where
-			V: rdf_types::VocabularyMut,
-			V::Iri: Eq + core::hash::Hash,
-			V::BlankId: Eq + core::hash::Hash
-		{
-			fn flatten_into_json_ld_node(
-				self,
-				vocabulary: &mut V,
-				interpretation: &I,
-				node: &mut json_ld::Node<V::Iri, V::BlankId, ()>
-			) {
-				match self {
-					$(
-						Self::$variant(m) => m.flatten_into_json_ld_node(vocabulary, interpretation, node)
-					),*
-				}
-			}
-		}
+    #[error("missing public key")]
+    MissingPublicKey,
 
-		$(
-			impl From<$variant_ty> for Any {
-				fn from(value: $variant_ty) -> Self {
-					Self::$variant(value)
-				}
-			}
+    #[error(transparent)]
+    Signer(#[from] ssi_crypto::MessageSignatureError)
+}
 
-			impl<'a> From<<$variant_ty as ssi_crypto::Referencable>::Reference<'a>> for AnyRef<'a> {
-				fn from(value: <$variant_ty as ssi_crypto::Referencable>::Reference<'a>) -> Self {
-					Self::$variant(value)
-				}
-			}
+pub trait SignatureAlgorithm<M> {
+    type Signature;
 
-			impl TryFrom<Any> for $variant_ty {
-				type Error = ssi_crypto::VerificationError;
+    /// Signature protocol.
+    type Protocol: ssi_crypto::SignatureProtocol;
 
-				fn try_from(value: Any) -> Result<Self, Self::Error> {
-					match value {
-						Any::$variant(m) => Ok(m),
-						_ => Err(ssi_crypto::VerificationError::InvalidSignature)
-					}
-				}
-			}
+    fn sign<S: MessageSigner<Self::Protocol>>(
+        &self,
+        method: &M,
+        bytes: &[u8],
+        signer: &S
+    ) -> Result<Self::Signature, SignatureError>;
 
-			impl<'a> TryFrom<AnyRef<'a>> for <$variant_ty as ssi_crypto::Referencable>::Reference<'a> {
-				type Error = ssi_crypto::VerificationError;
+    fn verify(&self,
+        signature: &Self::Signature,
+        method: &M,
+        bytes: &[u8]
+    ) -> Result<bool, VerificationError>;
+}
 
-				fn try_from(value: AnyRef<'a>) -> Result<Self, Self::Error> {
-					match value {
-						AnyRef::$variant(m) => Ok(m),
-						_ => Err(ssi_crypto::VerificationError::InvalidSignature)
-					}
-				}
-			}
-		)*
-	};
+/// Verification method signer.
+pub trait Signer<M, P> {
+    fn sign<A: SignatureAlgorithm<M, Protocol = P>>(
+        &self,
+		algorithm: A,
+        method: &M,
+        bytes: &[u8],
+    ) -> Result<A::Signature, SignatureError>;
 }
