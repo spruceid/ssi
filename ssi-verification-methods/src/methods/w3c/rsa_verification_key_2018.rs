@@ -1,18 +1,16 @@
 use std::hash::Hash;
 
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jwk::JWK;
 use ssi_security::PUBLIC_KEY_JWK;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError,
 };
 
 pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
@@ -51,21 +49,6 @@ impl RsaVerificationKey2018 {
     }
 }
 
-impl ssi_crypto::Referencable for RsaVerificationKey2018 {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-}
-
-impl ssi_crypto::VerificationMethod for RsaVerificationKey2018 {
-    type ProofContext = NoContext;
-
-    // Base64 signature.
-    type Signature = signature::SignatureValueBuf;
-}
-
 impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns the identifier of the key.
     fn id(&self) -> Iri {
@@ -87,41 +70,40 @@ impl VerificationMethod for RsaVerificationKey2018 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, RsaVerificationKey2018> for &'a RsaVerificationKey2018 {
-    /// Verifies the given signature.
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl crate::ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        signature: &'s signature::SignatureValue,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, RsaVerificationKey2018, signature::SignatureValueBuf> for &'a RsaVerificationKey2018 {
+//     /// Verifies the given signature.
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl crate::ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         signing_bytes: &[u8],
+//         signature: &'s signature::SignatureValue,
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let signature_bytes = signature.decode()?;
-        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
-        let jws_signing_bytes = header.encode_signing_bytes(signing_bytes);
+//         let signature_bytes = signature.decode()?;
+//         let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
+//         let jws_signing_bytes = header.encode_signing_bytes(signing_bytes);
 
-        match self.public_key.algorithm.as_ref() {
-            Some(ssi_jwk::Algorithm::RS256) => Ok(ssi_jws::verify_bytes(
-                ssi_jwk::Algorithm::RS256,
-                &jws_signing_bytes,
-                &self.public_key,
-                &signature_bytes,
-            )
-            .is_ok()),
-            _ => Err(ssi_crypto::VerificationError::InvalidKey),
-        }
-    }
-}
+//         match self.public_key.algorithm.as_ref() {
+//             Some(ssi_jwk::Algorithm::RS256) => Ok(ssi_jws::verify_bytes(
+//                 ssi_jwk::Algorithm::RS256,
+//                 &jws_signing_bytes,
+//                 &self.public_key,
+//                 &signature_bytes,
+//             )
+//             .is_ok()),
+//             _ => Err(ssi_crypto::VerificationError::InvalidKey),
+//         }
+//     }
+// }
 
 impl LinkedDataVerificationMethod for RsaVerificationKey2018 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

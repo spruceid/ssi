@@ -90,6 +90,7 @@ members = [
   "ssi-jws",
   "ssi-jwt",
   "ssi-tzkey",
+  "ssi-eip712",
   # "ssi-ssh",
   # "ssi-ucan",
   "ssi-rdf",
@@ -110,6 +111,7 @@ ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
 ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
 ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
 ssi-tzkey = { path = "./ssi-tzkey", version = "0.1" }
+ssi-eip712 = { path = "./ssi-eip712", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
 ssi-dids = { path = "./ssi-dids", version = "0.1" }
 ssi-security = { path = "./ssi-security", version = "0.1" }
@@ -130,6 +132,7 @@ json-ld = "0.15"
 serde = "1.0"
 serde_json = "1.0"
 serde_jcs = "0.1.0"
+hex = "0.4.3"
 treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
 treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
 

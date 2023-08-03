@@ -1,20 +1,18 @@
 use std::{borrow::Cow, hash::Hash};
 
-use async_trait::async_trait;
 use hex::FromHexError;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jwk::JWK;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_jws::CompactJWSString;
 use ssi_security::{PUBLIC_KEY_HEX, PUBLIC_KEY_JWK};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError,
 };
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
@@ -38,6 +36,12 @@ pub enum InvalidPublicKey {
 
     #[error("invalid key bytes: {0}")]
     K256(#[from] k256::elliptic_curve::Error),
+}
+
+impl From<InvalidPublicKey> for VerificationError {
+    fn from(_value: InvalidPublicKey) -> Self {
+        Self::InvalidKey
+    }
 }
 
 impl PublicKey {
@@ -97,20 +101,29 @@ impl EcdsaSecp256k1VerificationKey2019 {
             .map_err(|_| SignatureError::InvalidSecretKey)?;
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
-}
 
-impl ssi_crypto::Referencable for EcdsaSecp256k1VerificationKey2019 {
-    type Reference<'a> = &'a Self;
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature: &[u8]
+    ) -> Result<bool, VerificationError> {
+        let public_key = self
+            .public_key
+            .jwk()
+            .map_err(|_| VerificationError::InvalidKey)?;
+        if public_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256K) != ssi_jwk::Algorithm::ES256K
+        {
+            return Err(VerificationError::InvalidKey);
+        }
 
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
+        Ok(ssi_jws::verify_bytes(
+            ssi_jwk::Algorithm::ES256K,
+            data,
+            &public_key,
+            &signature,
+        )
+        .is_ok())
     }
-}
-
-impl ssi_crypto::VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
-    type ProofContext = NoContext;
-
-    type Signature = signature::Jws;
 }
 
 impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
@@ -138,52 +151,36 @@ impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1VerificationKey2019>
-    for &'a EcdsaSecp256k1VerificationKey2019
-{
-    /// Verifies the given signature.
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl crate::ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        data: &[u8],
-        jws: &'s CompactJWSStr,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1VerificationKey2019, signature::Jws>
+//     for &'a EcdsaSecp256k1VerificationKey2019
+// {
+//     /// Verifies the given signature.
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl crate::ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         data: &[u8],
+//         jws: &'s CompactJWSStr,
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let (_, payload, signature_bytes) =
-            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+//         let (_, payload, signature_bytes) =
+//             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
 
-        if payload.as_ref() != data {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if payload.as_ref() != data {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        let public_key = self
-            .public_key
-            .jwk()
-            .map_err(|_| VerificationError::InvalidKey)?;
-        if public_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256K) != ssi_jwk::Algorithm::ES256K
-        {
-            return Err(VerificationError::InvalidKey);
-        }
-
-        Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::ES256K,
-            jws.signing_bytes(),
-            &public_key,
-            &signature_bytes,
-        )
-        .is_ok())
-    }
-}
+//         self.verify_bytes(jws.signing_bytes(), &signature_bytes)
+//     }
+// }
 
 impl LinkedDataVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

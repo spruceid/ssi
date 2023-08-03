@@ -1,14 +1,13 @@
 use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::{borrow::Cow, marker::PhantomData};
+use std::marker::PhantomData;
 
 use iref::{Iri, IriBuf};
 use rdf_types::VocabularyMut;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    Any, ExpectedType, IntoAnyVerificationMethod, LinkedDataVerificationMethod,
-    TryFromVerificationMethod, TryIntoVerificationMethod, VerificationMethod,
+    ExpectedType, LinkedDataVerificationMethod
 };
 
 /// Reference to a verification method.
@@ -41,48 +40,6 @@ impl<M> Reference<M> {
 
     pub fn expected_type(&self) -> Option<&ExpectedType> {
         self.expected_type.as_ref()
-    }
-}
-
-impl<M: VerificationMethod> Reference<M> {
-    pub fn into_any(self) -> Reference<Any> {
-        Reference {
-            iri: self.iri,
-            expected_type: self.expected_type.or_else(M::expected_type),
-            m: PhantomData,
-        }
-    }
-
-    pub fn as_any(&self) -> ReferenceRef<Any> {
-        ReferenceRef {
-            iri: self.iri.as_iri(),
-            expected_type: self
-                .expected_type
-                .as_ref()
-                .map(Cow::Borrowed)
-                .or_else(|| M::expected_type().map(Cow::Owned)),
-            m: PhantomData,
-        }
-    }
-}
-
-impl<M, N> TryFromVerificationMethod<Reference<N>> for Reference<M> {
-    fn try_from_verification_method(
-        method: Reference<N>,
-    ) -> Result<Self, crate::InvalidVerificationMethod> {
-        Ok(Self {
-            iri: method.iri,
-            expected_type: method.expected_type,
-            m: PhantomData,
-        })
-    }
-}
-
-impl<M: VerificationMethod> IntoAnyVerificationMethod for Reference<M> {
-    type Output = Reference<Any>;
-
-    fn into_any_verification_method(self) -> Self::Output {
-        self.into_any()
     }
 }
 
@@ -147,115 +104,9 @@ impl<'de, M> Deserialize<'de> for Reference<M> {
     }
 }
 
-impl<M> ssi_crypto::Referencable for Reference<M> {
-    type Reference<'a> = ReferenceRef<'a, M> where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        ReferenceRef {
-            iri: self.iri.as_iri(),
-            expected_type: self.expected_type.as_ref().map(Cow::Borrowed),
-            m: PhantomData,
-        }
-    }
-}
-
-impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for Reference<M> {
-    type ProofContext = M::ProofContext;
-
-    type Signature = M::Signature;
-}
-
-impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference<M> {
+impl<M> LinkedDataVerificationMethod for Reference<M> {
     fn quads(&self, _quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
         rdf_types::Object::Id(rdf_types::Id::Iri(self.iri.clone()))
-    }
-}
-
-pub struct ReferenceRef<'a, M> {
-    iri: Iri<'a>,
-    expected_type: Option<Cow<'a, ExpectedType>>,
-    m: PhantomData<M>,
-}
-unsafe impl<'a, M> Send for ReferenceRef<'a, M> {}
-
-impl<'a, M> ReferenceRef<'a, M> {
-    pub fn iri(&self) -> Iri {
-        self.iri
-    }
-
-    pub fn expected_type(&self) -> Option<&ExpectedType> {
-        self.expected_type.as_deref()
-    }
-}
-
-impl<'a, M: VerificationMethod> ReferenceRef<'a, M> {
-    pub fn as_any(&self) -> ReferenceRef<'a, Any> {
-        ReferenceRef {
-            iri: self.iri,
-            expected_type: self
-                .expected_type
-                .clone()
-                .or_else(|| M::expected_type().map(Cow::Owned)),
-            m: PhantomData,
-        }
-    }
-}
-
-impl<'a, M, N: VerificationMethod> TryFromVerificationMethod<ReferenceRef<'a, N>>
-    for ReferenceRef<'a, M>
-{
-    fn try_from_verification_method(
-        method: ReferenceRef<'a, N>,
-    ) -> Result<Self, crate::InvalidVerificationMethod> {
-        Ok(ReferenceRef {
-            iri: method.iri,
-            expected_type: method
-                .expected_type
-                .or_else(|| N::expected_type().map(Cow::Owned)),
-            m: PhantomData,
-        })
-    }
-}
-
-impl<'a, M> fmt::Debug for ReferenceRef<'a, M> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.iri.fmt(f)
-    }
-}
-
-impl<'a, M> Clone for ReferenceRef<'a, M> {
-    fn clone(&self) -> Self {
-        Self {
-            iri: self.iri,
-            expected_type: self.expected_type.clone(),
-            m: PhantomData,
-        }
-    }
-}
-
-impl<'a, M> PartialEq for ReferenceRef<'a, M> {
-    fn eq(&self, other: &Self) -> bool {
-        self.iri == other.iri
-    }
-}
-
-impl<'a, M> Eq for ReferenceRef<'a, M> {}
-
-impl<'a, M> PartialOrd for ReferenceRef<'a, M> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.iri.partial_cmp(&other.iri)
-    }
-}
-
-impl<'a, M> Ord for ReferenceRef<'a, M> {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.iri.cmp(&other.iri)
-    }
-}
-
-impl<'a, M> core::hash::Hash for ReferenceRef<'a, M> {
-    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
-        self.iri.hash(state)
     }
 }
 
@@ -276,72 +127,6 @@ impl<M> From<IriBuf> for ReferenceOrOwned<M> {
     fn from(value: IriBuf) -> Self {
         Self::Reference(Reference::new(value))
     }
-}
-
-impl<M: TryFromVerificationMethod<N>, N> TryFromVerificationMethod<ReferenceOrOwned<N>>
-    for ReferenceOrOwned<M>
-{
-    fn try_from_verification_method(
-        method: ReferenceOrOwned<N>,
-    ) -> Result<Self, crate::InvalidVerificationMethod> {
-        match method {
-            ReferenceOrOwned::Reference(r) => r.try_into_verification_method().map(Self::Reference),
-            ReferenceOrOwned::Owned(m) => m.try_into_verification_method().map(Self::Owned),
-        }
-    }
-}
-
-/// Reference to a verification method.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ReferenceOrOwnedRef<'a, M: 'a + ssi_crypto::VerificationMethod> {
-    Reference(ReferenceRef<'a, M>),
-    Owned(M::Reference<'a>),
-}
-
-impl<'a, M, N> TryFromVerificationMethod<ReferenceOrOwnedRef<'a, N>> for ReferenceOrOwnedRef<'a, M>
-where
-    M: ssi_crypto::VerificationMethod,
-    M::Reference<'a>: TryFromVerificationMethod<N::Reference<'a>>,
-    N: VerificationMethod,
-{
-    fn try_from_verification_method(
-        method: ReferenceOrOwnedRef<'a, N>,
-    ) -> Result<Self, crate::InvalidVerificationMethod> {
-        match method {
-            ReferenceOrOwnedRef::Reference(r) => {
-                r.try_into_verification_method().map(Self::Reference)
-            }
-            ReferenceOrOwnedRef::Owned(m) => m.try_into_verification_method().map(Self::Owned),
-        }
-    }
-}
-
-impl<M: VerificationMethod + Into<Any>> IntoAnyVerificationMethod for ReferenceOrOwned<M> {
-    type Output = ReferenceOrOwned<Any>;
-
-    fn into_any_verification_method(self) -> Self::Output {
-        match self {
-            Self::Reference(r) => ReferenceOrOwned::Reference(r.into_any()),
-            Self::Owned(m) => ReferenceOrOwned::Owned(m.into()),
-        }
-    }
-}
-
-impl<M: ssi_crypto::VerificationMethod> ssi_crypto::Referencable for ReferenceOrOwned<M> {
-    type Reference<'a> = ReferenceOrOwnedRef<'a, M> where Self: 'a;
-
-    fn as_reference(&self) -> ReferenceOrOwnedRef<M> {
-        match self {
-            Self::Reference(r) => ReferenceOrOwnedRef::Reference(r.as_reference()),
-            Self::Owned(m) => ReferenceOrOwnedRef::Owned(m.as_reference()),
-        }
-    }
-}
-
-impl<M: ssi_crypto::VerificationMethod> ssi_crypto::VerificationMethod for ReferenceOrOwned<M> {
-    type ProofContext = M::ProofContext;
-
-    type Signature = M::Signature;
 }
 
 impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for ReferenceOrOwned<M> {

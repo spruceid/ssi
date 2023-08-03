@@ -223,7 +223,7 @@ impl ssi_crypto::Signer<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyrin
         &self,
         method: &ReferenceOrOwned<Ed25519VerificationKey2020>,
         bytes: &[u8],
-    ) -> Result<((), ssi_verification_methods::signature::ProofValue), ssi_crypto::SignatureError>
+    ) -> Result<((), ssi_verification_methods::signature::Multibase), ssi_crypto::SignatureError>
     {
         let id = match method {
             ReferenceOrOwned::Owned(key) => key.id(),
@@ -265,10 +265,10 @@ impl ssi_crypto::Verifier<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyr
                 // to sign itself. It cannot really be trusted then.
                 // It would be safer to either throw an error or at least fetch
                 // the actual key using its id.
-                key.verify(self, context, purpose, bytes, signature).await
+                key.verify_bytes(self, context, purpose, bytes, signature).await
             }
             ReferenceOrOwnedRef::Reference(id) => match self.keys.get(&id.iri()) {
-                Some(key) => key.0.verify(self, context, purpose, bytes, signature).await,
+                Some(key) => key.0.verify_bytes(self, context, purpose, bytes, signature).await,
                 None => Err(ssi_crypto::VerificationError::UnknownKey),
             },
         }

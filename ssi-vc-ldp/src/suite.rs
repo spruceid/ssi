@@ -3,21 +3,20 @@ use std::{future::Future, pin::Pin};
 
 use futures::FutureExt;
 use iref::Iri;
-use ssi_crypto::{SignatureError, Signer, VerificationError, Verifier};
 use ssi_rdf::IntoNQuads;
 use ssi_vc::ProofValidity;
-use ssi_verification_methods::LinkedDataVerificationMethod;
+use ssi_verification_methods::{LinkedDataVerificationMethod, Signer, SignatureError, VerificationError, Verifier, SignatureAlgorithm};
 
-use crate::{ProofConfiguration, ProofOptions, ProofParameters, UntypedProof, UntypedProofRef};
+use crate::{ProofConfiguration, UntypedProof};
 
-mod any;
+// mod any;
 mod dif;
 mod unspecified;
 
 #[cfg(feature = "w3c")]
 mod w3c;
 
-pub use any::*;
+// pub use any::*;
 pub use dif::*;
 pub use unspecified::*;
 
@@ -31,39 +30,35 @@ pub enum HashError {
 
     #[error("message is too long")]
     TooLong,
+
+    #[error("invalid message: {0}")]
+    InvalidMessage(Box<dyn 'static + std::error::Error>)
+}
+
+pub trait FromRdfAndSuite<S> {
+    // ...
 }
 
 /// Cryptographic suite.
 pub trait CryptographicSuite: Sync + Sized {
-    /// Transformation algorithm parameters.
-    type TransformationParameters;
-
     /// Transformation algorithm result.
     type Transformed;
-
-    /// Hashing algorithm parameters.
-    type HashParameters;
 
     /// Hashing algorithm result.
     type Hashed: Sync + AsRef<[u8]>;
 
-    /// Proof generation algorithm parameters.
-    type ProofParameters: ProofParameters<Self::VerificationMethod>;
+    /// Verification method.
+    type VerificationMethod: Sync;
 
-    type SigningParameters: SigningParameters<
-        Self::TransformationParameters,
-        Self::HashParameters,
-        Self::ProofParameters,
-    >;
+    /// Signature.
+    type Signature;
 
-    /// Combination of transformation parameters and hash parameters that can
-    /// be used to verify a credential.
-    type VerificationParameters: VerificationParameters<
-        Self::TransformationParameters,
-        Self::HashParameters,
-    >;
+    type SignatureProtocol: ssi_crypto::SignatureProtocol;
 
-    type VerificationMethod: Sync + ssi_crypto::VerificationMethod;
+    /// Signature algorithm.
+    type SignatureAlgorithm: SignatureAlgorithm<Self::VerificationMethod, Signature = Self::Signature, Protocol = Self::SignatureProtocol>;
+
+    type Options;
 
     fn iri(&self) -> Iri;
 
@@ -73,36 +68,48 @@ pub trait CryptographicSuite: Sync + Sized {
     fn hash(
         &self,
         data: Self::Transformed,
-        params: Self::HashParameters,
+        params: &ProofConfiguration<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError>;
+
+    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
 
     fn generate_proof(
         &self,
         data: &Self::Hashed,
-        signer: &impl Signer<Self::VerificationMethod>,
-        params: Self::ProofParameters,
-    ) -> Result<UntypedProof<Self::VerificationMethod>, SignatureError> {
-        let (context, jws) = signer.sign(params.verification_method(), data.as_ref())?;
-        Ok(params.into_proof(context, jws))
+        signer: &impl Signer<Self::VerificationMethod, Self::SignatureProtocol>,
+        params: ProofConfiguration<Self::VerificationMethod>,
+        _options: Self::Options
+    ) -> Result<UntypedProof<Self::VerificationMethod, Self::Signature>, SignatureError> {
+        let algorithm = self.setup_signature_algorithm();
+        
+        let signature = signer.sign(
+            algorithm,
+            &params.verification_method,
+            data.as_ref()
+        )?;
+
+        Ok(params.into_proof(signature))
     }
 
     fn verify_proof<'async_trait, 'd: 'async_trait, 'v: 'async_trait, 'p: 'async_trait>(
         &self,
         data: &'d Self::Hashed,
         verifier: &'v impl Verifier<Self::VerificationMethod>,
-        proof: UntypedProofRef<'p, Self::VerificationMethod>,
+        proof: &'p UntypedProof<Self::VerificationMethod, Self::Signature>,
     ) -> Pin<Box<dyn 'async_trait + Send + Future<Output = Result<ProofValidity, VerificationError>>>>
     where
         Self::VerificationMethod: 'p,
+        Self::SignatureAlgorithm: 'async_trait
     {
+        let algorithm = self.setup_signature_algorithm();
         Box::pin(
             verifier
                 .verify(
-                    proof.context,
-                    proof.verification_method,
+                    algorithm,
+                    &proof.verification_method,
                     proof.proof_purpose,
                     data.as_ref(),
-                    proof.signature,
+                    &proof.signature,
                 )
                 .map(|result| result.map(Into::into)),
         )
@@ -116,53 +123,15 @@ pub trait CryptographicSuiteInput<T>: CryptographicSuite {
     fn transform(
         &self,
         data: T,
-        params: Self::TransformationParameters,
+        params: &ProofConfiguration<Self::VerificationMethod>,
     ) -> Result<Self::Transformed, Self::TransformError>;
 }
 
-pub trait SigningParameters<T, H, P> {
-    fn transformation_parameters(&self) -> T;
-
-    fn hash_parameters(&self) -> H;
-
-    fn into_proof_parameters(self) -> P;
-}
-
-impl<M: Clone + ssi_crypto::VerificationMethod>
-    SigningParameters<(), ProofConfiguration<M>, ProofOptions<M>> for ProofOptions<M>
-{
-    fn transformation_parameters(&self) {}
-
-    fn hash_parameters(&self) -> ProofConfiguration<M> {
-        self.to_proof_configuration()
-    }
-
-    fn into_proof_parameters(self) -> ProofOptions<M> {
-        self
-    }
-}
-
-pub trait VerificationParameters<T, H> {
-    fn transformation_parameters(&self) -> T;
-
-    fn into_hash_parameters(self) -> H;
-}
-
-impl<M: Clone + ssi_crypto::VerificationMethod> VerificationParameters<(), ProofConfiguration<M>>
-    for ProofOptions<M>
-{
-    fn transformation_parameters(&self) {}
-
-    fn into_hash_parameters(self) -> ProofConfiguration<M> {
-        self.into_proof_configuration()
-    }
-}
-
 /// SHA256-based input hashing algorithm used by many cryptographic suites.
-fn sha256_hash<T: CryptographicSuite>(
+fn sha256_hash<'a, T: CryptographicSuite>(
     data: &[u8],
     suite: &T,
-    proof_configuration: ProofConfiguration<T::VerificationMethod>,
+    proof_configuration: &ProofConfiguration<T::VerificationMethod>,
 ) -> [u8; 64]
 where
     T::VerificationMethod: LinkedDataVerificationMethod,
@@ -208,7 +177,7 @@ macro_rules! impl_rdf_input_urdna2015 {
             fn transform(
                 &self,
                 data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
-                _options: (),
+                _options: &$crate::ProofConfiguration<<$ty as $crate::CryptographicSuite>::VerificationMethod>,
             ) -> Result<Self::Transformed, Self::TransformError> {
                 Ok(data.canonical_form())
             }

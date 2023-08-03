@@ -5,9 +5,9 @@ use ssi_security::{MULTIBASE, PROOF_VALUE};
 use treeldr_rust_prelude::{grdf::Graph, locspan::Meta, FromRdf, FromRdfError};
 
 /// `https://w3id.org/security#proofValue` signature value, multibase-encoded.
-pub struct ProofValue(pub String);
+pub struct Multibase(pub String);
 
-impl ssi_crypto::Referencable for ProofValue {
+impl ssi_crypto::Referencable for Multibase {
     type Reference<'a> = &'a str where Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -15,13 +15,13 @@ impl ssi_crypto::Referencable for ProofValue {
     }
 }
 
-impl From<String> for ProofValue {
+impl From<String> for Multibase {
     fn from(value: String) -> Self {
         Self(value)
     }
 }
 
-impl<V: IriVocabulary, I: IriInterpretation<V::Iri>> FromRdf<V, I> for ProofValue
+impl<V: IriVocabulary, I: IriInterpretation<V::Iri>> FromRdf<V, I> for Multibase
 where
     String: FromRdf<V, I>,
 {
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<V, I> crate::json_ld::FlattenIntoJsonLdNode<V, I> for ProofValue
+impl<V, I> crate::json_ld::FlattenIntoJsonLdNode<V, I> for Multibase
 where
     V: VocabularyMut,
     V::Iri: Eq + Hash,

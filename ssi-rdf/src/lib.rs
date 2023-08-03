@@ -33,8 +33,12 @@ impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
         }
     }
 
-    /// Returns the canonical form of the dataset, in the N-Quads format.
-    pub fn canonical_form(&self) -> String
+    /// Returns the list of quads in the dataset.
+    /// 
+    /// The order in which quads are returned is unspecified.
+    pub fn into_quads(
+        &self
+    ) -> Vec<Quad>
     where
         V: Vocabulary<
             Type = rdf_types::literal::Type<
@@ -47,7 +51,7 @@ impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
     {
         // TODO: make sure that a blank node identifier is assigned to resources
         //       without lexical representation.
-        let quads: Vec<Quad> = self
+        self
             .dataset
             .quads()
             .flat_map(|quad| {
@@ -60,8 +64,22 @@ impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
                     )
                 })
             })
-            .collect();
+            .collect()
+    } 
 
+    /// Returns the canonical form of the dataset, in the N-Quads format.
+    pub fn canonical_form(&self) -> String
+    where
+        V: Vocabulary<
+            Type = rdf_types::literal::Type<
+                <V as IriVocabulary>::Iri,
+                <V as LanguageTagVocabulary>::LanguageTag,
+            >,
+            Value = String,
+        >,
+        I: ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
+    {
+        let quads = self.into_quads();
         urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref())).into_nquads()
     }
 }

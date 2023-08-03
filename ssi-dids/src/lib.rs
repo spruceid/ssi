@@ -58,7 +58,7 @@ impl<T: Send + DIDResolver> ssi_verification_methods::ControllerProvider for Pro
 }
 
 #[async_trait]
-impl<T: Send + DIDResolver, M> ssi_crypto::Verifier<ssi_verification_methods::Reference<M>>
+impl<T: Send + DIDResolver, M, S: ssi_crypto::Referencable> ssi_crypto::Verifier<ssi_verification_methods::Reference<M>, S>
     for Provider<T>
 where
     M: Send
@@ -66,17 +66,15 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
-    for<'a> <M::ProofContext as ssi_crypto::Referencable>::Reference<'a>: Send,
-    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
-    for<'a> <M::Signature as ssi_crypto::Referencable>::Reference<'a>: Send,
+    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M, S>,
+    for<'a> S::Reference<'a>: Send,
 {
-    async fn verify<'c, 'm, 's>(
+    async fn verify<'m, 's>(
         &self,
-        context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
         method: ssi_verification_methods::ReferenceRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: <M::Signature as ssi_crypto::Referencable>::Reference<'s>,
+        signature: S::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>
     where
         M: 'async_trait,
@@ -92,7 +90,6 @@ where
                                     Ok(m) => {
                                         m.verify(
                                             self,
-                                            context,
                                             proof_purpose,
                                             signing_bytes,
                                             signature,
@@ -137,7 +134,7 @@ where
 }
 
 #[async_trait]
-impl<T: Send + DIDResolver, M> ssi_crypto::Verifier<ssi_verification_methods::ReferenceOrOwned<M>>
+impl<T: Send + DIDResolver, M, S: ssi_crypto::Referencable> ssi_crypto::Verifier<ssi_verification_methods::ReferenceOrOwned<M>, S>
     for Provider<T>
 where
     M: Send
@@ -145,26 +142,23 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
-    for<'a> <M::ProofContext as ssi_crypto::Referencable>::Reference<'a>: Send,
-    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M>,
-    for<'a> <M::Signature as ssi_crypto::Referencable>::Reference<'a>: Send,
+    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M, S>,
+    for<'a> S::Reference<'a>: Send,
 {
-    async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
+    async fn verify<'m: 'async_trait, 's: 'async_trait>(
         &self,
-        context: <M::ProofContext as ssi_crypto::Referencable>::Reference<'c>,
         method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>,
         proof_purpose: ssi_crypto::ProofPurpose,
         signing_bytes: &[u8],
-        signature: <M::Signature as ssi_crypto::Referencable>::Reference<'s>,
+        signature: S::Reference<'s>,
     ) -> Result<bool, ssi_crypto::VerificationError>
     where
         M: 'async_trait,
     {
         match method {
             ssi_verification_methods::ReferenceOrOwnedRef::Reference(r) => {
-                <Self as ssi_crypto::Verifier<ssi_verification_methods::Reference<M>>>::verify(
+                <Self as ssi_crypto::Verifier<ssi_verification_methods::Reference<M>, S>>::verify(
                     self,
-                    context,
                     r,
                     proof_purpose,
                     signing_bytes,
@@ -174,7 +168,7 @@ where
             }
             ssi_verification_methods::ReferenceOrOwnedRef::Owned(m) => {
                 // No need to dereference.
-                m.verify(self, context, proof_purpose, signing_bytes, signature)
+                m.verify(self, proof_purpose, signing_bytes, signature)
                     .await
             }
         }

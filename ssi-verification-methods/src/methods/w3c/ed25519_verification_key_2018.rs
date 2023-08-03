@@ -5,14 +5,13 @@ use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, NoContext,
-    VerificationMethod, VerificationMethodRef, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
+    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod,
+    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
@@ -73,20 +72,16 @@ impl Ed25519VerificationKey2018 {
         )
         .unwrap())
     }
-}
 
-impl ssi_crypto::Referencable for Ed25519VerificationKey2018 {
-    type Reference<'a> = &'a Self;
+    pub fn verify_bytes(&self, data: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+        let pk = self
+            .decode_public_key()
+            .map_err(|_| VerificationError::InvalidKey)?;
 
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
+        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        Ok(pk.verify(data, &signature).is_ok())
     }
-}
-
-impl ssi_crypto::VerificationMethod for Ed25519VerificationKey2018 {
-    type ProofContext = NoContext;
-
-    type Signature = signature::Jws;
 }
 
 impl VerificationMethod for Ed25519VerificationKey2018 {
@@ -107,44 +102,37 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
     }
 }
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2018> for &'a Ed25519VerificationKey2018 {
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        jws: &'s CompactJWSStr,
-    ) -> Result<bool, VerificationError> {
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2018, signature::Jws> for &'a Ed25519VerificationKey2018 {
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         signing_bytes: &[u8],
+//         jws: &'s CompactJWSStr,
+//     ) -> Result<bool, VerificationError> {
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
 
-        let (header, payload, signature_bytes) =
-            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+//         let (header, payload, signature_bytes) =
+//             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
 
-        if header.algorithm != ssi_jwk::Algorithm::EdDSA {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if header.algorithm != ssi_jwk::Algorithm::EdDSA {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        if payload.as_ref() != signing_bytes {
-            return Err(VerificationError::InvalidProof);
-        }
+//         if payload.as_ref() != signing_bytes {
+//             return Err(VerificationError::InvalidProof);
+//         }
 
-        let pk = self
-            .decode_public_key()
-            .map_err(|_| VerificationError::InvalidKey)?;
-
-        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
-            .map_err(|_| ssi_crypto::VerificationError::InvalidSignature)?;
-        Ok(pk.verify(signing_bytes, &signature).is_ok())
-    }
-}
+//         self.verify_bytes(jws.signing_bytes(), &signature_bytes)
+//     }
+// }
 
 impl LinkedDataVerificationMethod for Ed25519VerificationKey2018 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {

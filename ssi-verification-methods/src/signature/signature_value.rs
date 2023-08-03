@@ -7,6 +7,8 @@ use treeldr_rust_prelude::{grdf::Graph, locspan::Meta, FromRdf, FromRdfError};
 
 use crate::XSD_STRING;
 
+use super::AnyRef;
+
 /// `https://w3id.org/security#signatureValue` signature value, encoded in
 /// base64.
 pub struct SignatureValueBuf(pub String);
@@ -49,6 +51,17 @@ impl SignatureValue {
         multibase::Base::Base64
             .decode(&self.0)
             .map_err(|_| VerificationError::InvalidProof)
+    }
+}
+
+impl<'a> TryFrom<AnyRef<'a>> for &'a SignatureValue {
+    type Error = VerificationError;
+
+    fn try_from(value: AnyRef<'a>) -> Result<Self, Self::Error> {
+        match value.value {
+            super::any::ValueRef::SignatureValue(v) => Ok(v),
+            _ => Err(VerificationError::InvalidSignature)
+        }
     }
 }
 

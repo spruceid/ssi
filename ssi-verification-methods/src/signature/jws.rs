@@ -1,11 +1,14 @@
 use std::hash::Hash;
 
 use rdf_types::{IriInterpretation, IriVocabulary, VocabularyMut};
+use ssi_crypto::VerificationError;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_security::JWS;
 use treeldr_rust_prelude::{grdf::Graph, locspan::Meta, FromRdf, FromRdfError};
 
 use crate::XSD_STRING;
+
+use super::AnyRef;
 
 /// `https://w3id.org/security#jwk` signature value, encoded as a JWK.
 pub struct Jws(pub CompactJWSString);
@@ -15,6 +18,17 @@ impl ssi_crypto::Referencable for Jws {
 
     fn as_reference(&self) -> Self::Reference<'_> {
         &*self.0
+    }
+}
+
+impl<'a> TryFrom<AnyRef<'a>> for &'a CompactJWSStr {
+    type Error = VerificationError;
+
+    fn try_from(value: AnyRef<'a>) -> Result<Self, Self::Error> {
+        match value.value {
+            super::any::ValueRef::Jws(v) => Ok(v),
+            _ => Err(VerificationError::InvalidSignature)
+        }
     }
 }
 

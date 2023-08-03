@@ -7,7 +7,7 @@
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfiguration, ProofOptions,
+    impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfiguration
 };
 
 use crate::suite::{sha256_hash, HashError};
@@ -25,21 +25,19 @@ pub struct Ed25519Signature2020;
 
 impl_rdf_input_urdna2015!(Ed25519Signature2020);
 
-#[async_trait::async_trait]
 impl CryptographicSuite for Ed25519Signature2020 {
-    type TransformationParameters = ();
     type Transformed = String;
-
-    type HashParameters = ProofConfiguration<Self::VerificationMethod>;
     type Hashed = [u8; 64];
 
-    type ProofParameters = ProofOptions<Self::VerificationMethod>;
+    type VerificationMethod = Ed25519VerificationKey2020;
 
-    type SigningParameters = ProofOptions<Self::VerificationMethod>;
+    type Signature = Signature;
 
-    type VerificationParameters = ProofOptions<Self::VerificationMethod>;
+    type SignatureProtocol = ();
 
-    type VerificationMethod = verification::MethodReferenceOrOwned<Ed25519VerificationKey2020>;
+    type SignatureAlgorithm = SignatureAlgorithm;
+
+    type Options = ();
 
     fn iri(&self) -> iref::Iri {
         iri!("https://w3id.org/security#Ed25519Signature2020")
@@ -53,8 +51,42 @@ impl CryptographicSuite for Ed25519Signature2020 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfiguration<Self::VerificationMethod>,
+        proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
+    }
+
+    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
+        SignatureAlgorithm
+    }
+}
+
+pub struct Signature {
+    /// Multibase encoded signature.
+    pub proof_value: String
+}
+
+pub struct SignatureAlgorithm;
+
+impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020> for SignatureAlgorithm {
+    type Signature = Signature;
+
+    type Protocol = ();
+
+    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+            &self,
+            method: &Ed25519VerificationKey2020,
+            bytes: &[u8],
+            signer: &S
+        ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        todo!()
+    }
+
+    fn verify(&self,
+            signature: &Self::Signature,
+            method: &Ed25519VerificationKey2020,
+            bytes: &[u8]
+        ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        todo!()
     }
 }

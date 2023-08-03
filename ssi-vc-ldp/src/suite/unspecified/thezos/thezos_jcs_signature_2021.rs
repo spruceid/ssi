@@ -1,11 +1,12 @@
 use serde::Serialize;
+use ssi_jwk::JWK;
 use ssi_tzkey::EncodeTezosSignedMessageError;
 use ssi_verification_methods::TezosMethod2021;
 use static_iref::iri;
 
 use crate::{
-    suite::HashError, verification, CryptographicSuite, CryptographicSuiteInput,
-    ProofConfiguration, ProofOptions,
+    suite::HashError, CryptographicSuite, CryptographicSuiteInput,
+    ProofConfiguration
 };
 
 /// Tezos signature suite based on JCS.
@@ -46,7 +47,7 @@ impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
     type TransformError = TransformError;
 
     /// Transformation algorithm.
-    fn transform(&self, data: T, _options: ()) -> Result<Self::Transformed, TransformError> {
+    fn transform(&self, data: T, _options: &ProofConfiguration<Self::VerificationMethod>) -> Result<Self::Transformed, TransformError> {
         let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;
         match json {
             serde_json::Value::Object(obj) => Ok(obj),
@@ -55,21 +56,19 @@ impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
     }
 }
 
-#[async_trait::async_trait]
 impl CryptographicSuite for TezosJcsSignature2021 {
-    type TransformationParameters = ();
     type Transformed = serde_json::Map<String, serde_json::Value>;
-
-    type HashParameters = ProofConfiguration<Self::VerificationMethod>;
     type Hashed = Vec<u8>;
 
-    type ProofParameters = ProofOptions<Self::VerificationMethod>;
+    type VerificationMethod = TezosMethod2021;
 
-    type SigningParameters = ProofOptions<Self::VerificationMethod>;
+    type Signature = Signature;
 
-    type VerificationParameters = ProofOptions<Self::VerificationMethod>;
+    type SignatureProtocol = ();
 
-    type VerificationMethod = verification::MethodReferenceOrOwned<TezosMethod2021>;
+    type SignatureAlgorithm = SignatureAlgorithm;
+
+    type Options = ();
 
     fn iri(&self) -> iref::Iri {
         iri!("https://w3id.org/security#TezosJcsSignature2021")
@@ -82,7 +81,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
     fn hash(
         &self,
         mut data: serde_json::Map<String, serde_json::Value>,
-        proof_configuration: ProofConfiguration<Self::VerificationMethod>,
+        proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
         let json_proof_configuration = serde_json::to_value(proof_configuration).unwrap();
         data.insert("proof".to_string(), json_proof_configuration);
@@ -91,5 +90,47 @@ impl CryptographicSuite for TezosJcsSignature2021 {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
         }
+    }
+
+    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
+        SignatureAlgorithm
+    }
+}
+
+pub struct Signature {
+    /// Base58-encoded signature.
+    proof_value: String,
+
+    /// Signing key.
+    public_key: Option<PublicKey>
+}
+
+pub enum PublicKey {
+    Jwk(Box<JWK>),
+    Multibase(String)
+}
+
+pub struct SignatureAlgorithm;
+
+impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
+    type Signature = Signature;
+
+    type Protocol = ();
+
+    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+        &self,
+        method: &TezosMethod2021,
+        bytes: &[u8],
+        signer: &S
+    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        todo!()
+    }
+
+    fn verify(&self,
+            signature: &Self::Signature,
+            method: &TezosMethod2021,
+            bytes: &[u8]
+        ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        todo!()
     }
 }

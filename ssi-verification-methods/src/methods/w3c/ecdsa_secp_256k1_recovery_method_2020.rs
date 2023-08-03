@@ -3,7 +3,6 @@ use hex::FromHexError;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::{SignatureError, VerificationError};
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, ETHEREUM_ADDRESS, PUBLIC_KEY_HEX, PUBLIC_KEY_JWK};
@@ -12,8 +11,8 @@ use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ExpectedType, LinkedDataVerificationMethod, NoContext, VerificationMethod,
-    VerificationMethodRef, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, signature, SignatureError, VerificationError,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
@@ -36,20 +35,6 @@ pub struct EcdsaSecp256k1RecoveryMethod2020 {
     /// Public key.
     #[serde(flatten)]
     pub public_key: PublicKey,
-}
-
-impl ssi_crypto::Referencable for EcdsaSecp256k1RecoveryMethod2020 {
-    type Reference<'a> = &'a Self;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-}
-
-impl ssi_crypto::VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
-    type ProofContext = NoContext;
-
-    type Signature = signature::Jws;
 }
 
 impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
@@ -90,42 +75,14 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
             .map_err(|_| SignatureError::InvalidSecretKey)?;
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
-}
 
-#[async_trait]
-impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1RecoveryMethod2020>
-    for &'a EcdsaSecp256k1RecoveryMethod2020
-{
-    /// Verifies the given signature.
-    async fn verify<'c: 'async_trait, 's: 'async_trait>(
-        self,
-        controllers: &impl crate::ControllerProvider,
-        _: NoContext,
-        proof_purpose: ssi_crypto::ProofPurpose,
+    pub fn verify_bytes(
+        &self,
         data: &[u8],
-        jws: &'s CompactJWSStr,
+        signature: &[u8]
     ) -> Result<bool, VerificationError> {
-        // Check that this verification method is authorized for the given
-        // proof purpose.
-        controllers
-            .ensure_allows_verification_method(
-                self.controller.as_iri(),
-                self.id.as_iri(),
-                proof_purpose,
-            )
-            .await?;
-
-        // Decode the JWK.
-        let (header, payload, signature_bytes) =
-            jws.decode().map_err(|_| VerificationError::InvalidProof)?;
-
-        // Ensure the signed message matches the verified message.
-        if payload.as_ref() != data {
-            return Err(VerificationError::InvalidProof);
-        }
-
         // Recover the key used to sign the message.
-        let key = ssi_jws::recover(header.algorithm, &payload, &signature_bytes)
+        let key = ssi_jws::recover(ssi_jwk::Algorithm::ES256KR, data, signature)
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         // Check the validity of the signing key.
@@ -141,13 +98,48 @@ impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1RecoveryMethod2020>
         // Verify the signature.
         Ok(ssi_jws::verify_bytes(
             ssi_jwk::Algorithm::ES256KR,
-            jws.signing_bytes(),
+            data,
             &key,
-            &signature_bytes,
+            signature,
         )
         .is_ok())
     }
 }
+
+// #[async_trait]
+// impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1RecoveryMethod2020, signature::Jws>
+//     for &'a EcdsaSecp256k1RecoveryMethod2020
+// {
+//     /// Verifies the given signature.
+//     async fn verify<'s: 'async_trait>(
+//         self,
+//         controllers: &impl crate::ControllerProvider,
+//         proof_purpose: ssi_crypto::ProofPurpose,
+//         data: &[u8],
+//         jws: &'s CompactJWSStr,
+//     ) -> Result<bool, VerificationError> {
+//         // Check that this verification method is authorized for the given
+//         // proof purpose.
+//         controllers
+//             .ensure_allows_verification_method(
+//                 self.controller.as_iri(),
+//                 self.id.as_iri(),
+//                 proof_purpose,
+//             )
+//             .await?;
+
+//         // Decode the JWK.
+//         let (header, payload, signature_bytes) =
+//             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
+
+//         // Ensure the signed message matches the verified message.
+//         if payload.as_ref() != data {
+//             return Err(VerificationError::InvalidProof);
+//         }
+
+//         self.verify_bytes(jws.signing_bytes(), &signature_bytes)
+//     }
+// }
 
 impl LinkedDataVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {
@@ -266,6 +258,12 @@ pub enum InvalidPublicKey {
 
     #[error("unable to hash public key `{0}`")]
     HashError(String),
+}
+
+impl From<InvalidPublicKey> for VerificationError {
+    fn from(_value: InvalidPublicKey) -> Self {
+        Self::InvalidKey
+    }
 }
 
 impl PublicKey {

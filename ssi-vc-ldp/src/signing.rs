@@ -2,14 +2,14 @@ use rdf_types::{
     interpretation::TraversableInterpretation, BlankIdVocabularyMut, ReverseTermInterpretation,
     ReverseTermInterpretationMut,
 };
-use ssi_crypto::{SignatureError, Signer};
 use ssi_rdf::DatasetWithEntryPoint;
 use ssi_vc::Verifiable;
+use ssi_verification_methods::{SignatureError, Signer, SignatureAlgorithm};
 use std::hash::Hash;
 
 use crate::{
-    suite::{CryptographicSuiteInput, HashError, SigningParameters},
-    CryptographicSuite, DataIntegrity,
+    suite::{CryptographicSuiteInput, HashError},
+    CryptographicSuite, DataIntegrity, ProofConfiguration,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -33,10 +33,11 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
     pub fn sign_ld<'a, V, I>(
         vocabulary: &'a mut V,
         interpretation: &'a mut I,
-        signer: &impl Signer<S::VerificationMethod>,
+        signer: &impl Signer<S::VerificationMethod, S::SignatureProtocol>,
         credential: C,
         suite: S,
-        params: S::SigningParameters,
+        params: ProofConfiguration<S::VerificationMethod>,
+        options: S::Options
     ) -> Result<Verifiable<Self>, Error<S::TransformError>>
     where
         V: BlankIdVocabularyMut,
@@ -72,10 +73,10 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 
         // Apply the crypto suite.
         let transformed = suite
-            .transform(data, params.transformation_parameters())
+            .transform(data, &params)
             .map_err(Error::Transform)?;
-        let hash = suite.hash(transformed, params.hash_parameters())?;
-        let proof = suite.generate_proof(&hash, signer, params.into_proof_parameters())?;
+        let hash = suite.hash(transformed, &params)?;
+        let proof = suite.generate_proof(&hash, signer, params, options)?;
 
         Ok(Verifiable::new(
             Self::new(credential, hash),
