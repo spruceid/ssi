@@ -26,6 +26,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-jwt.workspace = true
 ssi-vc.workspace = true
+pin-project.workspace = true
 serde_with = "2.3.2"
 
 treeldr-rust-prelude.workspace = true

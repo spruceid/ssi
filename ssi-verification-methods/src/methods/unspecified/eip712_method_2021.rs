@@ -1,17 +1,16 @@
-use std::{borrow::Cow, hash::Hash};
+use std::hash::Hash;
 
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
-use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, PUBLIC_KEY_JWK};
+use ssi_security::BLOCKCHAIN_ACCOUNT_ID;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, VerificationError,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING, VerificationError, Referencable,
 };
 
 // mod context;
@@ -40,8 +39,7 @@ impl Eip712Method2021 {
 	pub fn verify_bytes(
 		&self,
 		data: &[u8],
-		signature_bytes: &[u8],
-		public_key: &JWK
+		signature_bytes: &[u8]
 	) -> Result<bool, VerificationError> {
 		// Interpret the signature.
 		let signature = k256::ecdsa::Signature::try_from(&signature_bytes[..64]).map_err(|_| VerificationError::InvalidSignature)?;
@@ -76,13 +74,21 @@ impl Eip712Method2021 {
 	}
 }
 
+impl Referencable for Eip712Method2021 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for Eip712Method2021 {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 
     fn expected_type() -> Option<ExpectedType> {

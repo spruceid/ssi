@@ -4,34 +4,28 @@ use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
+use ssi_jws::CompactJWSString;
 use ssi_security::PUBLIC_KEY_JWK;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
     ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, Referencable,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, VerificationError, Referencable,
 };
 
-pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
+pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
 
-pub const RSA_VERIFICATION_KEY_2018_IRI: Iri<'static> =
-    iri!("https://w3id.org/security#RsaVerificationKey2018");
+pub const SOLANA_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#SolanaMethod2021");
 
-/// RSA verification key 2018.
-///
-/// To be used with the [RSA Signature Suite 2018][1].
-///
-/// See: <https://www.w3.org/TR/did-spec-registries/#rsaverificationkey2018>
-///
-/// [1]: <https://w3c-ccg.github.io/lds-rsa2018/>
+/// Solana Method 2021.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(tag = "type", rename = "RsaVerificationKey2018")]
-pub struct RsaVerificationKey2018 {
+#[serde(tag = "type", rename = "SolanaMethod2021")]
+pub struct SolanaMethod2021 {
     /// Key identifier.
     pub id: IriBuf,
 
-    /// Key crontroller.
+    /// Key controller.
     pub controller: IriBuf, // TODO: should be an URI.
 
     /// Public JSON Web Key.
@@ -39,17 +33,33 @@ pub struct RsaVerificationKey2018 {
     pub public_key: Box<JWK>,
 }
 
-impl RsaVerificationKey2018 {
-    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<String, SignatureError> {
-        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
+impl SolanaMethod2021 {
+    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
+        let algorithm = secret_key
+            .algorithm
+            .ok_or(SignatureError::InvalidSecretKey)?;
+        let header = ssi_jws::Header::new_detached(algorithm, None);
         let signing_bytes = header.encode_signing_bytes(data);
-        let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, &signing_bytes, secret_key)
+        let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)
             .map_err(|_| SignatureError::InvalidSecretKey)?;
-        Ok(multibase::Base::Base64.encode(signature))
+        Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
+    }
+
+    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+        match self.public_key.algorithm.as_ref() {
+            Some(a) => Ok(ssi_jws::verify_bytes(
+                *a,
+                data,
+                &self.public_key,
+                signature,
+            )
+            .is_ok()),
+            None => Err(VerificationError::InvalidKey),
+        }
     }
 }
 
-impl Referencable for RsaVerificationKey2018 {
+impl Referencable for SolanaMethod2021 {
     type Reference<'a> = &'a Self where Self: 'a;
     
     fn as_reference(&self) -> Self::Reference<'_> {
@@ -57,19 +67,19 @@ impl Referencable for RsaVerificationKey2018 {
     }
 }
 
-impl VerificationMethod for RsaVerificationKey2018 {
+impl VerificationMethod for SolanaMethod2021 {
     /// Returns the identifier of the key.
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
     fn expected_type() -> Option<ExpectedType> {
-        Some(RSA_VERIFICATION_KEY_2018_TYPE.to_string().into())
+        Some(SOLANA_METHOD_2021_TYPE.to_string().into())
     }
 
     /// Returns the type of the key.
     fn type_(&self) -> &str {
-        RSA_VERIFICATION_KEY_2018_TYPE
+        SOLANA_METHOD_2021_TYPE
     }
 
     /// Returns an URI to the key controller.
@@ -78,47 +88,12 @@ impl VerificationMethod for RsaVerificationKey2018 {
     }
 }
 
-// #[async_trait]
-// impl<'a> VerificationMethodRef<'a, RsaVerificationKey2018, signature::SignatureValueBuf> for &'a RsaVerificationKey2018 {
-//     /// Verifies the given signature.
-//     async fn verify<'s: 'async_trait>(
-//         self,
-//         controllers: &impl crate::ControllerProvider,
-//         proof_purpose: ssi_crypto::ProofPurpose,
-//         signing_bytes: &[u8],
-//         signature: &'s signature::SignatureValue,
-//     ) -> Result<bool, VerificationError> {
-//         controllers
-//             .ensure_allows_verification_method(
-//                 self.controller.as_iri(),
-//                 self.id.as_iri(),
-//                 proof_purpose,
-//             )
-//             .await?;
-
-//         let signature_bytes = signature.decode()?;
-//         let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
-//         let jws_signing_bytes = header.encode_signing_bytes(signing_bytes);
-
-//         match self.public_key.algorithm.as_ref() {
-//             Some(ssi_jwk::Algorithm::RS256) => Ok(ssi_jws::verify_bytes(
-//                 ssi_jwk::Algorithm::RS256,
-//                 &jws_signing_bytes,
-//                 &self.public_key,
-//                 &signature_bytes,
-//             )
-//             .is_ok()),
-//             _ => Err(ssi_crypto::VerificationError::InvalidKey),
-//         }
-//     }
-// }
-
-impl LinkedDataVerificationMethod for RsaVerificationKey2018 {
+impl LinkedDataVerificationMethod for SolanaMethod2021 {
     fn quads(&self, quads: &mut Vec<Quad>) -> Object {
         quads.push(Quad(
             Id::Iri(self.id.clone()),
             RDF_TYPE_IRI.into(),
-            Object::Id(Id::Iri(RSA_VERIFICATION_KEY_2018_IRI.into())),
+            Object::Id(Id::Iri(SOLANA_METHOD_2021_IRI.into())),
             None,
         ));
 
@@ -143,7 +118,7 @@ impl LinkedDataVerificationMethod for RsaVerificationKey2018 {
     }
 }
 
-impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for RsaVerificationKey2018
+impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for SolanaMethod2021
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
@@ -158,7 +133,7 @@ where
     }
 }
 
-impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for RsaVerificationKey2018
+impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for SolanaMethod2021
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,

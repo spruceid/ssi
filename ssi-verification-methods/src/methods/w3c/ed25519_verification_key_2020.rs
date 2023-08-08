@@ -12,7 +12,7 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError,
+    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError, Referencable,
 };
 
 /// IRI of the Ed25519 Verification Key 2020 type.
@@ -120,13 +120,21 @@ impl Ed25519VerificationKey2020 {
     }
 }
 
+impl Referencable for Ed25519VerificationKey2020 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for Ed25519VerificationKey2020 {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 
     fn expected_type() -> Option<ExpectedType> {

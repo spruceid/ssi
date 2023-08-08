@@ -3,8 +3,8 @@ use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError},
-    CryptographicSuite, ProofConfiguration
+    suite::{sha256_hash, HashError, MultibaseSignature, MultibaseSignatureRef},
+    CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
 };
 
 /// ECDSA Cryptosuite v2019 `EcdsaSecp256r1Signature2019`.
@@ -20,7 +20,7 @@ impl CryptographicSuite for EcdsaSecp256r1Signature2019 {
 
     type VerificationMethod = EcdsaSecp256r1VerificationKey2019;
 
-    type Signature = Signature;
+    type Signature = MultibaseSignature;
 
     type SignatureProtocol = ();
 
@@ -39,7 +39,7 @@ impl CryptographicSuite for EcdsaSecp256r1Signature2019 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
@@ -49,15 +49,12 @@ impl CryptographicSuite for EcdsaSecp256r1Signature2019 {
     }
 }
 
-pub struct Signature {
-    /// Multibase encoded signature value.
-    pub proof_value: String
-}
-
 pub struct SignatureAlgorithm;
 
-impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2019> for SignatureAlgorithm {
-    type Signature = Signature;
+impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2019>
+    for SignatureAlgorithm
+{
+    type Signature = MultibaseSignature;
 
     type Protocol = ();
 
@@ -65,16 +62,17 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
         &self,
         method: &EcdsaSecp256r1VerificationKey2019,
         bytes: &[u8],
-        signer: &S
+        signer: &S,
     ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
         todo!()
     }
 
-    fn verify(&self,
-            signature: &Self::Signature,
-            method: &EcdsaSecp256r1VerificationKey2019,
-            bytes: &[u8]
-        ) -> Result<bool, ssi_verification_methods::VerificationError> {
+    fn verify(
+        &self,
+        signature: MultibaseSignatureRef,
+        method: &EcdsaSecp256r1VerificationKey2019,
+        bytes: &[u8],
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
         todo!()
     }
 }

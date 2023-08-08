@@ -119,7 +119,7 @@ impl<C: Sync> VcJwt<C> {
         }
 
         let mut claims: JWTClaims = serde_json::from_slice(&jws.decode_payload(&header)?)?;
-        let verification_method = build_verification_method(&header, &claims)?;
+        let verification_method = build_issuer(&header, &claims)?;
 
         match claims.verifiable_credential.take() {
             Some(mut credential) => {
@@ -193,17 +193,17 @@ fn interpret_id<T, B, I: IdInterpretationMut<T, B>>(
     }
 }
 
-fn build_verification_method<L, C>(
+fn build_issuer<L, C>(
     header: &Header,
     claims: &JWTClaims,
-) -> Result<verification::Method, Error<L, C>> {
+) -> Result<verification::Issuer, Error<L, C>> {
     let issuer = match &claims.issuer {
         Some(StringOrURI::URI(issuer_uri)) => Some(IriBuf::new(issuer_uri.as_str()).unwrap()),
         Some(StringOrURI::String(_)) => return Err(Error::InvalidIssuer),
         None => None,
     };
 
-    Ok(verification::Method::new(issuer, header.key_id.clone()))
+    Ok(verification::Issuer::new(issuer, header.key_id.clone()))
 }
 
 /// Transform the JWT specific headers and claims according to
@@ -220,7 +220,7 @@ fn add_claims_to_credential<L, C>(
 
         if let Some(value) = value {
             cred.insert(
-                Meta("expiration_date".into(), ()),
+                Meta("expirationDate".into(), ()),
                 Meta(String::from(value).into(), ()),
             );
         }
@@ -262,7 +262,7 @@ fn add_claims_to_credential<L, C>(
 
         if let Some(value) = value {
             cred.insert(
-                Meta("issuance_date".into(), ()),
+                Meta("issuanceDate".into(), ()),
                 Meta(String::from(value).into(), ()),
             );
         }
@@ -275,7 +275,7 @@ fn add_claims_to_credential<L, C>(
         match value {
             Some(value) => {
                 cred.insert(
-                    Meta("issuance_date".into(), ()),
+                    Meta("issuanceDate".into(), ()),
                     Meta(String::from(value).into(), ()),
                 );
             }
@@ -287,7 +287,7 @@ fn add_claims_to_credential<L, C>(
         match sub {
             StringOrURI::URI(sub_uri) => {
                 match cred
-                    .get_unique_mut("credential_subject")
+                    .get_unique_mut("credentialSubject")
                     .ok()
                     .flatten()
                     .map(Meta::value_mut)
@@ -298,7 +298,7 @@ fn add_claims_to_credential<L, C>(
                     }
                     None => {
                         cred.insert(
-                            Meta("credential_subject".into(), ()),
+                            Meta("credentialSubject".into(), ()),
                             Meta(sub_uri.to_string().into(), ()),
                         );
                     }

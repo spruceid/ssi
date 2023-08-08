@@ -5,6 +5,7 @@ mod decode;
 mod proof;
 mod signing;
 pub mod suite;
+pub(crate) mod utils;
 pub mod verification;
 
 pub use proof::*;

@@ -1,22 +1,24 @@
-use async_trait::async_trait;
-use ssi_verification_methods::{Verifier, VerificationError};
+use std::future::Future;
+use ssi_verification_methods::{Verifier, VerificationError, Referencable};
 
 use crate::Verifiable;
 
 /// Credential verifiable with a proof of type `Self::Proof`.
-#[async_trait]
 pub trait VerifiableWith {
     /// Verification method.
-    type Method;
+    type Method: Referencable;
 
     /// Proof type.
     type Proof;
 
-    async fn verify_with(
-        &self,
-        verifier: &impl Verifier<Self::Method>,
-        proof: &Self::Proof,
-    ) -> Result<ProofValidity, VerificationError>;
+    /// Future returned by `verify_with`.
+    type VerifyWith<'a, V: Verifier<Self::Method>>: 'a + Future<Output = Result<ProofValidity, VerificationError>> where Self: 'a, V: 'a;
+
+    fn verify_with<'a, V: Verifier<Self::Method>>(
+        &'a self,
+        verifier: &'a V,
+        proof: &'a Self::Proof,
+    ) -> Self::VerifyWith<'a, V>;
 
     fn with_proof(self, proof: Self::Proof) -> Verifiable<Self>
     where

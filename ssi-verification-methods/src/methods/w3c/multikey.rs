@@ -12,7 +12,7 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
+    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, Referencable,
 };
 
 /// IRI of the Multikey type.
@@ -109,13 +109,21 @@ impl Multikey {
     }
 }
 
+impl Referencable for Multikey {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for Multikey {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 
     fn expected_type() -> Option<ExpectedType> {

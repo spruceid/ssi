@@ -1,12 +1,12 @@
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::TezosMethod2021;
+use ssi_verification_methods::{Referencable, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite,
-    ProofConfiguration
+    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite, ProofConfiguration,
+    ProofConfigurationRef,
 };
 
 /// Tezos signature suite based on URDNA2015.
@@ -61,7 +61,7 @@ impl CryptographicSuite for TezosSignature2021 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
         let proof_quads = proof_configuration.quads(self).into_nquads();
         let message = format!("\n{data}\n{proof_quads}");
@@ -76,17 +76,48 @@ impl CryptographicSuite for TezosSignature2021 {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Signature {
     /// Base58-encoded signature.
-    pub proof_value: String,
+    proof_value: String,
 
     /// Signing key.
-    pub public_key: Option<PublicKey>
+    public_key: Option<PublicKey>,
 }
 
+impl Referencable for Signature {
+    type Reference<'a> = SignatureRef<'a> where Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        SignatureRef {
+            proof_value: &self.proof_value,
+            public_key: self.public_key.as_ref().map(|k| match k {
+                PublicKey::Jwk(jwk) => PublicKeyRef::Jwk(jwk),
+                PublicKey::Multibase(m) => PublicKeyRef::Multibase(m),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SignatureRef<'a> {
+    /// Base58-encoded signature.
+    proof_value: &'a str,
+
+    /// Signing key.
+    public_key: Option<PublicKeyRef<'a>>,
+}
+
+#[derive(Debug, Clone)]
 pub enum PublicKey {
     Jwk(Box<JWK>),
-    Multibase(String)
+    Multibase(String),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PublicKeyRef<'a> {
+    Jwk(&'a JWK),
+    Multibase(&'a str),
 }
 
 pub struct SignatureAlgorithm;
@@ -97,19 +128,20 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
     type Protocol = ();
 
     fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
-            &self,
-            method: &TezosMethod2021,
-            bytes: &[u8],
-            signer: &S
-        ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        &self,
+        method: &TezosMethod2021,
+        bytes: &[u8],
+        signer: &S,
+    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
         todo!()
     }
 
-    fn verify(&self,
-            signature: &Self::Signature,
-            method: &TezosMethod2021,
-            bytes: &[u8]
-        ) -> Result<bool, ssi_verification_methods::VerificationError> {
+    fn verify(
+        &self,
+        signature: SignatureRef,
+        method: &TezosMethod2021,
+        bytes: &[u8],
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
         todo!()
     }
 }

@@ -7,6 +7,7 @@ pub use base64::DecodeError as Base64DecodeError;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
+use core::fmt;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -217,6 +218,18 @@ impl Deref for CompactJWSStr {
     }
 }
 
+impl fmt::Display for CompactJWSStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl fmt::Debug for CompactJWSStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
 /// JWS in compact serialized form.
 pub struct CompactJWSBuf(Vec<u8>);
 
@@ -283,6 +296,7 @@ impl Deref for CompactJWSBuf {
 /// Contrarily to [`CompactJWS`], this type guarantees that the payload is
 /// a valid UTF-8 string, meaning the whole compact JWS is an UTF-8 string.
 /// This does not necessarily mean the payload is base64 encoded.
+#[derive(Clone)]
 pub struct CompactJWSString(String);
 
 impl CompactJWSString {
@@ -358,6 +372,18 @@ impl Deref for CompactJWSString {
 
     fn deref(&self) -> &Self::Target {
         self.as_compact_jws_str()
+    }
+}
+
+impl fmt::Display for CompactJWSString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+impl fmt::Debug for CompactJWSString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
     }
 }
 

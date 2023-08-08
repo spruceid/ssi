@@ -1,17 +1,16 @@
 use std::hash::Hash;
 
-use async_trait::async_trait;
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
-use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_jws::CompactJWSString;
 use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError,
+    ExpectedType, LinkedDataVerificationMethod,
+    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError, Referencable,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
@@ -84,13 +83,21 @@ impl Ed25519VerificationKey2018 {
     }
 }
 
+impl Referencable for Ed25519VerificationKey2018 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for Ed25519VerificationKey2018 {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 
     fn expected_type() -> Option<ExpectedType> {

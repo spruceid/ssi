@@ -9,15 +9,15 @@ use rdf_types::{
 };
 use ssi_security::{CRYPTOSUITE, PROOF_PURPOSE, VERIFICATION_METHOD};
 use ssi_verification_methods::{
-    json_ld::FlattenIntoJsonLdNode, signature,
-    InvalidVerificationMethod, LinkedDataVerificationMethod, ProofPurpose, VerificationError
+    json_ld::FlattenIntoJsonLdNode, InvalidVerificationMethod, LinkedDataVerificationMethod,
+    ProofPurpose, Referencable, ReferenceOrOwned, ReferenceOrOwnedRef, VerificationError,
 };
 use static_iref::iri;
 use treeldr_rust_prelude::{
     grdf::Graph,
     json_ld,
     locspan::{Meta, Stripped},
-    FromRdf, FromRdfError,
+    FromRdf, FromRdfError, IntoJsonLdObjectMeta,
 };
 
 use crate::CryptographicSuite;
@@ -56,18 +56,13 @@ impl<T: CryptographicSuite> Proof<T> {
     pub fn new(
         type_: T,
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: T::VerificationMethod,
+        verification_method: ReferenceOrOwned<T::VerificationMethod>,
         proof_purpose: ProofPurpose,
-        signature: T::Signature
+        signature: T::Signature,
     ) -> Self {
         Self {
             type_,
-            untyped: UntypedProof::new(
-                created,
-                verification_method,
-                proof_purpose,
-                signature
-            ),
+            untyped: UntypedProof::new(created, verification_method, proof_purpose, signature),
         }
     }
 
@@ -86,7 +81,7 @@ pub struct UntypedProof<M, S> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
 
     /// Verification method.
-    pub verification_method: M,
+    pub verification_method: ReferenceOrOwned<M>,
 
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
@@ -96,74 +91,77 @@ pub struct UntypedProof<M, S> {
 }
 
 impl<M, S> UntypedProof<M, S> {
-    pub fn from_options(
-        options: ProofConfiguration<M>,
-        signature: S
-    ) -> Self {
+    pub fn from_options(options: ProofConfiguration<M>, signature: S) -> Self {
         Self::new(
             options.created,
             options.verification_method,
             options.proof_purpose,
-            signature
+            signature,
         )
     }
 
     pub fn new(
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: M,
+        verification_method: ReferenceOrOwned<M>,
         proof_purpose: ProofPurpose,
-        signature: S
+        signature: S,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
-            signature
+            signature,
+        }
+    }
+
+    pub fn borrowed(&self) -> UntypedProofRef<M, S>
+    where
+        M: Referencable,
+        S: Referencable,
+    {
+        UntypedProofRef {
+            created: &self.created,
+            verification_method: self.verification_method.borrowed(),
+            proof_purpose: self.proof_purpose,
+            signature: self.signature.as_reference(),
         }
     }
 
     pub fn try_map_verification_method<N, T, E>(
         self,
-        f: impl FnOnce(
-            M,
-            S,
-        ) -> Result<(N, T), E>,
+        f: impl FnOnce(ReferenceOrOwned<M>, S) -> Result<(ReferenceOrOwned<N>, T), E>,
     ) -> Result<UntypedProof<N, T>, E> {
-        let (verification_method, signature) =
-            f(self.verification_method, self.signature)?;
+        let (verification_method, signature) = f(self.verification_method, self.signature)?;
 
         Ok(UntypedProof::new(
             self.created,
             verification_method,
             self.proof_purpose,
-            signature
+            signature,
         ))
     }
 
     pub fn map_verification_method<N, T>(
         self,
-        f: impl FnOnce(M, S) -> (N, T),
+        f: impl FnOnce(ReferenceOrOwned<M>, S) -> (ReferenceOrOwned<N>, T),
     ) -> UntypedProof<N, T> {
-        let (verification_method, signature) =
-            f(self.verification_method, self.signature);
+        let (verification_method, signature) = f(self.verification_method, self.signature);
 
         UntypedProof::new(
             self.created,
             verification_method,
             self.proof_purpose,
-            signature
+            signature,
         )
     }
 
-    pub fn try_cast_verification_method<N, T>(
-        self,
-    ) -> Result<UntypedProof<N, T>, ProofCastError>
+    pub fn try_cast_verification_method<N, T>(self) -> Result<UntypedProof<N, T>, ProofCastError>
     where
         M: TryInto<N, Error = InvalidVerificationMethod>,
         S: TryInto<T>,
     {
         self.try_map_verification_method(|m, signature| {
-            let n = m.try_into()?;
+            let n = m.try_cast()?;
             let signature = signature
                 .try_into()
                 .map_err(|_| ProofCastError::Signature)?;
@@ -171,11 +169,95 @@ impl<M, S> UntypedProof<M, S> {
         })
     }
 
-    pub fn into_typed<T: CryptographicSuite<VerificationMethod = M, Signature = S>>(self, type_: T) -> Proof<T> {
+    pub fn into_typed<T: CryptographicSuite<VerificationMethod = M, Signature = S>>(
+        self,
+        type_: T,
+    ) -> Proof<T> {
         Proof {
             type_,
             untyped: self,
         }
+    }
+}
+
+/// Untyped Data Integrity Proof.
+pub struct UntypedProofRef<'a, M: Referencable, S: 'a + Referencable> {
+    /// Date and time of creation.
+    pub created: &'a ssi_vc::schema::xsd::layout::DateTime,
+
+    /// Verification method.
+    pub verification_method: ReferenceOrOwnedRef<'a, M>,
+
+    /// Proof purpose.
+    pub proof_purpose: ProofPurpose,
+
+    /// Proof value.
+    pub signature: S::Reference<'a>,
+}
+
+impl<'a, M: Referencable, S: 'a + Referencable> UntypedProofRef<'a, M, S> {
+    pub fn new(
+        created: &'a ssi_vc::schema::xsd::layout::DateTime,
+        verification_method: ReferenceOrOwnedRef<'a, M>,
+        proof_purpose: ProofPurpose,
+        signature: S::Reference<'a>,
+    ) -> Self {
+        Self {
+            created,
+            verification_method,
+            proof_purpose,
+            signature,
+        }
+    }
+
+    pub fn try_map_verification_method<N: 'a + Referencable, T: 'a + Referencable, E>(
+        self,
+        f: impl FnOnce(
+            ReferenceOrOwnedRef<'a, M>,
+            S::Reference<'a>,
+        ) -> Result<(ReferenceOrOwnedRef<'a, N>, T::Reference<'a>), E>,
+    ) -> Result<UntypedProofRef<'a, N, T>, E> {
+        let (verification_method, signature) = f(self.verification_method, self.signature)?;
+
+        Ok(UntypedProofRef::new(
+            self.created,
+            verification_method,
+            self.proof_purpose,
+            signature,
+        ))
+    }
+
+    pub fn map_verification_method<N: 'a + Referencable, T: 'a + Referencable>(
+        self,
+        f: impl FnOnce(
+            ReferenceOrOwnedRef<'a, M>,
+            S::Reference<'a>,
+        ) -> (ReferenceOrOwnedRef<'a, N>, T::Reference<'a>),
+    ) -> UntypedProofRef<'a, N, T> {
+        let (verification_method, signature) = f(self.verification_method, self.signature);
+
+        UntypedProofRef::new(
+            self.created,
+            verification_method,
+            self.proof_purpose,
+            signature,
+        )
+    }
+
+    pub fn try_cast_verification_method<N: 'a + Referencable, T: 'a + Referencable>(
+        self,
+    ) -> Result<UntypedProofRef<'a, N, T>, ProofCastError>
+    where
+        M::Reference<'a>: TryInto<N::Reference<'a>, Error = InvalidVerificationMethod>,
+        S::Reference<'a>: TryInto<T::Reference<'a>>,
+    {
+        self.try_map_verification_method(|m, signature| {
+            let n = m.try_cast()?;
+            let signature = signature
+                .try_into()
+                .map_err(|_| ProofCastError::Signature)?;
+            Ok((n, signature))
+        })
     }
 }
 
@@ -209,8 +291,8 @@ pub const DC_CREATED_IRI: Iri<'static> = iri!("http://purl.org/dc/terms/created"
 
 pub const XSD_DATETIME_IRI: Iri<'static> = iri!("http://www.w3.org/2001/XMLSchema#dateTime");
 
-impl<M, S, V: VocabularyMut, I>
-    ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I> for UntypedProof<M, S>
+impl<M, S, V: VocabularyMut, I> ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>
+    for UntypedProof<M, S>
 where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
@@ -277,7 +359,7 @@ where
     V::Iri: Eq + Hash,
     V::BlankId: Eq + Hash,
     T::VerificationMethod: treeldr_rust_prelude::ld::IntoJsonLdObjectMeta<V, I>,
-    T::Signature: ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>
+    T::Signature: ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>,
 {
     fn into_json_ld_object_meta(
         self,
@@ -343,7 +425,7 @@ where
     ssi_vc::schema::xsd::layout::DateTime: FromRdf<V, I>,
     ssi_vc::schema::sec::layout::Multibase: FromRdf<V, I>,
     T::VerificationMethod: FromRdf<V, I>,
-    T::Signature: FromRdf<V, I>
+    T::Signature: FromRdf<V, I>,
 {
     fn from_rdf<G>(
         vocabulary: &V,
@@ -395,12 +477,13 @@ where
                     }
                 } else if p == VERIFICATION_METHOD {
                     for o in objects {
-                        verification_method = Some(T::VerificationMethod::from_rdf(
-                            vocabulary,
-                            interpretation,
-                            graph,
-                            o,
-                        )?);
+                        verification_method =
+                            Some(ReferenceOrOwned::<T::VerificationMethod>::from_rdf(
+                                vocabulary,
+                                interpretation,
+                                graph,
+                                o,
+                            )?);
                     }
                 } else if p == PROOF_PURPOSE {
                     for o in objects {
@@ -434,7 +517,7 @@ where
             created,
             verification_method,
             proof_purpose,
-            signature
+            signature,
         ))
     }
 }
@@ -443,36 +526,98 @@ where
 #[serde(rename_all = "camelCase")]
 pub struct ProofConfiguration<M> {
     pub created: ssi_vc::schema::xsd::layout::DateTime,
-    pub verification_method: M,
-    pub proof_purpose: ProofPurpose
+    pub verification_method: ReferenceOrOwned<M>,
+    pub proof_purpose: ProofPurpose,
 }
 
 impl<M> ProofConfiguration<M> {
     pub fn new(
         created: ssi_vc::schema::xsd::layout::DateTime,
-        verification_method: M,
-        proof_purpose: ProofPurpose
+        verification_method: ReferenceOrOwned<M>,
+        proof_purpose: ProofPurpose,
     ) -> Self {
         Self {
             created,
             verification_method,
-            proof_purpose
+            proof_purpose,
         }
     }
 
-    pub fn into_proof<S>(
-        self,
-        signature: S
-    ) -> UntypedProof<M, S> {
+    pub fn into_proof<S>(self, signature: S) -> UntypedProof<M, S> {
         UntypedProof::from_options(self, signature)
+    }
+
+    pub fn borrowed(&self) -> ProofConfigurationRef<M>
+    where
+        M: Referencable,
+    {
+        ProofConfigurationRef {
+            created: &self.created,
+            verification_method: self.verification_method.borrowed(),
+            proof_purpose: self.proof_purpose,
+        }
     }
 }
 
-impl<M> ProofConfiguration<M> {
+#[derive(Serialize)]
+#[serde(
+    rename_all = "camelCase",
+    bound(serialize = "M::Reference<'a>: Serialize")
+)]
+pub struct ProofConfigurationRef<'a, M: Referencable> {
+    pub created: &'a ssi_vc::schema::xsd::layout::DateTime,
+    pub verification_method: ReferenceOrOwnedRef<'a, M>,
+    pub proof_purpose: ProofPurpose,
+}
+
+impl<'a, M: Referencable> ProofConfigurationRef<'a, M> {
+    pub fn new(
+        created: &'a ssi_vc::schema::xsd::layout::DateTime,
+        verification_method: ReferenceOrOwnedRef<'a, M>,
+        proof_purpose: ProofPurpose,
+    ) -> Self {
+        Self {
+            created,
+            verification_method,
+            proof_purpose,
+        }
+    }
+
+    pub fn try_map_verification_method<N: 'a + Referencable, E>(
+        self,
+        f: impl FnOnce(ReferenceOrOwnedRef<'a, M>) -> Result<ReferenceOrOwnedRef<'a, N>, E>,
+    ) -> Result<ProofConfigurationRef<'a, N>, E> {
+        let verification_method = f(self.verification_method)?;
+
+        Ok(ProofConfigurationRef::new(
+            self.created,
+            verification_method,
+            self.proof_purpose,
+        ))
+    }
+
+    pub fn map_verification_method<N: 'a + Referencable>(
+        self,
+        f: impl FnOnce(ReferenceOrOwnedRef<'a, M>) -> ReferenceOrOwnedRef<'a, N>,
+    ) -> ProofConfigurationRef<'a, N> {
+        let verification_method = f(self.verification_method);
+
+        ProofConfigurationRef::new(self.created, verification_method, self.proof_purpose)
+    }
+
+    pub fn try_cast_verification_method<N: 'a + Referencable>(
+        self,
+    ) -> Result<ProofConfigurationRef<'a, N>, <M::Reference<'a> as TryInto<N::Reference<'a>>>::Error>
+    where
+        M::Reference<'a>: TryInto<N::Reference<'a>>,
+    {
+        self.try_map_verification_method(|m| Ok(m.try_cast()?))
+    }
+
     /// Returns the quads of the proof configuration, in canonical form.
     pub fn quads<T: CryptographicSuite>(&self, suite: &T) -> Vec<Quad>
     where
-        M: LinkedDataVerificationMethod
+        M::Reference<'a>: LinkedDataVerificationMethod,
     {
         let mut result: Vec<Quad> = Vec::new();
 

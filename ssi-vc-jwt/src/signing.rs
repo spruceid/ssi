@@ -54,14 +54,14 @@ pub struct LdOptions<I> {
 /// Signature algorithm.
 pub struct VcJwtSignature;
 
-impl SignatureAlgorithm<verification::Method> for VcJwtSignature {
+impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignature {
     type Signature = Vec<u8>;
 
     type Protocol = ();
 
     fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
         &self,
-        method: &verification::Method,
+        method: verification::AnyJwkMethodRef,
         bytes: &[u8],
         signer: &S
     ) -> Result<Self::Signature, SignatureError> {
@@ -69,8 +69,8 @@ impl SignatureAlgorithm<verification::Method> for VcJwtSignature {
     }
 
     fn verify(&self,
-        signature: &Self::Signature,
-        method: &verification::Method,
+        signature: &[u8],
+        method: verification::AnyJwkMethodRef,
         bytes: &[u8]
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
         todo!()
@@ -83,9 +83,9 @@ impl<C: Sync> VcJwt<C> {
         vocabulary: &mut V,
         interpretation: &I,
         loader: &mut L,
-        signer: &impl Signer<verification::Method, ()>,
+        signer: &impl Signer<verification::AnyJwkMethod, ()>,
         credential: C,
-        method: verification::Method,
+        signer_info: verification::Issuer,
         options: LdOptions<V::Iri>,
     ) -> Result<Verifiable<Self>, Error<L::ContextError>>
     where
@@ -175,8 +175,13 @@ impl<C: Sync> VcJwt<C> {
         let signing_bytes = header.encode_signing_bytes(&payload);
 
         // Build proof.
-        let signature = signer.sign(VcJwtSignature,&method, &signing_bytes)?;
-        let proof = Proof::new(signature, method);
+        let signature = signer.sign(
+            VcJwtSignature,
+            signer_info.id(),
+            signer_info.method_reference(),
+            &signing_bytes
+        ).await?;
+        let proof = Proof::new(signature, signer_info);
 
         // Build non-verifiable JWT credential.
         let jwt_credential = unsafe { Self::new_unchecked(credential, signing_bytes) };

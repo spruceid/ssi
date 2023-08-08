@@ -1,6 +1,4 @@
-use std::{borrow::Cow, hash::Hash};
-
-use async_trait::async_trait;
+use std::hash::Hash;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
@@ -10,16 +8,13 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    signature, ControllerProvider, ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, VerificationError,
+    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, VerificationError, Referencable
 };
 
-// mod context;
-// pub use context::*;
+pub const TEZOS_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#TezosMethod2021");
 
-pub const THEZOS_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#TezosMethod2021");
-
-pub const THEZOS_METHOD_2021_TYPE: &str = "TezosMethod2021";
+pub const TEZOS_METHOD_2021_TYPE: &str = "TezosMethod2021";
 
 /// `TezosMethod2021` Verification Method.
 ///
@@ -88,21 +83,29 @@ impl PublicKey {
     // }
 }
 
+impl Referencable for TezosMethod2021 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for TezosMethod2021 {
     fn id(&self) -> Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 
     fn expected_type() -> Option<ExpectedType> {
-        Some(THEZOS_METHOD_2021_TYPE.to_string().into())
+        Some(TEZOS_METHOD_2021_TYPE.to_string().into())
     }
 
     fn type_(&self) -> &str {
-        THEZOS_METHOD_2021_TYPE
+        TEZOS_METHOD_2021_TYPE
     }
 }
 
@@ -149,7 +152,7 @@ impl LinkedDataVerificationMethod for TezosMethod2021 {
         quads.push(Quad(
             Id::Iri(self.id.clone()),
             RDF_TYPE_IRI.into(),
-            Object::Id(Id::Iri(THEZOS_METHOD_2021_IRI.into())),
+            Object::Id(Id::Iri(TEZOS_METHOD_2021_IRI.into())),
             None,
         ));
 
