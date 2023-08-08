@@ -56,12 +56,12 @@ impl<C> Deref for VcJwt<C> {
 /// JWS proof.
 pub struct Proof {
     signature: Vec<u8>,
-    method: verification::Method,
+    issuer: verification::Issuer
 }
 
 impl Proof {
-    pub fn new(signature: Vec<u8>, method: verification::Method) -> Self {
-        Self { signature, method }
+    pub fn new(signature: Vec<u8>, signer: verification::Issuer) -> Self {
+        Self { signature, issuer: signer }
     }
 
     pub fn into_signature(self) -> Vec<u8> {

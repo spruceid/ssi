@@ -1,13 +1,14 @@
 use std::{
     fmt,
-    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign},
+    ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign}, future::Future, pin::Pin,
+    task
 };
 
-use async_trait::async_trait;
 use iref::{Iri, IriBuf};
+use pin_project::pin_project;
 use static_iref::iri;
 
-use crate::SignatureAlgorithm;
+use crate::{SignatureAlgorithm, Referencable, ReferenceOrOwnedRef, ControllerProvider, VerificationMethodRef, EnsureAllowsVerificationMethod};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerificationError {
@@ -43,6 +44,9 @@ pub enum VerificationError {
     #[error("invalid use of key with <{0}>")]
     InvalidKeyUse(ProofPurpose),
 
+    #[error("missing signature")]
+    MissingSignature,
+
     #[error("invalid signature")]
     InvalidSignature,
 
@@ -57,6 +61,9 @@ pub enum VerificationError {
     /// Unsupported controller scheme.
     #[error("unsupported key controller scheme `{0}`")]
     UnsupportedControllerScheme(String),
+
+    #[error("missing verification method")]
+    MissingVerificationMethod,
 
     #[error("invalid verification method `{0}`")]
     InvalidVerificationMethod(IriBuf),
@@ -73,20 +80,135 @@ impl From<std::convert::Infallible> for VerificationError {
 }
 
 /// Verifier.
-#[async_trait]
-pub trait Verifier<M>: Sync {
+pub trait Verifier<M: Referencable>: Sync + ControllerProvider {
+    /// Future returned by the `resolve_verification_method` method.
+    type ResolveVerificationMethod<'a, 'm: 'a>: 'a + Future<Output = Result<M::Reference<'a>, VerificationError>> where Self: 'a, M: 'm;
+
+    /// Resolve the verification method reference.
+    fn resolve_verification_method<'a, 'm: 'a>(
+        &'a self,
+        issuer: Option<Iri<'a>>,
+        method: Option<ReferenceOrOwnedRef<'m, M>>
+    ) -> Self::ResolveVerificationMethod<'a, 'm>;
+
     /// Verify the given `signature`, signed using the given `algorithm`,
     /// against the input `signing`.
-    async fn verify<A: SignatureAlgorithm<M>>(
-        &self,
+    fn verify<'f, 'm, 's, A: SignatureAlgorithm<M>>(
+        &'f self,
         algorithm: A,
-        method: &M,
+        issuer: Option<Iri<'f>>,
+        method_reference: Option<ReferenceOrOwnedRef<'m, M>>,
         proof_purpose: ProofPurpose,
-        signing_bytes: &[u8],
-        signature: &A::Signature,
-    ) -> Result<bool, VerificationError>
+        signing_bytes: &'f [u8],
+        signature: <A::Signature as Referencable>::Reference<'s>,
+    ) -> Verify<'f, 'm, 's, M, Self, A>
     where
-        M: 'async_trait;
+        M: 'f + 'm + Referencable
+    {
+        let resolution = self.resolve_verification_method(issuer, method_reference);
+
+        Verify {
+            verifier: self,
+            proof_purpose,
+            data: Some(VerifyData {
+                algorithm,
+                signature,
+                signing_bytes
+            }),
+            resolution,
+            check_purpose: None
+        }
+    }
+}
+
+#[pin_project]
+pub struct Verify<'f, 'm: 'f, 's: 'f, M: 'm + Referencable, V: 'f + ?Sized + Verifier<M>, A: SignatureAlgorithm<M>> {
+    verifier: &'f V,
+
+    proof_purpose: ProofPurpose,
+
+    data: Option<VerifyData<'f, 's, A, A::Signature>>,
+
+    #[pin]
+    resolution: V::ResolveVerificationMethod<'f, 'm>,
+
+    #[pin]
+    check_purpose: Option<VerifyProofPurpose<'f, M, V>>
+}
+
+struct VerifyData<'f, 's: 'f, A, S: 's + Referencable> {
+    algorithm: A,
+
+    signature: S::Reference<'s>,
+
+    signing_bytes: &'f [u8],
+}
+
+#[pin_project]
+struct VerifyProofPurpose<'a, M: 'a + Referencable, V: ?Sized + ControllerProvider> {
+    method: Option<M::Reference<'a>>,
+    
+    #[pin]
+    inner: Option<EnsureAllowsVerificationMethod<'a, V>>,
+}
+
+impl<'f, 'm, 's, M: 'm + Referencable, V: 'f + ?Sized + Verifier<M>, A: SignatureAlgorithm<M>> Future for Verify<'f, 'm, 's, M, V, A>
+where
+    M::Reference<'f>: VerificationMethodRef<'f>
+{
+    type Output = Result<bool, VerificationError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let mut this = self.project();
+        
+        if this.check_purpose.is_some() {
+            let check_purpose = this.check_purpose.as_pin_mut().unwrap().project();
+            
+            match check_purpose.inner.as_pin_mut() {
+                Some(inner) => {
+                    inner.poll(cx).map(|check_result| {
+                        check_result.and_then(|()| {
+                            let data = this.data.take().unwrap();
+                            data.algorithm.verify(
+                                data.signature,
+                                check_purpose.method.take().unwrap(),
+                                data.signing_bytes
+                            )
+                        })
+                    })
+                }
+                None => {
+                    let data = this.data.take().unwrap();
+                    task::Poll::Ready(data.algorithm.verify(
+                        data.signature,
+                        check_purpose.method.take().unwrap(),
+                        data.signing_bytes
+                    ))
+                }
+            }
+        } else {
+            match this.resolution.poll(cx) {
+                task::Poll::Pending => task::Poll::Pending,
+                task::Poll::Ready(Ok(method)) => {
+                    let inner = method.controller().map(|controller| {
+                        this.verifier.ensure_allows_verification_method(
+                            controller,
+                            method.id(),
+                            *this.proof_purpose
+                        )
+                    });
+                    
+                    this.check_purpose.set(Some(VerifyProofPurpose {
+                        method: Some(method),
+                        inner
+                    }));
+
+                    task::Poll::Pending
+                },
+                task::Poll::Ready(Err(e)) => task::Poll::Ready(Err(e))
+            }
+        }       
+    }
 }
 
 macro_rules! proof_purposes {

@@ -1,10 +1,10 @@
-use ssi_verification_methods::RsaVerificationKey2018;
+use ssi_verification_methods::{InvalidSignature, Referencable, RsaVerificationKey2018};
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError},
-    CryptographicSuite, ProofConfiguration
+    suite::{sha256_hash, AnySignature, AnySignatureRef, HashError},
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 /// RSA Signature Suite 2018.
@@ -41,7 +41,7 @@ impl CryptographicSuite for RsaSignature2018 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
@@ -52,9 +52,46 @@ impl CryptographicSuite for RsaSignature2018 {
 }
 
 /// Signature type.
+#[derive(Debug, Clone)]
 pub struct Signature {
-    /// Signature value.
-    pub signature_value: String
+    /// Base64-encoded signature value.
+    pub signature_value: String,
+}
+
+impl Referencable for Signature {
+    type Reference<'a> = SignatureRef<'a> where Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        SignatureRef {
+            signature_value: &self.signature_value,
+        }
+    }
+}
+
+impl From<Signature> for AnySignature {
+    fn from(value: Signature) -> Self {
+        AnySignature {
+            signature_value: Some(value.signature_value),
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct SignatureRef<'a> {
+    /// Base64-encoded signature value.
+    pub signature_value: &'a str,
+}
+
+impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
+        match value.signature_value {
+            Some(v) => Ok(Self { signature_value: v }),
+            None => Err(InvalidSignature::MissingValue),
+        }
+    }
 }
 
 /// Signature algorithm.
@@ -69,16 +106,17 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
         &self,
         method: &RsaVerificationKey2018,
         bytes: &[u8],
-        signer: &S
+        signer: &S,
     ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
         todo!()
     }
 
-    fn verify(&self,
-            signature: &Self::Signature,
-            method: &RsaVerificationKey2018,
-            bytes: &[u8]
-        ) -> Result<bool, ssi_verification_methods::VerificationError> {
+    fn verify(
+        &self,
+        signature: SignatureRef,
+        method: &RsaVerificationKey2018,
+        bytes: &[u8],
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
         todo!()
     }
 }

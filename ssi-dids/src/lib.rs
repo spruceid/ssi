@@ -12,7 +12,7 @@ use async_trait::async_trait;
 pub use did::*;
 pub use document::Document;
 pub use resolution::DIDResolver;
-use ssi_verification_methods::VerificationMethodRef;
+use ssi_verification_methods::ProofPurposes;
 
 pub struct Provider<T> {
     resolver: T,
@@ -23,7 +23,7 @@ impl ssi_verification_methods::Controller for Document {
     fn allows_verification_method(
         &self,
         id: iref::Iri,
-        proof_purposes: ssi_crypto::ProofPurposes,
+        proof_purposes: ProofPurposes,
     ) -> bool {
         DIDURL::new(id.as_bytes()).is_ok_and(|url| {
             self.verification_relationships
@@ -57,8 +57,8 @@ impl<T: Send + DIDResolver> ssi_verification_methods::ControllerProvider for Pro
     }
 }
 
-#[async_trait]
-impl<T: Send + DIDResolver, M, S: ssi_crypto::Referencable> ssi_crypto::Verifier<ssi_verification_methods::Reference<M>, S>
+// #[async_trait]
+impl<T: Send + DIDResolver, M> ssi_verification_methods::Verifier<M>
     for Provider<T>
 where
     M: Send
@@ -66,71 +66,77 @@ where
         + TryFrom<document::AnyVerificationMethod>
         + ssi_verification_methods::VerificationMethod,
     M::Error: Send,
-    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M, S>,
-    for<'a> S::Reference<'a>: Send,
+    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a>
 {
-    async fn verify<'m, 's>(
-        &self,
-        method: ssi_verification_methods::ReferenceRef<'m, M>,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        signature: S::Reference<'s>,
-    ) -> Result<bool, ssi_crypto::VerificationError>
-    where
-        M: 'async_trait,
-    {
-        if method.iri().scheme() == "did" {
-            match DIDURL::new(method.iri().as_bytes()) {
-                Ok(url) => {
-                    let options = self.options.clone().into();
-                    match self.resolver.dereference(url, &options).await {
-                        Ok(deref) => {
-                            match deref.content.into_verification_method() {
-                                Ok(any_method) => match M::try_from(any_method) {
-                                    Ok(m) => {
-                                        m.verify(
-                                            self,
-                                            proof_purpose,
-                                            signing_bytes,
-                                            signature,
-                                        )
-                                        .await
-                                    }
-                                    Err(_) => {
-                                        // Wrong verification method type, or invalid method data.
-                                        Err(ssi_crypto::VerificationError::InvalidKeyId(
-                                            method.iri().to_string(),
-                                        ))
-                                    }
-                                },
-                                Err(_) => {
-                                    // The IRI is not referring to a verification method.
-                                    Err(ssi_crypto::VerificationError::InvalidKeyId(
-                                        method.iri().to_string(),
-                                    ))
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            // Dereferencing failed for some reason.
-                            Err(ssi_crypto::VerificationError::InternalError(Box::new(e)))
-                        }
-                    }
-                }
-                Err(_) => {
-                    // The IRI is not a valid DID URL.
-                    Err(ssi_crypto::VerificationError::InvalidKeyId(
-                        method.iri().to_string(),
-                    ))
-                }
-            }
-        } else {
-            // Not a DID scheme.
-            Err(ssi_crypto::VerificationError::UnsupportedKeyId(
-                method.iri().to_string(),
-            ))
-        }
+    fn resolve_verification_method<'async_trait, 'a: 'async_trait, 'm: 'async_trait>(
+        &'a self,
+        method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>
+    ) -> std::pin::Pin<Box<dyn 'async_trait + Send + futures::Future<Output = Result<<M as ssi_verification_methods::Referencable>::Reference<'m>, ssi_verification_methods::VerificationError>>>> {
+        // ...
     }
+
+    // async fn verify<'m, 's>(
+    //     &self,
+    //     method: ssi_verification_methods::ReferenceRef<'m, M>,
+    //     proof_purpose: ssi_crypto::ProofPurpose,
+    //     signing_bytes: &[u8],
+    //     signature: S::Reference<'s>,
+    // ) -> Result<bool, ssi_crypto::VerificationError>
+    // where
+    //     M: 'async_trait,
+    // {
+    //     if method.iri().scheme() == "did" {
+    //         match DIDURL::new(method.iri().as_bytes()) {
+    //             Ok(url) => {
+    //                 let options = self.options.clone().into();
+    //                 match self.resolver.dereference(url, &options).await {
+    //                     Ok(deref) => {
+    //                         match deref.content.into_verification_method() {
+    //                             Ok(any_method) => match M::try_from(any_method) {
+    //                                 Ok(m) => {
+    //                                     m.verify(
+    //                                         self,
+    //                                         proof_purpose,
+    //                                         signing_bytes,
+    //                                         signature,
+    //                                     )
+    //                                     .await
+    //                                 }
+    //                                 Err(_) => {
+    //                                     // Wrong verification method type, or invalid method data.
+    //                                     Err(ssi_crypto::VerificationError::InvalidKeyId(
+    //                                         method.iri().to_string(),
+    //                                     ))
+    //                                 }
+    //                             },
+    //                             Err(_) => {
+    //                                 // The IRI is not referring to a verification method.
+    //                                 Err(ssi_crypto::VerificationError::InvalidKeyId(
+    //                                     method.iri().to_string(),
+    //                                 ))
+    //                             }
+    //                         }
+    //                     }
+    //                     Err(e) => {
+    //                         // Dereferencing failed for some reason.
+    //                         Err(ssi_crypto::VerificationError::InternalError(Box::new(e)))
+    //                     }
+    //                 }
+    //             }
+    //             Err(_) => {
+    //                 // The IRI is not a valid DID URL.
+    //                 Err(ssi_crypto::VerificationError::InvalidKeyId(
+    //                     method.iri().to_string(),
+    //                 ))
+    //             }
+    //         }
+    //     } else {
+    //         // Not a DID scheme.
+    //         Err(ssi_crypto::VerificationError::UnsupportedKeyId(
+    //             method.iri().to_string(),
+    //         ))
+    //     }
+    // }
 }
 
 #[async_trait]

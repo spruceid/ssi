@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
-default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "thezos", "eip712"]
+default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "thezos", "eip712", "aleo", "solana"]
 # enable RSA keys
 rsa = []
 # enable ed25519 keys
@@ -24,6 +24,10 @@ secp384r1 = ["p384"]
 thezos = ["ssi-tzkey"]
 
 eip712 = ["ssi-eip712"]
+
+aleo = []
+
+solana = []
 
 [dependencies]
 ssi-crypto.workspace = true
@@ -46,6 +50,9 @@ treeldr-rust-prelude.workspace = true
 ssi-multicodec.workspace = true
 multibase.workspace = true
 hex.workspace = true
+derivative.workspace = true
+pin-project.workspace = true
+futures = "0.3.28"
 
 ed25519-dalek = { version = "1", optional = true }
 k256 = { version = "0.11", optional = true, features = ["ecdsa", "sha256"] }

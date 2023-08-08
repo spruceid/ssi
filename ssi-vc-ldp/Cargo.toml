@@ -10,7 +10,7 @@ documentation = "https://docs.rs/ssi-ldp/"
 
 [features]
 # Default features.
-default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "thezos", "eip712"]
+default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "thezos", "eip712", "aleo", "solana"]
 
 # Enables signature suites specified by the W3C.
 w3c = ["ssi-eip712"]
@@ -40,13 +40,13 @@ rsa = ["ssi-verification-methods/rsa"]
 thezos = ["serde_json", "serde_jcs", "ssi-tzkey"]
 
 # Enables `AleoSignature2021`
-aleo = []
+aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo"]
 
 # Enables `Eip712Signature2021`
 eip712 = ["ssi-eip712"]
 
 # Enables `SolanaSignature2021`
-solana = []
+solana = ["ssi-verification-methods/solana"]
 
 # Enables `EthereumPersonalSignature2021`
 ethereum = []
@@ -64,6 +64,7 @@ ssi-vc.workspace = true
 ssi-security.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
 ssi-eip712 = { workspace = true, optional = true }
+ssi-caips.workspace = true
 chrono.workspace = true
 multibase.workspace = true
 iref.workspace = true
@@ -73,7 +74,9 @@ json-ld.workspace = true
 grdf.workspace = true
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
-futures = "0.3"
+pin-project.workspace = true
+derivative.workspace = true
+self_cell = "1.0.1"
 
 ed25519-dalek = { version = "1", optional = true }
 k256 = { version = "0.11", optional = true, features = ["ecdsa", "sha256"] }

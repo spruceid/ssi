@@ -37,6 +37,7 @@ digest = "0.9"
 iref.workspace = true
 static-iref.workspace = true
 async-trait.workspace = true
+multibase.workspace = true
 
 [dev-dependencies]
 hex = "0.4"

@@ -11,14 +11,12 @@
 use iref::{Iri, IriBuf};
 use static_iref::iri;
 
-// mod context;
 mod controller;
 mod methods;
 mod reference;
 pub mod signature;
 pub mod verification;
 
-// pub use context::*;
 pub use controller::*;
 pub use methods::*;
 pub use reference::*;
@@ -62,8 +60,30 @@ impl From<String> for ExpectedType {
     }
 }
 
+pub trait Referencable {
+    type Reference<'a>: Copy where Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_>;
+}
+
+impl<'t, T> Referencable for &'t T {
+    type Reference<'a> = &'t T where Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
+impl Referencable for Vec<u8> {
+    type Reference<'a> = &'a [u8] where Self: 'a;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 /// Verification method.
-pub trait VerificationMethod {
+pub trait VerificationMethod: Referencable {
     /// Identifier of the verification method.
     fn id(&self) -> Iri;
 
@@ -73,7 +93,7 @@ pub trait VerificationMethod {
     fn type_(&self) -> &str;
 
     /// Returns the IRI of the verification method controller.
-    fn controller(&self) -> Iri; // Should be an URI.
+    fn controller(&self) -> Option<Iri>; // Should be an URI.
 
     // fn verify<'f, 'a: 'f, 's: 'f, S: ssi_crypto::Referencable>(
     //     &'a self,
@@ -96,6 +116,24 @@ pub trait VerificationMethod {
     // }
 }
 
+pub trait VerificationMethodRef<'m> {
+    /// Identifier of the verification method.
+    fn id(&self) -> Iri<'m>;
+
+    /// Returns the IRI of the verification method controller.
+    fn controller(&self) -> Option<Iri<'m>>; // Should be an URI.
+}
+
+impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
+    fn id(&self) -> Iri<'m> {
+        M::id(self)
+    }
+
+    fn controller(&self) -> Option<Iri<'m>> {
+        M::controller(self)
+    }
+}
+
 pub trait LinkedDataVerificationMethod {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object;
 }
@@ -111,6 +149,12 @@ impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T
 pub struct InvalidVerificationMethod(pub IriBuf);
 
 impl From<InvalidVerificationMethod> for VerificationError {
+    fn from(value: InvalidVerificationMethod) -> Self {
+        Self::InvalidVerificationMethod(value.0)
+    }
+}
+
+impl From<InvalidVerificationMethod> for SignatureError {
     fn from(value: InvalidVerificationMethod) -> Self {
         Self::InvalidVerificationMethod(value.0)
     }

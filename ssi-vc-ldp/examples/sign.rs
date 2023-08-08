@@ -1,15 +1,17 @@
 //! This example shows how to sign and verify a custom credential type crafted
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
+use std::future;
+
 use chrono::Utc;
 use hashbrown::HashMap;
 use iref::{Iri, IriBuf};
 use json_ld::{Compact, Print};
 use rdf_types::{vocabulary::IriIndex, IndexVocabulary, IriVocabularyMut};
-use ssi_crypto::{ProofPurpose, ProofPurposes};
 use ssi_vc_ldp::{suite::Ed25519Signature2020, DataIntegrity};
 use ssi_verification_methods::{
-    Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ReferenceOrOwned,
-    ReferenceOrOwnedRef, VerificationMethod,
+    Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
+    ProofPurposes, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureError, Signer,
+    VerificationError, VerificationMethod, Verifier,
 };
 use static_iref::{iref, iri};
 use treeldr_rust_macros::tldr;
@@ -70,9 +72,7 @@ async fn main() {
     let mut controller = KeyController::default();
     controller.insert_key(
         iri!("https://example.com/controller#key").to_owned(),
-        ProofPurpose::AssertionMethod
-            | ProofPurpose::Authentication
-            | ProofPurpose::CapabilityDelegation,
+        ProofPurpose::Assertion | ProofPurpose::Authentication | ProofPurpose::CapabilityDelegation,
     );
     keyring.insert_controller(
         iri!("https://example.com/controller").to_owned(),
@@ -81,10 +81,10 @@ async fn main() {
 
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
-    let proof_options = ssi_vc_ldp::ProofOptions::new(
+    let proof_options = ssi_vc_ldp::ProofConfiguration::new(
         Utc::now(),
         iri!("https://example.com/controller#key").to_owned().into(),
-        ProofPurpose::AssertionMethod,
+        ProofPurpose::Assertion,
     );
 
     // We use the Linked-Data-based cryptographic suite `Ed25519Signature2020`.
@@ -102,7 +102,9 @@ async fn main() {
         credential,
         Ed25519Signature2020,
         proof_options.clone(),
+        (),
     )
+    .await
     .expect("signing failed");
 
     // Verify the generated verifiable credential.
@@ -113,51 +115,51 @@ async fn main() {
         .into_result()
         .expect("invalid proof");
 
-    // Put the verifiable credential in JSON-LD form.
-    let json_ld = Meta(verifiable_credential, ()).into_json_ld(&mut vocabulary, &interpretation);
+    // // Put the verifiable credential in JSON-LD form.
+    // let json_ld = Meta(verifiable_credential, ()).into_json_ld(&mut vocabulary, &interpretation);
 
-    // The generated JSON-LD is in expanded form. We want to compact it.
-    // We will use the context definitions defined in the
-    // `ssi-vc-ldp/examples/assets` folder.
-    let mut loader: json_ld::FsLoader<IriIndex, ()> =
-        json_ld::FsLoader::new(|_, _, s| json_ld::syntax::Value::parse_str(s, |_| ()));
-    loader.mount(
-        vocabulary.insert(iri!("https://www.w3.org/")),
-        "ssi-vc-ldp/examples/assets/www.w3.org",
-    );
-    loader.mount(
-        vocabulary.insert(iri!("https://w3id.org/")),
-        "ssi-vc-ldp/examples/assets/w3id.org",
-    );
+    // // The generated JSON-LD is in expanded form. We want to compact it.
+    // // We will use the context definitions defined in the
+    // // `ssi-vc-ldp/examples/assets` folder.
+    // let mut loader: json_ld::FsLoader<IriIndex, ()> =
+    //     json_ld::FsLoader::new(|_, _, s| json_ld::syntax::Value::parse_str(s, |_| ()));
+    // loader.mount(
+    //     vocabulary.insert(iri!("https://www.w3.org/")),
+    //     "ssi-vc-ldp/examples/assets/www.w3.org",
+    // );
+    // loader.mount(
+    //     vocabulary.insert(iri!("https://w3id.org/")),
+    //     "ssi-vc-ldp/examples/assets/w3id.org",
+    // );
 
-    // Pick and process the LD context used for compaction.
-    let context = Meta(
-        json_ld::syntax::context::Value::Many(vec![
-            Meta(
-                json_ld::syntax::Context::IriRef(iref!("https://w3id.org/security/v1").to_owned()),
-                (),
-            ),
-            Meta(
-                json_ld::syntax::Context::IriRef(
-                    iref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
-                ),
-                (),
-            ),
-        ]),
-        (),
-    );
-    let processed_context = context
-        .process(&mut vocabulary, &mut loader, None)
-        .await
-        .expect("unable to process context");
+    // // Pick and process the LD context used for compaction.
+    // let context = Meta(
+    //     json_ld::syntax::context::Value::Many(vec![
+    //         Meta(
+    //             json_ld::syntax::Context::IriRef(iref!("https://w3id.org/security/v1").to_owned()),
+    //             (),
+    //         ),
+    //         Meta(
+    //             json_ld::syntax::Context::IriRef(
+    //                 iref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
+    //             ),
+    //             (),
+    //         ),
+    //     ]),
+    //     (),
+    // );
+    // let processed_context = context
+    //     .process(&mut vocabulary, &mut loader, None)
+    //     .await
+    //     .expect("unable to process context");
 
-    // Compact the JSON-LD document.
-    let compact = json_ld
-        .compact_with(&mut vocabulary, processed_context.as_ref(), &mut loader)
-        .await
-        .expect("unable to compact document");
+    // // Compact the JSON-LD document.
+    // let compact = json_ld
+    //     .compact_with(&mut vocabulary, processed_context.as_ref(), &mut loader)
+    //     .await
+    //     .expect("unable to compact document");
 
-    println!("{}", compact.pretty_print())
+    // println!("{}", compact.pretty_print())
 }
 
 /// Simple key controller, just for this example.
@@ -174,11 +176,7 @@ impl KeyController {
 }
 
 impl Controller for KeyController {
-    fn allows_verification_method(
-        &self,
-        id: Iri,
-        proof_purposes: ssi_crypto::ProofPurposes,
-    ) -> bool {
+    fn allows_verification_method(&self, id: Iri, proof_purposes: ProofPurposes) -> bool {
         self.keys
             .get(&id)
             .is_some_and(|p| p.contains_all(proof_purposes))
@@ -218,59 +216,71 @@ impl Keyring {
     }
 }
 
-impl ssi_crypto::Signer<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyring {
-    fn sign(
-        &self,
-        method: &ReferenceOrOwned<Ed25519VerificationKey2020>,
-        bytes: &[u8],
-    ) -> Result<((), ssi_verification_methods::signature::Multibase), ssi_crypto::SignatureError>
+impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
+    type Sign<'a, 'm: 'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>> = future::Ready<Result<A::Signature, SignatureError>> where A::Signature: 'a;
+
+    fn sign<'a, 'm: 'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>>(
+        &'a self,
+        algorithm: A,
+        _issuer: Option<Iri<'a>>,
+        method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
+        bytes: &'a [u8],
+    ) -> Self::Sign<'a, 'm, A>
+    where
+        A::Signature: 'a,
     {
         let id = match method {
-            ReferenceOrOwned::Owned(key) => key.id(),
-            ReferenceOrOwned::Reference(id) => id.iri(),
+            Some(ReferenceOrOwnedRef::Owned(key)) => key.id(),
+            Some(ReferenceOrOwnedRef::Reference(id)) => id,
+            None => return future::ready(Err(SignatureError::MissingVerificationMethod)),
         };
 
-        match self.keys.get(&id) {
-            Some((method, key)) => Ok(((), method.sign(bytes, key))),
-            None => Err(ssi_crypto::SignatureError::UnknownVerificationMethod),
-        }
+        let result = match self.keys.get(&id) {
+            Some((method, key)) => {
+                // algorithm.sign(method, bytes, signer)
+                todo!()
+            }
+            None => Err(SignatureError::UnknownVerificationMethod),
+        };
+
+        future::ready(result)
     }
 }
 
-#[async_trait::async_trait]
 impl ControllerProvider for Keyring {
     type Controller<'a> = &'a KeyController;
 
-    async fn get_controller(
-        &self,
-        id: Iri<'_>,
-    ) -> Result<Option<Self::Controller<'_>>, ControllerError> {
-        Ok(self.controllers.get(&id.to_owned()))
+    type GetController<'a> = future::Ready<Result<Option<Self::Controller<'a>>, ControllerError>>;
+
+    fn get_controller(&self, id: Iri<'_>) -> Self::GetController<'_> {
+        future::ready(Ok(self.controllers.get(&id.to_owned())))
     }
 }
 
-#[async_trait::async_trait]
-impl ssi_crypto::Verifier<ReferenceOrOwned<Ed25519VerificationKey2020>> for Keyring {
-    async fn verify<'c: 'async_trait, 'm: 'async_trait, 's: 'async_trait>(
-        &self,
-        context: (),
-        method: ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>,
-        purpose: ssi_crypto::ProofPurpose,
-        bytes: &[u8],
-        signature: &'s ssi_vc::schema::sec::layout::Multibase,
-    ) -> Result<bool, ssi_crypto::VerificationError> {
-        match method {
-            ReferenceOrOwnedRef::Owned(key) => {
+impl Verifier<Ed25519VerificationKey2020> for Keyring {
+    type ResolveVerificationMethod<'a, 'm: 'a> =
+        future::Ready<Result<&'a Ed25519VerificationKey2020, VerificationError>>;
+
+    fn resolve_verification_method<'a, 'm: 'a>(
+        &'a self,
+        _issuer: Option<Iri<'a>>,
+        method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
+    ) -> Self::ResolveVerificationMethod<'a, 'm> {
+        let result = match method {
+            Some(ReferenceOrOwnedRef::Owned(_key)) => {
                 // If we get here, this means the VC embeds the public key used
                 // to sign itself. It cannot really be trusted then.
                 // It would be safer to either throw an error or at least fetch
                 // the actual key using its id.
-                key.verify_bytes(self, context, purpose, bytes, signature).await
+                todo!()
             }
-            ReferenceOrOwnedRef::Reference(id) => match self.keys.get(&id.iri()) {
-                Some(key) => key.0.verify_bytes(self, context, purpose, bytes, signature).await,
-                None => Err(ssi_crypto::VerificationError::UnknownKey),
+            Some(ReferenceOrOwnedRef::Reference(id)) => match self.keys.get(&id) {
+                Some((key, _)) => Ok(key),
+                None => Err(VerificationError::UnknownKey),
             },
-        }
+            None => Err(VerificationError::MissingVerificationMethod),
+        };
+
+        future::ready(result)
     }
 }

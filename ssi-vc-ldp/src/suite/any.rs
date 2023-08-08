@@ -1,6 +1,11 @@
-use crate::{suite::HashError, verification, CryptographicSuite, ProofConfiguration, ProofConfigurationRef};
-use std::future::Future;
-use std::pin::Pin;
+use crate::{
+    suite::{AnySignature, AnySignatureRef, HashError},
+    CryptographicSuite, ProofConfigurationRef,
+};
+use ssi_verification_methods::{AnyMethod, AnyMethodRef, SignatureError, VerificationError};
+
+mod protocol;
+pub use protocol::AnySignatureProtocol;
 
 macro_rules! crypto_suites {
     {
@@ -29,14 +34,70 @@ macro_rules! crypto_suites {
             ),*
         }
 
+        pub enum SignatureAlgorithm {
+            $(
+                $(#[cfg($($t)*)])?
+                $name(<super::$name as $crate::CryptographicSuite>::SignatureAlgorithm)
+            ),*
+        }
+
+        impl ssi_verification_methods::SignatureAlgorithm<AnyMethod> for SignatureAlgorithm {
+            type Signature = AnySignature;
+
+            type Protocol = AnySignatureProtocol;
+
+            fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+                &self,
+                method: AnyMethodRef,
+                bytes: &[u8],
+                signer: &S
+            ) -> Result<Self::Signature, SignatureError> {
+                match self {
+                    $(
+                        Self::$name(a) => {
+                            let projected_signer = ssi_crypto::ProjectedMessageSigner::new(signer);
+                            Ok(a.sign(
+                                method.try_into()?,
+                                bytes,
+                                &projected_signer
+                            )?.into())
+                        }
+                    ),*
+                }
+            }
+
+            fn verify(
+                &self,
+                signature: AnySignatureRef,
+                method: AnyMethodRef,
+                bytes: &[u8]
+            ) -> Result<bool, VerificationError> {
+                match self {
+                    $(
+                        Self::$name(a) => {
+                            a.verify(
+                                signature.try_into()?,
+                                method.try_into()?,
+                                bytes
+                            )
+                        }
+                    ),*
+                }
+            }
+        }
+
         // #[async_trait::async_trait]
         impl CryptographicSuite for Suite {
             type Transformed = String;
             type Hashed = [u8; 64];
 
-            type VerificationMethod = verification::MethodReferenceOrOwned<verification::method::Any>;
+            type VerificationMethod = AnyMethod;
 
-            type Signature = ssi_verification_methods::signature::Any;
+            type Signature = AnySignature;
+
+            type SignatureProtocol = AnySignatureProtocol;
+
+            type SignatureAlgorithm = SignatureAlgorithm;
 
             type Options = Options;
 
@@ -62,64 +123,22 @@ macro_rules! crypto_suites {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
-                        Self::$name => super::$name.hash(
-                            data,
-                            proof_configuration
-                                .try_cast_verification_method()
-                                .map_err(|_| HashError::InvalidVerificationMethod)?
-                        )
-                    ),*
-                }
-            }
-
-            fn generate_proof(
-                &self,
-                data: &Self::Hashed,
-                signer: &impl ssi_crypto::Signer<Self::VerificationMethod, Self::Signature>,
-                proof_configuration: ProofConfiguration<Self::VerificationMethod>,
-                options: Options
-            ) -> Result<crate::UntypedProof<Self::VerificationMethod, Self::Signature>, ssi_crypto::SignatureError> {
-                use ssi_verification_methods::IntoAnyVerificationMethod;
-                match self {
-                    $(
-                        $(#[cfg($($t)*)])?
                         Self::$name => {
-                            let signer = ssi_verification_methods::AnySigner(signer);
-                            super::$name.generate_proof(
+                            super::$name.hash(
                                 data,
-                                &signer,
                                 proof_configuration
                                     .try_cast_verification_method()
-                                    .map_err(|_| ssi_crypto::SignatureError::InvalidVerificationMethod)?,
-                                options.$field_name
-                            ).map(crate::UntypedProof::into_any_verification_method)
+                                    .map_err(|_| HashError::InvalidVerificationMethod)?
+                            )
                         }
                     ),*
                 }
             }
 
-            fn verify_proof<'async_trait, 'd: 'async_trait, 'v: 'async_trait, 'p: 'async_trait>(
-                &self,
-                data: &'d Self::Hashed,
-                verifier: &'v impl ssi_crypto::Verifier<Self::VerificationMethod, Self::Signature>,
-                proof: crate::UntypedProofRef<'p, Self::VerificationMethod, Self::Signature>,
-            ) -> Pin<Box<dyn 'async_trait + Send + Future<Output = Result<ssi_vc::ProofValidity, ssi_crypto::VerificationError>>>>
-            where
-                Self::VerificationMethod: 'async_trait,
-                Self::Signature: 'async_trait
-            {
+            fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
                 match self {
                     $(
-                        $(#[cfg($($t)*)])?
-                        Self::$name => Box::pin(async move {
-                            let verifier = ssi_verification_methods::AnyVerifier(verifier);
-                            let proof = proof.try_cast_verification_method()?;
-                            super::$name.verify_proof(
-                                data,
-                                &verifier,
-                                proof
-                            ).await
-                        })
+                        Self::$name => SignatureAlgorithm::$name(super::$name.setup_signature_algorithm())
                     ),*
                 }
             }

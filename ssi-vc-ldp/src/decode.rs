@@ -9,6 +9,7 @@ use rdf_types::{
 };
 use ssi_rdf::DatasetWithEntryPoint;
 use ssi_vc::Verifiable;
+use ssi_verification_methods::{Referencable, VerificationMethodRef};
 use static_iref::iri;
 use treeldr_rust_prelude::{grdf, locspan::Meta, FromRdf, FromRdfError};
 
@@ -78,6 +79,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         Proof<S>: FromRdf<V, I>,
         C: FromRdf<V, I>,
         S: CryptographicSuiteInput<DatasetWithEntryPoint<'a, V, I>>,
+        for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>, // TODO find a way to hide that bound, if possible.
     {
         input.relabel_and_canonicalize_with(vocabulary, generator);
 
@@ -143,11 +145,9 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 
                                 let transformed = proof
                                     .suite()
-                                    .transform(data, &params)
+                                    .transform(data, params.borrowed())
                                     .map_err(Error::Transform)?;
-                                let hashed = proof
-                                    .suite()
-                                    .hash(transformed, &params)?;
+                                let hashed = proof.suite().hash(transformed, params.borrowed())?;
 
                                 Ok(Verifiable::new(
                                     DataIntegrity::new(credential, hashed),

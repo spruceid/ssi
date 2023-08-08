@@ -9,7 +9,7 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError,
+    CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError, Referencable,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
@@ -94,6 +94,14 @@ impl EcdsaSecp256r1VerificationKey2019 {
     }
 }
 
+impl Referencable for EcdsaSecp256r1VerificationKey2019 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     /// Returns the identifier of the key.
     fn id(&self) -> Iri {
@@ -114,8 +122,8 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     }
 
     /// Returns an URI to the key controller.
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 }
 

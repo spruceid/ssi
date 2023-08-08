@@ -11,7 +11,7 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, VerificationError,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, VerificationError, Referencable,
 };
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
@@ -70,6 +70,14 @@ impl JsonWebKey2020 {
     }
 }
 
+impl Referencable for JsonWebKey2020 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for JsonWebKey2020 {
     /// Returns the identifier of the key.
     fn id(&self) -> Iri {
@@ -86,8 +94,8 @@ impl VerificationMethod for JsonWebKey2020 {
     }
 
     /// Returns an URI to the key controller.
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 }
 

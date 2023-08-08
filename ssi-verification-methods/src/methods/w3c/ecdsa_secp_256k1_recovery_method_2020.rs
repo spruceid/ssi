@@ -1,10 +1,9 @@
-use async_trait::async_trait;
 use hex::FromHexError;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_jws::CompactJWSString;
 use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, ETHEREUM_ADDRESS, PUBLIC_KEY_HEX, PUBLIC_KEY_JWK};
 use static_iref::iri;
 use std::hash::Hash;
@@ -12,7 +11,7 @@ use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMe
 
 use crate::{
     ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, signature, SignatureError, VerificationError,
+    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError, Referencable,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
@@ -37,6 +36,14 @@ pub struct EcdsaSecp256k1RecoveryMethod2020 {
     pub public_key: PublicKey,
 }
 
+impl Referencable for EcdsaSecp256k1RecoveryMethod2020 {
+    type Reference<'a> = &'a Self where Self: 'a;
+    
+    fn as_reference(&self) -> Self::Reference<'_> {
+        self
+    }
+}
+
 impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     /// Returns the identifier of the key.
     fn id(&self) -> Iri {
@@ -57,8 +64,8 @@ impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     }
 
     /// Returns an URI to the key controller.
-    fn controller(&self) -> Iri {
-        self.controller.as_iri()
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
     }
 }
 

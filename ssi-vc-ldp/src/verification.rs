@@ -1,31 +1,25 @@
-use std::{future::Future, pin::Pin};
+use method::{Referencable, VerificationMethodRef, Verifier};
 
-use method::{Verifier, VerificationError};
-use ssi_vc::ProofValidity;
+use crate::{suite::VerifyProof, CryptographicSuite, DataIntegrity, Proof};
 
-use crate::{CryptographicSuite, DataIntegrity, Proof};
-
-pub use method::{
-    Reference as MethodReference, ReferenceOrOwned as MethodReferenceOrOwned, VerificationMethod,
-};
+pub use method::{ReferenceOrOwned as MethodReferenceOrOwned, VerificationMethod};
 pub use ssi_verification_methods as method;
 
-impl<T: Sync, S: CryptographicSuite> ssi_vc::VerifiableWith for DataIntegrity<T, S> {
+impl<T, S: CryptographicSuite> ssi_vc::VerifiableWith for DataIntegrity<T, S>
+where
+    for<'a> <S::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
+{
     type Proof = Proof<S>;
     type Method = S::VerificationMethod;
 
-    fn verify_with<'life0, 'life1, 'life2, 'async_trait>(
-        &'life0 self,
-        verifier: &'life1 (impl 'async_trait + Verifier<Self::Method>),
-        proof: &'life2 Self::Proof,
-    ) -> Pin<Box<dyn Future<Output = Result<ProofValidity, VerificationError>> + Send + 'async_trait>>
-    where
-        'life0: 'async_trait,
-        'life1: 'async_trait,
-        'life2: 'async_trait,
-        Self: 'async_trait,
-    {
+    type VerifyWith<'a, V: Verifier<S::VerificationMethod>> = VerifyProof<'a, 'a, S, V> where Self: 'a, V: 'a;
+
+    fn verify_with<'a, V: Verifier<Self::Method>>(
+        &'a self,
+        verifier: &'a V,
+        proof: &'a Self::Proof,
+    ) -> VerifyProof<'a, 'a, S, V> {
         let suite = proof.suite();
-        suite.verify_proof(&self.hash, verifier, proof.untyped())
+        suite.verify_proof(&self.hash, verifier, proof.untyped().borrowed())
     }
 }

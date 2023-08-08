@@ -1,44 +1,44 @@
 //! EIP-712 Signature 2021 implementation.
 use rdf_types::Quad;
 use ssi_verification_methods::{
-    verification_method_union, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, Eip712Method2021
+    verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
+    Eip712Method2021,
 };
 use static_iref::iri;
 
 use crate::{
-    suite::{HashError, ethereum_eip712_signature_2021::Eip712Metadata},
-    CryptographicSuite, ProofConfiguration, CryptographicSuiteInput
+    suite::{Eip712Signature, Eip712SignatureRef, HashError},
+    CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 
 /// EIP-712 Signature 2021.
-/// 
+///
 /// Based on the [Ethereum EIP-712 Signature 2021][1] but working on
 /// Linked-Data documents.
-/// 
+///
 /// [1]: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
-/// 
+///
 /// # Input
-/// 
+///
 /// This suites accepts Linked Data documents.
-/// 
+///
 /// # Transformation algorithm
-/// 
+///
 /// The input document is converted into an RDF dataset and encoded into an
 /// a [EIP-712 `TypedData`][1] object.
-/// 
+///
 /// [1]: <https://eips.ethereum.org/EIPS/eip-712>
-/// 
+///
 /// # Hashing algorithm
-/// 
+///
 /// The transformed input is hashed using the `Keccak-256` algorithm.
-/// 
+///
 /// # Signature algorithm
-/// 
+///
 /// The hashed input is signed using the `ECDSA K-256` signature algorithm.
-/// 
+///
 /// # Verification methods
-/// 
+///
 /// The following verification methods can be used to sign/verify a credential
 /// with this suite:
 /// - [`Eip712Method2021`]
@@ -48,8 +48,8 @@ use crate::{
 pub struct Eip712Signature2021;
 
 verification_method_union! {
-    pub enum VerificationMethod {
-		Eip712Method2021,
+    pub enum VerificationMethod, VerificationMethodRef, VerificationMethodType {
+        Eip712Method2021,
         EcdsaSecp256k1VerificationKey2019,
         EcdsaSecp256k1RecoveryMethod2020
     }
@@ -62,11 +62,11 @@ impl CryptographicSuite for Eip712Signature2021 {
 
     type VerificationMethod = VerificationMethod;
 
-    type Signature = Signature;
+    type Signature = Eip712Signature;
 
-	type SignatureProtocol = ();
+    type SignatureProtocol = ();
 
-	type SignatureAlgorithm = SignatureAlgorithm;
+    type SignatureAlgorithm = SignatureAlgorithm;
 
     type Options = ();
 
@@ -82,51 +82,52 @@ impl CryptographicSuite for Eip712Signature2021 {
     fn hash(
         &self,
         data: ssi_eip712::TypedData,
-        _proof_configuration: &ProofConfiguration<Self::VerificationMethod>,
+        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
     ) -> Result<Self::Hashed, HashError> {
-        data.hash().map_err(|e| HashError::InvalidMessage(Box::new(e)))
+        data.hash()
+            .map_err(|e| HashError::InvalidMessage(Box::new(e)))
     }
 
-	fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-		SignatureAlgorithm
-	}
+    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
+        SignatureAlgorithm
+    }
 }
 
 impl<'a, V, I> CryptographicSuiteInput<ssi_rdf::DatasetWithEntryPoint<'a, V, I>>
-	for Eip712Signature2021
+    for Eip712Signature2021
 where
-	V: rdf_types::Vocabulary<
-		Type = rdf_types::literal::Type<
-			<V as rdf_types::IriVocabulary>::Iri,
-			<V as rdf_types::LanguageTagVocabulary>::LanguageTag,
-		>,
-		Value = String,
-	>,
-	I: rdf_types::ReverseTermInterpretation<
-		Iri = V::Iri,
-		BlankId = V::BlankId,
-		Literal = V::Literal,
-	>,
+    V: rdf_types::Vocabulary<
+        Type = rdf_types::literal::Type<
+            <V as rdf_types::IriVocabulary>::Iri,
+            <V as rdf_types::LanguageTagVocabulary>::LanguageTag,
+        >,
+        Value = String,
+    >,
+    I: rdf_types::ReverseTermInterpretation<
+        Iri = V::Iri,
+        BlankId = V::BlankId,
+        Literal = V::Literal,
+    >,
 {
-	type TransformError = std::convert::Infallible;
+    type TransformError = std::convert::Infallible;
 
-	/// Transformation algorithm.
-	fn transform(
-		&self,
-		data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
-		options: &ProofConfiguration<VerificationMethod>,
-	) -> Result<Self::Transformed, Self::TransformError> {
-		let document_quads = data.into_quads();
-		let proof_quads = options.quads(self);
-		Ok(new_ldp_siging_request(document_quads, proof_quads))
-	}
+    /// Transformation algorithm.
+    fn transform(
+        &self,
+        data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
+        options: ProofConfigurationRef<VerificationMethod>,
+    ) -> Result<Self::Transformed, Self::TransformError> {
+        let document_quads = data.into_quads();
+        let proof_quads = options.quads(self);
+        Ok(new_ldp_siging_request(document_quads, proof_quads))
+    }
 }
 
 /// Creates a typed structured data representing a Linked Data signing
 /// request.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```text
 /// LDPSigningRequest {
 ///   document: [
@@ -142,123 +143,106 @@ where
 /// }
 /// ```
 pub fn new_ldp_siging_request(
-	document: Vec<Quad>,
-	proof_configuration: Vec<Quad>
+    document: Vec<Quad>,
+    proof_configuration: Vec<Quad>,
 ) -> ssi_eip712::TypedData {
-	use ssi_eip712::{TypeRef, Value};
+    use ssi_eip712::{TypeRef, Value};
 
-	let types = ssi_eip712::Types {
-		eip712_domain: ssi_eip712::TypeDefinition::new(vec![ssi_eip712::MemberVariable {
-			name: "name".to_string(),
-			type_: TypeRef::String,
-		}]),
-		types: [(
-			"LDPSigningRequest".to_string(),
-			ssi_eip712::TypeDefinition::new(vec![
-				ssi_eip712::MemberVariable {
-					name: "document".to_string(),
-					type_: TypeRef::Array(Box::new(TypeRef::Array(Box::new(
-						TypeRef::String,
-					)))),
-				},
-				ssi_eip712::MemberVariable {
-					name: "proof".to_string(),
-					type_: TypeRef::Array(Box::new(TypeRef::Array(Box::new(
-						TypeRef::String,
-					)))),
-				},
-			]),
-		)]
-		.into_iter()
-		.collect(),
-	};
+    let types = ssi_eip712::Types {
+        eip712_domain: ssi_eip712::TypeDefinition::new(vec![ssi_eip712::MemberVariable {
+            name: "name".to_string(),
+            type_: TypeRef::String,
+        }]),
+        types: [(
+            "LDPSigningRequest".to_string(),
+            ssi_eip712::TypeDefinition::new(vec![
+                ssi_eip712::MemberVariable {
+                    name: "document".to_string(),
+                    type_: TypeRef::Array(Box::new(TypeRef::Array(Box::new(TypeRef::String)))),
+                },
+                ssi_eip712::MemberVariable {
+                    name: "proof".to_string(),
+                    type_: TypeRef::Array(Box::new(TypeRef::Array(Box::new(TypeRef::String)))),
+                },
+            ]),
+        )]
+        .into_iter()
+        .collect(),
+    };
 
-	fn encode_statement(Quad(s, p, o, g): Quad) -> Value {
-		use rdf_types::RdfDisplay;
+    fn encode_statement(Quad(s, p, o, g): Quad) -> Value {
+        use rdf_types::RdfDisplay;
 
-		let mut terms = vec![
-			Value::String(s.rdf_display().to_string()),
-			Value::String(p.rdf_display().to_string()),
-			Value::String(o.rdf_display().to_string()),
-		];
+        let mut terms = vec![
+            Value::String(s.rdf_display().to_string()),
+            Value::String(p.rdf_display().to_string()),
+            Value::String(o.rdf_display().to_string()),
+        ];
 
-		if let Some(graph_label) = g {
-			terms.push(Value::String(graph_label.rdf_display().to_string()));
-		}
-		
-		Value::Array(terms)
-	}
+        if let Some(graph_label) = g {
+            terms.push(Value::String(graph_label.rdf_display().to_string()));
+        }
 
-	ssi_eip712::TypedData {
-		types,
-		primary_type: "LDPSigningRequest".to_string(),
-		domain: Value::Struct(
-			[(
-				"name".to_string(),
-				Value::String("Eip712Method2021".to_string()),
-			)]
-			.into_iter()
-			.collect(),
-		),
-		message: Value::Struct(
-			[
-				(
-					"document".to_string(),
-					Value::Array(
-						document
-							.into_iter()
-							.map(encode_statement)
-							.collect(),
-					),
-				),
-				(
-					"proof".to_string(),
-					Value::Array(
-						proof_configuration
-							.into_iter()
-							.map(encode_statement)
-							.collect(),
-					),
-				),
-			]
-			.into_iter()
-			.collect(),
-		),
-	}
-}
+        Value::Array(terms)
+    }
 
-pub struct Signature {
-	/// Proof value 
-	pub proof_value: String,
-
-	/// Meta-information about the signature generation process.
-	pub eip712: Option<Eip712Metadata>
+    ssi_eip712::TypedData {
+        types,
+        primary_type: "LDPSigningRequest".to_string(),
+        domain: Value::Struct(
+            [(
+                "name".to_string(),
+                Value::String("Eip712Method2021".to_string()),
+            )]
+            .into_iter()
+            .collect(),
+        ),
+        message: Value::Struct(
+            [
+                (
+                    "document".to_string(),
+                    Value::Array(document.into_iter().map(encode_statement).collect()),
+                ),
+                (
+                    "proof".to_string(),
+                    Value::Array(
+                        proof_configuration
+                            .into_iter()
+                            .map(encode_statement)
+                            .collect(),
+                    ),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        ),
+    }
 }
 
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
-    type Signature = Signature;
+    type Signature = Eip712Signature;
 
-	type Protocol = ();
+    type Protocol = ();
 
-	fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
-			&self,
-			method: &VerificationMethod,
-			bytes: &[u8],
-			signer: &S
-		) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
-		todo!()
-	}
+    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+        &self,
+        method: VerificationMethodRef,
+        bytes: &[u8],
+        signer: &S,
+    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        todo!()
+    }
 
-	fn verify(
-		&self,
-		signature: &Self::Signature,
-		method: &VerificationMethod,
-		bytes: &[u8]
-	) -> Result<bool, ssi_verification_methods::VerificationError> {
-		todo!()
-	}
+    fn verify(
+        &self,
+        signature: Eip712SignatureRef,
+        method: VerificationMethodRef,
+        bytes: &[u8],
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        todo!()
+    }
 }
 
 // #[async_trait]
