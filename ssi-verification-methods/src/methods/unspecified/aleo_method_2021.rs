@@ -1,23 +1,26 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf};
-use rdf_types::{Quad, Object, Id, Literal, literal, VocabularyMut};
+use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
+use serde::{Deserialize, Serialize};
 use ssi_security::BLOCKCHAIN_ACCOUNT_ID;
 use static_iref::iri;
-use serde::{Serialize, Deserialize};
-use treeldr_rust_prelude::{IntoJsonLdObjectMeta, locspan::Meta, AsJsonLdObjectMeta};
+use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
-use crate::{VerificationMethod, ExpectedType, LinkedDataVerificationMethod, RDF_TYPE_IRI, CONTROLLER_IRI, XSD_STRING, Referencable};
+use crate::{
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable,
+    TypedVerificationMethod, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING,
+};
 
 pub const ALEO_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#AleoMethod2021");
 
 pub const ALEO_METHOD_2021_TYPE: &str = "AleoMethod2021";
 
 /// Aleo Method 2021.
-/// 
+///
 /// Schnorr signature with [Edwards BLS12] curve
 /// https://developer.aleo.org/aleo/concepts/accounts
-/// 
+///
 /// The verification method object must have a [blockchainAccountId] property, identifying the
 /// signer's Aleo
 /// account address and network id for verification purposes. The chain id part of the account address
@@ -29,23 +32,25 @@ pub const ALEO_METHOD_2021_TYPE: &str = "AleoMethod2021";
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type", rename = "AleoMethod2021")]
 pub struct AleoMethod2021 {
-	/// Key identifier.
-	pub id: IriBuf,
+    /// Key identifier.
+    pub id: IriBuf,
 
-	/// Controller of the verification method.
-	pub controller: IriBuf,
+    /// Controller of the verification method.
+    pub controller: IriBuf,
 
-	/// Blockchain accound ID.
-	#[serde(rename = "blockchainAccountId")]
-	pub blockchain_account_id: ssi_caips::caip10::BlockchainAccountId
+    /// Blockchain accound ID.
+    #[serde(rename = "blockchainAccountId")]
+    pub blockchain_account_id: ssi_caips::caip10::BlockchainAccountId,
 }
 
 impl Referencable for AleoMethod2021 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for AleoMethod2021 {
@@ -56,7 +61,9 @@ impl VerificationMethod for AleoMethod2021 {
     fn controller(&self) -> Option<Iri> {
         Some(self.controller.as_iri())
     }
+}
 
+impl TypedVerificationMethod for AleoMethod2021 {
     fn expected_type() -> Option<ExpectedType> {
         Some(ALEO_METHOD_2021_TYPE.to_string().into())
     }
@@ -83,14 +90,14 @@ impl LinkedDataVerificationMethod for AleoMethod2021 {
         ));
 
         quads.push(Quad(
-			Id::Iri(self.id.clone()),
-			BLOCKCHAIN_ACCOUNT_ID.into(),
-			Object::Literal(Literal::new(
-				self.blockchain_account_id.to_string(),
-				literal::Type::Any(XSD_STRING.into()),
-			)),
-			None,
-		));
+            Id::Iri(self.id.clone()),
+            BLOCKCHAIN_ACCOUNT_ID.into(),
+            Object::Literal(Literal::new(
+                self.blockchain_account_id.to_string(),
+                literal::Type::Any(XSD_STRING.into()),
+            )),
+            None,
+        ));
 
         rdf_types::Object::Id(rdf_types::Id::Iri(self.id.clone()))
     }
@@ -135,22 +142,22 @@ where
         );
 
         let key_prop = Meta(
-			json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
-			meta.clone(),
-		);
-		let key_value = json_ld::Value::Literal(
-			json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-				self.blockchain_account_id.to_string()
-			)),
-			None,
-		);
-		node.insert(
-			key_prop,
-			Meta(
-				json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-				meta.clone(),
-			),
-		);
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
+            meta.clone(),
+        );
+        let key_value = json_ld::Value::Literal(
+            json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                self.blockchain_account_id.to_string(),
+            )),
+            None,
+        );
+        node.insert(
+            key_prop,
+            Meta(
+                json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
+                meta.clone(),
+            ),
+        );
 
         Meta(
             json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
@@ -198,22 +205,22 @@ where
         );
 
         let key_prop = Meta(
-			json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
-			meta.clone(),
-		);
-		let key_value = json_ld::Value::Literal(
-			json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-				self.blockchain_account_id.to_string()
-			)),
-			None,
-		);
-		node.insert(
-			key_prop,
-			Meta(
-				json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-				meta.clone(),
-			),
-		);
+            json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
+            meta.clone(),
+        );
+        let key_value = json_ld::Value::Literal(
+            json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+                self.blockchain_account_id.to_string(),
+            )),
+            None,
+        );
+        node.insert(
+            key_prop,
+            Meta(
+                json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
+                meta.clone(),
+            ),
+        );
 
         Meta(
             json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),

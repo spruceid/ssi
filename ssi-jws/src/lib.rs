@@ -4,10 +4,10 @@
 
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
+use core::fmt;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
-use core::fmt;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ops::Deref;

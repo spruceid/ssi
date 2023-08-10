@@ -1,6 +1,10 @@
-use ssi_crypto::{protocol::Base58Btc, MessageSignatureError};
+use std::future;
+
+use ssi_crypto::{protocol::Base58Btc, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
-use ssi_verification_methods::{Referencable, SignatureError, SolanaMethod2021, VerificationError};
+use ssi_verification_methods::{
+    covariance_rule, Referencable, SignatureError, SolanaMethod2021, VerificationError,
+};
 use static_iref::iri;
 
 use crate::{
@@ -89,6 +93,8 @@ impl Referencable for Signature {
             proof_value: &self.proof_value,
         }
     }
+
+    covariance_rule!();
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -131,15 +137,16 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     type Protocol = Base58Btc;
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        _method: &SolanaMethod2021,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, SignatureError> {
-        Ok(Signature {
-            proof_value: signer.sign(Base58Btc, bytes)?,
-        })
+        method: &SolanaMethod2021,
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        todo!()
     }
 
     fn verify(

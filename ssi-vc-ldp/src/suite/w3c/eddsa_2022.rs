@@ -3,6 +3,10 @@
 //! This is the successor of the EdDSA Cryptosuite v2020.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/>
+use std::future;
+
+use ssi_crypto::MessageSigner;
+use ssi_verification_methods::SignatureError;
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfigurationRef};
@@ -65,12 +69,15 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &Multikey,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

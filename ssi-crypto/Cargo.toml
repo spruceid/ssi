@@ -38,6 +38,7 @@ iref.workspace = true
 static-iref.workspace = true
 async-trait.workspace = true
 multibase.workspace = true
+pin-project.workspace = true
 
 [dev-dependencies]
 hex = "0.4"

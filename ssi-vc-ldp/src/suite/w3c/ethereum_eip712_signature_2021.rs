@@ -1,9 +1,12 @@
 //! Ethereum EIP712 Signature 2021 implementation.
 //!
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
+use std::future;
+
+use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    JsonWebKey2020,
+    JsonWebKey2020, SignatureError,
 };
 use static_iref::iri;
 
@@ -216,12 +219,15 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: VerificationMethodRef,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

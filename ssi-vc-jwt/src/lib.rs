@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-use ssi_jws::{CompactJWS, InvalidCompactJWS};
-
 mod decode;
 mod encode;
 mod signing;
@@ -12,36 +10,24 @@ pub struct VcJwt<C> {
     /// Credential data.
     credential: C,
 
-    /// JWT signing bytes.
-    signing_bytes: Vec<u8>,
+    /// JWT header.
+    header: ssi_jws::Header,
+
+    /// JWT payload.
+    payload: Vec<u8>,
 }
 
 impl<C> VcJwt<C> {
-    pub fn new(credential: C, signing_bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        if CompactJWS::check_signing_bytes(&signing_bytes) {
-            Ok(unsafe { Self::new_unchecked(credential, signing_bytes) })
-        } else {
-            Err(InvalidCompactJWS(signing_bytes))
-        }
-    }
-
-    /// # Safety
-    ///
-    /// The `signing_bytes` must form a valid compact JWS once concatenated with
-    /// a `.` followed by the signature bytes.
-    pub unsafe fn new_unchecked(credential: C, signing_bytes: Vec<u8>) -> Self {
+    pub fn new(credential: C, header: ssi_jws::Header, payload: Vec<u8>) -> Self {
         Self {
             credential,
-            signing_bytes,
+            header,
+            payload,
         }
     }
 
-    pub fn signing_bytes(&self) -> &[u8] {
-        &self.signing_bytes
-    }
-
-    pub fn into_signing_bytes(self) -> Vec<u8> {
-        self.signing_bytes
+    pub fn build_signing_bytes(&self) -> Vec<u8> {
+        self.header.encode_signing_bytes(&self.payload)
     }
 }
 
@@ -56,12 +42,15 @@ impl<C> Deref for VcJwt<C> {
 /// JWS proof.
 pub struct Proof {
     signature: Vec<u8>,
-    issuer: verification::Issuer
+    issuer: verification::Issuer,
 }
 
 impl Proof {
     pub fn new(signature: Vec<u8>, signer: verification::Issuer) -> Self {
-        Self { signature, issuer: signer }
+        Self {
+            signature,
+            issuer: signer,
+        }
     }
 
     pub fn into_signature(self) -> Vec<u8> {

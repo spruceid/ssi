@@ -10,8 +10,9 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_JSON,
+    RDF_TYPE_IRI,
 };
 
 pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
@@ -47,13 +48,7 @@ impl SolanaMethod2021 {
 
     pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
         match self.public_key.algorithm.as_ref() {
-            Some(a) => Ok(ssi_jws::verify_bytes(
-                *a,
-                data,
-                &self.public_key,
-                signature,
-            )
-            .is_ok()),
+            Some(a) => Ok(ssi_jws::verify_bytes(*a, data, &self.public_key, signature).is_ok()),
             None => Err(VerificationError::InvalidKey),
         }
     }
@@ -61,10 +56,12 @@ impl SolanaMethod2021 {
 
 impl Referencable for SolanaMethod2021 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for SolanaMethod2021 {
@@ -73,6 +70,13 @@ impl VerificationMethod for SolanaMethod2021 {
         self.id.as_iri()
     }
 
+    /// Returns an URI to the key controller.
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
+    }
+}
+
+impl TypedVerificationMethod for SolanaMethod2021 {
     fn expected_type() -> Option<ExpectedType> {
         Some(SOLANA_METHOD_2021_TYPE.to_string().into())
     }
@@ -80,11 +84,6 @@ impl VerificationMethod for SolanaMethod2021 {
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         SOLANA_METHOD_2021_TYPE
-    }
-
-    /// Returns an URI to the key controller.
-    fn controller(&self) -> Option<Iri> {
-        Some(self.controller.as_iri())
     }
 }
 

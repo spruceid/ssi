@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use ed25519_dalek::Verifier;
+use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf};
 use rand_core_0_5::{CryptoRng, RngCore};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
@@ -11,8 +11,8 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
 };
 
 /// IRI of the Ed25519 Verification Key 2020 type.
@@ -104,13 +104,16 @@ impl Ed25519VerificationKey2020 {
         }
     }
 
-    // pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> signature::Multibase {
-    //     let signature = key_pair.sign(data);
-    //     let encoded = multibase::encode(multibase::Base::Base58Btc, signature);
-    //     signature::Multibase(encoded)
-    // }
+    pub fn sign_bytes(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> Vec<u8> {
+        let signature = key_pair.sign(data);
+        signature.to_bytes().to_vec()
+    }
 
-    pub fn verify_bytes(&self, data: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature_bytes: &[u8],
+    ) -> Result<bool, VerificationError> {
         let pk = self
             .decode_public_key()
             .map_err(|_| VerificationError::InvalidKey)?;
@@ -122,10 +125,12 @@ impl Ed25519VerificationKey2020 {
 
 impl Referencable for Ed25519VerificationKey2020 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for Ed25519VerificationKey2020 {
@@ -136,7 +141,9 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
     fn controller(&self) -> Option<Iri> {
         Some(self.controller.as_iri())
     }
+}
 
+impl TypedVerificationMethod for Ed25519VerificationKey2020 {
     fn expected_type() -> Option<ExpectedType> {
         Some(ED25519_VERIFICATION_KEY_2020_TYPE.to_string().into())
     }

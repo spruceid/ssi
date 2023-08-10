@@ -1,5 +1,5 @@
+use super::{non_serializable::NonSerializable, InvalidValue};
 use serde::Serialize;
-use super::{InvalidValue, non_serializable::NonSerializable};
 
 pub struct KeySerializer;
 
@@ -38,11 +38,11 @@ impl serde::Serializer for KeySerializer {
         Ok(v.to_string())
     }
 
-    fn serialize_u64(self, v: u64) -> Result<Self::Ok,Self::Error> {
+    fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
         Ok(v.to_string())
     }
 
-    fn serialize_u128(self, v: u128) -> Result<Self::Ok,Self::Error> {
+    fn serialize_u128(self, v: u128) -> Result<Self::Ok, Self::Error> {
         Ok(v.to_string())
     }
 
@@ -62,7 +62,7 @@ impl serde::Serializer for KeySerializer {
         Ok(v.to_string())
     }
 
-    fn serialize_i128(self, v: i128) -> Result<Self::Ok,Self::Error> {
+    fn serialize_i128(self, v: i128) -> Result<Self::Ok, Self::Error> {
         Ok(v.to_string())
     }
 
@@ -100,7 +100,7 @@ impl serde::Serializer for KeySerializer {
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize
+        T: Serialize,
     {
         value.serialize(self)
     }
@@ -113,7 +113,7 @@ impl serde::Serializer for KeySerializer {
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize
+        T: Serialize,
     {
         value.serialize(self)
     }
@@ -124,27 +124,27 @@ impl serde::Serializer for KeySerializer {
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: Serialize
+        T: Serialize,
     {
         value.serialize(self)
     }
-    
+
     fn serialize_struct(
-            self,
-            _name: &'static str,
-            _len: usize,
-        ) -> Result<Self::SerializeStruct, Self::Error> {
-            Err(InvalidValue::InvalidKey)
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Err(InvalidValue::InvalidKey)
     }
 
     fn serialize_struct_variant(
-            self,
-            _name: &'static str,
-            _variant_index: u32,
-            _variant: &'static str,
-            _len: usize,
-        ) -> Result<Self::SerializeStructVariant, Self::Error> {
-            Err(InvalidValue::InvalidKey)
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Err(InvalidValue::InvalidKey)
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
@@ -152,23 +152,23 @@ impl serde::Serializer for KeySerializer {
     }
 
     fn serialize_tuple_struct(
-            self,
-            _name: &'static str,
-            _len: usize,
-        ) -> Result<Self::SerializeTupleStruct, Self::Error> {
-            Err(InvalidValue::InvalidKey)
+        self,
+        _name: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Err(InvalidValue::InvalidKey)
     }
 
     fn serialize_tuple_variant(
-            self,
-            _name: &'static str,
-            _variant_index: u32,
-            _variant: &'static str,
-            _len: usize,
-        ) -> Result<Self::SerializeTupleVariant, Self::Error> {
-            Err(InvalidValue::InvalidKey)
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _len: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Err(InvalidValue::InvalidKey)
     }
-    
+
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
         Err(InvalidValue::InvalidKey)
     }
@@ -178,11 +178,11 @@ impl serde::Serializer for KeySerializer {
     }
 
     fn serialize_unit_variant(
-            self,
-            _name: &'static str,
-            _variant_index: u32,
-            _variant: &'static str,
-        ) -> Result<Self::Ok, Self::Error> {
-            Err(InvalidValue::InvalidKey)
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(InvalidValue::InvalidKey)
     }
 }

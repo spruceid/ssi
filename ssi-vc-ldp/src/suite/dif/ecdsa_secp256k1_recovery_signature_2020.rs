@@ -1,5 +1,8 @@
+use std::future;
+
+use ssi_crypto::MessageSigner;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
-use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, Referencable};
+use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, Referencable, SignatureError};
 use static_iref::iri;
 
 use crate::{
@@ -60,12 +63,15 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

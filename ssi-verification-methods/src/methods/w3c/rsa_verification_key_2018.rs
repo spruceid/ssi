@@ -9,8 +9,8 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
+    TypedVerificationMethod, VerificationMethod, CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI,
 };
 
 pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
@@ -51,10 +51,12 @@ impl RsaVerificationKey2018 {
 
 impl Referencable for RsaVerificationKey2018 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for RsaVerificationKey2018 {
@@ -63,6 +65,13 @@ impl VerificationMethod for RsaVerificationKey2018 {
         self.id.as_iri()
     }
 
+    /// Returns an URI to the key controller.
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
+    }
+}
+
+impl TypedVerificationMethod for RsaVerificationKey2018 {
     fn expected_type() -> Option<ExpectedType> {
         Some(RSA_VERIFICATION_KEY_2018_TYPE.to_string().into())
     }
@@ -70,11 +79,6 @@ impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         RSA_VERIFICATION_KEY_2018_TYPE
-    }
-
-    /// Returns an URI to the key controller.
-    fn controller(&self) -> Option<Iri> {
-        Some(self.controller.as_iri())
     }
 }
 

@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, str::FromStr};
 use iref::IriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_core::one_or_many::OneOrMany;
+use ssi_verification_methods::{ProofPurpose, ProofPurposes};
 
 use crate::{DIDBuf, DIDURLReferenceBuf, DID, DIDURL};
 

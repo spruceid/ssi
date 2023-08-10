@@ -1,15 +1,15 @@
 use keccak_hash::keccak;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-mod ty;
-mod value;
 mod encode;
 mod hashing;
+mod ty;
+mod value;
 
-pub use ty::*;
-pub use value::*;
 pub use encode::*;
 pub use hashing::TypedDataHashError;
+pub use ty::*;
+pub use value::*;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -30,8 +30,9 @@ impl TypedData {
 
     pub fn encode(&self) -> Result<[u8; 66], TypedDataHashError> {
         let message_hash = self.message.hash(&self.primary_type, &self.types)?;
-        let domain_separator =
-            self.domain.hash(&StructName::from("EIP712Domain"), &self.types)?;
+        let domain_separator = self
+            .domain
+            .hash(&StructName::from("EIP712Domain"), &self.types)?;
 
         let mut result = [0; 66];
         result[0] = 0x19;

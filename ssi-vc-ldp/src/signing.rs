@@ -3,6 +3,7 @@ use rdf_types::{
     interpretation::TraversableInterpretation, BlankIdVocabularyMut, ReverseTermInterpretation,
     ReverseTermInterpretationMut,
 };
+use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::DatasetWithEntryPoint;
 use ssi_vc::Verifiable;
 use ssi_verification_methods::{Referencable, SignatureError, Signer, VerificationMethodRef};
@@ -10,7 +11,6 @@ use std::{future::Future, hash::Hash, marker::PhantomData, pin::Pin, task};
 
 use crate::{
     suite::{CryptographicSuiteInput, GenerateProof, HashError},
-    utils::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture},
     CryptographicSuite, DataIntegrity, ProofConfiguration, UntypedProof,
 };
 
@@ -86,7 +86,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
     // For some reason the Rust compiler is unable to build a future that
     // returns a value of type `Verifiable<DataIntegrity<C, S>>`.
     // See: <https://github.com/rust-lang/rust/issues/103532>
-    pub fn sign_ld<'min, 'max: 'min, 'a, V, I, T>(
+    pub fn sign_ld<'max, 'a, V, I, T>(
         vocabulary: &'a mut V,
         interpretation: &'a mut I,
         signer: &'max T,
@@ -94,7 +94,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         suite: S,
         params: ProofConfiguration<S::VerificationMethod>,
         options: S::Options,
-    ) -> SignLinkedData<'min, 'max, C, S, T, S::TransformError>
+    ) -> SignLinkedData<'max, C, S, T, S::TransformError>
     where
         V: BlankIdVocabularyMut,
         I: TraversableInterpretation + ReverseTermInterpretationMut<BlankId = V::BlankId>,
@@ -137,11 +137,10 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 struct UnboundedGenerateProof<S, T>(PhantomData<(S, T)>);
 
 impl<
-        'min,
         'max,
         S: CryptographicSuite,
         T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    > UnboundedRefFuture<'min, 'max> for UnboundedGenerateProof<S, T>
+    > UnboundedRefFuture<'max> for UnboundedGenerateProof<S, T>
 where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
@@ -149,31 +148,30 @@ where
 {
     type Owned = S::Hashed;
 
-    type Bound<'a: 'min> = GenerateProof<'max, 'a, S, T> where 'max: 'a;
+    type Bound<'a> = GenerateProof<'a, S, T> where 'max: 'a;
 
     type Output = Result<UntypedProof<S::VerificationMethod, S::Signature>, SignatureError>;
 }
 
-struct Binder<'max, 's, S: CryptographicSuite, T> {
+struct Binder<'s, 'a, S: CryptographicSuite, T> {
     suite: &'s S,
     params: ProofConfiguration<S::VerificationMethod>,
     options: S::Options,
-    signer: &'max T,
+    signer: &'a T,
 }
 
 impl<
-        'min,
-        'max,
         's,
+        'max,
         S: CryptographicSuite,
         T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    > RefFutureBinder<'min, 'max, UnboundedGenerateProof<S, T>> for Binder<'max, 's, S, T>
+    > RefFutureBinder<'max, UnboundedGenerateProof<S, T>> for Binder<'s, 'max, S, T>
 where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
     S::Signature: 'max,
 {
-    fn bind<'a: 'min>(context: Self, hash: &'a S::Hashed) -> GenerateProof<'max, 'a, S, T>
+    fn bind<'a>(context: Self, hash: &'a S::Hashed) -> GenerateProof<'a, S, T>
     where
         'max: 'a,
     {
@@ -191,17 +189,17 @@ where
 // returns a value of type `Verifiable<DataIntegrity<C, S>>`.
 // See: <https://github.com/rust-lang/rust/issues/103532>
 #[pin_project]
-pub struct SignLinkedData<'min, 'max, C, S, T, E>
+pub struct SignLinkedData<'max, C, S, T, E>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
     #[pin]
-    inner: SignLinkedDataInner<'min, 'max, C, S, T, E>,
+    inner: SignLinkedDataInner<'max, C, S, T, E>,
 }
 
-impl<'min, 'max, C, S, T, E> Future for SignLinkedData<'min, 'max, C, S, T, E>
+impl<'max, C, S, T, E> Future for SignLinkedData<'max, C, S, T, E>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
@@ -218,17 +216,17 @@ where
 
 /// Private implementation of the `SignLinkedData` type.
 #[pin_project(project = SignLinkedDataInnerProj)]
-enum SignLinkedDataInner<'min, 'max, C, S, T, E>
+enum SignLinkedDataInner<'max, C, S, T, E>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
     Err(Option<Error<E>>),
-    Ok(#[pin] SignLinkedDataOk<'min, 'max, C, S, T, E>),
+    Ok(#[pin] SignLinkedDataOk<'max, C, S, T, E>),
 }
 
-impl<'min, 'max, C, S, T, E> Future for SignLinkedDataInner<'min, 'max, C, S, T, E>
+impl<'max, C, S, T, E> Future for SignLinkedDataInner<'max, C, S, T, E>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
@@ -248,7 +246,7 @@ where
 /// Private implementation of the `SignLinkedData` type, with the signature
 /// preparation succeded.
 #[pin_project]
-struct SignLinkedDataOk<'min, 'max, C, S, T, E>
+struct SignLinkedDataOk<'max, C, S, T, E>
 where
     S: CryptographicSuite,
     S::Hashed: 'max,
@@ -259,12 +257,12 @@ where
     payload: Option<(C, S)>,
 
     #[pin]
-    sign: SelfRefFuture<'min, 'max, UnboundedGenerateProof<S, T>>,
+    sign: SelfRefFuture<'max, UnboundedGenerateProof<S, T>>,
 
     e: PhantomData<E>,
 }
 
-impl<'min, 'max, C, S, T, E> Future for SignLinkedDataOk<'min, 'max, C, S, T, E>
+impl<'max, C, S, T, E> Future for SignLinkedDataOk<'max, C, S, T, E>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,

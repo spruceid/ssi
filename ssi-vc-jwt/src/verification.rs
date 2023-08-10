@@ -3,10 +3,16 @@ use std::{future::Future, pin::Pin, task};
 use pin_project::pin_project;
 use ssi_jwk::JWK;
 use ssi_vc::{ProofValidity, VerifiableWith};
-use ssi_verification_methods::{Verifier, VerificationError, Referencable, ReferenceOrOwnedRef, ProofPurpose, VerificationMethodRef};
+use ssi_verification_methods::{
+    covariance_rule, ProofPurpose, Referencable, ReferenceOrOwnedRef, VerificationError,
+    VerificationMethod, VerificationMethodRef, Verifier,
+};
 use treeldr_rust_prelude::iref::{Iri, IriBuf};
 
-use crate::{Proof, VcJwt, signing::VcJwtSignature};
+use crate::{
+    signing::{VcJwtSignatureAlgorithm, VcJwtSignatureRef},
+    Proof, VcJwt,
+};
 
 impl<C: Sync> VerifiableWith for VcJwt<C> {
     type Proof = Proof;
@@ -19,19 +25,26 @@ impl<C: Sync> VerifiableWith for VcJwt<C> {
         verifier: &'a V,
         proof: &'a Proof,
     ) -> Self::VerifyWith<'a, V> {
+        let signature = VcJwtSignatureRef {
+            header: &self.header,
+            signature_bytes: &proof.signature,
+        };
+
         VerifyWith(verifier.verify(
-            VcJwtSignature,
+            VcJwtSignatureAlgorithm::default(),
             proof.issuer.id(),
             proof.issuer.method_reference(),
             ProofPurpose::Assertion,
-            &self.signing_bytes,
-            &proof.signature
+            &self.payload,
+            signature,
         ))
     }
 }
 
 #[pin_project]
-pub struct VerifyWith<'a, V: Verifier<AnyJwkMethod>>(#[pin] ssi_verification_methods::Verify<'a, 'a, 'a, AnyJwkMethod, V, VcJwtSignature>);
+pub struct VerifyWith<'a, V: Verifier<AnyJwkMethod>>(
+    #[pin] ssi_verification_methods::Verify<'a, AnyJwkMethod, V, VcJwtSignatureAlgorithm>,
+);
 
 impl<'a, V: Verifier<AnyJwkMethod>> Future for VerifyWith<'a, V> {
     type Output = Result<ProofValidity, VerificationError>;
@@ -48,9 +61,9 @@ pub struct AnyJwkMethod {
 
     /// Key controller, if any.
     pub controller: Option<IriBuf>,
-    
+
     /// Public key.
-    pub public_key_jwk: Box<JWK>
+    pub public_key_jwk: Box<JWK>,
 }
 
 impl Referencable for AnyJwkMethod {
@@ -60,8 +73,20 @@ impl Referencable for AnyJwkMethod {
         AnyJwkMethodRef {
             id: self.id.as_iri(),
             controller: self.controller.as_ref().map(IriBuf::as_iri),
-            public_key_jwk: &self.public_key_jwk
+            public_key_jwk: &self.public_key_jwk,
         }
+    }
+
+    covariance_rule!();
+}
+
+impl VerificationMethod for AnyJwkMethod {
+    fn id(&self) -> Iri<'_> {
+        self.id.as_iri()
+    }
+
+    fn controller(&self) -> Option<Iri<'_>> {
+        self.controller.as_ref().map(IriBuf::as_iri)
     }
 }
 
@@ -71,7 +96,7 @@ pub struct AnyJwkMethodRef<'a> {
 
     pub controller: Option<Iri<'a>>,
 
-    pub public_key_jwk: &'a JWK
+    pub public_key_jwk: &'a JWK,
 }
 
 impl<'a> VerificationMethodRef<'a> for AnyJwkMethodRef<'a> {
@@ -94,14 +119,8 @@ pub struct Issuer {
 }
 
 impl Issuer {
-    pub fn new(
-        id: Option<IriBuf>,
-        key_id: Option<String>,
-    ) -> Self {
-        Self {
-            id,
-            key_id
-        }
+    pub fn new(id: Option<IriBuf>, key_id: Option<String>) -> Self {
+        Self { id, key_id }
     }
 
     pub fn id(&self) -> Option<Iri> {

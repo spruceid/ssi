@@ -1,4 +1,6 @@
-use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError};
+use std::future;
+
+use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
     verification_method_union, AleoMethod2021, BlockchainVerificationMethod2021, SignatureError,
@@ -108,15 +110,16 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = Base58BtcMultibase;
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        _method: VerificationMethodRef,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, SignatureError> {
-        Ok(MultibaseSignature {
-            proof_value: signer.sign(Base58BtcMultibase, bytes)?,
-        })
+        method: VerificationMethodRef,
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        todo!()
     }
 
     fn verify(

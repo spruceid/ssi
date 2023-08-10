@@ -1,4 +1,4 @@
-use ssi_verification_methods::Referencable;
+use ssi_verification_methods::{covariance_rule, Referencable};
 
 /// Common signature format for EIP-712-based cryptographic suites.
 #[derive(Debug, Clone)]
@@ -19,6 +19,8 @@ impl Referencable for Eip712Signature {
             eip712: self.eip712.as_ref(),
         }
     }
+
+    covariance_rule!();
 }
 
 /// Reference to [`Eip712Signature`].

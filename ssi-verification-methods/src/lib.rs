@@ -60,10 +60,47 @@ impl From<String> for ExpectedType {
     }
 }
 
+pub enum Cow<'a, T: 'a + Referencable> {
+    Borrowed(T::Reference<'a>),
+    Owned(T),
+}
+
+impl<'a, T: 'a + Referencable> Cow<'a, T> {
+    pub fn as_reference<'b>(&'b self) -> T::Reference<'b>
+    where
+        'a: 'b,
+    {
+        match self {
+            Self::Borrowed(b) => T::apply_covariance(*b),
+            Self::Owned(m) => m.as_reference(),
+        }
+    }
+}
+
 pub trait Referencable {
-    type Reference<'a>: Copy where Self: 'a;
+    type Reference<'a>: Copy
+    where
+        Self: 'a;
 
     fn as_reference(&self) -> Self::Reference<'_>;
+
+    fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small>
+    where
+        Self: 'big;
+}
+
+#[macro_export]
+macro_rules! covariance_rule {
+    () => {
+        fn apply_covariance<'big: 'small, 'small>(
+            r: <Self as $crate::Referencable>::Reference<'big>,
+        ) -> <Self as $crate::Referencable>::Reference<'small>
+        where
+            Self: 'big,
+        {
+            r
+        }
+    };
 }
 
 impl<'t, T> Referencable for &'t T {
@@ -72,6 +109,8 @@ impl<'t, T> Referencable for &'t T {
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl Referencable for Vec<u8> {
@@ -80,17 +119,14 @@ impl Referencable for Vec<u8> {
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 /// Verification method.
 pub trait VerificationMethod: Referencable {
     /// Identifier of the verification method.
     fn id(&self) -> Iri;
-
-    fn expected_type() -> Option<ExpectedType>;
-
-    /// Returns the name of the verification method's type.
-    fn type_(&self) -> &str;
 
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Option<Iri>; // Should be an URI.
@@ -116,6 +152,13 @@ pub trait VerificationMethod: Referencable {
     // }
 }
 
+pub trait TypedVerificationMethod: VerificationMethod {
+    fn expected_type() -> Option<ExpectedType>;
+
+    /// Returns the name of the verification method's type.
+    fn type_(&self) -> &str;
+}
+
 pub trait VerificationMethodRef<'m> {
     /// Identifier of the verification method.
     fn id(&self) -> Iri<'m>;
@@ -131,6 +174,25 @@ impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
 
     fn controller(&self) -> Option<Iri<'m>> {
         M::controller(self)
+    }
+}
+
+impl<'m, M: VerificationMethod> Cow<'m, M>
+where
+    M::Reference<'m>: VerificationMethodRef<'m>,
+{
+    fn id<'a>(&'a self) -> Iri<'a> {
+        match self {
+            Self::Owned(m) => m.id(),
+            Self::Borrowed(b) => b.id(),
+        }
+    }
+
+    fn controller<'a>(&'a self) -> Option<Iri<'a>> {
+        match self {
+            Self::Owned(m) => m.controller(),
+            Self::Borrowed(b) => b.controller(),
+        }
     }
 }
 

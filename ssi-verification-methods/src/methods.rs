@@ -77,6 +77,14 @@ macro_rules! verification_method_union {
 					),*
 				}
 			}
+
+			fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small> where Self: 'big {
+				match r {
+					$(
+						$name_ref::$variant(m) => $name_ref::$variant(m)
+					),*
+				}
+			}
 		}
 
 		impl $crate::VerificationMethod for $name {
@@ -88,6 +96,16 @@ macro_rules! verification_method_union {
 				}
 			}
 
+			fn controller(&self) -> Option<iref::Iri> {
+				match self {
+					$(
+						Self::$variant(m) => m.controller()
+					),*
+				}
+			}
+		}
+
+		impl $crate::TypedVerificationMethod for $name {
 			fn expected_type() -> Option<$crate::ExpectedType> {
 				let mut types = Vec::new();
 
@@ -110,14 +128,6 @@ macro_rules! verification_method_union {
 				match self {
 					$(
 						Self::$variant(m) => m.type_()
-					),*
-				}
-			}
-
-			fn controller(&self) -> Option<iref::Iri> {
-				match self {
-					$(
-						Self::$variant(m) => m.controller()
 					),*
 				}
 			}
@@ -202,7 +212,7 @@ macro_rules! verification_method_union {
 		$(
 			impl<'a> TryFrom<$name_ref<'a>> for &'a $variant {
 				type Error = $crate::InvalidVerificationMethod;
-			
+
 				fn try_from(value: $name_ref<'a>) -> Result<Self, Self::Error> {
 					match value {
 						$name_ref::$variant(m) => Ok(m),
@@ -216,39 +226,39 @@ macro_rules! verification_method_union {
 
 verification_method_union! {
     pub enum AnyMethod, AnyMethodRef, AnyMethodType {
-		/// Deprecated verification method for the `RsaSignature2018` suite.
-		RsaVerificationKey2018,
+        /// Deprecated verification method for the `RsaSignature2018` suite.
+        RsaVerificationKey2018,
 
-		/// Deprecated verification method for the `Ed25519Signature2018` suite.
-		Ed25519VerificationKey2018,
-	
-		/// Deprecated verification method for the `Ed25519Signature2020` suite.
-		Ed25519VerificationKey2020,
-	
-		EcdsaSecp256k1VerificationKey2019,
-	
-		EcdsaSecp256k1RecoveryMethod2020,
-	
-		EcdsaSecp256r1VerificationKey2019,
-	
-		/// `JsonWebKey2020`.
-		JsonWebKey2020,
-	
-		/// `Multikey`.
-		Multikey,
-	
-		Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-	
-		P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+        /// Deprecated verification method for the `Ed25519Signature2018` suite.
+        Ed25519VerificationKey2018,
 
-		TezosMethod2021,
+        /// Deprecated verification method for the `Ed25519Signature2020` suite.
+        Ed25519VerificationKey2020,
 
-		AleoMethod2021,
+        EcdsaSecp256k1VerificationKey2019,
 
-		BlockchainVerificationMethod2021,
+        EcdsaSecp256k1RecoveryMethod2020,
 
-		Eip712Method2021,
+        EcdsaSecp256r1VerificationKey2019,
 
-		SolanaMethod2021
-	}
+        /// `JsonWebKey2020`.
+        JsonWebKey2020,
+
+        /// `Multikey`.
+        Multikey,
+
+        Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+
+        P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+
+        TezosMethod2021,
+
+        AleoMethod2021,
+
+        BlockchainVerificationMethod2021,
+
+        Eip712Method2021,
+
+        SolanaMethod2021
+    }
 }

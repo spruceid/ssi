@@ -8,7 +8,7 @@
 use std::hash::Hash;
 
 use iref::Iri;
-use ssi_verification_methods::{Verifier, VerificationError};
+use ssi_verification_methods::{VerificationError, Verifier};
 use treeldr_rust_macros::tldr;
 use treeldr_rust_prelude::{locspan::Meta, rdf_types::VocabularyMut};
 

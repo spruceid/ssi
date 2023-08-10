@@ -1,15 +1,16 @@
-use std::hash::Hash;
 use iref::{Iri, IriBuf};
 use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, PUBLIC_KEY_JWK};
 use static_iref::iri;
+use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, VerificationError, Referencable
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_JSON,
+    RDF_TYPE_IRI, XSD_STRING,
 };
 
 pub const TEZOS_METHOD_2021_IRI: Iri<'static> = iri!("https://w3id.org/security#TezosMethod2021");
@@ -85,10 +86,12 @@ impl PublicKey {
 
 impl Referencable for TezosMethod2021 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for TezosMethod2021 {
@@ -99,7 +102,9 @@ impl VerificationMethod for TezosMethod2021 {
     fn controller(&self) -> Option<Iri> {
         Some(self.controller.as_iri())
     }
+}
 
+impl TypedVerificationMethod for TezosMethod2021 {
     fn expected_type() -> Option<ExpectedType> {
         Some(TEZOS_METHOD_2021_TYPE.to_string().into())
     }

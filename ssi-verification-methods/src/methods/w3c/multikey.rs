@@ -11,8 +11,8 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable,
+    TypedVerificationMethod, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
 };
 
 /// IRI of the Multikey type.
@@ -111,10 +111,12 @@ impl Multikey {
 
 impl Referencable for Multikey {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for Multikey {
@@ -125,7 +127,9 @@ impl VerificationMethod for Multikey {
     fn controller(&self) -> Option<Iri> {
         Some(self.controller.as_iri())
     }
+}
 
+impl TypedVerificationMethod for Multikey {
     fn expected_type() -> Option<ExpectedType> {
         Some(MULTIKEY_TYPE.to_string().into())
     }

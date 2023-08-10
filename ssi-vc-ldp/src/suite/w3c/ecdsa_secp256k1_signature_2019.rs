@@ -1,4 +1,7 @@
-use ssi_verification_methods::EcdsaSecp256k1VerificationKey2019;
+use std::future;
+
+use ssi_crypto::MessageSigner;
+use ssi_verification_methods::{EcdsaSecp256k1VerificationKey2019, SignatureError};
 use static_iref::iri;
 
 use crate::{
@@ -58,12 +61,15 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &EcdsaSecp256k1VerificationKey2019,
         bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

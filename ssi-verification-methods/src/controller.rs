@@ -1,8 +1,8 @@
-use std::{pin::Pin, future::Future, task};
 use iref::Iri;
 use pin_project::pin_project;
+use std::{future::Future, pin::Pin, task};
 
-use crate::{ProofPurposes, ProofPurpose, VerificationError};
+use crate::{ProofPurpose, ProofPurposes, VerificationError};
 
 /// Verification method controller.
 ///
@@ -36,23 +36,19 @@ pub trait ControllerProvider {
         Self: 'a;
 
     /// Future returned by the `get_controller` method.
-    type GetController<'a>: Future<Output = Result<Option<Self::Controller<'a>>, ControllerError>> where Self: 'a;
+    type GetController<'a>: Future<Output = Result<Option<Self::Controller<'a>>, ControllerError>>
+    where
+        Self: 'a;
 
     /// Returns the controller with the given identifier, if it can be found.
-    fn get_controller(
-        &self,
-        id: Iri<'_>,
-    ) -> Self::GetController<'_>;
+    fn get_controller<'a>(&'a self, id: Iri<'a>) -> Self::GetController<'a>;
 
     /// Returns the controller with the given identifier, or fails if it cannot
     /// be found.
-    fn require_controller<'a>(
-        &'a self,
-        id: Iri<'a>,
-    ) -> RequireController<'a, Self> {
+    fn require_controller<'a>(&'a self, id: Iri<'a>) -> RequireController<'a, Self> {
         RequireController {
             id,
-            get: self.get_controller(id)
+            get: self.get_controller(id),
         }
     }
 
@@ -67,7 +63,7 @@ pub trait ControllerProvider {
         AllowsVerificationMethod {
             method_id,
             proof_purposes,
-            require: self.require_controller(controller_id)
+            require: self.require_controller(controller_id),
         }
     }
 
@@ -85,18 +81,17 @@ pub trait ControllerProvider {
         EnsureAllowsVerificationMethod {
             method_id,
             proof_purpose,
-            require: self.require_controller(controller_id)
+            require: self.require_controller(controller_id),
         }
     }
 }
-
 
 #[pin_project]
 pub struct RequireController<'a, C: 'a + ?Sized + ControllerProvider> {
     id: Iri<'a>,
 
     #[pin]
-    get: C::GetController<'a>
+    get: C::GetController<'a>,
 }
 
 impl<'a, C: 'a + ?Sized + ControllerProvider> Future for RequireController<'a, C> {
@@ -104,7 +99,9 @@ impl<'a, C: 'a + ?Sized + ControllerProvider> Future for RequireController<'a, C
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
-        this.get.poll(cx).map(|result| result.and_then(|c| c.ok_or_else(|| ControllerError::NotFound(this.id.to_string()))))
+        this.get.poll(cx).map(|result| {
+            result.and_then(|c| c.ok_or_else(|| ControllerError::NotFound(this.id.to_string())))
+        })
     }
 }
 
@@ -115,7 +112,7 @@ pub struct AllowsVerificationMethod<'a, C: 'a + ?Sized + ControllerProvider> {
     proof_purposes: ProofPurposes,
 
     #[pin]
-    require: RequireController<'a, C>
+    require: RequireController<'a, C>,
 }
 
 impl<'a, C: 'a + ?Sized + ControllerProvider> Future for AllowsVerificationMethod<'a, C> {
@@ -124,7 +121,8 @@ impl<'a, C: 'a + ?Sized + ControllerProvider> Future for AllowsVerificationMetho
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
         this.require
-            .poll(cx).map_ok(|c| c.allows_verification_method(*this.method_id, *this.proof_purposes))
+            .poll(cx)
+            .map_ok(|c| c.allows_verification_method(*this.method_id, *this.proof_purposes))
     }
 }
 
@@ -135,7 +133,7 @@ pub struct EnsureAllowsVerificationMethod<'a, C: 'a + ?Sized + ControllerProvide
     proof_purpose: ProofPurpose,
 
     #[pin]
-    require: RequireController<'a, C>
+    require: RequireController<'a, C>,
 }
 
 impl<'a, C: 'a + ?Sized + ControllerProvider> Future for EnsureAllowsVerificationMethod<'a, C> {
@@ -149,7 +147,7 @@ impl<'a, C: 'a + ?Sized + ControllerProvider> Future for EnsureAllowsVerificatio
             .map(|result| match result {
                 Ok(true) => Ok(()),
                 Ok(false) => Err(VerificationError::InvalidKeyUse(*this.proof_purpose)),
-                Err(e) => Err(e.into())
+                Err(e) => Err(e.into()),
             })
     }
 }
@@ -173,7 +171,7 @@ pub enum ControllerError {
     UnsupportedScheme(String),
 
     /// Custom error from the controller provider.
-    InternalError(Box<dyn Send + std::error::Error>),
+    InternalError(String),
 }
 
 impl From<ControllerError> for VerificationError {

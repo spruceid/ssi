@@ -1,14 +1,18 @@
-use std::hash::Hash;
-
 use json_ld::{
     compaction::CompactMeta, context_processing::Processed, syntax::IntoJsonWithContext,
     ContextLoader, ExpandedDocument, Loader, Process, RemoteDocumentReference,
 };
 use json_syntax::Print;
 use locspan::Meta;
+use pin_project::pin_project;
 use rdf_types::VocabularyMut;
+use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
+use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_vc::{vocab::VERIFIABLE_CREDENTIAL, Verifiable, CREDENTIALS_V1_CONTEXT_IRI};
-use ssi_verification_methods::{SignatureError, SignatureAlgorithm, Signer};
+use ssi_verification_methods::{
+    covariance_rule, Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
+};
+use std::{future::Future, hash::Hash, marker::PhantomData};
 
 use crate::{verification, Proof, VcJwt};
 
@@ -52,28 +56,143 @@ pub struct LdOptions<I> {
 }
 
 /// Signature algorithm.
-pub struct VcJwtSignature;
+pub struct VcJwtSignatureAlgorithm {
+    pub base64_encode: bool,
+}
 
-impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignature {
-    type Signature = Vec<u8>;
+impl Default for VcJwtSignatureAlgorithm {
+    fn default() -> Self {
+        Self {
+            base64_encode: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VcJwtSignature {
+    pub header: ssi_jws::Header,
+    pub signature_bytes: Vec<u8>,
+}
+
+impl Referencable for VcJwtSignature {
+    type Reference<'a> = VcJwtSignatureRef<'a>;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        VcJwtSignatureRef {
+            header: &self.header,
+            signature_bytes: &self.signature_bytes,
+        }
+    }
+
+    covariance_rule!();
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct VcJwtSignatureRef<'a> {
+    pub header: &'a ssi_jws::Header,
+    pub signature_bytes: &'a [u8],
+}
+
+struct SignWithPayload<'a, S>(PhantomData<&'a S>);
+
+impl<'a, S: 'a + MessageSigner<()>> UnboundedRefFuture<'a> for SignWithPayload<'a, S> {
+    type Owned = Vec<u8>;
+
+    type Bound<'b> = S::Sign<'b> where 'a: 'b;
+
+    type Output = Result<Vec<u8>, MessageSignatureError>;
+}
+
+struct PayloadBinder<S> {
+    signer: S,
+}
+
+impl<'a, S: 'a + MessageSigner<()>> RefFutureBinder<'a, SignWithPayload<'a, S>>
+    for PayloadBinder<S>
+{
+    fn bind<'b>(context: Self, payload: &'b Vec<u8>) -> S::Sign<'b>
+    where
+        'a: 'b,
+    {
+        context.signer.sign((), payload)
+    }
+}
+
+#[pin_project]
+pub struct Sign<'a, S: 'a + MessageSigner<()>> {
+    header: Option<ssi_jws::Header>,
+
+    #[pin]
+    inner: SelfRefFuture<'a, SignWithPayload<'a, S>>,
+}
+
+impl<'a, S: 'a + MessageSigner<()>> Future for Sign<'a, S> {
+    type Output = Result<VcJwtSignature, SignatureError>;
+
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let this = self.project();
+        this.inner.poll(cx).map(|(result, _payload)| match result {
+            Ok(signature_bytes) => Ok(VcJwtSignature {
+                header: this.header.take().unwrap(),
+                signature_bytes,
+            }),
+            Err(e) => Err(e.into()),
+        })
+    }
+}
+
+impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm {
+    type Signature = VcJwtSignature;
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<()>> = Sign<'a, S>;
+
+    fn sign<'a, S: 'a + MessageSigner<()>>(
         &self,
         method: verification::AnyJwkMethodRef,
-        bytes: &[u8],
-        signer: &S
-    ) -> Result<Self::Signature, SignatureError> {
-        todo!()
+        payload: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        // Prepare JWS header.
+        let header = ssi_jws::Header {
+            algorithm: method.public_key_jwk.algorithm.unwrap_or_default(),
+            type_: Some("vc+ld+jwt".to_string()),
+            content_type: Some("vc+ld+json".to_string()),
+            base64urlencode_payload: (!self.base64_encode).then_some(false),
+            ..Default::default()
+        };
+
+        let signing_bytes = header.encode_signing_bytes(payload);
+
+        Sign {
+            header: Some(header),
+            inner: SelfRefFuture::new(signing_bytes, PayloadBinder { signer }),
+        }
     }
 
-    fn verify(&self,
-        signature: &[u8],
+    fn verify(
+        &self,
+        signature: VcJwtSignatureRef,
         method: verification::AnyJwkMethodRef,
-        bytes: &[u8]
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        bytes: &[u8],
+    ) -> Result<bool, VerificationError> {
+        let result = ssi_jws::verify_bytes(
+            signature.header.algorithm,
+            bytes,
+            method.public_key_jwk,
+            signature.signature_bytes,
+        );
+
+        match result {
+            Ok(()) => Ok(true),
+            Err(ssi_jws::Error::InvalidSignature) => Ok(false),
+            Err(ssi_jws::Error::InvalidJWS) => Err(VerificationError::InvalidKey),
+            Err(_) => Err(VerificationError::InvalidSignature),
+        }
     }
 }
 
@@ -96,14 +215,6 @@ impl<C: Sync> VcJwt<C> {
         L::Context: Into<json_ld::syntax::context::Value<()>>,
         C: treeldr_rust_prelude::AsJsonLdObjectMeta<V, I>,
     {
-        // Prepare JWS header.
-        let header = ssi_jws::Header {
-            type_: Some("vc+ld+jwt".to_string()),
-            content_type: Some("vc+ld+json".to_string()),
-            base64urlencode_payload: (!options.base64_encode).then_some(false),
-            ..Default::default()
-        };
-
         // Produce expanded JSON-LD payload.
         let mut json_ld_vc = credential.as_json_ld_object_meta(vocabulary, interpretation, ());
         if let Some(node) = json_ld_vc.as_node_mut() {
@@ -172,19 +283,22 @@ impl<C: Sync> VcJwt<C> {
             .compact_print()
             .to_string()
             .into_bytes();
-        let signing_bytes = header.encode_signing_bytes(&payload);
 
         // Build proof.
-        let signature = signer.sign(
-            VcJwtSignature,
-            signer_info.id(),
-            signer_info.method_reference(),
-            &signing_bytes
-        ).await?;
-        let proof = Proof::new(signature, signer_info);
+        let signature = signer
+            .sign(
+                VcJwtSignatureAlgorithm {
+                    base64_encode: options.base64_encode,
+                },
+                signer_info.id(),
+                signer_info.method_reference(),
+                &payload,
+            )
+            .await?;
+        let proof = Proof::new(signature.signature_bytes, signer_info);
 
         // Build non-verifiable JWT credential.
-        let jwt_credential = unsafe { Self::new_unchecked(credential, signing_bytes) };
+        let jwt_credential = Self::new(credential, signature.header, payload);
 
         // Build verifiable JWT credential.
         Ok(Verifiable::new(jwt_credential, proof))

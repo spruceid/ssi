@@ -1,14 +1,14 @@
-use std::hash::Hash;
-use indexmap::{IndexMap, Equivalent};
-use serde::{Serialize, Deserialize};
+use indexmap::{Equivalent, IndexMap};
+use serde::{Deserialize, Serialize};
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
+use std::hash::Hash;
 
 use crate::StructName;
 
-mod serialize;
 mod deserialize;
+mod serialize;
 
-pub use serialize::{to_value, to_struct, InvalidValue};
+pub use serialize::{to_struct, to_value, InvalidValue};
 
 /// EIP-712 structure instance.
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -27,7 +27,7 @@ impl Struct {
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
-    
+
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -36,7 +36,10 @@ impl Struct {
         self.0.get(key)
     }
 
-    pub fn get_mut(&mut self, key: &(impl ?Sized + Hash + Equivalent<String>)) -> Option<&mut Value> {
+    pub fn get_mut(
+        &mut self,
+        key: &(impl ?Sized + Hash + Equivalent<String>),
+    ) -> Option<&mut Value> {
         self.0.get_mut(key)
     }
 
@@ -137,7 +140,9 @@ impl From<Value> for serde_json::Value {
                 serde_json::Value::String("0x".to_string() + &bytes_to_lowerhex(&bytes))
             }
             Value::String(string) => serde_json::Value::String(string),
-            Value::Array(array) => serde_json::Value::Array(array.into_iter().map(serde_json::Value::from).collect()),
+            Value::Array(array) => {
+                serde_json::Value::Array(array.into_iter().map(serde_json::Value::from).collect())
+            }
             Value::Struct(hash_map) => serde_json::Value::Object(
                 hash_map
                     .into_iter()
@@ -185,7 +190,7 @@ impl TryFrom<serde_json::Value> for Value {
                     .collect::<Result<Struct, Self::Error>>()?,
             ),
         };
-        
+
         Ok(eip712_value)
     }
 }

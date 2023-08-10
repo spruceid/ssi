@@ -4,6 +4,12 @@
 //! and Curve25519. It is recommended to use `edssa-2022` instead.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
+use std::future;
+
+use futures::FutureExt;
+use multibase::Base;
+use ssi_crypto::{MessageSignatureError, MessageSigner};
+use ssi_verification_methods::{SignatureError, VerificationError};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfigurationRef};
@@ -66,6 +72,20 @@ pub struct Signature {
 
 pub struct SignatureAlgorithm;
 
+pub type MessageBuilder =
+    fn(Result<Vec<u8>, MessageSignatureError>) -> Result<MultibaseSignature, SignatureError>;
+
+fn build_signature(
+    r: Result<Vec<u8>, MessageSignatureError>,
+) -> Result<MultibaseSignature, SignatureError> {
+    match r {
+        Ok(bytes) => Ok(MultibaseSignature {
+            proof_value: multibase::encode(Base::Base58Btc, bytes),
+        }),
+        Err(e) => Err(e.into()),
+    }
+}
+
 impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
     for SignatureAlgorithm
 {
@@ -73,13 +93,16 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        futures::future::Map<S::Sign<'a>, MessageBuilder>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &Ed25519VerificationKey2020,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
-        todo!()
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        signer.sign((), bytes).map(build_signature)
     }
 
     fn verify(
@@ -87,7 +110,9 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
         signature: MultibaseSignatureRef,
         method: &Ed25519VerificationKey2020,
         bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+    ) -> Result<bool, VerificationError> {
+        let (_, signature_bytes) = multibase::decode(signature.proof_value)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        method.verify_bytes(bytes, &signature_bytes)
     }
 }

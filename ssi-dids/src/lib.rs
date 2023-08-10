@@ -8,11 +8,21 @@ mod did;
 pub mod document;
 pub mod resolution;
 
-use async_trait::async_trait;
 pub use did::*;
+use document::AnyVerificationMethod;
 pub use document::Document;
+use pin_project::pin_project;
 pub use resolution::DIDResolver;
-use ssi_verification_methods::ProofPurposes;
+use resolution::{DerefError, DerefOptions, DerefOutput, Dereference, Resolve};
+use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
+use ssi_verification_methods::{
+    ControllerError, ProofPurposes, Referencable, ReferenceOrOwnedRef, VerificationError,
+    VerificationMethodRef,
+};
+use std::future::Future;
+use std::marker::PhantomData;
+use std::pin::Pin;
+use std::task;
 
 pub struct Provider<T> {
     resolver: T,
@@ -20,11 +30,7 @@ pub struct Provider<T> {
 }
 
 impl ssi_verification_methods::Controller for Document {
-    fn allows_verification_method(
-        &self,
-        id: iref::Iri,
-        proof_purposes: ProofPurposes,
-    ) -> bool {
+    fn allows_verification_method(&self, id: iref::Iri, proof_purposes: ProofPurposes) -> bool {
         DIDURL::new(id.as_bytes()).is_ok_and(|url| {
             self.verification_relationships
                 .contains(&self.id, url, proof_purposes)
@@ -32,151 +38,206 @@ impl ssi_verification_methods::Controller for Document {
     }
 }
 
-#[async_trait]
-impl<T: Send + DIDResolver> ssi_verification_methods::ControllerProvider for Provider<T> {
-    type Controller<'a> = Document where Self: 'a;
+#[pin_project]
+pub struct GetController<'a, T: ?Sized + DIDResolver> {
+    #[pin]
+    inner: GetControllerInner<'a, T>,
+}
 
-    async fn get_controller(
-        &self,
-        id: iref::Iri<'_>,
-    ) -> Result<Option<Self::Controller<'_>>, ssi_verification_methods::ControllerError> {
-        if id.scheme() == "did" {
-            match DID::new(id.as_bytes()) {
-                Ok(did) => match self.resolver.resolve(did, self.options.clone()).await {
-                    Ok(output) => Ok(Some(output.document.into_document())),
-                    Err(resolution::Error::NotFound) => Ok(None),
-                    Err(e) => Err(ssi_verification_methods::ControllerError::InternalError(
-                        Box::new(e),
-                    )),
-                },
-                Err(_) => Err(ssi_verification_methods::ControllerError::Invalid),
-            }
-        } else {
-            Err(ssi_verification_methods::ControllerError::Invalid)
+impl<'a, T: ?Sized + DIDResolver> GetController<'a, T> {
+    fn pending(resolve: Resolve<'a, T>) -> Self {
+        Self {
+            inner: GetControllerInner::Pending(resolve),
+        }
+    }
+
+    fn err(e: ControllerError) -> Self {
+        Self {
+            inner: GetControllerInner::Err(Some(e)),
         }
     }
 }
 
-// #[async_trait]
-impl<T: Send + DIDResolver, M> ssi_verification_methods::Verifier<M>
-    for Provider<T>
-where
-    M: Send
-        + Sync
-        + TryFrom<document::AnyVerificationMethod>
-        + ssi_verification_methods::VerificationMethod,
-    M::Error: Send,
-    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a>
-{
-    fn resolve_verification_method<'async_trait, 'a: 'async_trait, 'm: 'async_trait>(
-        &'a self,
-        method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>
-    ) -> std::pin::Pin<Box<dyn 'async_trait + Send + futures::Future<Output = Result<<M as ssi_verification_methods::Referencable>::Reference<'m>, ssi_verification_methods::VerificationError>>>> {
-        // ...
-    }
+impl<'a, T: ?Sized + DIDResolver> Future for GetController<'a, T> {
+    type Output = Result<Option<Document>, ControllerError>;
 
-    // async fn verify<'m, 's>(
-    //     &self,
-    //     method: ssi_verification_methods::ReferenceRef<'m, M>,
-    //     proof_purpose: ssi_crypto::ProofPurpose,
-    //     signing_bytes: &[u8],
-    //     signature: S::Reference<'s>,
-    // ) -> Result<bool, ssi_crypto::VerificationError>
-    // where
-    //     M: 'async_trait,
-    // {
-    //     if method.iri().scheme() == "did" {
-    //         match DIDURL::new(method.iri().as_bytes()) {
-    //             Ok(url) => {
-    //                 let options = self.options.clone().into();
-    //                 match self.resolver.dereference(url, &options).await {
-    //                     Ok(deref) => {
-    //                         match deref.content.into_verification_method() {
-    //                             Ok(any_method) => match M::try_from(any_method) {
-    //                                 Ok(m) => {
-    //                                     m.verify(
-    //                                         self,
-    //                                         proof_purpose,
-    //                                         signing_bytes,
-    //                                         signature,
-    //                                     )
-    //                                     .await
-    //                                 }
-    //                                 Err(_) => {
-    //                                     // Wrong verification method type, or invalid method data.
-    //                                     Err(ssi_crypto::VerificationError::InvalidKeyId(
-    //                                         method.iri().to_string(),
-    //                                     ))
-    //                                 }
-    //                             },
-    //                             Err(_) => {
-    //                                 // The IRI is not referring to a verification method.
-    //                                 Err(ssi_crypto::VerificationError::InvalidKeyId(
-    //                                     method.iri().to_string(),
-    //                                 ))
-    //                             }
-    //                         }
-    //                     }
-    //                     Err(e) => {
-    //                         // Dereferencing failed for some reason.
-    //                         Err(ssi_crypto::VerificationError::InternalError(Box::new(e)))
-    //                     }
-    //                 }
-    //             }
-    //             Err(_) => {
-    //                 // The IRI is not a valid DID URL.
-    //                 Err(ssi_crypto::VerificationError::InvalidKeyId(
-    //                     method.iri().to_string(),
-    //                 ))
-    //             }
-    //         }
-    //     } else {
-    //         // Not a DID scheme.
-    //         Err(ssi_crypto::VerificationError::UnsupportedKeyId(
-    //             method.iri().to_string(),
-    //         ))
-    //     }
-    // }
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let this = self.project();
+        match this.inner.project() {
+            GetControllerProj::Pending(f) => f.poll(cx).map(|result| match result {
+                Ok(output) => Ok(Some(output.document.into_document())),
+                Err(resolution::Error::NotFound) => Ok(None),
+                Err(e) => Err(ssi_verification_methods::ControllerError::InternalError(
+                    e.to_string(),
+                )),
+            }),
+            GetControllerProj::Err(e) => task::Poll::Ready(Err(e.take().unwrap())),
+        }
+    }
 }
 
-#[async_trait]
-impl<T: Send + DIDResolver, M, S: ssi_crypto::Referencable> ssi_crypto::Verifier<ssi_verification_methods::ReferenceOrOwned<M>, S>
-    for Provider<T>
+#[pin_project(project = GetControllerProj)]
+enum GetControllerInner<'a, T: ?Sized + DIDResolver> {
+    Pending(#[pin] Resolve<'a, T>),
+    Err(Option<ControllerError>),
+}
+
+impl<T: DIDResolver> ssi_verification_methods::ControllerProvider for Provider<T> {
+    type Controller<'a> = Document where Self: 'a;
+
+    type GetController<'a> = GetController<'a, T> where Self: 'a;
+
+    fn get_controller<'a>(&'a self, id: iref::Iri<'a>) -> Self::GetController<'_> {
+        if id.scheme() == "did" {
+            match DID::new(id.into_bytes()) {
+                Ok(did) => GetController::pending(self.resolver.resolve(did, self.options.clone())),
+                Err(_) => GetController::err(ssi_verification_methods::ControllerError::Invalid),
+            }
+        } else {
+            GetController::err(ssi_verification_methods::ControllerError::Invalid)
+        }
+    }
+}
+
+#[pin_project]
+pub struct ResolveVerificationMethod<'a, M: 'a + Referencable, T: ?Sized + DIDResolver> {
+    #[pin]
+    inner: ResolveVerificationMethodInner<'a, T>,
+    m: PhantomData<&'a M>,
+}
+
+impl<'a, M: 'a + Referencable, T: ?Sized + DIDResolver> ResolveVerificationMethod<'a, M, T> {
+    fn dereference(resolver: &'a T, url: &'a DIDURL, options: DerefOptions) -> Self {
+        Self {
+            inner: ResolveVerificationMethodInner::Pending {
+                method_id: url,
+                dereference: SelfRefFuture::new(options, SetupDereference { resolver, url }),
+            },
+            m: PhantomData,
+        }
+    }
+
+    fn err(e: VerificationError) -> Self {
+        Self {
+            inner: ResolveVerificationMethodInner::Err(Some(e)),
+            m: PhantomData,
+        }
+    }
+}
+
+impl<'a, M: 'a + Referencable, T: ?Sized + DIDResolver> Future
+    for ResolveVerificationMethod<'a, M, T>
 where
-    M: Send
-        + Sync
-        + TryFrom<document::AnyVerificationMethod>
-        + ssi_verification_methods::VerificationMethod,
-    M::Error: Send,
-    for<'a> M::Reference<'a>: Send + ssi_verification_methods::VerificationMethodRef<'a, M, S>,
-    for<'a> S::Reference<'a>: Send,
+    M: TryFrom<AnyVerificationMethod>,
 {
-    async fn verify<'m: 'async_trait, 's: 'async_trait>(
-        &self,
-        method: ssi_verification_methods::ReferenceOrOwnedRef<'m, M>,
-        proof_purpose: ssi_crypto::ProofPurpose,
-        signing_bytes: &[u8],
-        signature: S::Reference<'s>,
-    ) -> Result<bool, ssi_crypto::VerificationError>
+    type Output = Result<ssi_verification_methods::Cow<'a, M>, VerificationError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let this = self.project();
+        match this.inner.project() {
+            ResolveVerificationMethodProj::Pending {
+                method_id,
+                dereference,
+            } => {
+                dereference.poll(cx).map(|(result, _)| match result {
+                    Ok(deref) => match deref.content.into_verification_method() {
+                        Ok(any_method) => match M::try_from(any_method) {
+                            Ok(m) => Ok(ssi_verification_methods::Cow::Owned(m)),
+                            Err(_) => {
+                                // Wrong verification method type, or invalid method data.
+                                Err(VerificationError::InvalidKeyId(method_id.to_string()))
+                            }
+                        },
+                        Err(_) => {
+                            // The IRI is not referring to a verification method.
+                            Err(VerificationError::InvalidKeyId(method_id.to_string()))
+                        }
+                    },
+                    Err(e) => {
+                        // Dereferencing failed for some reason.
+                        Err(VerificationError::InternalError(e.to_string()))
+                    }
+                })
+            }
+            ResolveVerificationMethodProj::Err(e) => task::Poll::Ready(Err(e.take().unwrap())),
+        }
+    }
+}
+
+#[pin_project(project = ResolveVerificationMethodProj)]
+enum ResolveVerificationMethodInner<'a, T: 'a + ?Sized + DIDResolver> {
+    Pending {
+        method_id: &'a DIDURL,
+
+        #[pin]
+        dereference: SelfRefFuture<'a, UnboundedDereference<T>>,
+    },
+    Err(Option<VerificationError>),
+}
+
+struct UnboundedDereference<T: ?Sized>(PhantomData<T>);
+
+impl<'max, T: 'max + ?Sized + DIDResolver> UnboundedRefFuture<'max> for UnboundedDereference<T> {
+    type Bound<'a> = Dereference<'a, T> where 'max: 'a;
+
+    type Owned = DerefOptions;
+
+    type Output = Result<DerefOutput, DerefError>;
+}
+
+struct SetupDereference<'a, T: ?Sized> {
+    resolver: &'a T,
+    url: &'a DIDURL,
+}
+
+impl<'max, T: 'max + ?Sized + DIDResolver> RefFutureBinder<'max, UnboundedDereference<T>>
+    for SetupDereference<'max, T>
+{
+    fn bind<'a>(context: Self, options: &'a DerefOptions) -> Dereference<'a, T>
     where
-        M: 'async_trait,
+        'max: 'a,
     {
+        context.resolver.dereference(context.url, options)
+    }
+}
+
+// #[async_trait]
+impl<T: DIDResolver, M> ssi_verification_methods::Verifier<M> for Provider<T>
+where
+    M: ssi_verification_methods::VerificationMethod,
+    for<'a> M::Reference<'a>: VerificationMethodRef<'a>,
+    M: TryFrom<AnyVerificationMethod>,
+{
+    type ResolveVerificationMethod<'a> = ResolveVerificationMethod<'a, M, T> where Self: 'a, M: 'a;
+
+    fn resolve_verification_method<'a, 'm: 'a>(
+        &'a self,
+        _issuer: Option<iref::Iri<'a>>,
+        method: Option<ReferenceOrOwnedRef<'m, M>>,
+    ) -> Self::ResolveVerificationMethod<'a> {
         match method {
-            ssi_verification_methods::ReferenceOrOwnedRef::Reference(r) => {
-                <Self as ssi_crypto::Verifier<ssi_verification_methods::Reference<M>, S>>::verify(
-                    self,
-                    r,
-                    proof_purpose,
-                    signing_bytes,
-                    signature,
-                )
-                .await
+            Some(method) => {
+                if method.id().scheme() == "did" {
+                    match DIDURL::new(method.id().into_bytes()) {
+                        Ok(url) => {
+                            let options = self.options.clone().into();
+                            ResolveVerificationMethod::dereference(&self.resolver, url, options)
+                        }
+                        Err(_) => {
+                            // The IRI is not a valid DID URL.
+                            ResolveVerificationMethod::err(VerificationError::InvalidKeyId(
+                                method.id().to_string(),
+                            ))
+                        }
+                    }
+                } else {
+                    // Not a DID scheme.
+                    ResolveVerificationMethod::err(VerificationError::UnsupportedKeyId(
+                        method.id().to_string(),
+                    ))
+                }
             }
-            ssi_verification_methods::ReferenceOrOwnedRef::Owned(m) => {
-                // No need to dereference.
-                m.verify(self, proof_purpose, signing_bytes, signature)
-                    .await
-            }
+            None => ResolveVerificationMethod::err(VerificationError::MissingVerificationMethod),
         }
     }
 }

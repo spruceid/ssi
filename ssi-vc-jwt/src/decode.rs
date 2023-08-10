@@ -118,7 +118,8 @@ impl<C: Sync> VcJwt<C> {
             Some(_) => return Err(Error::InvalidType(header.type_)),
         }
 
-        let mut claims: JWTClaims = serde_json::from_slice(&jws.decode_payload(&header)?)?;
+        let payload = jws.decode_payload(&header)?;
+        let mut claims: JWTClaims = serde_json::from_slice(&payload)?;
         let verification_method = build_issuer(&header, &claims)?;
 
         match claims.verifiable_credential.take() {
@@ -160,14 +161,7 @@ impl<C: Sync> VcJwt<C> {
                             )?;
                             let proof = Proof::new(jws.decode_signature()?, verification_method);
                             Ok(Verifiable::new(
-                                unsafe {
-                                    // SAFETY: because `jws` is well formed,
-                                    //         `jws.into_signing_bytes()` is
-                                    //         guaranteed to return valid
-                                    //         signing bytes to form a compact
-                                    //         JWS.
-                                    VcJwt::new_unchecked(credential, jws.into_signing_bytes())
-                                },
+                                VcJwt::new(credential, header, payload.into_owned()),
                                 proof,
                             ))
                         }
