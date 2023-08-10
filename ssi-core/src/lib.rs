@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+pub mod futures;
 pub mod one_or_many;
 pub mod uri;
 

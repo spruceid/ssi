@@ -1,12 +1,18 @@
 use iref::{Iri, IriBuf};
+use pin_project::pin_project;
 use ssi_core::one_or_many::OneOrMany;
+use std::future::Future;
+use std::pin::Pin;
+use std::task;
 
 use crate::{
     document::{self, representation, service, AnyVerificationMethod, Represented, Resource},
     DIDURLBuf, Fragment, PrimaryDIDURL, DIDURL,
 };
 
-use super::{DIDResolver, Error, Metadata, Options, Output, Parameters, MEDIA_TYPE_URL};
+use super::{
+    DIDResolver, DereferencePrimary, Error, Metadata, Options, Output, Parameters, MEDIA_TYPE_URL,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DerefError {
@@ -146,14 +152,53 @@ pub struct ContentMetadata {
     // ...
 }
 
+#[pin_project(project = DereferencePrimaryResourceProj)]
+pub(crate) enum DereferencePrimaryResource<'a, R: ?Sized + DIDResolver> {
+    Ready(Option<Result<DerefOutput<PrimaryContent>, DerefError>>),
+    Pending(#[pin] Pin<Box<DereferencePrimary<'a, R>>>),
+}
+
+impl<'a, R: ?Sized + DIDResolver> DereferencePrimaryResource<'a, R> {
+    fn err(e: DerefError) -> Self {
+        Self::Ready(Some(Err(e)))
+    }
+
+    fn ok(o: DerefOutput<PrimaryContent>) -> Self {
+        Self::Ready(Some(Ok(o)))
+    }
+}
+
+impl<'a, R: ?Sized + DIDResolver> Future for DereferencePrimaryResource<'a, R> {
+    type Output = Result<DerefOutput<PrimaryContent>, DerefError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        match self.project() {
+            DereferencePrimaryResourceProj::Ready(r) => task::Poll::Ready(r.take().unwrap()),
+            DereferencePrimaryResourceProj::Pending(f) => {
+                // 3.1
+                f.poll(cx).map(|result| match result {
+                    Ok(output) => Ok(output),
+                    Err(DerefError::Resolution(Error::MethodNotSupported(_))) => {
+                        Ok(DerefOutput::null())
+                    }
+                    Err(e) => Err(e),
+                })
+
+                // 3.2
+                // TODO: enable the client to dereference the DID URL
+            }
+        }
+    }
+}
+
 /// [Dereferencing the Primary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) - a subalgorithm of [DID URL dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm)
-pub(crate) async fn dereference_primary_resource(
-    resolver: &(impl ?Sized + DIDResolver),
-    primary_did_url: &PrimaryDIDURL,
+pub(crate) fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
+    resolver: &'a R,
+    primary_did_url: &'a PrimaryDIDURL,
     parameters: Parameters,
-    options: &DerefOptions,
+    options: &'a DerefOptions,
     resolution_output: Output,
-) -> Result<DerefOutput<PrimaryContent>, DerefError> {
+) -> DereferencePrimaryResource<'a, R> {
     // 1
     match &parameters.service {
         Some(id) => {
@@ -163,34 +208,49 @@ pub(crate) async fn dereference_primary_resource(
                     // 1.2, 1.2.1
                     // TODO: support these other cases?
                     let input_service_endpoint_url = match &service.service_endpoint {
-                        None => return Err(DerefError::MissingServiceEndpoint(id.clone())),
+                        None => {
+                            return DereferencePrimaryResource::err(
+                                DerefError::MissingServiceEndpoint(id.clone()),
+                            )
+                        }
                         Some(OneOrMany::One(service::Endpoint::Uri(uri))) => uri.as_iri(),
                         Some(OneOrMany::One(service::Endpoint::Map(_))) => {
-                            return Err(DerefError::UnsupportedServiceEndpointMap)
+                            return DereferencePrimaryResource::err(
+                                DerefError::UnsupportedServiceEndpointMap,
+                            )
                         }
                         Some(OneOrMany::Many(_)) => {
-                            return Err(DerefError::UnsupportedMultipleServiceEndpoints)
+                            return DereferencePrimaryResource::err(
+                                DerefError::UnsupportedMultipleServiceEndpoints,
+                            )
                         }
                     };
 
                     // 1.2.2, 1.2.3
-                    let output_service_endpoint_url = construct_service_endpoint(
+                    let r = construct_service_endpoint(
                         primary_did_url,
                         &parameters,
                         input_service_endpoint_url,
-                    )?;
+                    );
 
-                    // 1.3
-                    Ok(DerefOutput::url(output_service_endpoint_url))
+                    match r {
+                        Ok(output_service_endpoint_url) => {
+                            // 1.3
+                            DereferencePrimaryResource::ok(DerefOutput::url(
+                                output_service_endpoint_url,
+                            ))
+                        }
+                        Err(e) => DereferencePrimaryResource::err(e.into()),
+                    }
                 }
-                None => Ok(DerefOutput::null()),
+                None => DereferencePrimaryResource::ok(DerefOutput::null()),
             }
         }
         None => {
             // 2
             if primary_did_url.path().is_empty() && primary_did_url.query().is_none() {
                 // 2.1
-                return Ok(DerefOutput::new(
+                return DereferencePrimaryResource::ok(DerefOutput::new(
                     PrimaryContent::Document(resolution_output.document),
                     ContentMetadata::default(),
                     resolution_output.metadata,
@@ -199,19 +259,13 @@ pub(crate) async fn dereference_primary_resource(
 
             // 3
             if !primary_did_url.path().is_empty() || primary_did_url.query().is_some() {
-                // 3.1
-                match resolver.dereference_primary(primary_did_url, options).await {
-                    Ok(output) => return Ok(output),
-                    Err(DerefError::Resolution(Error::MethodNotSupported(_))) => (),
-                    Err(e) => return Err(e),
-                }
-
-                // 3.2
-                // TODO: enable the client to dereference the DID URL
+                return DereferencePrimaryResource::Pending(Box::pin(
+                    resolver.dereference_primary(primary_did_url, options),
+                ));
             }
 
             // 4
-            Ok(DerefOutput::null())
+            DereferencePrimaryResource::ok(DerefOutput::null())
         }
     }
 }

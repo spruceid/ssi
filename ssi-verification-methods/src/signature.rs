@@ -1,8 +1,8 @@
 use futures::Future;
 use iref::{Iri, IriBuf};
-use ssi_crypto::MessageSigner;
+use ssi_crypto::{MessageSigner, SignatureProtocol};
 
-use crate::{VerificationError, Referencable, ReferenceOrOwnedRef};
+use crate::{Referencable, ReferenceOrOwnedRef, VerificationError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignatureError {
@@ -25,7 +25,7 @@ pub enum SignatureError {
     MissingPublicKey,
 
     #[error(transparent)]
-    Signer(#[from] ssi_crypto::MessageSignatureError)
+    Signer(#[from] ssi_crypto::MessageSignatureError),
 }
 
 pub enum InvalidSignature {
@@ -33,7 +33,7 @@ pub enum InvalidSignature {
 
     InvalidValue,
 
-    MissingPublicKey
+    MissingPublicKey,
 }
 
 impl From<InvalidSignature> for VerificationError {
@@ -41,7 +41,7 @@ impl From<InvalidSignature> for VerificationError {
         match value {
             InvalidSignature::MissingValue => Self::MissingSignature,
             InvalidSignature::InvalidValue => Self::InvalidSignature,
-            InvalidSignature::MissingPublicKey => Self::MissingPublicKey
+            InvalidSignature::MissingPublicKey => Self::MissingPublicKey,
         }
     }
 }
@@ -52,32 +52,43 @@ pub trait SignatureAlgorithm<M: Referencable> {
     /// Signature protocol.
     type Protocol: ssi_crypto::SignatureProtocol;
 
-    fn sign<S: MessageSigner<Self::Protocol>>(
+    /// Future returned by the `sign` method.
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>>: 'a
+        + Future<Output = Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: M::Reference<'_>,
-        bytes: &[u8],
-        signer: &S
-    ) -> Result<Self::Signature, SignatureError>;
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S>
+    where
+        <Self::Protocol as SignatureProtocol>::Output: 'a;
 
     fn verify<'s, 'm>(
         &self,
         signature: <Self::Signature as Referencable>::Reference<'s>,
         method: M::Reference<'m>,
-        bytes: &[u8]
+        bytes: &[u8],
     ) -> Result<bool, VerificationError>;
 }
 
 /// Verification method signer.
 pub trait Signer<M: Referencable, P> {
-    type Sign<'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>: 'a + Future<Output = Result<A::Signature, SignatureError>> where Self: 'a, M: 'm, A::Signature: 'a;
+    type Sign<'a, A: SignatureAlgorithm<M, Protocol = P>>: 'a
+        + Future<Output = Result<A::Signature, SignatureError>>
+    where
+        Self: 'a,
+        M: 'a,
+        A::Signature: 'a;
 
     fn sign<'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>(
         &'a self,
-		algorithm: A,
+        algorithm: A,
         issuer: Option<Iri<'a>>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
         bytes: &'a [u8],
-    ) -> Self::Sign<'a, 'm, A>
+    ) -> Self::Sign<'a, A>
     where
         A::Signature: 'a;
 }

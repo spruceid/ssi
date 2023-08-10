@@ -66,25 +66,25 @@ impl ssi_crypto::SignatureProtocol for AnySignatureProtocol {
 }
 
 impl From<()> for AnySignatureProtocol {
-    fn from(value: ()) -> Self {
+    fn from(_value: ()) -> Self {
         Self::Direct
     }
 }
 
 impl From<protocol::Base58Btc> for AnySignatureProtocol {
-    fn from(value: protocol::Base58Btc) -> Self {
+    fn from(_value: protocol::Base58Btc) -> Self {
         Self::Base58Btc
     }
 }
 
 impl From<protocol::Base58BtcMultibase> for AnySignatureProtocol {
-    fn from(value: protocol::Base58BtcMultibase) -> Self {
+    fn from(_value: protocol::Base58BtcMultibase) -> Self {
         Self::Base58BtcMultibase
     }
 }
 
 impl From<protocol::EthereumWallet> for AnySignatureProtocol {
-    fn from(value: protocol::EthereumWallet) -> Self {
+    fn from(_value: protocol::EthereumWallet) -> Self {
         Self::EthereumWallet
     }
 }

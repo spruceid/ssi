@@ -3,17 +3,15 @@ use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use iref::Iri;
 use pin_project::pin_project;
+use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::IntoNQuads;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
     LinkedDataVerificationMethod, Referencable, SignatureAlgorithm, SignatureError, Signer,
-    VerificationError, VerificationMethodRef, Verifier,
+    VerificationError, VerificationMethod, VerificationMethodRef, Verifier,
 };
 
-use crate::{
-    utils::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture},
-    ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProofRef,
-};
+use crate::{ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProofRef};
 
 mod signatures;
 pub use signatures::*;
@@ -57,7 +55,7 @@ pub trait CryptographicSuite: Sized {
     type Hashed: AsRef<[u8]>;
 
     /// Verification method.
-    type VerificationMethod: Referencable;
+    type VerificationMethod: VerificationMethod;
 
     /// Signature.
     type Signature: Referencable;
@@ -86,17 +84,13 @@ pub trait CryptographicSuite: Sized {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
 
-    fn generate_proof<
-        'a,
-        'max: 'a,
-        S: Signer<Self::VerificationMethod, Self::SignatureProtocol>,
-    >(
+    fn generate_proof<'a, S: Signer<Self::VerificationMethod, Self::SignatureProtocol>>(
         &self,
         data: &'a Self::Hashed,
         signer: &'a S,
         params: ProofConfiguration<Self::VerificationMethod>,
         _options: Self::Options,
-    ) -> GenerateProof<'max, 'a, Self, S> {
+    ) -> GenerateProof<'a, Self, S> {
         let algorithm = self.setup_signature_algorithm();
 
         GenerateProof {
@@ -111,12 +105,12 @@ pub trait CryptographicSuite: Sized {
         }
     }
 
-    fn verify_proof<'a, 'p, V: Verifier<Self::VerificationMethod>>(
+    fn verify_proof<'a, 'p: 'a, V: Verifier<Self::VerificationMethod>>(
         &self,
         data: &'a Self::Hashed,
         verifier: &'a V,
         proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Signature>,
-    ) -> VerifyProof<'a, 'p, Self, V>
+    ) -> VerifyProof<'a, Self, V>
     where
         <Self::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
     {
@@ -136,19 +130,14 @@ pub trait CryptographicSuite: Sized {
 
 struct SignBounded<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
 
-impl<
-        'max,
-        'a,
-        M: 'a + 'max + Referencable,
-        A: SignatureAlgorithm<M>,
-        S: 'a + Signer<M, A::Protocol>,
-    > UnboundedRefFuture<'a, 'max> for SignBounded<'a, M, A, S>
+impl<'a, M: 'a + Referencable, A: SignatureAlgorithm<M>, S: 'a + Signer<M, A::Protocol>>
+    UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
 where
     A::Signature: 'a,
 {
     type Owned = ProofConfiguration<M>;
 
-    type Bound<'m: 'a> = S::Sign<'a, 'm, A> where 'max: 'm;
+    type Bound<'m> = S::Sign<'m, A> where 'a: 'm;
 
     type Output = Result<A::Signature, SignatureError>;
 }
@@ -159,19 +148,14 @@ struct Binder<'a, A, S> {
     data: &'a [u8],
 }
 
-impl<
-        'max,
-        'a,
-        M: 'a + 'max + Referencable,
-        A: SignatureAlgorithm<M>,
-        S: Signer<M, A::Protocol>,
-    > RefFutureBinder<'a, 'max, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
+impl<'a, M: 'a + Referencable, A: SignatureAlgorithm<M>, S: Signer<M, A::Protocol>>
+    RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
 where
     A::Signature: 'a,
 {
-    fn bind<'m>(context: Self, params: &'m ProofConfiguration<M>) -> S::Sign<'a, 'm, A>
+    fn bind<'m>(context: Self, params: &'m ProofConfiguration<M>) -> S::Sign<'m, A>
     where
-        'max: 'm,
+        'a: 'm,
     {
         context.signer.sign(
             context.algorithm,
@@ -184,25 +168,19 @@ where
 
 #[pin_project]
 pub struct GenerateProof<
-    'max,
     'a,
     S: CryptographicSuite,
     T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>,
 > where
-    S::VerificationMethod: 'max + 'a,
+    S::VerificationMethod: 'a,
     S::Signature: 'a,
 {
     #[pin]
-    signature:
-        SelfRefFuture<'a, 'max, SignBounded<'a, S::VerificationMethod, S::SignatureAlgorithm, T>>,
+    signature: SelfRefFuture<'a, SignBounded<'a, S::VerificationMethod, S::SignatureAlgorithm, T>>,
 }
 
-impl<
-        'max,
-        'a,
-        S: CryptographicSuite,
-        T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    > Future for GenerateProof<'max, 'a, S, T>
+impl<'a, S: CryptographicSuite, T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>> Future
+    for GenerateProof<'a, S, T>
 where
     S::VerificationMethod: 'a,
 {
@@ -223,21 +201,15 @@ where
 }
 
 #[pin_project]
-pub struct VerifyProof<'a, 'p, S: CryptographicSuite, V: Verifier<S::VerificationMethod>> {
+pub struct VerifyProof<'a, S: CryptographicSuite, V: Verifier<S::VerificationMethod>> {
     #[pin]
-    verify: ssi_verification_methods::Verify<
-        'a,
-        'p,
-        'p,
-        S::VerificationMethod,
-        V,
-        S::SignatureAlgorithm,
-    >,
+    verify: ssi_verification_methods::Verify<'a, S::VerificationMethod, V, S::SignatureAlgorithm>,
 }
 
-impl<'a, 'p, S: CryptographicSuite, V: Verifier<S::VerificationMethod>> Future
-    for VerifyProof<'a, 'p, S, V>
+impl<'a, S: CryptographicSuite, V: 'a + Verifier<S::VerificationMethod>> Future
+    for VerifyProof<'a, S, V>
 where
+    S::VerificationMethod: VerificationMethod,
     <S::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
 {
     type Output = Result<ProofValidity, VerificationError>;

@@ -1,4 +1,9 @@
-use ssi_verification_methods::{InvalidSignature, Referencable, RsaVerificationKey2018};
+use std::future;
+
+use ssi_crypto::MessageSigner;
+use ssi_verification_methods::{
+    covariance_rule, InvalidSignature, Referencable, RsaVerificationKey2018, SignatureError,
+};
 use static_iref::iri;
 
 use crate::{
@@ -66,6 +71,8 @@ impl Referencable for Signature {
             signature_value: &self.signature_value,
         }
     }
+
+    covariance_rule!();
 }
 
 impl From<Signature> for AnySignature {
@@ -102,12 +109,15 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &RsaVerificationKey2018,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

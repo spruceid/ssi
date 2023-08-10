@@ -2,10 +2,23 @@ use crate::{
     suite::{AnySignature, AnySignatureRef, HashError},
     CryptographicSuite, ProofConfigurationRef,
 };
-use ssi_verification_methods::{AnyMethod, AnyMethodRef, SignatureError, VerificationError};
+use pin_project::pin_project;
+use ssi_core::futures::FailibleFuture;
+use ssi_crypto::{MessageSigner, SignerAdapter};
+use ssi_verification_methods::{
+    AnyMethod, AnyMethodRef, SignatureAlgorithm, SignatureError, VerificationError,
+};
+use std::future::Future;
+use std::pin::Pin;
+use std::task;
 
 mod protocol;
 pub use protocol::AnySignatureProtocol;
+
+type SuiteMethod<S> = <S as CryptographicSuite>::VerificationMethod;
+type SuiteSign<'a, S, T> = <<S as CryptographicSuite>::SignatureAlgorithm as SignatureAlgorithm<
+    SuiteMethod<S>,
+>>::Sign<'a, T>;
 
 macro_rules! crypto_suites {
     {
@@ -34,33 +47,64 @@ macro_rules! crypto_suites {
             ),*
         }
 
-        pub enum SignatureAlgorithm {
+        pub enum AnySignatureAlgorithm {
             $(
                 $(#[cfg($($t)*)])?
                 $name(<super::$name as $crate::CryptographicSuite>::SignatureAlgorithm)
             ),*
         }
 
-        impl ssi_verification_methods::SignatureAlgorithm<AnyMethod> for SignatureAlgorithm {
+        #[pin_project(project = SignProj)]
+        pub enum Sign<'a, S: 'a + MessageSigner<AnySignatureProtocol>> {
+            $(
+                $(#[cfg($($t)*)])?
+                $name(#[pin] SuiteSign<'a, super::$name, SignerAdapter<S, AnySignatureProtocol>>)
+            ),*
+        }
+
+        impl<'a, S: 'a + MessageSigner<AnySignatureProtocol>> Future for Sign<'a, S> {
+            type Output = Result<AnySignature, SignatureError>;
+
+            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+                match self.project() {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        SignProj::$name(s) => {
+                            s.poll(cx).map_ok(Into::into)
+                        }
+                    ),*
+                }
+            }
+        }
+
+        impl SignatureAlgorithm<AnyMethod> for AnySignatureAlgorithm {
             type Signature = AnySignature;
 
             type Protocol = AnySignatureProtocol;
 
-            fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+            type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = FailibleFuture<Sign<'a, S>, SignatureError>;
+
+            fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
                 &self,
                 method: AnyMethodRef,
-                bytes: &[u8],
-                signer: &S
-            ) -> Result<Self::Signature, SignatureError> {
+                bytes: &'a [u8],
+                signer: S
+            ) -> Self::Sign<'a, S> {
                 match self {
                     $(
                         Self::$name(a) => {
-                            let projected_signer = ssi_crypto::ProjectedMessageSigner::new(signer);
-                            Ok(a.sign(
-                                method.try_into()?,
-                                bytes,
-                                &projected_signer
-                            )?.into())
+                            match method.try_into() {
+                                Ok(method) => {
+                                    FailibleFuture::ok(Sign::$name(a.sign(
+                                        method,
+                                        bytes,
+                                        SignerAdapter::new(signer)
+                                    )))
+                                }
+                                Err(e) => {
+                                    FailibleFuture::err(e.into())
+                                }
+                            }
                         }
                     ),*
                 }
@@ -97,7 +141,7 @@ macro_rules! crypto_suites {
 
             type SignatureProtocol = AnySignatureProtocol;
 
-            type SignatureAlgorithm = SignatureAlgorithm;
+            type SignatureAlgorithm = AnySignatureAlgorithm;
 
             type Options = Options;
 
@@ -138,7 +182,7 @@ macro_rules! crypto_suites {
             fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
                 match self {
                     $(
-                        Self::$name => SignatureAlgorithm::$name(super::$name.setup_signature_algorithm())
+                        Self::$name => AnySignatureAlgorithm::$name(super::$name.setup_signature_algorithm())
                     ),*
                 }
             }

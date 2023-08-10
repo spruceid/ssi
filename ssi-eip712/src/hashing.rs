@@ -1,6 +1,6 @@
 use keccak_hash::keccak;
 
-use crate::{Value, StructName, TypeDefinition, Types, TypeRef};
+use crate::{StructName, TypeDefinition, TypeRef, Types, Value};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TypedDataHashError {
@@ -41,28 +41,30 @@ pub enum TypedDataHashError {
 }
 
 impl Value {
-	/// https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct
+    /// https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct
     #[allow(clippy::ptr_arg)]
     pub fn hash(
         &self,
         struct_name: &StructName,
         types: &Types,
     ) -> Result<[u8; 32], TypedDataHashError> {
-        let encoded_data = self.encode(&TypeRef::Struct(struct_name.clone()), types)?.to_vec();
+        let encoded_data = self
+            .encode(&TypeRef::Struct(struct_name.clone()), types)?
+            .to_vec();
         Ok(keccak(encoded_data).to_fixed_bytes())
     }
 }
 
 impl TypeDefinition {
-	/// Hash the result of [`encodeType`]
-	#[allow(clippy::ptr_arg)]
-	pub fn hash(
-		&self,
-		struct_name: &StructName,
-		types: &Types,
-	) -> Result<[u8; 32], TypedDataHashError> {
-		let encoded_type = self.encode(struct_name, types)?.to_vec();
-		let type_hash = keccak(encoded_type).to_fixed_bytes();
-		Ok(type_hash)
-	}
+    /// Hash the result of [`encodeType`]
+    #[allow(clippy::ptr_arg)]
+    pub fn hash(
+        &self,
+        struct_name: &StructName,
+        types: &Types,
+    ) -> Result<[u8; 32], TypedDataHashError> {
+        let encoded_type = self.encode(struct_name, types)?.to_vec();
+        let type_hash = keccak(encoded_type).to_fixed_bytes();
+        Ok(type_hash)
+    }
 }

@@ -1,9 +1,11 @@
+use std::future;
+
 use ssi_crypto::{protocol::EthereumWallet, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
-    verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    Referencable, VerificationError,
+    covariance_rule, verification_method_union, EcdsaSecp256k1RecoveryMethod2020,
+    EcdsaSecp256k1VerificationKey2019, Referencable, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
@@ -77,6 +79,8 @@ impl Referencable for Signature {
             proof_value: &self.proof_value,
         }
     }
+
+    covariance_rule!();
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -111,15 +115,16 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = EthereumWallet;
 
-    fn sign<S: MessageSigner<EthereumWallet>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        _method: VerificationMethodRef,
-        bytes: &[u8],
-        wallet: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
-        Ok(Signature {
-            proof_value: wallet.sign(EthereumWallet, bytes)?,
-        })
+        method: VerificationMethodRef,
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        todo!()
     }
 
     fn verify(

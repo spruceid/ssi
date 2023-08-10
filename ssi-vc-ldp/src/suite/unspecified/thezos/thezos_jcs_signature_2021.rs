@@ -1,6 +1,9 @@
+use std::future;
+
 use serde::Serialize;
+use ssi_crypto::MessageSigner;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::TezosMethod2021;
+use ssi_verification_methods::{SignatureError, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
@@ -109,12 +112,15 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &TezosMethod2021,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

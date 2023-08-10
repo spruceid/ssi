@@ -9,8 +9,9 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
+    XSD_STRING,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
@@ -72,7 +73,11 @@ impl Ed25519VerificationKey2018 {
         .unwrap())
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature_bytes: &[u8],
+    ) -> Result<bool, VerificationError> {
         let pk = self
             .decode_public_key()
             .map_err(|_| VerificationError::InvalidKey)?;
@@ -85,10 +90,12 @@ impl Ed25519VerificationKey2018 {
 
 impl Referencable for Ed25519VerificationKey2018 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for Ed25519VerificationKey2018 {
@@ -99,7 +106,9 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
     fn controller(&self) -> Option<Iri> {
         Some(self.controller.as_iri())
     }
+}
 
+impl TypedVerificationMethod for Ed25519VerificationKey2018 {
     fn expected_type() -> Option<ExpectedType> {
         Some(ED25519_VERIFICATION_KEY_2018_TYPE.to_string().into())
     }

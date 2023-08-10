@@ -34,11 +34,9 @@ impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
     }
 
     /// Returns the list of quads in the dataset.
-    /// 
+    ///
     /// The order in which quads are returned is unspecified.
-    pub fn into_quads(
-        &self
-    ) -> Vec<Quad>
+    pub fn into_quads(&self) -> Vec<Quad>
     where
         V: Vocabulary<
             Type = rdf_types::literal::Type<
@@ -51,8 +49,7 @@ impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
     {
         // TODO: make sure that a blank node identifier is assigned to resources
         //       without lexical representation.
-        self
-            .dataset
+        self.dataset
             .quads()
             .flat_map(|quad| {
                 self.interpretation.quads_of(quad).map(|Quad(s, p, o, g)| {
@@ -65,7 +62,7 @@ impl<'a, V, I: Interpretation> DatasetWithEntryPoint<'a, V, I> {
                 })
             })
             .collect()
-    } 
+    }
 
     /// Returns the canonical form of the dataset, in the N-Quads format.
     pub fn canonical_form(&self) -> String

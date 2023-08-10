@@ -10,8 +10,9 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, SignatureError, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_JSON,
+    RDF_TYPE_IRI,
 };
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
@@ -58,13 +59,7 @@ impl JsonWebKey2020 {
 
     pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
         match self.public_key.algorithm.as_ref() {
-            Some(a) => Ok(ssi_jws::verify_bytes(
-                *a,
-                data,
-                &self.public_key,
-                signature,
-            )
-            .is_ok()),
+            Some(a) => Ok(ssi_jws::verify_bytes(*a, data, &self.public_key, signature).is_ok()),
             None => Err(VerificationError::InvalidKey),
         }
     }
@@ -72,10 +67,12 @@ impl JsonWebKey2020 {
 
 impl Referencable for JsonWebKey2020 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for JsonWebKey2020 {
@@ -84,6 +81,13 @@ impl VerificationMethod for JsonWebKey2020 {
         self.id.as_iri()
     }
 
+    /// Returns an URI to the key controller.
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
+    }
+}
+
+impl TypedVerificationMethod for JsonWebKey2020 {
     fn expected_type() -> Option<ExpectedType> {
         Some(JSON_WEB_KEY_2020_TYPE.to_string().into())
     }
@@ -91,11 +95,6 @@ impl VerificationMethod for JsonWebKey2020 {
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         JSON_WEB_KEY_2020_TYPE
-    }
-
-    /// Returns an URI to the key controller.
-    fn controller(&self) -> Option<Iri> {
-        Some(self.controller.as_iri())
     }
 }
 

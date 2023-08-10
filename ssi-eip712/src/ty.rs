@@ -1,6 +1,6 @@
-use std::{str::FromStr, fmt, collections::HashMap, num::ParseIntError};
+use std::{collections::HashMap, fmt, num::ParseIntError, str::FromStr};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::Value;
 
@@ -53,8 +53,8 @@ impl FromStr for TypeRef {
             "bool" => return Ok(TypeRef::Bool),
             _ => {}
         }
-        
-		if string.ends_with(']') {
+
+        if string.ends_with(']') {
             let mut parts = string.rsplitn(2, '[');
             let amount_str = parts.next().unwrap().split(']').next().unwrap();
             let inner = parts.next().ok_or(TypeParseError::UnmatchedBracket)?;
@@ -80,11 +80,11 @@ impl FromStr for TypeRef {
 }
 
 impl TryFrom<String> for TypeRef {
-	type Error = TypeParseError;
+    type Error = TypeParseError;
 
-	fn try_from(value: String) -> Result<Self, Self::Error> {
-		value.parse()
-	}
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        value.parse()
+    }
 }
 
 impl fmt::Display for TypeRef {
@@ -127,37 +127,31 @@ impl From<TypeRef> for String {
 pub struct TypeDefinition(Vec<MemberVariable>);
 
 impl TypeDefinition {
-	pub fn new(member_variables: Vec<MemberVariable>) -> Self {
-		Self(member_variables)
-	}
+    pub fn new(member_variables: Vec<MemberVariable>) -> Self {
+        Self(member_variables)
+    }
 
-	pub fn member_variables(&self) -> &[MemberVariable] {
-		&self.0
-	}
+    pub fn member_variables(&self) -> &[MemberVariable] {
+        &self.0
+    }
 
-	pub fn push(&mut self, m: MemberVariable) {
-		self.0.push(m)
-	}
+    pub fn push(&mut self, m: MemberVariable) {
+        self.0.push(m)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberVariable {
-	pub name: String,
+    pub name: String,
 
     #[serde(rename = "type")]
     pub type_: TypeRef,
 }
 
 impl MemberVariable {
-	pub fn new(
-		name: String,
-		type_: TypeRef,
-	) -> Self {
-		Self {
-			name,
-			type_
-		}
-	}
+    pub fn new(name: String, type_: TypeRef) -> Self {
+        Self { name, type_ }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -178,163 +172,164 @@ impl Types {
         }
     }
 
-	/// Generate EIP-712 types from a value.
-	/// 
-	/// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#types-generation>
-	pub fn generate(
-		doc: &Value,
-		primary_type: StructName,
-		domain_type: TypeDefinition
-	) -> Result<Self, TypesGenerationError> {
-		Ok(Self {
-			eip712_domain: domain_type,
-			types: Self::generate_inner(doc, primary_type)?
-		})
-	}
+    /// Generate EIP-712 types from a value.
+    ///
+    /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#types-generation>
+    pub fn generate(
+        doc: &Value,
+        primary_type: StructName,
+        domain_type: TypeDefinition,
+    ) -> Result<Self, TypesGenerationError> {
+        Ok(Self {
+            eip712_domain: domain_type,
+            types: Self::generate_inner(doc, primary_type)?,
+        })
+    }
 
-	/// Generate EIP-712 types from a value, without the toplevel `EIP712Domain` type.
-	/// 
-	/// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#types-generation>
-	fn generate_inner(
-		doc: &Value,
-		primary_type: StructName
-	) -> Result<HashMap<StructName, TypeDefinition>, TypesGenerationError> {
-		// 1
-		let mut output = HashMap::default();
-		// 2
-		// TypedDataField == MemberVariable
-		let mut types = TypeDefinition::default();
-		// 4
-		// Done already.
-		// 3
-		// Using JCS here probably has no effect:
-		// https://github.com/davidpdrsn/assert-json-diff
-		let doc_jcs = serde_jcs::to_string(doc).map_err(TypesGenerationError::JCS)?;
-		let doc: Value = serde_json::from_str(&doc_jcs).map_err(TypesGenerationError::JCS)?;
-		// 5
-		let object = doc
-			.as_struct()
-			.ok_or(TypesGenerationError::ExpectedObject)?;
-		let mut props: Vec<(&String, &Value)> = object.iter().collect();
-		// Iterate through object properties in the order JCS would sort them.
-		// https://datatracker.ietf.org/doc/html/rfc8785#section-3.2.3
-		props.sort_by_cached_key(|(name, _value)| name.encode_utf16().collect::<Vec<u16>>());
-		for (property_name, value) in props {
-			match value {
-				// 6
-				Value::Bool(_) => {
-					// 6.1
-					types.push(MemberVariable {
-						type_: TypeRef::Bool,
-						name: String::from(property_name),
-					});
-				}
-				Value::Integer(_) => {
-					// 6.2
-					types.push(MemberVariable {
-						type_: TypeRef::UintN(256),
-						name: String::from(property_name),
-					});
-				}
-				Value::String(_) => {
-					// 6.3
-					types.push(MemberVariable {
-						type_: TypeRef::String,
-						name: String::from(property_name),
-					});
-				}
-				// 7
-				Value::Array(array) => {
-					// Ensure values have same primitive type.
-					let mut values = array.iter();
-					let first_value = values
-						.next()
-						.ok_or_else(|| TypesGenerationError::EmptyArray(property_name.clone()))?;
-					match first_value {
-						Value::Bool(_) => {
-							// 7.1
-							for value in values {
-								if !matches!(value, Value::Bool(_)) {
-									return Err(TypesGenerationError::ArrayInconsistency(
-										"boolean",
-										property_name.clone(),
-									));
-								}
-							}
-							types.push(MemberVariable {
-								type_: TypeRef::Array(Box::new(TypeRef::Bool)),
-								name: String::from(property_name),
-							});
-						}
-						Value::Integer(_) => {
-							// 7.2
-							for value in values {
-								if !matches!(value, Value::Integer(_)) {
-									return Err(TypesGenerationError::ArrayInconsistency(
-										"number",
-										property_name.clone(),
-									));
-								}
-							}
-							types.push(MemberVariable {
-								type_: TypeRef::Array(Box::new(TypeRef::UintN(256))),
-								name: String::from(property_name),
-							});
-						}
-						Value::String(_) => {
-							// 7.3
-							for value in values {
-								if !matches!(value, Value::String(_)) {
-									return Err(TypesGenerationError::ArrayInconsistency(
-										"string",
-										property_name.clone(),
-									));
-								}
-							}
-							types.push(MemberVariable {
-								type_: TypeRef::Array(Box::new(TypeRef::String)),
-								name: String::from(property_name),
-							});
-						}
-						_ => {
-							return Err(TypesGenerationError::ComplexArrayValue(
-								property_name.clone(),
-							));
-						}
-					}
-				}
-				Value::Struct(object) => {
-					// 8
-					let mut recursive_output = Self::generate_inner(
-						&Value::Struct(object.clone()),
-						primary_type.clone(),
-					)?;
-					// 8.1
-					let recursive_types = recursive_output.remove(&primary_type).ok_or_else(|| {
-						TypesGenerationError::MissingPrimaryTypeInRecursiveOutput(primary_type.clone())
-					})?;
-					// 8.2
-					let property_type = property_to_struct_name(property_name);
-					types.push(MemberVariable {
-						name: String::from(property_name),
-						type_: TypeRef::Struct(property_type.clone()),
-					});
-					// 8.3
-					output.insert(property_type, recursive_types);
-					// 8.4
-					for (prop, type_) in recursive_output.into_iter() {
-						output.insert(prop, type_);
-					}
-				}
-				_ => {
-					return Err(TypesGenerationError::ComplexValue(property_name.clone()));
-				}
-			}
-		}
-		// 9
-		output.insert(primary_type, types);
-		Ok(output)
-	}
+    /// Generate EIP-712 types from a value, without the toplevel `EIP712Domain` type.
+    ///
+    /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#types-generation>
+    fn generate_inner(
+        doc: &Value,
+        primary_type: StructName,
+    ) -> Result<HashMap<StructName, TypeDefinition>, TypesGenerationError> {
+        // 1
+        let mut output = HashMap::default();
+        // 2
+        // TypedDataField == MemberVariable
+        let mut types = TypeDefinition::default();
+        // 4
+        // Done already.
+        // 3
+        // Using JCS here probably has no effect:
+        // https://github.com/davidpdrsn/assert-json-diff
+        let doc_jcs = serde_jcs::to_string(doc).map_err(TypesGenerationError::JCS)?;
+        let doc: Value = serde_json::from_str(&doc_jcs).map_err(TypesGenerationError::JCS)?;
+        // 5
+        let object = doc
+            .as_struct()
+            .ok_or(TypesGenerationError::ExpectedObject)?;
+        let mut props: Vec<(&String, &Value)> = object.iter().collect();
+        // Iterate through object properties in the order JCS would sort them.
+        // https://datatracker.ietf.org/doc/html/rfc8785#section-3.2.3
+        props.sort_by_cached_key(|(name, _value)| name.encode_utf16().collect::<Vec<u16>>());
+        for (property_name, value) in props {
+            match value {
+                // 6
+                Value::Bool(_) => {
+                    // 6.1
+                    types.push(MemberVariable {
+                        type_: TypeRef::Bool,
+                        name: String::from(property_name),
+                    });
+                }
+                Value::Integer(_) => {
+                    // 6.2
+                    types.push(MemberVariable {
+                        type_: TypeRef::UintN(256),
+                        name: String::from(property_name),
+                    });
+                }
+                Value::String(_) => {
+                    // 6.3
+                    types.push(MemberVariable {
+                        type_: TypeRef::String,
+                        name: String::from(property_name),
+                    });
+                }
+                // 7
+                Value::Array(array) => {
+                    // Ensure values have same primitive type.
+                    let mut values = array.iter();
+                    let first_value = values
+                        .next()
+                        .ok_or_else(|| TypesGenerationError::EmptyArray(property_name.clone()))?;
+                    match first_value {
+                        Value::Bool(_) => {
+                            // 7.1
+                            for value in values {
+                                if !matches!(value, Value::Bool(_)) {
+                                    return Err(TypesGenerationError::ArrayInconsistency(
+                                        "boolean",
+                                        property_name.clone(),
+                                    ));
+                                }
+                            }
+                            types.push(MemberVariable {
+                                type_: TypeRef::Array(Box::new(TypeRef::Bool)),
+                                name: String::from(property_name),
+                            });
+                        }
+                        Value::Integer(_) => {
+                            // 7.2
+                            for value in values {
+                                if !matches!(value, Value::Integer(_)) {
+                                    return Err(TypesGenerationError::ArrayInconsistency(
+                                        "number",
+                                        property_name.clone(),
+                                    ));
+                                }
+                            }
+                            types.push(MemberVariable {
+                                type_: TypeRef::Array(Box::new(TypeRef::UintN(256))),
+                                name: String::from(property_name),
+                            });
+                        }
+                        Value::String(_) => {
+                            // 7.3
+                            for value in values {
+                                if !matches!(value, Value::String(_)) {
+                                    return Err(TypesGenerationError::ArrayInconsistency(
+                                        "string",
+                                        property_name.clone(),
+                                    ));
+                                }
+                            }
+                            types.push(MemberVariable {
+                                type_: TypeRef::Array(Box::new(TypeRef::String)),
+                                name: String::from(property_name),
+                            });
+                        }
+                        _ => {
+                            return Err(TypesGenerationError::ComplexArrayValue(
+                                property_name.clone(),
+                            ));
+                        }
+                    }
+                }
+                Value::Struct(object) => {
+                    // 8
+                    let mut recursive_output =
+                        Self::generate_inner(&Value::Struct(object.clone()), primary_type.clone())?;
+                    // 8.1
+                    let recursive_types =
+                        recursive_output.remove(&primary_type).ok_or_else(|| {
+                            TypesGenerationError::MissingPrimaryTypeInRecursiveOutput(
+                                primary_type.clone(),
+                            )
+                        })?;
+                    // 8.2
+                    let property_type = property_to_struct_name(property_name);
+                    types.push(MemberVariable {
+                        name: String::from(property_name),
+                        type_: TypeRef::Struct(property_type.clone()),
+                    });
+                    // 8.3
+                    output.insert(property_type, recursive_types);
+                    // 8.4
+                    for (prop, type_) in recursive_output.into_iter() {
+                        output.insert(prop, type_);
+                    }
+                }
+                _ => {
+                    return Err(TypesGenerationError::ComplexValue(property_name.clone()));
+                }
+            }
+        }
+        // 9
+        output.insert(primary_type, types);
+        Ok(output)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -366,80 +361,80 @@ fn property_to_struct_name(property_name: &str) -> StructName {
 
 #[cfg(test)]
 lazy_static::lazy_static! {
-	// https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L917-L966
-	// https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26/files#r798853853
-	pub static ref EXAMPLE_TYPES: serde_json::Value = {
-		serde_json::json!({
-			"Data": [
-			{
-				"name": "job",
-				"type": "Job"
-			},
-			{
-				"name": "name",
-				"type": "Name"
-			}
-			],
-			"Job": [
-			{
-				"name": "employer",
-				"type": "string"
-			},
-			{
-				"name": "jobTitle",
-				"type": "string"
-			}
-			],
-			"Name": [
-			{
-				"name": "firstName",
-				"type": "string"
-			},
-			{
-				"name": "lastName",
-				"type": "string"
-			}
-			],
-			"Document": [
-			{
-				"name": "@context",
-				"type": "string[]"
-			},
-			{
-				"name": "@type",
-				"type": "string"
-			},
-			{
-				"name": "data",
-				"type": "Data"
-			},
-			{
-				"name": "proof",
-				"type": "Proof"
-			},
-			{
-				"name": "telephone",
-				"type": "string"
-			}
-			],
-			"Proof": [
-			{
-				"name": "created",
-				"type": "string"
-			},
-			{
-				"name": "proofPurpose",
-				"type": "string"
-			},
-			{
-				"name": "type",
-				"type": "string"
-			},
-			{
-				"name": "verificationMethod",
-				"type": "string"
-			}
-			]
-		})
-	};
+    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/blob/28bd5edecde8395242aea8ba64e9be25f59585d0/index.html#L917-L966
+    // https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/26/files#r798853853
+    pub static ref EXAMPLE_TYPES: serde_json::Value = {
+        serde_json::json!({
+            "Data": [
+            {
+                "name": "job",
+                "type": "Job"
+            },
+            {
+                "name": "name",
+                "type": "Name"
+            }
+            ],
+            "Job": [
+            {
+                "name": "employer",
+                "type": "string"
+            },
+            {
+                "name": "jobTitle",
+                "type": "string"
+            }
+            ],
+            "Name": [
+            {
+                "name": "firstName",
+                "type": "string"
+            },
+            {
+                "name": "lastName",
+                "type": "string"
+            }
+            ],
+            "Document": [
+            {
+                "name": "@context",
+                "type": "string[]"
+            },
+            {
+                "name": "@type",
+                "type": "string"
+            },
+            {
+                "name": "data",
+                "type": "Data"
+            },
+            {
+                "name": "proof",
+                "type": "Proof"
+            },
+            {
+                "name": "telephone",
+                "type": "string"
+            }
+            ],
+            "Proof": [
+            {
+                "name": "created",
+                "type": "string"
+            },
+            {
+                "name": "proofPurpose",
+                "type": "string"
+            },
+            {
+                "name": "type",
+                "type": "string"
+            },
+            {
+                "name": "verificationMethod",
+                "type": "string"
+            }
+            ]
+        })
+    };
 }

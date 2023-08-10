@@ -30,6 +30,7 @@ aleo = []
 solana = []
 
 [dependencies]
+ssi-core.workspace = true
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true

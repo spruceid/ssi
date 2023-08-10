@@ -7,6 +7,8 @@ use hashbrown::HashMap;
 use iref::{Iri, IriBuf};
 use json_ld::{Compact, Print};
 use rdf_types::{vocabulary::IriIndex, IndexVocabulary, IriVocabularyMut};
+use ssi_core::futures::FailibleFuture;
+use ssi_crypto::MessageSignatureError;
 use ssi_vc_ldp::{suite::Ed25519Signature2020, DataIntegrity};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
@@ -115,51 +117,51 @@ async fn main() {
         .into_result()
         .expect("invalid proof");
 
-    // // Put the verifiable credential in JSON-LD form.
-    // let json_ld = Meta(verifiable_credential, ()).into_json_ld(&mut vocabulary, &interpretation);
+    // Put the verifiable credential in JSON-LD form.
+    let json_ld = Meta(verifiable_credential, ()).into_json_ld(&mut vocabulary, &interpretation);
 
-    // // The generated JSON-LD is in expanded form. We want to compact it.
-    // // We will use the context definitions defined in the
-    // // `ssi-vc-ldp/examples/assets` folder.
-    // let mut loader: json_ld::FsLoader<IriIndex, ()> =
-    //     json_ld::FsLoader::new(|_, _, s| json_ld::syntax::Value::parse_str(s, |_| ()));
-    // loader.mount(
-    //     vocabulary.insert(iri!("https://www.w3.org/")),
-    //     "ssi-vc-ldp/examples/assets/www.w3.org",
-    // );
-    // loader.mount(
-    //     vocabulary.insert(iri!("https://w3id.org/")),
-    //     "ssi-vc-ldp/examples/assets/w3id.org",
-    // );
+    // The generated JSON-LD is in expanded form. We want to compact it.
+    // We will use the context definitions defined in the
+    // `ssi-vc-ldp/examples/assets` folder.
+    let mut loader: json_ld::FsLoader<IriIndex, ()> =
+        json_ld::FsLoader::new(|_, _, s| json_ld::syntax::Value::parse_str(s, |_| ()));
+    loader.mount(
+        vocabulary.insert(iri!("https://www.w3.org/")),
+        "ssi-vc-ldp/examples/assets/www.w3.org",
+    );
+    loader.mount(
+        vocabulary.insert(iri!("https://w3id.org/")),
+        "ssi-vc-ldp/examples/assets/w3id.org",
+    );
 
-    // // Pick and process the LD context used for compaction.
-    // let context = Meta(
-    //     json_ld::syntax::context::Value::Many(vec![
-    //         Meta(
-    //             json_ld::syntax::Context::IriRef(iref!("https://w3id.org/security/v1").to_owned()),
-    //             (),
-    //         ),
-    //         Meta(
-    //             json_ld::syntax::Context::IriRef(
-    //                 iref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
-    //             ),
-    //             (),
-    //         ),
-    //     ]),
-    //     (),
-    // );
-    // let processed_context = context
-    //     .process(&mut vocabulary, &mut loader, None)
-    //     .await
-    //     .expect("unable to process context");
+    // Pick and process the LD context used for compaction.
+    let context = Meta(
+        json_ld::syntax::context::Value::Many(vec![
+            Meta(
+                json_ld::syntax::Context::IriRef(iref!("https://w3id.org/security/v1").to_owned()),
+                (),
+            ),
+            Meta(
+                json_ld::syntax::Context::IriRef(
+                    iref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
+                ),
+                (),
+            ),
+        ]),
+        (),
+    );
+    let processed_context = context
+        .process(&mut vocabulary, &mut loader, None)
+        .await
+        .expect("unable to process context");
 
-    // // Compact the JSON-LD document.
-    // let compact = json_ld
-    //     .compact_with(&mut vocabulary, processed_context.as_ref(), &mut loader)
-    //     .await
-    //     .expect("unable to compact document");
+    // Compact the JSON-LD document.
+    let compact = json_ld
+        .compact_with(&mut vocabulary, processed_context.as_ref(), &mut loader)
+        .await
+        .expect("unable to compact document");
 
-    // println!("{}", compact.pretty_print())
+    println!("{}", compact.pretty_print())
 }
 
 /// Simple key controller, just for this example.
@@ -217,7 +219,7 @@ impl Keyring {
 }
 
 impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
-    type Sign<'a, 'm: 'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>> = future::Ready<Result<A::Signature, SignatureError>> where A::Signature: 'a;
+    type Sign<'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>> = FailibleFuture<A::Sign<'a, MessageSigner<'a>>, SignatureError> where A::Signature: 'a;
 
     fn sign<'a, 'm: 'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>>(
         &'a self,
@@ -225,25 +227,40 @@ impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
         _issuer: Option<Iri<'a>>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
         bytes: &'a [u8],
-    ) -> Self::Sign<'a, 'm, A>
+    ) -> Self::Sign<'a, A>
     where
         A::Signature: 'a,
     {
         let id = match method {
             Some(ReferenceOrOwnedRef::Owned(key)) => key.id(),
             Some(ReferenceOrOwnedRef::Reference(id)) => id,
-            None => return future::ready(Err(SignatureError::MissingVerificationMethod)),
+            None => return FailibleFuture::err(SignatureError::MissingVerificationMethod),
         };
 
-        let result = match self.keys.get(&id) {
-            Some((method, key)) => {
-                // algorithm.sign(method, bytes, signer)
-                todo!()
-            }
-            None => Err(SignatureError::UnknownVerificationMethod),
-        };
+        match self.keys.get(&id) {
+            Some((method, key_pair)) => FailibleFuture::ok(algorithm.sign(
+                method,
+                bytes,
+                MessageSigner { method, key_pair },
+            )),
+            None => FailibleFuture::err(SignatureError::UnknownVerificationMethod),
+        }
+    }
+}
 
-        future::ready(result)
+pub struct MessageSigner<'a> {
+    method: &'a Ed25519VerificationKey2020,
+    key_pair: &'a ssi_verification_methods::ed25519_dalek::Keypair,
+}
+
+impl<'a> ssi_crypto::MessageSigner for MessageSigner<'a> {
+    type Sign<'s> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where Self: 's;
+
+    fn sign<'s>(self, _protocol: (), message: &'s [u8]) -> Self::Sign<'s>
+    where
+        Self: 's,
+    {
+        std::future::ready(Ok(self.method.sign_bytes(message, self.key_pair)))
     }
 }
 
@@ -258,14 +275,15 @@ impl ControllerProvider for Keyring {
 }
 
 impl Verifier<Ed25519VerificationKey2020> for Keyring {
-    type ResolveVerificationMethod<'a, 'm: 'a> =
-        future::Ready<Result<&'a Ed25519VerificationKey2020, VerificationError>>;
+    type ResolveVerificationMethod<'a> = future::Ready<
+        Result<ssi_verification_methods::Cow<'a, Ed25519VerificationKey2020>, VerificationError>,
+    >;
 
     fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         _issuer: Option<Iri<'a>>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
-    ) -> Self::ResolveVerificationMethod<'a, 'm> {
+    ) -> Self::ResolveVerificationMethod<'a> {
         let result = match method {
             Some(ReferenceOrOwnedRef::Owned(_key)) => {
                 // If we get here, this means the VC embeds the public key used
@@ -275,7 +293,7 @@ impl Verifier<Ed25519VerificationKey2020> for Keyring {
                 todo!()
             }
             Some(ReferenceOrOwnedRef::Reference(id)) => match self.keys.get(&id) {
-                Some((key, _)) => Ok(key),
+                Some((key, _)) => Ok(ssi_verification_methods::Cow::Borrowed(key)),
                 None => Err(VerificationError::UnknownKey),
             },
             None => Err(VerificationError::MissingVerificationMethod),

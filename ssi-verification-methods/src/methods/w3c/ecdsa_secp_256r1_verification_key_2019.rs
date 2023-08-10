@@ -8,8 +8,8 @@ use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_TYPE_IRI, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
@@ -79,9 +79,13 @@ impl EcdsaSecp256r1VerificationKey2019 {
         multibase::encode(multibase::Base::Base58Btc, signature.as_bytes())
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature_bytes: &[u8],
+    ) -> Result<bool, VerificationError> {
         use p256::ecdsa::signature::Verifier;
-        
+
         let public_key = self
             .decode_public_key()
             .map_err(|_| VerificationError::InvalidKey)?;
@@ -96,10 +100,12 @@ impl EcdsaSecp256r1VerificationKey2019 {
 
 impl Referencable for EcdsaSecp256r1VerificationKey2019 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
@@ -108,6 +114,13 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
         self.id.as_iri()
     }
 
+    /// Returns an URI to the key controller.
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
+    }
+}
+
+impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     fn expected_type() -> Option<ExpectedType> {
         Some(
             ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
@@ -119,11 +132,6 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
-    }
-
-    /// Returns an URI to the key controller.
-    fn controller(&self) -> Option<Iri> {
-        Some(self.controller.as_iri())
     }
 }
 

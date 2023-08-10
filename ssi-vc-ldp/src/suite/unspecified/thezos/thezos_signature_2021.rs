@@ -1,7 +1,10 @@
+use std::future;
+
+use ssi_crypto::MessageSigner;
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{Referencable, TezosMethod2021};
+use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
@@ -97,6 +100,8 @@ impl Referencable for Signature {
             }),
         }
     }
+
+    covariance_rule!();
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -127,12 +132,15 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &TezosMethod2021,
         bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

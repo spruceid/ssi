@@ -1,5 +1,5 @@
+use ssi_verification_methods::{Referencable, VerificationError, Verifier};
 use std::future::Future;
-use ssi_verification_methods::{Verifier, VerificationError, Referencable};
 
 use crate::Verifiable;
 
@@ -12,7 +12,11 @@ pub trait VerifiableWith {
     type Proof;
 
     /// Future returned by `verify_with`.
-    type VerifyWith<'a, V: Verifier<Self::Method>>: 'a + Future<Output = Result<ProofValidity, VerificationError>> where Self: 'a, V: 'a;
+    type VerifyWith<'a, V: Verifier<Self::Method>>: 'a
+        + Future<Output = Result<ProofValidity, VerificationError>>
+    where
+        Self: 'a,
+        V: 'a;
 
     fn verify_with<'a, V: Verifier<Self::Method>>(
         &'a self,

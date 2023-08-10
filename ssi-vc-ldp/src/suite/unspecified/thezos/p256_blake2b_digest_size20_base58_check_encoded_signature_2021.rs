@@ -1,7 +1,11 @@
+use std::future;
+
+use ssi_crypto::MessageSigner;
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_verification_methods::{
-    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, Referencable,
+    covariance_rule, P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, Referencable,
+    SignatureError,
 };
 use static_iref::iri;
 
@@ -70,6 +74,8 @@ impl Referencable for Signature {
             public_key_jwk: &self.public_key_jwk,
         }
     }
+
+    covariance_rule!();
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -92,12 +98,15 @@ impl
 
     type Protocol = ();
 
-    fn sign<S: ssi_crypto::MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+        future::Ready<Result<Self::Signature, SignatureError>>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         method: &P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-        bytes: &[u8],
-        signer: &S,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
         todo!()
     }
 

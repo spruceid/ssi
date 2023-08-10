@@ -10,8 +10,9 @@ use std::hash::Hash;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod, VerificationMethod,
-    CONTROLLER_IRI, RDF_JSON, RDF_TYPE_IRI, XSD_STRING, SignatureError, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_JSON,
+    RDF_TYPE_IRI, XSD_STRING,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
@@ -38,10 +39,12 @@ pub struct EcdsaSecp256k1RecoveryMethod2020 {
 
 impl Referencable for EcdsaSecp256k1RecoveryMethod2020 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
@@ -50,6 +53,13 @@ impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
         self.id.as_iri()
     }
 
+    /// Returns an URI to the key controller.
+    fn controller(&self) -> Option<Iri> {
+        Some(self.controller.as_iri())
+    }
+}
+
+impl TypedVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     fn expected_type() -> Option<ExpectedType> {
         Some(
             ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
@@ -61,11 +71,6 @@ impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
-    }
-
-    /// Returns an URI to the key controller.
-    fn controller(&self) -> Option<Iri> {
-        Some(self.controller.as_iri())
     }
 }
 
@@ -83,11 +88,7 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
 
-    pub fn verify_bytes(
-        &self,
-        data: &[u8],
-        signature: &[u8]
-    ) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
         // Recover the key used to sign the message.
         let key = ssi_jws::recover(ssi_jwk::Algorithm::ES256KR, data, signature)
             .map_err(|_| VerificationError::InvalidSignature)?;
@@ -103,13 +104,7 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
         }
 
         // Verify the signature.
-        Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::ES256KR,
-            data,
-            &key,
-            signature,
-        )
-        .is_ok())
+        Ok(ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256KR, data, &key, signature).is_ok())
     }
 }
 

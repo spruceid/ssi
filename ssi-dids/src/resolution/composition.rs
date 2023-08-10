@@ -4,24 +4,24 @@ use crate::DIDResolver;
 
 use super::DIDMethodResolver;
 
-/// Compose multiple DID method resolvers into a DID resolver.
-#[derive(Default)]
-pub struct MethodComposition<'a> {
-    methods: HashMap<String, Box<dyn 'a + DIDMethodResolver>>,
-}
+// /// Compose multiple DID method resolvers into a DID resolver.
+// #[derive(Default)]
+// pub struct MethodComposition<'a> {
+//     methods: HashMap<String, Box<dyn 'a + DIDMethodResolver>>,
+// }
 
-impl<'a> MethodComposition<'a> {
-    pub fn insert(&mut self, resolver: impl 'a + DIDMethodResolver) {
-        let method = resolver.method_name().to_string();
-        self.methods.insert(method, Box::new(resolver));
-    }
-}
+// impl<'a> MethodComposition<'a> {
+//     pub fn insert(&mut self, resolver: impl 'a + DIDMethodResolver) {
+//         let method = resolver.method_name().to_string();
+//         self.methods.insert(method, Box::new(resolver));
+//     }
+// }
 
-impl<'a> DIDResolver for MethodComposition<'a> {
-    fn get_method(&self, method_name: &str) -> Option<&dyn DIDMethodResolver> {
-        self.methods.get(method_name).map(|m| &**m)
-    }
-}
+// impl<'a> DIDResolver for MethodComposition<'a> {
+//     fn get_method(&self, method_name: &str) -> Option<&dyn DIDMethodResolver> {
+//         self.methods.get(method_name).map(|m| &**m)
+//     }
+// }
 
 // #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 // #[cfg_attr(not(target_arch = "wasm32"), async_trait)]

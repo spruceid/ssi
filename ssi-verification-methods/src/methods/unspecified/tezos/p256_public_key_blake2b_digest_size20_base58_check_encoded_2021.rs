@@ -9,9 +9,9 @@ use static_iref::iri;
 use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    ExpectedType, LinkedDataVerificationMethod,
-    VerificationMethod, CONTROLLER_IRI,
-    RDF_TYPE_IRI, XSD_STRING, VerificationError, Referencable,
+    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable,
+    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
+    XSD_STRING,
 };
 
 pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI: Iri<'static> =
@@ -52,10 +52,12 @@ impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
 
 impl Referencable for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     type Reference<'a> = &'a Self where Self: 'a;
-    
+
     fn as_reference(&self) -> Self::Reference<'_> {
         self
     }
+
+    covariance_rule!();
 }
 
 impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
@@ -66,7 +68,9 @@ impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded20
     fn controller(&self) -> Option<Iri> {
         Some(self.controller.as_iri())
     }
+}
 
+impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn expected_type() -> Option<ExpectedType> {
         Some(
             P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
