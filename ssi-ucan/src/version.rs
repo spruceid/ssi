@@ -41,3 +41,35 @@ impl FromStr for SemanticVersion {
         }
     }
 }
+
+#[derive(
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Debug,
+    SerializeDisplay,
+    DeserializeFromStr,
+    Default,
+)]
+pub struct RevocationSemanticVersion;
+
+impl Display for RevocationSemanticVersion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "1.0.0-rc1")
+    }
+}
+
+impl FromStr for RevocationSemanticVersion {
+    type Err = VersionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "1.0.0-rc1" {
+            Ok(Self)
+        } else {
+            Err(VersionError::InvalidVersion(s.to_string()))
+        }
+    }
+}
