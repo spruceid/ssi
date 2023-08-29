@@ -16,22 +16,21 @@ use ssi_dids::{
     did_resolve::{dereference, Content, DIDResolver},
     Resource, VerificationMethod,
 };
-use ssi_jwk::JWK;
+use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, split_jws, verify_bytes, Header};
-use util::{match_key_with_did_pkh, match_key_with_vm};
 
 /// A deserialized UCAN
 #[derive(Clone, PartialEq, Debug)]
 pub struct Ucan<F = JsonValue, A = JsonValue> {
-    header: Header,
+    algorithm: Algorithm,
     payload: Payload<F, A>,
     signature: Vec<u8>,
 }
 
 impl<F, A> Ucan<F, A> {
     /// Get the Header of the UCAN
-    pub fn header(&self) -> &Header {
-        &self.header
+    pub fn algorithm(&self) -> &Algorithm {
+        &self.algorithm
     }
 
     /// Get the Payload of the UCAN
@@ -44,8 +43,8 @@ impl<F, A> Ucan<F, A> {
         &self.signature
     }
 
-    pub fn into_inner(self) -> (Header, Payload<F, A>, Vec<u8>) {
-        (self.header, self.payload, self.signature)
+    pub fn into_inner(self) -> (Algorithm, Payload<F, A>, Vec<u8>) {
+        (self.algorithm, self.payload, self.signature)
     }
 
     /// Extract or resolve the JWK used to issue this UCAN
@@ -53,28 +52,16 @@ impl<F, A> Ucan<F, A> {
         match (
             self.payload.issuer.get(..4),
             self.payload.issuer.get(4..8),
-            &self.header.jwk,
             dereference(resolver, &self.payload.issuer, &Default::default())
                 .await
                 .1,
         ) {
-            // did:pkh without fragment
-            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(jwk, &d)?;
-                Ok(jwk.clone())
-            }
-            // did:pkh with fragment
-            (
-                Some("did:"),
-                Some("pkh:"),
-                Some(jwk),
-                Content::Object(Resource::VerificationMethod(vm)),
-            ) => {
-                match_key_with_vm(jwk, &vm)?;
-                Ok(jwk.clone())
-            }
+            // TODO here we will have some complicated cases w.r.t. did:pkh
+            // some did:pkh's have recoverable signatures, some don't and will need
+            // a query param on the did
+            //
             // did:key without fragment
-            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -87,7 +74,7 @@ impl<F, A> Ucan<F, A> {
                 .get_jwk()
                 .map_err(Error::from),
             // general case, did with fragment
-            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+            (Some("did:"), Some(_), Content::Object(Resource::VerificationMethod(vm))) => {
                 Ok(vm.get_jwk()?)
             }
             _ => Err(Error::VerificationMethodMismatch),
@@ -108,7 +95,7 @@ impl<F, A> Ucan<F, A> {
         let jwk = ucan.get_verification_key(resolver).await?;
 
         verify_bytes(
-            ucan.header.algorithm,
+            ucan.algorithm,
             jwt.rsplit_once('.')
                 .ok_or(ssi_jws::Error::InvalidJWS)?
                 .0
@@ -133,10 +120,12 @@ impl<F, A> Ucan<F, A> {
             return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
+        let algorithm = parts.header.algorithm;
+
         // header can only contain 'typ' and 'alg' fields
         if parts.header
             != (Header {
-                algorithm: parts.header.algorithm,
+                algorithm,
                 type_: Some("JWT".to_string()),
                 ..Default::default()
             })
@@ -155,7 +144,7 @@ impl<F, A> Ucan<F, A> {
         }
 
         Ok(Self {
-            header: parts.header,
+            algorithm,
             payload,
             signature: parts.signature,
         })
@@ -170,7 +159,14 @@ impl<F, A> Ucan<F, A> {
     {
         Ok([
             base64::encode_config(
-                DagJsonCodec.encode(&to_ipld(&self.header).map_err(IpldError::new)?)?,
+                DagJsonCodec.encode(
+                    &to_ipld(&Header {
+                        algorithm: self.algorithm,
+                        type_: Some("JWT".to_string()),
+                        ..Default::default()
+                    })
+                    .map_err(IpldError::new)?,
+                )?,
                 base64::URL_SAFE_NO_PAD,
             ),
             base64::encode_config(
@@ -202,7 +198,7 @@ mod tests {
                 .unwrap();
 
             assert_eq!(ucan.payload, case.assertions.payload);
-            assert_eq!(ucan.header, case.assertions.header);
+            assert_eq!(ucan.algorithm, case.assertions.header.algorithm);
         }
     }
 
