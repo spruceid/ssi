@@ -78,22 +78,18 @@ impl<F, A> Payload<F, A> {
         F: Serialize,
         A: Serialize,
     {
-        let header = Header {
-            algorithm,
-            type_: Some("JWT".to_string()),
-            jwk: if self.issuer.starts_with("did:pkh:") {
-                Some(key.to_public())
-            } else {
-                None
-            },
-            ..Default::default()
-        };
-
         let signature = sign_bytes(
             algorithm,
             [
                 base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&header).map_err(IpldError::new)?)?,
+                    DagJsonCodec.encode(
+                        &to_ipld(&Header {
+                            algorithm,
+                            type_: Some("JWT".to_string()),
+                            ..Default::default()
+                        })
+                        .map_err(IpldError::new)?,
+                    )?,
                     base64::URL_SAFE_NO_PAD,
                 ),
                 base64::encode_config(
@@ -106,23 +102,16 @@ impl<F, A> Payload<F, A> {
             key,
         )?;
 
-        Ok(self.sign(header, signature))
+        Ok(self.sign(algorithm, signature))
     }
 
     /// Sign the payload with the given header and signature
     ///
-    /// This will not ensure that the header and signature are valid for the payload and will
-    /// not canonicalize the payload before signing. All header fields except for `alg` and `jwk`
-    /// will be ignored.
-    pub fn sign(self, mut header: Header, signature: Vec<u8>) -> Ucan<F, A> {
-        header = Header {
-            algorithm: header.algorithm,
-            type_: Some("JWT".to_string()),
-            jwk: header.jwk,
-            ..Default::default()
-        };
+    /// This will not ensure that the signature is valid for the payload and will
+    /// not canonicalize the payload before signing.
+    pub fn sign(self, algorithm: Algorithm, signature: Vec<u8>) -> Ucan<F, A> {
         Ucan {
-            header,
+            algorithm,
             payload: self,
             signature,
         }
