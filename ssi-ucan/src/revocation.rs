@@ -1,7 +1,4 @@
-use super::{
-    util::{match_key_with_did_pkh, match_key_with_vm},
-    Error,
-};
+use super::{version::RevocationSemanticVersion, Error};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_with::{
@@ -19,12 +16,16 @@ use ssi_jws::{sign_bytes, verify_bytes};
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct UcanRevocation {
+    #[serde(rename = "urv")]
+    semantic_version: RevocationSemanticVersion,
     #[serde(rename = "iss")]
     pub issuer: String,
+    #[serde(rename = "rvk")]
     #[serde_as(as = "DisplayFromStr")]
     pub revoke: Cid,
+    #[serde(rename = "sig")]
     #[serde_as(as = "Base64<UrlSafe, Unpadded>")]
-    pub challenge: Vec<u8>,
+    pub signature: Vec<u8>,
 }
 
 impl UcanRevocation {
@@ -35,9 +36,10 @@ impl UcanRevocation {
         algorithm: Algorithm,
     ) -> Result<Self, Error> {
         Ok(Self {
+            semantic_version: RevocationSemanticVersion,
             issuer,
             revoke,
-            challenge: sign_bytes(algorithm, format!("REVOKE:{}", revoke).as_bytes(), jwk)?,
+            signature: sign_bytes(algorithm, format!("REVOKE-UCAN:{}", revoke).as_bytes(), jwk)?,
         })
     }
     pub async fn verify_signature(
@@ -54,21 +56,6 @@ impl UcanRevocation {
                 .await
                 .1,
         ) {
-            // did:pkh without fragment
-            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
-                match_key_with_did_pkh(jwk, &d)?;
-                jwk.clone()
-            }
-            // did:pkh with fragment
-            (
-                Some("did:"),
-                Some("pkh:"),
-                Some(jwk),
-                Content::Object(Resource::VerificationMethod(vm)),
-            ) => {
-                match_key_with_vm(jwk, &vm)?;
-                jwk.clone()
-            }
             // did:key without fragment
             (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
                 .verification_method
@@ -90,9 +77,9 @@ impl UcanRevocation {
 
         Ok(verify_bytes(
             algorithm,
-            format!("REVOKE:{}", self.revoke).as_bytes(),
+            format!("REVOKE-UCAN:{}", self.revoke).as_bytes(),
             &key,
-            &self.challenge,
+            &self.signature,
         )?)
     }
 }
