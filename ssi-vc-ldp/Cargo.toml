@@ -55,7 +55,9 @@ ethereum = []
 ssi-verification-methods.workspace = true
 async-trait.workspace = true
 rdf-types.workspace = true
-treeldr-rust-prelude.workspace = true
+xsd-types.workspace = true
+# treeldr-rust-prelude.workspace = true
+linked-data = { workspace = true, features = ["derive"] }
 ssi-core.workspace = true
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
@@ -72,6 +74,7 @@ iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
 json-ld.workspace = true
+locspan.workspace = true
 grdf.workspace = true
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
@@ -92,7 +95,7 @@ serde_jcs = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-treeldr-rust-macros.workspace = true
+# treeldr-rust-macros.workspace = true
 static-iref.workspace = true
 rand = "0.7"
 hashbrown = "0.13.0"

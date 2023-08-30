@@ -166,7 +166,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
 
     type Options = Options;
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#EthereumEip712Signature2021")
     }
 

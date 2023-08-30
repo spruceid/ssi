@@ -41,7 +41,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#EthereumPersonalSignature2021")
     }
 
@@ -156,7 +156,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         let jwk = JWK {
             params: ssi_jwk::Params::EC(
                 ssi_jwk::ECParams::try_from(
-                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
+                    &k256::PublicKey::from_sec1_bytes(recovered_key.to_bytes().as_slice())
                         .map_err(|_| VerificationError::InvalidSignature)?,
                 )
                 .map_err(|_| VerificationError::InvalidSignature)?,

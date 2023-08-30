@@ -1,3 +1,4 @@
+use linked_data::LinkedData;
 use rdf_types::VocabularyMut;
 use std::ops::Deref;
 
@@ -13,11 +14,14 @@ pub use suite::{CryptographicSuite, CryptographicSuiteInput};
 pub use verification::*;
 
 /// Data Integrity credential.
+#[derive(LinkedData)]
 pub struct DataIntegrity<T, S: CryptographicSuite> {
     /// Credential value.
+    #[ld(flatten)]
     credential: T,
 
     /// Hashed value.
+    #[ld(ignore)]
     hash: S::Hashed,
 }
 
@@ -39,24 +43,5 @@ impl<T, S: CryptographicSuite> Deref for DataIntegrity<T, S> {
 
     fn deref(&self) -> &Self::Target {
         &self.credential
-    }
-}
-
-impl<
-        V: VocabularyMut,
-        I,
-        M,
-        T: treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I, M>,
-        S: CryptographicSuite,
-    > treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I, M> for DataIntegrity<T, S>
-{
-    fn into_json_ld_object_meta(
-        self,
-        namespace: &mut V,
-        interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        self.credential
-            .into_json_ld_object_meta(namespace, interpretation, meta)
     }
 }

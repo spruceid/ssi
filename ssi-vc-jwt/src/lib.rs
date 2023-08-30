@@ -10,10 +10,10 @@ pub struct VcJwt<C> {
     /// Credential data.
     credential: C,
 
-    /// JWT header.
+    /// JWS header.
     header: ssi_jws::Header,
 
-    /// JWT payload.
+    /// JWS payload.
     payload: Vec<u8>,
 }
 

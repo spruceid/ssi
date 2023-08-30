@@ -145,7 +145,7 @@ macro_rules! crypto_suites {
 
             type Options = Options;
 
-            fn iri(&self) -> iref::Iri {
+            fn iri(&self) -> &iref::Iri {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?

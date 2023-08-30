@@ -20,7 +20,7 @@ pub struct HTTPDIDResolver {
 
 impl HTTPDIDResolver {
     /// Construct a new HTTP DID Resolver with a given [endpoint][HTTPDIDResolver::endpoint] URL.
-    pub fn new(url: Iri) -> Self {
+    pub fn new(url: &Iri) -> Self {
         Self {
             endpoint: url.to_owned(),
         }

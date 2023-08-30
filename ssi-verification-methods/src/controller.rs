@@ -16,11 +16,11 @@ use crate::{ProofPurpose, ProofPurposes, VerificationError};
 pub trait Controller {
     /// Checks that the controller allows using the verification method for the
     /// given proof purposes.
-    fn allows_verification_method(&self, id: Iri, proof_purposes: ProofPurposes) -> bool;
+    fn allows_verification_method(&self, id: &Iri, proof_purposes: ProofPurposes) -> bool;
 }
 
 impl<'a, T: Controller> Controller for &'a T {
-    fn allows_verification_method(&self, id: Iri, proof_purposes: ProofPurposes) -> bool {
+    fn allows_verification_method(&self, id: &Iri, proof_purposes: ProofPurposes) -> bool {
         T::allows_verification_method(*self, id, proof_purposes)
     }
 }
@@ -41,11 +41,11 @@ pub trait ControllerProvider {
         Self: 'a;
 
     /// Returns the controller with the given identifier, if it can be found.
-    fn get_controller<'a>(&'a self, id: Iri<'a>) -> Self::GetController<'a>;
+    fn get_controller<'a>(&'a self, id: &'a Iri) -> Self::GetController<'a>;
 
     /// Returns the controller with the given identifier, or fails if it cannot
     /// be found.
-    fn require_controller<'a>(&'a self, id: Iri<'a>) -> RequireController<'a, Self> {
+    fn require_controller<'a>(&'a self, id: &'a Iri) -> RequireController<'a, Self> {
         RequireController {
             id,
             get: self.get_controller(id),
@@ -56,8 +56,8 @@ pub trait ControllerProvider {
     /// of the verification method `method_id` with the given proof purposes.
     fn allows_verification_method<'a>(
         &'a self,
-        controller_id: Iri<'a>,
-        method_id: Iri<'a>,
+        controller_id: &'a Iri,
+        method_id: &'a Iri,
         proof_purposes: ProofPurposes,
     ) -> AllowsVerificationMethod<'a, Self> {
         AllowsVerificationMethod {
@@ -74,8 +74,8 @@ pub trait ControllerProvider {
     /// returns an error if one of the input proof purposes is not allowed.
     fn ensure_allows_verification_method<'a>(
         &'a self,
-        controller_id: Iri<'a>,
-        method_id: Iri<'a>,
+        controller_id: &'a Iri,
+        method_id: &'a Iri,
         proof_purpose: ProofPurpose,
     ) -> EnsureAllowsVerificationMethod<'a, Self> {
         EnsureAllowsVerificationMethod {
@@ -88,7 +88,7 @@ pub trait ControllerProvider {
 
 #[pin_project]
 pub struct RequireController<'a, C: 'a + ?Sized + ControllerProvider> {
-    id: Iri<'a>,
+    id: &'a Iri,
 
     #[pin]
     get: C::GetController<'a>,
@@ -107,7 +107,7 @@ impl<'a, C: 'a + ?Sized + ControllerProvider> Future for RequireController<'a, C
 
 #[pin_project]
 pub struct AllowsVerificationMethod<'a, C: 'a + ?Sized + ControllerProvider> {
-    method_id: Iri<'a>,
+    method_id: &'a Iri,
 
     proof_purposes: ProofPurposes,
 
@@ -128,7 +128,7 @@ impl<'a, C: 'a + ?Sized + ControllerProvider> Future for AllowsVerificationMetho
 
 #[pin_project]
 pub struct EnsureAllowsVerificationMethod<'a, C: 'a + ?Sized + ControllerProvider> {
-    method_id: Iri<'a>,
+    method_id: &'a Iri,
 
     proof_purpose: ProofPurpose,
 

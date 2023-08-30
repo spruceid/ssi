@@ -70,6 +70,8 @@ multibase = "0.9.1"
 num-traits = "0.2"
 num-derive = "0.3"
 ssi-multicodec.workspace = true
+linked-data.workspace = true
+json-syntax = { workspace = true, features = ["serde"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"], optional = true }

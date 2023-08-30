@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::task;
 
 use crate::{
-    document::{self, representation, service, AnyVerificationMethod, Represented, Resource},
+    document::{self, representation, service, AnyDIDVerificationMethod, Represented, Resource},
     DIDURLBuf, Fragment, PrimaryDIDURL, DIDURL,
 };
 
@@ -120,14 +120,14 @@ pub enum Content {
 }
 
 impl Content {
-    pub fn as_verification_method(&self) -> Option<&AnyVerificationMethod> {
+    pub fn as_verification_method(&self) -> Option<&AnyDIDVerificationMethod> {
         match self {
             Self::Resource(r) => r.as_verification_method(),
             _ => None,
         }
     }
 
-    pub fn into_verification_method(self) -> Result<AnyVerificationMethod, Self> {
+    pub fn into_verification_method(self) -> Result<AnyDIDVerificationMethod, Self> {
         match self {
             Self::Resource(r) => r.into_verification_method().map_err(Self::Resource),
             other => Err(other),
@@ -286,10 +286,10 @@ pub enum ServiceEndpointConstructionConflict {
 fn construct_service_endpoint(
     did_url: &DIDURL,
     did_parameters: &Parameters,
-    service_endpoint_url: Iri,
+    service_endpoint_url: &Iri,
 ) -> Result<IriBuf, ServiceEndpointConstructionConflict> {
     // https://w3c-ccg.github.io/did-resolution/#algorithm
-    let mut output = IriBuf::from_scheme(service_endpoint_url.scheme());
+    let mut output = IriBuf::from_scheme(service_endpoint_url.scheme().to_owned());
     output.set_authority(service_endpoint_url.authority());
     output.set_path(service_endpoint_url.path());
 

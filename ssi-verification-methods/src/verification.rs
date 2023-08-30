@@ -8,6 +8,7 @@ use std::{
 };
 
 use iref::{Iri, IriBuf};
+use linked_data::LinkedData;
 use pin_project::pin_project;
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use static_iref::iri;
@@ -97,7 +98,7 @@ pub trait Verifier<M: Referencable>: ControllerProvider {
     /// Resolve the verification method reference.
     fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
-        issuer: Option<Iri<'a>>,
+        issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
     ) -> Self::ResolveVerificationMethod<'a>;
 
@@ -106,7 +107,7 @@ pub trait Verifier<M: Referencable>: ControllerProvider {
     fn verify<'f, 'm: 'f, 's: 'f, A: SignatureAlgorithm<M>>(
         &'f self,
         algorithm: A,
-        issuer: Option<Iri<'f>>,
+        issuer: Option<&'f Iri>,
         method_reference: Option<ReferenceOrOwnedRef<'m, M>>,
         proof_purpose: ProofPurpose,
         signing_bytes: &'f [u8],
@@ -251,21 +252,22 @@ where
 }
 
 macro_rules! proof_purposes {
-    ($($(#[$doc:meta])* $id:ident: $variant:ident = $iri:expr),*) => {
+    ($($(#[$doc:meta])* $id:ident: $variant:ident = $iri:literal),*) => {
         /// Proof purposes.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, LinkedData)]
         #[derive(serde::Serialize, serde::Deserialize)]
         pub enum ProofPurpose {
             $(
                 $(#[$doc])*
+                #[ld($iri)]
                 $variant
             ),*
         }
 
         impl ProofPurpose {
-            pub fn from_iri(iri: Iri) -> Option<Self> {
+            pub fn from_iri(iri: &Iri) -> Option<Self> {
                 $(
-                    if iri == $iri {
+                    if iri == iri!($iri) {
                         return Some(Self::$variant)
                     }
                 )*
@@ -273,10 +275,10 @@ macro_rules! proof_purposes {
                 None
             }
 
-            pub fn iri(&self) -> Iri<'static> {
+            pub fn iri(&self) -> &Iri {
                 match self {
                     $(
-                        Self::$variant => $iri
+                        Self::$variant => iri!($iri)
                     ),*
                 }
             }
@@ -507,23 +509,23 @@ macro_rules! proof_purposes {
 proof_purposes! {
     /// <https://w3id.org/security#assertionMethod>
     #[serde(rename = "assertionMethod")]
-    assertion_method: Assertion = iri!("https://w3id.org/security#assertionMethod"),
+    assertion_method: Assertion = "https://w3id.org/security#assertionMethod",
 
     /// <https://w3id.org/security#authenticationMethod>
     #[serde(rename = "authenticationMethod")]
-    authentication: Authentication = iri!("https://w3id.org/security#authenticationMethod"),
+    authentication: Authentication = "https://w3id.org/security#authenticationMethod",
 
     /// <https://w3id.org/security#capabilityInvocationMethod>
     #[serde(rename = "capabilityInvocationMethod")]
-    capability_invocation: CapabilityInvocation = iri!("https://w3id.org/security#capabilityInvocationMethod"),
+    capability_invocation: CapabilityInvocation = "https://w3id.org/security#capabilityInvocationMethod",
 
     /// <https://w3id.org/security#capabilityDelegationMethod>
     #[serde(rename = "capabilityDelegationMethod")]
-    capability_delegation: CapabilityDelegation = iri!("https://w3id.org/security#capabilityDelegationMethod"),
+    capability_delegation: CapabilityDelegation = "https://w3id.org/security#capabilityDelegationMethod",
 
     /// <https://w3id.org/security#keyAgreementMethod>
     #[serde(rename = "keyAgreementMethod")]
-    key_agreement: KeyAgreement = iri!("https://w3id.org/security#keyAgreementMethod")
+    key_agreement: KeyAgreement = "https://w3id.org/security#keyAgreementMethod"
 }
 
 impl fmt::Display for ProofPurpose {

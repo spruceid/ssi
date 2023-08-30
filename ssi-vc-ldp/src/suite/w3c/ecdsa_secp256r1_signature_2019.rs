@@ -31,7 +31,7 @@ impl CryptographicSuite for EcdsaSecp256r1Signature2019 {
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#EcdsaSecp256r1Signature2019")
     }
 

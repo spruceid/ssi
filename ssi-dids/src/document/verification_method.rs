@@ -17,7 +17,7 @@ use super::{
 pub enum ValueOrReference {
     Reference(DIDURLReferenceBuf),
     /// Embedded verification method.
-    Value(AnyVerificationMethod),
+    Value(AnyDIDVerificationMethod),
 }
 
 impl ValueOrReference {
@@ -56,7 +56,7 @@ impl ExtractResource for ValueOrReference {
     }
 }
 
-pub trait VerificationMethod {
+pub trait DIDVerificationMethod {
     fn id(&self) -> &DIDURL;
 
     fn type_(&self) -> &str;
@@ -65,7 +65,7 @@ pub trait VerificationMethod {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct AnyVerificationMethod {
+pub struct AnyDIDVerificationMethod {
     /// Verification method identifier.
     pub id: DIDURLBuf,
 
@@ -89,7 +89,7 @@ pub struct AnyVerificationMethod {
     pub properties: BTreeMap<String, serde_json::Value>,
 }
 
-impl AnyVerificationMethod {
+impl AnyDIDVerificationMethod {
     pub fn new(
         id: DIDURLBuf,
         type_: String,
@@ -105,13 +105,13 @@ impl AnyVerificationMethod {
     }
 }
 
-impl UsesResource for AnyVerificationMethod {
+impl UsesResource for AnyDIDVerificationMethod {
     fn uses_resource(&self, _base_did: &DID, id: &DIDURL) -> bool {
         self.id == *id
     }
 }
 
-impl FindResource for AnyVerificationMethod {
+impl FindResource for AnyDIDVerificationMethod {
     fn find_resource(&self, _base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
         if self.id == *id {
             Some(ResourceRef::VerificationMethod(self))
@@ -121,7 +121,7 @@ impl FindResource for AnyVerificationMethod {
     }
 }
 
-impl ExtractResource for AnyVerificationMethod {
+impl ExtractResource for AnyDIDVerificationMethod {
     fn extract_resource(self, _base_did: &DID, id: &DIDURL) -> Option<Resource> {
         if self.id == *id {
             Some(Resource::VerificationMethod(self))

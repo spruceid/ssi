@@ -1,43 +1,46 @@
 use std::hash::Hash;
 
 use ed25519_dalek::{Signer, Verifier};
-use iref::{Iri, IriBuf};
-use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
+use iref::{Iri, IriBuf, UriBuf};
+use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jws::CompactJWSString;
 use static_iref::iri;
-use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
-    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_TYPE_IRI,
-    XSD_STRING,
+    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
+    VerificationError, VerificationMethod,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
-pub const ED25519_VERIFICATION_KEY_2018_IRI: Iri<'static> =
+pub const ED25519_VERIFICATION_KEY_2018_IRI: &Iri =
     iri!("https://w3id.org/security#Ed25519VerificationKey2018");
 
 /// Ed25519 Verification Key 2018 type name.
 pub const ED25519_VERIFICATION_KEY_2018_TYPE: &str = "Ed25519VerificationKey2018";
 
-pub const PUBLIC_KEY_BASE_58_IRI: Iri<'static> = iri!("https://w3id.org/security#publicKeyBase58");
+pub const PUBLIC_KEY_BASE_58_IRI: &Iri = iri!("https://w3id.org/security#publicKeyBase58");
 
 /// Deprecated verification method for the `Ed25519Signature2018` suite.
 ///
 /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/#the-ed25519-key-format>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
 #[serde(tag = "type", rename = "Ed25519VerificationKey2018")]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+#[ld(type = "sec:Ed25519VerificationKey2018")]
 pub struct Ed25519VerificationKey2018 {
     /// Key identifier.
+    #[ld(id)]
     pub id: IriBuf,
 
     /// Controller of the verification method.
-    pub controller: IriBuf,
+    #[ld("sec:controller")]
+    pub controller: UriBuf,
 
     /// Public key encoded in base58 using the same alphabet as Bitcoin
     /// addresses and IPFS hashes.
     #[serde(rename = "publicKeyBase58")]
+    #[ld("sec:publicKeyBase58")]
     pub public_key_base58: String,
 }
 
@@ -99,11 +102,11 @@ impl Referencable for Ed25519VerificationKey2018 {
 }
 
 impl VerificationMethod for Ed25519VerificationKey2018 {
-    fn id(&self) -> Iri {
+    fn id(&self) -> &Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Option<Iri> {
+    fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
 }
@@ -115,193 +118,5 @@ impl TypedVerificationMethod for Ed25519VerificationKey2018 {
 
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2018_TYPE
-    }
-}
-
-// #[async_trait]
-// impl<'a> VerificationMethodRef<'a, Ed25519VerificationKey2018, signature::Jws> for &'a Ed25519VerificationKey2018 {
-//     async fn verify<'s: 'async_trait>(
-//         self,
-//         controllers: &impl ControllerProvider,
-//         proof_purpose: ssi_crypto::ProofPurpose,
-//         signing_bytes: &[u8],
-//         jws: &'s CompactJWSStr,
-//     ) -> Result<bool, VerificationError> {
-//         controllers
-//             .ensure_allows_verification_method(
-//                 self.controller.as_iri(),
-//                 self.id.as_iri(),
-//                 proof_purpose,
-//             )
-//             .await?;
-
-//         let (header, payload, signature_bytes) =
-//             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
-
-//         if header.algorithm != ssi_jwk::Algorithm::EdDSA {
-//             return Err(VerificationError::InvalidProof);
-//         }
-
-//         if payload.as_ref() != signing_bytes {
-//             return Err(VerificationError::InvalidProof);
-//         }
-
-//         self.verify_bytes(jws.signing_bytes(), &signature_bytes)
-//     }
-// }
-
-impl LinkedDataVerificationMethod for Ed25519VerificationKey2018 {
-    fn quads(&self, quads: &mut Vec<Quad>) -> Object {
-        quads.push(Quad(
-            Id::Iri(self.id.clone()),
-            RDF_TYPE_IRI.into(),
-            Object::Id(Id::Iri(ED25519_VERIFICATION_KEY_2018_IRI.into())),
-            None,
-        ));
-
-        quads.push(Quad(
-            Id::Iri(self.id.clone()),
-            CONTROLLER_IRI.into(),
-            Object::Id(Id::Iri(self.controller.clone())),
-            None,
-        ));
-
-        quads.push(Quad(
-            Id::Iri(self.id.clone()),
-            PUBLIC_KEY_BASE_58_IRI.into(),
-            Object::Literal(Literal::new(
-                self.public_key_base58.clone(),
-                literal::Type::Any(XSD_STRING.into()),
-            )),
-            None,
-        ));
-
-        rdf_types::Object::Id(rdf_types::Id::Iri(self.id.clone()))
-    }
-}
-
-impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M> for Ed25519VerificationKey2018
-where
-    V::Iri: Eq + Hash,
-    V::BlankId: Eq + Hash,
-{
-    fn into_json_ld_object_meta(
-        self,
-        vocabulary: &mut V,
-        _interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        let mut node = json_ld::Node::with_id(json_ld::syntax::Entry::new(
-            meta.clone(),
-            Meta(
-                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.id.as_iri()))),
-                meta.clone(),
-            ),
-        ));
-
-        let controller_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(CONTROLLER_IRI))),
-            meta.clone(),
-        );
-        let controller_value = json_ld::Node::with_id(json_ld::syntax::Entry::new(
-            meta.clone(),
-            Meta(
-                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.controller.as_iri()))),
-                meta.clone(),
-            ),
-        ));
-        node.insert(
-            controller_prop,
-            Meta(
-                json_ld::Indexed::new(json_ld::Object::Node(Box::new(controller_value)), None),
-                meta.clone(),
-            ),
-        );
-
-        let key_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_BASE_58_IRI))),
-            meta.clone(),
-        );
-        let key_value = json_ld::Value::Literal(
-            json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                self.public_key_base58,
-            )),
-            Some(vocabulary.insert(XSD_STRING)),
-        );
-        node.insert(
-            key_prop,
-            Meta(
-                json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-                meta.clone(),
-            ),
-        );
-
-        Meta(
-            json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
-            meta,
-        )
-    }
-}
-
-impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for Ed25519VerificationKey2018
-where
-    V::Iri: Eq + Hash,
-    V::BlankId: Eq + Hash,
-{
-    fn as_json_ld_object_meta(
-        &self,
-        vocabulary: &mut V,
-        _interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        let mut node = json_ld::Node::with_id(json_ld::syntax::Entry::new(
-            meta.clone(),
-            Meta(
-                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.id.as_iri()))),
-                meta.clone(),
-            ),
-        ));
-
-        let controller_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(CONTROLLER_IRI))),
-            meta.clone(),
-        );
-        let controller_value = json_ld::Node::with_id(json_ld::syntax::Entry::new(
-            meta.clone(),
-            Meta(
-                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.controller.as_iri()))),
-                meta.clone(),
-            ),
-        ));
-        node.insert(
-            controller_prop,
-            Meta(
-                json_ld::Indexed::new(json_ld::Object::Node(Box::new(controller_value)), None),
-                meta.clone(),
-            ),
-        );
-
-        let key_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_BASE_58_IRI))),
-            meta.clone(),
-        );
-        let key_value = json_ld::Value::Literal(
-            json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                self.public_key_base58.clone(),
-            )),
-            None,
-        );
-        node.insert(
-            key_prop,
-            Meta(
-                json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-                meta.clone(),
-            ),
-        );
-
-        Meta(
-            json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
-            meta,
-        )
     }
 }

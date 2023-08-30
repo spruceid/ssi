@@ -1,5 +1,7 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+use linked_data::rdf_types::{Interpretation, Vocabulary};
+use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
@@ -84,6 +86,38 @@ impl FromStr for JWK {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s)
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for JWK {
+    fn interpretation(
+        &self,
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<V, I> {
+        use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
+        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
+            RdfLiteral::Json(json_syntax::to_value(self).unwrap()),
+        ))))
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for JWK {
+    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<V, I>,
+    {
+        visitor.object(self)?;
+        visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for JWK {
+    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<V, I>,
+    {
+        visitor.end()
     }
 }
 

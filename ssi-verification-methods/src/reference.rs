@@ -1,15 +1,15 @@
-use iref::{Iri, IriBuf};
-use rdf_types::{interpretation::ReverseIriInterpretation, IriVocabulary, VocabularyMut};
-use serde::{Deserialize, Serialize};
-use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, FromRdf, IntoJsonLdObjectMeta};
-
 use crate::{LinkedDataVerificationMethod, Referencable, VerificationMethodRef};
+use iref::{Iri, IriBuf};
+use linked_data::LinkedData;
+use serde::{Deserialize, Serialize};
 
 /// Reference to a verification method.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, LinkedData,
+)]
 #[serde(untagged)]
 pub enum ReferenceOrOwned<M> {
-    Reference(IriBuf),
+    Reference(#[ld(id)] IriBuf),
     Owned(M),
 }
 
@@ -57,121 +57,11 @@ impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference
     }
 }
 
-impl<V: IriVocabulary, I, M: FromRdf<V, I>> FromRdf<V, I> for ReferenceOrOwned<M>
-where
-    I: ReverseIriInterpretation<Iri = V::Iri>,
-{
-    fn from_rdf<G>(
-        vocabulary: &V,
-        interpretation: &I,
-        graph: &G,
-        id: &<I as rdf_types::Interpretation>::Resource,
-    ) -> Result<Self, treeldr_rust_prelude::FromRdfError>
-    where
-        G: treeldr_rust_prelude::grdf::Graph<
-            Subject = <I as rdf_types::Interpretation>::Resource,
-            Predicate = <I as rdf_types::Interpretation>::Resource,
-            Object = <I as rdf_types::Interpretation>::Resource,
-        >,
-    {
-        match M::from_rdf(vocabulary, interpretation, graph, id) {
-            Ok(m) => Ok(Self::Owned(m)),
-            Err(treeldr_rust_prelude::FromRdfError::MissingRequiredPropertyValue) => {
-                let mut iris = interpretation.iris_of(id);
-                match iris.next() {
-                    Some(i) => {
-                        let iri = vocabulary.iri(i).unwrap();
-                        Ok(Self::Reference(iri.to_owned()))
-                    }
-                    None => Err(treeldr_rust_prelude::FromRdfError::UnexpectedLiteralValue), // TODO better error
-                }
-            }
-            Err(e) => Err(e),
-        }
-    }
-}
-
-impl<V: VocabularyMut, I, M: Clone, T: IntoJsonLdObjectMeta<V, I, M>> IntoJsonLdObjectMeta<V, I, M>
-    for ReferenceOrOwned<T>
-{
-    fn into_json_ld_object_meta(
-        self,
-        vocabulary: &mut V,
-        interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        match self {
-            Self::Reference(r) => Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
-                        json_ld::syntax::Entry::new(
-                            meta.clone(),
-                            Meta(
-                                json_ld::Id::Valid(json_ld::ValidId::Iri(
-                                    vocabulary.insert_owned(r),
-                                )),
-                                meta.clone(),
-                            ),
-                        ),
-                    ))),
-                    None,
-                ),
-                meta,
-            ),
-            Self::Owned(m) => m.into_json_ld_object_meta(vocabulary, interpretation, meta),
-        }
-    }
-}
-
-impl<V: VocabularyMut, I, M: Clone, T: AsJsonLdObjectMeta<V, I, M>> AsJsonLdObjectMeta<V, I, M>
-    for ReferenceOrOwned<T>
-{
-    fn as_json_ld_object_meta(
-        &self,
-        vocabulary: &mut V,
-        interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        match self {
-            Self::Reference(r) => Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Node(Box::new(json_ld::Node::with_id(
-                        json_ld::syntax::Entry::new(
-                            meta.clone(),
-                            Meta(
-                                json_ld::Id::Valid(json_ld::ValidId::Iri(
-                                    vocabulary.insert(r.as_iri()),
-                                )),
-                                meta.clone(),
-                            ),
-                        ),
-                    ))),
-                    None,
-                ),
-                meta,
-            ),
-            Self::Owned(m) => m.as_json_ld_object_meta(vocabulary, interpretation, meta),
-        }
-    }
-}
-
-// /// Method reference.
-// pub struct Reference {
-//     issuer: Option<IriBuf>,
-//     key_id: Option<IriBuf>
-// }
-
-// /// Method reference reference.
-// pub struct ReferenceRef<'a> {
-//     issuer: Option<Iri<'a>>,
-//     key_id: Option<Iri<'a>>
-// }
-
 /// Reference to a verification method.
-#[derive(Serialize)]
+#[derive(Serialize, LinkedData)]
 #[serde(untagged, bound(serialize = "M::Reference<'a>: Serialize"))]
 pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
-    Reference(Iri<'a>),
+    Reference(#[ld(id)] &'a Iri),
     Owned(M::Reference<'a>),
 }
 
@@ -179,7 +69,7 @@ impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M>
 where
     M::Reference<'a>: VerificationMethodRef<'a>,
 {
-    pub fn id(&self) -> Iri<'a> {
+    pub fn id(&self) -> &'a Iri {
         match self {
             Self::Reference(r) => *r,
             Self::Owned(m) => m.id(),

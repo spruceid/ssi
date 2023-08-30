@@ -40,7 +40,7 @@ impl CryptographicSuite for EdDsa2022 {
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#DataIntegrityProof")
     }
 

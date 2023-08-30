@@ -2,8 +2,11 @@
 
 use std::hash::Hash;
 
+use grdf::IdentityAccess;
 use iref::Iri;
 use json_ld::RdfQuads;
+use linked_data::{FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource};
+use locspan::Meta;
 use rdf_types::{
     Interpret, IriVocabulary, LanguageTagVocabulary, TermInterpretationMut, Triple, VocabularyMut,
 };
@@ -11,7 +14,7 @@ use ssi_rdf::DatasetWithEntryPoint;
 use ssi_vc::Verifiable;
 use ssi_verification_methods::{Referencable, VerificationMethodRef};
 use static_iref::iri;
-use treeldr_rust_prelude::{grdf, locspan::Meta, FromRdf, FromRdfError};
+// use treeldr_rust_prelude::{grdf, locspan::Meta, FromRdf, FromRdfError};
 
 use crate::{
     suite::{CryptographicSuiteInput, HashError},
@@ -33,10 +36,10 @@ pub enum Error<T> {
     MissingProofValue,
 
     #[error("invalid proof")]
-    InvalidProof(FromRdfError),
+    InvalidProof(FromLinkedDataError),
 
     #[error("invalid credential")]
-    InvalidCredential(FromRdfError),
+    InvalidCredential(FromLinkedDataError),
 
     #[error("input transformation failed: {0}")]
     Transform(T),
@@ -47,8 +50,8 @@ pub enum Error<T> {
 
 type HashDataset<T> = grdf::HashDataset<T, T, T, T>;
 
-const PROOF_IRI: Iri<'static> = iri!("https://w3id.org/security#proof");
-const PROOF_VALUE_IRI: Iri<'static> = iri!("https://w3id.org/security#proofValue");
+const PROOF_IRI: &Iri = iri!("https://w3id.org/security#proof");
+const PROOF_VALUE_IRI: &Iri = iri!("https://w3id.org/security#proofValue");
 
 impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
     /// Imports a Data Integrity credential from a JSON-LD document.
@@ -75,9 +78,9 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         V::BlankId: Clone + Eq + Hash,
         V::Literal: Clone,
         I: TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
-        I::Resource: Clone + Eq + Hash,
-        Proof<S>: FromRdf<V, I>,
-        C: FromRdf<V, I>,
+        I::Resource: Clone + Eq + Hash + LinkedDataResource<V, I>,
+        Proof<S>: LinkedDataDeserializeSubject<V, I>,
+        C: LinkedDataDeserializeSubject<V, I>,
         S: CryptographicSuiteInput<DatasetWithEntryPoint<'a, V, I>>,
         for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>, // TODO find a way to hide that bound, if possible.
     {
@@ -120,19 +123,17 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
                         match proof_graph.any_match(Triple(None, Some(&proof_value_property), None))
                         {
                             Some(Triple(proof_id, _, _)) => {
-                                let proof = Proof::from_rdf(
+                                let proof = Proof::deserialize_subject(
                                     vocabulary,
                                     interpretation,
-                                    &proof_graph,
-                                    proof_id,
+                                    &proof_graph.view(&proof_id, IdentityAccess),
                                 )
                                 .map_err(Error::InvalidProof)?;
 
-                                let credential = C::from_rdf(
+                                let credential = C::deserialize_subject(
                                     vocabulary,
                                     interpretation,
-                                    dataset.default_graph(),
-                                    &entry_point,
+                                    &dataset.view(None, &entry_point, IdentityAccess),
                                 )
                                 .map_err(Error::InvalidCredential)?;
 
