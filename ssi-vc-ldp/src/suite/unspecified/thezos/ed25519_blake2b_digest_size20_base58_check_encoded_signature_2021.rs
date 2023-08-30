@@ -34,7 +34,7 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
     }
 

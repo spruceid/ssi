@@ -1,7 +1,12 @@
+use linked_data::{
+    to_interpreted_subject_quads, LinkedData, LinkedDataResource, LinkedDataSubject,
+    RdfLiteralType, RdfLiteralValue,
+};
 use pin_project::pin_project;
 use rdf_types::{
-    interpretation::TraversableInterpretation, BlankIdVocabularyMut, ReverseTermInterpretation,
-    ReverseTermInterpretationMut,
+    interpretation::TraversableInterpretation, BlankIdInterpretationMut, BlankIdVocabularyMut,
+    InterpretationMut, IriInterpretationMut, IriVocabularyMut, LiteralInterpretationMut,
+    ReverseTermInterpretation, ReverseTermInterpretationMut, Vocabulary, VocabularyMut,
 };
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::DatasetWithEntryPoint;
@@ -38,15 +43,26 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         params: &ProofConfiguration<S::VerificationMethod>,
     ) -> Result<(S, S::Hashed), Error<S::TransformError>>
     where
-        V: BlankIdVocabularyMut,
-        I: TraversableInterpretation + ReverseTermInterpretationMut<BlankId = V::BlankId>,
-        I::Resource: Eq + Hash,
-        C: treeldr_rust_prelude::rdf::Quads<V, I>,
+        V: VocabularyMut,
+        V::Iri: Clone,
+        V::BlankId: Clone,
+        V::LanguageTag: Clone,
+        V::Value: RdfLiteralValue,
+        V::Type: RdfLiteralType<V>,
+        I: InterpretationMut
+            + IriInterpretationMut<V::Iri>
+            + BlankIdInterpretationMut<V::BlankId>
+            + LiteralInterpretationMut<V::Literal>
+            + TraversableInterpretation
+            + ReverseTermInterpretationMut<BlankId = V::BlankId>,
+        I::Resource: Clone + Eq + Hash,
+        C: LinkedDataSubject<V, I> + LinkedDataResource<V, I>,
         S: CryptographicSuiteInput<DatasetWithEntryPoint<'a, V, I>>,
     {
         // Convert the `credential` to an RDF dataset.
-        let (entry_point, quads) = credential.rdf_quads(vocabulary, interpretation, None);
-        let dataset = quads.collect();
+        let (entry_point, quads) =
+            to_interpreted_subject_quads(vocabulary, interpretation, None, credential).unwrap();
+        let dataset = quads.into_iter().collect();
 
         // Assign a term to all resources.
         let mut generator =
@@ -62,11 +78,13 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         });
 
         // Prepare the dataset for the crypto suite.
+        // let data = dataset.select();
+
         let data = DatasetWithEntryPoint {
             vocabulary,
             interpretation,
             dataset,
-            entry_point: entry_point.ok_or(Error::MissingCredentialId)?,
+            entry_point,
         };
 
         // Apply the crypto suite.
@@ -96,10 +114,20 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         options: S::Options,
     ) -> SignLinkedData<'max, C, S, T, S::TransformError>
     where
-        V: BlankIdVocabularyMut,
-        I: TraversableInterpretation + ReverseTermInterpretationMut<BlankId = V::BlankId>,
-        I::Resource: Eq + Hash,
-        C: treeldr_rust_prelude::rdf::Quads<V, I>,
+        V: VocabularyMut,
+        V::Iri: Clone,
+        V::BlankId: Clone,
+        V::LanguageTag: Clone,
+        V::Value: RdfLiteralValue,
+        V::Type: RdfLiteralType<V>,
+        I: InterpretationMut
+            + IriInterpretationMut<V::Iri>
+            + BlankIdInterpretationMut<V::BlankId>
+            + LiteralInterpretationMut<V::Literal>
+            + TraversableInterpretation
+            + ReverseTermInterpretationMut<BlankId = V::BlankId>,
+        I::Resource: Clone + Eq + Hash,
+        C: LinkedDataSubject<V, I> + LinkedDataResource<V, I>,
         S: 'max + CryptographicSuiteInput<DatasetWithEntryPoint<'a, V, I>>,
         T: Signer<S::VerificationMethod, S::SignatureProtocol>,
     {

@@ -14,7 +14,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 	} => {
-		#[derive(Clone)]
+		#[derive(Clone, linked_data::LinkedData)]
 		$vis enum $name {
 			$(
 				$(#[$meta])*
@@ -22,7 +22,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 
-		#[derive(Clone, Copy)]
+		#[derive(Clone, Copy, linked_data::LinkedData)]
 		$vis enum $name_ref<'a> {
 			$(
 				$(#[$meta])*
@@ -49,7 +49,7 @@ macro_rules! verification_method_union {
 		}
 
 		impl<'a> $name_ref<'a> {
-			fn id(&self) -> iref::Iri {
+			fn id(&self) -> &iref::Iri {
 				use $crate::VerificationMethod;
 				match self {
 					$(
@@ -88,7 +88,7 @@ macro_rules! verification_method_union {
 		}
 
 		impl $crate::VerificationMethod for $name {
-			fn id(&self) -> iref::Iri {
+			fn id(&self) -> &iref::Iri {
 				match self {
 					$(
 						Self::$variant(m) => m.id()
@@ -96,7 +96,7 @@ macro_rules! verification_method_union {
 				}
 			}
 
-			fn controller(&self) -> Option<iref::Iri> {
+			fn controller(&self) -> Option<&iref::Iri> {
 				match self {
 					$(
 						Self::$variant(m) => m.controller()
@@ -134,7 +134,7 @@ macro_rules! verification_method_union {
 		}
 
 		impl<'a> $crate::VerificationMethodRef<'a> for $name_ref<'a> {
-			fn id(&self) -> iref::Iri<'a> {
+			fn id(&self) -> &'a iref::Iri {
 				match self {
 					$(
 						Self::$variant(m) => m.id()
@@ -142,7 +142,7 @@ macro_rules! verification_method_union {
 				}
 			}
 
-			fn controller(&self) -> Option<iref::Iri<'a>> {
+			fn controller(&self) -> Option<&'a iref::Iri> {
 				match self {
 					$(
 						Self::$variant(m) => m.controller()
@@ -151,63 +151,63 @@ macro_rules! verification_method_union {
 			}
 		}
 
-		impl $crate::LinkedDataVerificationMethod for $name {
-			fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
-				match self {
-					$(
-						Self::$variant(m) => m.quads(quads)
-					),*
-				}
-			}
-		}
+		// impl $crate::LinkedDataVerificationMethod for $name {
+		// 	fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
+		// 		match self {
+		// 			$(
+		// 				Self::$variant(m) => m.quads(quads)
+		// 			),*
+		// 		}
+		// 	}
+		// }
 
-		impl<'a> $crate::LinkedDataVerificationMethod for $name_ref<'a> {
-			fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
-				match self {
-					$(
-						Self::$variant(m) => m.quads(quads)
-					),*
-				}
-			}
-		}
+		// impl<'a> $crate::LinkedDataVerificationMethod for $name_ref<'a> {
+		// 	fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
+		// 		match self {
+		// 			$(
+		// 				Self::$variant(m) => m.quads(quads)
+		// 			),*
+		// 		}
+		// 	}
+		// }
 
-		impl<V: rdf_types::VocabularyMut, I, M: Clone> treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I, M> for $name
-		where
-			V::Iri: Eq + std::hash::Hash,
-			V::BlankId: Eq + std::hash::Hash,
-		{
-			fn into_json_ld_object_meta(
-				self,
-				vocabulary: &mut V,
-				interpretation: &I,
-				meta: M,
-			) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-				match self {
-					$(
-						Self::$variant(m) => m.into_json_ld_object_meta(vocabulary, interpretation, meta)
-					),*
-				}
-			}
-		}
+		// impl<V: rdf_types::VocabularyMut, I, M: Clone> treeldr_rust_prelude::IntoJsonLdObjectMeta<V, I, M> for $name
+		// where
+		// 	V::Iri: Eq + std::hash::Hash,
+		// 	V::BlankId: Eq + std::hash::Hash,
+		// {
+		// 	fn into_json_ld_object_meta(
+		// 		self,
+		// 		vocabulary: &mut V,
+		// 		interpretation: &I,
+		// 		meta: M,
+		// 	) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
+		// 		match self {
+		// 			$(
+		// 				Self::$variant(m) => m.into_json_ld_object_meta(vocabulary, interpretation, meta)
+		// 			),*
+		// 		}
+		// 	}
+		// }
 
-		impl<V: rdf_types::VocabularyMut, I, M: Clone> treeldr_rust_prelude::AsJsonLdObjectMeta<V, I, M> for $name
-		where
-			V::Iri: Eq + std::hash::Hash,
-			V::BlankId: Eq + std::hash::Hash,
-		{
-			fn as_json_ld_object_meta(
-				&self,
-				vocabulary: &mut V,
-				interpretation: &I,
-				meta: M,
-			) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-				match self {
-					$(
-						Self::$variant(m) => m.as_json_ld_object_meta(vocabulary, interpretation, meta)
-					),*
-				}
-			}
-		}
+		// impl<V: rdf_types::VocabularyMut, I, M: Clone> treeldr_rust_prelude::AsJsonLdObjectMeta<V, I, M> for $name
+		// where
+		// 	V::Iri: Eq + std::hash::Hash,
+		// 	V::BlankId: Eq + std::hash::Hash,
+		// {
+		// 	fn as_json_ld_object_meta(
+		// 		&self,
+		// 		vocabulary: &mut V,
+		// 		interpretation: &I,
+		// 		meta: M,
+		// 	) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
+		// 		match self {
+		// 			$(
+		// 				Self::$variant(m) => m.as_json_ld_object_meta(vocabulary, interpretation, meta)
+		// 			),*
+		// 		}
+		// 	}
+		// }
 
 		$(
 			impl<'a> TryFrom<$name_ref<'a>> for &'a $variant {

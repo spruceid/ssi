@@ -1,5 +1,6 @@
 use std::hash::Hash;
 
+use linked_data::LinkedData;
 use rdf_types::VocabularyMut;
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
@@ -9,7 +10,6 @@ use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable};
 mod eip712;
 
 pub use eip712::*;
-use treeldr_rust_prelude::locspan::Meta;
 
 #[derive(Debug, Default, Clone)]
 pub struct AnySignature {
@@ -59,9 +59,11 @@ pub struct AnySignatureRef<'a> {
 }
 
 /// Common signature format where the proof value is multibase-encoded.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct MultibaseSignature {
     /// Multibase encoded signature.
+    #[ld("sec:proofValue")]
     pub proof_value: String,
 }
 
@@ -86,37 +88,37 @@ impl From<MultibaseSignature> for AnySignature {
     }
 }
 
-impl<V: VocabularyMut, I> ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>
-    for MultibaseSignature
-where
-    V::Iri: Eq + Hash,
-    V::BlankId: Eq + Hash,
-{
-    fn flatten_into_json_ld_node(
-        self,
-        vocabulary: &mut V,
-        _interpretation: &I,
-        node: &mut json_ld::Node<<V>::Iri, <V>::BlankId, ()>,
-    ) {
-        let properties = node.properties_mut();
+// impl<V: VocabularyMut, I> ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>
+//     for MultibaseSignature
+// where
+//     V::Iri: Eq + Hash,
+//     V::BlankId: Eq + Hash,
+// {
+//     fn flatten_into_json_ld_node(
+//         self,
+//         vocabulary: &mut V,
+//         _interpretation: &I,
+//         node: &mut json_ld::Node<<V>::Iri, <V>::BlankId, ()>,
+//     ) {
+//         let properties = node.properties_mut();
 
-        properties.insert(
-            Meta(json_ld::Id::iri(vocabulary.insert(PROOF_VALUE)), ()),
-            Meta(
-                json_ld::Indexed::new(
-                    json_ld::Object::Value(json_ld::Value::Literal(
-                        json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                            self.proof_value,
-                        )),
-                        None,
-                    )),
-                    None,
-                ),
-                (),
-            ),
-        );
-    }
-}
+//         properties.insert(
+//             Meta(json_ld::Id::iri(vocabulary.insert(PROOF_VALUE)), ()),
+//             Meta(
+//                 json_ld::Indexed::new(
+//                     json_ld::Object::Value(json_ld::Value::Literal(
+//                         json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
+//                             self.proof_value,
+//                         )),
+//                         None,
+//                     )),
+//                     None,
+//                 ),
+//                 (),
+//             ),
+//         );
+//     }
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct MultibaseSignatureRef<'a> {

@@ -1,8 +1,8 @@
 use chrono::{DateTime, LocalResult, Utc};
-use json_ld::{
-    context_processing::ProcessMeta, ContextLoader, JsonLdProcessor, Loader, RemoteDocument,
-    ToRdfError,
-};
+use grdf::IdentityAccess;
+use iref::IriBuf;
+use json_ld::{ContextLoader, JsonLdProcessor, Loader, RemoteDocument, ToRdfError};
+use linked_data::{FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource};
 use locspan::Meta;
 use rdf_types::{
     IdInterpretationMut, Interpret, IriVocabulary, LanguageTagVocabulary, TermInterpretationMut,
@@ -12,7 +12,7 @@ use ssi_jws::{CompactJWSBuf, Header};
 use ssi_jwt::{JWTClaims, StringOrURI};
 use ssi_vc::{datatype::VCDateTime, Verifiable};
 use std::hash::Hash;
-use treeldr_rust_prelude::{iref::IriBuf, FromRdf, FromRdfError};
+// use treeldr_rust_prelude::{iref::IriBuf, FromRdf, FromRdfError};
 
 use crate::{verification, Proof, VcJwt};
 
@@ -27,7 +27,7 @@ pub enum Error<L, C> {
     InvalidDateTime,
     InvalidSubject,
     Processing(ToRdfError<(), L, C>),
-    FromRdf(FromRdfError),
+    FromRdf(FromLinkedDataError),
     Base64(ssi_jws::Base64DecodeError),
     Json(serde_json::Error),
 }
@@ -59,8 +59,8 @@ impl<L, C> From<ToRdfError<(), L, C>> for Error<L, C> {
     }
 }
 
-impl<L, C> From<FromRdfError> for Error<L, C> {
-    fn from(value: FromRdfError) -> Self {
+impl<L, C> From<FromLinkedDataError> for Error<L, C> {
+    fn from(value: FromLinkedDataError) -> Self {
         Self::FromRdf(value)
     }
 }
@@ -92,11 +92,10 @@ impl<C: Sync> VcJwt<C> {
         V::BlankId: Clone + Eq + Hash + Sync + Send,
         V::Literal: Clone,
         I: TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
-        I::Resource: Eq + Hash + Sync + Send,
-        C: FromRdf<V, I> + Send,
+        I::Resource: Eq + Hash + Sync + Send + LinkedDataResource<V, I>,
+        C: LinkedDataDeserializeSubject<V, I> + Send,
         L: Loader<V::Iri, ()> + ContextLoader<V::Iri, ()> + Sync + Send,
         L::Output: Into<json_syntax::Value>,
-        L::Context: ProcessMeta<V::Iri, V::BlankId, ()> + Into<json_ld::syntax::context::Value<()>>,
         L::Error: Send,
         L::ContextError: Send,
     {
@@ -143,7 +142,7 @@ impl<C: Sync> VcJwt<C> {
                     Some(object) => match object.id() {
                         Some(Meta(id, _)) => {
                             let id = interpret_id(interpretation, id.clone())?;
-                            let dataset: treeldr_rust_prelude::grdf::HashDataset<
+                            let dataset: grdf::HashDataset<
                                 I::Resource,
                                 I::Resource,
                                 I::Resource,
@@ -153,11 +152,10 @@ impl<C: Sync> VcJwt<C> {
                                 .map(|quad| quad.interpret(interpretation))
                                 .collect();
 
-                            let credential = C::from_rdf(
+                            let credential = C::deserialize_subject(
                                 vocabulary,
                                 interpretation,
-                                dataset.default_graph(),
-                                &id,
+                                &dataset.default_graph().view(&id, IdentityAccess),
                             )?;
                             let proof = Proof::new(jws.decode_signature()?, verification_method);
                             Ok(Verifiable::new(
@@ -192,7 +190,7 @@ fn build_issuer<L, C>(
     claims: &JWTClaims,
 ) -> Result<verification::Issuer, Error<L, C>> {
     let issuer = match &claims.issuer {
-        Some(StringOrURI::URI(issuer_uri)) => Some(IriBuf::new(issuer_uri.as_str()).unwrap()),
+        Some(StringOrURI::URI(issuer_uri)) => Some(IriBuf::new(issuer_uri.to_string()).unwrap()),
         Some(StringOrURI::String(_)) => return Err(Error::InvalidIssuer),
         None => None,
     };

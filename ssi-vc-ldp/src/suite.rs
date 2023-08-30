@@ -2,13 +2,14 @@
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use iref::Iri;
+use linked_data::{to_quads, LinkedDataPredicateObjects};
 use pin_project::pin_project;
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::IntoNQuads;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
-    LinkedDataVerificationMethod, Referencable, SignatureAlgorithm, SignatureError, Signer,
-    VerificationError, VerificationMethod, VerificationMethodRef, Verifier,
+    Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
+    VerificationMethod, VerificationMethodRef, Verifier,
 };
 
 use crate::{ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProofRef};
@@ -71,7 +72,7 @@ pub trait CryptographicSuite: Sized {
 
     type Options;
 
-    fn iri(&self) -> Iri;
+    fn iri(&self) -> &Iri;
 
     fn cryptographic_suite(&self) -> Option<&str>;
 
@@ -238,11 +239,15 @@ fn sha256_hash<'a, T: CryptographicSuite>(
     proof_configuration: ProofConfigurationRef<'a, T::VerificationMethod>,
 ) -> [u8; 64]
 where
-    <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataVerificationMethod,
+    <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataPredicateObjects,
 {
+    let generator = rdf_types::generator::Blank::new();
     let transformed_document_hash = ssi_crypto::hashes::sha256::sha256(data);
     let proof_config_hash: [u8; 32] = ssi_crypto::hashes::sha256::sha256(
-        proof_configuration.quads(suite).into_nquads().as_bytes(),
+        to_quads(generator, &proof_configuration.with_suite(suite))
+            .unwrap()
+            .into_nquads()
+            .as_bytes(),
     );
     let mut hash_data = [0u8; 64];
     hash_data[..32].copy_from_slice(&transformed_document_hash);

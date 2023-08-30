@@ -9,7 +9,7 @@ pub mod document;
 pub mod resolution;
 
 pub use did::*;
-use document::AnyVerificationMethod;
+use document::AnyDIDVerificationMethod;
 pub use document::Document;
 use pin_project::pin_project;
 pub use resolution::DIDResolver;
@@ -30,7 +30,7 @@ pub struct Provider<T> {
 }
 
 impl ssi_verification_methods::Controller for Document {
-    fn allows_verification_method(&self, id: iref::Iri, proof_purposes: ProofPurposes) -> bool {
+    fn allows_verification_method(&self, id: &iref::Iri, proof_purposes: ProofPurposes) -> bool {
         DIDURL::new(id.as_bytes()).is_ok_and(|url| {
             self.verification_relationships
                 .contains(&self.id, url, proof_purposes)
@@ -87,9 +87,9 @@ impl<T: DIDResolver> ssi_verification_methods::ControllerProvider for Provider<T
 
     type GetController<'a> = GetController<'a, T> where Self: 'a;
 
-    fn get_controller<'a>(&'a self, id: iref::Iri<'a>) -> Self::GetController<'_> {
-        if id.scheme() == "did" {
-            match DID::new(id.into_bytes()) {
+    fn get_controller<'a>(&'a self, id: &'a iref::Iri) -> Self::GetController<'_> {
+        if id.scheme().as_str() == "did" {
+            match DID::new(id.as_bytes()) {
                 Ok(did) => GetController::pending(self.resolver.resolve(did, self.options.clone())),
                 Err(_) => GetController::err(ssi_verification_methods::ControllerError::Invalid),
             }
@@ -128,7 +128,7 @@ impl<'a, M: 'a + Referencable, T: ?Sized + DIDResolver> ResolveVerificationMetho
 impl<'a, M: 'a + Referencable, T: ?Sized + DIDResolver> Future
     for ResolveVerificationMethod<'a, M, T>
 where
-    M: TryFrom<AnyVerificationMethod>,
+    M: TryFrom<AnyDIDVerificationMethod>,
 {
     type Output = Result<ssi_verification_methods::Cow<'a, M>, VerificationError>;
 
@@ -206,19 +206,19 @@ impl<T: DIDResolver, M> ssi_verification_methods::Verifier<M> for Provider<T>
 where
     M: ssi_verification_methods::VerificationMethod,
     for<'a> M::Reference<'a>: VerificationMethodRef<'a>,
-    M: TryFrom<AnyVerificationMethod>,
+    M: TryFrom<AnyDIDVerificationMethod>,
 {
     type ResolveVerificationMethod<'a> = ResolveVerificationMethod<'a, M, T> where Self: 'a, M: 'a;
 
     fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
-        _issuer: Option<iref::Iri<'a>>,
+        _issuer: Option<&'a iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
     ) -> Self::ResolveVerificationMethod<'a> {
         match method {
             Some(method) => {
-                if method.id().scheme() == "did" {
-                    match DIDURL::new(method.id().into_bytes()) {
+                if method.id().scheme().as_str() == "did" {
+                    match DIDURL::new(method.id().as_bytes()) {
                         Ok(url) => {
                             let options = self.options.clone().into();
                             ResolveVerificationMethod::dereference(&self.resolver, url, options)

@@ -1,23 +1,22 @@
 use std::borrow::Cow;
 
-use async_trait::async_trait;
-use ssi_crypto::ProofPurposes;
 use ssi_dids::{
     document::{
         self,
         representation::{self, MediaType},
-        verification_method::VerificationMethod,
-        AnyVerificationMethod, VerificationRelationships,
+        verification_method::DIDVerificationMethod,
+        AnyDIDVerificationMethod, VerificationRelationships,
     },
     resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
     DIDBuf, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
 };
 use ssi_jwk::JWK;
+use ssi_verification_methods::ProofPurposes;
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
 
-/// `JsonWebKey2020` verification method description.
-pub struct JsonWebKey2020 {
+/// DID version of the `JsonWebKey2020` verification method.
+pub struct DIDJsonWebKey2020 {
     /// Verification method identifier.
     pub id: DIDURLBuf,
 
@@ -28,7 +27,7 @@ pub struct JsonWebKey2020 {
     pub public_key: JWK,
 }
 
-impl JsonWebKey2020 {
+impl DIDJsonWebKey2020 {
     pub fn new(id: DIDURLBuf, controller: DIDBuf, public_key: JWK) -> Self {
         Self {
             id,
@@ -38,7 +37,7 @@ impl JsonWebKey2020 {
     }
 }
 
-impl VerificationMethod for JsonWebKey2020 {
+impl DIDVerificationMethod for DIDJsonWebKey2020 {
     fn id(&self) -> &DIDURL {
         &self.id
     }
@@ -68,10 +67,10 @@ pub enum InvalidJsonWebKey2020 {
     PrivateKey,
 }
 
-impl From<JsonWebKey2020> for AnyVerificationMethod {
-    fn from(value: JsonWebKey2020) -> Self {
+impl From<DIDJsonWebKey2020> for AnyDIDVerificationMethod {
+    fn from(value: DIDJsonWebKey2020) -> Self {
         let public_key = serde_json::to_value(&value.public_key).unwrap();
-        AnyVerificationMethod::new(
+        AnyDIDVerificationMethod::new(
             value.id,
             JSON_WEB_KEY_2020_TYPE.to_string(),
             value.controller,
@@ -82,10 +81,10 @@ impl From<JsonWebKey2020> for AnyVerificationMethod {
     }
 }
 
-impl TryFrom<AnyVerificationMethod> for JsonWebKey2020 {
+impl TryFrom<AnyDIDVerificationMethod> for DIDJsonWebKey2020 {
     type Error = InvalidJsonWebKey2020;
 
-    fn try_from(mut value: AnyVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(mut value: AnyDIDVerificationMethod) -> Result<Self, Self::Error> {
         if value.type_ == "JsonWebKey2020" {
             match value.properties.remove("publicKeyJwk") {
                 Some(key_value) => match serde_json::from_value(key_value) {
@@ -111,10 +110,10 @@ pub struct JsonWebKey2020Ref<'a> {
     pub public_key: Cow<'a, JWK>,
 }
 
-impl<'a> TryFrom<&'a AnyVerificationMethod> for JsonWebKey2020Ref<'a> {
+impl<'a> TryFrom<&'a AnyDIDVerificationMethod> for JsonWebKey2020Ref<'a> {
     type Error = InvalidJsonWebKey2020;
 
-    fn try_from(value: &'a AnyVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a AnyDIDVerificationMethod) -> Result<Self, Self::Error> {
         if value.type_ == "JsonWebKey2020" {
             match value.properties.get("publicKeyJwk") {
                 Some(key_value) => match serde_json::from_value(key_value.clone()) {
@@ -161,66 +160,73 @@ impl JWKMethod {
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
 impl DIDMethodResolver for JWKMethod {
+    type ResolveMethodRepresentation<'a> = std::future::Ready<Result<Output<Vec<u8>>, Error>>;
+
     fn method_name(&self) -> &str {
         "jwk"
     }
 
-    async fn resolve_method_representation(
-        &self,
-        method_specific_id: &str,
+    fn resolve_method_representation<'a>(
+        &'a self,
+        method_specific_id: &'a str,
         options: Options,
-    ) -> Result<Output<Vec<u8>>, Error> {
-        let data = multibase::Base::decode(&multibase::Base::Base64Url, method_specific_id)
-            .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_string()))?;
-
-        let jwk: JWK = serde_json::from_slice(&data)
-            .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_string()))?;
-
-        let public_jwk = jwk.to_public();
-
-        if public_jwk != jwk {
-            return Err(Error::InvalidMethodSpecificId(
-                method_specific_id.to_string(),
-            ));
-        }
-
-        let did = DIDBuf::new(format!("did:jwk:{method_specific_id}").into_bytes()).unwrap();
-
-        let document = Document {
-            verification_method: vec![JsonWebKey2020::new(
-                DIDURLBuf::new(format!("did:jwk:{method_specific_id}#0").into_bytes()).unwrap(),
-                did.clone(),
-                jwk,
-            )
-            .into()],
-            verification_relationships: VerificationRelationships::from_reference(
-                RelativeDIDURLBuf::new(b"#0".to_vec()).unwrap().into(),
-                ProofPurposes::all(),
-            ),
-            ..Document::new(did)
-        };
-
-        let represented = document.into_representation(representation::Options::from_media_type(
-            options.accept.unwrap_or(MediaType::JsonLd),
-            || representation::json_ld::Options {
-                context: representation::json_ld::Context::array(
-                    representation::json_ld::DIDContext::V1,
-                    vec![serde_json::Value::String(
-                        "https://w3id.org/security/suites/jws-2020/v1".to_string(),
-                    )],
-                ),
-            },
-        ));
-
-        Ok(Output::new(
-            represented.to_bytes(),
-            document::Metadata::default(),
-            Metadata::from_content_type(Some(represented.media_type().to_string())),
-        ))
+    ) -> Self::ResolveMethodRepresentation<'a> {
+        std::future::ready(resolve_method_representation(method_specific_id, options))
     }
+}
+
+fn resolve_method_representation(
+    method_specific_id: &str,
+    options: Options,
+) -> Result<Output<Vec<u8>>, Error> {
+    let data = multibase::Base::decode(&multibase::Base::Base64Url, method_specific_id)
+        .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_string()))?;
+
+    let jwk: JWK = serde_json::from_slice(&data)
+        .map_err(|_| Error::InvalidMethodSpecificId(method_specific_id.to_string()))?;
+
+    let public_jwk = jwk.to_public();
+
+    if public_jwk != jwk {
+        return Err(Error::InvalidMethodSpecificId(
+            method_specific_id.to_string(),
+        ));
+    }
+
+    let did = DIDBuf::new(format!("did:jwk:{method_specific_id}").into_bytes()).unwrap();
+
+    let document = Document {
+        verification_method: vec![DIDJsonWebKey2020::new(
+            DIDURLBuf::new(format!("did:jwk:{method_specific_id}#0").into_bytes()).unwrap(),
+            did.clone(),
+            jwk,
+        )
+        .into()],
+        verification_relationships: VerificationRelationships::from_reference(
+            RelativeDIDURLBuf::new(b"#0".to_vec()).unwrap().into(),
+            ProofPurposes::all(),
+        ),
+        ..Document::new(did)
+    };
+
+    let represented = document.into_representation(representation::Options::from_media_type(
+        options.accept.unwrap_or(MediaType::JsonLd),
+        || representation::json_ld::Options {
+            context: representation::json_ld::Context::array(
+                representation::json_ld::DIDContext::V1,
+                vec![serde_json::Value::String(
+                    "https://w3id.org/security/suites/jws-2020/v1".to_string(),
+                )],
+            ),
+        },
+    ));
+
+    Ok(Output::new(
+        represented.to_bytes(),
+        document::Metadata::default(),
+        Metadata::from_content_type(Some(represented.media_type().to_string())),
+    ))
 }
 
 #[cfg(test)]

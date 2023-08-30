@@ -34,7 +34,7 @@ impl CryptographicSuite for RsaSignature2018 {
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#RsaSignature2018")
     }
 

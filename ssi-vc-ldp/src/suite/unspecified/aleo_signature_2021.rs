@@ -73,7 +73,7 @@ impl CryptographicSuite for AleoSignature2021 {
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#AleoSignature2021")
     }
 

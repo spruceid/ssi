@@ -1,11 +1,15 @@
 use json_ld::{
     compaction::CompactMeta, context_processing::Processed, syntax::IntoJsonWithContext,
-    ContextLoader, ExpandedDocument, Loader, Process, RemoteDocumentReference,
+    ContextLoader, ExpandedDocument, Indexed, Loader, Process, RemoteDocumentReference,
 };
 use json_syntax::Print;
+use linked_data::{AsRdfLiteral, LinkedDataResource, LinkedDataSubject};
 use locspan::Meta;
 use pin_project::pin_project;
-use rdf_types::VocabularyMut;
+use rdf_types::{
+    interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
+    Interpretation, ReverseLiteralInterpretation, VocabularyMut,
+};
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_vc::{vocab::VERIFIABLE_CREDENTIAL, Verifiable, CREDENTIALS_V1_CONTEXT_IRI};
@@ -200,7 +204,7 @@ impl<C: Sync> VcJwt<C> {
     /// Sign the given Linked Data credential.
     pub async fn sign_ld<V, I, L>(
         vocabulary: &mut V,
-        interpretation: &I,
+        interpretation: &mut I,
         loader: &mut L,
         signer: &impl Signer<verification::AnyJwkMethod, ()>,
         credential: C,
@@ -211,12 +215,19 @@ impl<C: Sync> VcJwt<C> {
         V: VocabularyMut + Send + Sync,
         V::Iri: Clone + Eq + Hash + Send + Sync,
         V::BlankId: Clone + Eq + Hash + Send + Sync,
+        V::LanguageTag: Clone,
+        V::Value: AsRdfLiteral<V>,
+        I: Interpretation
+            + ReverseIriInterpretation<Iri = V::Iri>
+            + ReverseBlankIdInterpretation<BlankId = V::BlankId>
+            + ReverseLiteralInterpretation<Literal = V::Literal>,
         L: Loader<V::Iri, ()> + ContextLoader<V::Iri, ()> + Send + Sync,
-        L::Context: Into<json_ld::syntax::context::Value<()>>,
-        C: treeldr_rust_prelude::AsJsonLdObjectMeta<V, I>,
+        C: LinkedDataSubject<V, I> + LinkedDataResource<V, I>,
     {
         // Produce expanded JSON-LD payload.
-        let mut json_ld_vc = credential.as_json_ld_object_meta(vocabulary, interpretation, ());
+        let mut json_ld_vc = Meta::none(Indexed::none(
+            json_ld::ser::serialize_object_with(vocabulary, interpretation, &credential).unwrap(),
+        ));
         if let Some(node) = json_ld_vc.as_node_mut() {
             node.type_entry_or_default((), ()).push(Meta(
                 json_ld::Id::iri(vocabulary.insert(VERIFIABLE_CREDENTIAL)),
@@ -249,7 +260,7 @@ impl<C: Sync> VcJwt<C> {
                     add_credentials_v1_context(&mut context);
                 }
 
-                let active_context: Processed<V::Iri, V::BlankId, _, ()> = context
+                let active_context: Processed<V::Iri, V::BlankId> = context
                     .process_full(
                         vocabulary,
                         &json_ld::Context::new(None),
@@ -320,7 +331,9 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>)
                 *context = json_ld::syntax::context::Value::Many(vec![
                     Meta(c, ()),
                     Meta(
-                        json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.into()),
+                        json_ld::syntax::Context::IriRef(
+                            CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
+                        ),
                         (),
                     ),
                 ]);
@@ -329,12 +342,12 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>)
         json_ld::syntax::context::Value::Many(list) => {
             if list.is_empty() {
                 *context = json_ld::syntax::context::Value::One(Meta(
-                    json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.into()),
+                    json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.to_owned().into()),
                     (),
                 ));
             } else if list.iter().all(|Meta(c, _)| !is_credentials_v1_context(c)) {
                 list.push(Meta(
-                    json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.into()),
+                    json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.to_owned().into()),
                     (),
                 ))
             }

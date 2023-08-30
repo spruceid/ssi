@@ -1,5 +1,6 @@
 use std::{future::Future, pin::Pin, task};
 
+use iref::{Iri, IriBuf};
 use pin_project::pin_project;
 use ssi_jwk::JWK;
 use ssi_vc::{ProofValidity, VerifiableWith};
@@ -7,7 +8,7 @@ use ssi_verification_methods::{
     covariance_rule, ProofPurpose, Referencable, ReferenceOrOwnedRef, VerificationError,
     VerificationMethod, VerificationMethodRef, Verifier,
 };
-use treeldr_rust_prelude::iref::{Iri, IriBuf};
+// use treeldr_rust_prelude::iref::{Iri, IriBuf};
 
 use crate::{
     signing::{VcJwtSignatureAlgorithm, VcJwtSignatureRef},
@@ -81,30 +82,30 @@ impl Referencable for AnyJwkMethod {
 }
 
 impl VerificationMethod for AnyJwkMethod {
-    fn id(&self) -> Iri<'_> {
+    fn id(&self) -> &Iri {
         self.id.as_iri()
     }
 
-    fn controller(&self) -> Option<Iri<'_>> {
+    fn controller(&self) -> Option<&Iri> {
         self.controller.as_ref().map(IriBuf::as_iri)
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnyJwkMethodRef<'a> {
-    pub id: Iri<'a>,
+    pub id: &'a Iri,
 
-    pub controller: Option<Iri<'a>>,
+    pub controller: Option<&'a Iri>,
 
     pub public_key_jwk: &'a JWK,
 }
 
 impl<'a> VerificationMethodRef<'a> for AnyJwkMethodRef<'a> {
-    fn id(&self) -> Iri<'a> {
+    fn id(&self) -> &'a Iri {
         self.id
     }
 
-    fn controller(&self) -> Option<Iri<'a>> {
+    fn controller(&self) -> Option<&'a Iri> {
         self.controller
     }
 }
@@ -123,7 +124,7 @@ impl Issuer {
         Self { id, key_id }
     }
 
-    pub fn id(&self) -> Option<Iri> {
+    pub fn id(&self) -> Option<&Iri> {
         self.id.as_ref().map(IriBuf::as_iri)
     }
 

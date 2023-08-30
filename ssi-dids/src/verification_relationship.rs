@@ -57,7 +57,7 @@ impl From<VerificationRelationship> for String {
 }
 
 impl VerificationRelationship {
-    pub fn to_iri(&self) -> Iri<'static> {
+    pub fn to_iri(&self) -> &Iri {
         match self {
             VerificationRelationship::Authentication => {
                 iri!("https://w3id.org/security#authenticationMethod")

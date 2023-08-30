@@ -15,7 +15,7 @@ pub mod verification_method;
 pub use representation::Represented;
 pub use resource::{Resource, ResourceRef};
 pub use service::Service;
-pub use verification_method::AnyVerificationMethod;
+pub use verification_method::AnyDIDVerificationMethod;
 
 use self::resource::{ExtractResource, FindResource};
 
@@ -55,12 +55,12 @@ pub struct Document {
     /// DID document, expressing [verification
     /// methods](https://www.w3.org/TR/did-core/#verification-methods).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub verification_method: Vec<AnyVerificationMethod>,
+    pub verification_method: Vec<AnyDIDVerificationMethod>,
 
     /// [`publicKey`](https://www.w3.org/TR/did-spec-registries/#publickey) property of a DID
     /// document (deprecated in favor of `verificationMethod`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub public_key: Vec<AnyVerificationMethod>,
+    pub public_key: Vec<AnyDIDVerificationMethod>,
 
     /// `service` property of a DID document, expressing
     /// [services](https://www.w3.org/TR/did-core/#services), generally as endpoints.
@@ -146,7 +146,7 @@ impl Document {
     pub fn service(&self, id: &str) -> Option<&Service> {
         self.service
             .iter()
-            .find(|s| s.id.fragment().is_some_and(|f| f == id))
+            .find(|s| s.id.fragment().is_some_and(|f| f.as_str() == id))
     }
 
     pub fn into_representation(self, options: representation::Options) -> Represented {

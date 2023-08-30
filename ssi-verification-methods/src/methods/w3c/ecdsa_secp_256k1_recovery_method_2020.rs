@@ -1,39 +1,37 @@
 use hex::FromHexError;
-use iref::{Iri, IriBuf};
-use rdf_types::{literal, Id, Literal, Object, Quad, VocabularyMut};
+use iref::{Iri, IriBuf, UriBuf};
+use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_security::{BLOCKCHAIN_ACCOUNT_ID, ETHEREUM_ADDRESS, PUBLIC_KEY_HEX, PUBLIC_KEY_JWK};
-use static_iref::iri;
 use std::hash::Hash;
-use treeldr_rust_prelude::{locspan::Meta, AsJsonLdObjectMeta, IntoJsonLdObjectMeta};
 
 use crate::{
-    covariance_rule, ExpectedType, LinkedDataVerificationMethod, Referencable, SignatureError,
-    TypedVerificationMethod, VerificationError, VerificationMethod, CONTROLLER_IRI, RDF_JSON,
-    RDF_TYPE_IRI, XSD_STRING,
+    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
+    VerificationError, VerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
 
-pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_IRI: Iri<'static> =
-    iri!("https://w3id.org/security#EcdsaSecp256k1RecoveryMethod2020");
-
 /// EcdsaSecp256k1RecoveryMethod2020 verification method.
 ///
 /// See: <https://w3c-ccg.github.io/security-vocab/#EcdsaSecp256k1RecoveryMethod2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
 #[serde(tag = "type", rename = "EcdsaSecp256k1RecoveryMethod2020")]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+#[ld(type = "sec:EcdsaSecp256k1RecoveryMethod2020")]
 pub struct EcdsaSecp256k1RecoveryMethod2020 {
     /// Key identifier.
+    #[ld(id)]
     pub id: IriBuf,
 
     /// Key controller.
-    pub controller: IriBuf, // TODO: should be an URI.
+    #[ld("sec:controller")]
+    pub controller: UriBuf,
 
     /// Public key.
     #[serde(flatten)]
+    #[ld(flatten)]
     pub public_key: PublicKey,
 }
 
@@ -49,12 +47,12 @@ impl Referencable for EcdsaSecp256k1RecoveryMethod2020 {
 
 impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     /// Returns the identifier of the key.
-    fn id(&self) -> Iri {
+    fn id(&self) -> &Iri {
         self.id.as_iri()
     }
 
     /// Returns an URI to the key controller.
-    fn controller(&self) -> Option<Iri> {
+    fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
 }
@@ -108,139 +106,23 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
     }
 }
 
-// #[async_trait]
-// impl<'a> VerificationMethodRef<'a, EcdsaSecp256k1RecoveryMethod2020, signature::Jws>
-//     for &'a EcdsaSecp256k1RecoveryMethod2020
-// {
-//     /// Verifies the given signature.
-//     async fn verify<'s: 'async_trait>(
-//         self,
-//         controllers: &impl crate::ControllerProvider,
-//         proof_purpose: ssi_crypto::ProofPurpose,
-//         data: &[u8],
-//         jws: &'s CompactJWSStr,
-//     ) -> Result<bool, VerificationError> {
-//         // Check that this verification method is authorized for the given
-//         // proof purpose.
-//         controllers
-//             .ensure_allows_verification_method(
-//                 self.controller.as_iri(),
-//                 self.id.as_iri(),
-//                 proof_purpose,
-//             )
-//             .await?;
-
-//         // Decode the JWK.
-//         let (header, payload, signature_bytes) =
-//             jws.decode().map_err(|_| VerificationError::InvalidProof)?;
-
-//         // Ensure the signed message matches the verified message.
-//         if payload.as_ref() != data {
-//             return Err(VerificationError::InvalidProof);
-//         }
-
-//         self.verify_bytes(jws.signing_bytes(), &signature_bytes)
-//     }
-// }
-
-impl LinkedDataVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
-    fn quads(&self, quads: &mut Vec<Quad>) -> Object {
-        quads.push(Quad(
-            Id::Iri(self.id.clone()),
-            RDF_TYPE_IRI.into(),
-            Object::Id(Id::Iri(ECDSA_SECP_256K1_RECOVERY_METHOD_2020_IRI.into())),
-            None,
-        ));
-
-        quads.push(Quad(
-            Id::Iri(self.id.clone()),
-            CONTROLLER_IRI.into(),
-            Object::Id(Id::Iri(self.controller.clone())),
-            None,
-        ));
-
-        self.public_key.quads(quads, Id::Iri(self.id.clone()));
-
-        rdf_types::Object::Id(rdf_types::Id::Iri(self.id.clone()))
-    }
-}
-
-impl<V: VocabularyMut, I, M: Clone> IntoJsonLdObjectMeta<V, I, M>
-    for EcdsaSecp256k1RecoveryMethod2020
-where
-    V::Iri: Eq + Hash,
-    V::BlankId: Eq + Hash,
-{
-    fn into_json_ld_object_meta(
-        self,
-        vocabulary: &mut V,
-        interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        self.as_json_ld_object_meta(vocabulary, interpretation, meta)
-    }
-}
-
-impl<V: VocabularyMut, I, M: Clone> AsJsonLdObjectMeta<V, I, M> for EcdsaSecp256k1RecoveryMethod2020
-where
-    V::Iri: Eq + Hash,
-    V::BlankId: Eq + Hash,
-{
-    fn as_json_ld_object_meta(
-        &self,
-        vocabulary: &mut V,
-        _interpretation: &I,
-        meta: M,
-    ) -> json_ld::IndexedObject<V::Iri, V::BlankId, M> {
-        let mut node = json_ld::Node::with_id(json_ld::syntax::Entry::new(
-            meta.clone(),
-            Meta(
-                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.id.as_iri()))),
-                meta.clone(),
-            ),
-        ));
-
-        let controller_prop = Meta(
-            json_ld::Id::Valid(Id::Iri(vocabulary.insert(CONTROLLER_IRI))),
-            meta.clone(),
-        );
-        let controller_value = json_ld::Node::with_id(json_ld::syntax::Entry::new(
-            meta.clone(),
-            Meta(
-                json_ld::Id::Valid(Id::Iri(vocabulary.insert(self.controller.as_iri()))),
-                meta.clone(),
-            ),
-        ));
-        node.insert(
-            controller_prop,
-            Meta(
-                json_ld::Indexed::new(json_ld::Object::Node(Box::new(controller_value)), None),
-                meta.clone(),
-            ),
-        );
-
-        self.public_key
-            .as_json_ld(vocabulary, &mut node, meta.clone());
-
-        Meta(
-            json_ld::Indexed::new(json_ld::Object::Node(Box::new(node)), None),
-            meta,
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[serde(rename = "publicKeyJwk")]
+    #[ld("sec:publicKeyJwk")]
     Jwk(Box<JWK>),
 
     #[serde(rename = "publicKeyHex")]
+    #[ld("sec:publicKeyHex")]
     Hex(String),
 
     #[serde(rename = "ethereumAddress")]
+    #[ld("sec:ethereumAddress")]
     EthereumAddress(ssi_security::EthereumAddressBuf),
 
     #[serde(rename = "blockchainAccountId")]
+    #[ld("sec:blockchainAccoundId")]
     BlockchainAccountId(ssi_caips::caip10::BlockchainAccountId),
 }
 
@@ -311,134 +193,6 @@ impl PublicKey {
                     Err(VerifyError::KeyMismatch(_, _)) => Ok(false),
                     Ok(()) => Ok(true),
                 }
-            }
-        }
-    }
-
-    fn quads(&self, quads: &mut Vec<Quad>, id: Id) {
-        match self {
-            Self::Jwk(jwk) => quads.push(Quad(
-                id,
-                PUBLIC_KEY_JWK.into(),
-                Object::Literal(Literal::new(
-                    serde_json::to_string(jwk).unwrap(),
-                    literal::Type::Any(RDF_JSON.into()),
-                )),
-                None,
-            )),
-            Self::Hex(hex) => quads.push(Quad(
-                id,
-                PUBLIC_KEY_HEX.into(),
-                Object::Literal(Literal::new(
-                    hex.clone(),
-                    literal::Type::Any(XSD_STRING.into()),
-                )),
-                None,
-            )),
-            Self::EthereumAddress(addr) => quads.push(Quad(
-                id,
-                ETHEREUM_ADDRESS.into(),
-                Object::Literal(Literal::new(
-                    addr.to_string(),
-                    literal::Type::Any(XSD_STRING.into()),
-                )),
-                None,
-            )),
-            Self::BlockchainAccountId(account_id) => quads.push(Quad(
-                id,
-                BLOCKCHAIN_ACCOUNT_ID.into(),
-                Object::Literal(Literal::new(
-                    account_id.to_string(),
-                    literal::Type::Any(XSD_STRING.into()),
-                )),
-                None,
-            )),
-        }
-    }
-
-    fn as_json_ld<V, M>(
-        &self,
-        vocabulary: &mut V,
-        node: &mut json_ld::Node<V::Iri, V::BlankId, M>,
-        meta: M,
-    ) where
-        V: VocabularyMut,
-        V::Iri: Eq + Hash,
-        V::BlankId: Eq + Hash,
-        M: Clone,
-    {
-        match self {
-            Self::Jwk(jwk) => {
-                let key_prop = Meta(
-                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_JWK))),
-                    meta.clone(),
-                );
-                let key_value =
-                    json_ld::Value::Json(json_syntax::to_value_with(jwk, || meta.clone()).unwrap());
-                node.insert(
-                    key_prop,
-                    Meta(
-                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-                        meta,
-                    ),
-                );
-            }
-            Self::Hex(hex) => {
-                let key_prop = Meta(
-                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(PUBLIC_KEY_HEX))),
-                    meta.clone(),
-                );
-                let key_value = json_ld::Value::Literal(
-                    json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                        hex.clone(),
-                    )),
-                    None,
-                );
-                node.insert(
-                    key_prop,
-                    Meta(
-                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-                        meta.clone(),
-                    ),
-                );
-            }
-            Self::EthereumAddress(addr) => {
-                let key_prop = Meta(
-                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(ETHEREUM_ADDRESS))),
-                    meta.clone(),
-                );
-                let key_value = json_ld::Value::Literal(
-                    json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                        addr.to_string(),
-                    )),
-                    None,
-                );
-                node.insert(
-                    key_prop,
-                    Meta(
-                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-                        meta.clone(),
-                    ),
-                );
-            }
-            Self::BlockchainAccountId(account_id) => {
-                let key_prop = Meta(
-                    json_ld::Id::Valid(Id::Iri(vocabulary.insert(BLOCKCHAIN_ACCOUNT_ID))),
-                    meta.clone(),
-                );
-                let key_value = json_ld::Value::Literal(
-                    json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-                        account_id.to_string(),
-                    )),
-                    None,
-                );
-                node.insert(
-                    key_prop,
-                    Meta(
-                        json_ld::Indexed::new(json_ld::Object::Value(key_value), None),
-                        meta.clone(),
-                    ),
-                );
             }
         }
     }

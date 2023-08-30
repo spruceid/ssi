@@ -23,6 +23,10 @@
 //! [test cases]: https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-10.md#test-cases
 
 use crate::caip2::{ChainId, ChainIdParseError};
+use linked_data::{
+    rdf_types::{Interpretation, Vocabulary},
+    LinkedDataPredicateObjects, LinkedDataSubject,
+};
 use ssi_jwk::{Params, JWK};
 use std::fmt;
 use std::str::FromStr;
@@ -78,6 +82,40 @@ impl<'de> Deserialize<'de> for BlockchainAccountId {
         }
 
         deserializer.deserialize_str(Visitor)
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I>
+    for BlockchainAccountId
+{
+    fn interpretation(
+        &self,
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<V, I> {
+        use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
+        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
+            RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
+        ))))
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for BlockchainAccountId {
+    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<V, I>,
+    {
+        visitor.object(self)?;
+        visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlockchainAccountId {
+    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<V, I>,
+    {
+        visitor.end()
     }
 }
 

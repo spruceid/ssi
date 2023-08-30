@@ -18,7 +18,9 @@ locspan.workspace = true
 rdf-types.workspace = true
 iref.workspace = true
 static-iref.workspace = true
+grdf.workspace = true
 json-ld.workspace = true
+linked-data.workspace = true
 ssi-core.workspace = true
 ssi-crypto.workspace = true
 ssi-verification-methods.workspace = true
@@ -30,7 +32,7 @@ pin-project.workspace = true
 futures.workspace = true
 serde_with = "2.3.2"
 
-treeldr-rust-prelude.workspace = true
+# treeldr-rust-prelude.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }

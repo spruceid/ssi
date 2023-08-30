@@ -85,7 +85,7 @@ pub trait Signer<M: Referencable, P> {
     fn sign<'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>(
         &'a self,
         algorithm: A,
-        issuer: Option<Iri<'a>>,
+        issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
         bytes: &'a [u8],
     ) -> Self::Sign<'a, A>

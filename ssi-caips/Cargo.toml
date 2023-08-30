@@ -21,6 +21,8 @@ ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 bs58 = { version = "0.4", features = ["check"] }
 bech32 = { version = "0.8", optional = true }
 serde.workspace = true
+linked-data.workspace = true
+xsd-types.workspace = true
 
 [dev-dependencies]
 serde_json = "1.0"

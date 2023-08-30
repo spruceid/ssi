@@ -21,6 +21,7 @@ ed25519 = ["ssi-jwk/ed25519"]
 ssi-crypto.workspace = true
 ssi-dids.workspace = true
 ssi-jwk.workspace = true
+ssi-verification-methods.workspace = true
 async-trait.workspace = true
 multibase = "0.8"
 serde_json.workspace = true

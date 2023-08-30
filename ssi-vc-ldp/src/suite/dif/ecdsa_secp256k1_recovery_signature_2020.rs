@@ -33,7 +33,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 
     type Options = ();
 
-    fn iri(&self) -> iref::Iri {
+    fn iri(&self) -> &iref::Iri {
         iri!("https://w3id.org/security#EcdsaSecp256k1RecoverySignature2020")
     }
 

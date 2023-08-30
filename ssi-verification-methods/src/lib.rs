@@ -31,21 +31,9 @@ pub use ed25519_dalek;
 /// This module should be a crate reexport in the future.
 pub mod json_ld;
 
-pub use treeldr_rust_prelude;
-
-/// IRI of the `rdf:type` property.
-pub(crate) const RDF_TYPE_IRI: Iri<'static> =
-    iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#type");
-
-/// IRI of the `rdf:JSON` datatype.
-pub(crate) const RDF_JSON: Iri<'static> = iri!("http://www.w3.org/1999/02/22-rdf-syntax-ns#JSON");
-
-/// IRI of the `xsd:string` datatype.
-pub(crate) const XSD_STRING: Iri<'static> = iri!("http://www.w3.org/2001/XMLSchema#string");
-
 /// IRI of the RDF property associated to the `controller` term found in a
 /// verification method.
-pub const CONTROLLER_IRI: Iri<'static> = iri!("https://w3id.org/security#controller");
+pub const CONTROLLER_IRI: &Iri = iri!("https://w3id.org/security#controller");
 
 /// Expected verification method type.
 #[derive(Debug, Clone)]
@@ -126,10 +114,10 @@ impl Referencable for Vec<u8> {
 /// Verification method.
 pub trait VerificationMethod: Referencable {
     /// Identifier of the verification method.
-    fn id(&self) -> Iri;
+    fn id(&self) -> &Iri;
 
     /// Returns the IRI of the verification method controller.
-    fn controller(&self) -> Option<Iri>; // Should be an URI.
+    fn controller(&self) -> Option<&Iri>; // Should be an URI.
 
     // fn verify<'f, 'a: 'f, 's: 'f, S: ssi_crypto::Referencable>(
     //     &'a self,
@@ -161,18 +149,18 @@ pub trait TypedVerificationMethod: VerificationMethod {
 
 pub trait VerificationMethodRef<'m> {
     /// Identifier of the verification method.
-    fn id(&self) -> Iri<'m>;
+    fn id(&self) -> &'m Iri;
 
     /// Returns the IRI of the verification method controller.
-    fn controller(&self) -> Option<Iri<'m>>; // Should be an URI.
+    fn controller(&self) -> Option<&'m Iri>; // Should be an URI.
 }
 
 impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
-    fn id(&self) -> Iri<'m> {
+    fn id(&self) -> &'m Iri {
         M::id(self)
     }
 
-    fn controller(&self) -> Option<Iri<'m>> {
+    fn controller(&self) -> Option<&'m Iri> {
         M::controller(self)
     }
 }
@@ -181,14 +169,14 @@ impl<'m, M: VerificationMethod> Cow<'m, M>
 where
     M::Reference<'m>: VerificationMethodRef<'m>,
 {
-    fn id<'a>(&'a self) -> Iri<'a> {
+    fn id<'a>(&'a self) -> &'a Iri {
         match self {
             Self::Owned(m) => m.id(),
             Self::Borrowed(b) => b.id(),
         }
     }
 
-    fn controller<'a>(&'a self) -> Option<Iri<'a>> {
+    fn controller<'a>(&'a self) -> Option<&'a Iri> {
         match self {
             Self::Owned(m) => m.controller(),
             Self::Borrowed(b) => b.controller(),

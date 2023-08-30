@@ -1,15 +1,15 @@
-# [package]
-# name = "ssi"
-# version = "0.7.0"
-# authors = ["Spruce Systems, Inc."]
-# edition = "2021"
-# license = "Apache-2.0"
-# description = "Core library for Verifiable Credentials and Decentralized Identifiers."
-# repository = "https://github.com/spruceid/ssi/"
-# documentation = "https://docs.rs/ssi/"
-# keywords = ["ssi", "did", "vc", "vp", "jsonld"]
+[package]
+name = "ssi"
+version = "0.7.0"
+authors = ["Spruce Systems, Inc."]
+edition = "2021"
+license = "Apache-2.0"
+description = "Core library for Verifiable Credentials and Decentralized Identifiers."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi/"
+keywords = ["ssi", "did", "vc", "vp", "jsonld"]
 
-# exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
+exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 
 # [features]
 # # default = ["w3c", "ripemd-160", "eip", "tezos"]
@@ -50,7 +50,8 @@
 # # keccak = ["eip"]
 # # sha = ["rsa"]
 
-# [dependencies]
+[dependencies]
+ssi-vc.workspace = true
 # # ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
 # # ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
 # # ssi-core = { path = "./ssi-core", version = "0.1" }
@@ -120,15 +121,19 @@ ssi-vc = { path = "./ssi-vc", version = "0.2" }
 async-trait = "0.1.68"
 thiserror = "1.0.40"
 chrono = "0.4.24"
-iref = "2.2.3"
-static-iref = "2"
-rdf-types = "0.15.4"
-grdf = "0.19.0"
-locspan = "0.7.13"
-json-syntax = "0.9.4"
-nquads-syntax = "0.13.0"
+iref = "3.1.2"
+static-iref = "3.0"
+rdf-types = "0.16.1"
+# xsd-types = "0.7.6"
+xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
+# grdf = "0.20"
+grdf = { path = "/home/work/Documents/Community/rdf/grdf" }
+locspan = "0.7.15"
+json-syntax = "0.9.6"
+nquads-syntax = "0.15"
 multibase = "0.9.1"
-json-ld = "0.15"
+# json-ld = "0.15"
+json-ld = { path = "/home/work/Documents/Community/rdf/json-ld/json-ld" }
 serde = "1.0"
 serde_json = "1.0"
 serde_jcs = "0.1.0"
@@ -136,11 +141,9 @@ hex = "0.4.3"
 derivative = "2.2.0"
 pin-project = "1.1.3"
 futures = "0.3.28"
-treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
-treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
-
-[patch.crates-io]
-rdf-types = { git = "https://github.com/timothee-haudebourg/rdf-types.git", rev = "55a0826" }
+# treeldr-rust-macros = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
+# treeldr-rust-prelude = { git = "https://github.com/spruceid/treeldr", branch = "rdf-types-v15.3" }
+linked-data = { path = "/home/work/Documents/Spruce/linked-data/linked-data" }
 
 # [dev-dependencies]
 # async-std = { version = "1.9", features = ["attributes"] }
