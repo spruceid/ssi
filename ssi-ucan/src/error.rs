@@ -8,12 +8,20 @@ pub enum Error {
     Ipld(#[from] libipld::error::Error),
     #[error("Verification method mismatch")]
     VerificationMethodMismatch,
-    #[error("Missing UCAN field, expected: '{0}'")]
-    MissingUCANHeaderField(&'static str),
     #[error("Header contains invalid fields")]
-    InvalidHeaderEntries(ssi_jws::Header),
+    InvalidHeaderEntries,
+    #[error("Incorrect Signature Length")]
+    IncorrectSignatureLength,
+    #[error("Failed to encode signature: {0}")]
+    SignatureEncodingError(#[from] varsig::SerError<std::convert::Infallible>),
+    #[error("Failed to decode signature: {0}")]
+    SignatureDecodingError(#[from] varsig::DeserError<varsig::common::webauthn::Error>),
+    #[error("Challenge Mismatch")]
+    ChallengeMismatch,
     #[error("Invalid DID URL")]
     DIDURL,
+    #[error(transparent)]
+    Base64(#[from] base64::DecodeError),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error(transparent)]
