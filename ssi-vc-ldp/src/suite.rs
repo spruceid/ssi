@@ -2,8 +2,12 @@
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use iref::Iri;
-use linked_data::{to_quads, LinkedDataPredicateObjects};
+use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects};
 use pin_project::pin_project;
+use rdf_types::{
+    interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
+    ExportedFromVocabulary, Interpretation, Quad, ReverseLiteralInterpretation, Vocabulary,
+};
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::IntoNQuads;
 use ssi_vc::ProofValidity;
@@ -30,6 +34,18 @@ pub use unspecified::*;
 
 #[cfg(feature = "w3c")]
 pub use w3c::*;
+
+#[derive(Debug, thiserror::Error)]
+pub enum TransformError {
+    #[error("RDF deserialization failed: {0}")]
+    LinkedData(#[from] linked_data::IntoQuadsError),
+
+    #[error("JSON serialization failed: {0}")]
+    JsonSerialization(serde_json::Error),
+
+    #[error("expected JSON object")]
+    ExpectedJsonObject,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum HashError {
@@ -131,7 +147,7 @@ pub trait CryptographicSuite: Sized {
 
 struct SignBounded<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
 
-impl<'a, M: 'a + Referencable, A: SignatureAlgorithm<M>, S: 'a + Signer<M, A::Protocol>>
+impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: 'a + Signer<M, A::Protocol>>
     UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
 where
     A::Signature: 'a,
@@ -149,7 +165,7 @@ struct Binder<'a, A, S> {
     data: &'a [u8],
 }
 
-impl<'a, M: 'a + Referencable, A: SignatureAlgorithm<M>, S: Signer<M, A::Protocol>>
+impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: Signer<M, A::Protocol>>
     RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
 where
     A::Signature: 'a,
@@ -174,6 +190,7 @@ pub struct GenerateProof<
     T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>,
 > where
     S::VerificationMethod: 'a,
+    S::SignatureAlgorithm: 'a,
     S::Signature: 'a,
 {
     #[pin]
@@ -221,15 +238,14 @@ where
     }
 }
 
-pub trait CryptographicSuiteInput<T>: CryptographicSuite {
-    type TransformError;
-
+pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     /// Transformation algorithm.
     fn transform(
         &self,
-        data: T,
+        data: &T,
+        context: C,
         params: ProofConfigurationRef<Self::VerificationMethod>,
-    ) -> Result<Self::Transformed, Self::TransformError>;
+    ) -> Result<Self::Transformed, TransformError>;
 }
 
 /// SHA256-based input hashing algorithm used by many cryptographic suites.
@@ -255,6 +271,66 @@ where
     hash_data
 }
 
+pub struct LinkedDataInput<'a, V, I, G> {
+    pub vocabulary: &'a mut V,
+    pub interpretation: &'a mut I,
+    pub generator: G,
+}
+
+impl Default for LinkedDataInput<'static, (), (), rdf_types::generator::Blank> {
+    fn default() -> Self {
+        Self {
+            vocabulary: rdf_types::vocabulary::no_vocabulary_mut(),
+            interpretation: rdf_types::vocabulary::no_vocabulary_mut(),
+            generator: rdf_types::generator::Blank::new(),
+        }
+    }
+}
+
+impl<'a, V: Vocabulary, I: Interpretation, G> LinkedDataInput<'a, V, I, G>
+where
+    I: ReverseIriInterpretation<Iri = V::Iri>
+        + ReverseBlankIdInterpretation<BlankId = V::BlankId>
+        + ReverseLiteralInterpretation<Literal = V::Literal>,
+    V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+    G: rdf_types::Generator<()>,
+{
+    pub fn new(vocabulary: &'a mut V, interpretation: &'a mut I, generator: G) -> Self {
+        Self {
+            vocabulary,
+            interpretation,
+            generator,
+        }
+    }
+
+    /// Returns the list of quads in the dataset.
+    ///
+    /// The order in which quads are returned is unspecified.
+    pub fn into_quads<T: LinkedData<V, I>>(
+        self,
+        input: &T,
+    ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
+        linked_data::to_lexical_quads_with(
+            self.vocabulary,
+            self.interpretation,
+            self.generator,
+            input,
+        )
+    }
+
+    /// Returns the canonical form of the dataset, in the N-Quads format.
+    pub fn into_canonical_form<T: LinkedData<V, I>>(
+        self,
+        input: &T,
+    ) -> Result<String, linked_data::IntoQuadsError> {
+        let quads = self.into_quads(input)?;
+        Ok(
+            ssi_rdf::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref()))
+                .into_nquads(),
+        )
+    }
+}
+
 /// `CryptographicSuiteInput` trait implementation for RDF dataset inputs
 /// normalized using URDNA2015.
 ///
@@ -264,33 +340,26 @@ where
 #[macro_export]
 macro_rules! impl_rdf_input_urdna2015 {
     ($ty:ident) => {
-        impl<'a, V, I> $crate::CryptographicSuiteInput<ssi_rdf::DatasetWithEntryPoint<'a, V, I>>
-            for $ty
+        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>
+            $crate::CryptographicSuiteInput<T, $crate::LinkedDataInput<'a, V, I, G>> for $ty
         where
-            V: rdf_types::Vocabulary<
-                Type = rdf_types::literal::Type<
-                    <V as rdf_types::IriVocabulary>::Iri,
-                    <V as rdf_types::LanguageTagVocabulary>::LanguageTag,
-                >,
-                Value = String,
-            >,
-            I: rdf_types::ReverseTermInterpretation<
-                Iri = V::Iri,
-                BlankId = V::BlankId,
-                Literal = V::Literal,
-            >,
+            I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+                + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
+                + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+            V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+            G: rdf_types::Generator<()>,
+            T: linked_data::LinkedData<V, I>,
         {
-            type TransformError = std::convert::Infallible;
-
             /// Transformation algorithm.
             fn transform(
                 &self,
-                data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
+                data: &T,
+                context: $crate::LinkedDataInput<'a, V, I, G>,
                 _options: $crate::ProofConfigurationRef<
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
                 >,
-            ) -> Result<Self::Transformed, Self::TransformError> {
-                Ok(data.canonical_form())
+            ) -> Result<Self::Transformed, $crate::suite::TransformError> {
+                Ok(context.into_canonical_form(data)?)
             }
         }
     };

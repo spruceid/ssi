@@ -3,16 +3,14 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
-use ssi_jwk::JWK;
-use static_iref::iri;
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::{Algorithm, JWK};
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SignatureError, SigningMethod, TypedVerificationMethod, VerificationError,
     VerificationMethod,
 };
-
-pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_IRI: &Iri =
-    iri!("https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
 
 pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
     "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
@@ -83,5 +81,51 @@ impl TypedVerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckE
 
     fn type_(&self) -> &str {
         ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod>
+    for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+{
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(value: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        if value.type_ == ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE {
+            Ok(Self {
+                id: value.id,
+                controller: value.controller,
+                blockchain_account_id: value
+                    .properties
+                    .get("blockchainAccountId")
+                    .ok_or_else(|| {
+                        InvalidVerificationMethod::missing_property("blockchainAccountId")
+                    })?
+                    .as_str()
+                    .ok_or_else(|| {
+                        InvalidVerificationMethod::invalid_property("blockchainAccountId")
+                    })?
+                    .parse()
+                    .map_err(|_| {
+                        InvalidVerificationMethod::invalid_property("blockchainAccountId")
+                    })?,
+            })
+        } else {
+            Err(InvalidVerificationMethod::InvalidTypeName(value.type_))
+        }
+    }
+}
+
+impl SigningMethod<JWK> for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+    fn sign_ref(
+        this: &Self,
+        key: &JWK,
+        protocol: (),
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(
+            ssi_jws::detached_sign_unencoded_payload(Algorithm::EdBlake2b, bytes, key)
+                .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?
+                .into_bytes(),
+        )
     }
 }

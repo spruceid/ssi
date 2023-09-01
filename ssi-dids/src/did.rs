@@ -1,8 +1,9 @@
 use core::fmt;
-use std::ops::Deref;
+use std::{borrow::Borrow, ops::Deref};
 
 mod url;
 
+use iref::{IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 pub use url::*;
 
@@ -15,6 +16,13 @@ impl<T> InvalidDID<T> {
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> InvalidDID<U> {
         InvalidDID(f(self.0), self.1)
     }
+}
+
+#[macro_export]
+macro_rules! did {
+    ($did:literal) => {
+        $crate::DID::new($did).unwrap()
+    };
 }
 
 /// DID.
@@ -30,12 +38,13 @@ impl DID {
     ///
     /// Fails if the data is not a DID according to the
     /// [DID Syntax](https://w3c.github.io/did-core/#did-syntax).
-    pub fn new(data: &[u8]) -> Result<&Self, InvalidDID<&[u8]>> {
-        match Self::validate(data) {
+    pub fn new<B: ?Sized + AsRef<[u8]>>(data: &B) -> Result<&Self, InvalidDID<&B>> {
+        let bytes = data.as_ref();
+        match Self::validate(bytes) {
             Ok(()) => Ok(unsafe {
                 // SAFETY: DID is a transparent wrapper over `[u8]`,
                 //         and we just checked that `data` is a DID.
-                std::mem::transmute(data)
+                std::mem::transmute(bytes)
             }),
             Err(e) => Err(InvalidDID(data, e)),
         }
@@ -124,6 +133,20 @@ impl PartialEq<DIDURLBuf> for DID {
     }
 }
 
+impl ToOwned for DID {
+    type Owned = DIDBuf;
+
+    fn to_owned(&self) -> Self::Owned {
+        unsafe { DIDBuf::new_unchecked(self.as_bytes().to_vec()) }
+    }
+}
+
+impl fmt::Display for DID {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
 /// Owned DID.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DIDBuf(Vec<u8>);
@@ -134,6 +157,21 @@ impl DIDBuf {
             Ok(()) => Ok(Self(data)),
             Err(e) => Err(InvalidDID(data, e)),
         }
+    }
+
+    pub fn from_string(data: String) -> Result<Self, InvalidDID<String>> {
+        Self::new(data.into_bytes()).map_err(|InvalidDID(bytes, e)| {
+            InvalidDID(unsafe { String::from_utf8_unchecked(bytes) }, e)
+        })
+    }
+
+    /// Creates a new DID buffer without validation.
+    ///
+    /// # Safety
+    ///
+    /// The input data must be a valid DID.
+    pub unsafe fn new_unchecked(data: Vec<u8>) -> Self {
+        Self(data)
     }
 
     pub fn as_did(&self) -> &DID {
@@ -158,10 +196,28 @@ impl TryFrom<String> for DIDBuf {
     }
 }
 
+impl From<DIDBuf> for UriBuf {
+    fn from(value: DIDBuf) -> Self {
+        unsafe { UriBuf::new_unchecked(value.0) }
+    }
+}
+
+impl From<DIDBuf> for IriBuf {
+    fn from(value: DIDBuf) -> Self {
+        unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(value.0)) }
+    }
+}
+
 impl Deref for DIDBuf {
     type Target = DID;
 
     fn deref(&self) -> &Self::Target {
+        self.as_did()
+    }
+}
+
+impl Borrow<DID> for DIDBuf {
+    fn borrow(&self) -> &DID {
         self.as_did()
     }
 }

@@ -9,18 +9,19 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-vc/"
 
 [dependencies]
+ssi-core.workspace = true
 ssi-crypto.workspace = true
 ssi-verification-methods.workspace = true
 ssi-rdf.workspace = true
 ssi-security.workspace = true
 linked-data.workspace = true
-# treeldr-rust-macros.workspace = true
-# treeldr-rust-prelude.workspace = true
 json-ld.workspace = true
 rdf-types.workspace = true
+xsd-types.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true

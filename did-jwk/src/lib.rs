@@ -5,7 +5,7 @@ use ssi_dids::{
         self,
         representation::{self, MediaType},
         verification_method::DIDVerificationMethod,
-        AnyDIDVerificationMethod, VerificationRelationships,
+        DIDVerificationMethod, VerificationRelationships,
     },
     resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
     DIDBuf, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
@@ -67,10 +67,10 @@ pub enum InvalidJsonWebKey2020 {
     PrivateKey,
 }
 
-impl From<DIDJsonWebKey2020> for AnyDIDVerificationMethod {
+impl From<DIDJsonWebKey2020> for DIDVerificationMethod {
     fn from(value: DIDJsonWebKey2020) -> Self {
         let public_key = serde_json::to_value(&value.public_key).unwrap();
-        AnyDIDVerificationMethod::new(
+        DIDVerificationMethod::new(
             value.id,
             JSON_WEB_KEY_2020_TYPE.to_string(),
             value.controller,
@@ -81,10 +81,10 @@ impl From<DIDJsonWebKey2020> for AnyDIDVerificationMethod {
     }
 }
 
-impl TryFrom<AnyDIDVerificationMethod> for DIDJsonWebKey2020 {
+impl TryFrom<DIDVerificationMethod> for DIDJsonWebKey2020 {
     type Error = InvalidJsonWebKey2020;
 
-    fn try_from(mut value: AnyDIDVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(mut value: DIDVerificationMethod) -> Result<Self, Self::Error> {
         if value.type_ == "JsonWebKey2020" {
             match value.properties.remove("publicKeyJwk") {
                 Some(key_value) => match serde_json::from_value(key_value) {
@@ -110,10 +110,10 @@ pub struct JsonWebKey2020Ref<'a> {
     pub public_key: Cow<'a, JWK>,
 }
 
-impl<'a> TryFrom<&'a AnyDIDVerificationMethod> for JsonWebKey2020Ref<'a> {
+impl<'a> TryFrom<&'a DIDVerificationMethod> for JsonWebKey2020Ref<'a> {
     type Error = InvalidJsonWebKey2020;
 
-    fn try_from(value: &'a AnyDIDVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a DIDVerificationMethod) -> Result<Self, Self::Error> {
         if value.type_ == "JsonWebKey2020" {
             match value.properties.get("publicKeyJwk") {
                 Some(key_value) => match serde_json::from_value(key_value.clone()) {

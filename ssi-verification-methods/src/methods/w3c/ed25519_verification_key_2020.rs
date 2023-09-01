@@ -5,17 +5,14 @@ use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
-use static_iref::iri;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    covariance_rule, ExpectedType, Referencable, SigningMethod, TypedVerificationMethod,
+    VerificationError, VerificationMethod,
 };
-
-/// IRI of the Ed25519 Verification Key 2020 type.
-pub const ED25519_VERIFICATION_KEY_2020_IRI: &Iri =
-    iri!("https://w3id.org/security#Ed25519VerificationKey2020");
 
 /// Ed25519 Verification Key 2020 type name.
 pub const ED25519_VERIFICATION_KEY_2020_TYPE: &str = "Ed25519VerificationKey2020";
@@ -153,5 +150,27 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
 
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
+    }
+}
+
+impl SigningMethod<ed25519_dalek::Keypair> for Ed25519VerificationKey2020 {
+    fn sign_ref(
+        this: &Self,
+        secret: &ed25519_dalek::Keypair,
+        protocol: (),
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(this.sign_bytes(message, secret))
+    }
+}
+
+impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
+    fn sign_ref(
+        this: &Self,
+        secret: &JWK,
+        protocol: (),
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        todo!()
     }
 }

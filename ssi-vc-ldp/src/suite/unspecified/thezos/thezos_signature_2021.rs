@@ -82,10 +82,10 @@ impl CryptographicSuite for TezosSignature2021 {
 #[derive(Debug, Clone)]
 pub struct Signature {
     /// Base58-encoded signature.
-    proof_value: String,
+    pub proof_value: String,
 
     /// Signing key.
-    public_key: Option<PublicKey>,
+    pub public_key: Option<PublicKey>,
 }
 
 impl Referencable for Signature {
@@ -107,10 +107,10 @@ impl Referencable for Signature {
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base58-encoded signature.
-    proof_value: &'a str,
+    pub proof_value: &'a str,
 
     /// Signing key.
-    public_key: Option<PublicKeyRef<'a>>,
+    pub public_key: Option<PublicKeyRef<'a>>,
 }
 
 #[derive(Debug, Clone)]

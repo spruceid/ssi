@@ -7,8 +7,8 @@ use ssi_verification_methods::{SignatureError, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
-    suite::HashError, CryptographicSuite, CryptographicSuiteInput, ProofConfiguration,
-    ProofConfigurationRef,
+    suite::{HashError, TransformError},
+    CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 
 pub use super::thezos_signature_2021::{PublicKey, PublicKeyRef, Signature, SignatureRef};
@@ -42,18 +42,12 @@ pub use super::thezos_signature_2021::{PublicKey, PublicKeyRef, Signature, Signa
 /// The [`TezosMethod2021`] verification method is used.
 pub struct TezosJcsSignature2021;
 
-pub enum TransformError {
-    JsonSerialization(serde_json::Error),
-    ExpectedJsonObject,
-}
-
 impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
-    type TransformError = TransformError;
-
     /// Transformation algorithm.
     fn transform(
         &self,
-        data: T,
+        data: &T,
+        context: (),
         _options: ProofConfigurationRef<Self::VerificationMethod>,
     ) -> Result<Self::Transformed, TransformError> {
         let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;

@@ -317,9 +317,11 @@ impl<C: Sync> VcJwt<C> {
 }
 
 fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>) {
-    fn is_credentials_v1_context<D>(context: &json_ld::syntax::Context<D>) -> bool {
+    fn is_credentials_v1_context<D>(context: &json_ld::syntax::ContextEntry<D>) -> bool {
         match context {
-            json_ld::syntax::Context::IriRef(iri) => iri.as_iri_ref() == CREDENTIALS_V1_CONTEXT_IRI,
+            json_ld::syntax::ContextEntry::IriRef(iri) => {
+                iri.as_iri_ref() == CREDENTIALS_V1_CONTEXT_IRI
+            }
             _ => false,
         }
     }
@@ -327,11 +329,11 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>)
     match context {
         json_ld::syntax::context::Value::One(Meta(c, _)) => {
             if !is_credentials_v1_context(c) {
-                let c = std::mem::replace(c, json_ld::syntax::Context::Null);
+                let c = std::mem::replace(c, json_ld::syntax::ContextEntry::Null);
                 *context = json_ld::syntax::context::Value::Many(vec![
                     Meta(c, ()),
                     Meta(
-                        json_ld::syntax::Context::IriRef(
+                        json_ld::syntax::ContextEntry::IriRef(
                             CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
                         ),
                         (),
@@ -342,12 +344,16 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>)
         json_ld::syntax::context::Value::Many(list) => {
             if list.is_empty() {
                 *context = json_ld::syntax::context::Value::One(Meta(
-                    json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.to_owned().into()),
+                    json_ld::syntax::ContextEntry::IriRef(
+                        CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
+                    ),
                     (),
                 ));
             } else if list.iter().all(|Meta(c, _)| !is_credentials_v1_context(c)) {
                 list.push(Meta(
-                    json_ld::syntax::Context::IriRef(CREDENTIALS_V1_CONTEXT_IRI.to_owned().into()),
+                    json_ld::syntax::ContextEntry::IriRef(
+                        CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
+                    ),
                     (),
                 ))
             }

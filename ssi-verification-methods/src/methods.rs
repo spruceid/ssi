@@ -4,6 +4,9 @@ pub use w3c::*;
 mod unspecified;
 pub use unspecified::*;
 
+mod generic;
+pub use generic::*;
+
 #[macro_export]
 macro_rules! verification_method_union {
 	{
@@ -216,7 +219,7 @@ macro_rules! verification_method_union {
 				fn try_from(value: $name_ref<'a>) -> Result<Self, Self::Error> {
 					match value {
 						$name_ref::$variant(m) => Ok(m),
-						other => Err($crate::InvalidVerificationMethod(other.id().to_owned()))
+						other => Err($crate::InvalidVerificationMethod::invalid_type_iri(other.id()))
 					}
 				}
 			}

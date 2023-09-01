@@ -11,6 +11,7 @@ use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ops::Deref;
+use std::str::FromStr;
 
 pub type VerificationWarnings = Vec<String>;
 
@@ -175,7 +176,7 @@ pub enum DecodeError {
 
 #[derive(Debug, thiserror::Error)]
 #[error("invalid compact JWS")]
-pub struct InvalidCompactJWS<B>(pub B);
+pub struct InvalidCompactJWS<B = String>(pub B);
 
 /// JWS in UTF-8 compact serialized form.
 ///
@@ -296,7 +297,8 @@ impl Deref for CompactJWSBuf {
 /// Contrarily to [`CompactJWS`], this type guarantees that the payload is
 /// a valid UTF-8 string, meaning the whole compact JWS is an UTF-8 string.
 /// This does not necessarily mean the payload is base64 encoded.
-#[derive(Clone)]
+#[derive(Clone, serde::Serialize)]
+#[serde(transparent)]
 pub struct CompactJWSString(String);
 
 impl CompactJWSString {
@@ -384,6 +386,47 @@ impl fmt::Display for CompactJWSString {
 impl fmt::Debug for CompactJWSString {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.as_str().fmt(f)
+    }
+}
+
+impl FromStr for CompactJWSString {
+    type Err = InvalidCompactJWS;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::from_string(s.to_owned())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CompactJWSString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = CompactJWSString;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("compact JWS")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                self.visit_string(v.to_owned())
+            }
+
+            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                CompactJWSString::from_string(v).map_err(|e| E::custom(e))
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
     }
 }
 

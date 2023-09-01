@@ -17,12 +17,12 @@ use static_iref::iri;
 // use treeldr_rust_prelude::{grdf, locspan::Meta, FromRdf, FromRdfError};
 
 use crate::{
-    suite::{CryptographicSuiteInput, HashError},
+    suite::{CryptographicSuiteInput, HashError, TransformError},
     CryptographicSuite, DataIntegrity, Proof, ProofConfiguration,
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error<T> {
+pub enum Error {
     #[error("missing credential")]
     MissingCredential,
 
@@ -42,7 +42,7 @@ pub enum Error<T> {
     InvalidCredential(FromLinkedDataError),
 
     #[error("input transformation failed: {0}")]
-    Transform(T),
+    Transform(#[from] TransformError),
 
     #[error("hash failed: {0}")]
     HashFailed(#[from] HashError),
@@ -59,13 +59,12 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
     /// The cryptographic suite is applied on the RDF graph represented by the
     /// input document.
     pub fn from_json_ld<'a, V, I, M: Clone>(
-        &self,
         vocabulary: &'a mut V,
         generator: &mut impl json_ld::Generator<V, M>,
         interpretation: &'a mut I,
         mut input: json_ld::ExpandedDocument<V::Iri, V::BlankId, M>,
         params: ProofConfiguration<S::VerificationMethod>,
-    ) -> Result<Verifiable<Self>, Error<S::TransformError>>
+    ) -> Result<Verifiable<Self>, Error>
     where
         V: VocabularyMut<
             Type = rdf_types::literal::Type<
@@ -146,12 +145,12 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 
                                 let transformed = proof
                                     .suite()
-                                    .transform(data, params.borrowed())
+                                    .transform(&data, (), params.borrowed())
                                     .map_err(Error::Transform)?;
                                 let hashed = proof.suite().hash(transformed, params.borrowed())?;
 
                                 Ok(Verifiable::new(
-                                    DataIntegrity::new(credential, hashed),
+                                    DataIntegrity::new_hashed(credential, hashed),
                                     proof,
                                 ))
                             }

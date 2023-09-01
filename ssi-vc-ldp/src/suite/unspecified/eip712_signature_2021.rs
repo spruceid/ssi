@@ -10,7 +10,7 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 use crate::{
-    suite::{Eip712Signature, Eip712SignatureRef, HashError},
+    suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 
@@ -112,14 +112,13 @@ where
         Literal = V::Literal,
     >,
 {
-    type TransformError = std::convert::Infallible;
-
     /// Transformation algorithm.
     fn transform(
         &self,
-        data: ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
+        data: &ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
+        context: (),
         options: ProofConfigurationRef<VerificationMethod>,
-    ) -> Result<Self::Transformed, Self::TransformError> {
+    ) -> Result<Self::Transformed, TransformError> {
         let document_quads = data.into_quads();
         let proof_quads = options.quads(self);
         Ok(new_ldp_siging_request(document_quads, proof_quads))

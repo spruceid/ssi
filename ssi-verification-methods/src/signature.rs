@@ -2,10 +2,20 @@ use futures::Future;
 use iref::{Iri, IriBuf};
 use ssi_crypto::{MessageSigner, SignatureProtocol};
 
-use crate::{Referencable, ReferenceOrOwnedRef, VerificationError};
+use crate::{
+    InvalidVerificationMethod, Referencable, ReferenceOrOwnedRef, VerificationError,
+    VerificationMethodResolutionError,
+};
+
+pub mod signer;
+
+pub use signer::Signer;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignatureError {
+    #[error("verification method resolution failed: {0}")]
+    Resolution(#[from] VerificationMethodResolutionError),
+
     #[error("missing verification method")]
     MissingVerificationMethod,
 
@@ -18,8 +28,8 @@ pub enum SignatureError {
     #[error("invalid secret key")]
     InvalidSecretKey,
 
-    #[error("invalid verification method `{0}`")]
-    InvalidVerificationMethod(IriBuf),
+    #[error(transparent)]
+    InvalidVerificationMethod(#[from] InvalidVerificationMethod),
 
     #[error("missing public key")]
     MissingPublicKey,
@@ -46,7 +56,7 @@ impl From<InvalidSignature> for VerificationError {
     }
 }
 
-pub trait SignatureAlgorithm<M: Referencable> {
+pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
     type Signature: Referencable;
 
     /// Signature protocol.
@@ -71,24 +81,4 @@ pub trait SignatureAlgorithm<M: Referencable> {
         method: M::Reference<'m>,
         bytes: &[u8],
     ) -> Result<bool, VerificationError>;
-}
-
-/// Verification method signer.
-pub trait Signer<M: Referencable, P> {
-    type Sign<'a, A: SignatureAlgorithm<M, Protocol = P>>: 'a
-        + Future<Output = Result<A::Signature, SignatureError>>
-    where
-        Self: 'a,
-        M: 'a,
-        A::Signature: 'a;
-
-    fn sign<'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>(
-        &'a self,
-        algorithm: A,
-        issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, M>>,
-        bytes: &'a [u8],
-    ) -> Self::Sign<'a, A>
-    where
-        A::Signature: 'a;
 }

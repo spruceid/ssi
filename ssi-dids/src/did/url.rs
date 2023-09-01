@@ -9,6 +9,7 @@ mod primary;
 mod reference;
 mod relative;
 
+use iref::{IriBuf, UriBuf};
 pub use primary::*;
 pub use reference::*;
 pub use relative::*;
@@ -364,6 +365,12 @@ impl DIDURLBuf {
         }
     }
 
+    pub fn from_string(data: String) -> Result<Self, InvalidDIDURL<String>> {
+        Self::new(data.into_bytes()).map_err(|InvalidDIDURL(bytes, e)| {
+            InvalidDIDURL(unsafe { String::from_utf8_unchecked(bytes) }, e)
+        })
+    }
+
     /// Creates a new DID URL from the given data without validation.
     ///
     /// # Safety
@@ -411,6 +418,18 @@ impl TryFrom<String> for DIDURLBuf {
     }
 }
 
+impl From<DIDURLBuf> for UriBuf {
+    fn from(value: DIDURLBuf) -> Self {
+        unsafe { UriBuf::new_unchecked(value.0) }
+    }
+}
+
+impl From<DIDURLBuf> for IriBuf {
+    fn from(value: DIDURLBuf) -> Self {
+        unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(value.0)) }
+    }
+}
+
 impl Deref for DIDURLBuf {
     type Target = DIDURL;
 
@@ -445,6 +464,12 @@ impl PartialEq<str> for DIDURLBuf {
 
 impl<'a> PartialEq<&'a str> for DIDURLBuf {
     fn eq(&self, other: &&'a str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<String> for DIDURLBuf {
+    fn eq(&self, other: &String) -> bool {
         self.as_str() == *other
     }
 }

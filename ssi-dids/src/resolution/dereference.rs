@@ -6,7 +6,7 @@ use std::pin::Pin;
 use std::task;
 
 use crate::{
-    document::{self, representation, service, AnyDIDVerificationMethod, Represented, Resource},
+    document::{self, representation, service, DIDVerificationMethod, Represented, Resource},
     DIDURLBuf, Fragment, PrimaryDIDURL, DIDURL,
 };
 
@@ -120,14 +120,14 @@ pub enum Content {
 }
 
 impl Content {
-    pub fn as_verification_method(&self) -> Option<&AnyDIDVerificationMethod> {
+    pub fn as_verification_method(&self) -> Option<&DIDVerificationMethod> {
         match self {
             Self::Resource(r) => r.as_verification_method(),
             _ => None,
         }
     }
 
-    pub fn into_verification_method(self) -> Result<AnyDIDVerificationMethod, Self> {
+    pub fn into_verification_method(self) -> Result<DIDVerificationMethod, Self> {
         match self {
             Self::Resource(r) => r.into_verification_method().map_err(Self::Resource),
             other => Err(other),

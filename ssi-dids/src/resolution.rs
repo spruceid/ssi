@@ -51,9 +51,18 @@ pub enum Error {
     #[error("invalid method specific identifier")]
     InvalidMethodSpecificId(String),
 
+    #[error("invalid options")]
+    InvalidOptions,
+
     #[error("DID resolver internal error: {0}")]
-    Internal(Box<dyn Send + std::error::Error>),
+    Internal(Box<DynInternalError>),
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type DynInternalError = dyn Send + std::error::Error;
+
+#[cfg(target_arch = "wasm32")]
+pub type DynInternalError = dyn std::error::Error;
 
 #[pin_project]
 pub struct Resolve<'a, T: 'a + ?Sized + DIDResolver> {
@@ -490,6 +499,22 @@ pub enum Parameter {
     Null,
     String(String),
     List(Vec<String>),
+}
+
+impl Parameter {
+    pub fn as_string(&self) -> Option<&str> {
+        match self {
+            Self::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn into_string(self) -> Result<String, Self> {
+        match self {
+            Self::String(s) => Ok(s),
+            other => Err(other),
+        }
+    }
 }
 
 /// Resolution output metadata.

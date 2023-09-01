@@ -130,13 +130,13 @@ async fn main() {
     let context = Meta(
         json_ld::syntax::context::Value::Many(vec![
             Meta(
-                json_ld::syntax::Context::IriRef(
+                json_ld::syntax::ContextEntry::IriRef(
                     iri_ref!("https://w3id.org/security/v1").to_owned(),
                 ),
                 (),
             ),
             Meta(
-                json_ld::syntax::Context::IriRef(
+                json_ld::syntax::ContextEntry::IriRef(
                     iri_ref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
                 ),
                 (),
