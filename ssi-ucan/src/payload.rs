@@ -1,14 +1,13 @@
-use super::{version::SemanticVersion, Algorithm, DummyHeader, Error, Signature, Ucan};
-use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld};
+use super::{jose::Signature, jwt::DummyHeader, version::SemanticVersion, Error, Ucan};
+use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld, Cid};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{serde_as, DisplayFromStr};
-use ssi_jwk::JWK;
+use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::sign_bytes;
 use std::collections::BTreeMap;
 
 use capabilities::Capabilities;
-pub use libipld::Cid;
 pub use ucan_capabilities_object as capabilities;
 
 /// The Payload of a UCAN, with JWS registered claims and UCAN specific claims
@@ -74,21 +73,21 @@ impl<F, A> Payload<F, A> {
     /// Sign the payload with the given key and algorithm
     ///
     /// This will use the canonical form of the UCAN for signing
-    pub fn sign_canonicalized_jws(self, alg: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
+    pub fn sign_canonicalized_jws(
+        self,
+        alg: Algorithm,
+        key: &JWK,
+    ) -> Result<Ucan<Signature, F, A>, Error>
     where
         F: Serialize,
         A: Serialize,
     {
-        let a = alg
-            .alg()
-            .ok_or(Error::JWS(ssi_jws::Error::UnsupportedAlgorithm))?;
         let signature = sign_bytes(
-            a,
+            alg,
             [
                 base64::encode_config(
-                    DagJsonCodec.encode(
-                        &to_ipld(&DummyHeader { alg, typ: "JWT" }).map_err(IpldError::new)?,
-                    )?,
+                    DagJsonCodec
+                        .encode(&to_ipld(&DummyHeader::new(alg)).map_err(IpldError::new)?)?,
                     base64::URL_SAFE_NO_PAD,
                 ),
                 base64::encode_config(
@@ -101,7 +100,7 @@ impl<F, A> Payload<F, A> {
             key,
         )?;
 
-        Ok(self.sign(Signature::new_jws(a, signature)?))
+        Ok(self.sign(Signature::new_jws(alg, signature)?))
     }
 
     pub fn encode_for_signing(&self, alg: Algorithm) -> Result<Vec<u8>, Error>
@@ -111,8 +110,7 @@ impl<F, A> Payload<F, A> {
     {
         Ok([
             base64::encode_config(
-                DagJsonCodec
-                    .encode(&to_ipld(&DummyHeader { alg, typ: "JWT" }).map_err(IpldError::new)?)?,
+                DagJsonCodec.encode(&to_ipld(&DummyHeader::new(alg)).map_err(IpldError::new)?)?,
                 base64::URL_SAFE_NO_PAD,
             ),
             base64::encode_config(
@@ -128,7 +126,7 @@ impl<F, A> Payload<F, A> {
     ///
     /// This will not ensure that the signature is valid for the payload and will
     /// not canonicalize the payload before signing.
-    pub fn sign(self, signature: Signature) -> Ucan<F, A> {
+    pub fn sign(self, signature: Signature) -> Ucan<Signature, F, A> {
         Ucan {
             payload: self,
             signature,
