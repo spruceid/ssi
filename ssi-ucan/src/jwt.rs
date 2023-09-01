@@ -31,6 +31,18 @@ where
     }
 }
 
+impl<S, F, A> Ucan<S, F, A>
+where
+    Self: UcanEncode<Jwt>,
+{
+    /// Encode the UCAN as a JWT
+    pub fn encode_jwt(
+        &self,
+    ) -> Result<<Self as UcanEncode<Jwt>>::Encoded, <Self as UcanEncode<Jwt>>::Error> {
+        self.encode()
+    }
+}
+
 pub trait Helper<'a, 's, E>: UcanDecode<'a, E> {
     type Signed;
     type Raw: 'a;

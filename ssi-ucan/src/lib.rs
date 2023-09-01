@@ -1,4 +1,5 @@
 mod error;
+pub mod generic_jwt;
 pub mod jose;
 pub mod jwt;
 mod payload;
@@ -11,11 +12,11 @@ pub use error::Error;
 pub use libipld::Cid;
 pub use payload::{capabilities, Payload, TimeInvalid};
 pub use revocation::UcanRevocation;
+pub use ssi_dids::did_resolve::DIDResolver;
+pub use ssi_jwk::JWK;
 pub use util::{canonical_cid, get_verification_key};
 
 use serde_json::Value as JsonValue;
-use ssi_dids::did_resolve::DIDResolver;
-use ssi_jwk::JWK;
 
 /// A deserialized UCAN
 #[derive(Clone, PartialEq, Debug)]
