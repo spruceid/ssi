@@ -1,31 +1,21 @@
-use linked_data::{
-    to_interpreted_subject_quads, LinkedData, LinkedDataResource, LinkedDataSubject,
-    RdfLiteralType, RdfLiteralValue,
-};
 use pin_project::pin_project;
-use rdf_types::{
-    interpretation::TraversableInterpretation, BlankIdInterpretationMut, BlankIdVocabularyMut,
-    InterpretationMut, IriInterpretationMut, IriVocabularyMut, LiteralInterpretationMut,
-    ReverseTermInterpretation, ReverseTermInterpretationMut, Vocabulary, VocabularyMut,
-};
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
-use ssi_rdf::DatasetWithEntryPoint;
 use ssi_vc::Verifiable;
 use ssi_verification_methods::{Referencable, SignatureError, Signer, VerificationMethodRef};
-use std::{future::Future, hash::Hash, marker::PhantomData, pin::Pin, task};
+use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use crate::{
-    suite::{CryptographicSuiteInput, GenerateProof, HashError},
+    suite::{CryptographicSuiteInput, GenerateProof, HashError, TransformError},
     CryptographicSuite, DataIntegrity, ProofConfiguration, UntypedProof,
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error<T> {
+pub enum Error {
     #[error("missing credential")]
     MissingCredentialId,
 
     #[error("input transformation failed: {0}")]
-    Transform(T),
+    Transform(#[from] TransformError),
 
     #[error("hash failed: {0}")]
     HashFailed(#[from] HashError),
@@ -34,111 +24,41 @@ pub enum Error<T> {
     ProofGenerationFailed(#[from] SignatureError),
 }
 
-impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
-    fn prepare_ld_signature<'a, V, I>(
-        vocabulary: &'a mut V,
-        interpretation: &'a mut I,
-        credential: &C,
-        suite: S,
-        params: &ProofConfiguration<S::VerificationMethod>,
-    ) -> Result<(S, S::Hashed), Error<S::TransformError>>
-    where
-        V: VocabularyMut,
-        V::Iri: Clone,
-        V::BlankId: Clone,
-        V::LanguageTag: Clone,
-        V::Value: RdfLiteralValue,
-        V::Type: RdfLiteralType<V>,
-        I: InterpretationMut
-            + IriInterpretationMut<V::Iri>
-            + BlankIdInterpretationMut<V::BlankId>
-            + LiteralInterpretationMut<V::Literal>
-            + TraversableInterpretation
-            + ReverseTermInterpretationMut<BlankId = V::BlankId>,
-        I::Resource: Clone + Eq + Hash,
-        C: LinkedDataSubject<V, I> + LinkedDataResource<V, I>,
-        S: CryptographicSuiteInput<DatasetWithEntryPoint<'a, V, I>>,
-    {
-        // Convert the `credential` to an RDF dataset.
-        let (entry_point, quads) =
-            to_interpreted_subject_quads(vocabulary, interpretation, None, credential).unwrap();
-        let dataset = quads.into_iter().collect();
-
-        // Assign a term to all resources.
-        let mut generator =
-            rdf_types::generator::Blank::new_with_prefix("_ssi-vc-ldp_".to_string());
-        interpretation.assign_terms(|interpretation, id| {
-            if interpretation.has_term(id) {
-                None
-            } else {
-                Some(rdf_types::Term::Id(rdf_types::Id::Blank(
-                    vocabulary.insert_owned_blank_id(generator.next_blank_id()),
-                )))
-            }
-        });
-
-        // Prepare the dataset for the crypto suite.
-        // let data = dataset.select();
-
-        let data = DatasetWithEntryPoint {
-            vocabulary,
-            interpretation,
-            dataset,
-            entry_point,
-        };
-
-        // Apply the crypto suite.
-        let transformed = suite
-            .transform(data, params.borrowed())
-            .map_err(Error::Transform)?;
-        let hash = suite.hash(transformed, params.borrowed())?;
-
-        Ok((suite, hash))
+impl From<crate::Error> for Error {
+    fn from(value: crate::Error) -> Self {
+        match value {
+            crate::Error::Transform(e) => Self::Transform(e),
+            crate::Error::HashFailed(e) => Self::HashFailed(e),
+        }
     }
+}
 
-    /// Sign the given Linked Data credential with a Data Integrity
-    /// cryptographic suite.
+impl<C, S: CryptographicSuite> DataIntegrity<C, S> {
+    /// Sign the given credential with the given Data Integrity cryptographic
+    /// suite.
     //
     // # Why is this not an `async` function?
     //
     // For some reason the Rust compiler is unable to build a future that
     // returns a value of type `Verifiable<DataIntegrity<C, S>>`.
     // See: <https://github.com/rust-lang/rust/issues/103532>
-    pub fn sign_ld<'max, 'a, V, I, T>(
-        vocabulary: &'a mut V,
-        interpretation: &'a mut I,
+    pub fn sign<'max, X, T>(
+        input: C,
+        context: X,
         signer: &'max T,
-        credential: C,
         suite: S,
         params: ProofConfiguration<S::VerificationMethod>,
         options: S::Options,
-    ) -> SignLinkedData<'max, C, S, T, S::TransformError>
+    ) -> SignLinkedData<'max, C, S, T>
     where
-        V: VocabularyMut,
-        V::Iri: Clone,
-        V::BlankId: Clone,
-        V::LanguageTag: Clone,
-        V::Value: RdfLiteralValue,
-        V::Type: RdfLiteralType<V>,
-        I: InterpretationMut
-            + IriInterpretationMut<V::Iri>
-            + BlankIdInterpretationMut<V::BlankId>
-            + LiteralInterpretationMut<V::Literal>
-            + TraversableInterpretation
-            + ReverseTermInterpretationMut<BlankId = V::BlankId>,
-        I::Resource: Clone + Eq + Hash,
-        C: LinkedDataSubject<V, I> + LinkedDataResource<V, I>,
-        S: 'max + CryptographicSuiteInput<DatasetWithEntryPoint<'a, V, I>>,
-        T: Signer<S::VerificationMethod, S::SignatureProtocol>,
+        S: CryptographicSuiteInput<C, X>,
+        S::VerificationMethod: 'max,
+        T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     {
-        let inner = match Self::prepare_ld_signature(
-            vocabulary,
-            interpretation,
-            &credential,
-            suite,
-            &params,
-        ) {
-            Ok((suite, hash)) => {
+        let inner = match Self::new(input, context, &suite, params.borrowed()) {
+            Ok(di) => {
+                let (input, hash) = di.into_parts();
+
                 let sign = SelfRefFuture::new(
                     hash,
                     Binder {
@@ -150,12 +70,11 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
                 );
 
                 SignLinkedDataInner::Ok(SignLinkedDataOk {
-                    payload: Some((credential, suite)),
+                    payload: Some((input, suite)),
                     sign,
-                    e: PhantomData,
                 })
             }
-            Err(e) => SignLinkedDataInner::Err(Some(e)),
+            Err(e) => SignLinkedDataInner::Err(Some(e.into())),
         };
 
         SignLinkedData { inner }
@@ -172,6 +91,7 @@ impl<
 where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
+    S::SignatureAlgorithm: 'max,
     S::Signature: 'max,
 {
     type Owned = S::Hashed;
@@ -197,6 +117,7 @@ impl<
 where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
+    S::SignatureAlgorithm: 'max,
     S::Signature: 'max,
 {
     fn bind<'a>(context: Self, hash: &'a S::Hashed) -> GenerateProof<'a, S, T>
@@ -217,24 +138,25 @@ where
 // returns a value of type `Verifiable<DataIntegrity<C, S>>`.
 // See: <https://github.com/rust-lang/rust/issues/103532>
 #[pin_project]
-pub struct SignLinkedData<'max, C, S, T, E>
+pub struct SignLinkedData<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
+    S::SignatureAlgorithm: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
     #[pin]
-    inner: SignLinkedDataInner<'max, C, S, T, E>,
+    inner: SignLinkedDataInner<'max, C, S, T>,
 }
 
-impl<'max, C, S, T, E> Future for SignLinkedData<'max, C, S, T, E>
+impl<'max, C, S, T> Future for SignLinkedData<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>, // TODO find a way to hide that bound, if possible.
 {
-    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error<E>>;
+    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
@@ -244,24 +166,25 @@ where
 
 /// Private implementation of the `SignLinkedData` type.
 #[pin_project(project = SignLinkedDataInnerProj)]
-enum SignLinkedDataInner<'max, C, S, T, E>
+enum SignLinkedDataInner<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
+    S::SignatureAlgorithm: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
-    Err(Option<Error<E>>),
-    Ok(#[pin] SignLinkedDataOk<'max, C, S, T, E>),
+    Err(Option<Error>),
+    Ok(#[pin] SignLinkedDataOk<'max, C, S, T>),
 }
 
-impl<'max, C, S, T, E> Future for SignLinkedDataInner<'max, C, S, T, E>
+impl<'max, C, S, T> Future for SignLinkedDataInner<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>,
 {
-    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error<E>>;
+    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         match self.project() {
@@ -274,11 +197,12 @@ where
 /// Private implementation of the `SignLinkedData` type, with the signature
 /// preparation succeded.
 #[pin_project]
-struct SignLinkedDataOk<'max, C, S, T, E>
+struct SignLinkedDataOk<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
+    S::SignatureAlgorithm: 'max,
     S::Signature: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
@@ -286,18 +210,16 @@ where
 
     #[pin]
     sign: SelfRefFuture<'max, UnboundedGenerateProof<S, T>>,
-
-    e: PhantomData<E>,
 }
 
-impl<'max, C, S, T, E> Future for SignLinkedDataOk<'max, C, S, T, E>
+impl<'max, C, S, T> Future for SignLinkedDataOk<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>,
 {
-    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error<E>>;
+    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
@@ -306,7 +228,10 @@ where
             result
                 .map(|proof| {
                     let (data, suite) = this.payload.take().unwrap();
-                    Verifiable::new(DataIntegrity::new(data, hash), proof.into_typed(suite))
+                    Verifiable::new(
+                        DataIntegrity::new_hashed(data, hash),
+                        proof.into_typed(suite),
+                    )
                 })
                 .map_err(Into::into)
         })

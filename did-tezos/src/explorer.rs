@@ -1,17 +1,25 @@
-use anyhow::Result;
+use std::collections::BTreeMap;
+
+use iref::{Uri, UriBuf};
 use serde::Deserialize;
 use ssi_core::one_or_many::OneOrMany;
-use ssi_dids::{Service, ServiceEndpoint, VerificationMethod, DIDURL};
-use std::convert::TryFrom;
+// use ssi_core::one_or_many::OneOrMany;
+use ssi_dids::{
+    document::{service::Endpoint, Service},
+    resolution::Error,
+    DIDURLBuf, DID,
+};
 use url::Url;
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
-pub async fn retrieve_did_manager(tzkt_url: &str, address: &str) -> Result<Option<String>> {
-    let client = reqwest::Client::builder().build()?;
-    let url = Url::parse(tzkt_url)?;
+pub async fn retrieve_did_manager(tzkt_url: &Uri, address: &str) -> Result<Option<String>, Error> {
+    let client = reqwest::Client::builder()
+        .build()
+        .map_err(|e| Error::Internal(Box::new(e)))?;
+    let url = Url::parse(tzkt_url).unwrap();
     let contracts: Vec<String> = client
-        .get(url.join("/v1/contracts")?)
+        .get(url.join("/v1/contracts").unwrap())
         .query(&[
             ("creator", address),
             ("sort", "lastActivity"),
@@ -20,9 +28,11 @@ pub async fn retrieve_did_manager(tzkt_url: &str, address: &str) -> Result<Optio
             ("codeHash", "1222545108"),
         ])
         .send()
-        .await?
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?
         .json()
-        .await?;
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?;
 
     if !contracts.is_empty() {
         Ok(Some(contracts[0].clone()))
@@ -39,11 +49,15 @@ struct ServiceResult {
 #[derive(Deserialize)]
 struct ServiceResultService {
     type_: String,
-    endpoint: String,
+    endpoint: UriBuf,
 }
 
 // Not using TZIP-016 for now as TzKT doesn't have an endpoint to execute views and tezedge-client doesn't support it yet.
-pub async fn execute_service_view(tzkt_url: &str, did: &str, contract: &str) -> Result<Service> {
+pub async fn execute_service_view(
+    tzkt_url: &Uri,
+    did: &DID,
+    contract: &str,
+) -> Result<Service, Error> {
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert(
         "User-Agent",
@@ -51,21 +65,28 @@ pub async fn execute_service_view(tzkt_url: &str, did: &str, contract: &str) -> 
     );
     let client = reqwest::Client::builder()
         .default_headers(headers)
-        .build()?;
-    let url = Url::parse(tzkt_url)?;
+        .build()
+        .map_err(|e| Error::Internal(Box::new(e)))?;
+    let url = Url::parse(tzkt_url).unwrap();
     let service_result: ServiceResult = client
-        .get(url.join(&format!("/v1/contracts/{contract}/storage"))?)
+        .get(
+            url.join(&format!("/v1/contracts/{contract}/storage"))
+                .map_err(|e| Error::Internal(Box::new(e)))?,
+        )
         .send()
-        .await?
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?
         .json()
-        .await?;
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?;
+
     Ok(Service {
-        id: format!("{}{}", did, "#discovery"),
+        id: UriBuf::new(format!("{did}#discovery").into_bytes()).unwrap(),
         type_: OneOrMany::One(service_result.service.type_.clone()),
-        service_endpoint: Some(OneOrMany::One(ServiceEndpoint::URI(
+        service_endpoint: Some(OneOrMany::One(Endpoint::Uri(
             service_result.service.endpoint,
         ))),
-        property_set: None,
+        property_set: BTreeMap::new(),
     })
 }
 
@@ -74,25 +95,34 @@ struct AuthResult {
     verification_method: String,
 }
 
-pub async fn execute_auth_view(tzkt_url: &str, contract: &str) -> Result<VerificationMethod> {
-    let client = reqwest::Client::builder().build()?;
-    let url = Url::parse(tzkt_url)?;
+pub async fn execute_auth_view(tzkt_url: &str, contract: &str) -> Result<DIDURLBuf, Error> {
+    let client = reqwest::Client::builder()
+        .build()
+        .map_err(|e| Error::Internal(Box::new(e)))?;
+    let url = Url::parse(tzkt_url).unwrap();
     let auth_result: AuthResult = client
-        .get(url.join(&format!("/v1/contracts/{contract}/storage"))?)
+        .get(
+            url.join(&format!("/v1/contracts/{}/storage", contract))
+                .map_err(|e| Error::Internal(Box::new(e)))?,
+        )
         .send()
-        .await?
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?
         .json()
-        .await?;
-    Ok(VerificationMethod::DIDURL(DIDURL::try_from(
-        auth_result.verification_method,
-    )?))
+        .await
+        .map_err(|e| Error::Internal(Box::new(e)))?;
+
+    DIDURLBuf::from_string(auth_result.verification_method)
+        .map_err(|e| Error::Internal(Box::new(e)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ssi_dids::DIDBuf;
+    use static_iref::uri;
 
-    const TZKT_URL: &str = "https://api.tzkt.io/";
+    const TZKT_URL: &Uri = uri!("https://api.tzkt.io/");
     const LIVE_TZ1: &str = "tz1giDGsifWB9q9siekCKQaJKrmC9da5M43J";
     const LIVE_NETWORK: &str = "mainnet";
     const LIVE_DID_MANAGER: &str = "KT1ACXxefCq3zVG9cth4whZqS1XYK9Qsn8Gi";
@@ -108,27 +138,21 @@ mod tests {
     async fn test_execute_view() {
         let service_endpoint = execute_service_view(
             TZKT_URL,
-            &format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1),
+            &DIDBuf::from_string(format!("did:tz:{}:{}", LIVE_NETWORK, LIVE_TZ1)).unwrap(),
             LIVE_DID_MANAGER,
         )
         .await;
         assert!(service_endpoint.is_ok());
         match service_endpoint.unwrap().service_endpoint.unwrap() {
-            OneOrMany::One(ServiceEndpoint::URI(endpoint)) => {
+            OneOrMany::One(Endpoint::Uri(endpoint)) => {
                 assert_eq!(endpoint, "http://example.com")
             }
             _ => panic!("Should have many."),
         };
         let verification_method = execute_auth_view(TZKT_URL, LIVE_DID_MANAGER).await;
-        assert!(verification_method.is_ok());
-        match verification_method.unwrap() {
-            VerificationMethod::DIDURL(did_url) => {
-                assert_eq!(
-                    did_url.to_string(),
-                    format!("did:pkh:tz:{}#TezosMethod2021", LIVE_TZ1)
-                )
-            }
-            _ => panic!("Impossible format."),
-        };
+        assert_eq!(
+            verification_method.unwrap(),
+            format!("did:pkh:tz:{}#TezosMethod2021", LIVE_TZ1)
+        );
     }
 }

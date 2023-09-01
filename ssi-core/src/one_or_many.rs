@@ -1,10 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+/// One or many.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
+}
+
+impl<T> Default for OneOrMany<T> {
+    fn default() -> Self {
+        Self::Many(Vec::new())
+    }
 }
 
 impl<T> OneOrMany<T> {

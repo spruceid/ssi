@@ -1,6 +1,6 @@
 use crate::{Document, DID, DIDURL};
 
-use super::AnyDIDVerificationMethod;
+use super::DIDVerificationMethod;
 
 /// Reference to an arbitrary resource in a DID document.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -9,18 +9,18 @@ pub enum Resource {
     Document(Document),
 
     /// Verification method.
-    VerificationMethod(AnyDIDVerificationMethod),
+    VerificationMethod(DIDVerificationMethod),
 }
 
 impl Resource {
-    pub fn as_verification_method(&self) -> Option<&AnyDIDVerificationMethod> {
+    pub fn as_verification_method(&self) -> Option<&DIDVerificationMethod> {
         match self {
             Self::VerificationMethod(m) => Some(m),
             _ => None,
         }
     }
 
-    pub fn into_verification_method(self) -> Result<AnyDIDVerificationMethod, Self> {
+    pub fn into_verification_method(self) -> Result<DIDVerificationMethod, Self> {
         match self {
             Self::VerificationMethod(m) => Ok(m),
             other => Err(other),
@@ -35,7 +35,7 @@ pub enum ResourceRef<'a> {
     Document(&'a Document),
 
     /// Verification method.
-    VerificationMethod(&'a AnyDIDVerificationMethod),
+    VerificationMethod(&'a DIDVerificationMethod),
 }
 
 pub trait UsesResource {

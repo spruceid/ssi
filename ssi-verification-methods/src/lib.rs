@@ -9,7 +9,9 @@
 //! [`ssi-ldp`]: <https://github.com/spruceid/ssi/tree/main/ssi-ldp>
 //! [`ssi-dids`]: <https://github.com/spruceid/ssi/tree/main/ssi-dids>
 use iref::{Iri, IriBuf};
+use ssi_crypto::{MessageSignatureError, MessageSigner, SignatureProtocol};
 use static_iref::iri;
+use std::future::Future;
 
 mod controller;
 mod methods;
@@ -118,26 +120,105 @@ pub trait VerificationMethod: Referencable {
 
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Option<&Iri>; // Should be an URI.
+}
 
-    // fn verify<'f, 'a: 'f, 's: 'f, S: ssi_crypto::Referencable>(
-    //     &'a self,
-    //     controllers: &'a impl ControllerProvider,
-    //     proof_purpose: ssi_crypto::ProofPurpose,
-    //     signing_bytes: &'a [u8],
-    //     signature: S::Reference<'s>,
-    // ) -> Pin<Box<dyn 'f + Send + Future<Output = Result<bool, ssi_crypto::VerificationError>>>>
-    // where
-    //     Self::Reference<'a>: Send + VerificationMethodRef<'a, Self, S>,
-    //     S::Reference<'s>: Send,
-    // {
-    //     let r = self.as_reference();
-    //     r.verify(
-    //         controllers,
-    //         proof_purpose,
-    //         signing_bytes,
-    //         signature,
-    //     )
-    // }
+#[derive(Debug, thiserror::Error)]
+pub enum VerificationMethodResolutionError {
+    /// Invalid key identifier.
+    #[error("invalid key id `{0}`")]
+    InvalidKeyId(String),
+
+    /// Unsupported key identifier.
+    #[error("unsupported key id `{0}`")]
+    UnsupportedKeyId(String),
+
+    #[error("missing verification method")]
+    MissingVerificationMethod,
+
+    #[error(transparent)]
+    InvalidVerificationMethod(#[from] InvalidVerificationMethod),
+
+    /// Verifier internal error.
+    #[error("internal error: {0}")]
+    InternalError(String),
+}
+
+pub trait VerificationMethodResolver<M: Referencable> {
+    /// Future returned by the `resolve_verification_method` method.
+    type ResolveVerificationMethod<'a>: 'a
+        + Future<Output = Result<Cow<'a, M>, VerificationMethodResolutionError>>
+    where
+        Self: 'a,
+        M: 'a;
+
+    /// Resolve the verification method reference.
+    fn resolve_verification_method<'a, 'm: 'a>(
+        &'a self,
+        issuer: Option<&'a Iri>,
+        method: Option<ReferenceOrOwnedRef<'m, M>>,
+    ) -> Self::ResolveVerificationMethod<'a>;
+}
+
+impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodResolver<M>
+    for &'t T
+{
+    type ResolveVerificationMethod<'a> = T::ResolveVerificationMethod<'a>
+    where
+        Self: 'a,
+        M: 'a;
+
+    fn resolve_verification_method<'a, 'm: 'a>(
+        &'a self,
+        issuer: Option<&'a Iri>,
+        method: Option<ReferenceOrOwnedRef<'m, M>>,
+    ) -> Self::ResolveVerificationMethod<'a> {
+        T::resolve_verification_method(self, issuer, method)
+    }
+}
+
+pub trait SigningMethod<S, P: SignatureProtocol = ()>: VerificationMethod + Referencable {
+    fn sign(
+        &self,
+        secret: &S,
+        protocol: P,
+        bytes: &[u8],
+    ) -> Result<P::Output, MessageSignatureError> {
+        Self::sign_ref(self.as_reference(), secret, protocol, bytes)
+    }
+
+    fn sign_ref(
+        this: Self::Reference<'_>,
+        secret: &S,
+        protocol: P,
+        bytes: &[u8],
+    ) -> Result<P::Output, MessageSignatureError>;
+}
+
+pub struct MethodWithSecret<'m, 's, M: 'm + Referencable, S> {
+    pub method: M::Reference<'m>,
+    pub secret: &'s S,
+}
+
+impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
+    pub fn new(method: M::Reference<'m>, secret: &'s S) -> Self {
+        Self { method, secret }
+    }
+}
+
+impl<'m, 's, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S, P>, S> MessageSigner<P>
+    for MethodWithSecret<'m, 's, M, S>
+{
+    type Sign<'a> = std::future::Ready<Result<P::Output, MessageSignatureError>> where
+    Self: 'a,
+    P: 'a;
+
+    fn sign<'a>(self, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
+    where
+        Self: 'a,
+        P: 'a,
+    {
+        std::future::ready(M::sign_ref(self.method, self.secret, protocol, message))
+    }
 }
 
 pub trait TypedVerificationMethod: VerificationMethod {
@@ -195,17 +276,37 @@ impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("invalid verification method `{0}`")]
-pub struct InvalidVerificationMethod(pub IriBuf);
+pub enum InvalidVerificationMethod {
+    #[error("invalid verification method type IRI `{0}`")]
+    InvalidTypeIri(IriBuf),
 
-impl From<InvalidVerificationMethod> for VerificationError {
-    fn from(value: InvalidVerificationMethod) -> Self {
-        Self::InvalidVerificationMethod(value.0)
-    }
+    #[error("invalid verification method type name `{0}`")]
+    InvalidTypeName(String),
+
+    #[error("missing verification method required property `{0}`")]
+    MissingProperty(String),
+
+    #[error("invalid verification method property `{0}`")]
+    InvalidProperty(String),
+
+    #[error("ambiguous public key")]
+    AmbiguousPublicKey,
 }
 
-impl From<InvalidVerificationMethod> for SignatureError {
-    fn from(value: InvalidVerificationMethod) -> Self {
-        Self::InvalidVerificationMethod(value.0)
+impl InvalidVerificationMethod {
+    pub fn invalid_type_iri(iri: &Iri) -> Self {
+        Self::InvalidTypeIri(iri.to_owned())
+    }
+
+    pub fn invalid_type_name(name: &str) -> Self {
+        Self::InvalidTypeName(name.to_owned())
+    }
+
+    pub fn missing_property(name: &str) -> Self {
+        Self::MissingProperty(name.to_owned())
+    }
+
+    pub fn invalid_property(name: &str) -> Self {
+        Self::InvalidProperty(name.to_owned())
     }
 }

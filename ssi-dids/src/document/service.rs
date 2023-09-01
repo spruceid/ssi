@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use iref::IriBuf;
+use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_core::one_or_many::OneOrMany;
 
@@ -14,7 +14,7 @@ use ssi_core::one_or_many::OneOrMany;
 #[serde(rename_all = "camelCase")]
 pub struct Service {
     /// id property (URI) of a service map.
-    pub id: IriBuf,
+    pub id: UriBuf,
 
     #[serde(rename = "type")]
     pub type_: OneOrMany<String>,
@@ -22,9 +22,8 @@ pub struct Service {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_endpoint: Option<OneOrMany<Endpoint>>,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
-    pub property_set: Option<BTreeMap<String, serde_json::Value>>,
+    pub property_set: BTreeMap<String, serde_json::Value>,
 }
 
 /// Service endpoint.
@@ -38,6 +37,6 @@ pub struct Service {
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
 pub enum Endpoint {
-    Uri(IriBuf), // TODO must be an URI
+    Uri(UriBuf), // TODO must be an URI
     Map(serde_json::Value),
 }

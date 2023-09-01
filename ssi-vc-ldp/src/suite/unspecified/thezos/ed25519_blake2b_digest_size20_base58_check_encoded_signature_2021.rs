@@ -16,6 +16,7 @@ use crate::{
 };
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz1` addresses.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 
 impl_rdf_input_urdna2015!(Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
@@ -55,13 +56,23 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// JSON Web Signature.
-    jws: CompactJWSString,
+    pub jws: CompactJWSString,
 
     /// Signing key.
-    public_key_jwk: Box<JWK>,
+    #[serde(rename = "publicKeyJwk")]
+    pub public_key_jwk: Box<JWK>,
+}
+
+impl Signature {
+    pub fn new(jws: CompactJWSString, public_key_jwk: JWK) -> Self {
+        Self {
+            jws,
+            public_key_jwk: Box::new(public_key_jwk),
+        }
+    }
 }
 
 impl Referencable for Signature {
@@ -79,9 +90,9 @@ impl Referencable for Signature {
 
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
-    jws: &'a CompactJWSStr,
+    pub jws: &'a CompactJWSStr,
 
-    public_key_jwk: &'a JWK,
+    pub public_key_jwk: &'a JWK,
 }
 
 pub struct SignatureAlgorithm;

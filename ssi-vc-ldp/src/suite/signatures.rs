@@ -1,10 +1,6 @@
-use std::hash::Hash;
-
 use linked_data::LinkedData;
-use rdf_types::VocabularyMut;
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
-use ssi_security::PROOF_VALUE;
 use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable};
 
 mod eip712;

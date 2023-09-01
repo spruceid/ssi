@@ -70,7 +70,7 @@ ssi-vc.workspace = true
 
 [workspace]
 members = [
-  # "did-tezos",
+  "did-tezos",
   "did-jwk",
   # "did-key",
   # "did-web",
@@ -85,7 +85,7 @@ members = [
   # "ssi-caips",
   "ssi-multicodec",
   "ssi-jwk",
-  # "ssi-core",
+  "ssi-core",
   "ssi-crypto",
   # "ssi-json-ld",
   "ssi-dids",
@@ -120,6 +120,7 @@ ssi-dids = { path = "./ssi-dids", version = "0.1" }
 ssi-security = { path = "./ssi-security", version = "0.1" }
 ssi-caips = { path = "./ssi-caips", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
+ssi-vc-ldp = { path = "./ssi-vc-ldp", version = "0.3" }
 async-trait = "0.1.68"
 thiserror = "1.0.40"
 chrono = "0.4.24"

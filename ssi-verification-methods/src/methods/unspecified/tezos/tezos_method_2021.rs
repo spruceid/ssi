@@ -1,13 +1,13 @@
-use iref::{Iri, IriBuf};
+use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use static_iref::iri;
-use std::hash::Hash;
+use std::{collections::BTreeMap, hash::Hash};
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const TEZOS_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#TezosMethod2021");
@@ -44,7 +44,7 @@ pub struct TezosMethod2021 {
 
     /// Controller of the verification method.
     #[ld("sec:controller")]
-    pub controller: IriBuf,
+    pub controller: UriBuf,
 
     #[serde(flatten)]
     #[ld(flatten)]
@@ -74,6 +74,30 @@ impl PublicKey {
                 }
                 Err(VerifyError::KeyMismatch(_, _)) => Ok(false),
                 Ok(()) => Ok(true),
+            },
+        }
+    }
+
+    fn from_generic(
+        properties: &BTreeMap<String, serde_json::Value>,
+    ) -> Result<Self, InvalidVerificationMethod> {
+        match properties.get("publicKeyJwk") {
+            Some(serde_json::Value::String(value)) => {
+                Ok(Self::Jwk(Box::new(value.parse().map_err(|_| {
+                    InvalidVerificationMethod::invalid_property("publicKeyJwk")
+                })?)))
+            }
+            Some(_) => Err(InvalidVerificationMethod::invalid_property("publicKeyJwk")),
+            None => match properties.get("blockchainAccountId") {
+                Some(serde_json::Value::String(value)) => {
+                    Ok(Self::Jwk(Box::new(value.parse().map_err(|_| {
+                        InvalidVerificationMethod::invalid_property("blockchainAccountId")
+                    })?)))
+                }
+                Some(_) => Err(InvalidVerificationMethod::invalid_property(
+                    "blockchainAccountId",
+                )),
+                None => Err(InvalidVerificationMethod::missing_property("publicKeyJwk")),
             },
         }
     }
@@ -115,5 +139,21 @@ impl TypedVerificationMethod for TezosMethod2021 {
 
     fn type_(&self) -> &str {
         TEZOS_METHOD_2021_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for TezosMethod2021 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(value: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        if value.type_ == TEZOS_METHOD_2021_TYPE {
+            Ok(Self {
+                id: value.id,
+                controller: value.controller,
+                public_key: PublicKey::from_generic(&value.properties)?,
+            })
+        } else {
+            Err(InvalidVerificationMethod::InvalidTypeName(value.type_))
+        }
     }
 }

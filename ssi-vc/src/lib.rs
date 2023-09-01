@@ -9,10 +9,12 @@ use iref::Iri;
 use linked_data::LinkedData;
 use ssi_verification_methods::{VerificationError, Verifier};
 
+pub mod credential;
 pub mod datatype;
 mod verification;
 pub mod vocab;
 
+pub use credential::Credential;
 pub use verification::*;
 
 pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =

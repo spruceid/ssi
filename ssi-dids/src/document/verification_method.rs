@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+use ssi_verification_methods::GenericVerificationMethod;
 
 use crate::{DIDBuf, DIDURLBuf, DIDURLReference, DIDURLReferenceBuf, DID, DIDURL};
 
@@ -17,7 +18,7 @@ use super::{
 pub enum ValueOrReference {
     Reference(DIDURLReferenceBuf),
     /// Embedded verification method.
-    Value(AnyDIDVerificationMethod),
+    Value(DIDVerificationMethod),
 }
 
 impl ValueOrReference {
@@ -25,6 +26,13 @@ impl ValueOrReference {
         match self {
             Self::Reference(r) => r.as_did_reference(),
             Self::Value(v) => DIDURLReference::Absolute(&v.id),
+        }
+    }
+
+    pub fn as_value(&self) -> Option<&DIDVerificationMethod> {
+        match self {
+            Self::Value(v) => Some(v),
+            _ => None,
         }
     }
 }
@@ -56,16 +64,8 @@ impl ExtractResource for ValueOrReference {
     }
 }
 
-pub trait DIDVerificationMethod {
-    fn id(&self) -> &DIDURL;
-
-    fn type_(&self) -> &str;
-
-    fn controller(&self) -> &DID;
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-pub struct AnyDIDVerificationMethod {
+pub struct DIDVerificationMethod {
     /// Verification method identifier.
     pub id: DIDURLBuf,
 
@@ -89,7 +89,7 @@ pub struct AnyDIDVerificationMethod {
     pub properties: BTreeMap<String, serde_json::Value>,
 }
 
-impl AnyDIDVerificationMethod {
+impl DIDVerificationMethod {
     pub fn new(
         id: DIDURLBuf,
         type_: String,
@@ -105,13 +105,24 @@ impl AnyDIDVerificationMethod {
     }
 }
 
-impl UsesResource for AnyDIDVerificationMethod {
+impl From<DIDVerificationMethod> for GenericVerificationMethod {
+    fn from(value: DIDVerificationMethod) -> Self {
+        GenericVerificationMethod {
+            id: value.id.into(),
+            type_: value.type_,
+            controller: value.controller.into(),
+            properties: value.properties,
+        }
+    }
+}
+
+impl UsesResource for DIDVerificationMethod {
     fn uses_resource(&self, _base_did: &DID, id: &DIDURL) -> bool {
         self.id == *id
     }
 }
 
-impl FindResource for AnyDIDVerificationMethod {
+impl FindResource for DIDVerificationMethod {
     fn find_resource(&self, _base_did: &DID, id: &DIDURL) -> Option<ResourceRef> {
         if self.id == *id {
             Some(ResourceRef::VerificationMethod(self))
@@ -121,7 +132,7 @@ impl FindResource for AnyDIDVerificationMethod {
     }
 }
 
-impl ExtractResource for AnyDIDVerificationMethod {
+impl ExtractResource for DIDVerificationMethod {
     fn extract_resource(self, _base_did: &DID, id: &DIDURL) -> Option<Resource> {
         if self.id == *id {
             Some(Resource::VerificationMethod(self))
@@ -130,83 +141,3 @@ impl ExtractResource for AnyDIDVerificationMethod {
         }
     }
 }
-
-// impl VerificationMethod {
-//     /// Return a DID URL for this verification method, given a DID as base URI.
-//     pub fn get_id(&self, did: &str) -> String {
-//         match self {
-//             Self::DIDURL(didurl) => didurl.to_string(),
-//             Self::RelativeDIDURL(relative_did_url) => relative_did_url.to_absolute(did).to_string(),
-//             Self::Map(map) => map.get_id(did),
-//         }
-//     }
-// }
-
-// impl VerificationMethodMap {
-//     /// Return a DID URL for this verification method, given a DID as base URI
-//     pub fn get_id(&self, did: &str) -> String {
-//         if let Ok(rel_did_url) = RelativeDIDURL::from_str(&self.id) {
-//             rel_did_url.to_absolute(did).to_string()
-//         } else {
-//             self.id.to_string()
-//         }
-//     }
-
-//     /// Get the verification material as a JWK, from the publicKeyJwk property, or converting from other
-//     /// public key properties as needed.
-//     pub fn get_jwk(&self) -> Result<JWK, Error> {
-//         let pk_hex_value = self
-//             .property_set
-//             .as_ref()
-//             .and_then(|cc| cc.get("publicKeyHex"));
-//         let pk_multibase_opt = match self.property_set {
-//             Some(ref props) => match props.get("publicKeyMultibase") {
-//                 Some(Value::String(string)) => Some(string.clone()),
-//                 Some(Value::Null) => None,
-//                 Some(_) => return Err(Error::ExpectedStringPublicKeyMultibase),
-//                 None => None,
-//             },
-//             None => None,
-//         };
-//         let pk_bytes = match (
-//             self.public_key_jwk.as_ref(),
-//             self.public_key_base58.as_ref(),
-//             pk_hex_value,
-//             pk_multibase_opt,
-//         ) {
-//             (Some(pk_jwk), None, None, None) => return Ok(pk_jwk.clone()),
-//             (None, Some(pk_bs58), None, None) => bs58::decode(&pk_bs58).into_vec()?,
-//             (None, None, Some(pk_hex), None) => {
-//                 let pk_hex = match pk_hex {
-//                     Value::String(string) => string,
-//                     _ => return Err(Error::HexString),
-//                 };
-//                 let pk_hex = pk_hex.strip_prefix("0x").unwrap_or(pk_hex);
-//                 hex::decode(pk_hex)?
-//             }
-//             (None, None, None, Some(pk_mb)) => multibase::decode(pk_mb)?.1,
-//             (None, None, None, None) => return Err(Error::MissingKey),
-//             _ => {
-//                 // https://w3c.github.io/did-core/#verification-material
-//                 // "expressing key material in a verification method using both publicKeyJwk and
-//                 // publicKeyBase58 at the same time is prohibited."
-//                 return Err(Error::MultipleKeyMaterial);
-//             }
-//         };
-//         Ok(ssi_jwk::JWK::from_vm_type(&self.type_, pk_bytes)?)
-//     }
-
-//     /// Verify that a given JWK can be used to satisfy this verification method.
-//     pub fn match_jwk(&self, jwk: &JWK) -> Result<(), Error> {
-//         if let Some(ref account_id) = self.blockchain_account_id {
-//             let account_id = BlockchainAccountId::from_str(account_id)?;
-//             account_id.verify(jwk)?;
-//         } else {
-//             let resolved_jwk = self.get_jwk()?;
-//             if !resolved_jwk.equals_public(jwk) {
-//                 return Err(Error::KeyMismatch);
-//             }
-//         }
-//         Ok(())
-//     }
-// }

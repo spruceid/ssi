@@ -59,10 +59,10 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
 #[derive(Debug, Clone)]
 pub struct Signature {
     /// JSON Web Signature.
-    jws: CompactJWSString,
+    pub jws: CompactJWSString,
 
     /// Signing key.
-    public_key_jwk: Box<JWK>,
+    pub public_key_jwk: Box<JWK>,
 }
 
 impl Referencable for Signature {
@@ -81,10 +81,10 @@ impl Referencable for Signature {
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// JSON Web Signature.
-    jws: &'a CompactJWSStr,
+    pub jws: &'a CompactJWSStr,
 
     /// Signing key.
-    public_key_jwk: &'a JWK,
+    pub public_key_jwk: &'a JWK,
 }
 
 pub struct SignatureAlgorithm;

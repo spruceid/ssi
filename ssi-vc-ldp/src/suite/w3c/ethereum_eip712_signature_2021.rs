@@ -11,7 +11,7 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 use crate::{
-    suite::{Eip712Signature, Eip712SignatureRef, HashError},
+    suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 
@@ -200,15 +200,14 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
 }
 
 impl CryptographicSuiteInput<ssi_eip712::TypedData> for EthereumEip712Signature2021 {
-    type TransformError = std::convert::Infallible;
-
     fn transform(
         &self,
-        data: ssi_eip712::TypedData,
+        data: &ssi_eip712::TypedData,
+        context: (),
         _params: ProofConfigurationRef<Self::VerificationMethod>,
-    ) -> Result<Self::Transformed, Self::TransformError> {
+    ) -> Result<Self::Transformed, TransformError> {
         // apply options.
-        Ok(data)
+        Ok(data.clone())
     }
 }
 
