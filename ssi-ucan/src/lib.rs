@@ -49,9 +49,13 @@ impl<S, F, A> Ucan<S, F, A> {
 mod tests {
     use super::payload::now;
     use super::*;
+    use crate::jwt::{UcanDecode, UcanEncode};
     use did_method_key::DIDKey;
+    use serde::Deserialize;
     use ssi_dids::{DIDMethod, Source};
     use ssi_jwk::Algorithm;
+
+    type JoseUcan = Ucan<jose::Signature>;
 
     #[async_std::test]
     async fn valid() {
@@ -59,12 +63,12 @@ mod tests {
             serde_json::from_str(include_str!("../../tests/ucan-v0.10.0-valid.json")).unwrap();
 
         for case in cases {
-            let ucan = Ucan::decode_and_verify(&case.token, DIDKey.to_resolver())
+            let ucan = JoseUcan::decode_and_verify(&case.token, DIDKey.to_resolver())
                 .await
                 .unwrap();
 
             assert_eq!(ucan.payload, case.assertions.payload);
-            assert_eq!(ucan.algorithm, case.assertions.header.algorithm);
+            assert_eq!(ucan.signature.alg(), case.assertions.header.alg);
         }
     }
 
@@ -73,12 +77,15 @@ mod tests {
         let cases: Vec<InvalidTestVector> =
             serde_json::from_str(include_str!("../../tests/ucan-v0.10.0-invalid.json")).unwrap();
         for case in cases {
-            match Ucan::<JsonValue>::decode(&case.token) {
+            match JoseUcan::decode(&case.token) {
                 Ok(u) => {
                     if u.payload.validate_time::<u64>(None).is_ok()
-                        && Ucan::<JsonValue>::decode_and_verify(&case.token, DIDKey.to_resolver())
-                            .await
-                            .is_ok()
+                        && Ucan::<jose::Signature, JsonValue>::decode_and_verify(
+                            &case.token,
+                            DIDKey.to_resolver(),
+                        )
+                        .await
+                        .is_ok()
                     {
                         assert!(false, "{}", case.comment);
                     }
@@ -102,17 +109,19 @@ mod tests {
             .unwrap();
         payload.proof = Some(vec![canonical_cid("hello")]);
 
-        let ucan = payload.sign_canonicalized(Algorithm::EdDSA, &key).unwrap();
+        let ucan = payload
+            .sign_canonicalized_jws(Algorithm::EdDSA, &key)
+            .unwrap();
 
-        let encoded = ucan.encode_as_canonicalized_jwt().unwrap();
-        Ucan::<JsonValue>::decode_and_verify(&encoded, DIDKey.to_resolver())
+        let encoded = ucan.encode_canonicalized_jwt().unwrap();
+        JoseUcan::decode_and_verify(&encoded, DIDKey.to_resolver())
             .await
             .unwrap();
     }
 
     #[derive(Deserialize)]
     struct ValidAssertions {
-        pub header: Header,
+        pub header: jwt::DummyHeader<Algorithm>,
         pub payload: Payload,
     }
 

@@ -65,12 +65,15 @@ pub trait UcanEncode<E> {
 #[serde(deny_unknown_fields)]
 pub(crate) struct DummyHeader<A = Algorithm> {
     pub alg: A,
-    typ: &'static str,
+    typ: String,
 }
 
 impl<A> DummyHeader<A> {
     pub fn new(alg: A) -> Self {
-        Self { alg, typ: "JWT" }
+        Self {
+            alg,
+            typ: "JWT".to_string(),
+        }
     }
 
     pub fn check_type(&self) -> Result<(), Error> {
