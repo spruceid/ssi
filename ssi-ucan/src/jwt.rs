@@ -58,7 +58,7 @@ pub trait UcanEncode<E> {
     type Encoded;
     /// Encode the UCAN in canonicalized form, by encoding the JWS segments
     /// as JCS/DAG-JSON
-    fn encode_canonicalized_jwt(&self) -> Result<Self::Encoded, Self::Error>;
+    fn encode(&self) -> Result<Self::Encoded, Self::Error>;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]

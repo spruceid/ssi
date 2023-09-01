@@ -102,7 +102,7 @@ where
 {
     type Error = Error;
     type Encoded = String;
-    fn encode_canonicalized_jwt(&self) -> Result<String, Error> {
+    fn encode(&self) -> Result<String, Error> {
         Ok([
             base64::encode_config(
                 DagJsonCodec.encode(

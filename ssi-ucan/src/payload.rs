@@ -1,4 +1,6 @@
-use super::{jose::Signature, jwt::DummyHeader, version::SemanticVersion, Error, Ucan};
+use super::{
+    jose::Signature, jwt::DummyHeader, version::SemanticVersion, webauthn::Webauthn, Error, Ucan,
+};
 use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld, Cid};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -82,28 +84,12 @@ impl<F, A> Payload<F, A> {
         F: Serialize,
         A: Serialize,
     {
-        let signature = sign_bytes(
-            alg,
-            [
-                base64::encode_config(
-                    DagJsonCodec
-                        .encode(&to_ipld(&DummyHeader::new(alg)).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-                base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&self).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-            ]
-            .join(".")
-            .as_bytes(),
-            key,
-        )?;
+        let signature = sign_bytes(alg, self.encode_for_signing_jws(alg)?.as_bytes(), key)?;
 
-        Ok(self.sign(Signature::new_jws(alg, signature)?))
+        Ok(self.sign_jws(Signature::new_jws(alg, signature)?))
     }
 
-    pub fn encode_for_signing(&self, alg: Algorithm) -> Result<Vec<u8>, Error>
+    pub fn encode_for_signing_jws(&self, alg: Algorithm) -> Result<String, Error>
     where
         F: Serialize,
         A: Serialize,
@@ -122,11 +108,42 @@ impl<F, A> Payload<F, A> {
         .into())
     }
 
+    pub fn encode_for_signing_webauthn(&self) -> Result<String, Error>
+    where
+        F: Serialize,
+        A: Serialize,
+    {
+        Ok([
+            base64::encode_config(
+                DagJsonCodec
+                    .encode(&to_ipld(&DummyHeader::new("webauthn")).map_err(IpldError::new)?)?,
+                base64::URL_SAFE_NO_PAD,
+            ),
+            base64::encode_config(
+                DagJsonCodec.encode(&to_ipld(&self).map_err(IpldError::new)?)?,
+                base64::URL_SAFE_NO_PAD,
+            ),
+        ]
+        .join(".")
+        .into())
+    }
+
     /// Sign the payload with the given header and signature
     ///
     /// This will not ensure that the signature is valid for the payload and will
     /// not canonicalize the payload before signing.
-    pub fn sign(self, signature: Signature) -> Ucan<Signature, F, A> {
+    pub fn sign_jws(self, signature: Signature) -> Ucan<Signature, F, A> {
+        Ucan {
+            payload: self,
+            signature,
+        }
+    }
+
+    /// Sign the payload with the given header and signature
+    ///
+    /// This will not ensure that the signature is valid for the payload and will
+    /// not canonicalize the payload before signing.
+    pub fn sign_webauthn(self, signature: Webauthn) -> Ucan<Webauthn, F, A> {
         Ucan {
             payload: self,
             signature,

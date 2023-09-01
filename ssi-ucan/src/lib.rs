@@ -1,11 +1,11 @@
 mod error;
-mod jose;
+pub mod jose;
 pub mod jwt;
 mod payload;
 mod revocation;
 mod util;
 mod version;
-mod webauthn;
+pub mod webauthn;
 
 pub use error::Error;
 pub use libipld::Cid;
@@ -113,7 +113,7 @@ mod tests {
             .sign_canonicalized_jws(Algorithm::EdDSA, &key)
             .unwrap();
 
-        let encoded = ucan.encode_canonicalized_jwt().unwrap();
+        let encoded = ucan.encode().unwrap();
         JoseUcan::decode_and_verify(&encoded, DIDKey.to_resolver())
             .await
             .unwrap();
