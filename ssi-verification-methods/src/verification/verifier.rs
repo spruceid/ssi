@@ -12,9 +12,10 @@ use std::{future::Future, marker::PhantomData, pin::Pin, task};
 pub trait Verifier<M: Referencable>: VerificationMethodResolver<M> + ControllerProvider {
     /// Verify the given `signature`, signed using the given `algorithm`,
     /// against the input `signing`.
-    fn verify<'f, 'm: 'f, 's: 'f, A: SignatureAlgorithm<M>>(
+    fn verify<'f, 'o: 'f, 'm: 'f, 's: 'f, A: SignatureAlgorithm<M>>(
         &'f self,
         algorithm: A,
+        options: <A::Options as Referencable>::Reference<'o>,
         issuer: Option<&'f Iri>,
         method_reference: Option<ReferenceOrOwnedRef<'m, M>>,
         proof_purpose: ProofPurpose,
@@ -28,6 +29,7 @@ pub trait Verifier<M: Referencable>: VerificationMethodResolver<M> + ControllerP
 
         Verify {
             verifier: self,
+            options: <A::Options as Referencable>::apply_covariance(options),
             proof_purpose,
             data: Some(VerifyData {
                 algorithm,
@@ -42,8 +44,12 @@ pub trait Verifier<M: Referencable>: VerificationMethodResolver<M> + ControllerP
 
 #[pin_project]
 pub struct Verify<'f, M: 'f + Referencable, V: 'f + ?Sized + Verifier<M>, A: SignatureAlgorithm<M>>
+where
+    A::Options: 'f,
 {
     verifier: &'f V,
+
+    options: <A::Options as Referencable>::Reference<'f>,
 
     proof_purpose: ProofPurpose,
 
@@ -152,8 +158,12 @@ where
         check_purpose.poll(cx).map(|(check_result, method)| {
             check_result.and_then(|()| {
                 let data = this.data.take().unwrap();
-                data.algorithm
-                    .verify(data.signature, method.as_reference(), data.signing_bytes)
+                data.algorithm.verify(
+                    *this.options,
+                    data.signature,
+                    method.as_reference(),
+                    data.signing_bytes,
+                )
             })
         })
     }

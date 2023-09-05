@@ -65,6 +65,8 @@ impl CryptographicSuite for EdDsa2022 {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = MultibaseSignature;
 
     type Protocol = ();
@@ -74,6 +76,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &Multikey,
         bytes: &'a [u8],
         signer: S,
@@ -83,6 +86,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     fn verify(
         &self,
+        options: (),
         signature: MultibaseSignatureRef,
         method: &Multikey,
         bytes: &[u8],

@@ -44,7 +44,7 @@ pub struct Proof<T: CryptographicSuite> {
     type_: T,
 
     /// Untyped proof.
-    untyped: UntypedProof<T::VerificationMethod, T::Signature>,
+    untyped: UntypedProof<T::VerificationMethod, T::Options, T::Signature>,
 }
 
 impl<T: CryptographicSuite> Proof<T> {
@@ -54,11 +54,18 @@ impl<T: CryptographicSuite> Proof<T> {
         created: xsd_types::DateTime,
         verification_method: ReferenceOrOwned<T::VerificationMethod>,
         proof_purpose: ProofPurpose,
+        options: T::Options,
         signature: T::Signature,
     ) -> Self {
         Self {
             type_,
-            untyped: UntypedProof::new(created, verification_method, proof_purpose, signature),
+            untyped: UntypedProof::new(
+                created,
+                verification_method,
+                proof_purpose,
+                options,
+                signature,
+            ),
         }
     }
 
@@ -66,17 +73,18 @@ impl<T: CryptographicSuite> Proof<T> {
         &self.type_
     }
 
-    pub fn untyped(&self) -> &UntypedProof<T::VerificationMethod, T::Signature> {
+    pub fn untyped(&self) -> &UntypedProof<T::VerificationMethod, T::Options, T::Signature> {
         &self.untyped
     }
 
-    pub fn configuration(&self) -> ProofConfigurationRef<T::VerificationMethod> {
+    pub fn configuration(&self) -> ProofConfigurationRef<T::VerificationMethod, T::Options> {
         self.untyped.configuration()
     }
 
-    pub fn clone_configuration(&self) -> ProofConfiguration<T::VerificationMethod>
+    pub fn clone_configuration(&self) -> ProofConfiguration<T::VerificationMethod, T::Options>
     where
         T::VerificationMethod: Clone,
+        T::Options: Clone,
     {
         self.untyped.clone_configuration()
     }
@@ -85,6 +93,7 @@ impl<T: CryptographicSuite> Proof<T> {
 impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Proof<T>
 where
     T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
+    T::Options: LinkedDataSubject<V, I>,
     T::Signature: LinkedDataSubject<V, I>,
     V: VocabularyMut,
     V::Value: RdfLiteralValue,
@@ -107,6 +116,7 @@ impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataPredicat
     for Proof<T>
 where
     T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
+    T::Options: LinkedDataSubject<V, I>,
     T::Signature: LinkedDataSubject<V, I>,
     V: VocabularyMut,
     V::Value: RdfLiteralValue,
@@ -138,13 +148,18 @@ pub struct Type {
     #[serde(rename = "type")]
     type_: IriBuf,
 
-    #[serde(rename = "cryptosuite")]
+    #[serde(
+        rename = "cryptosuite",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
     cryptosuite: Option<String>,
 }
 
 impl<T: CryptographicSuite> serde::Serialize for Proof<T>
 where
     T::VerificationMethod: serde::Serialize,
+    T::Options: serde::Serialize,
     T::Signature: serde::Serialize,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -152,15 +167,15 @@ where
         S: serde::Serializer,
     {
         #[derive(serde::Serialize)]
-        struct TypedProof<'a, M, S> {
+        struct TypedProof<'a, M, O, S> {
             #[serde(rename = "type")]
             type_: &'a Iri,
 
-            #[serde(rename = "cryptosuite")]
+            #[serde(rename = "cryptosuite", skip_serializing_if = "Option::is_none")]
             cryptosuite: Option<&'a str>,
 
             #[serde(flatten)]
-            untyped: &'a UntypedProof<M, S>,
+            untyped: &'a UntypedProof<M, O, S>,
         }
 
         let typed = TypedProof {
@@ -176,6 +191,7 @@ where
 impl<'de, T: CryptographicSuite + TryFrom<Type>> serde::Deserialize<'de> for Proof<T>
 where
     T::VerificationMethod: serde::Deserialize<'de>,
+    T::Options: serde::Deserialize<'de>,
     T::Signature: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -183,12 +199,12 @@ where
         D: serde::Deserializer<'de>,
     {
         #[derive(serde::Deserialize)]
-        struct TypedProof<M, S> {
+        struct TypedProof<M, O, S> {
             #[serde(flatten)]
             type_: Type,
 
             #[serde(flatten)]
-            untyped: UntypedProof<M, S>,
+            untyped: UntypedProof<M, O, S>,
         }
 
         let typed = TypedProof::deserialize(deserializer)?;

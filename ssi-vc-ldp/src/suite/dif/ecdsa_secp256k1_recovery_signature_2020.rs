@@ -44,7 +44,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
@@ -59,6 +59,8 @@ pub struct SignatureAlgorithm;
 impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod2020>
     for SignatureAlgorithm
 {
+    type Options = ();
+
     type Signature = JwsSignature;
 
     type Protocol = ();
@@ -68,6 +70,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
         signer: S,
@@ -77,6 +80,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     fn verify(
         &self,
+        options: (),
         signature: JwsSignatureRef,
         method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],

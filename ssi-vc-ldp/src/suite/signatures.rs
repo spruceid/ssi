@@ -133,9 +133,17 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for MultibaseSignatureRef<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct JwsSignature {
+    #[ld("sec:jws")]
     pub jws: CompactJWSString,
+}
+
+impl JwsSignature {
+    pub fn new(jws: CompactJWSString) -> Self {
+        Self { jws }
+    }
 }
 
 impl Referencable for JwsSignature {
@@ -157,8 +165,10 @@ impl From<JwsSignature> for AnySignature {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct JwsSignatureRef<'a> {
+    #[ld("sec:jws")]
     pub jws: &'a CompactJWSStr,
 }
 

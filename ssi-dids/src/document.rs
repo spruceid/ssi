@@ -168,6 +168,7 @@ pub struct Metadata {
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct VerificationRelationships {
     /// [`authentication`](https://www.w3.org/TR/did-core/#dfn-authentication) property of a DID
     /// document, expressing [verification

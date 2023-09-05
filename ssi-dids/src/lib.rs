@@ -13,3 +13,5 @@ pub use did::*;
 pub use document::Document;
 pub use resolution::DIDResolver;
 pub use verifier::DIDVerifier;
+
+pub use json_ld;

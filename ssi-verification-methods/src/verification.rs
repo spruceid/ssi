@@ -59,6 +59,9 @@ pub enum VerificationError {
     #[error("invalid use of key with <{0}>")]
     InvalidKeyUse(ProofPurpose),
 
+    #[error("invalid proof options")]
+    InvalidProofOptions,
+
     #[error("missing signature")]
     MissingSignature,
 

@@ -2,14 +2,14 @@
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use iref::Iri;
-use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects};
+use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
 use pin_project::pin_project;
 use rdf_types::{
     interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
     ExportedFromVocabulary, Interpretation, Quad, ReverseLiteralInterpretation, Vocabulary,
 };
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
-use ssi_rdf::IntoNQuads;
+use ssi_rdf::urdna2015;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
     Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
@@ -74,6 +74,8 @@ pub trait CryptographicSuite: Sized {
     /// Verification method.
     type VerificationMethod: VerificationMethod;
 
+    type Options: Referencable;
+
     /// Signature.
     type Signature: Referencable;
 
@@ -82,11 +84,10 @@ pub trait CryptographicSuite: Sized {
     /// Signature algorithm.
     type SignatureAlgorithm: SignatureAlgorithm<
         Self::VerificationMethod,
+        Options = Self::Options,
         Signature = Self::Signature,
         Protocol = Self::SignatureProtocol,
     >;
-
-    type Options;
 
     fn iri(&self) -> &Iri;
 
@@ -96,7 +97,7 @@ pub trait CryptographicSuite: Sized {
     fn hash(
         &self,
         data: Self::Transformed,
-        params: ProofConfigurationRef<Self::VerificationMethod>,
+        params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError>;
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
@@ -105,8 +106,7 @@ pub trait CryptographicSuite: Sized {
         &self,
         data: &'a Self::Hashed,
         signer: &'a S,
-        params: ProofConfiguration<Self::VerificationMethod>,
-        _options: Self::Options,
+        params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> GenerateProof<'a, Self, S> {
         let algorithm = self.setup_signature_algorithm();
 
@@ -126,7 +126,7 @@ pub trait CryptographicSuite: Sized {
         &self,
         data: &'a Self::Hashed,
         verifier: &'a V,
-        proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Signature>,
+        proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Options, Self::Signature>,
     ) -> VerifyProof<'a, Self, V>
     where
         <Self::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
@@ -135,6 +135,7 @@ pub trait CryptographicSuite: Sized {
         VerifyProof {
             verify: verifier.verify(
                 algorithm,
+                proof.options,
                 None,
                 Some(proof.verification_method),
                 proof.proof_purpose,
@@ -152,7 +153,7 @@ impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: 'a + Signer<M, 
 where
     A::Signature: 'a,
 {
-    type Owned = ProofConfiguration<M>;
+    type Owned = ProofConfiguration<M, A::Options>;
 
     type Bound<'m> = S::Sign<'m, A> where 'a: 'm;
 
@@ -170,12 +171,13 @@ impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: Signer<M, A::Pr
 where
     A::Signature: 'a,
 {
-    fn bind<'m>(context: Self, params: &'m ProofConfiguration<M>) -> S::Sign<'m, A>
+    fn bind<'m>(context: Self, params: &'m ProofConfiguration<M, A::Options>) -> S::Sign<'m, A>
     where
         'a: 'm,
     {
         context.signer.sign(
             context.algorithm,
+            params.options.as_reference(),
             None,
             Some(params.verification_method.borrowed()),
             context.data,
@@ -191,6 +193,7 @@ pub struct GenerateProof<
 > where
     S::VerificationMethod: 'a,
     S::SignatureAlgorithm: 'a,
+    S::Options: 'a,
     S::Signature: 'a,
 {
     #[pin]
@@ -202,7 +205,8 @@ impl<'a, S: CryptographicSuite, T: 'a + Signer<S::VerificationMethod, S::Signatu
 where
     S::VerificationMethod: 'a,
 {
-    type Output = Result<UntypedProof<S::VerificationMethod, S::Signature>, SignatureError>;
+    type Output =
+        Result<UntypedProof<S::VerificationMethod, S::Options, S::Signature>, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         // Ok(params.into_proof(signature))
@@ -244,7 +248,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         &self,
         data: &T,
         context: C,
-        params: ProofConfigurationRef<Self::VerificationMethod>,
+        params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Transformed, TransformError>;
 }
 
@@ -252,22 +256,24 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
 fn sha256_hash<'a, T: CryptographicSuite>(
     data: &[u8],
     suite: &T,
-    proof_configuration: ProofConfigurationRef<'a, T::VerificationMethod>,
+    proof_configuration: ProofConfigurationRef<'a, T::VerificationMethod, T::Options>,
 ) -> [u8; 64]
 where
     <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataPredicateObjects,
+    <T::Options as Referencable>::Reference<'a>: LinkedDataSubject,
 {
     let generator = rdf_types::generator::Blank::new();
+    let proof_config_quads = to_quads(generator, &proof_configuration.with_suite(suite)).unwrap();
+    let proof_config_normalized_quads =
+        urdna2015::normalize(proof_config_quads.iter().map(Quad::as_quad_ref)).into_nquads();
+    let proof_config_hash: [u8; 32] =
+        ssi_crypto::hashes::sha256::sha256(proof_config_normalized_quads.as_bytes());
+
     let transformed_document_hash = ssi_crypto::hashes::sha256::sha256(data);
-    let proof_config_hash: [u8; 32] = ssi_crypto::hashes::sha256::sha256(
-        to_quads(generator, &proof_configuration.with_suite(suite))
-            .unwrap()
-            .into_nquads()
-            .as_bytes(),
-    );
+
     let mut hash_data = [0u8; 64];
-    hash_data[..32].copy_from_slice(&transformed_document_hash);
-    hash_data[32..].copy_from_slice(&proof_config_hash);
+    hash_data[..32].copy_from_slice(&proof_config_hash);
+    hash_data[32..].copy_from_slice(&transformed_document_hash);
     hash_data
 }
 
@@ -357,6 +363,7 @@ macro_rules! impl_rdf_input_urdna2015 {
                 context: $crate::LinkedDataInput<'a, V, I, G>,
                 _options: $crate::ProofConfigurationRef<
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
+                    <$ty as $crate::CryptographicSuite>::Options,
                 >,
             ) -> Result<Self::Transformed, $crate::suite::TransformError> {
                 Ok(context.into_canonical_form(data)?)

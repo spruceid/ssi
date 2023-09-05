@@ -52,7 +52,7 @@ impl JsonWebKey2020 {
         let algorithm = secret_key
             .algorithm
             .ok_or(SignatureError::InvalidSecretKey)?;
-        let header = ssi_jws::Header::new_detached(algorithm, None);
+        let header = ssi_jws::Header::new_unencoded(algorithm, None);
         let signing_bytes = header.encode_signing_bytes(data);
         let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)
             .map_err(|_| SignatureError::InvalidSecretKey)?;

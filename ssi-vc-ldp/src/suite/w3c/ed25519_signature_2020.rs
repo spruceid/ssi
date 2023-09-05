@@ -89,6 +89,8 @@ fn build_signature(
 impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
     for SignatureAlgorithm
 {
+    type Options = ();
+
     type Signature = MultibaseSignature;
 
     type Protocol = ();
@@ -98,6 +100,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &Ed25519VerificationKey2020,
         bytes: &'a [u8],
         signer: S,
@@ -107,6 +110,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     fn verify(
         &self,
+        options: (),
         signature: MultibaseSignatureRef,
         method: &Ed25519VerificationKey2020,
         bytes: &[u8],

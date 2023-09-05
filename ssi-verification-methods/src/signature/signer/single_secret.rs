@@ -34,9 +34,10 @@ where
 {
     type Sign<'a, A: crate::SignatureAlgorithm<M, Protocol = P>> = Sign<'a, M, V, A, S> where Self: 'a, M: 'a, A: 'a, A::Signature: 'a;
 
-    fn sign<'a, 'm: 'a, A: crate::SignatureAlgorithm<M, Protocol = P>>(
+    fn sign<'a, 'o: 'a, 'm: 'a, A: crate::SignatureAlgorithm<M, Protocol = P>>(
         &'a self,
         algorithm: A,
+        options: <A::Options as Referencable>::Reference<'o>,
         issuer: Option<&'a iref::Iri>,
         method: Option<crate::ReferenceOrOwnedRef<'m, M>>,
         bytes: &'a [u8],
@@ -49,6 +50,7 @@ where
             Some(_) => Sign::Ok(ResolveAndSign {
                 resolve: self.resolver.resolve_verification_method(issuer, method),
                 algorithm: Some(algorithm),
+                options: <A::Options as Referencable>::apply_covariance(options),
                 bytes,
                 secret: &self.secret,
                 sign: None,
@@ -101,6 +103,7 @@ where
     #[pin]
     resolve: V::ResolveVerificationMethod<'a>,
     algorithm: Option<A>,
+    options: <A::Options as Referencable>::Reference<'a>,
     bytes: &'a [u8],
     secret: &'a S,
 
@@ -131,7 +134,8 @@ where
                         algorithm: this.algorithm.take().unwrap(),
                         method,
                     },
-                    Binder::<S> {
+                    Binder::<A::Options, S> {
+                        options: *this.options,
                         bytes: this.bytes,
                         secret: *this.secret,
                     },
@@ -166,12 +170,14 @@ struct Owned<'a, M: 'a + Referencable, A> {
     method: Cow<'a, M>,
 }
 
-struct Binder<'a, S> {
+struct Binder<'a, O: 'a + Referencable, S> {
+    options: O::Reference<'a>,
     bytes: &'a [u8],
     secret: &'a S,
 }
 
-impl<'a, M, A, S> RefFutureBinder<'a, UnboundSignWithMethodAndSecret<'a, M, A, S>> for Binder<'a, S>
+impl<'a, M, A, S> RefFutureBinder<'a, UnboundSignWithMethodAndSecret<'a, M, A, S>>
+    for Binder<'a, A::Options, S>
 where
     M: 'a + Referencable + SigningMethod<S, A::Protocol>,
     A: 'a + SignatureAlgorithm<M>,
@@ -185,6 +191,7 @@ where
         'a: 'm,
     {
         value.algorithm.sign(
+            <A::Options as Referencable>::apply_covariance(context.options),
             value.method.as_reference(),
             context.bytes,
             MethodWithSecret::new(value.method.as_reference(), context.secret),

@@ -49,7 +49,7 @@ pub struct LdOptions<I> {
     /// in the credential. If the `add_credentials_v1_context` is set to `true`
     /// (by default) then the <https://www.w3.org/2018/credentials/v1> will be
     /// added to the context, even if `None` is passed.
-    pub context: Option<RemoteDocumentReference<I, (), json_ld::syntax::context::Value<()>>>,
+    pub context: Option<RemoteDocumentReference<I, (), json_ld::syntax::Context>>,
 
     /// Specifies if the <https://www.w3.org/2018/credentials/v1> context is
     /// to be added to the compaction context (true by default).
@@ -246,7 +246,7 @@ impl<C: Sync> VcJwt<C> {
             ),
             None => {
                 if options.add_credentials_v1_context {
-                    Some(Meta(json_ld::syntax::context::Value::Many(Vec::new()), ()))
+                    Some(Meta(json_ld::syntax::Context::Many(Vec::new()), ()))
                 } else {
                     None
                 }
@@ -316,7 +316,7 @@ impl<C: Sync> VcJwt<C> {
     }
 }
 
-fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>) {
+fn add_credentials_v1_context(context: &mut json_ld::syntax::Context) {
     fn is_credentials_v1_context<D>(context: &json_ld::syntax::ContextEntry<D>) -> bool {
         match context {
             json_ld::syntax::ContextEntry::IriRef(iri) => {
@@ -327,10 +327,10 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>)
     }
 
     match context {
-        json_ld::syntax::context::Value::One(Meta(c, _)) => {
+        json_ld::syntax::Context::One(Meta(c, _)) => {
             if !is_credentials_v1_context(c) {
                 let c = std::mem::replace(c, json_ld::syntax::ContextEntry::Null);
-                *context = json_ld::syntax::context::Value::Many(vec![
+                *context = json_ld::syntax::Context::Many(vec![
                     Meta(c, ()),
                     Meta(
                         json_ld::syntax::ContextEntry::IriRef(
@@ -341,9 +341,9 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::context::Value<()>)
                 ]);
             }
         }
-        json_ld::syntax::context::Value::Many(list) => {
+        json_ld::syntax::Context::Many(list) => {
             if list.is_empty() {
-                *context = json_ld::syntax::context::Value::One(Meta(
+                *context = json_ld::syntax::Context::One(Meta(
                     json_ld::syntax::ContextEntry::IriRef(
                         CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
                     ),

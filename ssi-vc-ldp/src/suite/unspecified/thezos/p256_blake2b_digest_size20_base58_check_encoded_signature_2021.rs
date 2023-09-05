@@ -46,7 +46,7 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
@@ -94,6 +94,8 @@ impl
         P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
     > for SignatureAlgorithm
 {
+    type Options = ();
+
     type Signature = Signature;
 
     type Protocol = ();
@@ -103,6 +105,7 @@ impl
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
         bytes: &'a [u8],
         signer: S,
@@ -112,6 +115,7 @@ impl
 
     fn verify(
         &self,
+        options: (),
         signature: SignatureRef,
         method: &P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
         bytes: &[u8],
