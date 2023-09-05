@@ -7,9 +7,9 @@ use ssi_jws::{split_jws, verify_bytes};
 impl<'a, S, F, A> Ucan<S, F, A>
 where
     Self: UcanDecode<'a, Jwt, Encoded = &'a str, Error = Error>
-        + for<'s> Helper<'a, 's, Jwt, Raw = &'a str>,
-    for<'s> <Self as Helper<'a, 's, Jwt>>::Signed: AsRef<[u8]>,
-    for<'s> <Self as Helper<'a, 's, Jwt>>::Signature: AsRef<[u8]>,
+        + for<'s> Transformable<'a, 's, Jwt, Raw = &'a str>,
+    for<'s> <Self as Transformable<'a, 's, Jwt>>::Signed: AsRef<[u8]>,
+    for<'s> <Self as Transformable<'a, 's, Jwt>>::Signature: AsRef<[u8]>,
 {
     /// Decode the UCAN and verify it's signature
     ///
@@ -43,8 +43,8 @@ where
     }
 }
 
-pub trait Helper<'a, 's, E>: UcanDecode<'a, E> {
-    type Signed;
+pub trait Transformable<'a, 's, E>: UcanDecode<'a, E> {
+    type Signed: AsRef<[u8]>;
     type Raw: 'a;
     type Signature: 's;
     fn transform(

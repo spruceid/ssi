@@ -1,3 +1,4 @@
+pub mod common;
 mod error;
 pub mod generic_jwt;
 pub mod jose;
@@ -40,7 +41,7 @@ impl<S, F, A> Ucan<S, F, A> {
         (self.payload, self.signature)
     }
 
-    /// Extract or resolve the JWK used to issue this UCAN
+    /// Extract or resolve the public key used to issue this UCAN in JWK form
     pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
         get_verification_key(&self.payload.issuer, resolver).await
     }

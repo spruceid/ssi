@@ -1,10 +1,9 @@
 use crate::{
-    jwt::{decode_ucan_jwt, DummyHeader, Helper, Jwt, UcanDecode, UcanEncode},
+    jwt::{decode_ucan_jwt, DummyHeader, Jwt, UcanDecode, UcanEncode},
     Error, Ucan,
 };
 use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld};
 use serde::{Deserialize, Serialize};
-use ssi_jwk::{Algorithm, JWK};
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Signature {
@@ -23,28 +22,6 @@ impl Signature {
 
     pub fn alg(&self) -> &str {
         self.alg.as_str()
-    }
-}
-
-impl<'a, 's, F, A> Helper<'a, 's, Jwt> for Ucan<Signature, F, A>
-where
-    DummyHeader<String>: for<'d> Deserialize<'d>,
-    F: for<'d> Deserialize<'d>,
-    A: for<'d> Deserialize<'d>,
-{
-    type Signed = &'a str;
-    type Raw = &'a str;
-    type Signature = &'s [u8];
-    fn transform(
-        &'s self,
-        signed: Self::Raw,
-        jwk: &JWK,
-    ) -> Result<(Algorithm, Self::Signed, Self::Signature), Error> {
-        Ok((
-            jwk.algorithm.unwrap_or(Algorithm::ES256),
-            signed,
-            self.signature().bytes(),
-        ))
     }
 }
 

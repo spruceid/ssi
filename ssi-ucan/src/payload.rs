@@ -1,7 +1,4 @@
-use super::{
-    generic_jwt, jose::Signature, jwt::DummyHeader, version::SemanticVersion, webauthn::Webauthn,
-    Error, Ucan,
-};
+use super::{jose::Signature, jwt::DummyHeader, version::SemanticVersion, Error, Ucan};
 use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld, Cid};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -87,7 +84,7 @@ impl<F, A> Payload<F, A> {
     {
         let signature = sign_bytes(alg, self.encode_for_signing_jws(alg)?.as_bytes(), key)?;
 
-        Ok(self.sign_jws(Signature::new_jws(alg, signature)?))
+        Ok(self.sign(Signature::new_jws(alg, signature)?))
     }
 
     pub fn encode_for_signing_jws(&self, alg: Algorithm) -> Result<String, Error>
@@ -133,36 +130,10 @@ impl<F, A> Payload<F, A> {
     ///
     /// This will not ensure that the signature is valid for the payload and will
     /// not canonicalize the payload before signing.
-    pub fn sign_jws(self, signature: Signature) -> Ucan<Signature, F, A> {
+    pub fn sign<S>(self, signature: S) -> Ucan<S, F, A> {
         Ucan {
             payload: self,
             signature,
-        }
-    }
-
-    /// Sign the payload with the given header and signature
-    ///
-    /// This will not ensure that the signature is valid for the payload and will
-    /// not canonicalize the payload before signing.
-    pub fn sign_webauthn(self, signature: Webauthn) -> Ucan<Webauthn, F, A> {
-        Ucan {
-            payload: self,
-            signature,
-        }
-    }
-
-    /// Sign the payload with the given header and signature
-    ///
-    /// This will not ensure that the signature is valid for the payload and will
-    /// not canonicalize the payload before signing.
-    pub fn sign_generic(
-        self,
-        alg: String,
-        signature: Vec<u8>,
-    ) -> Ucan<generic_jwt::Signature, F, A> {
-        Ucan {
-            payload: self,
-            signature: generic_jwt::Signature::new(alg, signature),
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    jwt::{decode_ucan_jwt, DummyHeader, Helper, Jwt, UcanDecode, UcanEncode},
+    jwt::{decode_ucan_jwt, DummyHeader, Jwt, Transformable, UcanDecode, UcanEncode},
     Error, Ucan,
 };
 use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld};
@@ -60,7 +60,7 @@ impl Signature {
     }
 }
 
-impl<'a, 's, F, A> Helper<'a, 's, Jwt> for Ucan<Signature, F, A>
+impl<'a, 's, F, A> Transformable<'a, 's, Jwt> for Ucan<Signature, F, A>
 where
     DummyHeader<Algorithm>: for<'d> Deserialize<'d>,
     F: for<'d> Deserialize<'d>,
