@@ -105,6 +105,8 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = Signature;
 
     type Protocol = ();
@@ -114,6 +116,7 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &RsaVerificationKey2018,
         bytes: &'a [u8],
         signer: S,
@@ -123,6 +126,7 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
 
     fn verify(
         &self,
+        options: (),
         signature: SignatureRef,
         method: &RsaVerificationKey2018,
         bytes: &[u8],

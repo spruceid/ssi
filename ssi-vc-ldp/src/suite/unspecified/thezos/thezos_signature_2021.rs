@@ -64,7 +64,7 @@ impl CryptographicSuite for TezosSignature2021 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         let proof_quads = proof_configuration.quads(self).into_nquads();
         let message = format!("\n{data}\n{proof_quads}");
@@ -128,6 +128,8 @@ pub enum PublicKeyRef<'a> {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = Signature;
 
     type Protocol = ();
@@ -137,6 +139,7 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &TezosMethod2021,
         bytes: &[u8],
         signer: S,
@@ -146,6 +149,7 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn verify(
         &self,
+        options: (),
         signature: SignatureRef,
         method: &TezosMethod2021,
         bytes: &[u8],

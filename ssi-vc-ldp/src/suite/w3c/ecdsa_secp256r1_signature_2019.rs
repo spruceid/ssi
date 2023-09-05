@@ -57,6 +57,8 @@ pub struct SignatureAlgorithm;
 impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2019>
     for SignatureAlgorithm
 {
+    type Options = ();
+
     type Signature = MultibaseSignature;
 
     type Protocol = ();
@@ -66,6 +68,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &EcdsaSecp256r1VerificationKey2019,
         bytes: &'a [u8],
         signer: S,
@@ -75,6 +78,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
 
     fn verify(
         &self,
+        options: (),
         signature: MultibaseSignatureRef,
         method: &EcdsaSecp256r1VerificationKey2019,
         bytes: &[u8],

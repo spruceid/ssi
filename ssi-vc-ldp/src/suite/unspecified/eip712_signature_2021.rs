@@ -85,7 +85,7 @@ impl CryptographicSuite for Eip712Signature2021 {
     fn hash(
         &self,
         data: ssi_eip712::TypedData,
-        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         data.hash()
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
@@ -224,6 +224,8 @@ pub fn new_ldp_siging_request(
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = Eip712Signature;
 
     type Protocol = ();
@@ -233,6 +235,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -242,6 +245,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
+        options: (),
         signature: Eip712SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

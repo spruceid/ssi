@@ -6,12 +6,12 @@ use std::future;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    JsonWebKey2020, SignatureError,
+    JsonWebKey2020, Referencable, SignatureError,
 };
 use static_iref::iri;
 
 use crate::{
-    suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
+    suite::{Eip712Signature, Eip712SignatureRef, HashError, OptionsRef, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 
@@ -55,6 +55,7 @@ use crate::{
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EthereumEip712Signature2021; // TODO add LD support
 
+#[derive(Debug, Clone, Copy)]
 pub struct Options {
     /// If true (by default), the signature metadata will include the
     /// `eip712` property.
@@ -64,6 +65,21 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Self { embed: true }
+    }
+}
+
+impl Referencable for Options {
+    type Reference<'a> = Self;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        *self
+    }
+
+    fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small>
+    where
+        Self: 'big,
+    {
+        r
     }
 }
 
@@ -188,7 +204,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
     fn hash(
         &self,
         data: ssi_eip712::TypedData,
-        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Options>,
     ) -> Result<Self::Hashed, HashError> {
         data.hash()
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
@@ -204,7 +220,7 @@ impl CryptographicSuiteInput<ssi_eip712::TypedData> for EthereumEip712Signature2
         &self,
         data: &ssi_eip712::TypedData,
         context: (),
-        _params: ProofConfigurationRef<Self::VerificationMethod>,
+        _params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Transformed, TransformError> {
         // apply options.
         Ok(data.clone())
@@ -214,6 +230,8 @@ impl CryptographicSuiteInput<ssi_eip712::TypedData> for EthereumEip712Signature2
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
+    type Options = Options;
+
     type Signature = Eip712Signature;
 
     type Protocol = ();
@@ -223,6 +241,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: Options,
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -232,6 +251,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
+        options: Options,
         signature: Eip712SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

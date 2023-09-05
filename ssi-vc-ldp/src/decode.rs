@@ -63,7 +63,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
         generator: &mut impl json_ld::Generator<V, M>,
         interpretation: &'a mut I,
         mut input: json_ld::ExpandedDocument<V::Iri, V::BlankId, M>,
-        params: ProofConfiguration<S::VerificationMethod>,
+        params: ProofConfiguration<S::VerificationMethod, S::Options>,
     ) -> Result<Verifiable<Self>, Error>
     where
         V: VocabularyMut<

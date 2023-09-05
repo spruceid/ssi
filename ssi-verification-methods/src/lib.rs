@@ -93,6 +93,16 @@ macro_rules! covariance_rule {
     };
 }
 
+impl Referencable for () {
+    type Reference<'a> = ();
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        *self
+    }
+
+    covariance_rule!();
+}
+
 impl<'t, T> Referencable for &'t T {
     type Reference<'a> = &'t T where Self: 'a;
 

@@ -6,7 +6,7 @@ use pin_project::pin_project;
 use ssi_core::futures::FailibleFuture;
 use ssi_crypto::{MessageSigner, SignerAdapter};
 use ssi_verification_methods::{
-    AnyMethod, AnyMethodRef, SignatureAlgorithm, SignatureError, VerificationError,
+    AnyMethod, AnyMethodRef, Referencable, SignatureAlgorithm, SignatureError, VerificationError,
 };
 use std::future::Future;
 use std::pin::Pin;
@@ -47,6 +47,39 @@ macro_rules! crypto_suites {
             ),*
         }
 
+        impl Referencable for Options {
+            type Reference<'a> = OptionsRef<'a>;
+
+            fn as_reference(&self) -> Self::Reference<'_> {
+                OptionsRef {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        $field_name: self.$field_name.as_reference()
+                    ),*
+                }
+            }
+
+            fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small>
+            where
+                Self: 'big
+            {
+                OptionsRef {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        $field_name: <<super::$name as $crate::CryptographicSuite>::Options as Referencable>::apply_covariance(r.$field_name)
+                    ),*
+                }
+            }
+        }
+
+        #[derive(Clone, Copy)]
+        pub struct OptionsRef<'a> {
+            $(
+                $(#[cfg($($t)*)])?
+                pub $field_name: <<super::$name as $crate::CryptographicSuite>::Options as Referencable>::Reference<'a>
+            ),*
+        }
+
         pub enum AnySignatureAlgorithm {
             $(
                 $(#[cfg($($t)*)])?
@@ -78,6 +111,8 @@ macro_rules! crypto_suites {
         }
 
         impl SignatureAlgorithm<AnyMethod> for AnySignatureAlgorithm {
+            type Options = Options;
+
             type Signature = AnySignature;
 
             type Protocol = AnySignatureProtocol;
@@ -86,6 +121,7 @@ macro_rules! crypto_suites {
 
             fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
                 &self,
+                options: <Self::Options as Referencable>::Reference<'a>,
                 method: AnyMethodRef,
                 bytes: &'a [u8],
                 signer: S
@@ -95,11 +131,19 @@ macro_rules! crypto_suites {
                         Self::$name(a) => {
                             match method.try_into() {
                                 Ok(method) => {
-                                    FailibleFuture::ok(Sign::$name(a.sign(
-                                        method,
-                                        bytes,
-                                        SignerAdapter::new(signer)
-                                    )))
+                                    match options.try_into() {
+                                        Ok(options) => {
+                                            FailibleFuture::ok(Sign::$name(a.sign(
+                                                options,
+                                                method,
+                                                bytes,
+                                                SignerAdapter::new(signer)
+                                            )))
+                                        }
+                                        Err(e) => {
+                                            FailibleFuture::err(e.into())
+                                        }
+                                    }
                                 }
                                 Err(e) => {
                                     FailibleFuture::err(e.into())
@@ -112,6 +156,7 @@ macro_rules! crypto_suites {
 
             fn verify(
                 &self,
+                options: OptionsRef,
                 signature: AnySignatureRef,
                 method: AnyMethodRef,
                 bytes: &[u8]
@@ -120,6 +165,7 @@ macro_rules! crypto_suites {
                     $(
                         Self::$name(a) => {
                             a.verify(
+                                options.try_into()?,
                                 signature.try_into()?,
                                 method.try_into()?,
                                 bytes
@@ -163,7 +209,7 @@ macro_rules! crypto_suites {
                 }
             }
 
-            fn hash(&self, data: String, proof_configuration: ProofConfigurationRef<Self::VerificationMethod>) -> Result<Self::Hashed, HashError> {
+            fn hash(&self, data: String, proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>) -> Result<Self::Hashed, HashError> {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
@@ -188,6 +234,12 @@ macro_rules! crypto_suites {
             }
         }
     };
+}
+
+impl<'a> From<OptionsRef<'a>> for () {
+    fn from(_value: OptionsRef<'a>) -> Self {
+        ()
+    }
 }
 
 crypto_suites! {

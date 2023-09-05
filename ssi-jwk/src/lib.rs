@@ -1,5 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
+use core::fmt;
 use linked_data::rdf_types::{Interpretation, Vocabulary};
 use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
 use num_bigint::{BigInt, Sign};
@@ -89,6 +90,12 @@ impl FromStr for JWK {
     }
 }
 
+impl fmt::Display for JWK {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        serde_jcs::to_string(self).unwrap().fmt(f)
+    }
+}
+
 impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for JWK {
     fn interpretation(
         &self,
@@ -96,8 +103,12 @@ impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for
         _interpretation: &mut I,
     ) -> linked_data::ResourceInterpretation<V, I> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
+
+        let mut value = json_syntax::to_value(self).unwrap();
+        value.canonicalize();
+
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
-            RdfLiteral::Json(json_syntax::to_value(self).unwrap()),
+            RdfLiteral::Json(value),
         ))))
     }
 }

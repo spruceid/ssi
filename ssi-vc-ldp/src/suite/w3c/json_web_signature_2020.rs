@@ -56,6 +56,8 @@ impl CryptographicSuite for JsonWebSignature2020 {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = JwsSignature;
 
     type Protocol = ();
@@ -65,6 +67,7 @@ impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureA
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &JsonWebKey2020,
         bytes: &'a [u8],
         signer: S,
@@ -74,6 +77,7 @@ impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureA
 
     fn verify(
         &self,
+        options: (),
         signature: JwsSignatureRef,
         method: &JsonWebKey2020,
         bytes: &[u8],

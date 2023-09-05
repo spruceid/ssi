@@ -17,9 +17,10 @@ pub trait Signer<M: Referencable, P> {
         A: 'a,
         A::Signature: 'a;
 
-    fn sign<'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>(
+    fn sign<'a, 'o: 'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>(
         &'a self,
         algorithm: A,
+        options: <A::Options as Referencable>::Reference<'o>,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
         bytes: &'a [u8],

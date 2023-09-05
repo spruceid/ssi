@@ -65,7 +65,7 @@ impl Ed25519VerificationKey2018 {
         data: &[u8],
         key_pair: &ed25519_dalek::Keypair,
     ) -> Result<CompactJWSString, SignatureError> {
-        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::EdDSA, None);
+        let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdDSA, None);
         let signing_bytes = header.encode_signing_bytes(data);
         let signature = key_pair.sign(&signing_bytes);
 

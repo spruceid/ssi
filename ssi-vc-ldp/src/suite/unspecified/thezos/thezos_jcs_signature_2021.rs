@@ -48,7 +48,7 @@ impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
         &self,
         data: &T,
         context: (),
-        _options: ProofConfigurationRef<Self::VerificationMethod>,
+        _options: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Transformed, TransformError> {
         let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;
         match json {
@@ -83,7 +83,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
     fn hash(
         &self,
         mut data: serde_json::Map<String, serde_json::Value>,
-        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         let json_proof_configuration = serde_json::to_value(proof_configuration).unwrap();
         data.insert("proof".to_string(), json_proof_configuration);
@@ -102,6 +102,8 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = Signature;
 
     type Protocol = ();
@@ -111,6 +113,7 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &TezosMethod2021,
         bytes: &'a [u8],
         signer: S,
@@ -120,6 +123,7 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn verify(
         &self,
+        options: (),
         signature: SignatureRef,
         method: &TezosMethod2021,
         bytes: &[u8],

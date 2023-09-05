@@ -57,30 +57,30 @@ async fn test_derivation_tz1() {
         )
         .await
         .unwrap();
-    let doc = output.document.into_document();
+    let doc = output.document;
     eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
     assert_eq!(
         serde_json::to_value(doc).unwrap(),
         json!({
             "@context": [
-            "https://www.w3.org/ns/did/v1",
-            {
-                "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
-                "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
-            }
+                "https://www.w3.org/ns/did/v1",
+                {
+                    "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+                    "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+                }
             ],
             "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
             "verificationMethod": [{
-            "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
-            "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
-            "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
-            "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
+                "id": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId",
+                "type": "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
+                "controller": "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+                "blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"
             }],
             "authentication": [
-            "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
+                "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
             ],
             "assertionMethod": [
-            "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
+                "did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8#blockchainAccountId"
             ]
         })
     );
@@ -95,7 +95,7 @@ async fn test_derivation_tz2() {
         )
         .await
         .unwrap();
-    let doc = output.document.into_document();
+    let doc = output.document;
     eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
     assert_eq!(
         serde_json::to_value(doc).unwrap(),
@@ -184,9 +184,11 @@ async fn credential_prove_verify_did_tz1() {
 		"2021-03-02T18:59:44.462Z".parse().unwrap(),
 		iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
 		ProofPurpose::Assertion,
-		ssi_vc_ldp::suite::ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Signature::new(
-			"eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap(),
-			r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
+        ssi_vc_ldp::suite::ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Options::new(
+            r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
+        ),
+		ssi_vc_ldp::suite::JwsSignature::new(
+			"eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
 		)
 	);
 
@@ -202,7 +204,7 @@ async fn credential_prove_verify_did_tz1() {
 
     let vc = ssi_vc::Verifiable::new(ldp_cred, proof);
 
-    assert!(vc.verify(&didtz).await.is_ok());
+    assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // test that issuer property is used for verification
     let mut cred_bad_issuer = vc.credential().value().clone();
@@ -218,13 +220,13 @@ async fn credential_prove_verify_did_tz1() {
 
     let vc_bad_issuer = ssi_vc::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
 
-    assert!(vc_bad_issuer.verify(&didtz).await.is_err());
+    assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     let signer = SingleSecretSigner::new(&didtz, JWK::generate_ed25519().unwrap());
 
     // Check that proof JWK must match proof verificationMethod
     let vc_wrong_key = ssi_vc_ldp::DataIntegrity::<
-        Credential,
+        _, // Credential,
         ssi_vc_ldp::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
     >::sign(
         vc.credential().value().clone(),
@@ -232,12 +234,11 @@ async fn credential_prove_verify_did_tz1() {
         &signer,
         ssi_vc_ldp::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
         vc.proof().clone_configuration(),
-        Default::default(),
     )
     .await
     .unwrap();
 
-    assert!(vc_wrong_key.verify(&didtz).await.is_err());
+    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
     // 	// Make it into a VP
     // 	use ssi_core::one_or_many::OneOrMany;

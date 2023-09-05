@@ -111,6 +111,8 @@ impl SignatureAlgorithm {
 }
 
 impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = Signature;
 
     type Protocol = EthereumWallet;
@@ -120,6 +122,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -129,6 +132,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
+        options: (),
         signature: SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

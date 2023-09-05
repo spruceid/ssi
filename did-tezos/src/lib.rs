@@ -156,6 +156,12 @@ impl DIDMethodResolver for DIDTz {
                     public_key: Some(public_key.to_owned()),
                 });
 
+            let mut json_ld_context = JsonLdContext::default();
+            json_ld_context.add_verification_method(&vm);
+            if let Some(vm) = &authentication_vm {
+                json_ld_context.add_verification_method(vm);
+            }
+
             let mut doc = DIDTz::tier1_derivation(&did, vm, authentication_vm);
 
             let tzkt_url = match options.parameters.additional.get("tzkt_url") {
@@ -212,22 +218,13 @@ impl DIDMethodResolver for DIDTz {
                     .map_err(|e| Error::Internal(Box::new(e)))?;
             }
 
-            // let res_meta = ResolutionMetadata {
-            //     ..Default::default()
-            // };
-
-            // let doc_meta = DocumentMetadata {
-            //     ..Default::default()
-            // };
-
+            let content_type = options.accept.unwrap_or(MediaType::JsonLd);
             let represented = doc.into_representation(representation::Options::from_media_type(
-                options.accept.unwrap_or(MediaType::JsonLd),
-                || representation::json_ld::Options {
+                content_type,
+                move || representation::json_ld::Options {
                     context: representation::json_ld::Context::array(
                         representation::json_ld::DIDContext::V1,
-                        vec![serde_json::Value::String(
-                            "https://w3id.org/security/suites/jws-2020/v1".to_string(),
-                        )],
+                        vec![json_ld_context.into()],
                     ),
                 },
             ));
@@ -235,7 +232,7 @@ impl DIDMethodResolver for DIDTz {
             Ok(Output::new(
                 represented.to_bytes(),
                 document::Metadata::default(),
-                resolution::Metadata::default(),
+                resolution::Metadata::from_content_type(Some(content_type.to_string())),
             ))
         })
     }
@@ -375,6 +372,83 @@ struct SignedIetfJsonPatchPayload {
 #[serde(tag = "type", content = "value")]
 enum Updates {
     SignedIetfJsonPatch(Vec<String>),
+}
+
+#[derive(Debug, Default)]
+struct JsonLdContext {
+    ecdsa_secp256k1_recovery_method_2020: bool,
+    ed_25519_public_key_blake2b_digest_size_20_base58_check_encoded2021: bool,
+    p256_public_key_blake2b_digest_size_20_base58_check_encoded2021: bool,
+    blockchain_account_id: bool,
+    public_key_base58: bool,
+}
+
+impl JsonLdContext {
+    pub fn add_verification_method(&mut self, m: &TezosVerificationMethod) {
+        self.blockchain_account_id |= m.blockchain_account_id.is_some();
+        self.public_key_base58 |= m.public_key.is_some();
+        self.add_verification_method_type(m.type_);
+    }
+
+    pub fn add_verification_method_type(&mut self, ty: VerificationMethodType) {
+        match ty {
+            VerificationMethodType::EcdsaSecp256k1RecoveryMethod2020 => {
+                self.ecdsa_secp256k1_recovery_method_2020 = true
+            }
+            VerificationMethodType::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
+                self.ed_25519_public_key_blake2b_digest_size_20_base58_check_encoded2021 = true
+            }
+            VerificationMethodType::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
+                self.p256_public_key_blake2b_digest_size_20_base58_check_encoded2021 = true
+            }
+        }
+    }
+}
+
+impl From<JsonLdContext> for representation::json_ld::ContextEntry {
+    fn from(value: JsonLdContext) -> Self {
+        use representation::json_ld::context::{Definition, TermDefinition};
+        let mut def = Definition::new();
+
+        if value.ecdsa_secp256k1_recovery_method_2020 {
+            let ty = VerificationMethodType::EcdsaSecp256k1RecoveryMethod2020;
+            def.bindings.insert(
+                ty.name().into(),
+                TermDefinition::Simple(ty.as_iri().to_owned().into()).into(),
+            );
+        }
+
+        if value.ed_25519_public_key_blake2b_digest_size_20_base58_check_encoded2021 {
+            let ty =
+                VerificationMethodType::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
+            def.bindings.insert(
+                ty.name().into(),
+                TermDefinition::Simple(ty.as_iri().to_owned().into()).into(),
+            );
+        }
+
+        if value.p256_public_key_blake2b_digest_size_20_base58_check_encoded2021 {
+            let ty = VerificationMethodType::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
+            def.bindings.insert(
+                ty.name().into(),
+                TermDefinition::Simple(ty.as_iri().to_owned().into()).into(),
+            );
+        }
+
+        if value.blockchain_account_id {
+            def.bindings.insert(
+                "blockchainAccountId".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#blockchainAccountId")
+                        .to_owned()
+                        .into(),
+                )
+                .into(),
+            );
+        }
+
+        Self::Definition(def)
+    }
 }
 
 impl DIDTz {

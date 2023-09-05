@@ -9,10 +9,11 @@ use crate::{CryptographicSuite, Proof, ProofConfiguration, ProofConfigurationRef
 /// Untyped Data Integrity Proof.
 #[derive(Debug, Clone, LinkedData, serde::Serialize, serde::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
+#[ld(prefix("dc" = "http://purl.org/dc/terms/"))]
 #[serde(rename_all = "camelCase")]
-pub struct UntypedProof<M, S> {
+pub struct UntypedProof<M, O, S> {
     /// Date and time of creation.
-    #[ld("sec:created")]
+    #[ld("dc:created")]
     pub created: xsd_types::DateTime,
 
     /// Verification method.
@@ -23,18 +24,24 @@ pub struct UntypedProof<M, S> {
     #[ld("sec:proofPurpose")]
     pub proof_purpose: ProofPurpose,
 
+    /// Additional proof options required by the cryptographic suite.
+    #[ld(flatten)]
+    #[serde(flatten)]
+    pub options: O,
+
     /// Proof value.
     #[ld(flatten)]
     #[serde(flatten)]
     pub signature: S,
 }
 
-impl<M, S> UntypedProof<M, S> {
-    pub fn from_options(options: ProofConfiguration<M>, signature: S) -> Self {
+impl<M, O, S> UntypedProof<M, O, S> {
+    pub fn from_configuration(configuration: ProofConfiguration<M, O>, signature: S) -> Self {
         Self::new(
-            options.created,
-            options.verification_method,
-            options.proof_purpose,
+            configuration.created,
+            configuration.verification_method,
+            configuration.proof_purpose,
+            configuration.options,
             signature,
         )
     }
@@ -43,94 +50,110 @@ impl<M, S> UntypedProof<M, S> {
         created: xsd_types::DateTime,
         verification_method: ReferenceOrOwned<M>,
         proof_purpose: ProofPurpose,
+        options: O,
         signature: S,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
+            options,
             signature,
         }
     }
 
-    pub fn borrowed(&self) -> UntypedProofRef<M, S>
+    pub fn borrowed(&self) -> UntypedProofRef<M, O, S>
     where
         M: Referencable,
+        O: Referencable,
         S: Referencable,
     {
         UntypedProofRef {
             created: &self.created,
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
+            options: self.options.as_reference(),
             signature: self.signature.as_reference(),
         }
     }
 
-    pub fn configuration(&self) -> ProofConfigurationRef<M>
+    pub fn configuration(&self) -> ProofConfigurationRef<M, O>
     where
         M: Referencable,
+        O: Referencable,
     {
         ProofConfigurationRef {
             created: &self.created,
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
+            options: self.options.as_reference(),
         }
     }
 
-    pub fn clone_configuration(&self) -> ProofConfiguration<M>
+    pub fn clone_configuration(&self) -> ProofConfiguration<M, O>
     where
         M: Clone,
+        O: Clone,
     {
         ProofConfiguration {
             created: self.created,
             verification_method: self.verification_method.clone(),
             proof_purpose: self.proof_purpose,
+            options: self.options.clone(),
         }
     }
 
-    pub fn try_map_verification_method<N, T, E>(
+    pub fn try_map_verification_method<N, P, T, E>(
         self,
-        f: impl FnOnce(ReferenceOrOwned<M>, S) -> Result<(ReferenceOrOwned<N>, T), E>,
-    ) -> Result<UntypedProof<N, T>, E> {
-        let (verification_method, signature) = f(self.verification_method, self.signature)?;
+        f: impl FnOnce(ReferenceOrOwned<M>, O, S) -> Result<(ReferenceOrOwned<N>, P, T), E>,
+    ) -> Result<UntypedProof<N, P, T>, E> {
+        let (verification_method, options, signature) =
+            f(self.verification_method, self.options, self.signature)?;
 
         Ok(UntypedProof::new(
             self.created,
             verification_method,
             self.proof_purpose,
+            options,
             signature,
         ))
     }
 
-    pub fn map_verification_method<N, T>(
+    pub fn map_verification_method<N, P, T>(
         self,
-        f: impl FnOnce(ReferenceOrOwned<M>, S) -> (ReferenceOrOwned<N>, T),
-    ) -> UntypedProof<N, T> {
-        let (verification_method, signature) = f(self.verification_method, self.signature);
+        f: impl FnOnce(ReferenceOrOwned<M>, O, S) -> (ReferenceOrOwned<N>, P, T),
+    ) -> UntypedProof<N, P, T> {
+        let (verification_method, options, signature) =
+            f(self.verification_method, self.options, self.signature);
 
         UntypedProof::new(
             self.created,
             verification_method,
             self.proof_purpose,
+            options,
             signature,
         )
     }
 
-    pub fn try_cast_verification_method<N, T>(self) -> Result<UntypedProof<N, T>, ProofCastError>
+    pub fn try_cast_verification_method<N, P, T>(
+        self,
+    ) -> Result<UntypedProof<N, P, T>, ProofCastError>
     where
         M: TryInto<N, Error = InvalidVerificationMethod>,
+        O: TryInto<P>,
         S: TryInto<T>,
     {
-        self.try_map_verification_method(|m, signature| {
+        self.try_map_verification_method(|m, options, signature| {
             let n = m.try_cast()?;
+            let options = options.try_into().map_err(|_| ProofCastError::Options)?;
             let signature = signature
                 .try_into()
                 .map_err(|_| ProofCastError::Signature)?;
-            Ok((n, signature))
+            Ok((n, options, signature))
         })
     }
 
-    pub fn into_typed<T: CryptographicSuite<VerificationMethod = M, Signature = S>>(
+    pub fn into_typed<T: CryptographicSuite<VerificationMethod = M, Options = O, Signature = S>>(
         self,
         type_: T,
     ) -> Proof<T> {
@@ -142,7 +165,7 @@ impl<M, S> UntypedProof<M, S> {
 }
 
 /// Untyped Data Integrity Proof.
-pub struct UntypedProofRef<'a, M: Referencable, S: 'a + Referencable> {
+pub struct UntypedProofRef<'a, M: Referencable, O: 'a + Referencable, S: 'a + Referencable> {
     /// Date and time of creation.
     pub created: &'a xsd_types::DateTime,
 
@@ -152,72 +175,108 @@ pub struct UntypedProofRef<'a, M: Referencable, S: 'a + Referencable> {
     /// Proof purpose.
     pub proof_purpose: ProofPurpose,
 
+    pub options: O::Reference<'a>,
+
     /// Proof value.
     pub signature: S::Reference<'a>,
 }
 
-impl<'a, M: Referencable, S: 'a + Referencable> UntypedProofRef<'a, M, S> {
+impl<'a, M: Referencable, O: 'a + Referencable, S: 'a + Referencable> UntypedProofRef<'a, M, O, S> {
     pub fn new(
         created: &'a xsd_types::DateTime,
         verification_method: ReferenceOrOwnedRef<'a, M>,
         proof_purpose: ProofPurpose,
+        options: O::Reference<'a>,
         signature: S::Reference<'a>,
     ) -> Self {
         Self {
             created,
             verification_method,
             proof_purpose,
+            options,
             signature,
         }
     }
 
-    pub fn try_map_verification_method<N: 'a + Referencable, T: 'a + Referencable, E>(
+    pub fn try_map_verification_method<
+        N: 'a + Referencable,
+        P: 'a + Referencable,
+        T: 'a + Referencable,
+        E,
+    >(
         self,
         f: impl FnOnce(
             ReferenceOrOwnedRef<'a, M>,
+            O::Reference<'a>,
             S::Reference<'a>,
-        ) -> Result<(ReferenceOrOwnedRef<'a, N>, T::Reference<'a>), E>,
-    ) -> Result<UntypedProofRef<'a, N, T>, E> {
-        let (verification_method, signature) = f(self.verification_method, self.signature)?;
+        ) -> Result<
+            (
+                ReferenceOrOwnedRef<'a, N>,
+                P::Reference<'a>,
+                T::Reference<'a>,
+            ),
+            E,
+        >,
+    ) -> Result<UntypedProofRef<'a, N, P, T>, E> {
+        let (verification_method, options, signature) =
+            f(self.verification_method, self.options, self.signature)?;
 
         Ok(UntypedProofRef::new(
             self.created,
             verification_method,
             self.proof_purpose,
+            options,
             signature,
         ))
     }
 
-    pub fn map_verification_method<N: 'a + Referencable, T: 'a + Referencable>(
+    pub fn map_verification_method<
+        N: 'a + Referencable,
+        P: 'a + Referencable,
+        T: 'a + Referencable,
+    >(
         self,
         f: impl FnOnce(
             ReferenceOrOwnedRef<'a, M>,
+            O::Reference<'a>,
             S::Reference<'a>,
-        ) -> (ReferenceOrOwnedRef<'a, N>, T::Reference<'a>),
-    ) -> UntypedProofRef<'a, N, T> {
-        let (verification_method, signature) = f(self.verification_method, self.signature);
+        ) -> (
+            ReferenceOrOwnedRef<'a, N>,
+            P::Reference<'a>,
+            T::Reference<'a>,
+        ),
+    ) -> UntypedProofRef<'a, N, P, T> {
+        let (verification_method, options, signature) =
+            f(self.verification_method, self.options, self.signature);
 
         UntypedProofRef::new(
             self.created,
             verification_method,
             self.proof_purpose,
+            options,
             signature,
         )
     }
 
-    pub fn try_cast_verification_method<N: 'a + Referencable, T: 'a + Referencable>(
+    pub fn try_cast_verification_method<
+        N: 'a + Referencable,
+        P: 'a + Referencable,
+        T: 'a + Referencable,
+    >(
         self,
-    ) -> Result<UntypedProofRef<'a, N, T>, ProofCastError>
+    ) -> Result<UntypedProofRef<'a, N, P, T>, ProofCastError>
     where
         M::Reference<'a>: TryInto<N::Reference<'a>, Error = InvalidVerificationMethod>,
+        O::Reference<'a>: TryInto<P::Reference<'a>>,
         S::Reference<'a>: TryInto<T::Reference<'a>>,
     {
-        self.try_map_verification_method(|m, signature| {
+        self.try_map_verification_method(|m, options, signature| {
             let n = m.try_cast()?;
+            let options = options.try_into().map_err(|_| ProofCastError::Options)?;
             let signature = signature
                 .try_into()
                 .map_err(|_| ProofCastError::Signature)?;
-            Ok((n, signature))
+            Ok((n, options, signature))
         })
     }
 }
@@ -226,6 +285,9 @@ impl<'a, M: Referencable, S: 'a + Referencable> UntypedProofRef<'a, M, S> {
 pub enum ProofCastError {
     #[error(transparent)]
     VerificationMethod(#[from] InvalidVerificationMethod),
+
+    #[error("invalid options")]
+    Options,
 
     #[error("invalid signature")]
     Signature,
@@ -237,6 +299,7 @@ impl From<ProofCastError> for VerificationError {
             ProofCastError::VerificationMethod(iri) => {
                 VerificationError::InvalidVerificationMethod(iri)
             }
+            ProofCastError::Options => VerificationError::InvalidProofOptions,
             ProofCastError::Signature => VerificationError::InvalidSignature,
         }
     }

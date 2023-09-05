@@ -133,6 +133,8 @@ impl LocalSolanaTransaction {
 }
 
 impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = Signature;
 
     type Protocol = Base58Btc;
@@ -142,6 +144,7 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &SolanaMethod2021,
         bytes: &'a [u8],
         signer: S,
@@ -151,6 +154,7 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     fn verify(
         &self,
+        options: (),
         signature: SignatureRef,
         method: &SolanaMethod2021,
         bytes: &[u8],

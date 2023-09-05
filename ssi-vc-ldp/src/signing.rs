@@ -47,8 +47,7 @@ impl<C, S: CryptographicSuite> DataIntegrity<C, S> {
         context: X,
         signer: &'max T,
         suite: S,
-        params: ProofConfiguration<S::VerificationMethod>,
-        options: S::Options,
+        params: ProofConfiguration<S::VerificationMethod, S::Options>,
     ) -> SignLinkedData<'max, C, S, T>
     where
         S: CryptographicSuiteInput<C, X>,
@@ -64,7 +63,6 @@ impl<C, S: CryptographicSuite> DataIntegrity<C, S> {
                     Binder {
                         suite: &suite,
                         params,
-                        options,
                         signer,
                     },
                 );
@@ -92,19 +90,20 @@ where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
+    S::Options: 'max,
     S::Signature: 'max,
 {
     type Owned = S::Hashed;
 
     type Bound<'a> = GenerateProof<'a, S, T> where 'max: 'a;
 
-    type Output = Result<UntypedProof<S::VerificationMethod, S::Signature>, SignatureError>;
+    type Output =
+        Result<UntypedProof<S::VerificationMethod, S::Options, S::Signature>, SignatureError>;
 }
 
 struct Binder<'s, 'a, S: CryptographicSuite, T> {
     suite: &'s S,
-    params: ProofConfiguration<S::VerificationMethod>,
-    options: S::Options,
+    params: ProofConfiguration<S::VerificationMethod, S::Options>,
     signer: &'a T,
 }
 
@@ -118,6 +117,7 @@ where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
+    S::Options: 'max,
     S::Signature: 'max,
 {
     fn bind<'a>(context: Self, hash: &'a S::Hashed) -> GenerateProof<'a, S, T>
@@ -126,7 +126,7 @@ where
     {
         context
             .suite
-            .generate_proof(hash, context.signer, context.params, context.options)
+            .generate_proof(hash, context.signer, context.params)
     }
 }
 
@@ -143,6 +143,7 @@ where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
+    S::Options: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
     #[pin]
@@ -171,6 +172,7 @@ where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
+    S::Options: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
     Err(Option<Error>),
@@ -203,6 +205,7 @@ where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
+    S::Options: 'max,
     S::Signature: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {

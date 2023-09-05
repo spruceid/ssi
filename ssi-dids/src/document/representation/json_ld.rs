@@ -1,6 +1,8 @@
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 use std::{ops::Deref, str::FromStr};
 
+pub use json_ld::syntax::{context, ContextEntry};
+
 use crate::Document;
 
 /// DID document represented as a JSON document.
@@ -97,7 +99,7 @@ pub enum Context {
 }
 
 impl Context {
-    pub fn array(did_context: DIDContext, additional_contexts: Vec<serde_json::Value>) -> Self {
+    pub fn array(did_context: DIDContext, additional_contexts: Vec<ContextEntry>) -> Self {
         Self::Array(ContextArray(did_context, additional_contexts))
     }
 }
@@ -109,7 +111,7 @@ impl Default for Context {
 }
 
 #[derive(Debug, Default)]
-pub struct ContextArray(DIDContext, Vec<serde_json::Value>);
+pub struct ContextArray(DIDContext, Vec<ContextEntry>);
 
 impl Serialize for ContextArray {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

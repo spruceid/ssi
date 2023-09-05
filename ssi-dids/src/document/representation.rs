@@ -26,7 +26,8 @@ pub use json::Json;
 use crate::Document;
 
 /// DID document in a specific representation.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Represented<D = Document> {
     Json(Json<D>),
     JsonLd(JsonLd<D>),
@@ -136,7 +137,7 @@ pub enum Options {
 impl Options {
     pub fn from_media_type(
         type_: MediaType,
-        json_ld_options: impl Fn() -> json_ld::Options,
+        json_ld_options: impl FnOnce() -> json_ld::Options,
     ) -> Self {
         match type_ {
             MediaType::Json => Self::Json,

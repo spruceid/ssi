@@ -5,11 +5,11 @@ use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
+use ssi_jws::{CompactJWSStr, Header};
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, SignatureError, SigningMethod, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    Referencable, SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
@@ -115,17 +115,20 @@ impl TryFrom<GenericVerificationMethod>
     }
 }
 
+fn build_signing_bytes(bytes: &[u8], public_key: &JWK) -> (Header, Vec<u8>) {
+    let header = ssi_jws::Header::new_unencoded(Algorithm::EdBlake2b, public_key.key_id.clone());
+    let signing_bytes = header.encode_signing_bytes(bytes);
+    (header, signing_bytes)
+}
+
 impl SigningMethod<JWK> for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn sign_ref(
-        this: &Self,
+        _this: &Self,
         key: &JWK,
-        protocol: (),
+        _protocol: (),
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        Ok(
-            ssi_jws::detached_sign_unencoded_payload(Algorithm::EdBlake2b, bytes, key)
-                .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?
-                .into_bytes(),
-        )
+        ssi_jws::sign_bytes(Algorithm::EdBlake2b, bytes, key)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

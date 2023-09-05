@@ -70,7 +70,7 @@ impl Base58Btc {
 /// Ethereum Wallet protocol.
 ///
 /// Used in combination with the `EthereumPersonalSignature2021` cryptographic
-/// suite.The signer (the Ethereum Wallet) must prefix the message with
+/// suite. The signer (the Ethereum Wallet) must prefix the message with
 /// `\x19Ethereum Signed Message:\n` and send back the signature encoded in
 /// hexadecimal, with a `0x` prefix.
 pub struct EthereumWallet;

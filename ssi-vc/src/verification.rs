@@ -47,6 +47,14 @@ pub enum ProofValidity {
 }
 
 impl ProofValidity {
+    pub fn is_valid(&self) -> bool {
+        matches!(self, Self::Valid)
+    }
+
+    pub fn is_invalid(&self) -> bool {
+        matches!(self, Self::Invalid)
+    }
+
     pub fn into_result(self) -> Result<(), InvalidProof> {
         match self {
             Self::Valid => Ok(()),

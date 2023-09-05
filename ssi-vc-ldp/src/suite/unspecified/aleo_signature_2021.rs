@@ -85,7 +85,7 @@ impl CryptographicSuite for AleoSignature2021 {
     fn hash(
         &self,
         data: String,
-        proof_configuration: ProofConfigurationRef<Self::VerificationMethod>,
+        proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
@@ -106,6 +106,8 @@ impl SignatureAlgorithm {
 }
 
 impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
+    type Options = ();
+
     type Signature = MultibaseSignature;
 
     type Protocol = Base58BtcMultibase;
@@ -115,6 +117,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -124,6 +127,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
+        options: (),
         signature: MultibaseSignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

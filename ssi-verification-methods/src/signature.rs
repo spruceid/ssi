@@ -36,6 +36,15 @@ pub enum SignatureError {
 
     #[error(transparent)]
     Signer(#[from] ssi_crypto::MessageSignatureError),
+
+    #[error("invalid received signature")]
+    InvalidSignature,
+}
+
+impl From<std::convert::Infallible> for SignatureError {
+    fn from(_value: std::convert::Infallible) -> Self {
+        unreachable!()
+    }
 }
 
 pub enum InvalidSignature {
@@ -57,6 +66,8 @@ impl From<InvalidSignature> for VerificationError {
 }
 
 pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
+    type Options: Referencable;
+
     type Signature: Referencable;
 
     /// Signature protocol.
@@ -68,6 +79,7 @@ pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: <Self::Options as Referencable>::Reference<'a>,
         method: M::Reference<'_>,
         bytes: &'a [u8],
         signer: S,
@@ -75,8 +87,9 @@ pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
     where
         <Self::Protocol as SignatureProtocol>::Output: 'a;
 
-    fn verify<'s, 'm>(
+    fn verify<'o, 's, 'm>(
         &self,
+        options: <Self::Options as Referencable>::Reference<'o>,
         signature: <Self::Signature as Referencable>::Reference<'s>,
         method: M::Reference<'m>,
         bytes: &[u8],

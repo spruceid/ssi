@@ -61,13 +61,7 @@ impl CompactJWS {
                         state = State::Signature
                     }
                 }
-                State::Signature => {
-                    match b {
-                        b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
-                        b'.' => (), // it was still the payload, not in base64.
-                        _ => state = State::Payload, // still the payload, not in base64.
-                    }
-                }
+                State::Signature => (),
             }
         }
 
@@ -231,6 +225,15 @@ impl fmt::Debug for CompactJWSStr {
     }
 }
 
+impl serde::Serialize for CompactJWSStr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.as_str().serialize(serializer)
+    }
+}
+
 /// JWS in compact serialized form.
 pub struct CompactJWSBuf(Vec<u8>);
 
@@ -252,12 +255,22 @@ impl CompactJWSBuf {
 
     pub fn from_signing_bytes_and_signature(
         signing_bytes: Vec<u8>,
-        signature: Vec<u8>,
+        signature: &[u8],
     ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
         let mut bytes = signing_bytes;
         bytes.push(b'.');
-        bytes.extend(signature);
+        bytes.extend(signature.iter().copied());
         Self::new(bytes)
+    }
+
+    /// Creates a new detached JWS.
+    ///
+    /// Detached means the payload will not appear in the JWS.
+    pub fn new_detached(header: Header, signature: &[u8]) -> Self {
+        let mut bytes = header.encode();
+        bytes.extend([b'.', b'.']);
+        bytes.extend(signature.iter().copied());
+        unsafe { Self::new_unchecked(bytes) }
     }
 
     /// # Safety
@@ -339,6 +352,27 @@ impl CompactJWSString {
         bytes.push(b'.');
         bytes.extend(signature);
         Self::new(bytes)
+    }
+
+    /// Creates a new detached JWS from a header and base64-encoded signature.
+    ///
+    /// Detached means the payload will not appear in the JWS.
+    pub fn new_detached(
+        header: Header,
+        b64_signature: &[u8],
+    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+        let mut bytes = header.encode();
+        bytes.extend([b'.', b'.']);
+        bytes.extend(b64_signature.iter().copied());
+        Self::new(bytes)
+    }
+
+    /// Creates a new detached JWS from a header and unencoded signature.
+    ///
+    /// Detached means the payload will not appear in the JWS.
+    pub fn encode_detached(header: Header, signature: &[u8]) -> Self {
+        let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+        Self::new_detached(header, b64_signature.as_bytes()).unwrap()
     }
 
     /// # Safety
@@ -507,12 +541,12 @@ impl From<serde_json::Error> for InvalidHeader {
 impl Header {
     /// Create a new header for a JWS with detached payload.
     ///
-    /// Detached means the payload will not be base64 encoded
+    /// Unencoded means the payload will not be base64 encoded
     /// when the `encode_signing_bytes` function is called.
     /// This is done by setting the `b64` header parameter to `true`,
     /// while adding `b64` to the list of critical parameters the
     /// receiver must understand to decode the JWS.
-    pub fn new_detached(algorithm: Algorithm, key_id: Option<String>) -> Self {
+    pub fn new_unencoded(algorithm: Algorithm, key_id: Option<String>) -> Self {
         Self {
             algorithm,
             key_id,

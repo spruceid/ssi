@@ -41,7 +41,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         input: T,
         context: X,
         suite: &S,
-        params: ProofConfigurationRef<S::VerificationMethod>,
+        params: ProofConfigurationRef<S::VerificationMethod, S::Options>,
     ) -> Result<Self, Error>
     where
         S: CryptographicSuiteInput<T, X>,

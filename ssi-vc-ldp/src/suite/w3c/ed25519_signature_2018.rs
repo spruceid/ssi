@@ -61,6 +61,8 @@ pub struct SignatureAlgorithm;
 impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
     for SignatureAlgorithm
 {
+    type Options = ();
+
     type Signature = JwsSignature;
 
     type Protocol = ();
@@ -70,6 +72,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
+        options: (),
         method: &Ed25519VerificationKey2018,
         bytes: &'a [u8],
         signer: S,
@@ -79,6 +82,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
 
     fn verify(
         &self,
+        options: (),
         signature: JwsSignatureRef,
         method: &Ed25519VerificationKey2018,
         bytes: &[u8],

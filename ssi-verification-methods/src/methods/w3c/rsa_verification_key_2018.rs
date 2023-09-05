@@ -44,7 +44,7 @@ pub struct RsaVerificationKey2018 {
 
 impl RsaVerificationKey2018 {
     pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<String, SignatureError> {
-        let header = ssi_jws::Header::new_detached(ssi_jwk::Algorithm::RS256, None);
+        let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::RS256, None);
         let signing_bytes = header.encode_signing_bytes(data);
         let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, &signing_bytes, secret_key)
             .map_err(|_| SignatureError::InvalidSecretKey)?;

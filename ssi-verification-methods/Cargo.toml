@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
-default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "thezos", "eip712", "aleo", "solana"]
+default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "eip712", "aleo", "solana"]
 # enable RSA keys
 rsa = []
 # enable ed25519 keys
@@ -21,7 +21,7 @@ secp256r1 = ["p256"]
 # enable secp384r1 (p384) keys
 secp384r1 = ["p384"]
 
-thezos = ["ssi-tzkey"]
+tezos = ["ssi-tzkey", "ssi-caips/tezos"]
 
 eip712 = ["ssi-eip712"]
 
