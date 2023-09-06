@@ -141,6 +141,7 @@ pub fn get_keywordsmap() -> HashMap<String, u8> {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 pub struct JsonldDocument {
     context: Value,
     id: Value,
@@ -148,11 +149,13 @@ pub struct JsonldDocument {
     verifiable_credential: Value,
 }
 
+#[allow(dead_code)]
 pub struct CredentialSubject {
     over_age: Value,
     concealed_id_token: Value,
 }
 
+#[allow(dead_code)]
 pub struct Proof {
     type_: Value,
     created: Value,
@@ -161,6 +164,7 @@ pub struct Proof {
     proof_value: Value,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Entry {
     aliases: Aliases,
@@ -170,6 +174,7 @@ pub struct Entry {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct Aliases {
     id: String,
     type_: String,
@@ -379,7 +384,7 @@ pub async fn truage_jsonld_to_cborld(
                 }
                 //to do
                 if val.is_number() {
-                    let value_encoded = val;
+                    let _value_encoded = val;
                 }
             }
 
@@ -432,7 +437,7 @@ pub async fn encode(document: Value) -> Vec<u8> {
             if value == vec![65] {
                 prefix = vec![24, key, 24];
                 suffix = value;
-            } else if value == vec![21] {
+            } else if value == vec![21] || value == vec![18] {
                 suffix = value;
             }
         } else {
@@ -511,8 +516,6 @@ pub async fn encode(document: Value) -> Vec<u8> {
     final_result.push(map_indicator4);
 
     for (key, value) in level_one {
-        // println!("level_one_entry key: {:?}, value: {:?}", key, value);
-
         let mut prefix = vec![];
         let mut suffix = vec![];
         if key == 0 {
@@ -654,5 +657,70 @@ mod tests {
         //     }
         // }
         assert_eq!(cborld_encoded, cmp_hex);
+    }
+
+    #[async_std::test]
+    async fn test_age_over() {
+        let bytes: Vec<u8> = vec![
+            217, 5, 1, 163, 0, 17, 24, 116, 24, 110, 24, 124, 168, 1, 131, 17, 22, 20, 24, 112,
+            130, 3, 80, 159, 95, 241, 151, 214, 212, 74, 61, 166, 130, 52, 252, 121, 150, 103, 67,
+            24, 114, 165, 24, 116, 24, 150, 24, 182, 26, 99, 123, 190, 237, 24, 190, 24, 196, 24,
+            192, 88, 65, 122, 29, 132, 172, 43, 117, 194, 204, 250, 248, 229, 124, 199, 188, 148,
+            223, 155, 115, 20, 41, 26, 67, 235, 13, 87, 234, 212, 223, 223, 47, 5, 117, 167, 96,
+            70, 197, 16, 232, 137, 25, 106, 254, 243, 233, 73, 105, 34, 98, 253, 232, 219, 252, 91,
+            82, 95, 114, 249, 18, 108, 78, 15, 236, 27, 70, 4, 24, 194, 131, 25, 4, 1, 88, 34, 237,
+            1, 145, 251, 113, 106, 74, 102, 30, 197, 251, 100, 54, 179, 246, 34, 94, 191, 193, 10,
+            126, 218, 96, 210, 180, 187, 94, 111, 179, 236, 251, 177, 32, 127, 88, 34, 237, 1, 145,
+            251, 113, 106, 74, 102, 30, 197, 251, 100, 54, 179, 246, 34, 94, 191, 193, 10, 126,
+            218, 96, 210, 180, 187, 94, 111, 179, 236, 251, 177, 32, 127, 24, 117, 130, 24, 108,
+            24, 130, 24, 158, 162, 24, 138, 88, 88, 122, 217, 5, 1, 164, 0, 21, 24, 106, 24, 100,
+            24, 108, 75, 122, 217, 5, 1, 162, 0, 22, 24, 124, 24, 65, 24, 110, 88, 59, 122, 0, 0,
+            154, 62, 19, 12, 98, 215, 0, 228, 10, 131, 136, 163, 163, 172, 79, 141, 241, 174, 208,
+            229, 150, 211, 46, 189, 197, 40, 226, 35, 68, 62, 154, 28, 203, 36, 251, 193, 148, 128,
+            236, 156, 224, 57, 55, 228, 84, 139, 92, 193, 42, 156, 45, 6, 52, 237, 63, 192, 24,
+            148, 18, 24, 162, 26, 99, 245, 8, 236, 24, 164, 26, 99, 123, 190, 236, 24, 168, 130,
+            25, 4, 1, 88, 34, 237, 1, 145, 251, 113, 106, 74, 102, 30, 197, 251, 100, 54, 179, 246,
+            34, 94, 191, 193, 10, 126, 218, 96, 210, 180, 187, 94, 111, 179, 236, 251, 177, 32,
+            127,
+        ];
+        let hex = hex::encode(bytes.clone());
+        let cmp_hex = hex::decode(hex).unwrap();
+        let doc: Value = serde_json::json!({
+            "@context": "https://www.w3.org/2018/credentials/v1",
+            "type": "VerifiablePresentation",
+            "verifiableCredential": {
+                "@context": [
+                    "https://www.w3.org/2018/credentials/v1",
+                    "https://w3id.org/age/v1",
+                    "https://w3id.org/security/suites/ed25519-2020/v1"
+                ],
+                "id": "urn:uuid:9f5ff197-d6d4-4a3d-a682-34fc79966743",
+                "type": [
+                    "VerifiableCredential",
+                    "OverAgeTokenCredential"
+                ],
+                "issuer": "did:key:z6MkpH7YDw3LBmqTmUzifCBe999t8DatvWnpxSgYQn9UEeyc",
+                "issuanceDate": "2022-11-21T18:09:48Z",
+                "expirationDate": "2023-02-21T18:09:48Z",
+                "credentialSubject": {
+                    "overAge": 18,
+                    "concealedIdToken": "zPwe8eWs7Gv9pfQ2UL6y17BfCNYFx2fiHGqChnf4jK5wdtH6EgeBM6jNshNYvBYkZjudjGWyEyi5zjBVBkMtdgN7V7AKnL5BSGcxi25KpGk6KQDP9mRKHfWw"
+                },
+                "proof": {
+                    "type": "Ed25519Signature2020",
+                    "created": "2022-11-21T18:09:49Z",
+                    "verificationMethod": "did:key:z6MkpH7YDw3LBmqTmUzifCBe999t8DatvWnpxSgYQn9UEeyc#z6MkpH7YDw3LBmqTmUzifCBe999t8DatvWnpxSgYQn9UEeyc",
+                    "proofPurpose": "assertionMethod",
+                    "proofValue": "zbEKA8bqX3cYWJ5cYEQztNy9m3pR1L3QyDxoKcu7jXWyWz8NzKvbtpeWFnzReLAoWD2exshvto1fxbf7H7H6Vfsh"
+                }
+            }
+        });
+
+        let cborld_encoded = encode(doc).await;
+
+        assert_eq!(cborld_encoded, cmp_hex);
+
+        println!("cbor encoded: {:?}", cborld_encoded);
+        println!("reference bytes: {:?}", bytes);
     }
 }
