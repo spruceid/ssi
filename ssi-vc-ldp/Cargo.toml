@@ -80,6 +80,7 @@ hex.workspace = true
 serde = { workspace = true, features = ["derive"] }
 pin-project.workspace = true
 derivative.workspace = true
+educe.workspace = true
 futures.workspace = true
 self_cell = "1.0.1"
 

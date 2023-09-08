@@ -4,9 +4,11 @@ use linked_data::LinkedData;
 use serde_json::json;
 use ssi_dids::{did, resolution::Options, DIDResolver, DIDVerifier};
 use ssi_jwk::JWK;
+use ssi_jws::CompactJWSString;
+use ssi_vc::Verifiable;
 use ssi_vc_ldp::{
     verification::method::{signer::SingleSecretSigner, ProofPurpose},
-    LinkedDataInput,
+    LinkedDataInput, DataIntegrity,
 };
 use static_iref::iri;
 
@@ -159,7 +161,7 @@ async fn credential_prove_verify_did_tz1() {
         UriBuf::new(mock_server.uri().into_bytes()).unwrap(),
     )));
 
-    #[derive(Clone, LinkedData)]
+    #[derive(Clone, serde::Serialize, LinkedData)]
     #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
     #[ld(type = "cred:VerifiableCredential")]
     struct Credential {
@@ -173,8 +175,10 @@ async fn credential_prove_verify_did_tz1() {
         credential_subject: IriBuf,
     }
 
+    let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
+
     let cred = Credential {
-        issuer: iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned(),
+        issuer: did.clone().into(),
         issuance_date: "2021-01-27T16:39:07Z".parse().unwrap(),
         credential_subject: iri!("did:example:foo").to_owned(),
     };
@@ -240,130 +244,69 @@ async fn credential_prove_verify_did_tz1() {
 
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
-    // 	// Make it into a VP
-    // 	use ssi_core::one_or_many::OneOrMany;
-    // 	use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
-    // 	let mut vp = Presentation {
-    // 		context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
-    // 			DEFAULT_CONTEXT.to_string(),
-    // 		))]),
+    #[derive(Clone, serde::Serialize, LinkedData)]
+    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
+    #[ld(type = "cred:VerifiablePresentation")]
+    struct Presentation {
+        #[ld(id)]
+        id: IriBuf,
 
-    // 		id: Some("http://example.org/presentations/3731".try_into().unwrap()),
-    // 		type_: OneOrMany::One("VerifiablePresentation".to_string()),
-    // 		verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
-    // 		proof: None,
-    // 		holder: None,
-    // 		property_set: None,
-    // 		holder_binding: None,
-    // 	};
-    // 	let mut vp_issue_options = LinkedDataProofOptions::default();
-    // 	vp.holder = Some(URI::String(did.to_string()));
-    // 	vp_issue_options.verification_method =
-    // 		Some(URI::String(did.to_string() + "#blockchainAccountId"));
-    // 	vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-    // 	eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-    // 	let mut context_loader = ssi_json_ld::ContextLoader::default();
-    // 	// let vp_proof = vp.generate_proof(&key, &vp_issue_options, &DIDTZ).await.unwrap();
-    // 	let vp_proof_str = r###"
-    // {
-    // "@context": {
-    // "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021": {
-    // 	"@context": {
-    // 	"@protected": true,
-    // 	"@version": 1.1,
-    // 	"challenge": "https://w3id.org/security#challenge",
-    // 	"created": {
-    // 		"@id": "http://purl.org/dc/terms/created",
-    // 		"@type": "http://www.w3.org/2001/XMLSchema#dateTime"
-    // 	},
-    // 	"domain": "https://w3id.org/security#domain",
-    // 	"expires": {
-    // 		"@id": "https://w3id.org/security#expiration",
-    // 		"@type": "http://www.w3.org/2001/XMLSchema#dateTime"
-    // 	},
-    // 	"id": "@id",
-    // 	"jws": "https://w3id.org/security#jws",
-    // 	"nonce": "https://w3id.org/security#nonce",
-    // 	"proofPurpose": {
-    // 		"@context": {
-    // 		"@protected": true,
-    // 		"@version": 1.1,
-    // 		"assertionMethod": {
-    // 			"@container": "@set",
-    // 			"@id": "https://w3id.org/security#assertionMethod",
-    // 			"@type": "@id"
-    // 		},
-    // 		"authentication": {
-    // 			"@container": "@set",
-    // 			"@id": "https://w3id.org/security#authenticationMethod",
-    // 			"@type": "@id"
-    // 		},
-    // 		"id": "@id",
-    // 		"type": "@type"
-    // 		},
-    // 		"@id": "https://w3id.org/security#proofPurpose",
-    // 		"@type": "@vocab"
-    // 	},
-    // 	"publicKeyJwk": {
-    // 		"@id": "https://w3id.org/security#publicKeyJwk",
-    // 		"@type": "@json"
-    // 	},
-    // 	"type": "@type",
-    // 	"verificationMethod": {
-    // 		"@id": "https://w3id.org/security#verificationMethod",
-    // 		"@type": "@id"
-    // 	}
-    // 	},
-    // 	"@id": "https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021"
-    // }
-    // },
-    // "type": "Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021",
-    // "proofPurpose": "authentication",
-    // "verificationMethod": "did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId",
-    // "created": "2021-03-02T19:05:08.271Z",
-    // "jws": "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw",
-    // "publicKeyJwk": {
-    // "crv": "Ed25519",
-    // "kty": "OKP",
-    // "x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"
-    // }
-    // }"###;
-    // 	let vp_proof = serde_json::from_str(vp_proof_str).unwrap();
-    // 	println!("{}", serde_json::to_string_pretty(&vp_proof).unwrap());
-    // 	vp.add_proof(vp_proof);
-    // 	println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-    // 	vp.validate().unwrap();
-    // 	let vp_verification_result = vp
-    // 		.verify(Some(vp_issue_options.clone()), &didtz, &mut context_loader)
-    // 		.await;
-    // 	println!("{:#?}", vp_verification_result);
-    // 	assert!(vp_verification_result.errors.is_empty());
+        #[ld("cred:holder")]
+        holder: linked_data::Ref<UriBuf>,
 
-    // 	// mess with the VP proof to make verify fail
-    // 	let mut vp1 = vp.clone();
-    // 	match vp1.proof {
-    // 		Some(OneOrMany::One(ref mut proof)) => match proof.jws {
-    // 			Some(ref mut jws) => {
-    // 				jws.insert(0, 'x');
-    // 			}
-    // 			_ => unreachable!(),
-    // 		},
-    // 		_ => unreachable!(),
-    // 	}
-    // 	let vp_verification_result = vp1
-    // 		.verify(Some(vp_issue_options), &didtz, &mut context_loader)
-    // 		.await;
-    // 	println!("{:#?}", vp_verification_result);
-    // 	assert!(!vp_verification_result.errors.is_empty());
+        #[ld("cred:verifiableCredential", graph)]
+        verifiable_credential: Verifiable<DataIntegrity<Credential, ssi_vc_ldp::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021>>
+    }
 
-    // 	// test that holder is verified
-    // 	let mut vp2 = vp.clone();
-    // 	vp2.holder = Some(URI::String("did:example:bad".to_string()));
-    // 	assert!(!vp2
-    // 		.verify(None, &didtz, &mut context_loader)
-    // 		.await
-    // 		.errors
-    // 		.is_empty());
+    let presentation = Presentation {
+        id: iri!("http://example.org/presentations/3731").to_owned(),
+        holder: linked_data::Ref(did.into()),
+        verifiable_credential: vc
+    };
+
+    let vp_proof = ssi_vc_ldp::Proof::new(
+		ssi_vc_ldp::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+		"2021-03-02T19:05:08.271Z".parse().unwrap(),
+		iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
+		ProofPurpose::Authentication,
+        ssi_vc_ldp::suite::ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Options::new(
+            r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
+        ),
+		ssi_vc_ldp::suite::JwsSignature::new(
+			"eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
+		)
+	);
+
+    let ldp_vp = ssi_vc_ldp::DataIntegrity::new(
+        presentation.clone(),
+        LinkedDataInput::default(),
+        vp_proof.suite(),
+        vp_proof.configuration(),
+    )
+    .unwrap();
+
+    let vp = ssi_vc::Verifiable::new(ldp_vp, vp_proof.clone());
+
+    println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+
+    assert!(vp.verify(&didtz).await.unwrap().is_valid());
+
+    // mess with the VP proof to make verify fail
+    let mut vp1 = vp.clone();
+    vp1.proof_mut().signature_mut().jws = CompactJWSString::from_string(format!("x{}", vp1.proof_mut().signature_mut().jws)).unwrap();
+    assert!(vp1.verify(&didtz).await.is_err());
+
+    // test that holder is verified
+    let mut presentation2 = presentation.clone();
+    presentation2.holder = linked_data::Ref(did!("did:example:bad").to_owned().into());
+    let ldp_vp2 = ssi_vc_ldp::DataIntegrity::new(
+        presentation2,
+        LinkedDataInput::default(),
+        vp_proof.suite(),
+        vp_proof.configuration(),
+    ).unwrap();
+    let vp2 = ssi_vc::Verifiable::new(ldp_vp2, vp_proof);
+    assert!(vp2.verify(&didtz).await.unwrap().is_invalid());
 }
 
 // #[tokio::test]
