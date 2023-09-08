@@ -63,6 +63,7 @@ rand = { version = "0.8", optional = true }
 ring = { version = "0.16", optional = true }
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
+linked-data.workspace = true
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

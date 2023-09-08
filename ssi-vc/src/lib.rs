@@ -5,6 +5,7 @@
 //! The `ssi` library collection provides two proof mechanisms:
 //!   - JSON Web Token, defined by the `ssi-jwt` library.
 //!   - Data Integrity Proofs, defined by the `ssi-ldp` library.
+use educe::Educe;
 use iref::Iri;
 use linked_data::LinkedData;
 use ssi_verification_methods::{VerificationError, Verifier};
@@ -47,14 +48,17 @@ pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =
 // pub use schema::cred::*;
 
 /// Verifiable credential.
-#[derive(LinkedData)]
+#[derive(Educe, serde::Serialize, serde::Deserialize, LinkedData)]
+#[educe(Clone(bound = "C: Clone, C::Proof: Clone"))]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Verifiable<C: VerifiableWith> {
     /// Credential.
+    #[serde(flatten)]
     #[ld(flatten)]
     credential: C,
 
     /// Credential proof.
-    #[ld("sec:proof")]
+    #[ld("sec:proof", graph)]
     proof: C::Proof,
 }
 
@@ -67,8 +71,16 @@ impl<C: VerifiableWith> Verifiable<C> {
         &self.credential
     }
 
+    pub fn credential_mut(&mut self) -> &mut C {
+        &mut self.credential
+    }
+
     pub fn proof(&self) -> &C::Proof {
         &self.proof
+    }
+
+    pub fn proof_mut(&mut self) -> &mut C::Proof {
+        &mut self.proof
     }
 
     pub fn map<D: VerifiableWith>(

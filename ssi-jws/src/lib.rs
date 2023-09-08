@@ -4,6 +4,7 @@
 
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
+use linked_data::{LinkedDataSubject, LinkedDataPredicateObjects, LinkedDataResource, RdfTermRef};
 use core::fmt;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
@@ -125,8 +126,10 @@ impl CompactJWS {
     }
 
     /// Returns the Base64 encoded signature.
-    pub fn signature(&self) -> &[u8] {
-        &self.0[self.signature_start()..]
+    pub fn signature(&self) -> &str {
+        unsafe {
+            std::str::from_utf8_unchecked(&self.0[self.signature_start()..])
+        }
     }
 
     pub fn decode_signature(&self) -> Result<Vec<u8>, Base64DecodeError> {
@@ -428,6 +431,37 @@ impl FromStr for CompactJWSString {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::from_string(s.to_owned())
+    }
+}
+
+impl LinkedDataResource for CompactJWSString {
+    fn interpretation(
+        &self,
+        _vocabulary: &mut (),
+        _interpretation: &mut (),
+    ) -> linked_data::ResourceInterpretation<(), ()> {
+        use linked_data::{ResourceInterpretation, CowRdfTerm, RdfLiteralRef, xsd_types::ValueRef};
+        ResourceInterpretation::Uninterpreted(Some(
+            CowRdfTerm::Borrowed(RdfTermRef::Literal(RdfLiteralRef::Xsd(ValueRef::String(&self.0)))
+        )))
+    }
+}
+
+impl LinkedDataSubject for CompactJWSString {
+    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<(), ()>
+    {
+        serializer.end()
+    }
+}
+
+impl LinkedDataPredicateObjects for CompactJWSString {
+    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+        where
+            S: linked_data::PredicateObjectsVisitor<(), ()> {
+        visitor.object(self)?;
+        visitor.end()
     }
 }
 

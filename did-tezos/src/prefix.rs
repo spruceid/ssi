@@ -24,7 +24,6 @@ pub enum Prefix {
 
 impl Prefix {
     pub fn from_address(address: &str) -> Result<Self, PrefixError> {
-        eprintln!("prefix from address: {address}");
         match address.get(..3) {
             Some(prefix) => Self::from_str(prefix).map_err(PrefixError::Invalid),
             None => Err(PrefixError::Missing),

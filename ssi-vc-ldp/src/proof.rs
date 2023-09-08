@@ -1,5 +1,5 @@
 use linked_data::{
-    LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfLiteralValue,
+    LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfLiteralValue, LinkedDataGraph,
 };
 
 use iref::{Iri, IriBuf};
@@ -88,6 +88,26 @@ impl<T: CryptographicSuite> Proof<T> {
     {
         self.untyped.clone_configuration()
     }
+
+    pub fn signature(&self) -> &T::Signature {
+        &self.untyped.signature
+    }
+
+    pub fn signature_mut(&mut self) -> &mut T::Signature {
+        &mut self.untyped.signature
+    }
+}
+
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataResource<V, I>
+    for Proof<T>
+{
+    fn interpretation(
+        &self,
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<V, I> {
+        linked_data::ResourceInterpretation::Uninterpreted(None)
+    }
 }
 
 impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Proof<T>
@@ -130,15 +150,20 @@ where
     }
 }
 
-impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataResource<V, I>
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I>
     for Proof<T>
+where
+    T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
+    T::Options: LinkedDataSubject<V, I>,
+    T::Signature: LinkedDataSubject<V, I>,
+    V: VocabularyMut,
+    V::Value: RdfLiteralValue,
 {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
-        linked_data::ResourceInterpretation::Uninterpreted(None)
+    fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+        where
+            S: linked_data::GraphVisitor<V, I> {
+        visitor.subject(self)?;
+        visitor.end()
     }
 }
 

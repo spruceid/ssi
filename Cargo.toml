@@ -142,6 +142,7 @@ serde_json = "1.0"
 serde_jcs = "0.1.0"
 hex = "0.4.3"
 derivative = "2.2.0"
+educe = "0.4.22"
 pin-project = "1.1.3"
 futures = "0.3.28"
 linked-data = { git = "https://github.com/spruceid/linked-data-rs.git" }
@@ -205,3 +206,6 @@ linked-data = { git = "https://github.com/spruceid/linked-data-rs.git" }
 # ]
 # # filter_commits = false
 # tag_pattern = "v[0-9]*"
+
+[patch.crates-io]
+rdf-types = { git = "https://github.com/timothee-haudebourg/rdf-types.git" }

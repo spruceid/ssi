@@ -1,3 +1,4 @@
+use educe::Educe;
 use linked_data::LinkedData;
 use std::ops::Deref;
 use suite::{HashError, TransformError};
@@ -21,13 +22,16 @@ pub enum Error {
 }
 
 /// Data Integrity credential.
-#[derive(LinkedData)]
+#[derive(Educe, serde::Serialize, LinkedData)]
+#[educe(Clone(bound = "T: Clone, S::Hashed: Clone"))]
+#[serde(transparent)]
 pub struct DataIntegrity<T, S: CryptographicSuite> {
     /// Credential value.
     #[ld(flatten)]
     credential: T,
 
     /// Hashed value.
+    #[serde(skip)]
     #[ld(ignore)]
     hash: S::Hashed,
 }
