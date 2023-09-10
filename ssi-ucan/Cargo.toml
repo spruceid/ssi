@@ -28,7 +28,7 @@ libipld = { version = "0.16", default-features = false, features = ["dag-json", 
 ucan-capabilities-object = "0.1"
 
 ssi-crypto = { path  = "../ssi-crypto", version = "0.1", default-features = false, optional = true }
-varsig = { path = "../../cacao/varsig", optional = true }
+varsig = { git = "https://github.com/spruceid/cacao-rs", branch = "feat/webauthn", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
