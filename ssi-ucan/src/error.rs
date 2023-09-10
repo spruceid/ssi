@@ -28,4 +28,6 @@ pub enum Error {
     Caip10Parse(#[from] ssi_caips::caip10::BlockchainAccountIdParseError),
     #[error(transparent)]
     Caip10Verify(#[from] ssi_caips::caip10::BlockchainAccountIdVerifyError),
+    #[error("Unable to infer algorithm")]
+    AlgUnknown,
 }

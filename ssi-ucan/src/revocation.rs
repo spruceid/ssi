@@ -45,19 +45,17 @@ impl Revocation {
     pub async fn verify_signature(
         &self,
         resolver: &dyn DIDResolver,
-        algorithm: Algorithm,
-        jwk: Option<&JWK>,
+        algorithm: Option<Algorithm>,
     ) -> Result<(), Error> {
         let key: JWK = match (
             self.issuer.get(..4),
             self.issuer.get(4..8),
-            jwk,
             dereference(resolver, &self.issuer, &Default::default())
                 .await
                 .1,
         ) {
             // did:key without fragment
-            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -69,14 +67,14 @@ impl Revocation {
                 .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+            (Some("did:"), Some(_), Content::Object(Resource::VerificationMethod(vm))) => {
                 vm.get_jwk()?
             }
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
         Ok(verify_bytes(
-            algorithm,
+            algorithm.or(key.algorithm).ok_or(Error::AlgUnknown)?,
             format!("REVOKE-UCAN:{}", self.revoke).as_bytes(),
             &key,
             &self.signature,
