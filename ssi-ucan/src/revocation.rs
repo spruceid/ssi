@@ -15,7 +15,7 @@ use ssi_jws::{sign_bytes, verify_bytes};
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct UcanRevocation {
+pub struct Revocation {
     #[serde(rename = "urv")]
     semantic_version: RevocationSemanticVersion,
     #[serde(rename = "iss")]
@@ -28,7 +28,7 @@ pub struct UcanRevocation {
     pub signature: Vec<u8>,
 }
 
-impl UcanRevocation {
+impl Revocation {
     pub fn sign(
         issuer: String,
         revoke: Cid,

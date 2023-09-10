@@ -12,7 +12,7 @@ pub mod webauthn;
 pub use error::Error;
 pub use libipld::Cid;
 pub use payload::{capabilities, Payload, TimeInvalid};
-pub use revocation::UcanRevocation;
+pub use revocation::Revocation;
 pub use ssi_dids::did_resolve::DIDResolver;
 pub use ssi_jwk::JWK;
 pub use util::{canonical_cid, get_verification_key};
