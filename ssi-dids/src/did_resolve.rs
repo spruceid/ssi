@@ -868,10 +868,7 @@ fn transform_resolution_result(
         Ok(result) => result,
         Err(err) => {
             return (
-                ResolutionMetadata::from_error(&format!(
-                    "Error parsing resolution result: {}",
-                    err
-                )),
+                ResolutionMetadata::from_error(&format!("Error parsing resolution result: {err}")),
                 None,
                 None,
             )
@@ -944,7 +941,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(client) => client,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {err}")),
                     None,
                     None,
                 );
@@ -960,7 +957,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(resp) => resp,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error sending HTTP request: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error sending HTTP request: {err}")),
                     None,
                     None,
                 )
@@ -974,8 +971,7 @@ impl DIDResolver for HTTPDIDResolver {
                 Err(err) => {
                     return (
                         ResolutionMetadata::from_error(&format!(
-                            "Error reading HTTP header: {}",
-                            err
+                            "Error reading HTTP header: {err}"
                         )),
                         None,
                         None,
@@ -1014,8 +1010,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!(
-                        "Error parsing resolution response: {}",
-                        err
+                        "Error parsing resolution response: {err}"
                     )),
                     None,
                     None,
@@ -1034,7 +1029,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(doc) => doc,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error parsing DID document: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error parsing DID document: {err}")),
                     None,
                     None,
                 )
@@ -1058,8 +1053,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Unable to serialize input metadata into query string: {}",
-                        err
+                        "Unable to serialize input metadata into query string: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1091,8 +1085,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error building HTTP client: {}",
-                        err
+                        "Error building HTTP client: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1110,8 +1103,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error sending HTTP request: {}",
-                        err
+                        "Error sending HTTP request: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1134,8 +1126,7 @@ impl DIDResolver for HTTPDIDResolver {
                 Err(err) => {
                     return Some((
                         DereferencingMetadata::from_error(&format!(
-                            "Error reading HTTP header: {}",
-                            err
+                            "Error reading HTTP header: {err}"
                         )),
                         Content::Null,
                         ContentMetadata::default(),
@@ -1149,8 +1140,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error reading HTTP response: {}",
-                        err
+                        "Error reading HTTP response: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1164,8 +1154,7 @@ impl DIDResolver for HTTPDIDResolver {
                     Err(err) => {
                         return Some((
                             DereferencingMetadata::from_error(&format!(
-                                "Error parsing DID document: {}",
-                                err
+                                "Error parsing DID document: {err}"
                             )),
                             Content::Null,
                             ContentMetadata::default(),
@@ -1182,8 +1171,7 @@ impl DIDResolver for HTTPDIDResolver {
                     Err(err) => {
                         return Some((
                             DereferencingMetadata::from_error(&format!(
-                                "Error parsing DID resolution result: {}",
-                                err
+                                "Error parsing DID resolution result: {err}"
                             )),
                             Content::Null,
                             ContentMetadata::default(),
@@ -1206,8 +1194,7 @@ impl DIDResolver for HTTPDIDResolver {
                         Err(err) => {
                             return Some((
                                 DereferencingMetadata::from_error(&format!(
-                                    "Error parsing JSON: {}",
-                                    err
+                                    "Error parsing JSON: {err}"
                                 )),
                                 Content::Null,
                                 ContentMetadata::default(),

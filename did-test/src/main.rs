@@ -372,7 +372,7 @@ impl ResolverOutcome {
                     return Self::RepresentationNotSupportedErrorOutcome
                 }
                 ERROR_NOT_FOUND => return Self::NotFoundErrorOutcome,
-                _ => panic!("Unknown outcome for error: {}", error),
+                _ => panic!("Unknown outcome for error: {error}"),
             }
         }
         if deactivated == Some(true) {
@@ -828,7 +828,7 @@ async fn report_method(mut args: Args) {
         "onion" => report_method_onion().await,
         "pkh" => report_method_pkh().await,
         "webkey" => report_method_webkey().await,
-        method => panic!("unknown method {}", method),
+        method => panic!("unknown method {method}"),
     }
 }
 
@@ -842,7 +842,7 @@ async fn report_resolver(mut args: Args) {
         "onion" => report_resolver_onion().await,
         "pkh" => report_resolver_pkh().await,
         "webkey" => report_resolver_webkey().await,
-        method => panic!("unknown method {}", method),
+        method => panic!("unknown method {method}"),
     }
 }
 
@@ -856,7 +856,7 @@ async fn report_dereferencer(mut args: Args) {
         "onion" => report_dereferencer_onion().await,
         "pkh" => report_dereferencer_pkh().await,
         "webkey" => report_dereferencer_webkey().await,
-        method => panic!("unknown method {}", method),
+        method => panic!("unknown method {method}"),
     }
 }
 
@@ -869,6 +869,6 @@ async fn main() {
         "method" => report_method(args).await,
         "resolver" => report_resolver(args).await,
         "dereferencer" => report_dereferencer(args).await,
-        section => panic!("unknown section {}", section),
+        section => panic!("unknown section {section}"),
     }
 }

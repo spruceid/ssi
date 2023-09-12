@@ -63,7 +63,7 @@ fn gpg_pk_to_vm(did: &str, pk: SignedPublicKey) -> Result<(VerificationMethodMap
     let fingerprint = pk
         .fingerprint()
         .iter()
-        .fold(String::new(), |acc, &x| format!("{}{:02X}", acc, x));
+        .fold(String::new(), |acc, &x| format!("{acc}{x:02X}"));
     let vm_url = DIDURL {
         did: did.to_string(),
         fragment: Some(fingerprint.clone()),
@@ -228,7 +228,7 @@ fn parse_did_webkey_url(did: &str) -> Result<(DIDWebKeyType, String), Resolution
         }
     };
     #[allow(unused_mut)]
-    let mut url = format!("https://{}/{}", domain_name, path);
+    let mut url = format!("https://{domain_name}/{path}");
     #[cfg(test)]
     PROXY.with(|proxy| {
         if let Some(ref proxy) = *proxy.borrow() {
@@ -259,7 +259,7 @@ impl DIDResolver for DIDWebKey {
             Ok(c) => c,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {err}")),
                     None,
                     None,
                 )
@@ -273,10 +273,7 @@ impl DIDResolver for DIDWebKey {
             Ok(req) => req,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error sending HTTP request : {}",
-                        err
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error sending HTTP request : {err}")),
                     None,
                     None,
                 )
@@ -312,7 +309,7 @@ impl DIDResolver for DIDWebKey {
                 ),
                 Err(err) => {
                     return (
-                        ResolutionMetadata::from_error(&format!("Error parsing keys: {}", err)),
+                        ResolutionMetadata::from_error(&format!("Error parsing keys: {err}")),
                         None,
                         None,
                     )

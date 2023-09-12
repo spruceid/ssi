@@ -97,7 +97,7 @@ fn resolve_pk(
         Ok(pk_bytes) => pk_bytes,
         Err(e) => {
             return (
-                ResolutionMetadata::from_error(&format!("Unable to parse key: {}", e)),
+                ResolutionMetadata::from_error(&format!("Unable to parse key: {e}")),
                 None,
                 None,
             );
@@ -107,7 +107,7 @@ fn resolve_pk(
         Ok(hash) => hash,
         Err(e) => {
             return (
-                ResolutionMetadata::from_error(&format!("Unable to hash account address: {}", e)),
+                ResolutionMetadata::from_error(&format!("Unable to hash account address: {e}")),
                 None,
                 None,
             )
@@ -309,7 +309,7 @@ impl DIDMethod for DIDEthr {
             Ok(hash) => hash,
             _ => return None,
         };
-        let did = format!("did:ethr:{}", hash);
+        let did = format!("did:ethr:{hash}");
         Some(did)
     }
 

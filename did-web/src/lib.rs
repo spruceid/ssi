@@ -118,7 +118,7 @@ impl DIDResolver for DIDWeb {
             Ok(c) => c,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {err}")),
                     Vec::new(),
                     None,
                 )
@@ -133,8 +133,7 @@ impl DIDResolver for DIDWeb {
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!(
-                        "Error sending HTTP request ({}): {}",
-                        url, err
+                        "Error sending HTTP request ({url}): {err}"
                     )),
                     Vec::new(),
                     None,

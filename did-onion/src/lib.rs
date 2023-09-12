@@ -22,7 +22,7 @@ pub struct DIDOnion {
 impl DIDOnion {
     fn with_port(port: usize) -> Self {
         Self {
-            proxy_url: format!("socks5h://127.0.0.1:{}", port),
+            proxy_url: format!("socks5h://127.0.0.1:{port}"),
         }
     }
 }
@@ -51,7 +51,7 @@ fn did_onion_url(did: &str) -> Result<String, ResolutionMetadata> {
         Some(_) => parts.collect::<Vec<&str>>().join("/"),
         None => ".well-known".to_string(),
     };
-    let url = format!("http://{}.onion/{}/did.json", onion_address, path);
+    let url = format!("http://{onion_address}.onion/{path}/did.json");
     Ok(url)
 }
 
@@ -113,7 +113,7 @@ impl DIDResolver for DIDOnion {
             Ok(proxy) => client_builder.proxy(proxy),
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error constructing proxy: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error constructing proxy: {err}")),
                     Vec::new(),
                     None,
                 )
@@ -123,7 +123,7 @@ impl DIDResolver for DIDOnion {
             Ok(c) => c,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {err}")),
                     Vec::new(),
                     None,
                 )
@@ -137,10 +137,7 @@ impl DIDResolver for DIDOnion {
             Ok(req) => req,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!(
-                        "Error sending HTTP request : {}",
-                        err
-                    )),
+                    ResolutionMetadata::from_error(&format!("Error sending HTTP request: {err}")),
                     Vec::new(),
                     None,
                 )

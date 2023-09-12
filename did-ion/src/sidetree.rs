@@ -1329,7 +1329,7 @@ impl<S: Sidetree> fmt::Display for SidetreeDID<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "did:{}:", S::METHOD)?;
         if let Some(network) = S::NETWORK {
-            write!(f, "{}:", network)?;
+            write!(f, "{network}:")?;
         }
         match self {
             Self::Short { did_suffix } => f.write_str(&did_suffix.0),
@@ -1395,7 +1395,7 @@ pub struct HTTPSidetreeDIDResolver<S: Sidetree> {
 
 impl<S: Sidetree> HTTPSidetreeDIDResolver<S> {
     pub fn new(sidetree_api_url: &str) -> Self {
-        let identifiers_url = format!("{}identifiers/", sidetree_api_url);
+        let identifiers_url = format!("{sidetree_api_url}identifiers/");
         Self {
             http_did_resolver: HTTPDIDResolver::new(&identifiers_url),
             _marker: PhantomData,
@@ -1571,7 +1571,7 @@ impl fmt::Display for SidetreeAPIError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Sidetree error {}", self.code)?;
         if let Some(ref message) = self.message {
-            write!(f, ": {}", message)?;
+            write!(f, ": {message}")?;
         }
         Ok(())
     }
@@ -1621,7 +1621,7 @@ impl<S: Sidetree + Send + Sync> DIDMethod for SidetreeClient<S> {
             .endpoint
             .as_ref()
             .ok_or_else(|| anyhow!("Missing Sidetree REST API endpoint"))?;
-        let url = format!("{}operations/", endpoint);
+        let url = format!("{endpoint}operations/");
         let client = Client::builder().build().context("Build HTTP client")?;
         let resp = client
             .post(url)
