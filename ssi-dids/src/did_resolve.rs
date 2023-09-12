@@ -626,8 +626,7 @@ async fn dereference_primary_resource(
                 Err(err) => {
                     return (
                         DereferencingMetadata::from_error(&format!(
-                            "Unable to construct service endpoint: {}",
-                            err
+                            "Unable to construct service endpoint: {err}"
                         )),
                         Content::Null,
                         ContentMetadata::default(),
@@ -715,8 +714,7 @@ async fn dereference_secondary_resource(
                 Err(error) => {
                     return (
                         DereferencingMetadata::from_error(&format!(
-                            "Unable to find object in DID document: {}",
-                            error
+                            "Unable to find object in DID document: {error}"
                         )),
                         Content::Null,
                         ContentMetadata::default(),
@@ -761,10 +759,7 @@ async fn dereference_secondary_resource(
             ContentMetadata::default(),
         ),
         Some(content_type) => (
-            DereferencingMetadata::from_error(&format!(
-                "Unsupported content type: {}",
-                content_type
-            )),
+            DereferencingMetadata::from_error(&format!("Unsupported content type: {content_type}")),
             Content::Null,
             ContentMetadata::default(),
         ),
@@ -1331,7 +1326,7 @@ pub async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Result<Docum
         return Err(Error::UnableToResolve(err));
     }
     let doc = doc_opt
-        .ok_or_else(|| Error::UnableToResolve(format!("Missing document for DID: {}", did)))?;
+        .ok_or_else(|| Error::UnableToResolve(format!("Missing document for DID: {did}")))?;
     Ok(doc)
 }
 
@@ -1380,7 +1375,7 @@ pub async fn get_verification_methods_for_all(
         let vm_ids = doc
             .get_verification_method_ids(verification_relationship.clone())
             .map_err(|e| {
-                Error::UnableToResolve(format!("Unable to get verification method ids: {:?}", e))
+                Error::UnableToResolve(format!("Unable to get verification method ids: {e:?}"))
             })?;
         for id in vm_ids {
             vm_ids_for_purpose.insert(id);

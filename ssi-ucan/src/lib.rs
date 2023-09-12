@@ -320,8 +320,8 @@ pub enum UcanResource {
 impl Display for UcanResource {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
-            Self::Proof(p) => write!(f, "{}", p),
-            Self::URI(u) => write!(f, "{}", u),
+            Self::Proof(p) => write!(f, "{p}"),
+            Self::URI(u) => write!(f, "{u}"),
         }
     }
 }
@@ -422,7 +422,7 @@ impl UcanRevocation {
         Ok(Self {
             issuer,
             revoke,
-            challenge: sign_bytes(algorithm, format!("REVOKE:{}", revoke).as_bytes(), jwk)?,
+            challenge: sign_bytes(algorithm, format!("REVOKE:{revoke}").as_bytes(), jwk)?,
         })
     }
     pub async fn verify_signature(

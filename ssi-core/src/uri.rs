@@ -51,7 +51,7 @@ impl FromStr for URI {
 impl std::fmt::Display for URI {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::String(ref string) => write!(f, "{}", string),
+            Self::String(ref string) => write!(f, "{string}"),
         }
     }
 }
