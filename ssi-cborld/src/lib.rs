@@ -437,7 +437,7 @@ pub async fn encode(document: Value) -> Vec<u8> {
             if value == vec![65] {
                 prefix = vec![24, key, 24];
                 suffix = value;
-            } else if value == vec![21] || value == vec![18] {
+            } else if value == vec![21] || value == vec![18] || value == vec![19] ||value == vec![20] {
                 suffix = value;
             }
         } else {
