@@ -176,7 +176,7 @@ impl DIDResolver for DIDTz {
 
         let default_url = match &self.tzkt_url {
             Some(u) => u.clone(),
-            None => format!("https://api.{}.tzkt.io", network),
+            None => format!("https://api.{network}.tzkt.io"),
         };
         let mut tzkt_url = &default_url;
         if let Some(s) = &input_metadata.property_set {
@@ -413,7 +413,7 @@ impl DIDTz {
                 id: String::from(vm_didurl.clone()),
                 type_: proof_type.to_string(),
                 controller: did.to_string(),
-                blockchain_account_id: Some(format!("tezos:{}:{}", genesis_block_hash, address)),
+                blockchain_account_id: Some(format!("tezos:{genesis_block_hash}:{address}")),
                 ..Default::default()
             })]),
             authentication: match public_key {

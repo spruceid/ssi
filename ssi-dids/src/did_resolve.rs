@@ -626,8 +626,7 @@ async fn dereference_primary_resource(
                 Err(err) => {
                     return (
                         DereferencingMetadata::from_error(&format!(
-                            "Unable to construct service endpoint: {}",
-                            err
+                            "Unable to construct service endpoint: {err}"
                         )),
                         Content::Null,
                         ContentMetadata::default(),
@@ -715,8 +714,7 @@ async fn dereference_secondary_resource(
                 Err(error) => {
                     return (
                         DereferencingMetadata::from_error(&format!(
-                            "Unable to find object in DID document: {}",
-                            error
+                            "Unable to find object in DID document: {error}"
                         )),
                         Content::Null,
                         ContentMetadata::default(),
@@ -761,10 +759,7 @@ async fn dereference_secondary_resource(
             ContentMetadata::default(),
         ),
         Some(content_type) => (
-            DereferencingMetadata::from_error(&format!(
-                "Unsupported content type: {}",
-                content_type
-            )),
+            DereferencingMetadata::from_error(&format!("Unsupported content type: {content_type}")),
             Content::Null,
             ContentMetadata::default(),
         ),
@@ -873,10 +868,7 @@ fn transform_resolution_result(
         Ok(result) => result,
         Err(err) => {
             return (
-                ResolutionMetadata::from_error(&format!(
-                    "Error parsing resolution result: {}",
-                    err
-                )),
+                ResolutionMetadata::from_error(&format!("Error parsing resolution result: {err}")),
                 None,
                 None,
             )
@@ -949,7 +941,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(client) => client,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {err}")),
                     None,
                     None,
                 );
@@ -965,7 +957,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(resp) => resp,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error sending HTTP request: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error sending HTTP request: {err}")),
                     None,
                     None,
                 )
@@ -979,8 +971,7 @@ impl DIDResolver for HTTPDIDResolver {
                 Err(err) => {
                     return (
                         ResolutionMetadata::from_error(&format!(
-                            "Error reading HTTP header: {}",
-                            err
+                            "Error reading HTTP header: {err}"
                         )),
                         None,
                         None,
@@ -1019,8 +1010,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!(
-                        "Error parsing resolution response: {}",
-                        err
+                        "Error parsing resolution response: {err}"
                     )),
                     None,
                     None,
@@ -1039,7 +1029,7 @@ impl DIDResolver for HTTPDIDResolver {
             Ok(doc) => doc,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error parsing DID document: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error parsing DID document: {err}")),
                     None,
                     None,
                 )
@@ -1063,8 +1053,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Unable to serialize input metadata into query string: {}",
-                        err
+                        "Unable to serialize input metadata into query string: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1096,8 +1085,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error building HTTP client: {}",
-                        err
+                        "Error building HTTP client: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1115,8 +1103,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error sending HTTP request: {}",
-                        err
+                        "Error sending HTTP request: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1139,8 +1126,7 @@ impl DIDResolver for HTTPDIDResolver {
                 Err(err) => {
                     return Some((
                         DereferencingMetadata::from_error(&format!(
-                            "Error reading HTTP header: {}",
-                            err
+                            "Error reading HTTP header: {err}"
                         )),
                         Content::Null,
                         ContentMetadata::default(),
@@ -1154,8 +1140,7 @@ impl DIDResolver for HTTPDIDResolver {
             Err(err) => {
                 return Some((
                     DereferencingMetadata::from_error(&format!(
-                        "Error reading HTTP response: {}",
-                        err
+                        "Error reading HTTP response: {err}"
                     )),
                     Content::Null,
                     ContentMetadata::default(),
@@ -1169,8 +1154,7 @@ impl DIDResolver for HTTPDIDResolver {
                     Err(err) => {
                         return Some((
                             DereferencingMetadata::from_error(&format!(
-                                "Error parsing DID document: {}",
-                                err
+                                "Error parsing DID document: {err}"
                             )),
                             Content::Null,
                             ContentMetadata::default(),
@@ -1187,8 +1171,7 @@ impl DIDResolver for HTTPDIDResolver {
                     Err(err) => {
                         return Some((
                             DereferencingMetadata::from_error(&format!(
-                                "Error parsing DID resolution result: {}",
-                                err
+                                "Error parsing DID resolution result: {err}"
                             )),
                             Content::Null,
                             ContentMetadata::default(),
@@ -1211,8 +1194,7 @@ impl DIDResolver for HTTPDIDResolver {
                         Err(err) => {
                             return Some((
                                 DereferencingMetadata::from_error(&format!(
-                                    "Error parsing JSON: {}",
-                                    err
+                                    "Error parsing JSON: {err}"
                                 )),
                                 Content::Null,
                                 ContentMetadata::default(),
@@ -1331,7 +1313,7 @@ pub async fn easy_resolve(did: &str, resolver: &dyn DIDResolver) -> Result<Docum
         return Err(Error::UnableToResolve(err));
     }
     let doc = doc_opt
-        .ok_or_else(|| Error::UnableToResolve(format!("Missing document for DID: {}", did)))?;
+        .ok_or_else(|| Error::UnableToResolve(format!("Missing document for DID: {did}")))?;
     Ok(doc)
 }
 
@@ -1380,7 +1362,7 @@ pub async fn get_verification_methods_for_all(
         let vm_ids = doc
             .get_verification_method_ids(verification_relationship.clone())
             .map_err(|e| {
-                Error::UnableToResolve(format!("Unable to get verification method ids: {:?}", e))
+                Error::UnableToResolve(format!("Unable to get verification method ids: {e:?}"))
             })?;
         for id in vm_ids {
             vm_ids_for_purpose.insert(id);

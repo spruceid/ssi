@@ -237,7 +237,7 @@ impl DIDResolver for DIDKey {
             ]),
             id: did.to_string(),
             verification_method: Some(vec![VerificationMethod::Map(VerificationMethodMap {
-                id: format!("{}#{}", did, method_specific_id),
+                id: format!("{did}#{method_specific_id}"),
                 type_: vm_type,
                 controller: did.to_string(),
                 public_key_jwk: Some(jwk),

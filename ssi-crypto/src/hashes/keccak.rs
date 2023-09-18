@@ -4,7 +4,7 @@ pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
     "0x".to_string()
         + &bytes
             .iter()
-            .map(|byte| format!("{:02x}", byte))
+            .map(|byte| format!("{byte:02x}"))
             .collect::<String>()
 }
 

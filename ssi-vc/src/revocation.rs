@@ -346,8 +346,7 @@ impl CredentialStatus for RevocationList2020Status {
         {
             // TODO: support JSON-LD credentials defining the terms elsewhere.
             return result.with_error(format!(
-                "Missing expected context URI {} for credential using RevocationList2020",
-                REVOCATION_LIST_2020_V1_CONTEXT
+                "Missing expected context URI {REVOCATION_LIST_2020_V1_CONTEXT} for credential using RevocationList2020"
             ));
         }
         if self.id == URI::String(self.revocation_list_credential.clone()) {
@@ -371,7 +370,7 @@ impl CredentialStatus for RevocationList2020Status {
                 Ok(credential) => credential,
                 Err(e) => {
                     return result
-                        .with_error(format!("Unable to fetch revocation list credential: {}", e));
+                        .with_error(format!("Unable to fetch revocation list credential: {e}"));
                 }
             };
         let list_issuer_id = match &revocation_list_credential.issuer {
@@ -383,24 +382,21 @@ impl CredentialStatus for RevocationList2020Status {
         };
         if issuer_id != list_issuer_id {
             return result.with_error(format!(
-                "Revocation list issuer mismatch. Credential: {}, Revocation list: {}",
-                issuer_id, list_issuer_id
+                "Revocation list issuer mismatch. Credential: {issuer_id}, Revocation list: {list_issuer_id}"
             ));
         }
 
         if let Err(e) = revocation_list_credential.validate() {
-            return result.with_error(format!("Invalid list credential: {}", e));
+            return result.with_error(format!("Invalid list credential: {e}"));
         }
         let vc_result = revocation_list_credential
             .verify(None, resolver, context_loader)
             .await;
         for warning in vc_result.warnings {
-            result
-                .warnings
-                .push(format!("Revocation list: {}", warning));
+            result.warnings.push(format!("Revocation list: {warning}"));
         }
         for error in vc_result.errors {
-            result.errors.push(format!("Revocation list: {}", error));
+            result.errors.push(format!("Revocation list: {error}"));
         }
         if !result.errors.is_empty() {
             return result;
@@ -412,7 +408,7 @@ impl CredentialStatus for RevocationList2020Status {
                 Ok(credential) => credential,
                 Err(e) => {
                     return result
-                        .with_error(format!("Unable to parse revocation list credential: {}", e));
+                        .with_error(format!("Unable to parse revocation list credential: {e}"));
                 }
             };
         if revocation_list_credential.id != URI::String(self.revocation_list_credential.to_string())
@@ -427,7 +423,7 @@ impl CredentialStatus for RevocationList2020Status {
 
         let list = match List::try_from(&revocation_list.encoded_list) {
             Ok(list) => list,
-            Err(e) => return result.with_error(format!("Unable to decode revocation list: {}", e)),
+            Err(e) => return result.with_error(format!("Unable to decode revocation list: {e}")),
         };
         let credential_index = self.revocation_list_index.0;
         use bitvec::prelude::*;
@@ -478,8 +474,7 @@ impl CredentialStatus for StatusList2021Entry {
         {
             // TODO: support JSON-LD credentials defining the terms elsewhere.
             return result.with_error(format!(
-                "Missing expected context URI {} for credential using StatusList2021",
-                STATUS_LIST_2021_V1_CONTEXT
+                "Missing expected context URI {STATUS_LIST_2021_V1_CONTEXT} for credential using StatusList2021"
             ));
         }
         if self.id == URI::String(self.status_list_credential.clone()) {
@@ -501,7 +496,7 @@ impl CredentialStatus for StatusList2021Entry {
         let status_list_credential = match load_credential(&self.status_list_credential).await {
             Ok(credential) => credential,
             Err(e) => {
-                return result.with_error(format!("Unable to fetch status list credential: {}", e));
+                return result.with_error(format!("Unable to fetch status list credential: {e}"));
             }
         };
         let list_issuer_id = match &status_list_credential.issuer {
@@ -512,22 +507,21 @@ impl CredentialStatus for StatusList2021Entry {
         };
         if issuer_id != list_issuer_id {
             return result.with_error(format!(
-                "Status list issuer mismatch. Credential: {}, Status list: {}",
-                issuer_id, list_issuer_id
+                "Status list issuer mismatch. Credential: {issuer_id}, Status list: {list_issuer_id}"
             ));
         }
 
         if let Err(e) = status_list_credential.validate() {
-            return result.with_error(format!("Invalid list credential: {}", e));
+            return result.with_error(format!("Invalid list credential: {e}"));
         }
         let vc_result = status_list_credential
             .verify(None, resolver, context_loader)
             .await;
         for warning in vc_result.warnings {
-            result.warnings.push(format!("Status list: {}", warning));
+            result.warnings.push(format!("Status list: {warning}"));
         }
         if let Some(error) = vc_result.errors.into_iter().next() {
-            result.errors.push(format!("Status list: {}", error));
+            result.errors.push(format!("Status list: {error}"));
             return result;
         }
         // Note: vc_result.checks is not checked here. It is assumed that default checks passed.
@@ -537,7 +531,7 @@ impl CredentialStatus for StatusList2021Entry {
                 Ok(credential) => credential,
                 Err(e) => {
                     return result
-                        .with_error(format!("Unable to parse status list credential: {}", e));
+                        .with_error(format!("Unable to parse status list credential: {e}"));
                 }
             };
         if status_list_credential.id != URI::String(self.status_list_credential.to_string()) {
@@ -551,7 +545,7 @@ impl CredentialStatus for StatusList2021Entry {
 
         let list = match List::try_from(&status_list.encoded_list) {
             Ok(list) => list,
-            Err(e) => return result.with_error(format!("Unable to decode status list: {}", e)),
+            Err(e) => return result.with_error(format!("Unable to decode status list: {e}")),
         };
         let credential_index = self.status_list_index.0;
         use bitvec::prelude::*;

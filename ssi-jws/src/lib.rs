@@ -350,8 +350,7 @@ pub fn verify_bytes_warnable(
                     // For user convenience, output the normalized signature.
                     let sig_normalized_b64 = base64::encode_config(s, base64::URL_SAFE_NO_PAD);
                     warnings.push(format!(
-                        "Non-normalized ES256K signature. Normalized: {}",
-                        sig_normalized_b64
+                        "Non-normalized ES256K signature. Normalized: {sig_normalized_b64}"
                     ));
                     s
                 } else {

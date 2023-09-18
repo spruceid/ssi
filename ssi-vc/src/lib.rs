@@ -768,7 +768,7 @@ impl Credential {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to split JWS: {}", err)),
+                    VerificationResult::error(&format!("Unable to split JWS: {err}")),
                 );
             }
         };
@@ -782,7 +782,7 @@ impl Credential {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to decode JWS: {}", err)),
+                    VerificationResult::error(&format!("Unable to decode JWS: {err}")),
                 );
             }
         };
@@ -791,7 +791,7 @@ impl Credential {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to decode JWS claims: {}", err)),
+                    VerificationResult::error(&format!("Unable to decode JWS claims: {err}")),
                 );
             }
         };
@@ -801,8 +801,7 @@ impl Credential {
                 return (
                     None,
                     VerificationResult::error(&format!(
-                        "Unable to convert JWT claims to VC: {}",
-                        err
+                        "Unable to convert JWT claims to VC: {err}"
                     )),
                 );
             }
@@ -810,7 +809,7 @@ impl Credential {
         if let Err(err) = vc.validate_unsigned() {
             return (
                 None,
-                VerificationResult::error(&format!("Invalid VC: {}", err)),
+                VerificationResult::error(&format!("Invalid VC: {err}")),
             );
         }
         // TODO: error if any unconvertable claims
@@ -823,7 +822,7 @@ impl Credential {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to filter proofs: {}", err)),
+                    VerificationResult::error(&format!("Unable to filter proofs: {err}")),
                 );
             }
         };
@@ -838,7 +837,7 @@ impl Credential {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to resolve key for JWS: {}", err)),
+                    VerificationResult::error(&format!("Unable to resolve key for JWS: {err}")),
                 );
             }
         };
@@ -852,7 +851,7 @@ impl Credential {
                 }
                 Err(err) => results
                     .errors
-                    .push(format!("Unable to verify signature: {}", err)),
+                    .push(format!("Unable to verify signature: {err}")),
             }
             return (Some(vc), results);
         }
@@ -995,7 +994,7 @@ impl Credential {
         let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
-                return VerificationResult::error(&format!("Unable to filter proofs: {}", err));
+                return VerificationResult::error(&format!("Unable to filter proofs: {err}"));
             }
         };
         if proofs.is_empty() {
@@ -1070,18 +1069,14 @@ impl Credential {
             Ok(status) => status,
             Err(e) => {
                 return VerificationResult::error(&format!(
-                    "Unable to convert credentialStatus: {}",
-                    e
+                    "Unable to convert credentialStatus: {e}"
                 ))
             }
         };
         let checkable_status: CheckableStatus = match serde_json::from_value(status_value) {
             Ok(checkable_status) => checkable_status,
             Err(e) => {
-                return VerificationResult::error(&format!(
-                    "Unable to parse credentialStatus: {}",
-                    e
-                ))
+                return VerificationResult::error(&format!("Unable to parse credentialStatus: {e}"))
             }
         };
         let mut result = checkable_status.check(self, resolver, context_loader).await;
@@ -1322,7 +1317,7 @@ impl Presentation {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to split JWS: {}", err)),
+                    VerificationResult::error(&format!("Unable to split JWS: {err}")),
                 );
             }
         };
@@ -1336,7 +1331,7 @@ impl Presentation {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to decode JWS: {}", err)),
+                    VerificationResult::error(&format!("Unable to decode JWS: {err}")),
                 );
             }
         };
@@ -1345,7 +1340,7 @@ impl Presentation {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to decode JWS claims: {}", err)),
+                    VerificationResult::error(&format!("Unable to decode JWS claims: {err}")),
                 );
             }
         };
@@ -1355,8 +1350,7 @@ impl Presentation {
                 return (
                     None,
                     VerificationResult::error(&format!(
-                        "Unable to convert JWT claims to VP: {}",
-                        err
+                        "Unable to convert JWT claims to VP: {err}"
                     )),
                 );
             }
@@ -1364,7 +1358,7 @@ impl Presentation {
         if let Err(err) = vp.validate_unsigned() {
             return (
                 None,
-                VerificationResult::error(&format!("Invalid VP: {}", err)),
+                VerificationResult::error(&format!("Invalid VP: {err}")),
             );
         }
         let mut results = VerificationResult::new();
@@ -1378,7 +1372,7 @@ impl Presentation {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to filter proofs: {}", err)),
+                    VerificationResult::error(&format!("Unable to filter proofs: {err}")),
                 );
             }
         };
@@ -1393,7 +1387,7 @@ impl Presentation {
             Err(err) => {
                 return (
                     None,
-                    VerificationResult::error(&format!("Unable to resolve key for JWS: {}", err)),
+                    VerificationResult::error(&format!("Unable to resolve key for JWS: {err}")),
                 );
             }
         };
@@ -1406,7 +1400,7 @@ impl Presentation {
                 }
                 Err(err) => results
                     .errors
-                    .push(format!("Unable to filter proofs: {}", err)),
+                    .push(format!("Unable to filter proofs: {err}")),
             }
             return (Some(vp), results);
         }
@@ -1583,7 +1577,7 @@ impl Presentation {
         let (proofs, _) = match self.filter_proofs(options, None, resolver).await {
             Ok(proofs) => proofs,
             Err(err) => {
-                return VerificationResult::error(&format!("Unable to filter proofs: {}", err));
+                return VerificationResult::error(&format!("Unable to filter proofs: {err}"));
             }
         };
         if proofs.is_empty() {
