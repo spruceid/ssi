@@ -1,8 +1,11 @@
 use crate::{
-    jwt::{JwtSignatureDe, JwtSignatureSer},
-    Ucan,
+    jwt::{Jwt, JwtSignatureDe, JwtSignatureSer},
+    Ucan, UcanDecode,
 };
+use serde::Deserialize;
+use ssi_dids::did_resolve::DIDResolver;
 use ssi_jwk::Algorithm;
+use ssi_jws::verify_bytes;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Signature {
@@ -98,5 +101,50 @@ impl JwtSignatureDe for Signature {
     type Error = Error;
     fn from_header(a: Self::Alg, s: Self::Signature) -> Result<Self, Self::Error> {
         Self::new(a, s)
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum VerificationError<E: std::fmt::Display> {
+    #[error(transparent)]
+    JWS(#[from] ssi_jws::Error),
+    #[error(transparent)]
+    DID(#[from] ssi_dids::Error),
+    #[error(transparent)]
+    Decode(E),
+}
+
+impl<F, A> Ucan<F, A, Signature> {
+    /// Decode the UCAN and verify it's signature
+    ///
+    /// This method will resolve the DID of the issuer and verify the signature
+    /// using their public key.
+    pub async fn decode_and_verify_jwt<'a>(
+        jwt: &'a str,
+        resolver: &dyn DIDResolver,
+        algorithm: Option<Algorithm>,
+    ) -> Result<Self, VerificationError<<Self as UcanDecode<Jwt>>::Error>>
+    where
+        F: for<'d> Deserialize<'d>,
+        A: for<'d> Deserialize<'d>,
+    {
+        // decode the ucan
+        let ucan = Self::decode(jwt).map_err(VerificationError::Decode)?;
+
+        // get verification key
+        let jwk = ucan.get_verification_key(resolver).await?;
+
+        // get signed bytes
+        let signed = jwt.rsplit_once('.').ok_or(ssi_jws::Error::InvalidJWS)?.0;
+
+        verify_bytes(
+            algorithm
+                .or(jwk.algorithm)
+                .unwrap_or(ucan.signature().alg()),
+            signed.as_ref(),
+            &jwk,
+            ucan.signature().bytes(),
+        )?;
+        Ok(ucan)
     }
 }
