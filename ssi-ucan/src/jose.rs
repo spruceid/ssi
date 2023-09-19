@@ -105,7 +105,7 @@ impl JwtSignatureDe for Signature {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum VerificationError<E: std::fmt::Display> {
+pub enum VerificationError<E: std::error::Error> {
     #[error(transparent)]
     JWS(#[from] ssi_jws::Error),
     #[error(transparent)]
@@ -116,7 +116,7 @@ pub enum VerificationError<E: std::fmt::Display> {
 
 impl<E> From<EncodeError> for VerificationError<E>
 where
-    E: std::fmt::Display,
+    E: std::error::Error,
 {
     fn from(e: EncodeError) -> Self {
         Self::Decode(e.into())

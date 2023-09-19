@@ -26,7 +26,7 @@ pub trait JwtSignatureDe {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum DecodeError<S: std::fmt::Display> {
+pub enum DecodeError<S: std::error::Error> {
     #[error("Invalid DID URL")]
     DIDURL,
     #[error(transparent)]
@@ -43,7 +43,7 @@ pub enum DecodeError<S: std::fmt::Display> {
 
 impl<S> From<EncodeError> for DecodeError<S>
 where
-    S: std::fmt::Display,
+    S: std::error::Error,
 {
     fn from(e: EncodeError) -> Self {
         match e {
@@ -60,7 +60,7 @@ where
     S: JwtSignatureDe,
     S::Alg: for<'d> Deserialize<'d>,
     S::Signature: From<Vec<u8>>,
-    S::Error: std::fmt::Display,
+    S::Error: std::error::Error,
 {
     type Error = DecodeError<S::Error>;
     type Encoded<'e> = &'e str;
@@ -137,7 +137,7 @@ impl<A> DummyHeader<A> {
     pub fn from_str<E>(h: &str) -> Result<Self, DecodeError<E>>
     where
         Self: for<'a> Deserialize<'a>,
-        E: std::fmt::Display,
+        E: std::error::Error,
     {
         Ok(serde_json::from_slice(&base64::decode_config(
             h,
@@ -157,7 +157,7 @@ where
     A: for<'d> Deserialize<'d>,
     F: for<'d> Deserialize<'d>,
     NB: for<'d> Deserialize<'d>,
-    E: std::fmt::Display,
+    E: std::error::Error,
 {
     let parts = split_jws(jwt).map_err(|_| DecodeError::InvalidJwtString)?;
 
