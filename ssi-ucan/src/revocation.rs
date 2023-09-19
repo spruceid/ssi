@@ -15,7 +15,7 @@ use ssi_jws::{sign_bytes, verify_bytes};
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
-pub struct UcanRevocation {
+pub struct Revocation {
     #[serde(rename = "urv")]
     semantic_version: RevocationSemanticVersion,
     #[serde(rename = "iss")]
@@ -28,7 +28,20 @@ pub struct UcanRevocation {
     pub signature: Vec<u8>,
 }
 
-impl UcanRevocation {
+impl Revocation {
+    pub fn new(issuer: String, revoke: Cid, signature: Vec<u8>) -> Self {
+        Self {
+            semantic_version: RevocationSemanticVersion,
+            issuer,
+            revoke,
+            signature,
+        }
+    }
+
+    pub fn for_signing(revoke: &Cid) -> String {
+        format!("REVOKE-UCAN:{}", revoke)
+    }
+
     pub fn sign(
         issuer: String,
         revoke: Cid,
@@ -39,25 +52,24 @@ impl UcanRevocation {
             semantic_version: RevocationSemanticVersion,
             issuer,
             revoke,
-            signature: sign_bytes(algorithm, format!("REVOKE-UCAN:{}", revoke).as_bytes(), jwk)?,
+            signature: sign_bytes(algorithm, Self::for_signing(&revoke).as_bytes(), jwk)?,
         })
     }
+
     pub async fn verify_signature(
         &self,
         resolver: &dyn DIDResolver,
-        algorithm: Algorithm,
-        jwk: Option<&JWK>,
+        algorithm: Option<Algorithm>,
     ) -> Result<(), Error> {
         let key: JWK = match (
             self.issuer.get(..4),
             self.issuer.get(4..8),
-            jwk,
             dereference(resolver, &self.issuer, &Default::default())
                 .await
                 .1,
         ) {
             // did:key without fragment
-            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), Content::DIDDocument(d)) => d
                 .verification_method
                 .iter()
                 .flatten()
@@ -69,15 +81,15 @@ impl UcanRevocation {
                 .ok_or(Error::VerificationMethodMismatch)?
                 .get_jwk()?,
             // general case, did with fragment
-            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
+            (Some("did:"), Some(_), Content::Object(Resource::VerificationMethod(vm))) => {
                 vm.get_jwk()?
             }
             _ => return Err(Error::VerificationMethodMismatch),
         };
 
         Ok(verify_bytes(
-            algorithm,
-            format!("REVOKE-UCAN:{}", self.revoke).as_bytes(),
+            algorithm.or(key.algorithm).ok_or(Error::AlgUnknown)?,
+            Self::for_signing(&self.revoke).as_bytes(),
             &key,
             &self.signature,
         )?)

@@ -6,7 +6,7 @@ mod version;
 
 pub use error::Error;
 pub use payload::{capabilities, Payload, TimeInvalid};
-pub use revocation::UcanRevocation;
+pub use revocation::Revocation;
 pub use util::canonical_cid;
 
 use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld};

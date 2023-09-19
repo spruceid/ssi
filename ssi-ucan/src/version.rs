@@ -26,8 +26,8 @@ impl Display for SemanticVersion {
 
 #[derive(thiserror::Error, Debug)]
 pub enum VersionError {
-    #[error("Invalid version: expected 0.2.0, found {0}")]
-    InvalidVersion(String),
+    #[error("Invalid version: expected {0}, found {1}")]
+    InvalidVersion(&'static str, String),
 }
 
 impl FromStr for SemanticVersion {
@@ -37,7 +37,7 @@ impl FromStr for SemanticVersion {
         if s == "0.2.0" {
             Ok(Self)
         } else {
-            Err(VersionError::InvalidVersion(s.to_string()))
+            Err(VersionError::InvalidVersion("0.2.0", s.to_string()))
         }
     }
 }
@@ -69,7 +69,7 @@ impl FromStr for RevocationSemanticVersion {
         if s == "1.0.0-rc1" {
             Ok(Self)
         } else {
-            Err(VersionError::InvalidVersion(s.to_string()))
+            Err(VersionError::InvalidVersion("1.0.0-rc1", s.to_string()))
         }
     }
 }
