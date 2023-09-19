@@ -714,7 +714,7 @@ mod tests {
                 "issuanceDate": "2022-11-21T18:09:48Z",
                 "expirationDate": "2023-02-21T18:09:48Z",
                 "credentialSubject": {
-                    "overAge": 0,
+                    "overAge": 18,
                     "concealedIdToken": "zPwe8eWs7Gv9pfQ2UL6y17BfCNYFx2fiHGqChnf4jK5wdtH6EgeBM6jNshNYvBYkZjudjGWyEyi5zjBVBkMtdgN7V7AKnL5BSGcxi25KpGk6KQDP9mRKHfWw"
                 },
                 "proof": {
