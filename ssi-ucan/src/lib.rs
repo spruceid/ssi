@@ -7,15 +7,12 @@ mod version;
 pub use error::Error;
 pub use payload::{capabilities, Payload, TimeInvalid};
 pub use revocation::Revocation;
-pub use util::canonical_cid;
+pub use util::{canonical_cid, get_verification_key};
 
 use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld};
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use ssi_dids::{
-    did_resolve::{dereference, Content, DIDResolver},
-    Resource, VerificationMethod,
-};
+use ssi_dids::did_resolve::DIDResolver;
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, split_jws, verify_bytes, Header};
 
@@ -47,38 +44,9 @@ impl<F, A> Ucan<F, A> {
         (self.algorithm, self.payload, self.signature)
     }
 
-    /// Extract or resolve the JWK used to issue this UCAN
+    /// Extract or resolve the JWK used to issue this UCAN, if possible
     pub async fn get_verification_key(&self, resolver: &dyn DIDResolver) -> Result<JWK, Error> {
-        match (
-            self.payload.issuer.get(..4),
-            self.payload.issuer.get(4..8),
-            dereference(resolver, &self.payload.issuer, &Default::default())
-                .await
-                .1,
-        ) {
-            // TODO here we will have some complicated cases w.r.t. did:pkh
-            // some did:pkh's have recoverable signatures, some don't and will need
-            // a query param on the did
-            //
-            // did:key without fragment
-            (Some("did:"), Some("key:"), Content::DIDDocument(d)) => d
-                .verification_method
-                .iter()
-                .flatten()
-                .next()
-                .and_then(|v| match v {
-                    VerificationMethod::Map(vm) => Some(vm),
-                    _ => None,
-                })
-                .ok_or(Error::VerificationMethodMismatch)?
-                .get_jwk()
-                .map_err(Error::from),
-            // general case, did with fragment
-            (Some("did:"), Some(_), Content::Object(Resource::VerificationMethod(vm))) => {
-                Ok(vm.get_jwk()?)
-            }
-            _ => Err(Error::VerificationMethodMismatch),
-        }
+        get_verification_key(&self.payload.issuer, resolver).await
     }
 
     /// Decode the UCAN and verify it's signature
