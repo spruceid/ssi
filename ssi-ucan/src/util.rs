@@ -1,11 +1,10 @@
-use crate::Error;
 use libipld::{
     multihash::{Code, MultihashDigest},
     Cid,
 };
 use ssi_dids::{
     did_resolve::{dereference, Content, DIDResolver},
-    Resource, VerificationMethod,
+    Error, Resource, VerificationMethod,
 };
 use ssi_jwk::JWK;
 
@@ -37,13 +36,31 @@ pub async fn get_verification_key(id: &str, resolver: &dyn DIDResolver) -> Resul
                 VerificationMethod::Map(vm) => Some(vm),
                 _ => None,
             })
-            .ok_or(Error::VerificationMethodMismatch)?
+            .ok_or(Error::MissingKey)?
             .get_jwk()
             .map_err(Error::from),
         // general case, did with fragment
         (Some("did:"), Some(_), Content::Object(Resource::VerificationMethod(vm))) => {
             Ok(vm.get_jwk()?)
         }
-        _ => Err(Error::VerificationMethodMismatch),
+        _ => Err(Error::MissingKey),
     }
+}
+
+pub trait UcanDecode<E> {
+    type Error;
+    type Encoded<'e>;
+    /// Decode the UCAN
+    fn decode(encoded: Self::Encoded<'_>) -> Result<Self, Self::Error>
+    where
+        Self: Sized;
+}
+
+pub trait UcanEncode<E> {
+    type Error;
+    type Encoded<'a>
+    where
+        Self: 'a;
+    /// Encode the UCAN
+    fn encode(&self) -> Result<Self::Encoded<'_>, Self::Error>;
 }

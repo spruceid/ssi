@@ -1,10 +1,10 @@
-use super::{version::SemanticVersion, Error, Ucan};
-use libipld::{codec::Codec, error::Error as IpldError, json::DagJsonCodec, serde::to_ipld, Cid};
+use super::{jose, jwt, version::SemanticVersion, Ucan};
+use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use serde_with::{serde_as, DisplayFromStr};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{sign_bytes, Header};
+use ssi_jws::sign_bytes;
 use std::collections::BTreeMap;
 
 use capabilities::Capabilities;
@@ -73,49 +73,56 @@ impl<F, A> Payload<F, A> {
     /// Sign the payload with the given key and algorithm
     ///
     /// This will use the canonical form of the UCAN for signing
-    pub fn sign_canonicalized(self, algorithm: Algorithm, key: &JWK) -> Result<Ucan<F, A>, Error>
+    pub fn sign_with_jwk(self, key: &JWK, algorithm: Option<Algorithm>) -> Result<Ucan<F, A>, Error>
     where
         F: Serialize,
         A: Serialize,
     {
-        let signature = sign_bytes(
-            algorithm,
-            [
-                base64::encode_config(
-                    DagJsonCodec.encode(
-                        &to_ipld(&Header {
-                            algorithm,
-                            type_: Some("JWT".to_string()),
-                            ..Default::default()
-                        })
-                        .map_err(IpldError::new)?,
-                    )?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-                base64::encode_config(
-                    DagJsonCodec.encode(&to_ipld(&self).map_err(IpldError::new)?)?,
-                    base64::URL_SAFE_NO_PAD,
-                ),
-            ]
-            .join(".")
-            .as_bytes(),
-            key,
-        )?;
+        let alg = algorithm.or(key.algorithm).ok_or(Error::AlgUnknown)?;
+        let signature = sign_bytes(alg, self.encode_for_signing_jwt(alg)?.as_ref(), key)?;
 
-        Ok(self.sign(algorithm, signature))
+        Ok(self.sign(jose::Signature::new(alg, signature)?))
+    }
+
+    /// Encode the payload and header in cannonical form for signing
+    pub fn encode_for_signing_jwt<Alg>(&self, alg: Alg) -> Result<String, jwt::EncodeError>
+    where
+        F: Serialize,
+        A: Serialize,
+        Alg: Serialize,
+    {
+        Ok([
+            base64::encode_config(
+                serde_jcs::to_string(&jwt::DummyHeader::new(alg))?,
+                base64::URL_SAFE_NO_PAD,
+            ),
+            base64::encode_config(serde_jcs::to_string(&self)?, base64::URL_SAFE_NO_PAD),
+        ]
+        .join("."))
     }
 
     /// Sign the payload with the given header and signature
     ///
     /// This will not ensure that the signature is valid for the payload and will
     /// not canonicalize the payload before signing.
-    pub fn sign(self, algorithm: Algorithm, signature: Vec<u8>) -> Ucan<F, A> {
+    pub fn sign<S>(self, signature: S) -> Ucan<F, A, S> {
         Ucan {
-            algorithm,
             payload: self,
             signature,
         }
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("Unable to infer algorithm")]
+    AlgUnknown,
+    #[error(transparent)]
+    JWS(#[from] ssi_jws::Error),
+    #[error(transparent)]
+    Encoding(#[from] jwt::EncodeError),
+    #[error(transparent)]
+    InvalidSignature(#[from] jose::Error),
 }
 
 #[derive(thiserror::Error, Debug)]

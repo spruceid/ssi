@@ -12,6 +12,7 @@ documentation = "https://docs.rs/ssi-ucan/"
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_jcs = "0.1"
 serde_with = { version = "1.14", features = ["base64"]}
 base64 = "0.12"
 ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
