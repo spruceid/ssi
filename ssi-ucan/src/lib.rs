@@ -5,7 +5,6 @@ mod revocation;
 pub mod util;
 mod version;
 
-// pub use error::Error;
 pub use payload::{capabilities, Payload, TimeInvalid};
 pub use revocation::Revocation;
 pub use util::*;
