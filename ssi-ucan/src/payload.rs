@@ -101,7 +101,7 @@ impl<F, A> Payload<F, A> {
         .join("."))
     }
 
-    /// Sign the payload with the given header and signature
+    /// Sign the payload with the given signature
     ///
     /// This will not ensure that the signature is valid for the payload and will
     /// not canonicalize the payload before signing.

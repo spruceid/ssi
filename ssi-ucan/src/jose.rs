@@ -1,6 +1,6 @@
 use crate::{
-    jwt::{Jwt, JwtSignatureDe, JwtSignatureSer},
-    Ucan, UcanDecode,
+    jwt::{DecodeError, EncodeError, JwtSignatureDe, JwtSignatureSer},
+    Ucan,
 };
 use serde::Deserialize;
 use ssi_dids::did_resolve::DIDResolver;
@@ -111,7 +111,16 @@ pub enum VerificationError<E: std::fmt::Display> {
     #[error(transparent)]
     DID(#[from] ssi_dids::Error),
     #[error(transparent)]
-    Decode(E),
+    Decode(#[from] DecodeError<E>),
+}
+
+impl<E> From<EncodeError> for VerificationError<E>
+where
+    E: std::fmt::Display,
+{
+    fn from(e: EncodeError) -> Self {
+        Self::Decode(e.into())
+    }
 }
 
 impl<F, A> Ucan<F, A, Signature> {
@@ -123,7 +132,7 @@ impl<F, A> Ucan<F, A, Signature> {
         jwt: &'a str,
         resolver: &dyn DIDResolver,
         algorithm: Option<Algorithm>,
-    ) -> Result<Self, VerificationError<<Self as UcanDecode<Jwt>>::Error>>
+    ) -> Result<Self, VerificationError<Error>>
     where
         F: for<'d> Deserialize<'d>,
         A: for<'d> Deserialize<'d>,
