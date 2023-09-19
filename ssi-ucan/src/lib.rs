@@ -1,13 +1,13 @@
 pub mod jose;
 pub mod jwt;
-mod payload;
-mod revocation;
+pub mod payload;
+pub mod revocation;
 pub mod util;
 mod version;
 
 pub use payload::{capabilities, Payload, TimeInvalid};
 pub use revocation::Revocation;
-pub use util::*;
+pub use util::{UcanDecode, UcanEncode};
 
 use serde_json::Value as JsonValue;
 use ssi_dids::did_resolve::DIDResolver;
@@ -39,7 +39,7 @@ impl<F, A, S> Ucan<F, A, S> {
         &self,
         resolver: &dyn DIDResolver,
     ) -> Result<JWK, ssi_dids::Error> {
-        get_verification_key(&self.payload.issuer, resolver).await
+        util::get_verification_key(&self.payload.issuer, resolver).await
     }
 
     /// Decode the UCAN
@@ -66,6 +66,7 @@ impl<F, A, S> Ucan<F, A, S> {
 #[cfg(test)]
 mod tests {
     use super::payload::now;
+    use super::util::canonical_cid;
     use super::*;
     use did_method_key::DIDKey;
     use serde::Deserialize;

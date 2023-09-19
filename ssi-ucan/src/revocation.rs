@@ -1,4 +1,4 @@
-use super::{get_verification_key, version::RevocationSemanticVersion};
+use super::{util::get_verification_key, version::RevocationSemanticVersion};
 use libipld::Cid;
 use serde::{Deserialize, Serialize};
 use serde_with::{
