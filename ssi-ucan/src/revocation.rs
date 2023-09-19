@@ -46,13 +46,17 @@ impl Revocation {
         issuer: String,
         revoke: Cid,
         jwk: &JWK,
-        algorithm: Algorithm,
+        algorithm: Option<Algorithm>,
     ) -> Result<Self, Error> {
         Ok(Self {
             semantic_version: RevocationSemanticVersion,
             issuer,
             revoke,
-            signature: sign_bytes(algorithm, Self::for_signing(&revoke).as_bytes(), jwk)?,
+            signature: sign_bytes(
+                algorithm.or(jwk.algorithm).ok_or(Error::AlgUnknown)?,
+                Self::for_signing(&revoke).as_bytes(),
+                jwk,
+            )?,
         })
     }
 
