@@ -133,12 +133,8 @@ pub enum TimeInvalid {
     TooLate,
 }
 
-fn now() -> f64 {
-    (chrono::prelude::Utc::now()
-        .timestamp_nanos_opt()
-        .expect("value can not be represented in a timestamp with nanosecond precision.")
-        as f64)
-        / 1e+9_f64
+pub(crate) fn now() -> u64 {
+    chrono::prelude::Utc::now().timestamp() as u64
 }
 
 fn cmp_time<T: PartialOrd<u64>>(
