@@ -16,11 +16,19 @@ thiserror = "1.0"
 flate2 = "1.0"
 bitvec = "0.20"
 base64 = "0.12"
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.11", default-features = false, features = [
+  "json",
+  "rustls-tls",
+] }
 cacaos = { version = "0.5.1" }
 siwe-recap = { version = "0.1" }
-libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "derive"]}
-multihash = { version = "0.16", default-features = false, features = ["blake3"] }
+libipld = { version = "0.14", default-features = false, features = [
+  "dag-cbor",
+  "derive",
+] }
+multihash = { version = "0.16", default-features = false, features = [
+  "blake3",
+] }
 iref = "2.2.2"
 ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
@@ -40,11 +48,16 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 async-std = { version = "1.9", features = ["attributes"] }
 multibase = "0.8"
 hex = "0.4"
-k256 = { version = "0.11", features = ["ecdsa"] }
+sha3 = "0.10.8"
+k256 = { version = "0.13.1", features = ["ecdsa"] }
 keccak-hash = { version = "0.7" }
 serde_jcs = "0.1"
 ssi-crypto = { path = "../ssi-crypto" }
-ssi-ldp = { path = "../ssi-ldp", features = ["aleo", "example-http-issuer", "secp384r1"] }
+ssi-ldp = { path = "../ssi-ldp", features = [
+  "aleo",
+  "example-http-issuer",
+  "secp384r1",
+] }
 ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
 josekit = "0.8.2"
 time = "0.3.20"

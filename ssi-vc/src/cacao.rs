@@ -118,6 +118,8 @@ pub(crate) mod tests {
     use ssi_dids::example::DIDExample;
     use ssi_jwk::JWK;
 
+    use sha3::Digest;
+
     const VC_ID_1: &str = "http://example.edu/credentials/1872";
     const VC_ID_2: &str = "http://example.edu/credentials/0000";
     const VP_ID: &str = "uuid:my_vp";
@@ -137,7 +139,7 @@ pub(crate) mod tests {
         credential: Option<(&str, (&str, &str, &JWK))>,
     ) -> Vec<String> {
         use cacaos::{siwe, siwe_cacao::SiweCacao};
-        use k256::{ecdsa::signature::Signer, elliptic_curve::sec1::ToEncodedPoint};
+        use k256::elliptic_curve::sec1::ToEncodedPoint;
         use keccak_hash::keccak;
         use libipld::{cbor::DagCborCodec, multihash::Code, store::DefaultParams, Block};
         use siwe_recap::{Builder, Namespace};
@@ -217,11 +219,14 @@ pub(crate) mod tests {
             None
         };
 
-        let hash =
+        let data =
             ssi_crypto::hashes::keccak::prefix_personal_message(&delegation_message.to_string());
-        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&hash).unwrap();
-        let mut delegation_sig = sig.as_ref().to_vec();
-        delegation_sig[64] += 27;
+        let (sig, rec_id) = signing_key
+            .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data))
+            .unwrap();
+        let mut delegation_sig = sig.to_vec();
+        // Recovery ID starts at 27 instead of 0.
+        delegation_sig.push(rec_id.to_byte() + 27);
 
         let delegation_cacao = SiweCacao::new(
             delegation_message.try_into().unwrap(),

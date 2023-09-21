@@ -3572,6 +3572,7 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
 
     #[async_std::test]
     async fn verify_typed_data() {
+        use sha3::Digest;
         use ssi_ldp::eip712::TypedData;
         let proof: Proof = serde_json::from_value(json!({
           "verificationMethod": "did:example:aaaabbbb#issuerKey-1",
@@ -3774,13 +3775,14 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             ssi_jwk::Params::EC(ec) => ec,
             _ => unreachable!(),
         };
-        use k256::ecdsa::signature::Signer;
         let secret_key = k256::SecretKey::try_from(ec_params).unwrap();
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let sig: k256::ecdsa::recoverable::Signature = signing_key.try_sign(&bytes).unwrap();
-        let sig_bytes = &mut sig.as_ref().to_vec();
+        let (sig, rec_id) = signing_key
+            .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(bytes))
+            .unwrap();
+        let sig_bytes = &mut sig.to_vec();
         // Recovery ID starts at 27 instead of 0.
-        sig_bytes[64] += 27;
+        sig_bytes.push(rec_id.to_byte() + 27);
         let sig_hex = ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes);
         let mut proof = proof.clone();
         proof.proof_value = Some(sig_hex.clone());
