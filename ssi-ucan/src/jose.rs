@@ -80,7 +80,7 @@ impl<F, A> Ucan<F, A, Signature> {
 
     /// Get the Signature bytes of the UCAN
     pub fn sig_bytes(&self) -> &[u8] {
-        &self.signature.bytes()
+        self.signature.bytes()
     }
 }
 

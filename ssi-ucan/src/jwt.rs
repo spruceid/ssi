@@ -103,7 +103,7 @@ where
                 serde_jcs::to_string(&self.payload)?,
                 base64::URL_SAFE_NO_PAD,
             ),
-            base64::encode_config(&self.signature.sig().as_ref(), base64::URL_SAFE_NO_PAD),
+            base64::encode_config(self.signature.sig().as_ref(), base64::URL_SAFE_NO_PAD),
         ]
         .join("."))
     }
@@ -152,7 +152,9 @@ impl<A> From<A> for DummyHeader<A> {
     }
 }
 
-fn decode_ucan_jwt<F, NB, A, E>(jwt: &str) -> Result<(A, Payload<F, NB>, Vec<u8>), DecodeError<E>>
+type JwtParts<A, F, NB> = (A, Payload<F, NB>, Vec<u8>);
+
+fn decode_ucan_jwt<F, NB, A, E>(jwt: &str) -> Result<JwtParts<A, F, NB>, DecodeError<E>>
 where
     A: for<'d> Deserialize<'d>,
     F: for<'d> Deserialize<'d>,
@@ -181,6 +183,6 @@ where
         return Err(DecodeError::DIDURL);
     }
 
-    let sig = base64::decode_config(&parts.2, base64::URL_SAFE_NO_PAD)?;
+    let sig = base64::decode_config(parts.2, base64::URL_SAFE_NO_PAD)?;
     Ok((header.alg, payload, sig))
 }
