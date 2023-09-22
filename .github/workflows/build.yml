@@ -80,3 +80,10 @@ jobs:
 
     - name: Test each feature
       run: cargo hack test --each-feature --workspace --exclude ssi --exclude 'ssi-did-test' --exclude 'ssi-vc-test'  -- --test-threads=4
+
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Check semver
+      uses: obi1kenobi/cargo-semver-checks-action@v2
