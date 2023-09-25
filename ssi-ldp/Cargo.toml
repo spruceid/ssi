@@ -1,6 +1,6 @@
 [package]
 name = "ssi-ldp"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -18,9 +18,15 @@ secp384r1 = ["ssi-jws/secp384r1"]
 ed25519 = ["ssi-jws/ed25519"]
 rsa = ["ssi-jws/rsa"]
 ## enable the EIP-defined LDPs: EIP712
-eip = ["keccak-hash", "ssi-caips/eip", "secp256k1", "ssi-jws/eip"]
+eip = ["keccak-hash", "ssi-caips/eip", "secp256k1", "ssi-jws/eip", "sha3"]
 ## enable LDPs from the Tezos Ecosystem
-tezos = ["ssi-tzkey", "ssi-jws/tezos", "ssi-caips/tezos", "secp256k1", "secp256r1"]
+tezos = [
+  "ssi-tzkey",
+  "ssi-jws/tezos",
+  "ssi-caips/tezos",
+  "secp256k1",
+  "secp256r1",
+]
 ## enable LDPs from the Aleo Ecosystem
 aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 ## enable LDPs from the Solana Ecosystem
@@ -46,16 +52,17 @@ serde_jcs = "0.1"
 hex = "0.4"
 multibase = "0.8"
 sha2 = "0.10.7"
-k256 = { version = "0.11", optional = true, features = ["ecdsa"] }
-p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
+sha3 = { version = "0.10.8", optional = true }
+k256 = { version = "0.13.1", optional = true, features = ["ecdsa"] }
+p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
 keccak-hash = { version = "0.7", optional = true }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1.1"}
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.2"}
-ssi-core = { path = "../ssi-core", version = "0.1"}
-ssi-dids = { path = "../ssi-dids", version = "0.1"}
-ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
-ssi-jws = { path = "../ssi-jws", version = "0.1"}
-ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true}
+ssi-jwk = { path = "../ssi-jwk", version = "0.1.1" }
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.2" }
+ssi-core = { path = "../ssi-core", version = "0.1" }
+ssi-dids = { path = "../ssi-dids", version = "0.1" }
+ssi-crypto = { path = "../ssi-crypto", version = "0.1" }
+ssi-jws = { path = "../ssi-jws", version = "0.1" }
+ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true }
 ssi-caips = { path = "../ssi-caips", version = "0.1" }
 ssi-contexts = { version = "0.1.5", path = "../contexts" }
 

@@ -123,7 +123,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }
             let hash = match algorithm {
-                Algorithm::EdBlake2b => <blake2::Blake2b<U32> as Digest>::new_with_prefix(data)
+                Algorithm::EdBlake2b => blake2::Blake2b::<U32>::new_with_prefix(data)
                     .finalize()
                     .to_vec(),
                 _ => data.to_vec(),
@@ -136,95 +136,109 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             // TODO: SymmetricParams
             #[cfg(all(feature = "ed25519", not(feature = "ring")))]
             {
-                let keypair = ed25519_dalek::Keypair::try_from(okp)?;
+                let secret = ed25519_dalek::SigningKey::try_from(okp)?;
                 use ed25519_dalek::Signer;
-                keypair.sign(&hash).to_bytes().to_vec()
+                secret.sign(&hash).to_bytes().to_vec()
             }
         }
         #[allow(unused)]
-        JWKParams::EC(ec) => {
-            match algorithm {
-                #[cfg(feature = "p384")]
-                Algorithm::ES384 => {
-                    use p384::ecdsa::signature::{Signature, Signer};
-                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                    let secret_key = p384::SecretKey::try_from(ec)?;
-                    let signing_key = p384::ecdsa::SigningKey::from(secret_key);
-                    let sig: p384::ecdsa::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                    sig.as_bytes().to_vec()
-                }
-                #[cfg(feature = "p256")]
-                Algorithm::ES256 => {
-                    use p256::ecdsa::signature::{Signature, Signer};
-                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                    let secret_key = p256::SecretKey::try_from(ec)?;
-                    let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                    let sig: p256::ecdsa::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                    sig.as_bytes().to_vec()
-                }
-                #[cfg(feature = "secp256k1")]
-                Algorithm::ES256K => {
-                    use k256::ecdsa::signature::{Signature, Signer};
-                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                    let secret_key = k256::SecretKey::try_from(ec)?;
-                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                    let sig: k256::ecdsa::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                    sig.as_bytes().to_vec()
-                }
-                #[cfg(feature = "secp256k1")]
-                Algorithm::ES256KR => {
-                    use k256::ecdsa::signature::{digest::Digest, DigestSigner, Signature, Signer};
-                    let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
-                    let secret_key = k256::SecretKey::try_from(ec)?;
-                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                    let sig: k256::ecdsa::recoverable::Signature = signing_key
-                        .try_sign_digest(<sha2::Sha256 as Digest>::new_with_prefix(data))?;
-                    sig.as_bytes().to_vec()
-                }
-                #[cfg(feature = "secp256k1")]
-                Algorithm::ESKeccakKR => {
-                    use k256::ecdsa::signature::{Signature, Signer};
-                    let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
-                    let secret_key = k256::SecretKey::try_from(ec)?;
-                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                    let sig: k256::ecdsa::recoverable::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
-                    sig.as_bytes().to_vec()
-                }
-                #[cfg(feature = "p256")]
-                Algorithm::ESBlake2b => {
-                    use p256::ecdsa::signature::{
-                        digest::{consts::U32, Digest},
-                        DigestSigner, Signature,
-                    };
-                    let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
-                    let secret_key = p256::SecretKey::try_from(ec)?;
-                    let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                    let sig: p256::ecdsa::Signature = signing_key
-                        .try_sign_digest(<blake2::Blake2b<U32> as Digest>::new_with_prefix(data))?;
-                    sig.as_bytes().to_vec()
-                }
-                #[cfg(feature = "secp256k1")]
-                Algorithm::ESBlake2bK => {
-                    use k256::ecdsa::signature::{
-                        digest::{consts::U32, Digest},
-                        DigestSigner, Signature,
-                    };
-                    let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
-                    let secret_key = k256::SecretKey::try_from(ec)?;
-                    let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                    let sig: k256::ecdsa::Signature = signing_key
-                        .try_sign_digest(<blake2::Blake2b<U32> as Digest>::new_with_prefix(data))?;
-                    sig.as_bytes().to_vec()
-                }
-                _ => {
-                    return Err(Error::UnsupportedAlgorithm);
-                }
+        JWKParams::EC(ec) => match algorithm {
+            #[cfg(feature = "p384")]
+            Algorithm::ES384 => {
+                use p384::ecdsa::{signature::Signer, Signature};
+                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                let secret_key = p384::SecretKey::try_from(ec)?;
+                let signing_key = p384::ecdsa::SigningKey::from(secret_key);
+                let sig: p384::ecdsa::Signature =
+                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                sig.to_bytes().to_vec()
             }
-        }
+            #[cfg(feature = "p256")]
+            Algorithm::ES256 => {
+                use p256::ecdsa::{signature::Signer, Signature};
+                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                let secret_key = p256::SecretKey::try_from(ec)?;
+                let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                let sig: p256::ecdsa::Signature =
+                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                sig.to_bytes().to_vec()
+            }
+            #[cfg(feature = "secp256k1")]
+            Algorithm::ES256K => {
+                use k256::ecdsa::{signature::Signer, Signature};
+                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let sig: Signature = signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                sig.to_bytes().to_vec()
+            }
+            #[cfg(feature = "secp256k1")]
+            Algorithm::ES256KR => {
+                use k256::ecdsa::{
+                    signature::{digest::Digest, Signer},
+                    Signature,
+                };
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let (sig, rec_id) =
+                    signing_key.sign_digest_recoverable(sha2::Sha256::new_with_prefix(data))?;
+                let mut res = sig.to_bytes().to_vec();
+                res.push(rec_id.to_byte());
+                res
+            }
+            #[cfg(feature = "secp256k1")]
+            Algorithm::ESKeccakKR => {
+                use k256::ecdsa::{
+                    signature::{digest::Digest, Signer},
+                    Signature,
+                };
+                let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let (sig, rec_id) = signing_key
+                    .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data))
+                    .map_err(ssi_jwk::Error::from)?;
+                let mut res = sig.to_bytes().to_vec();
+                res.push(rec_id.to_byte());
+                res
+            }
+            #[cfg(feature = "p256")]
+            Algorithm::ESBlake2b => {
+                use p256::ecdsa::{
+                    signature::{
+                        digest::{consts::U32, Digest},
+                        DigestSigner,
+                    },
+                    Signature,
+                };
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                let secret_key = p256::SecretKey::try_from(ec)?;
+                let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                let sig: p256::ecdsa::Signature =
+                    signing_key.try_sign_digest(blake2::Blake2b::<U32>::new_with_prefix(data))?;
+                sig.to_bytes().to_vec()
+            }
+            #[cfg(feature = "secp256k1")]
+            Algorithm::ESBlake2bK => {
+                use k256::ecdsa::{
+                    signature::{
+                        digest::{consts::U32, Digest},
+                        DigestSigner,
+                    },
+                    Signature,
+                };
+                let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
+                let secret_key = k256::SecretKey::try_from(ec)?;
+                let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                let sig: k256::ecdsa::Signature =
+                    signing_key.try_sign_digest(blake2::Blake2b::<U32>::new_with_prefix(data))?;
+                sig.to_bytes().to_vec()
+            }
+            _ => {
+                return Err(Error::UnsupportedAlgorithm);
+            }
+        },
         _ => return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented)),
     };
     clear_on_drop::clear_stack(1);
@@ -316,9 +330,9 @@ pub fn verify_bytes_warnable(
             #[cfg(feature = "ed25519")]
             {
                 use ed25519_dalek::Verifier;
-                let public_key = ed25519_dalek::PublicKey::try_from(okp)?;
-                let signature = ed25519_dalek::Signature::from_bytes(signature)
-                    .map_err(ssi_jwk::Error::from)?;
+                let public_key = ed25519_dalek::VerifyingKey::try_from(okp)?;
+                let signature: ed25519_dalek::Signature =
+                    signature.try_into().map_err(ssi_jwk::Error::from)?;
                 public_key
                     .verify(&hash, &signature)
                     .map_err(ssi_jwk::Error::from)?;
@@ -348,7 +362,8 @@ pub fn verify_bytes_warnable(
                     k256::ecdsa::Signature::try_from(signature).map_err(ssi_jwk::Error::from)?;
                 let normalized_sig = if let Some(s) = sig.normalize_s() {
                     // For user convenience, output the normalized signature.
-                    let sig_normalized_b64 = base64::encode_config(s, base64::URL_SAFE_NO_PAD);
+                    let sig_normalized_b64 =
+                        base64::encode_config(s.to_bytes(), base64::URL_SAFE_NO_PAD);
                     warnings.push(format!(
                         "Non-normalized ES256K signature. Normalized: {sig_normalized_b64}"
                     ));
@@ -362,41 +377,79 @@ pub fn verify_bytes_warnable(
             }
             #[cfg(feature = "secp256k1")]
             Algorithm::ES256KR => {
-                use k256::ecdsa::signature::{
-                    digest::{consts::U32, Digest},
-                    DigestVerifier, Verifier,
+                use k256::ecdsa::{
+                    signature::{
+                        digest::{consts::U32, Digest},
+                        DigestVerifier, Verifier,
+                    },
+                    RecoveryId, VerifyingKey,
                 };
+                if signature.len() != 65 {
+                    Err(k256::ecdsa::Error::new())?;
+                }
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = k256::PublicKey::try_from(ec)?;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
-                let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
+                let sig = k256::ecdsa::Signature::try_from(&signature[..64])
                     .map_err(ssi_jwk::Error::from)?;
-                if let Err(_e) = verifying_key
-                    .verify_digest(<sha2::Sha256 as Digest>::new_with_prefix(data), &sig)
-                {
-                    // Legacy mode: allow using Keccak-256 instead of SHA-256
-                    verify_bytes(Algorithm::ESKeccakKR, data, key, signature)?;
-                    warnings
-                        .push("Signature uses legacy mode ES256K-R with Keccak-256".to_string());
+                let rec_id = k256::ecdsa::RecoveryId::try_from(signature[64])
+                    .map_err(ssi_jwk::Error::from)?;
+                match VerifyingKey::recover_from_digest(
+                    <sha2::Sha256 as Digest>::new_with_prefix(data),
+                    &sig,
+                    rec_id,
+                ) {
+                    Err(_e) => {
+                        // Legacy mode: allow using Keccak-256 instead of SHA-256
+                        verify_bytes(Algorithm::ESKeccakKR, data, key, signature)?;
+                        warnings.push(
+                            "Signature uses legacy mode ES256K-R with Keccak-256".to_string(),
+                        );
+                    }
+                    Ok(recovered_key) => match recovered_key == verifying_key {
+                        true => (),
+                        false => Err(k256::ecdsa::Error::new())?,
+                    },
                 }
             }
             #[cfg(feature = "eip")]
             Algorithm::ESKeccakKR => {
-                use k256::ecdsa::signature::Verifier;
+                use k256::ecdsa::{
+                    signature::{
+                        digest::{consts::U32, Digest},
+                        DigestVerifier, Verifier,
+                    },
+                    RecoveryId, VerifyingKey,
+                };
+                if signature.len() != 65 {
+                    Err(k256::ecdsa::Error::new())?;
+                }
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = k256::PublicKey::try_from(ec)?;
                 let verifying_key = k256::ecdsa::VerifyingKey::from(public_key);
-                let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
+                let sig = k256::ecdsa::Signature::try_from(&signature[..64])
                     .map_err(ssi_jwk::Error::from)?;
-                verifying_key
-                    .verify(data, &sig)
+                let rec_id = k256::ecdsa::RecoveryId::try_from(signature[64])
                     .map_err(ssi_jwk::Error::from)?;
+                let recovered_key = VerifyingKey::recover_from_digest(
+                    sha3::Keccak256::new_with_prefix(data),
+                    &sig,
+                    rec_id,
+                )
+                .map_err(ssi_jwk::Error::from)?;
+                match recovered_key == verifying_key {
+                    true => (),
+                    false => Err(k256::ecdsa::Error::new())?,
+                }
             }
             #[cfg(feature = "p256")]
             Algorithm::ESBlake2b => {
-                use p256::ecdsa::signature::{
-                    digest::{consts::U32, Digest},
-                    DigestVerifier, Signature,
+                use p256::ecdsa::{
+                    signature::{
+                        digest::{consts::U32, Digest},
+                        DigestVerifier,
+                    },
+                    Signature,
                 };
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let public_key = p256::PublicKey::try_from(ec)?;
@@ -465,17 +518,22 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
     match algorithm {
         #[cfg(feature = "secp256k1")]
         Algorithm::ES256KR => {
-            let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
-                .map_err(ssi_jwk::Error::from)?;
+            use k256::ecdsa::VerifyingKey;
+            if signature.len() != 65 {
+                Err(k256::ecdsa::Error::new())?;
+            }
+            let sig =
+                k256::ecdsa::Signature::try_from(&signature[..64]).map_err(ssi_jwk::Error::from)?;
+            let rec_id =
+                k256::ecdsa::RecoveryId::try_from(signature[64]).map_err(ssi_jwk::Error::from)?;
             let hash = ssi_crypto::hashes::sha256::sha256(data);
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
-            let recovered_key = sig
-                .recover_verifying_key_from_digest_bytes(digest)
+            let recovered_key = VerifyingKey::recover_from_prehash(digest, &sig, rec_id)
                 .map_err(ssi_jwk::Error::from)?;
             use ssi_jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(
-                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
+                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                         .map_err(ssi_jwk::Error::from)?,
                 )?),
                 public_key_use: None,
@@ -491,14 +549,23 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         }
         #[cfg(feature = "secp256k1")]
         Algorithm::ESKeccakKR => {
-            let sig = k256::ecdsa::recoverable::Signature::try_from(signature)
-                .map_err(ssi_jwk::Error::from)?;
-            let recovered_key = sig
-                .recover_verifying_key(data)
-                .map_err(ssi_jwk::Error::from)?;
+            use k256::ecdsa::{signature::digest::Digest, VerifyingKey};
+            if signature.len() != 65 {
+                Err(k256::ecdsa::Error::new())?;
+            }
+            let sig =
+                k256::ecdsa::Signature::try_from(&signature[..64]).map_err(ssi_jwk::Error::from)?;
+            let rec_id =
+                k256::ecdsa::RecoveryId::try_from(signature[64]).map_err(ssi_jwk::Error::from)?;
+            let recovered_key = VerifyingKey::recover_from_digest(
+                sha3::Keccak256::new_with_prefix(data),
+                &sig,
+                rec_id,
+            )
+            .map_err(ssi_jwk::Error::from)?;
             use ssi_jwk::ECParams;
             let jwk = JWK::from(JWKParams::EC(ECParams::try_from(
-                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
             )?));
             Ok(jwk)

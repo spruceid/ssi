@@ -269,7 +269,7 @@ impl Default for Algorithm {
 }
 
 impl JWK {
-    #[cfg(any(feature = "ed25519"))]
+    #[cfg(feature = "ed25519")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
         #[cfg(feature = "ring")]
         {
@@ -289,12 +289,13 @@ impl JWK {
         }
         #[cfg(not(feature = "ring"))]
         {
-            let mut csprng = rand_old::rngs::OsRng {};
-            let keypair = ed25519_dalek::Keypair::generate(&mut csprng);
+            let mut csprng = rand::rngs::OsRng {};
+            let secret = ed25519_dalek::SigningKey::generate(&mut csprng);
+            let public = secret.verifying_key();
             Ok(JWK::from(Params::OKP(OctetParams {
                 curve: "Ed25519".to_string(),
-                public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
-                private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
+                public_key: Base64urlUInt(public.as_ref().to_vec()),
+                private_key: Some(Base64urlUInt(secret.to_bytes().to_vec())),
             })))
         }
     }
@@ -303,7 +304,7 @@ impl JWK {
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = k256::SecretKey::random(&mut rng);
-        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -314,7 +315,7 @@ impl JWK {
     pub fn generate_p256() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = p256::SecretKey::random(&mut rng);
-        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -325,7 +326,7 @@ impl JWK {
     pub fn generate_p384() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
         let secret_key = p384::SecretKey::random(&mut rng);
-        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key: p384::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -492,7 +493,7 @@ impl JWK {
             }
             "Multikey" => match multicodec::decode(&pk_bytes) {
                 Ok((codec, pk)) => match codec {
-                    #[cfg(any(feature = "ed25519"))]
+                    #[cfg(feature = "ed25519")]
                     multicodec::Codec::Ed25519Pub => ed25519_parse(&pk),
                     #[cfg(feature = "secp256k1")]
                     multicodec::Codec::Secp256k1Pub => secp256k1_parse(&pk),
@@ -512,9 +513,9 @@ impl JWK {
         let bytes = multibase::decode(multicodec)?.1;
         match multicodec::decode(&bytes) {
             Ok((codec, k)) => match codec {
-                #[cfg(any(feature = "ed25519"))]
+                #[cfg(feature = "ed25519")]
                 multicodec::Codec::Ed25519Pub => ed25519_parse(&k),
-                #[cfg(any(feature = "ed25519"))]
+                #[cfg(feature = "ed25519")]
                 multicodec::Codec::Ed25519Priv => ed25519_parse_private(&k),
                 #[cfg(feature = "secp256k1")]
                 multicodec::Codec::Secp256k1Pub => secp256k1_parse(&k),
@@ -793,18 +794,18 @@ impl TryFrom<&RSAParams> for ring::signature::RsaKeyPair {
 }
 
 #[cfg(feature = "ed25519")]
-impl TryFrom<&OctetParams> for ed25519_dalek::PublicKey {
+impl TryFrom<&OctetParams> for ed25519_dalek::VerifyingKey {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
         if params.curve != *"Ed25519" {
             return Err(Error::CurveNotImplemented(params.curve.to_string()));
         }
-        Ok(Self::from_bytes(&params.public_key.0)?)
+        Ok(params.public_key.0.as_slice().as_ref().try_into()?)
     }
 }
 
 #[cfg(feature = "ed25519")]
-impl TryFrom<&OctetParams> for ed25519_dalek::SecretKey {
+impl TryFrom<&OctetParams> for ed25519_dalek::SigningKey {
     type Error = Error;
     fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
         if params.curve != *"Ed25519" {
@@ -814,20 +815,7 @@ impl TryFrom<&OctetParams> for ed25519_dalek::SecretKey {
             .private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        Ok(Self::from_bytes(&private_key.0)?)
-    }
-}
-
-#[cfg(feature = "ed25519")]
-impl TryFrom<&OctetParams> for ed25519_dalek::Keypair {
-    type Error = Error;
-    fn try_from(params: &OctetParams) -> Result<Self, Self::Error> {
-        if params.curve != *"Ed25519" {
-            return Err(Error::CurveNotImplemented(params.curve.to_string()));
-        }
-        let public = ed25519_dalek::PublicKey::try_from(params)?;
-        let secret = ed25519_dalek::SecretKey::try_from(params)?;
-        Ok(ed25519_dalek::Keypair { secret, public })
+        Ok(private_key.0.as_slice().as_ref().try_into()?)
     }
 }
 
@@ -861,7 +849,7 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
 
 #[cfg(feature = "ed25519")]
 pub fn ed25519_parse(data: &[u8]) -> Result<JWK, Error> {
-    let _ = ed25519_dalek::PublicKey::from_bytes(data)?;
+    let _: ed25519_dalek::VerifyingKey = data.try_into()?;
     Ok(JWK::from(Params::OKP(OctetParams {
         curve: "Ed25519".to_string(),
         public_key: Base64urlUInt(data.to_owned()),
@@ -871,10 +859,10 @@ pub fn ed25519_parse(data: &[u8]) -> Result<JWK, Error> {
 
 #[cfg(feature = "ed25519")]
 fn ed25519_parse_private(data: &[u8]) -> Result<JWK, Error> {
-    let key = ed25519_dalek::SecretKey::from_bytes(data)?;
+    let key: ed25519_dalek::SigningKey = data.try_into()?;
     Ok(JWK::from(Params::OKP(OctetParams {
         curve: "Ed25519".to_string(),
-        public_key: Base64urlUInt(ed25519_dalek::PublicKey::from(&key).as_bytes().to_vec()),
+        public_key: Base64urlUInt(ed25519_dalek::VerifyingKey::from(&key).as_bytes().to_vec()),
         private_key: Some(Base64urlUInt(data.to_owned())),
     })))
 }
@@ -932,7 +920,7 @@ pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
 
 #[cfg(feature = "secp256r1")]
 fn p256_parse_private(data: &[u8]) -> Result<JWK, Error> {
-    let k = p256::SecretKey::from_be_bytes(data)?;
+    let k = p256::SecretKey::from_bytes(data.into())?;
     let jwk = JWK {
         params: Params::EC(ECParams::try_from(&k)?),
         public_key_use: None,
@@ -966,7 +954,7 @@ pub fn p384_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
 
 #[cfg(feature = "secp384r1")]
 fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
-    let k = p384::SecretKey::from_be_bytes(data)?;
+    let k = p384::SecretKey::from_bytes(data.into())?;
     let jwk = JWK {
         params: Params::EC(ECParams::try_from(&k)?),
         public_key_use: None,
@@ -1082,7 +1070,7 @@ impl TryFrom<&ECParams> for k256::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = k256::SecretKey::from_be_bytes(&private_key.0)?;
+        let secret_key = k256::SecretKey::from_bytes(private_key.0.as_slice().into())?;
         Ok(secret_key)
     }
 }
@@ -1099,7 +1087,7 @@ impl TryFrom<&ECParams> for p256::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = p256::SecretKey::from_be_bytes(&private_key.0)?;
+        let secret_key = p256::SecretKey::from_bytes(private_key.0.as_slice().into())?;
         Ok(secret_key)
     }
 }
@@ -1116,7 +1104,7 @@ impl TryFrom<&ECParams> for p384::SecretKey {
             .ecc_private_key
             .as_ref()
             .ok_or(Error::MissingPrivateKey)?;
-        let secret_key = p384::SecretKey::from_be_bytes(&private_key.0)?;
+        let secret_key = p384::SecretKey::from_bytes(private_key.0.as_slice().into())?;
         Ok(secret_key)
     }
 }
@@ -1204,7 +1192,7 @@ impl TryFrom<&k256::SecretKey> for ECParams {
             curve: Some("secp256k1".to_string()),
             x_coordinate: Some(Base64urlUInt(x.to_vec())),
             y_coordinate: Some(Base64urlUInt(y.to_vec())),
-            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_bytes().to_vec())),
         })
     }
 }
@@ -1239,7 +1227,7 @@ impl TryFrom<&p256::SecretKey> for ECParams {
             curve: Some("P-256".to_string()),
             x_coordinate: Some(Base64urlUInt(x.to_vec())),
             y_coordinate: Some(Base64urlUInt(y.to_vec())),
-            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_bytes().to_vec())),
         })
     }
 }
@@ -1274,7 +1262,7 @@ impl TryFrom<&p384::SecretKey> for ECParams {
             curve: Some("P-384".to_string()),
             x_coordinate: Some(Base64urlUInt(x.to_vec())),
             y_coordinate: Some(Base64urlUInt(y.to_vec())),
-            ecc_private_key: Some(Base64urlUInt(k.to_be_bytes().to_vec())),
+            ecc_private_key: Some(Base64urlUInt(k.to_bytes().to_vec())),
         })
     }
 }

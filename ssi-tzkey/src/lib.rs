@@ -77,13 +77,9 @@ pub fn jwk_from_tezos_key(tz_pk: &str) -> Result<JWK, DecodeTezosPkError> {
             let sk_bytes = bs58::decode(&tz_pk).with_check(None).into_vec()?[4..].to_owned();
             let pk_bytes;
             {
-                let sk = ed25519_dalek::SecretKey::from_bytes(if sk_bytes.len() == 64 {
-                    &sk_bytes[..32]
-                } else {
-                    &sk_bytes
-                })
-                .map_err(ssi_jwk::Error::from)?;
-                pk_bytes = ed25519_dalek::PublicKey::from(&sk).as_bytes().to_vec()
+                let sk = ed25519_dalek::SigningKey::try_from(sk_bytes.as_slice())
+                    .map_err(ssi_jwk::Error::from)?;
+                pk_bytes = ed25519_dalek::VerifyingKey::from(&sk).as_bytes().to_vec()
             }
             (
                 Algorithm::EdBlake2b,

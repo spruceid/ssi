@@ -1,6 +1,6 @@
 [package]
 name = "ssi-jws"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
@@ -9,9 +9,23 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-jws/"
 
 [features]
-default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
+default = [
+  "secp256k1",
+  "secp256r1",
+  "ed25519",
+  "rsa",
+  "eip",
+  "ssi-jwk/ripemd-160",
+]
 ## enable secp256k1 signatures
-secp256k1 = ["ssi-jwk/secp256k1", "k256/keccak256", "ssi-crypto/secp256k1", "blake2", "dep:sha2"]
+secp256k1 = [
+  "ssi-jwk/secp256k1",
+  "k256",
+  "ssi-crypto/secp256k1",
+  "blake2",
+  "dep:sha2",
+  "dep:sha3",
+]
 ## enable secp256r1 (p256) signatures
 secp256r1 = ["ssi-jwk/secp256r1", "p256", "blake2"]
 ## enable secp384r1 (p384) signatures
@@ -24,7 +38,7 @@ rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "rand"]
 ## enable aleo ecosystem signatures
 aleo = ["ssi-jwk/aleo"]
 ## enable ethereum style signatures
-eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "k256/keccak256", "secp256k1"]
+eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "secp256k1"]
 ## enable tezos style signatures
 tezos = ["ssi-jwk/tezos", "secp256k1", "secp256r1", "ed25519"]
 
@@ -36,18 +50,19 @@ thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 base64 = "0.12"
-k256 = { version = "0.11", optional = true, features = ["ecdsa"] }
-p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
-p384 = { version = "0.11", optional = true, features = ["ecdsa"] }
+k256 = { version = "0.13.1", optional = true, features = ["ecdsa"] }
+p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
+p384 = { version = "0.13.0", optional = true, features = ["ecdsa"] }
 # blake2b_simd = { version = "0.5", optional = true }
 blake2 = { version = "0.10", optional = true }
-ed25519-dalek = { version = "1", optional = true }
+ed25519-dalek = { version = "2.0.0", optional = true }
 sha2 = { version = "0.10", optional = true }
+sha3 = { version = "0.10.8", optional = true }
 rsa = { version = "0.6", optional = true }
 rand = { version = "0.8", optional = true }
 ring = { version = "0.16", optional = true }
-ssi-crypto = { path = "../ssi-crypto", version = "0.1"}
-ssi-jwk = { path = "../ssi-jwk", version = "0.1"}
+ssi-crypto = { path = "../ssi-crypto", version = "0.1" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1" }
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
