@@ -3,7 +3,7 @@ pub mod jwt;
 pub mod payload;
 pub mod revocation;
 pub mod util;
-mod version;
+pub mod version;
 
 pub use payload::{capabilities, Payload, TimeInvalid};
 pub use revocation::Revocation;
