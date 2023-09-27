@@ -4,6 +4,7 @@ use ssi_jwk::JWK;
 use ssi_jwt::NumericDate;
 use std::collections::BTreeMap;
 
+use crate::serialized::deserialize_string_format;
 use crate::verify::{DecodedDisclosure, DisclosureKind};
 use crate::*;
 
@@ -12,6 +13,16 @@ pub struct ValidityClaims {
     pub nbf: Option<NumericDate>,
     pub iat: Option<NumericDate>,
     pub exp: Option<NumericDate>,
+}
+
+pub fn decode_verify_string_format<Claims: DeserializeOwned>(
+    serialized: &str,
+    key: &JWK,
+) -> Result<(ValidityClaims, Claims), Error> {
+    let deserialized =
+        deserialize_string_format(serialized).ok_or(Error::UnableToDeserializeStringFormat)?;
+
+    decode_verify(deserialized.jwt, key, &deserialized.disclosures)
 }
 
 pub fn decode_verify<Claims: DeserializeOwned>(
@@ -32,6 +43,12 @@ pub fn decode_verify<Claims: DeserializeOwned>(
     let mut disclosures = translate_to_in_progress_disclosures(disclosures, sd_alg)?;
 
     visit_claims(&mut payload_claims, &mut disclosures)?;
+
+    for (_, disclosure) in disclosures {
+        if !disclosure.found {
+            return Err(Error::UnusedDisclosure);
+        }
+    }
 
     Ok((validity_claims, serde_json::from_value(payload_claims)?))
 }
@@ -67,6 +84,7 @@ fn translate_to_in_progress_disclosures(
     Ok(disclosure_map)
 }
 
+#[derive(Debug)]
 struct InProgressDisclosure {
     decoded: DecodedDisclosure,
     hash: String,
@@ -98,8 +116,8 @@ fn visit_claims(
     }
 
     // Process _sd claim
-    let new_claims = if let Some(sd) = payload_claims[SD_CLAIM_NAME].as_array() {
-        decode_sd_claims(sd, disclosures)?
+    let new_claims = if let Some(sd_claims) = payload_claims.get(SD_CLAIM_NAME) {
+        decode_sd_claims(sd_claims, disclosures)?
     } else {
         vec![]
     };
@@ -121,7 +139,12 @@ fn visit_claims(
     // Process array claims
     for (_, item) in payload_claims.iter_mut() {
         if let Some(array) = item.as_array_mut() {
-            let new_array_items = decode_array_claims(array, disclosures)?;
+            let mut new_array_items = decode_array_claims(array, disclosures)?;
+
+            for item in new_array_items.iter_mut() {
+                visit_claims(item, disclosures)?;
+            }
+
             *array = new_array_items;
         }
     }
@@ -130,9 +153,10 @@ fn visit_claims(
 }
 
 fn decode_sd_claims(
-    sd_claims: &Vec<serde_json::Value>,
+    sd_claims: &serde_json::Value,
     disclosures: &mut BTreeMap<String, InProgressDisclosure>,
 ) -> Result<Vec<(String, serde_json::Value)>, Error> {
+    let sd_claims = sd_claims.as_array().ok_or(Error::SdPropertyNotArray)?;
     let mut found_disclosures = vec![];
     for disclosure_hash in sd_claims {
         let disclosure_hash = disclosure_hash.as_str().ok_or(Error::SdClaimNotString)?;

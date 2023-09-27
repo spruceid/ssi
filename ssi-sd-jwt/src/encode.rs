@@ -37,12 +37,33 @@ pub fn encode_disclosure_with_rng<ClaimValue: Serialize, Rand: Rng + CryptoRng>(
     encode_disclosure_with_salt(&salt, claim_name, claim_value)
 }
 
-pub fn encode_disclosure<ClaimValue: Serialize>(
+fn encode_disclosure<ClaimValue: Serialize>(
     claim_name: Option<&str>,
     claim_value: &ClaimValue,
 ) -> Result<String, serde_json::Error> {
     let mut rng = rand::rngs::OsRng {};
     encode_disclosure_with_rng(&mut rng, claim_name, claim_value)
+}
+
+pub fn encode_property_disclosure<ClaimValue: Serialize>(
+    sd_alg: SdAlg,
+    claim_name: &str,
+    claim_value: &ClaimValue,
+) -> Result<Disclosure, serde_json::Error> {
+    let encoded = encode_disclosure(Some(claim_name), claim_value)?;
+    let hash = hash_encoded_disclosure(sd_alg, &encoded);
+
+    Ok(Disclosure { encoded, hash })
+}
+
+pub fn encode_array_disclosure<ClaimValue: Serialize>(
+    sd_alg: SdAlg,
+    claim_value: &ClaimValue,
+) -> Result<Disclosure, serde_json::Error> {
+    let encoded = encode_disclosure(None, claim_value)?;
+    let hash = hash_encoded_disclosure(sd_alg, &encoded);
+
+    Ok(Disclosure { encoded, hash })
 }
 
 pub fn encode_sign<Claims: Serialize>(
@@ -51,7 +72,7 @@ pub fn encode_sign<Claims: Serialize>(
     key: &JWK,
     sd_alg: SdAlg,
     disclosures: Vec<UnencodedDisclosure>,
-) -> Result<(String, Vec<PostEncodedDisclosure>), Error> {
+) -> Result<(String, Vec<FullDisclosure>), Error> {
     let mut base_claims_json = serde_json::to_value(base_claims)?;
 
     let post_encoded_disclosures: Result<Vec<_>, Error> = disclosures
@@ -59,7 +80,7 @@ pub fn encode_sign<Claims: Serialize>(
         .map(|disclosure| {
             let encoded = disclosure.encode()?;
             let hash = hash_encoded_disclosure(sd_alg, &encoded);
-            Ok(PostEncodedDisclosure {
+            Ok(FullDisclosure {
                 encoded,
                 hash,
                 unencoded: disclosure.clone(),
@@ -87,7 +108,7 @@ pub fn encode_sign<Claims: Serialize>(
 
         for disclosure in post_encoded_disclosures.iter() {
             match disclosure.unencoded {
-                UnencodedDisclosure::Claim(ref claim_name, _) => {
+                UnencodedDisclosure::Property(ref claim_name, _) => {
                     sd_claim.push(serde_json::Value::String(disclosure.hash.clone()));
                     base_claims_obj.remove(claim_name);
                 }
@@ -119,21 +140,41 @@ pub fn encode_sign<Claims: Serialize>(
 
 #[derive(Clone, Debug)]
 pub enum UnencodedDisclosure {
-    Claim(String, serde_json::Value),
+    Property(String, serde_json::Value),
     ArrayItem(String, serde_json::Value),
 }
 
 impl UnencodedDisclosure {
+    pub fn new_property<S: AsRef<str>, Value: Serialize>(
+        name: S,
+        value: &Value,
+    ) -> Result<Self, serde_json::Error> {
+        Ok(UnencodedDisclosure::Property(
+            name.as_ref().to_owned(),
+            serde_json::to_value(value)?,
+        ))
+    }
+
+    pub fn new_array_item<S: AsRef<str>, Value: Serialize>(
+        parent: S,
+        value: &Value,
+    ) -> Result<Self, serde_json::Error> {
+        Ok(UnencodedDisclosure::ArrayItem(
+            parent.as_ref().to_owned(),
+            serde_json::to_value(value)?,
+        ))
+    }
+
     pub fn claim_value_as_ref(&self) -> &serde_json::Value {
         match self {
             UnencodedDisclosure::ArrayItem(_, value) => value,
-            UnencodedDisclosure::Claim(_, value) => value,
+            UnencodedDisclosure::Property(_, value) => value,
         }
     }
 
     pub fn encoded_claim_name(&self) -> Option<&str> {
         match self {
-            UnencodedDisclosure::Claim(name, _) => Some(name),
+            UnencodedDisclosure::Property(name, _) => Some(name),
             UnencodedDisclosure::ArrayItem(_, _) => None,
         }
     }
@@ -144,7 +185,7 @@ impl UnencodedDisclosure {
 }
 
 #[derive(Debug)]
-pub struct PostEncodedDisclosure {
+pub struct FullDisclosure {
     pub encoded: String,
     pub hash: String,
     pub unencoded: UnencodedDisclosure,
