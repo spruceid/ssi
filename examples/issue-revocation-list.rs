@@ -21,7 +21,7 @@ async fn main() {
         more_properties: serde_json::Value::Null,
     };
     let mut vc = Credential::try_from(rl_vc).unwrap();
-    vc.issuance_date = Some(ssi::vc::VCDateTime::from(ssi::ldp::now_ms()));
+    vc.issuance_date = Some(ssi::vc::VCDateTime::from(ssi::ldp::now_ns()));
     let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     let verification_method = "did:example:foo#key1".to_string();
     proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));

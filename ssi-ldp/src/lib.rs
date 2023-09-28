@@ -122,10 +122,15 @@ impl From<Result<VerificationWarnings, Error>> for VerificationResult {
 }
 
 // Get current time to millisecond precision if possible
+#[deprecated = "Use now_ns instead"]
 pub fn now_ms() -> DateTime<Utc> {
+    now_ns()
+}
+
+// Get current time to nanosecond precision if possible
+pub fn now_ns() -> DateTime<Utc> {
     let datetime = Utc::now();
-    let ms = datetime.timestamp_subsec_millis();
-    let ns = ms * 1_000_000;
+    let ns = datetime.timestamp_subsec_nanos();
     datetime.with_nanosecond(ns).unwrap_or(datetime)
 }
 

@@ -93,7 +93,7 @@ impl Proof {
                 .map(|uri| uri.to_string()),
             domain: options.domain.clone(),
             challenge: options.challenge.clone(),
-            created: Some(options.created.unwrap_or_else(now_ms)),
+            created: Some(options.created.unwrap_or_else(now_ns)),
             ..self
         }
     }
@@ -114,7 +114,7 @@ impl Proof {
             );
         }
         if let Some(created) = self.created {
-            assert_local!(options.created.unwrap_or_else(now_ms) >= created);
+            assert_local!(options.created.unwrap_or_else(now_ns) >= created);
         } else {
             return false;
         }
@@ -244,7 +244,7 @@ impl Default for LinkedDataProofOptions {
         Self {
             verification_method: None,
             proof_purpose: Some(ProofPurpose::default()),
-            created: Some(crate::now_ms()),
+            created: Some(crate::now_ns()),
             challenge: None,
             domain: None,
             checks: Some(vec![Check::Proof]),
