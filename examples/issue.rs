@@ -11,7 +11,7 @@ async fn main() {
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         "type": "VerifiableCredential",
         "issuer": "did:example:foo",
-        "issuanceDate": ssi::ldp::now_ms(),
+        "issuanceDate": ssi::ldp::now_ns(),
         "credentialSubject": {
             "id": "urn:uuid:".to_string() + &uuid::Uuid::new_v4().to_string()
         }

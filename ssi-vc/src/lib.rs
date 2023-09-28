@@ -3004,7 +3004,6 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await
             .unwrap();
         let vp_jwt_verify_options = LinkedDataProofOptions {
-            created: None,
             checks: None,
             proof_purpose: None,
             ..Default::default()
