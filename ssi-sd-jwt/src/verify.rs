@@ -27,17 +27,17 @@ impl DecodedDisclosure {
             serde_json::Value::Array(values) => match values.len() {
                 3 => validate_property_disclosure(&values),
                 2 => validate_array_item_disclosure(&values),
-                _ => Err(Error::DisclosureArrayLength),
+                _ => Err(Error::DisclosureMalformed),
             },
-            _ => todo!("handle other json: {:?}", json),
+            _ => Err(Error::DisclosureMalformed),
         }
     }
 }
 
 fn validate_property_disclosure(values: &[serde_json::Value]) -> Result<DecodedDisclosure, Error> {
-    let salt = values[0].as_str().ok_or(Error::DisclosureHasWrongType)?;
+    let salt = values[0].as_str().ok_or(Error::DisclosureMalformed)?;
 
-    let name = values[1].as_str().ok_or(Error::DisclosureHasWrongType)?;
+    let name = values[1].as_str().ok_or(Error::DisclosureMalformed)?;
 
     Ok(DecodedDisclosure {
         salt: salt.to_owned(),
@@ -51,7 +51,7 @@ fn validate_property_disclosure(values: &[serde_json::Value]) -> Result<DecodedD
 fn validate_array_item_disclosure(
     values: &[serde_json::Value],
 ) -> Result<DecodedDisclosure, Error> {
-    let salt = values[0].as_str().ok_or(Error::DisclosureHasWrongType)?;
+    let salt = values[0].as_str().ok_or(Error::DisclosureMalformed)?;
 
     Ok(DecodedDisclosure {
         salt: salt.to_owned(),
@@ -79,15 +79,12 @@ pub fn verify_sd_disclosures_array(
             DisclosureKind::Property { name, value } => {
                 let orig = verfied_claims.insert(name, value);
 
-                if let Some(orig) = orig {
-                    todo!(
-                        "handle multiple claims with the same property name: {:?}",
-                        orig,
-                    )
+                if orig.is_some() {
+                    return Err(Error::DisclosureUsedMultipleTimes);
                 }
             }
             DisclosureKind::ArrayItem(_) => {
-                todo!("array item disclouse in sd claims: {:?}", decoded)
+                return Err(Error::ArrayDisclosureWhenExpectingProperty);
             }
         }
     }

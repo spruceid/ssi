@@ -28,10 +28,8 @@ pub enum Error {
     SdPropertyNotArray,
     #[error("A disclosure claim would collid with an existing JWT claim")]
     DisclosureClaimCollidesWithJwtClaim,
-    #[error("A disclosure didn't have the correct array length")]
-    DisclosureArrayLength,
-    #[error("A disclosure didn't contain the right types for elements")]
-    DisclosureHasWrongType,
+    #[error("A disclosure is malformed")]
+    DisclosureMalformed,
     #[error("A single disclosure was used multiple times")]
     DisclosureUsedMultipleTimes,
     #[error("Found an array item disclosure when expecting a property type")]
