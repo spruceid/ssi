@@ -3,13 +3,14 @@ use std::future;
 use ssi_crypto::{protocol::Base58Btc, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
-    covariance_rule, Referencable, SignatureError, SolanaMethod2021, VerificationError,
+    covariance_rule, InvalidSignature, Referencable, SignatureError, SolanaMethod2021,
+    VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError},
+    suite::{sha256_hash, AnySignature, AnySignatureRef, HashError},
     CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
 };
 
@@ -97,10 +98,50 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
+impl From<Signature> for AnySignature {
+    fn from(value: Signature) -> Self {
+        AnySignature {
+            proof_value: Some(value.proof_value),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<AnySignature> for Signature {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
+        match value.proof_value {
+            Some(v) => Ok(Self { proof_value: v }),
+            None => Err(InvalidSignature::MissingValue),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base58Btc encoded signature.
     pub proof_value: &'a str,
+}
+
+impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: SignatureRef<'a>) -> Self {
+        AnySignatureRef {
+            proof_value: Some(value.proof_value),
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
+        match value.proof_value {
+            Some(v) => Ok(Self { proof_value: v }),
+            None => Err(InvalidSignature::MissingValue),
+        }
+    }
 }
 
 pub struct SignatureAlgorithm;

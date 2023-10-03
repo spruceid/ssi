@@ -33,6 +33,7 @@ impl<C: Sync> VerifiableWith for VcJwt<C> {
 
         VerifyWith(verifier.verify(
             VcJwtSignatureAlgorithm::default(),
+            (),
             proof.issuer.id(),
             proof.issuer.method_reference(),
             ProofPurpose::Assertion,

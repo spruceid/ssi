@@ -3,8 +3,8 @@ use std::future;
 use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
-    verification_method_union, AleoMethod2021, BlockchainVerificationMethod2021, SignatureError,
-    VerificationError,
+    verification_method_union, AleoMethod2021, BlockchainVerificationMethod2021,
+    InvalidVerificationMethod, SignatureError, VerificationError,
 };
 use static_iref::iri;
 

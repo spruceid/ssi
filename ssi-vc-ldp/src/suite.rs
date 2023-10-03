@@ -21,19 +21,18 @@ use crate::{ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProo
 mod signatures;
 pub use signatures::*;
 
-mod any;
-mod dif;
-mod unspecified;
-
 #[cfg(feature = "w3c")]
 mod w3c;
-
-pub use any::*;
-pub use dif::*;
-pub use unspecified::*;
-
 #[cfg(feature = "w3c")]
 pub use w3c::*;
+
+#[cfg(feature = "dif")]
+mod dif;
+#[cfg(feature = "dif")]
+pub use dif::*;
+
+mod unspecified;
+pub use unspecified::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TransformError {

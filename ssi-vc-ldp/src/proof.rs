@@ -1,5 +1,6 @@
 use linked_data::{
-    LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfLiteralValue, LinkedDataGraph,
+    LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
+    RdfLiteralValue,
 };
 
 use iref::{Iri, IriBuf};
@@ -150,8 +151,7 @@ where
     }
 }
 
-impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I>
-    for Proof<T>
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Proof<T>
 where
     T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
     T::Options: LinkedDataSubject<V, I>,
@@ -160,8 +160,9 @@ where
     V::Value: RdfLiteralValue,
 {
     fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-        where
-            S: linked_data::GraphVisitor<V, I> {
+    where
+        S: linked_data::GraphVisitor<V, I>,
+    {
         visitor.subject(self)?;
         visitor.end()
     }

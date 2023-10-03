@@ -1,4 +1,5 @@
 mod w3c;
+use ssi_jwk::JWK;
 pub use w3c::*;
 
 mod unspecified;
@@ -6,6 +7,8 @@ pub use unspecified::*;
 
 mod generic;
 pub use generic::*;
+
+use crate::SigningMethod;
 
 #[macro_export]
 macro_rules! verification_method_union {
@@ -225,43 +228,4 @@ macro_rules! verification_method_union {
 			}
 		)*
 	};
-}
-
-verification_method_union! {
-    pub enum AnyMethod, AnyMethodRef, AnyMethodType {
-        /// Deprecated verification method for the `RsaSignature2018` suite.
-        RsaVerificationKey2018,
-
-        /// Deprecated verification method for the `Ed25519Signature2018` suite.
-        Ed25519VerificationKey2018,
-
-        /// Deprecated verification method for the `Ed25519Signature2020` suite.
-        Ed25519VerificationKey2020,
-
-        EcdsaSecp256k1VerificationKey2019,
-
-        EcdsaSecp256k1RecoveryMethod2020,
-
-        EcdsaSecp256r1VerificationKey2019,
-
-        /// `JsonWebKey2020`.
-        JsonWebKey2020,
-
-        /// `Multikey`.
-        Multikey,
-
-        Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-
-        P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-
-        TezosMethod2021,
-
-        AleoMethod2021,
-
-        BlockchainVerificationMethod2021,
-
-        Eip712Method2021,
-
-        SolanaMethod2021
-    }
 }

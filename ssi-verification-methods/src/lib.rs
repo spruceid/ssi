@@ -134,6 +134,9 @@ pub trait VerificationMethod: Referencable {
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerificationMethodResolutionError {
+    #[error("unknown key")]
+    UnknownKey,
+
     /// Invalid key identifier.
     #[error("invalid key id `{0}`")]
     InvalidKeyId(String),

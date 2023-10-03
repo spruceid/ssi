@@ -113,7 +113,8 @@ impl
                 &signing_bytes,
                 options.public_key_jwk,
                 &signature,
-            ).is_ok())
+            )
+            .is_ok())
         } else {
             Ok(false)
         }
