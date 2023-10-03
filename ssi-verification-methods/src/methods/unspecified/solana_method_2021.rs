@@ -5,16 +5,15 @@ use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
 
-pub const SOLANA_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#SolanaMethod2021");
+// pub const SOLANA_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#SolanaMethod2021");
 
 /// Solana Method 2021.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
@@ -83,8 +82,32 @@ impl TypedVerificationMethod for SolanaMethod2021 {
         Some(SOLANA_METHOD_2021_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == SOLANA_METHOD_2021_TYPE
+    }
+
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         SOLANA_METHOD_2021_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for SolanaMethod2021 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key: Box::new(
+                m.properties
+                    .get("publicKeyJwk")
+                    .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyJwk"))?
+                    .as_str()
+                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+                    .parse()
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+            )
+        })
     }
 }

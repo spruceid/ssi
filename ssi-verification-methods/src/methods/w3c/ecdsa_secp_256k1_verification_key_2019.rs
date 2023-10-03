@@ -9,7 +9,7 @@ use ssi_jws::CompactJWSString;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
@@ -152,8 +152,39 @@ impl TypedVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
         )
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE
+    }
+
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1VerificationKey2019 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        let public_key = match (m.properties.get("publicKeyJwk"), m.properties.get("publicKeyHex")) {
+            (Some(k), None) => k
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+                .parse()
+                .map(|jwk| PublicKey::Jwk(Box::new(jwk)))
+                .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
+            (None, Some(k)) => k
+                .as_str()
+                .map(|s| PublicKey::Hex(s.to_owned()))
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyHex"))?,
+            (Some(_), Some(_)) => return Err(InvalidVerificationMethod::AmbiguousPublicKey),
+            (None, None) => return Err(InvalidVerificationMethod::missing_property("publicKeyJwk"))
+        };
+
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key
+        })
     }
 }

@@ -1,22 +1,15 @@
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task;
-
-use futures::Future;
 use linked_data::LinkedData;
-use pin_project::pin_project;
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
-use ssi_crypto::{MessageSignatureError, MessageSigner};
+use ssi_crypto::MessageSigner;
 use ssi_jwk::{Algorithm, JWK};
 use ssi_verification_methods::{
     covariance_rule, Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, Referencable,
-    SignatureError, VerificationError,
+    VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef},
+    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws},
     CryptographicSuite, ProofConfigurationRef,
 };
 
@@ -74,7 +67,7 @@ impl
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignWith<'a, S>;
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
@@ -89,10 +82,7 @@ impl
         );
         let signing_bytes = header.encode_signing_bytes(bytes);
 
-        SignWith {
-            header: Some(header),
-            sign: SelfRefFuture::new(signing_bytes, Binder { signer }),
-        }
+        SignIntoDetachedJws::new(header, signing_bytes, signer)
     }
 
     fn verify(
@@ -155,52 +145,4 @@ pub struct OptionsRef<'a> {
     #[serde(rename = "publicKeyJwk")]
     #[ld("sec:publicKeyJwk")]
     pub public_key_jwk: &'a JWK,
-}
-
-struct UnboundSign<S>(PhantomData<S>);
-
-impl<'a, S: 'a + MessageSigner> UnboundedRefFuture<'a> for UnboundSign<S> {
-    type Owned = Vec<u8>;
-
-    type Bound<'r> = S::Sign<'r> where 'a: 'r;
-
-    type Output = Result<Vec<u8>, MessageSignatureError>;
-}
-
-struct Binder<S> {
-    // signing_bytes: Vec<u8>
-    signer: S,
-}
-
-impl<'a, S: 'a + MessageSigner> RefFutureBinder<'a, UnboundSign<S>> for Binder<S> {
-    fn bind<'r>(context: Self, value: &'r Vec<u8>) -> S::Sign<'r>
-    where
-        'a: 'r,
-    {
-        context.signer.sign((), value)
-    }
-}
-
-#[pin_project]
-pub struct SignWith<'a, S: 'a + MessageSigner> {
-    header: Option<ssi_jws::Header>,
-
-    #[pin]
-    sign: SelfRefFuture<'a, UnboundSign<S>>,
-}
-
-impl<'a, S: 'a + MessageSigner> Future for SignWith<'a, S> {
-    type Output = Result<JwsSignature, SignatureError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.sign.poll(cx).map(|(r, _)| match r {
-            Ok(signature) => {
-                let header = this.header.take().unwrap();
-                let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
-                Ok(JwsSignature::new(jws))
-            }
-            Err(e) => Err(e.into()),
-        })
-    }
 }

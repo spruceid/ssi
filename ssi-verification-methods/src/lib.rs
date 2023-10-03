@@ -237,6 +237,8 @@ impl<'m, 's, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S, P>, S
 pub trait TypedVerificationMethod: VerificationMethod {
     fn expected_type() -> Option<ExpectedType>;
 
+    fn type_match(ty: &str) -> bool;
+
     /// Returns the name of the verification method's type.
     fn type_(&self) -> &str;
 }
@@ -304,6 +306,9 @@ pub enum InvalidVerificationMethod {
 
     #[error("ambiguous public key")]
     AmbiguousPublicKey,
+
+    #[error("unsupported method type")]
+    UnsupportedMethodType
 }
 
 impl InvalidVerificationMethod {

@@ -130,6 +130,16 @@ macro_rules! verification_method_union {
 				}
 			}
 
+			fn type_match(ty: &str) -> bool {
+				$(
+					if <$variant as $crate::TypedVerificationMethod>::type_match(ty) {
+						return true
+					}
+				)*
+				
+				false
+			}
+
 			fn type_(&self) -> &str {
 				match self {
 					$(
@@ -227,5 +237,19 @@ macro_rules! verification_method_union {
 				}
 			}
 		)*
+
+		impl TryFrom<$crate::GenericVerificationMethod> for $name {
+			type Error = $crate::InvalidVerificationMethod;
+		
+			fn try_from(value: $crate::GenericVerificationMethod) -> Result<Self, Self::Error> {
+				$(
+					if <$variant as $crate::TypedVerificationMethod>::type_match(&value.type_) {
+						return <$variant as TryFrom<$crate::GenericVerificationMethod>>::try_from(value).map(Self::$variant)
+					}
+				)*
+
+				Err($crate::InvalidVerificationMethod::UnsupportedMethodType)
+			}
+		}		
 	};
 }

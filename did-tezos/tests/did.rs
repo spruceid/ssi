@@ -9,7 +9,7 @@ use ssi_top::{AnySuite, AnySuiteOptions};
 use ssi_vc::Verifiable;
 use ssi_vc_ldp::{
     verification::method::{signer::SingleSecretSigner, ProofPurpose},
-    DataIntegrity, LinkedDataInput, ProofConfiguration,
+    CryptographicSuiteInput, DataIntegrity, LinkedDataInput, ProofConfiguration,
 };
 use static_iref::iri;
 
@@ -346,162 +346,24 @@ async fn credential_prove_verify_did_tz2() {
     );
 
     let suite = AnySuite::pick(&key, Some(&issue_options.verification_method)).unwrap();
-    let vc = DataIntegrity::<_, AnySuite>::sign(
-        cred,
-        LinkedDataInput::default(),
-        &signer,
-        suite,
-        issue_options,
-    );
+    let vc = suite
+        .sign(cred, LinkedDataInput::default(), &signer, issue_options)
+        .await
+        .unwrap();
+    assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
-    // 	let issue_options = LinkedDataProofOptions {
-    // 		verification_method: Some(URI::String(did.to_string() + "#blockchainAccountId")),
-    // 		..Default::default()
-    // 	};
-    // 	eprintln!("vm {:?}", issue_options.verification_method);
-    // 	let mut context_loader = ssi_json_ld::ContextLoader::default();
-    // 	let vc_no_proof = vc.clone();
-    // 	let proof = vc
-    // 		.generate_proof(&key, &issue_options, &DIDTZ, &mut context_loader)
-    // 		.await
-    // 		.unwrap();
-    // 	println!("{}", serde_json::to_string_pretty(&proof).unwrap());
-    // 	vc.add_proof(proof);
-    // 	vc.validate().unwrap();
-    // 	let verification_result = vc.verify(None, &DIDTZ, &mut context_loader).await;
-    // 	println!("{:#?}", verification_result);
-    // 	assert!(verification_result.errors.is_empty());
-
-    // 	// test that issuer property is used for verification
-    // 	let mut vc_bad_issuer = vc.clone();
-    // 	vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:example:bad".to_string())));
-    // 	assert!(!vc_bad_issuer
-    // 		.verify(None, &DIDTZ, &mut context_loader)
-    // 		.await
-    // 		.errors
-    // 		.is_empty());
-
-    // 	// Check that proof JWK must match proof verificationMethod
-    // 	let mut vc_wrong_key = vc_no_proof.clone();
-    // 	let other_key = JWK::generate_ed25519().unwrap();
-    // 	let proof_bad = ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-    // 		.sign(
-    // 			&vc_no_proof,
-    // 			&issue_options,
-    // 			&DIDTZ,
-    // 			&mut context_loader,
-    // 			&other_key,
-    // 			None,
-    // 		)
-    // 		.await
-    // 		.unwrap();
-    // 	vc_wrong_key.add_proof(proof_bad);
-    // 	vc_wrong_key.validate().unwrap();
-    // 	assert!(!vc_wrong_key
-    // 		.verify(None, &DIDTZ, &mut context_loader)
-    // 		.await
-    // 		.errors
-    // 		.is_empty());
-
-    // 	// Make it into a VP
-    // 	use ssi_core::one_or_many::OneOrMany;
-    // 	use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
-    // 	let mut vp = Presentation {
-    // 		context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
-    // 			DEFAULT_CONTEXT.to_string(),
-    // 		))]),
-
-    // 		id: Some("http://example.org/presentations/3731".try_into().unwrap()),
-    // 		type_: OneOrMany::One("VerifiablePresentation".to_string()),
-    // 		verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
-    // 		proof: None,
-    // 		holder: None,
-    // 		property_set: None,
-    // 		holder_binding: None,
-    // 	};
-    // 	let mut vp_issue_options = LinkedDataProofOptions::default();
-    // 	vp.holder = Some(URI::String(did.to_string()));
-    // 	vp_issue_options.verification_method =
-    // 		Some(URI::String(did.to_string() + "#blockchainAccountId"));
-    // 	vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-    // 	eprintln!("vp: {}", serde_json::to_string_pretty(&vp).unwrap());
-    // 	let mut context_loader = ssi_json_ld::ContextLoader::default();
-    // 	let vp_proof = vp
-    // 		.generate_proof(&key, &vp_issue_options, &DIDTZ, &mut context_loader)
-    // 		.await
-    // 		.unwrap();
-    // 	vp.add_proof(vp_proof);
-    // 	println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-    // 	vp.validate().unwrap();
-    // 	let vp_verification_result = vp
-    // 		.verify(Some(vp_issue_options.clone()), &DIDTZ, &mut context_loader)
-    // 		.await;
-    // 	println!("{:#?}", vp_verification_result);
-    // 	assert!(vp_verification_result.errors.is_empty());
-
-    // 	// mess with the VP proof to make verify fail
-    // 	let mut vp1 = vp.clone();
-    // 	match vp1.proof {
-    // 		Some(OneOrMany::One(ref mut proof)) => match proof.jws {
-    // 			Some(ref mut jws) => {
-    // 				jws.insert(0, 'x');
-    // 			}
-    // 			_ => unreachable!(),
-    // 		},
-    // 		_ => unreachable!(),
-    // 	}
-    // 	let vp_verification_result = vp1
-    // 		.verify(Some(vp_issue_options), &DIDTZ, &mut context_loader)
-    // 		.await;
-    // 	println!("{:#?}", vp_verification_result);
-    // 	assert!(!vp_verification_result.errors.is_empty());
-
-    // 	// test that holder is verified
-    // 	let mut vp2 = vp.clone();
-    // 	vp2.holder = Some(URI::String("did:example:bad".to_string()));
-    // 	assert!(!vp2
-    // 		.verify(None, &DIDTZ, &mut context_loader)
-    // 		.await
-    // 		.errors
-    // 		.is_empty());
-    // }
-
-    // #[tokio::test]
-    // async fn test_derivation_tz3() {
-    // 	let (res_meta, doc_opt, _meta_opt) = DIDTZ
-    // 		.resolve(
-    // 			"did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-    // 			&ResolutionInputMetadata::default(),
-    // 		)
-    // 		.await;
-    // 	assert_eq!(res_meta.error, None);
-    // 	let doc = doc_opt.unwrap();
-    // 	eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
-    // 	assert_eq!(
-    // 		serde_json::to_value(doc).unwrap(),
-    // 		json!({
-    // 			"@context": [
-    // 			"https://www.w3.org/ns/did/v1",
-    // 			{
-    // 				"P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021": "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
-    // 				"blockchainAccountId": "https://w3id.org/security#blockchainAccountId"
-    // 			}
-    // 			],
-    // 			"id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-    // 			"verificationMethod": [{
-    // 			"id": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId",
-    // 			"type": "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021",
-    // 			"controller": "did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
-    // 			"blockchainAccountId": "tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"
-    // 			}],
-    // 			"authentication": [
-    // 			"did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"
-    // 			],
-    // 			"assertionMethod": [
-    // 			"did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX#blockchainAccountId"
-    // 			]
-    // 		})
-    // 	);
+    // // Test that issuer property is used for verification.
+    // let mut cred_bad_issuer = vc.credential().value().clone();
+    // cred_bad_issuer.issuer = iri!("did:example:bad").to_owned();
+    // let ldp_cred_bad_issuer = ssi_vc_ldp::DataIntegrity::new(
+    //     cred_bad_issuer,
+    //     LinkedDataInput::default(),
+    //     vc.proof().suite(),
+    //     vc.proof().configuration(),
+    // )
+    // .unwrap();
+    // let vc_bad_issuer = ssi_vc::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
+    // assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 }
 
 // #[tokio::test]

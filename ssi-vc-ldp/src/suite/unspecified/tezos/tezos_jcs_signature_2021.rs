@@ -11,7 +11,7 @@ use crate::{
     CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 
-pub use super::thezos_signature_2021::{PublicKey, PublicKeyRef, Signature, SignatureRef};
+pub use super::tezos_signature_2021::{PublicKey, PublicKeyRef, Signature, SignatureRef};
 
 /// Tezos signature suite based on JCS.
 ///

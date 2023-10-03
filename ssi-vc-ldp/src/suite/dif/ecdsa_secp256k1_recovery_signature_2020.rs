@@ -1,13 +1,14 @@
 use std::future;
 
 use ssi_crypto::MessageSigner;
+use ssi_jwk::Algorithm;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, Referencable, SignatureError};
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef},
+    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws},
     CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
 };
 
@@ -65,17 +66,21 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
+    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        todo!()
+        let header = ssi_jws::Header::new_unencoded(
+            Algorithm::ES256KR,
+            Some(method.id.as_str().to_owned())
+        );
+
+        SignIntoDetachedJws::new(header, bytes.to_vec(), signer)
     }
 
     fn verify(

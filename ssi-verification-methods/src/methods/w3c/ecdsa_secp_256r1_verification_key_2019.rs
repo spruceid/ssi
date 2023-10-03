@@ -2,18 +2,17 @@ use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_multicodec::MultiEncodedBuf;
-use static_iref::iri;
 use std::hash::Hash;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
 
-pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_IRI: &Iri =
-    iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019");
+// pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_IRI: &Iri =
+//     iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019");
 
 #[derive(Debug, thiserror::Error)]
 pub enum InvalidPublicKey {
@@ -132,8 +131,29 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
         )
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
+    }
+
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for EcdsaSecp256r1VerificationKey2019 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key_multibase: m.properties
+                .get("publicKeyMultibase")
+                .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
+                .to_owned()
+        })
     }
 }

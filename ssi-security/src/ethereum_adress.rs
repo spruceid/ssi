@@ -4,7 +4,7 @@ use linked_data::{
     LinkedDataPredicateObjects, LinkedDataSubject,
 };
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
+use std::{ops::Deref, str::FromStr};
 
 /// Value for the `ethereumAddress` property.
 ///
@@ -32,6 +32,14 @@ impl EthereumAddressBuf {
 
     pub fn into_string(self) -> String {
         self.0
+    }
+}
+
+impl FromStr for EthereumAddressBuf {
+    type Err = std::convert::Infallible;
+    
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Self(s.to_owned())) // TODO actually parse
     }
 }
 

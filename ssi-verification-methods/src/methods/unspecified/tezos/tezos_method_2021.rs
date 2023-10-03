@@ -33,7 +33,7 @@ pub const TEZOS_METHOD_2021_TYPE: &str = "TezosMethod2021";
 /// In the proof, the public must be stored using the `publicKeyJwk` or
 /// `publicKeyMultibase` properties. Here `publicKeyMultibase` is used in a
 /// non-standard way, where the public key is encoded in base58 (`z` prefix) as
-/// a thezos key (so without multicodec, contrarily to the specification).
+/// a tezos key (so without multicodec, contrarily to the specification).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
 #[serde(tag = "type", rename = "TezosMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
@@ -135,6 +135,10 @@ impl VerificationMethod for TezosMethod2021 {
 impl TypedVerificationMethod for TezosMethod2021 {
     fn expected_type() -> Option<ExpectedType> {
         Some(TEZOS_METHOD_2021_TYPE.to_string().into())
+    }
+
+    fn type_match(ty: &str) -> bool {
+        ty == TEZOS_METHOD_2021_TYPE
     }
 
     fn type_(&self) -> &str {
