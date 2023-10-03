@@ -101,11 +101,3 @@ impl<'a> From<aleo_signature_2021::VerificationMethodRef<'a>> for AnyMethodRef<'
         }
     }
 }
-
-impl TryFrom<GenericVerificationMethod> for AnyMethod {
-    type Error = InvalidVerificationMethod;
-
-    fn try_from(value: GenericVerificationMethod) -> Result<Self, Self::Error> {
-        todo!()
-    }
-}

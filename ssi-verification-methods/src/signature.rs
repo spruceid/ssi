@@ -53,6 +53,8 @@ pub enum InvalidSignature {
     InvalidValue,
 
     MissingPublicKey,
+
+    AmbiguousPublicKey
 }
 
 impl From<InvalidSignature> for VerificationError {
@@ -61,6 +63,7 @@ impl From<InvalidSignature> for VerificationError {
             InvalidSignature::MissingValue => Self::MissingSignature,
             InvalidSignature::InvalidValue => Self::InvalidSignature,
             InvalidSignature::MissingPublicKey => Self::MissingPublicKey,
+            InvalidSignature::AmbiguousPublicKey => Self::AmbiguousPublicKey
         }
     }
 }

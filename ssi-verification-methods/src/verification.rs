@@ -55,6 +55,10 @@ pub enum VerificationError {
     #[error("missing public key")]
     MissingPublicKey,
 
+    /// More than one public key is provided.
+    #[error("ambiguous public key")]
+    AmbiguousPublicKey,
+
     /// Cryptographic key is not used correctly.
     #[error("invalid use of key with <{0}>")]
     InvalidKeyUse(ProofPurpose),

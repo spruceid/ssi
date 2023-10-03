@@ -1,17 +1,18 @@
 use std::future;
 
+use linked_data::LinkedData;
 use ssi_crypto::MessageSigner;
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_verification_methods::{
     covariance_rule, P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, Referencable,
-    SignatureError,
+    SignatureError, InvalidSignature,
 };
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError},
+    suite::{sha256_hash, HashError, AnySignature, AnySignatureRef},
     CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
 };
 
@@ -56,13 +57,26 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Signature {
     /// JSON Web Signature.
+    #[ld("sec:jwk")]
     pub jws: CompactJWSString,
 
     /// Signing key.
+    #[ld("sec:publicKeyJwk")]
     pub public_key_jwk: Box<JWK>,
+}
+
+impl From<Signature> for AnySignature {
+    fn from(value: Signature) -> Self {
+        AnySignature {
+            jws: Some(value.jws),
+            public_key_jwk: Some(value.public_key_jwk),
+            ..Default::default()
+        }
+    }
 }
 
 impl Referencable for Signature {
@@ -85,6 +99,27 @@ pub struct SignatureRef<'a> {
 
     /// Signing key.
     pub public_key_jwk: &'a JWK,
+}
+
+impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: SignatureRef<'a>) -> Self {
+        AnySignatureRef {
+            jws: Some(value.jws),
+            public_key_jwk: Some(value.public_key_jwk),
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            jws: value.jws.ok_or(InvalidSignature::MissingValue)?,
+            public_key_jwk: value.public_key_jwk.ok_or(InvalidSignature::MissingPublicKey)?
+        })
+    }
 }
 
 pub struct SignatureAlgorithm;

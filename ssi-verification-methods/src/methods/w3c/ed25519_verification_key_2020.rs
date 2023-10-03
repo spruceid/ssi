@@ -11,7 +11,7 @@ use ssi_multicodec::MultiEncodedBuf;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, SigningMethod, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 /// Ed25519 Verification Key 2020 type name.
@@ -148,6 +148,10 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
         Some(ED25519_VERIFICATION_KEY_2020_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == ED25519_VERIFICATION_KEY_2020_TYPE
+    }
+
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
@@ -172,5 +176,22 @@ impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         todo!()
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2020 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key_multibase: m.properties
+                .get("publicKeyMultibase")
+                .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
+                .to_owned()
+        })
     }
 }

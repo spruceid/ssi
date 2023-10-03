@@ -3,13 +3,12 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
-use static_iref::iri;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationMethod,
+    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
-pub const ALEO_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#AleoMethod2021");
+// pub const ALEO_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#AleoMethod2021");
 
 pub const ALEO_METHOD_2021_TYPE: &str = "AleoMethod2021";
 
@@ -70,7 +69,29 @@ impl TypedVerificationMethod for AleoMethod2021 {
         Some(ALEO_METHOD_2021_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == ALEO_METHOD_2021_TYPE
+    }
+
     fn type_(&self) -> &str {
         ALEO_METHOD_2021_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for AleoMethod2021 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            blockchain_account_id: m.properties
+                .get("blockchainAccountId")
+                .ok_or_else(|| InvalidVerificationMethod::missing_property("blockchainAccountId"))?
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                .parse()
+                .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+        })
     }
 }

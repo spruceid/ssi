@@ -17,7 +17,7 @@ ssi-security.workspace = true
 linked-data.workspace = true
 json-ld.workspace = true
 rdf-types.workspace = true
-xsd-types.workspace = true
+xsd-types = { workspace = true, features = ["serde"] }
 iref.workspace = true
 static-iref.workspace = true
 async-trait.workspace = true

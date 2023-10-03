@@ -4,17 +4,16 @@ use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
-use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationMethod,
+    VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
 
-pub const RSA_VERIFICATION_KEY_2018_IRI: &Iri =
-    iri!("https://w3id.org/security#RsaVerificationKey2018");
+// pub const RSA_VERIFICATION_KEY_2018_IRI: &Iri =
+//     iri!("https://w3id.org/security#RsaVerificationKey2018");
 
 /// RSA verification key 2018.
 ///
@@ -79,8 +78,32 @@ impl TypedVerificationMethod for RsaVerificationKey2018 {
         Some(RSA_VERIFICATION_KEY_2018_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == RSA_VERIFICATION_KEY_2018_TYPE
+    }
+
     /// Returns the type of the key.
     fn type_(&self) -> &str {
         RSA_VERIFICATION_KEY_2018_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for RsaVerificationKey2018 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key: Box::new(
+                m.properties
+                    .get("publicKeyJwk")
+                    .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyJwk"))?
+                    .as_str()
+                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+                    .parse()
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+            )
+        })
     }
 }

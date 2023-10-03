@@ -8,7 +8,7 @@ use std::hash::Hash;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
@@ -64,6 +64,10 @@ impl TypedVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
                 .to_string()
                 .into(),
         )
+    }
+
+    fn type_match(ty: &str) -> bool {
+        ty == ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
     }
 
     /// Returns the type of the key.
@@ -195,5 +199,54 @@ impl PublicKey {
                 }
             }
         }
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        let public_key = match (
+            m.properties.get("publicKeyJwk"),
+            m.properties.get("publicKeyHex"),
+            m.properties.get("ethereumAddress"),
+            m.properties.get("blockchainAccountId")
+        ) {
+            (Some(k), None, None, None) => PublicKey::Jwk(Box::new(
+                k
+                    .as_str()
+                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+                    .parse()
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+            )),
+            (None, Some(k), None, None) => PublicKey::Hex(
+                k
+                    .as_str()
+                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyHex"))?
+                    .to_owned()
+            ),
+            (None, None, Some(k), None) => PublicKey::EthereumAddress(
+                k
+                    .as_str()
+                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("ethereumAddress"))?
+                    .parse()
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("ethereumAddress"))?
+            ),
+            (None, None, None, Some(k)) => PublicKey::BlockchainAccountId(
+                k
+                    .as_str()
+                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                    .parse()
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+            ),
+            (None, None, None, None) => return Err(InvalidVerificationMethod::missing_property("publicKeyJwk")),
+            _ => return Err(InvalidVerificationMethod::AmbiguousPublicKey),
+        };
+
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key
+        })
     }
 }

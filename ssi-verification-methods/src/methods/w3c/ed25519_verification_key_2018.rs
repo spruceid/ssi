@@ -9,7 +9,7 @@ use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 /// IRI of the Ed25519 Verification Key 2018 type.
@@ -116,7 +116,28 @@ impl TypedVerificationMethod for Ed25519VerificationKey2018 {
         Some(ED25519_VERIFICATION_KEY_2018_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == ED25519_VERIFICATION_KEY_2018_TYPE
+    }
+
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2018_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key_base58: m.properties
+                .get("publicKeyBase58")
+                .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyBase58"))?
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyBase58"))?
+                .to_owned()
+        })
     }
 }

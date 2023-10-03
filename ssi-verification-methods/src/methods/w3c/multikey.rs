@@ -6,14 +6,13 @@ use linked_data::LinkedData;
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use ssi_multicodec::MultiEncodedBuf;
-use static_iref::iri;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationMethod,
+    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
-/// IRI of the Multikey type.
-pub const MULTIKEY_IRI: &Iri = iri!("https://w3id.org/security#Multikey");
+// /// IRI of the Multikey type.
+// pub const MULTIKEY_IRI: &Iri = iri!("https://w3id.org/security#Multikey");
 
 /// Multikey type name.
 pub const MULTIKEY_TYPE: &str = "Multikey";
@@ -136,7 +135,28 @@ impl TypedVerificationMethod for Multikey {
         Some(MULTIKEY_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == MULTIKEY_TYPE
+    }
+
     fn type_(&self) -> &str {
         MULTIKEY_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for Multikey {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            public_key_multibase: m.properties
+                .get("publicKeyMultibase")
+                .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
+                .to_owned()
+        })
     }
 }

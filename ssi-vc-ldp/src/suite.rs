@@ -16,7 +16,7 @@ use ssi_verification_methods::{
     VerificationMethod, VerificationMethodRef, Verifier,
 };
 
-use crate::{ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProofRef};
+use crate::{ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProofRef, signing::SignLinkedData, DataIntegrity};
 
 mod signatures;
 pub use signatures::*;
@@ -44,6 +44,12 @@ pub enum TransformError {
 
     #[error("expected JSON object")]
     ExpectedJsonObject,
+
+    #[error("unsupported input format")]
+    UnsupportedInputFormat,
+
+    #[error("invalid verification method")]
+    InvalidVerificationMethod
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -56,6 +62,9 @@ pub enum HashError {
 
     #[error("invalid message: {0}")]
     InvalidMessage(Box<dyn 'static + std::error::Error>),
+
+    #[error("invalid transformed input")]
+    InvalidTransformedInput
 }
 
 pub trait FromRdfAndSuite<S> {
@@ -249,6 +258,20 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         context: C,
         params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Transformed, TransformError>;
+
+    fn sign<'max, S>(
+        self,
+        input: T,
+        context: C,
+        signer: &'max S,
+        params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
+    ) -> SignLinkedData<'max, T, Self, S>
+    where
+        Self::VerificationMethod: 'max,
+        S: 'max + Signer<Self::VerificationMethod, Self::SignatureProtocol>
+    {
+        DataIntegrity::sign(input, context, signer, self, params)
+    }
 }
 
 /// SHA256-based input hashing algorithm used by many cryptographic suites.

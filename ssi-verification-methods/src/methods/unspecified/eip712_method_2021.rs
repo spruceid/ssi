@@ -1,20 +1,19 @@
 use std::hash::Hash;
 
-use iref::{Iri, IriBuf};
+use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
-use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
 };
 
 // mod context;
 // pub use context::*;
 
-pub const EIP712_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#Eip712Method2021");
+// pub const EIP712_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#Eip712Method2021");
 
 pub const EIP712_METHOD_2021_TYPE: &str = "Eip712Method2021";
 
@@ -30,7 +29,7 @@ pub struct Eip712Method2021 {
 
     /// Controller of the verification method.
     #[ld("sec:controller")]
-    pub controller: IriBuf,
+    pub controller: UriBuf,
 
     /// Blockchain accound ID.
     #[serde(rename = "blockchainAccountId")]
@@ -108,7 +107,29 @@ impl TypedVerificationMethod for Eip712Method2021 {
         Some(EIP712_METHOD_2021_TYPE.to_string().into())
     }
 
+    fn type_match(ty: &str) -> bool {
+        ty == EIP712_METHOD_2021_TYPE
+    }
+
     fn type_(&self) -> &str {
         EIP712_METHOD_2021_TYPE
+    }
+}
+
+impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        Ok(Self {
+            id: m.id,
+            controller: m.controller,
+            blockchain_account_id: m.properties
+                .get("blockchainAccountId")
+                .ok_or_else(|| InvalidVerificationMethod::missing_property("blockchainAccountId"))?
+                .as_str()
+                .ok_or_else(|| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                .parse()
+                .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+        })
     }
 }

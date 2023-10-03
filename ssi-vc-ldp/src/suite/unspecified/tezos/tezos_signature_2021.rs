@@ -1,14 +1,15 @@
 use std::future;
 
+use linked_data::LinkedData;
 use ssi_crypto::MessageSigner;
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, TezosMethod2021};
+use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, TezosMethod2021, InvalidSignature};
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite, ProofConfiguration,
+    impl_rdf_input_urdna2015, suite::{HashError, AnySignature, AnySignatureRef}, CryptographicSuite, ProofConfiguration,
     ProofConfigurationRef,
 };
 
@@ -79,12 +80,15 @@ impl CryptographicSuite for TezosSignature2021 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Signature {
     /// Base58-encoded signature.
+    #[ld("sec:proofValue")]
     pub proof_value: String,
 
     /// Signing key.
+    #[ld(flatten)]
     pub public_key: Option<PublicKey>,
 }
 
@@ -104,6 +108,26 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
+impl From<Signature> for AnySignature {
+    fn from(value: Signature) -> Self {
+        let mut public_key_jwk = None;
+        let mut public_key_multibase = None;
+
+        match value.public_key {
+            Some(PublicKey::Jwk(k)) => public_key_jwk = Some(k),
+            Some(PublicKey::Multibase(k)) => public_key_multibase = Some(k),
+            None => ()
+        }
+
+        Self {
+            proof_value: Some(value.proof_value),
+            public_key_jwk,
+            public_key_multibase,
+            ..Default::default()
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base58-encoded signature.
@@ -113,9 +137,51 @@ pub struct SignatureRef<'a> {
     pub public_key: Option<PublicKeyRef<'a>>,
 }
 
-#[derive(Debug, Clone)]
+impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: SignatureRef<'a>) -> Self {
+        let mut public_key_jwk = None;
+        let mut public_key_multibase = None;
+
+        match value.public_key {
+            Some(PublicKeyRef::Jwk(k)) => public_key_jwk = Some(k),
+            Some(PublicKeyRef::Multibase(k)) => public_key_multibase = Some(k),
+            None => ()
+        }
+
+        Self {
+            proof_value: Some(value.proof_value),
+            public_key_jwk,
+            public_key_multibase,
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
+        let public_key = match (value.public_key_jwk, value.public_key_multibase) {
+            (Some(k), None) => Some(PublicKeyRef::Jwk(k)),
+            (None, Some(k)) => Some(PublicKeyRef::Multibase(k)),
+            (Some(_), Some(_)) => return Err(InvalidSignature::AmbiguousPublicKey),
+            (None, None) => None
+        };
+
+        Ok(Self {
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
+            public_key
+        })
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
+    #[ld("sec:publicKeyJwk")]
     Jwk(Box<JWK>),
+
+    #[ld("sec:publicKeyMultibase")]
     Multibase(String),
 }
 
