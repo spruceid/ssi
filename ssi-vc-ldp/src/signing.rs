@@ -33,6 +33,21 @@ impl From<crate::Error> for Error {
     }
 }
 
+pub fn sign<'max, C, S: CryptographicSuite, X, T>(
+    input: C,
+    context: X,
+    signer: &'max T,
+    suite: S,
+    params: ProofConfiguration<S::VerificationMethod, S::Options>,
+) -> SignLinkedData<'max, C, S, T>
+where
+    S: CryptographicSuiteInput<C, X>,
+    S::VerificationMethod: 'max,
+    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+{
+    DataIntegrity::<C, S>::sign(input, context, signer, suite, params)
+}
+
 impl<C, S: CryptographicSuite> DataIntegrity<C, S> {
     /// Sign the given credential with the given Data Integrity cryptographic
     /// suite.

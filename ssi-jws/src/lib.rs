@@ -4,9 +4,9 @@
 
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
-use linked_data::{LinkedDataSubject, LinkedDataPredicateObjects, LinkedDataResource, RdfTermRef};
 use core::fmt;
 pub use error::Error;
+use linked_data::{LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::borrow::Cow;
@@ -127,9 +127,7 @@ impl CompactJWS {
 
     /// Returns the Base64 encoded signature.
     pub fn signature(&self) -> &str {
-        unsafe {
-            std::str::from_utf8_unchecked(&self.0[self.signature_start()..])
-        }
+        unsafe { std::str::from_utf8_unchecked(&self.0[self.signature_start()..]) }
     }
 
     pub fn decode_signature(&self) -> Result<Vec<u8>, Base64DecodeError> {
@@ -440,17 +438,17 @@ impl LinkedDataResource for CompactJWSString {
         _vocabulary: &mut (),
         _interpretation: &mut (),
     ) -> linked_data::ResourceInterpretation<(), ()> {
-        use linked_data::{ResourceInterpretation, CowRdfTerm, RdfLiteralRef, xsd_types::ValueRef};
-        ResourceInterpretation::Uninterpreted(Some(
-            CowRdfTerm::Borrowed(RdfTermRef::Literal(RdfLiteralRef::Xsd(ValueRef::String(&self.0)))
-        )))
+        use linked_data::{xsd_types::ValueRef, CowRdfTerm, RdfLiteralRef, ResourceInterpretation};
+        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(RdfTermRef::Literal(
+            RdfLiteralRef::Xsd(ValueRef::String(&self.0)),
+        ))))
     }
 }
 
 impl LinkedDataSubject for CompactJWSString {
     fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<(), ()>
+        S: linked_data::SubjectVisitor<(), ()>,
     {
         serializer.end()
     }
@@ -458,8 +456,9 @@ impl LinkedDataSubject for CompactJWSString {
 
 impl LinkedDataPredicateObjects for CompactJWSString {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-        where
-            S: linked_data::PredicateObjectsVisitor<(), ()> {
+    where
+        S: linked_data::PredicateObjectsVisitor<(), ()>,
+    {
         visitor.object(self)?;
         visitor.end()
     }

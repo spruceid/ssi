@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use iref::Iri;
 use linked_data::{LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
 use rdf_types::Quad;
@@ -45,6 +46,20 @@ impl<M, O> ProofConfiguration<M, O> {
         }
     }
 
+    pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: O) -> Self {
+        // Get current time to millisecond precision if possible
+        let datetime = chrono::Utc::now();
+        let ms = datetime.timestamp_subsec_millis();
+        let ns = ms * 1_000_000;
+
+        Self {
+            created: datetime.with_nanosecond(ns).unwrap_or(datetime).into(),
+            verification_method,
+            proof_purpose: ProofPurpose::default(),
+            options,
+        }
+    }
+
     pub fn into_proof<S>(self, signature: S) -> UntypedProof<M, O, S> {
         UntypedProof::from_configuration(self, signature)
     }
@@ -60,6 +75,12 @@ impl<M, O> ProofConfiguration<M, O> {
             proof_purpose: self.proof_purpose,
             options: self.options.as_reference(),
         }
+    }
+}
+
+impl<M> ProofConfiguration<M> {
+    pub fn from_method(verification_method: ReferenceOrOwned<M>) -> Self {
+        Self::from_method_and_options(verification_method, ())
     }
 }
 

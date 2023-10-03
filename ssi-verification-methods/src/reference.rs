@@ -1,4 +1,6 @@
-use crate::{LinkedDataVerificationMethod, Referencable, VerificationMethodRef};
+use crate::{
+    LinkedDataVerificationMethod, Referencable, VerificationMethod, VerificationMethodRef,
+};
 use iref::{Iri, IriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,16 @@ pub enum ReferenceOrOwned<M> {
 }
 
 impl<M> ReferenceOrOwned<M> {
+    pub fn id(&self) -> &Iri
+    where
+        M: VerificationMethod,
+    {
+        match self {
+            Self::Reference(r) => r,
+            Self::Owned(m) => m.id(),
+        }
+    }
+
     pub fn borrowed(&self) -> ReferenceOrOwnedRef<M>
     where
         M: Referencable,

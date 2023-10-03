@@ -11,7 +11,7 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 use crate::{
-    suite::{Eip712Signature, Eip712SignatureRef, HashError, OptionsRef, TransformError},
+    suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
 };
 

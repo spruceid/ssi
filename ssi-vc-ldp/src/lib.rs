@@ -10,6 +10,7 @@ pub mod suite;
 pub mod verification;
 
 pub use proof::*;
+pub use signing::sign;
 pub use suite::{CryptographicSuite, CryptographicSuiteInput, LinkedDataInput};
 
 #[derive(Debug, thiserror::Error)]

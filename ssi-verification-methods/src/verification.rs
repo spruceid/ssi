@@ -373,6 +373,12 @@ proof_purposes! {
     key_agreement: KeyAgreement = "https://w3id.org/security#keyAgreementMethod"
 }
 
+impl Default for ProofPurpose {
+    fn default() -> Self {
+        ProofPurpose::Assertion
+    }
+}
+
 impl fmt::Display for ProofPurpose {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.iri().fmt(f)

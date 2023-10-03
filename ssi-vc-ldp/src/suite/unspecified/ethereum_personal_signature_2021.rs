@@ -5,7 +5,8 @@ use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
     covariance_rule, verification_method_union, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, Referencable, SignatureError, VerificationError,
+    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, Referencable, SignatureError,
+    VerificationError,
 };
 use static_iref::iri;
 
@@ -141,8 +142,8 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         let message = ssi_crypto::hashes::keccak::prefix_personal_message(bytes);
 
         let Some(hex_signature) = signature.proof_value.strip_prefix("0x") else {
-			return Err(VerificationError::InvalidSignature)
-		};
+            return Err(VerificationError::InvalidSignature);
+        };
 
         let signature_bytes =
             hex::decode(&hex_signature).map_err(|_| VerificationError::InvalidSignature)?;

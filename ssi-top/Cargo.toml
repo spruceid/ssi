@@ -1,0 +1,78 @@
+[package]
+name = "ssi-top"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Sensible default trait implementation for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-vc/"
+
+[features]
+# Default features.
+default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "thezos", "eip712", "aleo", "solana"]
+
+# Enables signature suites specified by the W3C.
+w3c = ["ssi-vc-ldp/w3c"]
+
+# Enables signature suites based on ED25519:
+# - `Ed25519Signature2018`
+# - `Ed25519Signature2020`
+# - `EdDsa2022`
+ed25519 = ["ssi-vc-ldp/ed25519", "ssi-verification-methods/ed25519"]
+
+# Enables signature suites based on secp256k1:
+# - `EcdsaSecp256k1Signature2019`
+secp256k1 = ["ssi-vc-ldp/secp256k1", "ssi-verification-methods/secp256k1"]
+
+# Enables signature suites based on secp256r1:
+# - `EcdsaSecp256r1Signature2019`
+secp256r1 = ["ssi-vc-ldp/secp256r1", "ssi-verification-methods/secp256r1"]
+
+# Enables `RsaSignature2018`
+rsa = ["ssi-vc-ldp/rsa", "ssi-verification-methods/rsa"]
+
+# Enables all the thezos signatures suites:
+# - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
+# - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
+# - `ThezosJcsSignature2021`
+# - `ThezosSignature2021`
+thezos = ["ssi-vc-ldp/thezos"]
+
+# Enables `AleoSignature2021`
+aleo = ["ssi-jwk/aleo", "ssi-vc-ldp/aleo", "ssi-verification-methods/aleo"]
+
+# Enables `Eip712Signature2021`
+eip712 = ["ssi-vc-ldp/eip712"]
+
+# Enables `SolanaSignature2021`
+solana = ["ssi-vc-ldp/solana", "ssi-verification-methods/solana"]
+
+# Enables `EthereumPersonalSignature2021`
+ethereum = []
+
+[dependencies]
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-verification-methods.workspace = true
+ssi-vc-ldp.workspace = true
+ssi-dids.workspace = true
+pin-project.workspace = true
+thiserror.workspace = true
+iref.workspace = true
+rdf-types.workspace = true
+linked-data.workspace = true
+serde = { workspace = true, features = ["derive"] }
+
+# use crate::{
+#     suite::{AnySignature, AnySignatureRef, HashError},
+#     CryptographicSuite, ProofConfigurationRef,
+# };
+# use pin_project::pin_project;
+# use ssi_core::futures::FailibleFuture;
+# use ssi_crypto::{MessageSigner, SignerAdapter, MessageSignatureError};
+# use ssi_jwk::JWK;
+# use ssi_verification_methods::{
+#     AnyMethod, AnyMethodRef, Referencable, SigningMethod, SignatureAlgorithm, SignatureError, VerificationError, ReferenceOrOwnedRef, ReferenceOrOwned,
+# };

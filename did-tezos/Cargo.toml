@@ -37,6 +37,7 @@ features = ["json", "native-tls-vendored"]
 ssi-tzkey.workspace = true
 ssi-vc.workspace = true
 ssi-vc-ldp.workspace = true
+ssi-top.workspace = true
 tokio = { version = "1.0", features = ["macros"] }
 wiremock = "0.5"
 linked-data = { workspace = true, features = ["derive"] }

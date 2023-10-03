@@ -149,6 +149,8 @@ impl<'a, S: 'a + MessageSigner<()>> Future for Sign<'a, S> {
 }
 
 impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm {
+    type Options = ();
+
     type Signature = VcJwtSignature;
 
     type Protocol = ();
@@ -157,6 +159,7 @@ impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm 
 
     fn sign<'a, S: 'a + MessageSigner<()>>(
         &self,
+        options: (),
         method: verification::AnyJwkMethodRef,
         payload: &'a [u8],
         signer: S,
@@ -180,6 +183,7 @@ impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm 
 
     fn verify(
         &self,
+        options: (),
         signature: VcJwtSignatureRef,
         method: verification::AnyJwkMethodRef,
         bytes: &[u8],
@@ -301,6 +305,7 @@ impl<C: Sync> VcJwt<C> {
                 VcJwtSignatureAlgorithm {
                     base64_encode: options.base64_encode,
                 },
+                (),
                 signer_info.id(),
                 signer_info.method_reference(),
                 &payload,

@@ -39,7 +39,7 @@ impl Referencable for AnySignature {
     covariance_rule!();
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AnySignatureRef<'a> {
     pub proof_value: Option<&'a str>,
 
@@ -83,38 +83,6 @@ impl From<MultibaseSignature> for AnySignature {
         }
     }
 }
-
-// impl<V: VocabularyMut, I> ssi_verification_methods::json_ld::FlattenIntoJsonLdNode<V, I>
-//     for MultibaseSignature
-// where
-//     V::Iri: Eq + Hash,
-//     V::BlankId: Eq + Hash,
-// {
-//     fn flatten_into_json_ld_node(
-//         self,
-//         vocabulary: &mut V,
-//         _interpretation: &I,
-//         node: &mut json_ld::Node<<V>::Iri, <V>::BlankId, ()>,
-//     ) {
-//         let properties = node.properties_mut();
-
-//         properties.insert(
-//             Meta(json_ld::Id::iri(vocabulary.insert(PROOF_VALUE)), ()),
-//             Meta(
-//                 json_ld::Indexed::new(
-//                     json_ld::Object::Value(json_ld::Value::Literal(
-//                         json_ld::object::Literal::String(json_ld::object::LiteralString::Inferred(
-//                             self.proof_value,
-//                         )),
-//                         None,
-//                     )),
-//                     None,
-//                 ),
-//                 (),
-//             ),
-//         );
-//     }
-// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct MultibaseSignatureRef<'a> {

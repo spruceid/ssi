@@ -15,7 +15,8 @@ use ssi_vc_ldp::{suite::Ed25519Signature2020, DataIntegrity};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
     ProofPurposes, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureError, Signer,
-    VerificationError, VerificationMethod, Verifier,
+    VerificationError, VerificationMethod, VerificationMethodResolutionError,
+    VerificationMethodResolver, Verifier,
 };
 use static_iref::{iri, iri_ref, uri};
 
@@ -128,7 +129,7 @@ async fn main() {
 
     // Pick and process the LD context used for compaction.
     let context = Meta(
-        json_ld::syntax::context::Value::Many(vec![
+        json_ld::syntax::Context::Many(vec![
             Meta(
                 json_ld::syntax::ContextEntry::IriRef(
                     iri_ref!("https://w3id.org/security/v1").to_owned(),
@@ -213,7 +214,7 @@ impl Keyring {
 }
 
 impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
-    type Sign<'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>> = FailibleFuture<A::Sign<'a, MessageSigner<'a>>, SignatureError> where A::Signature: 'a;
+    type Sign<'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>> = FailibleFuture<A::Sign<'a, MessageSigner<'a>>, SignatureError> where A: 'a, A::Signature: 'a;
 
     fn sign<'a, 'm: 'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>>(
         &'a self,
@@ -223,6 +224,7 @@ impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
         bytes: &'a [u8],
     ) -> Self::Sign<'a, A>
     where
+        A: 'a,
         A::Signature: 'a,
     {
         let id = match method {
@@ -233,6 +235,7 @@ impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
 
         match self.keys.get(id) {
             Some((method, key_pair)) => FailibleFuture::ok(algorithm.sign(
+                (),
                 method,
                 bytes,
                 MessageSigner { method, key_pair },
@@ -268,9 +271,12 @@ impl ControllerProvider for Keyring {
     }
 }
 
-impl Verifier<Ed25519VerificationKey2020> for Keyring {
+impl VerificationMethodResolver<Ed25519VerificationKey2020> for Keyring {
     type ResolveVerificationMethod<'a> = future::Ready<
-        Result<ssi_verification_methods::Cow<'a, Ed25519VerificationKey2020>, VerificationError>,
+        Result<
+            ssi_verification_methods::Cow<'a, Ed25519VerificationKey2020>,
+            VerificationMethodResolutionError,
+        >,
     >;
 
     fn resolve_verification_method<'a, 'm: 'a>(
@@ -288,9 +294,9 @@ impl Verifier<Ed25519VerificationKey2020> for Keyring {
             }
             Some(ReferenceOrOwnedRef::Reference(id)) => match self.keys.get(id) {
                 Some((key, _)) => Ok(ssi_verification_methods::Cow::Borrowed(key)),
-                None => Err(VerificationError::UnknownKey),
+                None => Err(VerificationMethodResolutionError::UnknownKey),
             },
-            None => Err(VerificationError::MissingVerificationMethod),
+            None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
         };
 
         future::ready(result)

@@ -100,7 +100,8 @@ members = [
   "ssi-vc",
   "ssi-vc-jwt",
   "ssi-vc-ldp",
-  # "ssi-zcap-ld"
+  # "ssi-zcap-ld",
+  "ssi-top"
 ]
 
 [workspace.dependencies]
@@ -119,6 +120,7 @@ ssi-security = { path = "./ssi-security", version = "0.1" }
 ssi-caips = { path = "./ssi-caips", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2" }
 ssi-vc-ldp = { path = "./ssi-vc-ldp", version = "0.3" }
+ssi-top = { path = "./ssi-top", version = "0.1" }
 async-trait = "0.1.68"
 thiserror = "1.0.40"
 chrono = "0.4.24"

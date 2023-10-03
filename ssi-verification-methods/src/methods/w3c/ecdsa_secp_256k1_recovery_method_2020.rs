@@ -173,8 +173,8 @@ impl PublicKey {
             }
             Self::EthereumAddress(a) => {
                 let ssi_jwk::Params::EC(params) = &other.params else {
-					return Err(InvalidPublicKey::InvalidParams)
-				};
+                    return Err(InvalidPublicKey::InvalidParams);
+                };
 
                 let pk: k256::PublicKey = params
                     .try_into()
