@@ -1,7 +1,7 @@
 use jose_b64::base64ct::{Base64UrlUnpadded, Encoding};
 use sha2::Digest;
 
-use crate::Error;
+use crate::DecodeError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SdAlg {
@@ -21,12 +21,12 @@ impl SdAlg {
 }
 
 impl TryFrom<&str> for SdAlg {
-    type Error = Error;
+    type Error = DecodeError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value {
             Self::SHA256_STR => SdAlg::Sha256,
-            other => return Err(Error::UnknownSdAlg(other.to_owned())),
+            other => return Err(DecodeError::UnknownSdAlg(other.to_owned())),
         })
     }
 }

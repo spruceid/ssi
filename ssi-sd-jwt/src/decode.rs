@@ -18,9 +18,9 @@ pub struct ValidityClaims {
 pub fn decode_verify<Claims: DeserializeOwned>(
     serialized: &str,
     key: &JWK,
-) -> Result<(ValidityClaims, Claims), Error> {
-    let deserialized =
-        deserialize_string_format(serialized).ok_or(Error::UnableToDeserializeStringFormat)?;
+) -> Result<(ValidityClaims, Claims), DecodeError> {
+    let deserialized = deserialize_string_format(serialized)
+        .ok_or(DecodeError::UnableToDeserializeStringFormat)?;
 
     decode_verify_disclosure_array(deserialized.jwt, key, &deserialized.disclosures)
 }
@@ -29,7 +29,7 @@ pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
     jwt: &str,
     key: &JWK,
     disclosures: &[&str],
-) -> Result<(ValidityClaims, Claims), Error> {
+) -> Result<(ValidityClaims, Claims), DecodeError> {
     let mut payload_claims: serde_json::Value = ssi_jwt::decode_verify(jwt, key)?;
 
     let validity_claims: ValidityClaims = serde_json::from_value(payload_claims.clone())?;
@@ -46,17 +46,17 @@ pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
 
     for (_, disclosure) in disclosures {
         if !disclosure.found {
-            return Err(Error::UnusedDisclosure);
+            return Err(DecodeError::UnusedDisclosure);
         }
     }
 
     Ok((validity_claims, serde_json::from_value(payload_claims)?))
 }
 
-fn sd_alg(claims: &serde_json::Value) -> Result<SdAlg, Error> {
+fn sd_alg(claims: &serde_json::Value) -> Result<SdAlg, DecodeError> {
     let alg_name = claims[SD_ALG_CLAIM_NAME]
         .as_str()
-        .ok_or(Error::MissingSdAlg)?;
+        .ok_or(DecodeError::MissingSdAlg)?;
 
     SdAlg::try_from(alg_name)
 }
@@ -64,8 +64,8 @@ fn sd_alg(claims: &serde_json::Value) -> Result<SdAlg, Error> {
 fn translate_to_in_progress_disclosures(
     disclosures: &[&str],
     sd_alg: SdAlg,
-) -> Result<BTreeMap<String, InProgressDisclosure>, Error> {
-    let disclosure_vec: Result<Vec<_>, Error> = disclosures
+) -> Result<BTreeMap<String, InProgressDisclosure>, DecodeError> {
+    let disclosure_vec: Result<Vec<_>, DecodeError> = disclosures
         .iter()
         .map(|disclosure| InProgressDisclosure::new(disclosure, sd_alg))
         .collect();
@@ -77,7 +77,7 @@ fn translate_to_in_progress_disclosures(
         let prev = disclosure_map.insert(disclosure.hash.clone(), disclosure);
 
         if prev.is_some() {
-            return Err(Error::MultipleDisclosuresWithSameHash);
+            return Err(DecodeError::MultipleDisclosuresWithSameHash);
         }
     }
 
@@ -92,7 +92,7 @@ struct InProgressDisclosure {
 }
 
 impl InProgressDisclosure {
-    fn new(disclosure: &str, sd_alg: SdAlg) -> Result<Self, Error> {
+    fn new(disclosure: &str, sd_alg: SdAlg) -> Result<Self, DecodeError> {
         Ok(InProgressDisclosure {
             decoded: DecodedDisclosure::new(disclosure)?,
             hash: hash_encoded_disclosure(sd_alg, disclosure),
@@ -104,7 +104,7 @@ impl InProgressDisclosure {
 fn visit_claims(
     payload_claims: &mut serde_json::Value,
     disclosures: &mut BTreeMap<String, InProgressDisclosure>,
-) -> Result<(), Error> {
+) -> Result<(), DecodeError> {
     let payload_claims = match payload_claims.as_object_mut() {
         Some(obj) => obj,
         None => return Ok(()),
@@ -132,7 +132,7 @@ fn visit_claims(
         let prev = payload_claims.insert(new_claim_name, new_claim_value);
 
         if prev.is_some() {
-            return Err(Error::DisclosureClaimCollidesWithJwtClaim);
+            return Err(DecodeError::DisclosureClaimCollidesWithJwtClaim);
         }
     }
 
@@ -155,20 +155,24 @@ fn visit_claims(
 fn decode_sd_claims(
     sd_claims: &serde_json::Value,
     disclosures: &mut BTreeMap<String, InProgressDisclosure>,
-) -> Result<Vec<(String, serde_json::Value)>, Error> {
-    let sd_claims = sd_claims.as_array().ok_or(Error::SdPropertyNotArray)?;
+) -> Result<Vec<(String, serde_json::Value)>, DecodeError> {
+    let sd_claims = sd_claims
+        .as_array()
+        .ok_or(DecodeError::SdPropertyNotArray)?;
     let mut found_disclosures = vec![];
     for disclosure_hash in sd_claims {
-        let disclosure_hash = disclosure_hash.as_str().ok_or(Error::SdClaimNotString)?;
+        let disclosure_hash = disclosure_hash
+            .as_str()
+            .ok_or(DecodeError::SdClaimNotString)?;
 
         if let Some(in_progress_disclosure) = disclosures.get_mut(disclosure_hash) {
             if in_progress_disclosure.found {
-                return Err(Error::DisclosureUsedMultipleTimes);
+                return Err(DecodeError::DisclosureUsedMultipleTimes);
             }
             in_progress_disclosure.found = true;
             match in_progress_disclosure.decoded.kind {
                 DisclosureKind::ArrayItem(_) => {
-                    return Err(Error::ArrayDisclosureWhenExpectingProperty)
+                    return Err(DecodeError::ArrayDisclosureWhenExpectingProperty)
                 }
                 DisclosureKind::Property {
                     ref name,
@@ -184,13 +188,13 @@ fn decode_sd_claims(
 fn decode_array_claims(
     array: &[serde_json::Value],
     disclosures: &mut BTreeMap<String, InProgressDisclosure>,
-) -> Result<Vec<serde_json::Value>, Error> {
+) -> Result<Vec<serde_json::Value>, DecodeError> {
     let mut new_items = vec![];
     for item in array.iter() {
         if let Some(hash) = array_item_is_disclosure(item) {
             if let Some(in_progress_disclosure) = disclosures.get_mut(hash) {
                 if in_progress_disclosure.found {
-                    return Err(Error::DisclosureUsedMultipleTimes);
+                    return Err(DecodeError::DisclosureUsedMultipleTimes);
                 }
                 in_progress_disclosure.found = true;
                 match in_progress_disclosure.decoded.kind {
@@ -198,7 +202,7 @@ fn decode_array_claims(
                         new_items.push(value.clone());
                     }
                     DisclosureKind::Property { .. } => {
-                        return Err(Error::PropertyDisclosureWhenExpectingArray)
+                        return Err(DecodeError::PropertyDisclosureWhenExpectingArray)
                     }
                 }
             }

@@ -1,7 +1,7 @@
 use jose_b64::base64ct::{Base64UrlUnpadded, Encoding};
 
 use crate::digest::{hash_encoded_disclosure, SdAlg};
-use crate::Error;
+use crate::DecodeError;
 
 #[derive(Debug, PartialEq)]
 pub struct DecodedDisclosure {
@@ -19,7 +19,7 @@ pub enum DisclosureKind {
 }
 
 impl DecodedDisclosure {
-    pub fn new(encoded: &str) -> Result<Self, Error> {
+    pub fn new(encoded: &str) -> Result<Self, DecodeError> {
         let bytes = Base64UrlUnpadded::decode_vec(encoded).unwrap();
         let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
 
@@ -27,17 +27,19 @@ impl DecodedDisclosure {
             serde_json::Value::Array(values) => match values.len() {
                 3 => validate_property_disclosure(&values),
                 2 => validate_array_item_disclosure(&values),
-                _ => Err(Error::DisclosureMalformed),
+                _ => Err(DecodeError::DisclosureMalformed),
             },
-            _ => Err(Error::DisclosureMalformed),
+            _ => Err(DecodeError::DisclosureMalformed),
         }
     }
 }
 
-fn validate_property_disclosure(values: &[serde_json::Value]) -> Result<DecodedDisclosure, Error> {
-    let salt = values[0].as_str().ok_or(Error::DisclosureMalformed)?;
+fn validate_property_disclosure(
+    values: &[serde_json::Value],
+) -> Result<DecodedDisclosure, DecodeError> {
+    let salt = values[0].as_str().ok_or(DecodeError::DisclosureMalformed)?;
 
-    let name = values[1].as_str().ok_or(Error::DisclosureMalformed)?;
+    let name = values[1].as_str().ok_or(DecodeError::DisclosureMalformed)?;
 
     Ok(DecodedDisclosure {
         salt: salt.to_owned(),
@@ -50,8 +52,8 @@ fn validate_property_disclosure(values: &[serde_json::Value]) -> Result<DecodedD
 
 fn validate_array_item_disclosure(
     values: &[serde_json::Value],
-) -> Result<DecodedDisclosure, Error> {
-    let salt = values[0].as_str().ok_or(Error::DisclosureMalformed)?;
+) -> Result<DecodedDisclosure, DecodeError> {
+    let salt = values[0].as_str().ok_or(DecodeError::DisclosureMalformed)?;
 
     Ok(DecodedDisclosure {
         salt: salt.to_owned(),
@@ -63,7 +65,7 @@ pub fn verify_sd_disclosures_array(
     digest_algo: SdAlg,
     disclosures: &[&str],
     sd_claim: &[&str],
-) -> Result<serde_json::Value, Error> {
+) -> Result<serde_json::Value, DecodeError> {
     let mut verfied_claims = serde_json::Map::new();
 
     for disclosure in disclosures {
@@ -80,11 +82,11 @@ pub fn verify_sd_disclosures_array(
                 let orig = verfied_claims.insert(name, value);
 
                 if orig.is_some() {
-                    return Err(Error::DisclosureUsedMultipleTimes);
+                    return Err(DecodeError::DisclosureUsedMultipleTimes);
                 }
             }
             DisclosureKind::ArrayItem(_) => {
-                return Err(Error::ArrayDisclosureWhenExpectingProperty);
+                return Err(DecodeError::ArrayDisclosureWhenExpectingProperty);
             }
         }
     }

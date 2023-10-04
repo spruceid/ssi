@@ -72,10 +72,10 @@ pub fn encode_sign<Claims: Serialize>(
     key: &JWK,
     sd_alg: SdAlg,
     disclosures: Vec<UnencodedDisclosure>,
-) -> Result<(String, Vec<FullDisclosure>), Error> {
+) -> Result<(String, Vec<FullDisclosure>), EncodeError> {
     let mut base_claims_json = serde_json::to_value(base_claims)?;
 
-    let post_encoded_disclosures: Result<Vec<_>, Error> = disclosures
+    let post_encoded_disclosures: Result<Vec<_>, EncodeError> = disclosures
         .iter()
         .map(|disclosure| {
             let encoded = disclosure.encode()?;
@@ -93,7 +93,7 @@ pub fn encode_sign<Claims: Serialize>(
     {
         let base_claims_obj = base_claims_json
             .as_object_mut()
-            .ok_or(Error::EncodedAsNonObject)?;
+            .ok_or(EncodeError::EncodedAsNonObject)?;
 
         let prev_sd_alg = base_claims_obj.insert(
             SD_ALG_CLAIM_NAME.to_owned(),
@@ -101,7 +101,7 @@ pub fn encode_sign<Claims: Serialize>(
         );
 
         if prev_sd_alg.is_some() {
-            return Err(Error::EncodedClaimsContainsReservedProperty);
+            return Err(EncodeError::EncodedClaimsContainsReservedProperty);
         }
 
         let mut sd_claim = vec![];
@@ -118,7 +118,7 @@ pub fn encode_sign<Claims: Serialize>(
                     }
 
                     let array = base_claims_obj.get_mut(claim_name).unwrap();
-                    let array = array.as_array_mut().ok_or(Error::ExpectedArray)?;
+                    let array = array.as_array_mut().ok_or(EncodeError::ExpectedArray)?;
 
                     array.push(serde_json::json!({ARRAY_CLAIM_ITEM_PROPERTY_NAME: disclosure.hash.clone()}));
                 }
@@ -129,7 +129,7 @@ pub fn encode_sign<Claims: Serialize>(
             base_claims_obj.insert(SD_CLAIM_NAME.to_owned(), serde_json::Value::Array(sd_claim));
 
         if prev_sd.is_some() {
-            return Err(Error::EncodedClaimsContainsReservedProperty);
+            return Err(EncodeError::EncodedClaimsContainsReservedProperty);
         }
     }
 
