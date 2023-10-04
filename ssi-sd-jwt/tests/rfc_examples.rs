@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ssi_sd_jwt::decode_verify;
+use ssi_sd_jwt::decode_verify_disclosure_array;
 
 fn rfc_a_5_key() -> ssi_jwk::JWK {
     serde_json::from_value(serde_json::json!({
@@ -80,7 +80,8 @@ fn rfc_a_1_example_2_verification() {
 
     // Raw with no disclosures
     let (_, no_disclosures) =
-        decode_verify::<Example2Claims>(EXAMPLE_2_JWT, &rfc_a_5_key(), &[]).unwrap();
+        decode_verify_disclosure_array::<Example2Claims>(EXAMPLE_2_JWT, &rfc_a_5_key(), &[])
+            .unwrap();
 
     assert_eq!(
         no_disclosures,
@@ -94,9 +95,12 @@ fn rfc_a_1_example_2_verification() {
     );
 
     // Top level claim disclosed
-    let (_, sub_claim_disclosed) =
-        decode_verify::<Example2Claims>(EXAMPLE_2_JWT, &rfc_a_5_key(), &[SUB_CLAIM_DISCLOSURE])
-            .unwrap();
+    let (_, sub_claim_disclosed) = decode_verify_disclosure_array::<Example2Claims>(
+        EXAMPLE_2_JWT,
+        &rfc_a_5_key(),
+        &[SUB_CLAIM_DISCLOSURE],
+    )
+    .unwrap();
 
     assert_eq!(
         sub_claim_disclosed,
@@ -111,7 +115,7 @@ fn rfc_a_1_example_2_verification() {
     );
 
     // Address claim disclosed
-    let (_, address_country_disclosed) = decode_verify::<Example2Claims>(
+    let (_, address_country_disclosed) = decode_verify_disclosure_array::<Example2Claims>(
         EXAMPLE_2_JWT,
         &rfc_a_5_key(),
         &[ADDRESS_COUNTRY_DISCLOSURE],
@@ -133,7 +137,7 @@ fn rfc_a_1_example_2_verification() {
     );
 
     // All claims disclosed
-    let (_, all_claims) = decode_verify::<Example2Claims>(
+    let (_, all_claims) = decode_verify_disclosure_array::<Example2Claims>(
         EXAMPLE_2_JWT,
         &rfc_a_5_key(),
         &[
@@ -304,7 +308,7 @@ fn rfc_a_2_example_3_verification() {
         "WyJreDVrRjE3Vi14MEptd1V4OXZndnR3IiwgIm1zaXNkbiIsICI0OTEyMzQ1Njc4OSJd";
 
     // All Claims
-    let (_, all_claims) = decode_verify::<Example3Claims>(
+    let (_, all_claims) = decode_verify_disclosure_array::<Example3Claims>(
         EXAMPLE_3_JWT,
         &rfc_a_5_key(),
         &[

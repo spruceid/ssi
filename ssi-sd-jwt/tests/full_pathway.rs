@@ -44,7 +44,7 @@ fn full_pathway_regular_claim() {
     )
     .unwrap();
 
-    let (_, full_jwt_claims) = decode_verify::<BaseClaims>(
+    let (_, full_jwt_claims) = decode_verify_disclosure_array::<BaseClaims>(
         &jwt,
         &test_key(),
         &[&disclosures[0].encoded, &disclosures[1].encoded],
@@ -61,7 +61,8 @@ fn full_pathway_regular_claim() {
     );
 
     let (_, one_sd_claim) =
-        decode_verify::<BaseClaims>(&jwt, &test_key(), &[&disclosures[1].encoded]).unwrap();
+        decode_verify_disclosure_array::<BaseClaims>(&jwt, &test_key(), &[&disclosures[1].encoded])
+            .unwrap();
 
     assert_eq!(
         BaseClaims {
@@ -98,7 +99,7 @@ fn full_pathway_array() {
     )
     .unwrap();
 
-    let (_, full_jwt_claims) = decode_verify::<BaseClaims>(
+    let (_, full_jwt_claims) = decode_verify_disclosure_array::<BaseClaims>(
         &jwt,
         &test_key(),
         &[&disclosures[0].encoded, &disclosures[1].encoded],
@@ -168,7 +169,8 @@ fn nested_claims() {
     .unwrap();
 
     // No claims provided
-    let (_, no_sd_claims) = decode_verify::<Claims>(&jwt, &test_key(), &[]).unwrap();
+    let (_, no_sd_claims) =
+        decode_verify_disclosure_array::<Claims>(&jwt, &test_key(), &[]).unwrap();
     assert_eq!(
         no_sd_claims,
         Claims {
@@ -179,7 +181,8 @@ fn nested_claims() {
 
     // Outer provided
     let (_, outer_provided) =
-        decode_verify::<Claims>(&jwt, &test_key(), &[&outer_disclosure.encoded]).unwrap();
+        decode_verify_disclosure_array::<Claims>(&jwt, &test_key(), &[&outer_disclosure.encoded])
+            .unwrap();
     assert_eq!(
         outer_provided,
         Claims {
@@ -189,7 +192,7 @@ fn nested_claims() {
     );
 
     // Inner and outer provided
-    let (_, inner_and_outer_provided) = decode_verify::<Claims>(
+    let (_, inner_and_outer_provided) = decode_verify_disclosure_array::<Claims>(
         &jwt,
         &test_key(),
         &[&outer_disclosure.encoded, &inner_disclosure.encoded],
@@ -208,6 +211,7 @@ fn nested_claims() {
     );
 
     // Inner without outer errors
-    let result = decode_verify::<Claims>(&jwt, &test_key(), &[&inner_disclosure.encoded]);
+    let result =
+        decode_verify_disclosure_array::<Claims>(&jwt, &test_key(), &[&inner_disclosure.encoded]);
     assert!(result.is_err());
 }

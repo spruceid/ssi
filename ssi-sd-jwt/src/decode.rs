@@ -15,17 +15,17 @@ pub struct ValidityClaims {
     pub exp: Option<NumericDate>,
 }
 
-pub fn decode_verify_string_format<Claims: DeserializeOwned>(
+pub fn decode_verify<Claims: DeserializeOwned>(
     serialized: &str,
     key: &JWK,
 ) -> Result<(ValidityClaims, Claims), Error> {
     let deserialized =
         deserialize_string_format(serialized).ok_or(Error::UnableToDeserializeStringFormat)?;
 
-    decode_verify(deserialized.jwt, key, &deserialized.disclosures)
+    decode_verify_disclosure_array(deserialized.jwt, key, &deserialized.disclosures)
 }
 
-pub fn decode_verify<Claims: DeserializeOwned>(
+pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
     jwt: &str,
     key: &JWK,
     disclosures: &[&str],
