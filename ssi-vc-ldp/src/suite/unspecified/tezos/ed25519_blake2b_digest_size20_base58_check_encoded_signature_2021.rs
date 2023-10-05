@@ -1,9 +1,8 @@
-use linked_data::LinkedData;
+use super::{Options, OptionsRef};
 use ssi_crypto::MessageSigner;
-use ssi_jwk::{Algorithm, JWK};
+use ssi_jwk::Algorithm;
 use ssi_verification_methods::{
-    covariance_rule, Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, Referencable,
-    VerificationError,
+    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
 };
 use static_iref::iri;
 
@@ -80,9 +79,7 @@ impl
             Algorithm::EdBlake2b,
             options.public_key_jwk.key_id.clone(),
         );
-        let signing_bytes = header.encode_signing_bytes(bytes);
-
-        SignIntoDetachedJws::new(header, signing_bytes, signer)
+        SignIntoDetachedJws::new(header, bytes, signer)
     }
 
     fn verify(
@@ -109,40 +106,4 @@ impl
             Ok(false)
         }
     }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct Options {
-    #[serde(rename = "publicKeyJwk")]
-    #[ld("sec:publicKeyJwk")]
-    pub public_key_jwk: Box<JWK>,
-}
-
-impl Options {
-    pub fn new(public_key_jwk: JWK) -> Self {
-        Self {
-            public_key_jwk: Box::new(public_key_jwk),
-        }
-    }
-}
-
-impl Referencable for Options {
-    type Reference<'a> = OptionsRef<'a>;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        OptionsRef {
-            public_key_jwk: &self.public_key_jwk,
-        }
-    }
-
-    covariance_rule!();
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, LinkedData)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct OptionsRef<'a> {
-    #[serde(rename = "publicKeyJwk")]
-    #[ld("sec:publicKeyJwk")]
-    pub public_key_jwk: &'a JWK,
 }

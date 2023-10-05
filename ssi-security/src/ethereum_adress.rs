@@ -37,7 +37,7 @@ impl EthereumAddressBuf {
 
 impl FromStr for EthereumAddressBuf {
     type Err = std::convert::Infallible;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Self(s.to_owned())) // TODO actually parse
     }

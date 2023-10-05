@@ -4,10 +4,7 @@ use ssi_crypto::MessageSigner;
 use ssi_verification_methods::SignatureError;
 use static_iref::iri;
 
-use crate::{
-    impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfiguration,
-    ProofConfigurationRef,
-};
+use crate::{impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfigurationRef};
 
 use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef};
 
@@ -72,7 +69,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &Ed25519VerificationKey2018,
         bytes: &'a [u8],
         signer: S,
@@ -82,7 +79,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: JwsSignatureRef,
         method: &Ed25519VerificationKey2018,
         bytes: &[u8],

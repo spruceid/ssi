@@ -6,7 +6,7 @@ mod ethereum_personal_signature_2021;
 mod solana_signature_2021;
 
 #[cfg(feature = "tezos")]
-mod tezos;
+pub mod tezos;
 
 pub use aleo_signature_2021::AleoSignature2021;
 pub use eip712_signature_2021::Eip712Signature2021;

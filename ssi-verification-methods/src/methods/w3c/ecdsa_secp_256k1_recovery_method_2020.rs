@@ -2,13 +2,13 @@ use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
+use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWSString;
 use std::hash::Hash;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
@@ -76,23 +76,30 @@ impl TypedVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum SignatureError {
+    #[error("invalid secret key")]
+    InvalidSecretKey,
+}
+
 impl EcdsaSecp256k1RecoveryMethod2020 {
-    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
+    pub fn sign(&self, secret_key: &JWK, data: &[u8]) -> Result<Vec<u8>, SignatureError> {
         let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256KR);
         if algorithm != ssi_jwk::Algorithm::ES256KR {
             return Err(SignatureError::InvalidSecretKey);
         }
 
-        let header = ssi_jws::Header::new_unencoded(algorithm, None);
-        let signing_bytes = header.encode_signing_bytes(data);
-        let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)
-            .map_err(|_| SignatureError::InvalidSecretKey)?;
-        Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
+        ssi_jws::sign_bytes(algorithm, data, secret_key)
+            .map_err(|_| SignatureError::InvalidSecretKey)
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
         // Recover the key used to sign the message.
-        let key = ssi_jws::recover(ssi_jwk::Algorithm::ES256KR, data, signature)
+        let key = ssi_jws::recover(ssi_jwk::Algorithm::ES256KR, signing_bytes, signature)
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         // Check the validity of the signing key.
@@ -102,11 +109,14 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
             .map_err(|_| VerificationError::InvalidProof)?;
         let algorithm = key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256KR);
         if !matching_keys || algorithm != ssi_jwk::Algorithm::ES256KR {
-            return Err(VerificationError::InvalidKey);
+            return Ok(false);
         }
 
         // Verify the signature.
-        Ok(ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256KR, data, &key, signature).is_ok())
+        Ok(
+            ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256KR, signing_bytes, &key, signature)
+                .is_ok(),
+        )
     }
 }
 
@@ -210,43 +220,56 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
             m.properties.get("publicKeyJwk"),
             m.properties.get("publicKeyHex"),
             m.properties.get("ethereumAddress"),
-            m.properties.get("blockchainAccountId")
+            m.properties.get("blockchainAccountId"),
         ) {
             (Some(k), None, None, None) => PublicKey::Jwk(Box::new(
-                k
-                    .as_str()
+                k.as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
                     .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
             )),
             (None, Some(k), None, None) => PublicKey::Hex(
-                k
-                    .as_str()
+                k.as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyHex"))?
-                    .to_owned()
+                    .to_owned(),
             ),
             (None, None, Some(k), None) => PublicKey::EthereumAddress(
-                k
-                    .as_str()
+                k.as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("ethereumAddress"))?
                     .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("ethereumAddress"))?
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("ethereumAddress"))?,
             ),
             (None, None, None, Some(k)) => PublicKey::BlockchainAccountId(
-                k
-                    .as_str()
-                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                k.as_str()
+                    .ok_or_else(|| {
+                        InvalidVerificationMethod::invalid_property("blockchainAccountId")
+                    })?
                     .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                    .map_err(|_| {
+                        InvalidVerificationMethod::invalid_property("blockchainAccountId")
+                    })?,
             ),
-            (None, None, None, None) => return Err(InvalidVerificationMethod::missing_property("publicKeyJwk")),
+            (None, None, None, None) => {
+                return Err(InvalidVerificationMethod::missing_property("publicKeyJwk"))
+            }
             _ => return Err(InvalidVerificationMethod::AmbiguousPublicKey),
         };
 
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key
+            public_key,
         })
+    }
+}
+
+impl SigningMethod<JWK> for EcdsaSecp256k1RecoveryMethod2020 {
+    fn sign_bytes_ref(
+        this: Self::Reference<'_>,
+        secret: &JWK,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        this.sign(secret, bytes)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

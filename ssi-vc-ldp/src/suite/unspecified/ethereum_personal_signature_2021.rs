@@ -5,14 +5,12 @@ use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
     covariance_rule, verification_method_union, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, Referencable, SignatureError,
-    VerificationError,
+    EcdsaSecp256k1VerificationKey2019, Referencable, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite, ProofConfiguration,
-    ProofConfigurationRef,
+    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite, ProofConfigurationRef,
 };
 
 /// Ethereum Personal Signature 2021.
@@ -123,7 +121,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -133,7 +131,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

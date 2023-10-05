@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use ssi_crypto::protocol;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -8,61 +10,38 @@ pub enum AnySignatureProtocol {
     EthereumWallet,
 }
 
-pub enum AnyProtocolOutput {
-    Direct(Vec<u8>),
-    Base58Btc(String),
-    Base58BtcMultibase(String),
-    EthereumWallet(String),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum AnyProtocolOutputType {
-    Direct,
-    Base58Btc,
-    Base58BtcMultibase,
-    EthereumWallet,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("invalid output")]
-pub struct InvalidProtocolOutput(pub AnyProtocolOutputType);
-
-impl TryFrom<AnyProtocolOutput> for Vec<u8> {
-    type Error = InvalidProtocolOutput;
-
-    fn try_from(value: AnyProtocolOutput) -> Result<Self, Self::Error> {
-        match value {
-            AnyProtocolOutput::Direct(bytes) => Ok(bytes),
-            AnyProtocolOutput::Base58Btc(_) => {
-                Err(InvalidProtocolOutput(AnyProtocolOutputType::Base58Btc))
-            }
-            AnyProtocolOutput::Base58BtcMultibase(_) => Err(InvalidProtocolOutput(
-                AnyProtocolOutputType::Base58BtcMultibase,
-            )),
-            AnyProtocolOutput::EthereumWallet(_) => {
-                Err(InvalidProtocolOutput(AnyProtocolOutputType::EthereumWallet))
-            }
-        }
-    }
-}
-
-impl TryFrom<AnyProtocolOutput> for String {
-    type Error = InvalidProtocolOutput;
-
-    fn try_from(value: AnyProtocolOutput) -> Result<Self, Self::Error> {
-        match value {
-            AnyProtocolOutput::Direct(_) => {
-                Err(InvalidProtocolOutput(AnyProtocolOutputType::Direct))
-            }
-            AnyProtocolOutput::Base58Btc(s) => Ok(s),
-            AnyProtocolOutput::Base58BtcMultibase(s) => Ok(s),
-            AnyProtocolOutput::EthereumWallet(s) => Ok(s),
-        }
-    }
-}
-
 impl ssi_crypto::SignatureProtocol for AnySignatureProtocol {
-    type Output = AnyProtocolOutput;
+    fn prepare_message<'b>(&self, bytes: &'b [u8]) -> Cow<'b, [u8]> {
+        match self {
+            Self::Direct => ().prepare_message(bytes),
+            Self::Base58Btc => protocol::Base58Btc.prepare_message(bytes),
+            Self::Base58BtcMultibase => protocol::Base58BtcMultibase.prepare_message(bytes),
+            Self::EthereumWallet => protocol::EthereumWallet.prepare_message(bytes),
+        }
+    }
+
+    fn encode_signature(&self, signature: Vec<u8>) -> Vec<u8> {
+        match self {
+            Self::Direct => ().encode_signature(signature),
+            Self::Base58Btc => protocol::Base58Btc.encode_signature(signature),
+            Self::Base58BtcMultibase => protocol::Base58BtcMultibase.encode_signature(signature),
+            Self::EthereumWallet => protocol::EthereumWallet.encode_signature(signature),
+        }
+    }
+
+    fn decode_signature<'s>(
+        &self,
+        encoded_signature: &'s [u8],
+    ) -> Result<Cow<'s, [u8]>, protocol::InvalidProtocolSignature> {
+        match self {
+            Self::Direct => ().decode_signature(encoded_signature),
+            Self::Base58Btc => protocol::Base58Btc.decode_signature(encoded_signature),
+            Self::Base58BtcMultibase => {
+                protocol::Base58BtcMultibase.decode_signature(encoded_signature)
+            }
+            Self::EthereumWallet => protocol::EthereumWallet.decode_signature(encoded_signature),
+        }
+    }
 }
 
 impl From<()> for AnySignatureProtocol {

@@ -4,8 +4,6 @@
 //! and Curve25519. It is recommended to use `edssa-2022` instead.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-use std::future;
-
 use futures::FutureExt;
 use multibase::Base;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
@@ -100,7 +98,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &Ed25519VerificationKey2020,
         bytes: &'a [u8],
         signer: S,
@@ -110,7 +108,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: MultibaseSignatureRef,
         method: &Ed25519VerificationKey2020,
         bytes: &[u8],

@@ -8,14 +8,14 @@ use ssi_vc_ldp::{
     CryptographicSuite, CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
 };
 use ssi_verification_methods::{
-    covariance_rule, Referencable, ReferenceOrOwned, SignatureAlgorithm,
-    SignatureError, SigningMethod, VerificationError,
+    covariance_rule, Referencable, ReferenceOrOwned, SignatureAlgorithm, SignatureError,
+    SigningMethod, VerificationError,
 };
 use std::future::Future;
 use std::pin::Pin;
 use std::task;
 
-use crate::{AnyMethod, AnyMethodRef, AnyProtocolOutput, AnySignatureProtocol};
+use crate::{AnyMethod, AnyMethodRef, AnySignatureProtocol};
 
 type SuiteMethod<S> = <S as CryptographicSuite>::VerificationMethod;
 type SuiteSign<'a, S, T> = <<S as CryptographicSuite>::SignatureAlgorithm as SignatureAlgorithm<
@@ -199,9 +199,10 @@ macro_rules! crypto_suites {
     };
 }
 
+#[derive(Debug, Clone)]
 pub enum Transformed {
     String(String),
-    JsonObject(serde_json::Map<String, serde_json::Value>)
+    JsonObject(serde_json::Map<String, serde_json::Value>),
 }
 
 impl From<String> for Transformed {
@@ -222,7 +223,7 @@ impl TryFrom<Transformed> for String {
     fn try_from(value: Transformed) -> Result<Self, Self::Error> {
         match value {
             Transformed::String(s) => Ok(s),
-            _ => Err(HashError::InvalidTransformedInput)
+            _ => Err(HashError::InvalidTransformedInput),
         }
     }
 }
@@ -233,21 +234,22 @@ impl TryFrom<Transformed> for serde_json::Map<String, serde_json::Value> {
     fn try_from(value: Transformed) -> Result<Self, Self::Error> {
         match value {
             Transformed::JsonObject(o) => Ok(o),
-            _ => Err(HashError::InvalidTransformedInput)
+            _ => Err(HashError::InvalidTransformedInput),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Hashed {
     Array([u8; 64]),
-    Vec(Vec<u8>)
+    Vec(Vec<u8>),
 }
 
 impl AsRef<[u8]> for Hashed {
     fn as_ref(&self) -> &[u8] {
         match self {
             Self::Array(a) => a.as_ref(),
-            Self::Vec(v) => v.as_ref()
+            Self::Vec(v) => v.as_ref(),
         }
     }
 }
@@ -265,18 +267,23 @@ impl From<Vec<u8>> for Hashed {
 }
 
 /// Options for all cryptographic suites.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, LinkedData)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct AnySuiteOptions {
     #[serde(rename = "publicKeyJwk")]
     #[ld("sec:publicKeyJwk")]
-    pub public_key_jwk: Box<JWK>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_jwk: Option<Box<JWK>>,
 }
 
 impl AnySuiteOptions {
-    pub fn new(public_key_jwk: JWK) -> Self {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_key(jwk: JWK) -> Self {
         Self {
-            public_key_jwk: Box::new(public_key_jwk),
+            public_key_jwk: Some(Box::new(jwk)),
         }
     }
 }
@@ -286,7 +293,7 @@ impl Referencable for AnySuiteOptions {
 
     fn as_reference(&self) -> Self::Reference<'_> {
         AnySuiteOptionsRef {
-            public_key_jwk: Some(&self.public_key_jwk),
+            public_key_jwk: self.public_key_jwk.as_deref(),
         }
     }
 
@@ -305,24 +312,26 @@ impl<'a> From<AnySuiteOptionsRef<'a>> for () {
 }
 
 #[cfg(feature = "tezos")]
-impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::OptionsRef<'a> {
+impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptionsRef<'a> {
     type Error = InvalidOptions;
 
     fn try_from(value: AnySuiteOptionsRef<'a>) -> Result<Self, Self::Error> {
         Ok(Self {
-            public_key_jwk: value.public_key_jwk.ok_or(InvalidOptions::MissingPublicKey)?,
+            public_key_jwk: value
+                .public_key_jwk
+                .ok_or(InvalidOptions::MissingPublicKey)?,
         })
     }
 }
 
 pub enum InvalidOptions {
-    MissingPublicKey
+    MissingPublicKey,
 }
 
 impl From<InvalidOptions> for VerificationError {
     fn from(value: InvalidOptions) -> Self {
         match value {
-            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey
+            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey,
         }
     }
 }
@@ -330,7 +339,7 @@ impl From<InvalidOptions> for VerificationError {
 impl From<InvalidOptions> for SignatureError {
     fn from(value: InvalidOptions) -> Self {
         match value {
-            InvalidOptions::MissingPublicKey => SignatureError::MissingPublicKey
+            InvalidOptions::MissingPublicKey => SignatureError::MissingPublicKey,
         }
     }
 }
@@ -410,15 +419,6 @@ impl AnySuite {
         jwk: &JWK,
         verification_method: Option<&ReferenceOrOwned<AnyMethod>>,
     ) -> Option<Self> {
-        match verification_method {
-            Some(vm) => {
-                eprintln!("picking for {} and algorithm {:?}", vm.id(), jwk.algorithm)
-            }
-            None => {
-                eprintln!("picking for no vm")
-            }
-        }
-
         use ssi_jwk::Algorithm;
         let algorithm = jwk.get_algorithm()?;
         Some(match algorithm {
@@ -491,7 +491,7 @@ impl AnySuite {
                     return Some(Self::EcdsaSecp256k1RecoverySignature2020);
 
                     #[allow(unreachable_code)]
-                    return None
+                    return None;
                 }
                 #[cfg(feature = "secp256k1")]
                 _ => Self::EcdsaSecp256k1Signature2019,
@@ -557,13 +557,14 @@ where
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => {
-                            ssi_vc_ldp::suite::$name.transform(
+                            let r = ssi_vc_ldp::suite::$name.transform(
                                 data,
                                 context,
                                 params
                                     .try_cast_verification_method()
                                     .map_err(|_| TransformError::InvalidVerificationMethod)?
-                            ).map(Into::into)
+                            ).map(Into::into)?;
+                            Ok(r)
                         },
                     )*
                     _ => Err(TransformError::UnsupportedInputFormat)
@@ -604,29 +605,32 @@ where
     }
 }
 
-impl SigningMethod<JWK, AnySignatureProtocol> for AnyMethod {
-    fn sign_ref(
+impl SigningMethod<JWK> for AnyMethod {
+    fn sign_bytes_ref(
         this: AnyMethodRef,
         secret: &JWK,
-        protocol: AnySignatureProtocol,
         bytes: &[u8],
-    ) -> Result<AnyProtocolOutput, MessageSignatureError> {
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         match this {
             AnyMethodRef::RsaVerificationKey2018(_) => todo!(),
             AnyMethodRef::Ed25519VerificationKey2018(_) => todo!(),
             AnyMethodRef::Ed25519VerificationKey2020(_) => todo!(),
             AnyMethodRef::EcdsaSecp256k1VerificationKey2019(_) => todo!(),
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(_) => todo!(),
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => m.sign_bytes(secret, bytes),
             AnyMethodRef::EcdsaSecp256r1VerificationKey2019(_) => todo!(),
             AnyMethodRef::JsonWebKey2020(_) => todo!(),
             AnyMethodRef::Multikey(_) => todo!(),
-            AnyMethodRef::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => todo!(),
-            AnyMethodRef::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => todo!(),
+            AnyMethodRef::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
+                m.sign_bytes(secret, bytes)
+            }
+            AnyMethodRef::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
+                m.sign_bytes(secret, bytes)
+            }
             AnyMethodRef::TezosMethod2021(_) => todo!(),
             AnyMethodRef::AleoMethod2021(_) => todo!(),
             AnyMethodRef::BlockchainVerificationMethod2021(_) => todo!(),
             AnyMethodRef::Eip712Method2021(_) => todo!(),
-            AnyMethodRef::SolanaMethod2021(_) => todo!()
+            AnyMethodRef::SolanaMethod2021(_) => todo!(),
         }
     }
 }

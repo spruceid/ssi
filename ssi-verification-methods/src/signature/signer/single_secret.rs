@@ -29,7 +29,7 @@ impl<R, S> SingleSecretSigner<R, S> {
 
 impl<M: Referencable, P: SignatureProtocol, V, S> Signer<M, P> for SingleSecretSigner<V, S>
 where
-    M: SigningMethod<S, P>,
+    M: SigningMethod<S>,
     V: VerificationMethodResolver<M>,
 {
     type Sign<'a, A: crate::SignatureAlgorithm<M, Protocol = P>> = Sign<'a, M, V, A, S> where Self: 'a, M: 'a, A: 'a, A::Signature: 'a;
@@ -63,7 +63,7 @@ where
 #[pin_project(project = SignProj)]
 pub enum Sign<'a, M: 'a + Referencable, V: 'a + VerificationMethodResolver<M>, A, S>
 where
-    M: 'a + Referencable + SigningMethod<S, A::Protocol>,
+    M: 'a + Referencable + SigningMethod<S>,
     V: 'a + VerificationMethodResolver<M>,
     A: 'a + SignatureAlgorithm<M>,
     S: 'a,
@@ -74,7 +74,7 @@ where
 
 impl<'a, M, V, A, S> Future for Sign<'a, M, V, A, S>
 where
-    M: 'a + Referencable + SigningMethod<S, A::Protocol>,
+    M: 'a + Referencable + SigningMethod<S>,
     V: 'a + VerificationMethodResolver<M>,
     A: 'a + SignatureAlgorithm<M>,
     S: 'a,
@@ -95,7 +95,7 @@ where
 #[pin_project]
 pub struct ResolveAndSign<'a, M, V, A, S>
 where
-    M: 'a + Referencable + SigningMethod<S, A::Protocol>,
+    M: 'a + Referencable + SigningMethod<S>,
     V: 'a + VerificationMethodResolver<M>,
     A: 'a + SignatureAlgorithm<M>,
     S: 'a,
@@ -113,10 +113,9 @@ where
 
 impl<'a, M, V, A, S> Future for ResolveAndSign<'a, M, V, A, S>
 where
-    M: 'a + Referencable + SigningMethod<S, A::Protocol>,
+    M: 'a + Referencable + SigningMethod<S>,
     V: 'a + VerificationMethodResolver<M>,
     A: SignatureAlgorithm<M>,
-    <A::Protocol as SignatureProtocol>::Output: 'a,
     S: 'a,
 {
     type Output = Result<A::Signature, SignatureError>;
@@ -154,7 +153,7 @@ struct UnboundSignWithMethodAndSecret<'a, M, A, S>(PhantomData<(&'a (), M, A, S)
 
 impl<'a, M, A, S> UnboundedRefFuture<'a> for UnboundSignWithMethodAndSecret<'a, M, A, S>
 where
-    M: 'a + Referencable + SigningMethod<S, A::Protocol>,
+    M: 'a + Referencable + SigningMethod<S>,
     A: 'a + SignatureAlgorithm<M>,
     S: 'a,
 {
@@ -179,7 +178,7 @@ struct Binder<'a, O: 'a + Referencable, S> {
 impl<'a, M, A, S> RefFutureBinder<'a, UnboundSignWithMethodAndSecret<'a, M, A, S>>
     for Binder<'a, A::Options, S>
 where
-    M: 'a + Referencable + SigningMethod<S, A::Protocol>,
+    M: 'a + Referencable + SigningMethod<S>,
     A: 'a + SignatureAlgorithm<M>,
     S: 'a,
 {

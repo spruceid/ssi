@@ -1,5 +1,4 @@
 mod w3c;
-use ssi_jwk::JWK;
 pub use w3c::*;
 
 mod unspecified;
@@ -7,8 +6,6 @@ pub use unspecified::*;
 
 mod generic;
 pub use generic::*;
-
-use crate::SigningMethod;
 
 #[macro_export]
 macro_rules! verification_method_union {
@@ -20,7 +17,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 	} => {
-		#[derive(Clone, linked_data::LinkedData)]
+		#[derive(Clone, serde::Serialize, serde::Deserialize, linked_data::LinkedData)]
 		$vis enum $name {
 			$(
 				$(#[$meta])*
@@ -136,7 +133,7 @@ macro_rules! verification_method_union {
 						return true
 					}
 				)*
-				
+
 				false
 			}
 
@@ -240,7 +237,7 @@ macro_rules! verification_method_union {
 
 		impl TryFrom<$crate::GenericVerificationMethod> for $name {
 			type Error = $crate::InvalidVerificationMethod;
-		
+
 			fn try_from(value: $crate::GenericVerificationMethod) -> Result<Self, Self::Error> {
 				$(
 					if <$variant as $crate::TypedVerificationMethod>::type_match(&value.type_) {
@@ -250,6 +247,6 @@ macro_rules! verification_method_union {
 
 				Err($crate::InvalidVerificationMethod::UnsupportedMethodType)
 			}
-		}		
+		}
 	};
 }

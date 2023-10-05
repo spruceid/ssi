@@ -3,8 +3,8 @@ use std::future;
 use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
-    verification_method_union, AleoMethod2021, BlockchainVerificationMethod2021,
-    InvalidVerificationMethod, SignatureError, VerificationError,
+    verification_method_union, AleoMethod2021, BlockchainVerificationMethod2021, SignatureError,
+    VerificationError,
 };
 use static_iref::iri;
 
@@ -98,10 +98,10 @@ impl CryptographicSuite for AleoSignature2021 {
 pub struct SignatureAlgorithm;
 
 impl SignatureAlgorithm {
-    pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<String, MessageSignatureError> {
+    pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
         let signature =
             ssi_jwk::aleo::sign(&message, key).map_err(MessageSignatureError::signature_failed)?;
-        Ok(Base58BtcMultibase::encode(&signature))
+        Ok(Base58BtcMultibase::encode_signature(&signature))
     }
 }
 
@@ -117,7 +117,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -127,7 +127,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: MultibaseSignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

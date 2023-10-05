@@ -4,9 +4,7 @@ use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{JsonWebKey2020, SignatureError};
 use static_iref::iri;
 
-use crate::{
-    impl_rdf_input_urdna2015, CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
-};
+use crate::{impl_rdf_input_urdna2015, CryptographicSuite, ProofConfigurationRef};
 
 use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef};
 
@@ -67,7 +65,7 @@ impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureA
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &JsonWebKey2020,
         bytes: &'a [u8],
         signer: S,
@@ -77,7 +75,7 @@ impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureA
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: JwsSignatureRef,
         method: &JsonWebKey2020,
         bytes: &[u8],

@@ -18,6 +18,8 @@ keccak-hash = "0.7"
 hex = "0.4"
 rdf-types.workspace = true
 indexmap = { version = "2.0.0", features = ["serde"] }
+json-syntax.workspace = true
+linked-data.workspace = true
 
 [dev-dependencies]
 lazy_static = "1.4"

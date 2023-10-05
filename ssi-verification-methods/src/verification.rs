@@ -1,23 +1,13 @@
 use std::{
     fmt,
-    future::Future,
-    marker::PhantomData,
     ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign},
-    pin::Pin,
-    task,
 };
 
 use iref::{Iri, IriBuf};
 use linked_data::LinkedData;
-use pin_project::pin_project;
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use static_iref::iri;
 
-use crate::{
-    ControllerProvider, Cow, EnsureAllowsVerificationMethod, InvalidVerificationMethod,
-    Referencable, ReferenceOrOwnedRef, SignatureAlgorithm, VerificationMethod,
-    VerificationMethodRef, VerificationMethodResolutionError,
-};
+use crate::{InvalidVerificationMethod, VerificationMethodResolutionError};
 
 mod verifier;
 

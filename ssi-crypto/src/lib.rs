@@ -19,6 +19,9 @@ pub enum MessageSignatureError {
 
     #[error("invalid signer response")]
     InvalidResponse,
+
+    #[error("invalid secret key")]
+    InvalidSecretKey,
 }
 
 impl MessageSignatureError {
@@ -28,7 +31,7 @@ impl MessageSignatureError {
 }
 
 pub trait MessageSigner<P: SignatureProtocol = ()> {
-    type Sign<'a>: 'a + Future<Output = Result<P::Output, MessageSignatureError>>
+    type Sign<'a>: 'a + Future<Output = Result<Vec<u8>, MessageSignatureError>>
     where
         Self: 'a,
         P: 'a;
@@ -71,7 +74,6 @@ impl<S: MessageSigner<P>, P: SignatureProtocol, Q: SignatureProtocol> MessageSig
     for SignerAdapter<S, P>
 where
     P: TryFrom<Q>,
-    Q::Output: TryFrom<P::Output>,
 {
     type Sign<'a> = SignerAdapterSign<'a, S, P, Q> where Self: 'a, Q: 'a;
 
@@ -103,10 +105,8 @@ pub struct SignerAdapterSign<'a, S: MessageSigner<P>, P: SignatureProtocol, Q: S
 
 impl<'a, S: MessageSigner<P>, P: SignatureProtocol, Q: SignatureProtocol> Future
     for SignerAdapterSign<'a, S, P, Q>
-where
-    Q::Output: TryFrom<P::Output>,
 {
-    type Output = Result<Q::Output, MessageSignatureError>;
+    type Output = Result<Vec<u8>, MessageSignatureError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -125,10 +125,8 @@ enum SignerAdapterSignInner<'a, S: MessageSigner<P>, P: SignatureProtocol, Q: Si
 
 impl<'a, S: MessageSigner<P>, P: SignatureProtocol, Q: SignatureProtocol> Future
     for SignerAdapterSignInner<'a, S, P, Q>
-where
-    Q::Output: TryFrom<P::Output>,
 {
-    type Output = Result<Q::Output, MessageSignatureError>;
+    type Output = Result<Vec<u8>, MessageSignatureError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
@@ -155,21 +153,14 @@ pub struct SignerAdapterSignOk<
 
 impl<'a, S: MessageSigner<P>, P: SignatureProtocol, Q: SignatureProtocol> Future
     for SignerAdapterSignOk<'a, S, P, Q>
-where
-    Q::Output: TryFrom<P::Output>,
 {
-    type Output = Result<Q::Output, MessageSignatureError>;
+    type Output = Result<Vec<u8>, MessageSignatureError>;
 
     fn poll(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Self::Output> {
         let this = self.project();
-        this.inner.poll(cx).map(|result| {
-            result.and_then(|s| {
-                s.try_into()
-                    .map_err(|_| MessageSignatureError::InvalidResponse)
-            })
-        })
+        this.inner.poll(cx)
     }
 }

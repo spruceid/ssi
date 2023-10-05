@@ -11,7 +11,7 @@ use static_iref::iri;
 use crate::{
     impl_rdf_input_urdna2015,
     suite::{sha256_hash, AnySignature, AnySignatureRef, HashError},
-    CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 /// Solana Signature 2021
@@ -147,12 +147,12 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
 pub struct SignatureAlgorithm;
 
 impl SignatureAlgorithm {
-    pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<String, MessageSignatureError> {
+    pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
         let tx = LocalSolanaTransaction::with_message(&message);
         let bytes = tx.to_bytes();
         let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, &bytes, key)
             .map_err(MessageSignatureError::signature_failed)?;
-        Ok(Base58Btc::encode(&signature))
+        Ok(Base58Btc::encode_signature(&signature))
     }
 }
 
@@ -185,7 +185,7 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &SolanaMethod2021,
         bytes: &'a [u8],
         signer: S,
@@ -195,7 +195,7 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: SignatureRef,
         method: &SolanaMethod2021,
         bytes: &[u8],
@@ -203,7 +203,7 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
         let tx = LocalSolanaTransaction::with_message(bytes);
         let signing_bytes = tx.to_bytes();
 
-        let signature_bytes = Base58Btc::decode(&signature.proof_value)
+        let signature_bytes = Base58Btc::decode_signature(signature.proof_value.as_bytes())
             .map_err(|_| VerificationError::InvalidSignature)?;
         Ok(ssi_jws::verify_bytes(
             ssi_jwk::Algorithm::EdDSA,

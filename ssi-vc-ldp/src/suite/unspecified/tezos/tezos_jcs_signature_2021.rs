@@ -8,7 +8,7 @@ use static_iref::iri;
 
 use crate::{
     suite::{HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
+    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
 pub use super::tezos_signature_2021::{PublicKey, PublicKeyRef, Signature, SignatureRef};
@@ -47,7 +47,7 @@ impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
     fn transform(
         &self,
         data: &T,
-        context: (),
+        _context: (),
         _options: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Transformed, TransformError> {
         let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;

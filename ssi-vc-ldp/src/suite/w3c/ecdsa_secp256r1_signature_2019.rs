@@ -7,7 +7,7 @@ use static_iref::iri;
 use crate::{
     impl_rdf_input_urdna2015,
     suite::{sha256_hash, HashError, MultibaseSignature, MultibaseSignatureRef},
-    CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 /// ECDSA Cryptosuite v2019 `EcdsaSecp256r1Signature2019`.
@@ -68,7 +68,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &EcdsaSecp256r1VerificationKey2019,
         bytes: &'a [u8],
         signer: S,
@@ -78,7 +78,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: MultibaseSignatureRef,
         method: &EcdsaSecp256r1VerificationKey2019,
         bytes: &[u8],

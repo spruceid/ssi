@@ -11,7 +11,7 @@ use static_iref::iri;
 
 use crate::{
     suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
+    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
 /// EIP-712 Signature 2021.
@@ -116,7 +116,7 @@ where
     fn transform(
         &self,
         data: &ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
-        context: (),
+        _context: (),
         options: ProofConfigurationRef<VerificationMethod>,
     ) -> Result<Self::Transformed, TransformError> {
         let document_quads = data.into_quads();
@@ -235,7 +235,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -245,7 +245,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: Eip712SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],
