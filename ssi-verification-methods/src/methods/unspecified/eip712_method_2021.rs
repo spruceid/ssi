@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
-    VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 // mod context;
@@ -123,13 +123,14 @@ impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            blockchain_account_id: m.properties
+            blockchain_account_id: m
+                .properties
                 .get("blockchainAccountId")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("blockchainAccountId"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
                 .parse()
-                .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?,
         })
     }
 }

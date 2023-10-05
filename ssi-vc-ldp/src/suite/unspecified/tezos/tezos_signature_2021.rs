@@ -5,12 +5,15 @@ use ssi_crypto::MessageSigner;
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, TezosMethod2021, InvalidSignature};
+use ssi_verification_methods::{
+    covariance_rule, InvalidSignature, Referencable, SignatureError, TezosMethod2021,
+};
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::{HashError, AnySignature, AnySignatureRef}, CryptographicSuite, ProofConfiguration,
-    ProofConfigurationRef,
+    impl_rdf_input_urdna2015,
+    suite::{AnySignature, AnySignatureRef, HashError},
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 /// Tezos signature suite based on URDNA2015.
@@ -116,7 +119,7 @@ impl From<Signature> for AnySignature {
         match value.public_key {
             Some(PublicKey::Jwk(k)) => public_key_jwk = Some(k),
             Some(PublicKey::Multibase(k)) => public_key_multibase = Some(k),
-            None => ()
+            None => (),
         }
 
         Self {
@@ -145,7 +148,7 @@ impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
         match value.public_key {
             Some(PublicKeyRef::Jwk(k)) => public_key_jwk = Some(k),
             Some(PublicKeyRef::Multibase(k)) => public_key_multibase = Some(k),
-            None => ()
+            None => (),
         }
 
         Self {
@@ -165,12 +168,12 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
             (Some(k), None) => Some(PublicKeyRef::Jwk(k)),
             (None, Some(k)) => Some(PublicKeyRef::Multibase(k)),
             (Some(_), Some(_)) => return Err(InvalidSignature::AmbiguousPublicKey),
-            (None, None) => None
+            (None, None) => None,
         };
 
         Ok(Self {
             proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-            public_key
+            public_key,
         })
     }
 }

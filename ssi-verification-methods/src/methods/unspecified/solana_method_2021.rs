@@ -7,8 +7,8 @@ use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
@@ -106,8 +106,8 @@ impl TryFrom<GenericVerificationMethod> for SolanaMethod2021 {
                     .as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
                     .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
-            )
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
+            ),
         })
     }
 }

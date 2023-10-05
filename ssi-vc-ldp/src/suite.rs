@@ -16,7 +16,10 @@ use ssi_verification_methods::{
     VerificationMethod, VerificationMethodRef, Verifier,
 };
 
-use crate::{ProofConfiguration, ProofConfigurationRef, UntypedProof, UntypedProofRef, signing::SignLinkedData, DataIntegrity};
+use crate::{
+    signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationRef,
+    UntypedProof, UntypedProofRef,
+};
 
 mod signatures;
 pub use signatures::*;
@@ -49,7 +52,7 @@ pub enum TransformError {
     UnsupportedInputFormat,
 
     #[error("invalid verification method")]
-    InvalidVerificationMethod
+    InvalidVerificationMethod,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -64,7 +67,7 @@ pub enum HashError {
     InvalidMessage(Box<dyn 'static + std::error::Error>),
 
     #[error("invalid transformed input")]
-    InvalidTransformedInput
+    InvalidTransformedInput,
 }
 
 pub trait FromRdfAndSuite<S> {
@@ -268,7 +271,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     ) -> SignLinkedData<'max, T, Self, S>
     where
         Self::VerificationMethod: 'max,
-        S: 'max + Signer<Self::VerificationMethod, Self::SignatureProtocol>
+        S: 'max + Signer<Self::VerificationMethod, Self::SignatureProtocol>,
     {
         DataIntegrity::sign(input, context, signer, self, params)
     }

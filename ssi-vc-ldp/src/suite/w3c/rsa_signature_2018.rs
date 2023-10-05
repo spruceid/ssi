@@ -116,7 +116,7 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &RsaVerificationKey2018,
         bytes: &'a [u8],
         signer: S,
@@ -126,7 +126,7 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: SignatureRef,
         method: &RsaVerificationKey2018,
         bytes: &[u8],

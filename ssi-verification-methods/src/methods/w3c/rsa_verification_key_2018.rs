@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SignatureError, TypedVerificationMethod, VerificationMethod,
 };
 
 pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
@@ -102,8 +102,8 @@ impl TryFrom<GenericVerificationMethod> for RsaVerificationKey2018 {
                     .as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
                     .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
-            )
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
+            ),
         })
     }
 }

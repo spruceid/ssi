@@ -1,15 +1,12 @@
-use std::future;
-
 use ssi_crypto::MessageSigner;
 use ssi_jwk::Algorithm;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
-use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, Referencable, SignatureError};
+use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, VerificationError};
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
     suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws},
-    CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 /// `EcdsaSecp256k1RecoverySignature2020`.
@@ -35,7 +32,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#EcdsaSecp256k1RecoverySignature2020")
+        iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020")
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -71,25 +68,30 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         _options: (),
-        method: &EcdsaSecp256k1RecoveryMethod2020,
+        _method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
         let header = ssi_jws::Header::new_unencoded(
             Algorithm::ES256KR,
-            Some(method.id.as_str().to_owned())
+            None, // TODO should we use method id as key id?
         );
-
-        SignIntoDetachedJws::new(header, bytes.to_vec(), signer)
+        SignIntoDetachedJws::new(header, bytes, signer)
     }
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: JwsSignatureRef,
         method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+    ) -> Result<bool, VerificationError> {
+        let (header, _, signature) = signature
+            .jws
+            .decode()
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        let signing_bytes = header.encode_signing_bytes(bytes);
+
+        method.verify_bytes(&signing_bytes, &signature)
     }
 }

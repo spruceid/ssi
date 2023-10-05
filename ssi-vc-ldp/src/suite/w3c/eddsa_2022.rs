@@ -76,7 +76,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &Multikey,
         bytes: &'a [u8],
         signer: S,
@@ -86,7 +86,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: MultibaseSignatureRef,
         method: &Multikey,
         bytes: &[u8],

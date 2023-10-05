@@ -5,21 +5,14 @@ use iref::{Iri, IriBuf, UriBuf};
 use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jws::CompactJWSString;
-use static_iref::iri;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
-
-/// IRI of the Ed25519 Verification Key 2018 type.
-pub const ED25519_VERIFICATION_KEY_2018_IRI: &Iri =
-    iri!("https://w3id.org/security#Ed25519VerificationKey2018");
 
 /// Ed25519 Verification Key 2018 type name.
 pub const ED25519_VERIFICATION_KEY_2018_TYPE: &str = "Ed25519VerificationKey2018";
-
-pub const PUBLIC_KEY_BASE_58_IRI: &Iri = iri!("https://w3id.org/security#publicKeyBase58");
 
 /// Deprecated verification method for the `Ed25519Signature2018` suite.
 ///
@@ -132,12 +125,13 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key_base58: m.properties
+            public_key_base58: m
+                .properties
                 .get("publicKeyBase58")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyBase58"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyBase58"))?
-                .to_owned()
+                .to_owned(),
         })
     }
 }

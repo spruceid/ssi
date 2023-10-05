@@ -1,10 +1,8 @@
 use futures::Future;
-use iref::{Iri, IriBuf};
-use ssi_crypto::{MessageSigner, SignatureProtocol};
+use ssi_crypto::MessageSigner;
 
 use crate::{
-    InvalidVerificationMethod, Referencable, ReferenceOrOwnedRef, VerificationError,
-    VerificationMethodResolutionError,
+    InvalidVerificationMethod, Referencable, VerificationError, VerificationMethodResolutionError,
 };
 
 pub mod signer;
@@ -54,7 +52,7 @@ pub enum InvalidSignature {
 
     MissingPublicKey,
 
-    AmbiguousPublicKey
+    AmbiguousPublicKey,
 }
 
 impl From<InvalidSignature> for VerificationError {
@@ -63,7 +61,7 @@ impl From<InvalidSignature> for VerificationError {
             InvalidSignature::MissingValue => Self::MissingSignature,
             InvalidSignature::InvalidValue => Self::InvalidSignature,
             InvalidSignature::MissingPublicKey => Self::MissingPublicKey,
-            InvalidSignature::AmbiguousPublicKey => Self::AmbiguousPublicKey
+            InvalidSignature::AmbiguousPublicKey => Self::AmbiguousPublicKey,
         }
     }
 }
@@ -86,9 +84,7 @@ pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
         method: M::Reference<'_>,
         bytes: &'a [u8],
         signer: S,
-    ) -> Self::Sign<'a, S>
-    where
-        <Self::Protocol as SignatureProtocol>::Output: 'a;
+    ) -> Self::Sign<'a, S>;
 
     fn verify<'o, 's, 'm>(
         &self,

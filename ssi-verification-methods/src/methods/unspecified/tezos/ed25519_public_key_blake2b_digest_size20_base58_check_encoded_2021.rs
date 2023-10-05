@@ -5,7 +5,6 @@ use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{CompactJWSStr, Header};
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -119,17 +118,10 @@ impl TryFrom<GenericVerificationMethod>
     }
 }
 
-fn build_signing_bytes(bytes: &[u8], public_key: &JWK) -> (Header, Vec<u8>) {
-    let header = ssi_jws::Header::new_unencoded(Algorithm::EdBlake2b, public_key.key_id.clone());
-    let signing_bytes = header.encode_signing_bytes(bytes);
-    (header, signing_bytes)
-}
-
 impl SigningMethod<JWK> for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    fn sign_ref(
+    fn sign_bytes_ref(
         _this: &Self,
         key: &JWK,
-        _protocol: (),
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(Algorithm::EdBlake2b, bytes, key)

@@ -331,7 +331,6 @@ impl Represented {
         content_metadata: ContentMetadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
-        eprintln!("deref from {self:?}");
         match self {
             Self::Json(d) => d.dereference_secondary_resource(
                 primary_did_url,

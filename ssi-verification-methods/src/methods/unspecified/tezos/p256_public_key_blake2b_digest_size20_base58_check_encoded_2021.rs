@@ -8,8 +8,7 @@ use ssi_jwk::{Algorithm, JWK};
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, SignatureError, SigningMethod, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    Referencable, SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
@@ -93,7 +92,7 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
 
     fn try_from(value: GenericVerificationMethod) -> Result<Self, Self::Error> {
         if value.type_ == P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE {
-            Ok(Self {
+            let r = Self {
                 id: value.id,
                 controller: value.controller,
                 blockchain_account_id: value
@@ -110,7 +109,9 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
                     .map_err(|_| {
                         InvalidVerificationMethod::invalid_property("blockchainAccountId")
                     })?,
-            })
+            };
+
+            Ok(r)
         } else {
             Err(InvalidVerificationMethod::InvalidTypeName(value.type_))
         }
@@ -118,16 +119,12 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
 }
 
 impl SigningMethod<JWK> for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    fn sign_ref(
-        this: &Self,
+    fn sign_bytes_ref(
+        _this: &Self,
         key: &JWK,
-        protocol: (),
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        Ok(
-            ssi_jws::detached_sign_unencoded_payload(Algorithm::ESBlake2b, bytes, key)
-                .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?
-                .into_bytes(),
-        )
+        ssi_jws::sign_bytes(Algorithm::ESBlake2b, bytes, key)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

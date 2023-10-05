@@ -5,16 +5,13 @@ use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use static_iref::iri;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, SignatureError, TypedVerificationMethod,
-    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
-
-pub const JSON_WEB_KEY_2020_IRI: &Iri = iri!("https://w3id.org/security#JsonWebKey2020");
 
 /// JSON Web Key 2020 verification method.
 ///
@@ -118,8 +115,8 @@ impl TryFrom<GenericVerificationMethod> for JsonWebKey2020 {
                     .as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
                     .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
-            )
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
+            ),
         })
     }
 }

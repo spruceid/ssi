@@ -4,7 +4,7 @@ use ssi_verification_methods::{
     EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
     EcdsaSecp256r1VerificationKey2019, Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
     Ed25519VerificationKey2018, Ed25519VerificationKey2020, Eip712Method2021,
-    GenericVerificationMethod, InvalidVerificationMethod, JsonWebKey2020, Multikey,
+    InvalidVerificationMethod, JsonWebKey2020, Multikey,
     P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, RsaVerificationKey2018,
     SolanaMethod2021, TezosMethod2021,
 };

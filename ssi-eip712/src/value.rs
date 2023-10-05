@@ -1,4 +1,8 @@
 use indexmap::{Equivalent, IndexMap};
+use linked_data::{
+    LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
+};
+use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
 use std::hash::Hash;
@@ -150,6 +154,59 @@ impl From<Value> for serde_json::Value {
                     .collect(),
             ),
         }
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataResource<V, I> for Value {
+    fn interpretation(
+        &self,
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<V, I> {
+        linked_data::ResourceInterpretation::Uninterpreted(Some(linked_data::CowRdfTerm::Owned(
+            rdf_types::Term::Literal(linked_data::RdfLiteral::Json(
+                json_syntax::to_value(self).unwrap(),
+            )),
+        )))
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Value {
+    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<V, I>,
+    {
+        serializer.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for Value {
+    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<V, I>,
+    {
+        visitor.object(self)?;
+        visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Value {
+    fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::GraphVisitor<V, I>,
+    {
+        visitor.subject(self)?;
+        visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for Value {
+    fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::Visitor<V, I>,
+    {
+        visitor.default_graph(self)?;
+        visitor.end()
     }
 }
 

@@ -363,7 +363,7 @@ impl CompactJWSString {
         b64_signature: &[u8],
     ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
         let mut bytes = header.encode();
-        bytes.extend([b'.', b'.']);
+        bytes.extend(b"..");
         bytes.extend(b64_signature.iter().copied());
         Self::new(bytes)
     }

@@ -10,8 +10,8 @@ use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, SigningMethod, TypedVerificationMethod,
-    VerificationError, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 /// Ed25519 Verification Key 2020 type name.
@@ -158,10 +158,9 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
 }
 
 impl SigningMethod<ed25519_dalek::Keypair> for Ed25519VerificationKey2020 {
-    fn sign_ref(
+    fn sign_bytes_ref(
         this: &Self,
         secret: &ed25519_dalek::Keypair,
-        protocol: (),
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(this.sign_bytes(message, secret))
@@ -169,13 +168,22 @@ impl SigningMethod<ed25519_dalek::Keypair> for Ed25519VerificationKey2020 {
 }
 
 impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
-    fn sign_ref(
+    fn sign_bytes_ref(
         this: &Self,
-        secret: &JWK,
-        protocol: (),
+        secret_key: &JWK,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        todo!()
+        let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::EdDSA);
+        match &secret_key.params {
+            ssi_jwk::Params::OKP(p)
+                if algorithm == ssi_jwk::Algorithm::EdDSA && p.curve == "Ed25519" =>
+            {
+                let keypair = ed25519_dalek::Keypair::try_from(p)
+                    .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
+                Self::sign_bytes_ref(this, &keypair, message)
+            }
+            _ => Err(MessageSignatureError::InvalidSecretKey),
+        }
     }
 }
 
@@ -186,12 +194,13 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2020 {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key_multibase: m.properties
+            public_key_multibase: m
+                .properties
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
-                .to_owned()
+                .to_owned(),
         })
     }
 }

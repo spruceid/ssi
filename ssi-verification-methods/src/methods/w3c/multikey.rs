@@ -8,7 +8,8 @@ use serde::{Deserialize, Serialize};
 use ssi_multicodec::MultiEncodedBuf;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, TypedVerificationMethod, VerificationMethod,
 };
 
 // /// IRI of the Multikey type.
@@ -151,12 +152,13 @@ impl TryFrom<GenericVerificationMethod> for Multikey {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key_multibase: m.properties
+            public_key_multibase: m
+                .properties
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
-                .to_owned()
+                .to_owned(),
         })
     }
 }

@@ -7,7 +7,7 @@ use static_iref::iri;
 use crate::{
     impl_rdf_input_urdna2015,
     suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef},
-    CryptographicSuite, ProofConfiguration, ProofConfigurationRef,
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 /// Ecdsa Secp256k1 Signature 2019.
@@ -68,7 +68,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: (),
+        _options: (),
         method: &EcdsaSecp256k1VerificationKey2019,
         bytes: &[u8],
         signer: S,
@@ -78,7 +78,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: JwsSignatureRef,
         method: &EcdsaSecp256k1VerificationKey2019,
         bytes: &[u8],

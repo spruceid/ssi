@@ -189,22 +189,36 @@ impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodRe
     }
 }
 
-pub trait SigningMethod<S, P: SignatureProtocol = ()>: VerificationMethod + Referencable {
+pub trait SigningMethod<S>: VerificationMethod + Referencable {
     fn sign(
         &self,
         secret: &S,
-        protocol: P,
+        protocol: impl SignatureProtocol,
         bytes: &[u8],
-    ) -> Result<P::Output, MessageSignatureError> {
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         Self::sign_ref(self.as_reference(), secret, protocol, bytes)
     }
 
     fn sign_ref(
         this: Self::Reference<'_>,
         secret: &S,
-        protocol: P,
+        protocol: impl SignatureProtocol,
         bytes: &[u8],
-    ) -> Result<P::Output, MessageSignatureError>;
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        let prepared_bytes = protocol.prepare_message(bytes);
+        let signed_bytes = Self::sign_bytes_ref(this, secret, &prepared_bytes)?;
+        Ok(protocol.encode_signature(signed_bytes))
+    }
+
+    fn sign_bytes(&self, secret: &S, bytes: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+        Self::sign_bytes_ref(self.as_reference(), secret, bytes)
+    }
+
+    fn sign_bytes_ref(
+        this: Self::Reference<'_>,
+        secret: &S,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError>;
 }
 
 pub struct MethodWithSecret<'m, 's, M: 'm + Referencable, S> {
@@ -218,10 +232,10 @@ impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
     }
 }
 
-impl<'m, 's, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S, P>, S> MessageSigner<P>
+impl<'m, 's, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S>, S> MessageSigner<P>
     for MethodWithSecret<'m, 's, M, S>
 {
-    type Sign<'a> = std::future::Ready<Result<P::Output, MessageSignatureError>> where
+    type Sign<'a> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where
     Self: 'a,
     P: 'a;
 
@@ -308,7 +322,7 @@ pub enum InvalidVerificationMethod {
     AmbiguousPublicKey,
 
     #[error("unsupported method type")]
-    UnsupportedMethodType
+    UnsupportedMethodType,
 }
 
 impl InvalidVerificationMethod {

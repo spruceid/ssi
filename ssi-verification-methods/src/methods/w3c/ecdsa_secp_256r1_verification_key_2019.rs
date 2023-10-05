@@ -5,8 +5,8 @@ use ssi_multicodec::MultiEncodedBuf;
 use std::hash::Hash;
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationError,
-    VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
@@ -148,12 +148,13 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256r1VerificationKey2019 {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key_multibase: m.properties
+            public_key_multibase: m
+                .properties
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
-                .to_owned()
+                .to_owned(),
         })
     }
 }

@@ -5,7 +5,8 @@ use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    covariance_rule, ExpectedType, Referencable, TypedVerificationMethod, VerificationMethod, GenericVerificationMethod, InvalidVerificationMethod,
+    covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
+    Referencable, TypedVerificationMethod, VerificationMethod,
 };
 
 // pub const BLOCKCHAIN_VERIFICATION_METHOD_2021_IRI: &Iri =
@@ -76,13 +77,14 @@ impl TryFrom<GenericVerificationMethod> for BlockchainVerificationMethod2021 {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            blockchain_account_id: m.properties
+            blockchain_account_id: m
+                .properties
                 .get("blockchainAccountId")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("blockchainAccountId"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
                 .parse()
-                .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?
+                .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?,
         })
     }
 }

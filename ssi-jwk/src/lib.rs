@@ -354,7 +354,14 @@ impl JWK {
     #[cfg(feature = "secp256k1")]
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
-        let secret_key = k256::SecretKey::random(&mut rng);
+        Self::generate_secp256k1_from(&mut rng)
+    }
+
+    #[cfg(feature = "secp256k1")]
+    pub fn generate_secp256k1_from(
+        rng: &mut (impl rand::CryptoRng + rand::RngCore),
+    ) -> Result<JWK, Error> {
+        let secret_key = k256::SecretKey::random(rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
@@ -365,7 +372,14 @@ impl JWK {
     #[cfg(feature = "secp256r1")]
     pub fn generate_p256() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};
-        let secret_key = p256::SecretKey::random(&mut rng);
+        Self::generate_p256_from(&mut rng)
+    }
+
+    #[cfg(feature = "secp256r1")]
+    pub fn generate_p256_from(
+        rng: &mut (impl rand::CryptoRng + rand::RngCore),
+    ) -> Result<JWK, Error> {
+        let secret_key = p256::SecretKey::random(rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
