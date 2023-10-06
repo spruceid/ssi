@@ -1,10 +1,13 @@
-use async_trait::async_trait;
-use serde_json::Value;
-use ssi_dids::document::VerificationRelationships;
+use iref::Iri;
+use ssi_dids::document::representation::MediaType;
 use ssi_dids::document::verification_method::ValueOrReference;
-use std::collections::BTreeMap;
-use std::str::FromStr;
+use ssi_dids::{document, resolution, DIDBuf};
+use ssi_dids::{document::representation, resolution::Output};
 use static_iref::iri;
+use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
+use std::str::FromStr;
 
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_caips::caip2::ChainId;
@@ -12,8 +15,9 @@ use ssi_caips::caip2::ChainId;
 //     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
 // };
 use ssi_dids::{
-    DIDMethod, Document, document::DIDVerificationMethod,
-    DIDURL, DIDURLBuf, DID,
+    document::DIDVerificationMethod,
+    resolution::{DIDMethodResolver, Error},
+    DIDURLBuf, Document, DID,
 };
 use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
 
@@ -27,9 +31,9 @@ pub enum PkhVerificationMethodType {
     EcdsaSecp256k1RecoveryMethod2020,
     TezosMethod2021,
     SolanaMethod2021,
-    // Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-    // P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-    BlockchainVerificationMethod2021
+    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+    BlockchainVerificationMethod2021,
 }
 
 impl PkhVerificationMethodType {
@@ -50,14 +54,14 @@ impl PkhVerificationMethodType {
             Self::Ed25519VerificationKey2018 => "Ed25519VerificationKey2018",
             Self::TezosMethod2021 => "TezosMethod2021",
             Self::SolanaMethod2021 => "SolanaMethod2021",
-            // Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
-            //     "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
-            // }
+            Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
+                "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+            }
             Self::EcdsaSecp256k1RecoveryMethod2020 => "EcdsaSecp256k1RecoveryMethod2020",
-            // Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
-            //     "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
-            // }
-            Self::BlockchainVerificationMethod2021 => "BlockchainVerificationMethod2021"
+            Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
+                "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+            }
+            Self::BlockchainVerificationMethod2021 => "BlockchainVerificationMethod2021",
         }
     }
 
@@ -66,9 +70,9 @@ impl PkhVerificationMethodType {
             Self::Ed25519VerificationKey2018 => iri!("https://w3id.org/security#Ed25519VerificationKey2018"),
             Self::TezosMethod2021 => iri!("https://w3id.org/security#TezosMethod2021"),
             Self::SolanaMethod2021 => iri!("https://w3id.org/security#SolanaMethod2021"),
-            // Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => iri!("https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
+            Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => iri!("https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
             Self::EcdsaSecp256k1RecoveryMethod2020 => iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
-            // Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021")
+            Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
             Self::BlockchainVerificationMethod2021 => iri!("https://w3id.org/security#BlockchainVerificationMethod2021")
         }
     }
@@ -79,23 +83,26 @@ pub struct PkhVerificationMethod {
     pub type_: PkhVerificationMethodType,
     pub controller: DIDBuf,
     pub blockchain_account_id: BlockchainAccountId,
-    pub public_key_jwk: Option<JWK>
+    pub public_key_jwk: Option<JWK>,
 }
 
 impl From<PkhVerificationMethod> for DIDVerificationMethod {
     fn from(value: PkhVerificationMethod) -> Self {
-        let mut properties = BTreeMap::new();
-        properties.insert("blockchainAccountId", value.blockchain_account_id.to_string());
-        
+        let mut properties: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        properties.insert(
+            "blockchainAccountId".to_owned(),
+            value.blockchain_account_id.to_string().into(),
+        );
+
         if let Some(key) = value.public_key_jwk {
-            properties.insert("publicKeyJwk", key.to_string());
+            properties.insert("publicKeyJwk".to_owned(), key.to_string().into());
         }
 
         Self {
             id: value.id,
-            type_: value.type_.to_string(),
+            type_: value.type_.name().to_owned(),
             controller: value.controller,
-            properties
+            properties,
         }
     }
 }
@@ -120,111 +127,88 @@ const REFERENCE_SOLANA_MAINNET: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
 /// did:pkh DID Method
 pub struct DIDPKH;
 
-type ResolutionResult = (
-    ResolutionMetadata,
-    Option<Document>,
-    Option<DocumentMetadata>,
-);
+type ResolutionResult = Result<(Document, JsonLdContext), Error>;
 
-fn resolution_result(doc: Document) -> ResolutionResult {
-    let res_meta = ResolutionMetadata {
-        ..Default::default()
-    };
-    let doc_meta = DocumentMetadata {
-        ..Default::default()
-    };
-    (res_meta, Some(doc), Some(doc_meta))
-}
-
-fn resolution_error(err: &str) -> ResolutionResult {
-    (ResolutionMetadata::from_error(err), None, None)
-}
-
-async fn resolve_tezos(did: &DID, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_tezos(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     if account_address.len() < 3 {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
-    let (vm_type, vm_type_iri) = match account_address.get(0..3) {
-        Some("tz1") => ("Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
-        Some("tz2") => ("EcdsaSecp256k1RecoveryMethod2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
-        Some("tz3") => ("P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
-        _ => return resolution_error(ERROR_INVALID_DID),
+
+    let vm_type = match account_address.get(0..3) {
+        Some("tz1") => {
+            PkhVerificationMethodType::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+        }
+        Some("tz2") => PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
+        Some("tz3") => {
+            PkhVerificationMethodType::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+        }
+        _ => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
     };
+
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "tezos".to_string(),
             reference: reference.to_string(),
         },
     };
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(vm_type.to_string(), Value::String(vm_type_iri.to_string()));
-    context.insert(
-        "TezosMethod2021".to_string(),
-        Value::String("https://w3id.org/security#TezosMethod2021".to_string()),
-    );
 
-    let vm_url = DIDURLBuf::new(format!("{did}#blockchainAccountId")).unwrap();
+    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
     let vm = PkhVerificationMethod {
-        id: String::from(vm_url.clone()),
-        type_: vm_type.to_string(),
-        controller: did.to_string(),
-        blockchain_account_id,
-        ..Default::default()
+        id: vm_url.clone(),
+        type_: vm_type,
+        controller: did.to_owned(),
+        blockchain_account_id: blockchain_account_id.clone(),
+        public_key_jwk: None,
     };
 
-    let vm2_url = DIDURLBuf::new(format!("{did}#TezosMethod2021")).unwrap();
+    let vm2_url = DIDURLBuf::from_string(format!("{did}#TezosMethod2021")).unwrap();
     let vm2 = PkhVerificationMethod {
-        id: String::from(vm2_url.clone()),
+        id: vm2_url.clone(),
         type_: PkhVerificationMethodType::TezosMethod2021,
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
+        controller: did.to_owned(),
+        blockchain_account_id,
+        public_key_jwk: None,
     };
 
-    let mut doc = Document::new(did);
-    doc.verification_method.extend([vm, vm2]);
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
+    json_ld_context.add_verification_method(&vm2);
+
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.extend([vm.into(), vm2.into()]);
     doc.verification_relationships.authentication.extend([
-        ValueOrReference::Reference(vm_url.clone()),
-        ValueOrReference::Reference(vm2_url.clone())
+        ValueOrReference::Reference(vm_url.clone().into()),
+        ValueOrReference::Reference(vm2_url.clone().into()),
     ]);
     doc.verification_relationships.assertion_method.extend([
-        ValueOrReference::Reference(vm_url),
-        ValueOrReference::Reference(vm2_url),
+        ValueOrReference::Reference(vm_url.into()),
+        ValueOrReference::Reference(vm2_url.into()),
     ]);
 
-    // context: Contexts::Many(vec![
-    //     Context::URI(DEFAULT_CONTEXT.into()),
-    //     Context::Object(context),
-    // ])
-
-    resolution_result(doc)
+    Ok((doc, json_ld_context))
 }
 
 async fn resolve_eip155(
     did: &DID,
-    account_address: String,
+    account_address: &str,
     reference: &str,
     legacy: bool,
 ) -> ResolutionResult {
     if !account_address.starts_with("0x") {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
+
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "eip155".to_string(),
             reference: reference.to_string(),
@@ -237,55 +221,49 @@ async fn resolve_eip155(
     } else {
         "blockchainAccountId"
     };
-    let vm_url = DIDURLBuf::new(format!("{did}#{vm_fragment}")).unwrap();
+    let vm_url = DIDURLBuf::from_string(format!("{did}#{vm_fragment}")).unwrap();
     let vm = PkhVerificationMethod {
-        id: vm_url.to_string(),
+        id: vm_url.clone(),
         type_: PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
-        controller: did.to_string(),
+        controller: did.to_owned(),
         blockchain_account_id,
-        ..Default::default()
+        public_key_jwk: None,
     };
 
-    let mut doc = Document::new(did);
-    doc.verification_method.push(vm);
-    doc.verification_relationships.authentication.push(ValueOrReference::Reference(vm_url.clone()));
-    doc.verification_relationships.assertion_method.push(ValueOrReference::Reference(vm_url));
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
 
-    resolution_result(doc)
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.push(vm.into());
+    doc.verification_relationships
+        .authentication
+        .push(ValueOrReference::Reference(vm_url.clone().into()));
+    doc.verification_relationships
+        .assertion_method
+        .push(ValueOrReference::Reference(vm_url.into()));
+
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_solana(did: &DID, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_solana(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     let public_key_bytes = match bs58::decode(&account_address).into_vec() {
         Ok(bytes) => bytes,
-        Err(_) => return resolution_error(ERROR_INVALID_DID),
+        Err(_) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
     };
     if public_key_bytes.len() != 32 {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     let chain_id = ChainId {
         namespace: "solana".to_string(),
         reference: reference.to_string(),
     };
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "publicKeyJwk".to_string(),
-        serde_json::json!({
-            "@id": "https://w3id.org/security#publicKeyJwk",
-            "@type": "@json"
-        }),
-    );
-    context.insert(
-        "Ed25519VerificationKey2018".to_string(),
-        Value::String("https://w3id.org/security#Ed25519VerificationKey2018".to_string()),
-    );
-    context.insert(
-        "SolanaMethod2021".to_string(),
-        Value::String("https://w3id.org/security#SolanaMethod2021".to_string()),
-    );
+
     let pk_jwk = JWK {
         params: Params::OKP(OctetParams {
             curve: "Ed25519".to_string(),
@@ -302,55 +280,58 @@ async fn resolve_solana(did: &DID, account_address: String, reference: &str) -> 
         x509_thumbprint_sha256: None,
     };
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id,
     };
-    let vm_url = DIDURLBuf::new(format!("{did}#controller")).unwrap();
+    let vm_url = DIDURLBuf::from_string(format!("{did}#controller")).unwrap();
     let vm = PkhVerificationMethod {
-        id: vm_url.to_string(),
-        type_:  PkhVerificationMethodType::Ed25519VerificationKey2018,
+        id: vm_url.clone(),
+        type_: PkhVerificationMethodType::Ed25519VerificationKey2018,
         public_key_jwk: Some(pk_jwk.clone()),
-        controller: did.to_string(),
-        blockchain_account_id
+        controller: did.to_owned(),
+        blockchain_account_id: blockchain_account_id.clone(),
     };
-    let solvm_url = DIDURLBuf::new(format!("{did}#SolanaMethod2021")).unwrap();
+    let solvm_url = DIDURLBuf::from_string(format!("{did}#SolanaMethod2021")).unwrap();
     let solvm = PkhVerificationMethod {
-        id: solvm_url.to_string(),
+        id: solvm_url.clone(),
         type_: PkhVerificationMethodType::SolanaMethod2021,
         public_key_jwk: Some(pk_jwk),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
+        controller: did.to_owned(),
+        blockchain_account_id,
     };
 
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
+    json_ld_context.add_verification_method(&solvm);
+
     let mut doc = Document::new(did.to_owned());
-    // context: Contexts::Many(vec![
-    //     Context::URI(DEFAULT_CONTEXT.into()),
-    //     Context::Object(context),
-    // ]),
-    doc.verification_method.extend([vm, solvm]);
+    doc.verification_method.extend([vm.into(), solvm.into()]);
     doc.verification_relationships.authentication.extend([
-        ValueOrReference::Reference(vm_url.clone()),
-        ValueOrReference::Reference(solvm_url.clone())
+        ValueOrReference::Reference(vm_url.clone().into()),
+        ValueOrReference::Reference(solvm_url.clone().into()),
     ]);
     doc.verification_relationships.assertion_method.extend([
-        ValueOrReference::Reference(vm_url),
-        ValueOrReference::Reference(solvm_url)
+        ValueOrReference::Reference(vm_url.into()),
+        ValueOrReference::Reference(solvm_url.into()),
     ]);
 
-    resolution_result(doc)
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_bip122(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     match reference {
         REFERENCE_BIP122_BITCOIN_MAINNET => {
             if !account_address.starts_with('1') {
-                return resolution_error(ERROR_INVALID_DID);
+                return Err(Error::InvalidMethodSpecificId(
+                    did.method_specific_id().to_owned(),
+                ));
             }
         }
         REFERENCE_BIP122_DOGECOIN_MAINNET => {
             if !account_address.starts_with('D') {
-                return resolution_error(ERROR_INVALID_DID);
+                return Err(Error::InvalidMethodSpecificId(
+                    did.method_specific_id().to_owned(),
+                ));
             }
         }
         _ => {
@@ -358,138 +339,186 @@ async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> 
         }
     }
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "bip122".to_string(),
             reference: reference.to_string(),
         },
     };
-    let vm_url = DIDURLBuf::new(format!("{did}#blockchainAccountId")).unwrap();
+    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
     let vm = PkhVerificationMethod {
-        id: String::from(vm_url.clone()),
+        id: vm_url.clone(),
         type_: PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
-        controller: did.to_string(),
+        controller: did.to_owned(),
         blockchain_account_id,
-        ..Default::default()
+        public_key_jwk: None,
     };
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
+
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
 
     let mut doc = Document::new(did.to_owned());
-    // context: Contexts::Many(vec![
-    //     Context::URI(DEFAULT_CONTEXT.into()),
-    //     Context::Object(context),
-    // ]),
-    doc.verification_method.push(vm);
-    doc.verification_relationships.authentication.push(ValueOrReference::Reference(vm_url.clone()));
-    doc.verification_relationships.assertion_method.push(ValueOrReference::Reference(vm_url));
+    doc.verification_method.push(vm.into());
+    doc.verification_relationships
+        .authentication
+        .push(ValueOrReference::Reference(vm_url.clone().into()));
+    doc.verification_relationships
+        .assertion_method
+        .push(ValueOrReference::Reference(vm_url.into()));
 
-    resolution_result(doc)
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_aleo(did: &DID, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_aleo(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     use bech32::FromBase32;
     let (hrp, data, _variant) = match bech32::decode(&account_address) {
-        Err(_e) => return resolution_error(ERROR_INVALID_DID),
+        Err(_e) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
         Ok(data) => data,
     };
     if data.is_empty() {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     if hrp != "aleo" {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     let data = match Vec::<u8>::from_base32(&data) {
-        Err(_e) => return resolution_error(ERROR_INVALID_DID),
+        Err(_e) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
         Ok(data) => data,
     };
     // Address data is decoded for validation only.
     // The verification method object just uses the account address in blockchainAccountId.
     if data.len() != 32 {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     let chain_id = ChainId {
         namespace: "aleo".to_string(),
         reference: reference.to_string(),
     };
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id,
     };
-    let vm_url = DIDURLBuf::new(format!("{did}#blockchainAccountId")).unwrap();
+    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
     let vm = PkhVerificationMethod {
-        id: vm_url.to_string(),
-        type_: "BlockchainVerificationMethod2021".to_string(),
-        controller: did.to_string(),
+        id: vm_url.clone(),
+        type_: PkhVerificationMethodType::BlockchainVerificationMethod2021,
+        controller: did.to_owned(),
         blockchain_account_id,
-        ..Default::default()
+        public_key_jwk: None,
     };
+
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
 
     let mut doc = Document::new(did.to_owned());
-    // context: Contexts::Many(vec![
-    //     Context::URI(DEFAULT_CONTEXT.into()),
-    //     Context::URI(iref!("https://w3id.org/security/suites/blockchain-2021/v1").to_owned()),
-    // ]),
-    doc.verification_method.push(vm);
-    doc.verification_relationships.authentication.push(ValueOrReference::Reference(vm_url.clone()));
-    doc.verification_relationships.assertion_method.push(ValueOrReference::Reference(vm_url));
+    doc.verification_method.push(vm.into());
+    doc.verification_relationships
+        .authentication
+        .push(ValueOrReference::Reference(vm_url.clone().into()));
+    doc.verification_relationships
+        .assertion_method
+        .push(ValueOrReference::Reference(vm_url.into()));
 
-    resolution_result(doc)
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_caip10(did: &str, account_id: String) -> ResolutionResult {
-    let account_id = match BlockchainAccountId::from_str(&account_id) {
+async fn resolve_caip10(did: &DID, account_id: &str) -> ResolutionResult {
+    let account_id = match BlockchainAccountId::from_str(account_id) {
         Ok(account_id) => account_id,
-        Err(_) => return resolution_error(ERROR_INVALID_DID),
+        Err(_) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
     };
+
     let namespace = account_id.chain_id.namespace;
     let reference = account_id.chain_id.reference;
     match &namespace[..] {
-        "tezos" => resolve_tezos(did, account_id.account_address, &reference).await,
-        "eip155" => resolve_eip155(did, account_id.account_address, &reference, false).await,
-        "bip122" => resolve_bip122(did, account_id.account_address, &reference).await,
-        "solana" => resolve_solana(did, account_id.account_address, &reference).await,
-        "aleo" => resolve_aleo(did, account_id.account_address, &reference).await,
-        _ => resolution_error(ERROR_INVALID_DID),
+        "tezos" => resolve_tezos(did, &account_id.account_address, &reference).await,
+        "eip155" => resolve_eip155(did, &account_id.account_address, &reference, false).await,
+        "bip122" => resolve_bip122(did, &account_id.account_address, &reference).await,
+        "solana" => resolve_solana(did, &account_id.account_address, &reference).await,
+        "aleo" => resolve_aleo(did, &account_id.account_address, &reference).await,
+        _ => Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        )),
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl DIDResolver for DIDPKH {
-    async fn resolve(
-        &self,
-        did: &str,
-        _input_metadata: &ResolutionInputMetadata,
-    ) -> ResolutionResult {
-        let (type_, data) = match did.splitn(4, ':').collect::<Vec<&str>>().as_slice() {
-            ["did", "pkh", type_, data] => (type_.to_string(), data.to_string()),
-            _ => return resolution_error(ERROR_INVALID_DID),
-        };
+#[cfg(target_arch = "wasm32")]
+pub type ResolveMethodRepresentation<'a> =
+    Pin<Box<dyn 'a + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
 
-        match &type_[..] {
-            // Non-CAIP-10 (deprecated)
-            "tz" => resolve_tezos(did, data, REFERENCE_TEZOS_MAINNET).await,
-            "eth" => resolve_eip155(did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
-            "celo" => resolve_eip155(did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
-            "poly" => resolve_eip155(did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
-            "sol" => resolve_solana(did, data, REFERENCE_SOLANA_MAINNET).await,
-            "btc" => resolve_bip122(did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
-            "doge" => resolve_bip122(did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
-            // CAIP-10
-            _ => resolve_caip10(did, type_ + ":" + &data).await,
-        }
+#[cfg(not(target_arch = "wasm32"))]
+pub type ResolveMethodRepresentation<'a> =
+    Pin<Box<dyn 'a + Send + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
+
+impl DIDMethodResolver for DIDPKH {
+    type ResolveMethodRepresentation<'a> = ResolveMethodRepresentation<'a>;
+
+    fn method_name(&self) -> &str {
+        "pkh"
     }
 
-    fn to_did_method(&self) -> Option<&dyn DIDMethod> {
-        Some(self)
+    fn resolve_method_representation<'a>(
+        &'a self,
+        id: &'a str,
+        options: ssi_dids::resolution::Options,
+    ) -> Self::ResolveMethodRepresentation<'a> {
+        Box::pin(async move {
+            let (type_, data) = id
+                .split_once(':')
+                .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))?;
+
+            let did = DIDBuf::from_string(format!("did:pkh:{id}")).unwrap();
+            let (doc, json_ld_context) = match type_ {
+                // Non-CAIP-10 (deprecated)
+                "tz" => resolve_tezos(&did, data, REFERENCE_TEZOS_MAINNET).await,
+                "eth" => resolve_eip155(&did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
+                "celo" => resolve_eip155(&did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
+                "poly" => resolve_eip155(&did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
+                "sol" => resolve_solana(&did, data, REFERENCE_SOLANA_MAINNET).await,
+                "btc" => resolve_bip122(&did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
+                "doge" => resolve_bip122(&did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
+                // CAIP-10
+                _ => {
+                    let account_id = type_.to_string() + ":" + data;
+                    resolve_caip10(&did, &account_id).await
+                }
+            }?;
+
+            let content_type = options.accept.unwrap_or(MediaType::JsonLd);
+            let represented = doc.into_representation(representation::Options::from_media_type(
+                content_type,
+                move || representation::json_ld::Options {
+                    context: representation::json_ld::Context::array(
+                        representation::json_ld::DIDContext::V1,
+                        vec![json_ld_context.into()],
+                    ),
+                },
+            ));
+
+            Ok(Output::new(
+                represented.to_bytes(),
+                document::Metadata::default(),
+                resolution::Metadata::from_content_type(Some(content_type.to_string())),
+            ))
+        })
     }
 }
 
@@ -657,16 +686,8 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
     Ok(format!("did:pkh:{}", account_id))
 }
 
-impl DIDMethod for DIDPKH {
-    fn name(&self) -> &'static str {
-        "pkh"
-    }
-
-    fn generate(&self, source: &Source) -> Option<String> {
-        let (key, pkh_name) = match source {
-            Source::KeyAndPattern(key, pattern) => (key, pattern),
-            _ => return None,
-        };
+impl DIDPKH {
+    pub fn generate(&self, key: &JWK, pkh_name: &str) -> Option<String> {
         let addr = match match &pkh_name[..] {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
             #[cfg(feature = "tezos")]
@@ -690,10 +711,6 @@ impl DIDMethod for DIDPKH {
         };
         let did = format!("did:pkh:{}:{}", pkh_name, addr);
         Some(did)
-    }
-
-    fn to_resolver(&self) -> &dyn DIDResolver {
-        self
     }
 }
 
