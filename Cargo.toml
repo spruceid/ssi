@@ -75,7 +75,7 @@ members = [
   # "did-web",
   # "did-ethr",
   # "did-sol",
-  # "did-pkh",
+  "did-pkh",
   # "did-onion",
   # "did-ion",
   # "did-webkey",
