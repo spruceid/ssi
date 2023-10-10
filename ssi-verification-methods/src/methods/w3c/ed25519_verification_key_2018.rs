@@ -116,6 +116,10 @@ impl TypedVerificationMethod for Ed25519VerificationKey2018 {
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2018_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ED25519_VERIFICATION_KEY_2018_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {

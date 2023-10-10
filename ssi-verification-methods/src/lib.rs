@@ -255,6 +255,8 @@ pub trait TypedVerificationMethod: VerificationMethod {
 
     /// Returns the name of the verification method's type.
     fn type_(&self) -> &str;
+
+    fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str;
 }
 
 pub trait VerificationMethodRef<'m> {

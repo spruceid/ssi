@@ -139,6 +139,10 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     fn type_(&self) -> &str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for EcdsaSecp256r1VerificationKey2019 {

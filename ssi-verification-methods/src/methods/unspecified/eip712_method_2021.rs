@@ -114,6 +114,10 @@ impl TypedVerificationMethod for Eip712Method2021 {
     fn type_(&self) -> &str {
         EIP712_METHOD_2021_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        EIP712_METHOD_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {

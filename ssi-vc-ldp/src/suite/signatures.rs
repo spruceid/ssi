@@ -10,9 +10,7 @@ use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable, SignatureError};
 
-mod eip712;
-
-pub use eip712::*;
+use crate::eip712::Eip712Metadata;
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]

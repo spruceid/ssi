@@ -144,6 +144,10 @@ impl TypedVerificationMethod for TezosMethod2021 {
     fn type_(&self) -> &str {
         TEZOS_METHOD_2021_TYPE
     }
+    
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        TEZOS_METHOD_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for TezosMethod2021 {

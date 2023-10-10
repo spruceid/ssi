@@ -5,12 +5,12 @@ use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
     covariance_rule, verification_method_union, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, Referencable, SignatureError, VerificationError,
+    EcdsaSecp256k1VerificationKey2019, Referencable, SignatureError, VerificationError, InvalidSignature,
 };
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::HashError, CryptographicSuite, ProofConfigurationRef,
+    impl_rdf_input_urdna2015, suite::{HashError, AnySignature, AnySignatureRef}, CryptographicSuite, ProofConfigurationRef,
 };
 
 /// Ethereum Personal Signature 2021.
@@ -82,9 +82,47 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
+impl From<Signature> for AnySignature {
+    fn from(value: Signature) -> Self {
+        Self {
+            proof_value: Some(value.proof_value),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<AnySignature> for Signature {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
+        Ok(Self {
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     pub proof_value: &'a str,
+}
+
+impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: SignatureRef<'a>) -> Self {
+        Self {
+            proof_value: Some(value.proof_value),
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+        })
+    }
 }
 
 pub struct SignatureAlgorithm;

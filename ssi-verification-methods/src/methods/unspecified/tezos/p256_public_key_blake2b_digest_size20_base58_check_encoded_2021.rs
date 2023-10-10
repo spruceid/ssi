@@ -85,6 +85,10 @@ impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEnco
     fn type_(&self) -> &str {
         P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {

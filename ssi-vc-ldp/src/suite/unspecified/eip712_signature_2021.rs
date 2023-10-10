@@ -10,8 +10,9 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 use crate::{
-    suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
+    suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
+    eip712::{Eip712Signature, Eip712SignatureRef}, LinkedDataInput
 };
 
 /// EIP-712 Signature 2021.
@@ -96,33 +97,47 @@ impl CryptographicSuite for Eip712Signature2021 {
     }
 }
 
-impl<'a, V, I> CryptographicSuiteInput<ssi_rdf::DatasetWithEntryPoint<'a, V, I>>
-    for Eip712Signature2021
+impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>
+    CryptographicSuiteInput<T, LinkedDataInput<'a, V, I, G>> for Eip712Signature2021
 where
-    V: rdf_types::Vocabulary<
-        Type = rdf_types::literal::Type<
-            <V as rdf_types::IriVocabulary>::Iri,
-            <V as rdf_types::LanguageTagVocabulary>::LanguageTag,
-        >,
-        Value = String,
-    >,
-    I: rdf_types::ReverseTermInterpretation<
-        Iri = V::Iri,
-        BlankId = V::BlankId,
-        Literal = V::Literal,
-    >,
+    I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+        + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
+        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+    G: rdf_types::Generator<()>,
+    T: linked_data::LinkedData<V, I>,
 {
+    type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, LinkedDataInput<'a, V, I, G>: 't;
+
     /// Transformation algorithm.
-    fn transform(
-        &self,
-        data: &ssi_rdf::DatasetWithEntryPoint<'a, V, I>,
-        _context: (),
-        options: ProofConfigurationRef<VerificationMethod>,
-    ) -> Result<Self::Transformed, TransformError> {
-        let document_quads = data.into_quads();
-        let proof_quads = options.quads(self);
-        Ok(new_ldp_siging_request(document_quads, proof_quads))
+    fn transform<'t, 'c: 't>(
+        &'t self,
+        data: &'t T,
+        context: LinkedDataInput<'a, V, I, G>,
+        options: ProofConfigurationRef<'c, VerificationMethod>,
+    ) -> Self::Transform<'t> where LinkedDataInput<'a, V, I, G>: 't {
+        std::future::ready(transform(self, data, context, options))
     }
+}
+
+fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>(
+    suite: &Eip712Signature2021,
+    data: &T,
+    context: LinkedDataInput<V, I, G>,
+    options: ProofConfigurationRef<VerificationMethod>,
+) -> Result<ssi_eip712::TypedData, TransformError>
+where
+    I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+    + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
+    + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+    G: rdf_types::Generator<()>,
+    T: linked_data::LinkedData<V, I>,
+{
+    let document_quads = context.into_quads(data)?;
+    let document_quads: Vec<_> = ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref())).collect();
+    let proof_quads = options.quads(suite);
+    Ok(new_ldp_siging_request(document_quads, proof_quads))
 }
 
 /// Creates a typed structured data representing a Linked Data signing

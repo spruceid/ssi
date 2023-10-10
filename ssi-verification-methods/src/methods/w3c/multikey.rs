@@ -143,6 +143,10 @@ impl TypedVerificationMethod for Multikey {
     fn type_(&self) -> &str {
         MULTIKEY_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        MULTIKEY_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for Multikey {

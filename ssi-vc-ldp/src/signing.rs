@@ -6,7 +6,7 @@ use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use crate::{
     suite::{CryptographicSuiteInput, GenerateProof, HashError, TransformError},
-    CryptographicSuite, DataIntegrity, ProofConfiguration, UntypedProof,
+    CryptographicSuite, DataIntegrity, ProofConfiguration, UntypedProof, BuildDataIntegrity,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -33,22 +33,22 @@ impl From<crate::Error> for Error {
     }
 }
 
-pub fn sign<'max, C, S: CryptographicSuite, X, T>(
-    input: C,
+pub fn sign<'max, T, S: CryptographicSuite, X, I>(
+    input: T,
     context: X,
-    signer: &'max T,
+    signer: &'max I,
     suite: S,
     params: ProofConfiguration<S::VerificationMethod, S::Options>,
-) -> SignLinkedData<'max, C, S, T>
+) -> SignLinkedData<'max, T, S, X, I>
 where
-    S: CryptographicSuiteInput<C, X>,
+    S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
-    DataIntegrity::<C, S>::sign(input, context, signer, suite, params)
+    DataIntegrity::<T, S>::sign(input, context, signer, suite, params)
 }
 
-impl<C, S: CryptographicSuite> DataIntegrity<C, S> {
+impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     /// Sign the given credential with the given Data Integrity cryptographic
     /// suite.
     //
@@ -57,40 +57,51 @@ impl<C, S: CryptographicSuite> DataIntegrity<C, S> {
     // For some reason the Rust compiler is unable to build a future that
     // returns a value of type `Verifiable<DataIntegrity<C, S>>`.
     // See: <https://github.com/rust-lang/rust/issues/103532>
-    pub fn sign<'max, X, T>(
-        input: C,
+    pub fn sign<'max, X, I>(
+        input: T,
         context: X,
-        signer: &'max T,
+        signer: &'max I,
         suite: S,
         params: ProofConfiguration<S::VerificationMethod, S::Options>,
-    ) -> SignLinkedData<'max, C, S, T>
+    ) -> SignLinkedData<'max, T, S, X, I>
     where
-        S: CryptographicSuiteInput<C, X>,
+        S: CryptographicSuiteInput<T, X>,
         S::VerificationMethod: 'max,
-        T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+        I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     {
-        let inner = match Self::new(input, context, &suite, params.borrowed()) {
-            Ok(di) => {
-                let (input, hash) = di.into_parts();
+        SignLinkedData {
+            signer,
+            build: SelfRefFuture::new(BuildBounds { suite, params }, BuildParameters { input, context }),
+            inner: None
+        }
+    }
+}
 
-                let sign = SelfRefFuture::new(
-                    hash,
-                    Binder {
-                        suite: &suite,
-                        params,
-                        signer,
-                    },
-                );
+struct UnboundedBuild<T, S, X>(PhantomData<(T, S, X)>);
 
-                SignLinkedDataInner::Ok(SignLinkedDataOk {
-                    payload: Some((input, suite)),
-                    sign,
-                })
-            }
-            Err(e) => SignLinkedDataInner::Err(Some(e.into())),
-        };
+impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max> UnboundedRefFuture<'max> for UnboundedBuild<T, S, X> {
+    type Bound<'a> = BuildDataIntegrity<'a, T, S, X> where 'max: 'a;
 
-        SignLinkedData { inner }
+    type Owned = BuildBounds<S>;
+
+    type Output = Result<DataIntegrity<T, S>, crate::Error>;
+}
+
+struct BuildBounds<S: CryptographicSuite> {
+    suite: S,
+    params: ProofConfiguration<S::VerificationMethod, S::Options>
+}
+
+struct BuildParameters<T, X> {
+    input: T,
+    context: X,
+}
+
+impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max> RefFutureBinder<'max, UnboundedBuild<T, S, X>> for BuildParameters<T, X> {
+    fn bind<'a>(context: Self, bounds: &'a BuildBounds<S>) -> BuildDataIntegrity<'a, T, S, X>
+        where
+            'max: 'a {
+        DataIntegrity::new(context.input, context.context, &bounds.suite, bounds.params.borrowed())
     }
 }
 
@@ -98,7 +109,7 @@ struct UnboundedGenerateProof<S, T>(PhantomData<(S, T)>);
 
 impl<
         'max,
-        S: CryptographicSuite,
+        S: 'max + CryptographicSuite,
         T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     > UnboundedRefFuture<'max> for UnboundedGenerateProof<S, T>
 where
@@ -108,7 +119,7 @@ where
     S::Options: 'max,
     S::Signature: 'max,
 {
-    type Owned = S::Hashed;
+    type Owned = (S, S::Hashed);
 
     type Bound<'a> = GenerateProof<'a, S, T> where 'max: 'a;
 
@@ -116,18 +127,16 @@ where
         Result<UntypedProof<S::VerificationMethod, S::Options, S::Signature>, SignatureError>;
 }
 
-struct Binder<'s, 'a, S: CryptographicSuite, T> {
-    suite: &'s S,
+struct Binder<'a, S: CryptographicSuite, T> {
     params: ProofConfiguration<S::VerificationMethod, S::Options>,
     signer: &'a T,
 }
 
 impl<
-        's,
         'max,
-        S: CryptographicSuite,
+        S: 'max + CryptographicSuite,
         T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    > RefFutureBinder<'max, UnboundedGenerateProof<S, T>> for Binder<'s, 'max, S, T>
+    > RefFutureBinder<'max, UnboundedGenerateProof<S, T>> for Binder<'max, S, T>
 where
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
@@ -135,12 +144,11 @@ where
     S::Options: 'max,
     S::Signature: 'max,
 {
-    fn bind<'a>(context: Self, hash: &'a S::Hashed) -> GenerateProof<'a, S, T>
+    fn bind<'a>(context: Self, (suite, hash): &'a (S, S::Hashed)) -> GenerateProof<'a, S, T>
     where
         'max: 'a,
     {
-        context
-            .suite
+        suite
             .generate_proof(hash, context.signer, context.params)
     }
 }
@@ -153,60 +161,63 @@ where
 // returns a value of type `Verifiable<DataIntegrity<C, S>>`.
 // See: <https://github.com/rust-lang/rust/issues/103532>
 #[pin_project]
-pub struct SignLinkedData<'max, C, S, T>
+pub struct SignLinkedData<'max, T, S, X, I>
 where
-    S: CryptographicSuite,
+    T: 'max,
+    S: 'max + CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
     S::Options: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    X: 'max,
+    I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
+    signer: &'max I,
+
     #[pin]
-    inner: SignLinkedDataInner<'max, C, S, T>,
+    build: SelfRefFuture<'max, UnboundedBuild<T, S, X>>,
+
+    #[pin]
+    inner: Option<SignLinkedDataOk<'max, T, S, I>>,
 }
 
-impl<'max, C, S, T> Future for SignLinkedData<'max, C, S, T>
+impl<'max, T, S, X, I> Future for SignLinkedData<'max, T, S, X, I>
 where
-    S: CryptographicSuite,
+    S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
     for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>, // TODO find a way to hide that bound, if possible.
 {
-    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
+    type Output = Result<Verifiable<DataIntegrity<T, S>>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.inner.poll(cx)
-    }
-}
-
-/// Private implementation of the `SignLinkedData` type.
-#[pin_project(project = SignLinkedDataInnerProj)]
-enum SignLinkedDataInner<'max, C, S, T>
-where
-    S: CryptographicSuite,
-    S::VerificationMethod: 'max,
-    S::SignatureAlgorithm: 'max,
-    S::Options: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-{
-    Err(Option<Error>),
-    Ok(#[pin] SignLinkedDataOk<'max, C, S, T>),
-}
-
-impl<'max, C, S, T> Future for SignLinkedDataInner<'max, C, S, T>
-where
-    S: CryptographicSuite,
-    S::VerificationMethod: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>,
-{
-    type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        match self.project() {
-            SignLinkedDataInnerProj::Ok(f) => f.poll(cx),
-            SignLinkedDataInnerProj::Err(e) => task::Poll::Ready(Err(e.take().unwrap())),
+        let mut this = self.project();
+        
+        loop {
+            if this.inner.is_some() {
+                let inner = this.inner.as_pin_mut().unwrap();
+                break inner.poll(cx)
+            } else {
+                match this.build.as_mut().poll(cx) {
+                    task::Poll::Pending => break task::Poll::Pending,
+                    task::Poll::Ready((Ok(di), BuildBounds { suite, params })) => {
+                        let (input, hash) = di.into_parts();
+        
+                        let sign = SelfRefFuture::new(
+                            (suite, hash),
+                            Binder {
+                                params,
+                                signer: *this.signer,
+                            },
+                        );
+        
+                        this.inner.set(Some(SignLinkedDataOk {
+                            payload: Some(input),
+                            sign,
+                        }));
+                    }
+                    task::Poll::Ready((Err(e), _)) => break task::Poll::Ready(Err(e.into()))
+                }
+            }
         }
     }
 }
@@ -216,7 +227,7 @@ where
 #[pin_project]
 struct SignLinkedDataOk<'max, C, S, T>
 where
-    S: CryptographicSuite,
+    S: 'max + CryptographicSuite,
     S::Hashed: 'max,
     S::VerificationMethod: 'max,
     S::SignatureAlgorithm: 'max,
@@ -224,7 +235,7 @@ where
     S::Signature: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
 {
-    payload: Option<(C, S)>,
+    payload: Option<C>,
 
     #[pin]
     sign: SelfRefFuture<'max, UnboundedGenerateProof<S, T>>,
@@ -242,10 +253,10 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
 
-        this.sign.poll(cx).map(|(result, hash)| {
+        this.sign.poll(cx).map(|(result, (suite, hash))| {
             result
                 .map(|proof| {
-                    let (data, suite) = this.payload.take().unwrap();
+                    let data = this.payload.take().unwrap();
                     Verifiable::new(
                         DataIntegrity::new_hashed(data, hash),
                         proof.into_typed(suite),

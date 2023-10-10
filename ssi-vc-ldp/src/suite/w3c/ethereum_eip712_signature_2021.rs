@@ -1,8 +1,10 @@
 //! Ethereum EIP712 Signature 2021 implementation.
 //!
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
-use std::future;
-
+use std::{future::{self, Future}, task, pin::Pin};
+use iref::Uri;
+use linked_data::LinkedData;
+use pin_project::pin_project;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
@@ -11,8 +13,8 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 use crate::{
-    suite::{Eip712Signature, Eip712SignatureRef, HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, ProofConfiguration, ProofConfigurationRef,
+    suite::{HashError, TransformError, CryptographicSuiteOptions},
+    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef, eip712::{Input, Eip712Signature, Eip712SignatureRef, TypesOrURI, TypesProvider, TypesFetchError},
 };
 
 /// Ethereum EIP-712 Signature 2021.
@@ -55,24 +57,42 @@ use crate::{
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EthereumEip712Signature2021; // TODO add LD support
 
-#[derive(Debug, Clone, Copy)]
-pub struct Options {
-    /// If true (by default), the signature metadata will include the
-    /// `eip712` property.
-    pub embed: bool,
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, LinkedData)]
+#[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
+#[serde(rename_all = "camelCase")]
+pub struct Eip712Options {
+    /// URI to an object containing the JSON schema describing the message to
+    /// be signed.
+    ///
+    // Allow messageSchema for backwards-compatibility since
+    // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
+    #[ld("eip712:types")]
+    #[serde(alias = "messageSchema")]
+    pub types: Option<crate::eip712::TypesOrURI>,
+
+    /// Value of the `primaryType` property of the `TypedData` object.
+    #[ld("eip712:primaryType")]
+    pub primary_type: Option<ssi_eip712::StructName>,
+
+    /// Value of the `domain` property of the `TypedData` object.
+    #[ld("eip712:domain")]
+    pub domain: Option<ssi_eip712::Value>,
 }
 
-impl Default for Options {
-    fn default() -> Self {
-        Self { embed: true }
-    }
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
+pub struct Options {
+    #[ld("eip712:eip712")]
+    pub eip712: Option<Eip712Options>
 }
 
 impl Referencable for Options {
-    type Reference<'a> = Self;
+    type Reference<'a> = OptionsRef<'a>;
 
     fn as_reference(&self) -> Self::Reference<'_> {
-        *self
+        OptionsRef {
+            eip712: self.eip712.as_ref()
+        }
     }
 
     fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small>
@@ -83,80 +103,14 @@ impl Referencable for Options {
     }
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+impl<T: CryptographicSuite> CryptographicSuiteOptions<T> for Options {}
+
+#[derive(Debug, Default, Clone, Copy, serde::Serialize, LinkedData)]
+#[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 #[serde(rename_all = "camelCase")]
-pub struct Input {
-    pub types: Option<ssi_eip712::Types>,
-    pub primary_type: Option<ssi_eip712::StructName>,
-    pub domain: Option<ssi_eip712::Value>,
-    pub message: ssi_eip712::Struct,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum InvalidInput {
-    #[error(transparent)]
-    TypeGenerationFailed(#[from] ssi_eip712::TypesGenerationError),
-
-    #[error("invalid message")]
-    InvalidMessage,
-
-    #[error("found a `proof` value in the message")]
-    FoundProofValue,
-}
-
-impl Input {
-    pub fn try_into_typed_data<M: serde::Serialize>(
-        mut self,
-        proof_configuration: ProofConfiguration<M>,
-    ) -> Result<ssi_eip712::TypedData, InvalidInput> {
-        let domain = self.domain.unwrap_or_else(Self::default_domain);
-        let primary_type = self.primary_type.unwrap_or_else(Self::default_primary_type);
-
-        self.message.insert(
-            "proof".to_string(),
-            ssi_eip712::to_value(&proof_configuration).unwrap(),
-        );
-
-        let message = ssi_eip712::Value::Struct(self.message);
-
-        let types = match self.types {
-            Some(types) => types,
-            None => ssi_eip712::Types::generate(
-                &message,
-                primary_type.clone(),
-                Self::default_domain_type(),
-            )?,
-        };
-
-        Ok(ssi_eip712::TypedData {
-            types,
-            primary_type,
-            domain,
-            message,
-        })
-    }
-
-    pub fn default_domain() -> ssi_eip712::Value {
-        ssi_eip712::Value::Struct(
-            [(
-                "name".to_string(),
-                ssi_eip712::Value::String("EthereumEip712Signature2021".to_string()),
-            )]
-            .into_iter()
-            .collect(),
-        )
-    }
-
-    pub fn default_domain_type() -> ssi_eip712::TypeDefinition {
-        ssi_eip712::TypeDefinition::new(vec![ssi_eip712::MemberVariable::new(
-            "name".to_string(),
-            ssi_eip712::TypeRef::String,
-        )])
-    }
-
-    pub fn default_primary_type() -> ssi_eip712::StructName {
-        "Document".into()
-    }
+pub struct OptionsRef<'a> {
+    #[ld("eip712:eip712")]
+    pub eip712: Option<&'a Eip712Options>
 }
 
 verification_method_union! {
@@ -204,7 +158,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
     fn hash(
         &self,
         data: ssi_eip712::TypedData,
-        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Options>,
+        _proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         data.hash()
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
@@ -215,15 +169,97 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
     }
 }
 
-impl CryptographicSuiteInput<ssi_eip712::TypedData> for EthereumEip712Signature2021 {
-    fn transform(
-        &self,
-        data: &ssi_eip712::TypedData,
-        context: (),
-        _params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Transformed, TransformError> {
-        // apply options.
-        Ok(data.clone())
+impl<T: serde::Serialize, C: TypesProvider> CryptographicSuiteInput<T, C> for EthereumEip712Signature2021
+where
+    for<'a> <Self::VerificationMethod as Referencable>::Reference<'a>: serde::Serialize,
+    for<'a> <Self::Options as Referencable>::Reference<'a>: serde::Serialize
+{
+    type Transform<'a> = Transform<'a, C> where Self: 'a, T: 'a, C: 'a;
+        
+    fn transform<'a, 'c: 'a>(
+        &'a self,
+        data: &'a T,
+        context: C,
+        params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
+    ) -> Self::Transform<'a> where C: 'a {
+        let (types, primary_type, domain) = match params.options.eip712 {
+            Some(eip712) => {
+                let types = match &eip712.types {
+                    Some(TypesOrURI::Object(types)) => {
+                        FetchTypes::Ready(Some(types.clone()))
+                    }
+                    Some(TypesOrURI::URI(uri)) => {
+                        FetchTypes::Pending(context.fetch_types(uri))
+                    }
+                    None => FetchTypes::Ready(None)
+                };
+
+                (types, eip712.primary_type.clone(), eip712.domain.clone())
+            }
+            None => (FetchTypes::Ready(None), None, None)
+        };
+
+        Transform {
+            params: params.without_options().shorten_lifetime(),
+            types,
+            primary_type,
+            domain,
+            message: Some(ssi_eip712::to_struct(data).map_err(|_| TransformError::InvalidData))
+        }
+    }
+}
+
+#[pin_project(project = FetchTypesProj)]
+enum FetchTypes<C: TypesProvider> {
+    Ready(Option<ssi_eip712::Types>),
+    Pending(#[pin] C::Fetch)
+}
+
+impl<C: TypesProvider> Future for FetchTypes<C> {
+    type Output = Result<Option<ssi_eip712::Types>, TypesFetchError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        match self.project() {
+            FetchTypesProj::Ready(t) => task::Poll::Ready(Ok(t.take())),
+            FetchTypesProj::Pending(f) => f.poll(cx).map(|r| r.map(Some))
+        }
+    }
+}
+
+#[pin_project]
+pub struct Transform<'a, C: TypesProvider> {
+    params: ProofConfigurationRef<'a, VerificationMethod>,
+
+    #[pin]
+    types: FetchTypes<C>,
+    primary_type: Option<String>,
+    domain: Option<ssi_eip712::Value>,
+    message: Option<Result<ssi_eip712::Struct, TransformError>>
+}
+
+impl<'a, C: TypesProvider> Future for Transform<'a, C> {
+    type Output = Result<ssi_eip712::TypedData, TransformError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let this = self.project();
+        if this.message.as_ref().is_some_and(|r| r.is_err()) {
+            task::Poll::Ready(Err(this.message.take().unwrap().err().unwrap()))
+        } else {
+            match this.types.poll(cx) {
+                task::Poll::Pending => task::Poll::Pending,
+                task::Poll::Ready(Err(e)) => task::Poll::Ready(Err(TransformError::Internal(e.to_string()))),
+                task::Poll::Ready(Ok(types)) => {
+                    let input = Input {
+                        types,
+                        primary_type: this.primary_type.take(),
+                        domain: this.domain.take(),
+                        message: this.message.take().unwrap().ok().unwrap()
+                    };
+
+                    task::Poll::Ready(input.try_into_typed_data(*this.params).map_err(|_| TransformError::InvalidData))
+                }
+            }
+        }
     }
 }
 
@@ -241,7 +277,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
-        options: Options,
+        options: OptionsRef<'a>,
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
@@ -251,7 +287,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     fn verify(
         &self,
-        options: Options,
+        options: OptionsRef,
         signature: Eip712SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],

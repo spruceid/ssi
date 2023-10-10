@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, num::ParseIntError, str::FromStr};
+use std::{collections::BTreeMap, fmt, num::ParseIntError, str::FromStr};
 
 use serde::{Deserialize, Serialize};
 
@@ -7,7 +7,7 @@ use crate::Value;
 pub type StructName = String;
 
 /// EIP-712 types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(untagged)]
 #[serde(try_from = "String", into = "String")]
 pub enum TypeRef {
@@ -123,7 +123,7 @@ impl From<TypeRef> for String {
 
 /// Structured typed data as described in
 /// [Definition of typed structured data 𝕊](https://github.com/ethereum/EIPs/blob/master/EIPS/eip-712.md#definition-of-typed-structured-data-%F0%9D%95%8A)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TypeDefinition(Vec<MemberVariable>);
 
 impl TypeDefinition {
@@ -140,7 +140,7 @@ impl TypeDefinition {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct MemberVariable {
     pub name: String,
 
@@ -154,13 +154,13 @@ impl MemberVariable {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Types {
     #[serde(rename = "EIP712Domain")]
     pub eip712_domain: TypeDefinition,
 
     #[serde(flatten)]
-    pub types: HashMap<StructName, TypeDefinition>,
+    pub types: BTreeMap<StructName, TypeDefinition>,
 }
 
 impl Types {
@@ -192,9 +192,9 @@ impl Types {
     fn generate_inner(
         doc: &Value,
         primary_type: StructName,
-    ) -> Result<HashMap<StructName, TypeDefinition>, TypesGenerationError> {
+    ) -> Result<BTreeMap<StructName, TypeDefinition>, TypesGenerationError> {
         // 1
-        let mut output = HashMap::default();
+        let mut output = BTreeMap::default();
         // 2
         // TypedDataField == MemberVariable
         let mut types = TypeDefinition::default();

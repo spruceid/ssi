@@ -17,7 +17,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 	} => {
-		#[derive(Clone, serde::Serialize, serde::Deserialize, linked_data::LinkedData)]
+		#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::LinkedData)]
 		$vis enum $name {
 			$(
 				$(#[$meta])*
@@ -25,7 +25,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 
-		#[derive(Clone, Copy, linked_data::LinkedData)]
+		#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::LinkedData)]
 		$vis enum $name_ref<'a> {
 			$(
 				$(#[$meta])*
@@ -33,7 +33,7 @@ macro_rules! verification_method_union {
 			),*
 		}
 
-		#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+		#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 		$vis enum $kind {
 			$(
 				$(#[$meta])*
@@ -141,6 +141,14 @@ macro_rules! verification_method_union {
 				match self {
 					$(
 						Self::$variant(m) => m.type_()
+					),*
+				}
+			}
+
+			fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str {
+				match r {
+					$(
+						$name_ref::$variant(m) => <$variant as $crate::TypedVerificationMethod>::ref_type(m)
 					),*
 				}
 			}

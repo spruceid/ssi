@@ -99,6 +99,10 @@ impl TypedVerificationMethod for JsonWebKey2020 {
     fn type_(&self) -> &str {
         JSON_WEB_KEY_2020_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        JSON_WEB_KEY_2020_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for JsonWebKey2020 {

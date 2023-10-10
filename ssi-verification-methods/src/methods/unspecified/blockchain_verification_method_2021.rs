@@ -68,6 +68,10 @@ impl TypedVerificationMethod for BlockchainVerificationMethod2021 {
     fn type_(&self) -> &str {
         BLOCKCHAIN_VERIFICATION_METHOD_2021_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        BLOCKCHAIN_VERIFICATION_METHOD_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for BlockchainVerificationMethod2021 {

@@ -1,19 +1,21 @@
+use iref::UriBuf;
 use linked_data::{
     LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
 };
 use rdf_types::{Interpretation, Vocabulary};
-use ssi_verification_methods::{covariance_rule, Referencable};
+use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature};
+
+use crate::suite::{AnySignature, AnySignatureRef};
 
 /// Common signature format for EIP-712-based cryptographic suites.
+/// 
+/// See: <https://eips.ethereum.org/EIPS/eip-712>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Eip712Signature {
-    /// Proof value
+    /// Hex encoded output of the EIP712 signature function according to
+    /// [EIP712](https://eips.ethereum.org/EIPS/eip-712).
     pub proof_value: String,
-
-    /// Meta-information about the signature generation process.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub eip712: Option<Eip712Metadata>,
 }
 
 impl Referencable for Eip712Signature {
@@ -21,22 +23,56 @@ impl Referencable for Eip712Signature {
 
     fn as_reference(&self) -> Self::Reference<'_> {
         Eip712SignatureRef {
-            proof_value: &self.proof_value,
-            eip712: self.eip712.as_ref(),
+            proof_value: &self.proof_value
         }
     }
 
     covariance_rule!();
 }
 
+impl From<Eip712Signature> for AnySignature {
+    fn from(value: Eip712Signature) -> Self {
+        Self {
+            proof_value: Some(value.proof_value),
+            ..Default::default()
+        }
+    }
+}
+
+impl TryFrom<AnySignature> for Eip712Signature {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
+        Ok(Self {
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+        })
+    }
+}
+
 /// Reference to [`Eip712Signature`].
 #[derive(Debug, Clone, Copy)]
 pub struct Eip712SignatureRef<'a> {
     /// Proof value
-    pub proof_value: &'a str,
+    pub proof_value: &'a str
+}
 
-    /// Meta-information about the signature generation process.
-    pub eip712: Option<&'a Eip712Metadata>,
+impl<'a> From<Eip712SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: Eip712SignatureRef<'a>) -> Self {
+        Self {
+            proof_value: Some(value.proof_value),
+            ..Default::default()
+        }
+    }
+}
+
+impl<'a> TryFrom<AnySignatureRef<'a>> for Eip712SignatureRef<'a> {
+    type Error = InvalidSignature;
+
+    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
+        Ok(Self {
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+        })
+    }
 }
 
 /// Meta-information about the signature generation process.
@@ -66,10 +102,10 @@ pub struct Eip712Metadata {
 }
 
 /// Object containing EIP-712 types, or a URI for such.
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum TypesOrURI {
-    URI(String),
+    URI(UriBuf),
     Object(ssi_eip712::Types),
 }
 

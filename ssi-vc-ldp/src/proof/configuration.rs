@@ -143,6 +143,16 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         }
     }
 
+    /// Apply covariance rules to shorten the `'a` lifetime.
+    pub fn shorten_lifetime<'b>(self) -> ProofConfigurationRef<'b, M, O> where 'a: 'b {
+        ProofConfigurationRef {
+            created: self.created,
+            verification_method: self.verification_method.shorten_lifetime(),
+            proof_purpose: self.proof_purpose,
+            options: O::apply_covariance(self.options)
+        }
+    }
+
     pub fn try_map_verification_method<N: 'a + Referencable, P: 'a + Referencable, E>(
         self,
         f: impl FnOnce(
@@ -205,6 +215,15 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
             verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
             options: self.options,
+        }
+    }
+
+    pub fn without_options(self) -> ProofConfigurationRef<'a, M> {
+        ProofConfigurationRef {
+            created: self.created,
+            verification_method: self.verification_method,
+            proof_purpose: self.proof_purpose,
+            options: ()
         }
     }
 

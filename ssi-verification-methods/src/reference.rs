@@ -77,6 +77,15 @@ pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
     Owned(M::Reference<'a>),
 }
 
+impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
+    pub fn shorten_lifetime<'b>(self) -> ReferenceOrOwnedRef<'b, M> where 'a: 'b {
+        match self {
+            Self::Reference(i) => ReferenceOrOwnedRef::Reference(i),
+            Self::Owned(r) => ReferenceOrOwnedRef::Owned(M::apply_covariance(r))
+        }
+    }
+}
+
 impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M>
 where
     M::Reference<'a>: VerificationMethodRef<'a>,

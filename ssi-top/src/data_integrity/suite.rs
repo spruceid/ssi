@@ -1,14 +1,13 @@
-use linked_data::LinkedData;
 use pin_project::pin_project;
 use ssi_core::futures::FailibleFuture;
 use ssi_crypto::{MessageSignatureError, MessageSigner, SignerAdapter};
 use ssi_jwk::JWK;
 use ssi_vc_ldp::{
-    suite::{AnySignature, AnySignatureRef, HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
+    suite::{AnySignature, AnySignatureRef, HashError},
+    CryptographicSuite, ProofConfigurationRef,
 };
 use ssi_verification_methods::{
-    covariance_rule, Referencable, ReferenceOrOwned, SignatureAlgorithm, SignatureError,
+    Referencable, ReferenceOrOwned, SignatureAlgorithm, SignatureError,
     SigningMethod, VerificationError,
 };
 use std::future::Future;
@@ -16,6 +15,7 @@ use std::pin::Pin;
 use std::task;
 
 use crate::{AnyMethod, AnyMethodRef, AnySignatureProtocol};
+use super::{AnySuiteOptions, AnySuiteOptionsRef, Transformed};
 
 type SuiteMethod<S> = <S as CryptographicSuite>::VerificationMethod;
 type SuiteSign<'a, S, T> = <<S as CryptographicSuite>::SignatureAlgorithm as SignatureAlgorithm<
@@ -200,63 +200,33 @@ macro_rules! crypto_suites {
 }
 
 #[derive(Debug, Clone)]
-pub enum Transformed {
-    String(String),
-    JsonObject(serde_json::Map<String, serde_json::Value>),
-}
-
-impl From<String> for Transformed {
-    fn from(value: String) -> Self {
-        Self::String(value)
-    }
-}
-
-impl From<serde_json::Map<String, serde_json::Value>> for Transformed {
-    fn from(value: serde_json::Map<String, serde_json::Value>) -> Self {
-        Self::JsonObject(value)
-    }
-}
-
-impl TryFrom<Transformed> for String {
-    type Error = HashError;
-
-    fn try_from(value: Transformed) -> Result<Self, Self::Error> {
-        match value {
-            Transformed::String(s) => Ok(s),
-            _ => Err(HashError::InvalidTransformedInput),
-        }
-    }
-}
-
-impl TryFrom<Transformed> for serde_json::Map<String, serde_json::Value> {
-    type Error = HashError;
-
-    fn try_from(value: Transformed) -> Result<Self, Self::Error> {
-        match value {
-            Transformed::JsonObject(o) => Ok(o),
-            _ => Err(HashError::InvalidTransformedInput),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
 pub enum Hashed {
-    Array([u8; 64]),
+    Array32([u8; 32]),
+    Array64([u8; 64]),
     Vec(Vec<u8>),
+    String(String)
 }
 
 impl AsRef<[u8]> for Hashed {
     fn as_ref(&self) -> &[u8] {
         match self {
-            Self::Array(a) => a.as_ref(),
+            Self::Array32(a) => a.as_ref(),
+            Self::Array64(a) => a.as_ref(),
             Self::Vec(v) => v.as_ref(),
+            Self::String(s) => s.as_bytes()
         }
+    }
+}
+
+impl From<[u8; 32]> for Hashed {
+    fn from(value: [u8; 32]) -> Self {
+        Self::Array32(value)
     }
 }
 
 impl From<[u8; 64]> for Hashed {
     fn from(value: [u8; 64]) -> Self {
-        Self::Array(value)
+        Self::Array64(value)
     }
 }
 
@@ -266,81 +236,9 @@ impl From<Vec<u8>> for Hashed {
     }
 }
 
-/// Options for all cryptographic suites.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, LinkedData)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct AnySuiteOptions {
-    #[serde(rename = "publicKeyJwk")]
-    #[ld("sec:publicKeyJwk")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key_jwk: Option<Box<JWK>>,
-}
-
-impl AnySuiteOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_key(jwk: JWK) -> Self {
-        Self {
-            public_key_jwk: Some(Box::new(jwk)),
-        }
-    }
-}
-
-impl Referencable for AnySuiteOptions {
-    type Reference<'a> = AnySuiteOptionsRef<'a>;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        AnySuiteOptionsRef {
-            public_key_jwk: self.public_key_jwk.as_deref(),
-        }
-    }
-
-    covariance_rule!();
-}
-
-#[derive(Clone, Default, Copy)]
-pub struct AnySuiteOptionsRef<'a> {
-    pub public_key_jwk: Option<&'a JWK>,
-}
-
-impl<'a> From<AnySuiteOptionsRef<'a>> for () {
-    fn from(_value: AnySuiteOptionsRef<'a>) -> Self {
-        ()
-    }
-}
-
-#[cfg(feature = "tezos")]
-impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptionsRef<'a> {
-    type Error = InvalidOptions;
-
-    fn try_from(value: AnySuiteOptionsRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            public_key_jwk: value
-                .public_key_jwk
-                .ok_or(InvalidOptions::MissingPublicKey)?,
-        })
-    }
-}
-
-pub enum InvalidOptions {
-    MissingPublicKey,
-}
-
-impl From<InvalidOptions> for VerificationError {
-    fn from(value: InvalidOptions) -> Self {
-        match value {
-            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey,
-        }
-    }
-}
-
-impl From<InvalidOptions> for SignatureError {
-    fn from(value: InvalidOptions) -> Self {
-        match value {
-            InvalidOptions::MissingPublicKey => SignatureError::MissingPublicKey,
-        }
+impl From<String> for Hashed {
+    fn from(value: String) -> Self {
+        Self::String(value)
     }
 }
 
@@ -387,6 +285,9 @@ crypto_suites! {
     #[cfg(feature = "w3c")]
     json_web_signature_2020: JsonWebSignature2020,
 
+    #[cfg(feature = "w3c")]
+    ethereum_eip712_signature_2021: EthereumEip712Signature2021,
+
     /// DIF Ecdsa Secp256k1 Recovery Signature 2020.
     ///
     /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
@@ -401,20 +302,38 @@ crypto_suites! {
     #[cfg(feature = "aleo")]
     aleo_signature_2021: AleoSignature2021,
 
+    /// Unspecified Tezos Ed25519 Blake2b, digest size 20, base 58 check encoded, Signature 2021.
     #[cfg(feature = "tezos")]
     ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021: Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
 
+    /// Unspecified Tezos P256 Blake2b, digest size 20, base 58 check encoded, Signature 2021.
     #[cfg(feature = "tezos")]
     p256_blake2b_digest_size20_base58_check_encoded_signature_2021: P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
 
+    /// Unspecified Tezos JCS Signature 2021.
     #[cfg(feature = "tezos")]
     tezos_jcs_signature_2021: TezosJcsSignature2021,
 
+    /// Unspecified Tezos Signature 2021.
     #[cfg(feature = "tezos")]
-    tezos_signature_2021: TezosSignature2021
+    tezos_signature_2021: TezosSignature2021,
+
+    #[cfg(feature = "eip712")]
+    eip712_signature_2021: Eip712Signature2021,
+
+    // #[cfg(feature = "ethereum")]
+    ethereum_personal_signature_2021: EthereumPersonalSignature2021
 }
 
 impl AnySuite {
+    pub fn requires_public_key_jwk(&self) -> bool {
+        if cfg!(feature = "tezos") {
+            matches!(self, Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 | Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021) 
+        } else {
+            false
+        }
+    }
+
     pub fn pick(
         jwk: &JWK,
         verification_method: Option<&ReferenceOrOwned<AnyMethod>>,
@@ -479,6 +398,7 @@ impl AnySuite {
             },
             Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
                 #[cfg(any(feature = "tezos", feature = "dif"))]
+                #[allow(unreachable_code)]
                 Some(vm)
                     if vm.id().starts_with("did:tz:") || vm.id().starts_with("did:pkh:tz:") =>
                 {
@@ -490,7 +410,6 @@ impl AnySuite {
                     #[cfg(feature = "dif")]
                     return Some(Self::EcdsaSecp256k1RecoverySignature2020);
 
-                    #[allow(unreachable_code)]
                     return None;
                 }
                 #[cfg(feature = "secp256k1")]
@@ -527,81 +446,6 @@ impl AnySuite {
             }
             _ => return None,
         })
-    }
-}
-
-impl<'a, T, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G>
-    CryptographicSuiteInput<T, LinkedDataInput<'a, V, I, G>> for AnySuite
-where
-    I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
-        + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    G: rdf_types::Generator<()>,
-    T: linked_data::LinkedData<V, I>,
-{
-    fn transform(
-        &self,
-        data: &T,
-        context: LinkedDataInput<'a, V, I, G>,
-        params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Transformed, TransformError> {
-        macro_rules! ld_crypto_suites {
-            {
-                $(
-                    $(#[cfg($($t:tt)*)])?
-                    $field_name:ident: $name:ident
-                ),*
-            } => {
-                match self {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        Self::$name => {
-                            let r = ssi_vc_ldp::suite::$name.transform(
-                                data,
-                                context,
-                                params
-                                    .try_cast_verification_method()
-                                    .map_err(|_| TransformError::InvalidVerificationMethod)?
-                            ).map(Into::into)?;
-                            Ok(r)
-                        },
-                    )*
-                    _ => Err(TransformError::UnsupportedInputFormat)
-                }
-            }
-        }
-
-        ld_crypto_suites! {
-            #[cfg(all(feature = "w3c", feature = "rsa"))]
-            rsa_signature_2018: RsaSignature2018,
-            #[cfg(all(feature = "w3c", feature = "ed25519"))]
-            ed25519_signature_2018: Ed25519Signature2018,
-            #[cfg(all(feature = "w3c", feature = "ed25519"))]
-            ed25519_signature_2020: Ed25519Signature2020,
-            #[cfg(all(feature = "w3c", feature = "ed25519"))]
-            ed_dsa_2022: EdDsa2022,
-            #[cfg(all(feature = "w3c", feature = "secp256k1"))]
-            ecdsa_secp_256k1_signature2019: EcdsaSecp256k1Signature2019,
-            #[cfg(all(feature = "w3c", feature = "secp256r1"))]
-            ecdsa_secp_256r1_signature2019: EcdsaSecp256r1Signature2019,
-            #[cfg(feature = "w3c")]
-            json_web_signature_2020: JsonWebSignature2020,
-            #[cfg(all(feature = "dif", feature = "secp256k1"))]
-            ecdsa_secp256k1_recovery_signature2020: EcdsaSecp256k1RecoverySignature2020,
-            #[cfg(feature = "solana")]
-            solana_signature_2021: SolanaSignature2021,
-            #[cfg(feature = "aleo")]
-            aleo_signature_2021: AleoSignature2021,
-            #[cfg(feature = "tezos")]
-            ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021: Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-            #[cfg(feature = "tezos")]
-            p256_blake2b_digest_size20_base58_check_encoded_signature_2021: P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-            // #[cfg(feature = "tezos")]
-            // tezos_jcs_signature_2021: TezosJcsSignature2021,
-            #[cfg(feature = "tezos")]
-            tezos_signature_2021: TezosSignature2021
-        }
     }
 }
 

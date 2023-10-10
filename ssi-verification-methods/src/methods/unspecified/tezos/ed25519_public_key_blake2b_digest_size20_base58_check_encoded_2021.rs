@@ -85,6 +85,10 @@ impl TypedVerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckE
     fn type_(&self) -> &str {
         ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod>

@@ -58,7 +58,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
     ///
     /// The cryptographic suite is applied on the RDF graph represented by the
     /// input document.
-    pub fn from_json_ld<'a, V, I, M: Clone>(
+    pub async fn from_json_ld<'a, V, I, M: Clone>(
         vocabulary: &'a mut V,
         generator: &mut impl json_ld::Generator<V, M>,
         interpretation: &'a mut I,
@@ -145,7 +145,7 @@ impl<C: Sync, S: CryptographicSuite> DataIntegrity<C, S> {
 
                                 let transformed = proof
                                     .suite()
-                                    .transform(&data, (), params.borrowed())
+                                    .transform(&data, (), params.borrowed()).await
                                     .map_err(Error::Transform)?;
                                 let hashed = proof.suite().hash(transformed, params.borrowed())?;
 

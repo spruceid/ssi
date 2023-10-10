@@ -15,7 +15,7 @@ mod serialize;
 pub use serialize::{to_struct, to_value, InvalidValue};
 
 /// EIP-712 structure instance.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct Struct(IndexMap<String, Value>);
 
@@ -85,7 +85,7 @@ impl FromIterator<(StructName, Value)> for Struct {
 }
 
 /// EIP-712 values, JSON-compatible
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     String(String),
     Bytes(Vec<u8>),

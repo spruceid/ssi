@@ -90,6 +90,10 @@ impl TypedVerificationMethod for SolanaMethod2021 {
     fn type_(&self) -> &str {
         SOLANA_METHOD_2021_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        SOLANA_METHOD_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for SolanaMethod2021 {

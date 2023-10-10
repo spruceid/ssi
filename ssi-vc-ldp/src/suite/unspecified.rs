@@ -1,8 +1,8 @@
 //! Group cryptographic suites that currently lack a specification.
 
 pub mod aleo_signature_2021;
-mod eip712_signature_2021;
-mod ethereum_personal_signature_2021;
+pub mod eip712_signature_2021;
+pub mod ethereum_personal_signature_2021;
 mod solana_signature_2021;
 
 #[cfg(feature = "tezos")]

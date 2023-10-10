@@ -74,6 +74,10 @@ impl TypedVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     fn type_(&self) -> &str {
         ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

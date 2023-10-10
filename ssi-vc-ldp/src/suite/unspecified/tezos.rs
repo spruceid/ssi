@@ -13,6 +13,8 @@ use ssi_verification_methods::{covariance_rule, Referencable};
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
 
+use crate::suite::CryptographicSuiteOptions;
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Options {
@@ -28,6 +30,8 @@ impl Options {
         }
     }
 }
+
+impl<T> CryptographicSuiteOptions<T>for Options {}
 
 impl Referencable for Options {
     type Reference<'a> = OptionsRef<'a>;

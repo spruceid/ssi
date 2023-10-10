@@ -77,6 +77,10 @@ impl TypedVerificationMethod for AleoMethod2021 {
     fn type_(&self) -> &str {
         ALEO_METHOD_2021_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ALEO_METHOD_2021_TYPE
+    }
 }
 
 impl TryFrom<GenericVerificationMethod> for AleoMethod2021 {

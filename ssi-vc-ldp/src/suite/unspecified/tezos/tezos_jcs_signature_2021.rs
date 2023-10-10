@@ -43,18 +43,24 @@ pub use super::tezos_signature_2021::{PublicKey, PublicKeyRef, Signature, Signat
 pub struct TezosJcsSignature2021;
 
 impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
+    type Transform<'a> = std::future::Ready<Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a;
+
     /// Transformation algorithm.
-    fn transform(
-        &self,
-        data: &T,
+    fn transform<'a, 'c: 'a>(
+        &'a self,
+        data: &'a T,
         _context: (),
-        _options: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Transformed, TransformError> {
-        let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;
-        match json {
-            serde_json::Value::Object(obj) => Ok(obj),
-            _ => Err(TransformError::ExpectedJsonObject),
-        }
+        _options: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
+    ) -> Self::Transform<'a> {
+        std::future::ready(transform(data))
+    }
+}
+
+fn transform<T: Serialize>(data: &T) -> Result<serde_json::Map<String, serde_json::Value>, TransformError> {
+    let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;
+    match json {
+        serde_json::Value::Object(obj) => Ok(obj),
+        _ => Err(TransformError::ExpectedJsonObject),
     }
 }
 

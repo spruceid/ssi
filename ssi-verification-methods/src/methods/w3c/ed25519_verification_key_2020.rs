@@ -155,6 +155,10 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
+    
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ED25519_VERIFICATION_KEY_2020_TYPE
+    }
 }
 
 impl SigningMethod<ed25519_dalek::Keypair> for Ed25519VerificationKey2020 {

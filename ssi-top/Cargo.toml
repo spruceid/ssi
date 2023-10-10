@@ -46,7 +46,7 @@ tezos = ["ssi-vc-ldp/tezos"]
 aleo = ["ssi-jwk/aleo", "ssi-vc-ldp/aleo", "ssi-verification-methods/aleo"]
 
 # Enables `Eip712Signature2021`
-eip712 = ["ssi-vc-ldp/eip712"]
+eip712 = ["ssi-eip712", "ssi-vc-ldp/eip712"]
 
 # Enables `SolanaSignature2021`
 solana = ["ssi-vc-ldp/solana", "ssi-verification-methods/solana"]
@@ -61,6 +61,7 @@ ssi-jwk.workspace = true
 ssi-verification-methods.workspace = true
 ssi-vc-ldp.workspace = true
 ssi-dids.workspace = true
+ssi-eip712 = { workspace = true, optional = true }
 pin-project.workspace = true
 thiserror.workspace = true
 iref.workspace = true
