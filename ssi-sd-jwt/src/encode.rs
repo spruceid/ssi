@@ -130,7 +130,7 @@ pub fn encode_sign<Claims: Serialize>(
                         let _ = base_claims_obj.insert(claim_name.clone(), serde_json::json!([]));
                     }
 
-                    // unwrap() justified as id statement above adds claim_name to the map if it 
+                    // unwrap() justified as id statement above adds claim_name to the map if it
                     // doesn't previously exist
                     let array = base_claims_obj.get_mut(claim_name).unwrap();
                     let array = array.as_array_mut().ok_or(EncodeError::ExpectedArray)?;
