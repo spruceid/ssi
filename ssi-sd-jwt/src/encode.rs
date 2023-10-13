@@ -5,6 +5,16 @@ use ssi_jwk::{Algorithm, JWK};
 
 use crate::*;
 
+/// Disclosure as encoded
+#[derive(Debug, PartialEq)]
+pub struct Disclosure {
+    /// Base 64 of disclosure object
+    pub encoded: String,
+
+    /// Base 64 of hash of disclosure object
+    pub hash: String,
+}
+
 fn encode_disclosure_with_salt<ClaimValue: Serialize>(
     salt: &str,
     claim_name: Option<&str>,
@@ -45,6 +55,7 @@ fn encode_disclosure<ClaimValue: Serialize>(
     encode_disclosure_with_rng(&mut rng, claim_name, claim_value)
 }
 
+/// Lower level API to create a property style disclosure
 pub fn encode_property_disclosure<ClaimValue: Serialize>(
     sd_alg: SdAlg,
     claim_name: &str,
@@ -56,6 +67,7 @@ pub fn encode_property_disclosure<ClaimValue: Serialize>(
     Ok(Disclosure { encoded, hash })
 }
 
+/// Lower level API to create an array style disclosure
 pub fn encode_array_disclosure<ClaimValue: Serialize>(
     sd_alg: SdAlg,
     claim_value: &ClaimValue,
@@ -66,6 +78,7 @@ pub fn encode_array_disclosure<ClaimValue: Serialize>(
     Ok(Disclosure { encoded, hash })
 }
 
+/// High level API to create most SD-JWTs
 pub fn encode_sign<Claims: Serialize>(
     algorithm: Algorithm,
     base_claims: &Claims,
@@ -138,13 +151,18 @@ pub fn encode_sign<Claims: Serialize>(
     Ok((jwt, post_encoded_disclosures))
 }
 
+/// Represents a disclosure before encoding
 #[derive(Clone, Debug)]
 pub enum UnencodedDisclosure {
+    /// Property style disclosure
     Property(String, serde_json::Value),
+
+    /// Array style disclosure
     ArrayItem(String, serde_json::Value),
 }
 
 impl UnencodedDisclosure {
+    /// Create a new property style UnencodedDisclosure
     pub fn new_property<S: AsRef<str>, Value: Serialize>(
         name: S,
         value: &Value,
@@ -155,6 +173,7 @@ impl UnencodedDisclosure {
         ))
     }
 
+    /// Create a new array style UnencodedDisclosure
     pub fn new_array_item<S: AsRef<str>, Value: Serialize>(
         parent: S,
         value: &Value,
@@ -165,6 +184,7 @@ impl UnencodedDisclosure {
         ))
     }
 
+    /// Obtain reference to the disclosure's JSON object
     pub fn claim_value_as_ref(&self) -> &serde_json::Value {
         match self {
             UnencodedDisclosure::ArrayItem(_, value) => value,
@@ -172,6 +192,8 @@ impl UnencodedDisclosure {
         }
     }
 
+    /// Obtain reference to the disclosure's name if it is an array style
+    /// disclosure
     pub fn encoded_claim_name(&self) -> Option<&str> {
         match self {
             UnencodedDisclosure::Property(name, _) => Some(name),
@@ -179,6 +201,7 @@ impl UnencodedDisclosure {
         }
     }
 
+    /// Encode the disclosure into the plaintext base64 string encoding
     pub fn encode(&self) -> Result<String, serde_json::Error> {
         encode_disclosure(self.encoded_claim_name(), self.claim_value_as_ref())
     }

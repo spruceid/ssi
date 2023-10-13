@@ -3,8 +3,11 @@ use sha2::Digest;
 
 use crate::DecodeError;
 
+/// Elements of the _sd_alg claim
+#[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SdAlg {
+    /// SHA-256 Algortim for hashing disclosures
     Sha256,
 }
 
@@ -13,6 +16,7 @@ impl SdAlg {
 }
 
 impl SdAlg {
+    /// String encoding of _sd_alg field
     pub fn to_str(&self) -> &'static str {
         match self {
             SdAlg::Sha256 => Self::SHA256_STR,
@@ -37,6 +41,8 @@ impl From<SdAlg> for &'static str {
     }
 }
 
+/// Lower level API to generate the hash of a given disclosure string already converted
+/// into base 64
 pub fn hash_encoded_disclosure(digest_algo: SdAlg, disclosure: &str) -> String {
     match digest_algo {
         SdAlg::Sha256 => {

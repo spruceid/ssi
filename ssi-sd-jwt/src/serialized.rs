@@ -1,3 +1,5 @@
+/// Lower level API to encode a fully encoded SD-JWT given a JWT and disclosure array
+/// already fully encoded into their string representations
 pub fn serialize_string_format(jwt: &str, disclosures: &[&str]) -> String {
     let mut serialized = format!("{}~", jwt);
 
@@ -20,6 +22,8 @@ impl<'a> Deserialized<'a> {
     }
 }
 
+/// Lower level API to seserialize a fully encoded SD-JWT into it's JWT and disclosure
+/// components
 pub fn deserialize_string_format(serialized: &str) -> Option<Deserialized<'_>> {
     if !serialized.contains('~') {
         return None;

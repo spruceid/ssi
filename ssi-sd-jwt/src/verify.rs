@@ -1,6 +1,5 @@
 use jose_b64::base64ct::{Base64UrlUnpadded, Encoding};
 
-use crate::digest::{hash_encoded_disclosure, SdAlg};
 use crate::DecodeError;
 
 #[derive(Debug, PartialEq)]
@@ -61,60 +60,54 @@ fn validate_array_item_disclosure(
     })
 }
 
-pub fn verify_sd_disclosures_array(
-    digest_algo: SdAlg,
-    disclosures: &[&str],
-    sd_claim: &[&str],
-) -> Result<serde_json::Value, DecodeError> {
-    let mut verfied_claims = serde_json::Map::new();
-
-    for disclosure in disclosures {
-        let disclosure_hash = hash_encoded_disclosure(digest_algo, disclosure);
-
-        if !disclosure_hash_exists_in_sd_claims(&disclosure_hash, sd_claim) {
-            continue;
-        }
-
-        let decoded = DecodedDisclosure::new(disclosure)?;
-
-        match decoded.kind {
-            DisclosureKind::Property { name, value } => {
-                let orig = verfied_claims.insert(name, value);
-
-                if orig.is_some() {
-                    return Err(DecodeError::DisclosureUsedMultipleTimes);
-                }
-            }
-            DisclosureKind::ArrayItem(_) => {
-                return Err(DecodeError::ArrayDisclosureWhenExpectingProperty);
-            }
-        }
-    }
-
-    Ok(serde_json::Value::Object(verfied_claims))
-}
-
-fn disclosure_hash_exists_in_sd_claims(disclosure_hash: &str, sd_claim: &[&str]) -> bool {
-    // Todo: Yeah, this is O(N^2) since it's embedded in the for loop in
-    // verify_disclosures().  I'm expecting small values of N for sd_claim
-    // where it's just easier to check them rather than
-    // going through the rigmarole of adding them to map structure beforehand.
-    // Validate this though.
-    for sd_claim_item in sd_claim {
-        // Todo: Does this need to be constant time?  I can't think of a reason
-        // given that sd_claims are ostensibly public anyway, but probably
-        // should just to be safe.
-        if &disclosure_hash == sd_claim_item {
-            return true;
-        }
-    }
-
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::digest::{hash_encoded_disclosure, SdAlg};
+
+    fn verify_sd_disclosures_array(
+        digest_algo: SdAlg,
+        disclosures: &[&str],
+        sd_claim: &[&str],
+    ) -> Result<serde_json::Value, DecodeError> {
+        let mut verfied_claims = serde_json::Map::new();
+
+        for disclosure in disclosures {
+            let disclosure_hash = hash_encoded_disclosure(digest_algo, disclosure);
+
+            if !disclosure_hash_exists_in_sd_claims(&disclosure_hash, sd_claim) {
+                continue;
+            }
+
+            let decoded = DecodedDisclosure::new(disclosure)?;
+
+            match decoded.kind {
+                DisclosureKind::Property { name, value } => {
+                    let orig = verfied_claims.insert(name, value);
+
+                    if orig.is_some() {
+                        return Err(DecodeError::DisclosureUsedMultipleTimes);
+                    }
+                }
+                DisclosureKind::ArrayItem(_) => {
+                    return Err(DecodeError::ArrayDisclosureWhenExpectingProperty);
+                }
+            }
+        }
+
+        Ok(serde_json::Value::Object(verfied_claims))
+    }
+
+    fn disclosure_hash_exists_in_sd_claims(disclosure_hash: &str, sd_claim: &[&str]) -> bool {
+        for sd_claim_item in sd_claim {
+            if &disclosure_hash == sd_claim_item {
+                return true;
+            }
+        }
+
+        false
+    }
 
     #[test]
     fn test_verify_disclosures() {

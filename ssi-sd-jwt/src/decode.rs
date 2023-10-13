@@ -8,13 +8,21 @@ use crate::serialized::deserialize_string_format;
 use crate::verify::{DecodedDisclosure, DisclosureKind};
 use crate::*;
 
+/// Expiration validity claims that are sampled before expanding selective disclosures
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct ValidityClaims {
+    /// Not Before claim
     pub nbf: Option<NumericDate>,
+
+    /// Issued After claim
     pub iat: Option<NumericDate>,
+
+    /// Expiration claim
     pub exp: Option<NumericDate>,
 }
 
+/// High level API to decode a fuilly encoded SD-JWT.  That is a JWT and selective
+/// disclosures seperated by tildes
 pub fn decode_verify<Claims: DeserializeOwned>(
     serialized: &str,
     key: &JWK,
@@ -25,6 +33,8 @@ pub fn decode_verify<Claims: DeserializeOwned>(
     decode_verify_disclosure_array(deserialized.jwt, key, &deserialized.disclosures)
 }
 
+/// Lower level API to decode an SD-JWT that has already been split into it's
+/// JWT and disclosure components
 pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
     jwt: &str,
     key: &JWK,
