@@ -2,8 +2,6 @@
 //!
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 use std::{future::{self, Future}, task, pin::Pin};
-use iref::Uri;
-use linked_data::LinkedData;
 use pin_project::pin_project;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
@@ -57,7 +55,11 @@ use crate::{
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EthereumEip712Signature2021; // TODO add LD support
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, LinkedData)]
+impl EthereumEip712Signature2021 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EthereumEip712Signature2021");
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 #[serde(rename_all = "camelCase")]
 pub struct Eip712Options {
@@ -79,7 +81,7 @@ pub struct Eip712Options {
     pub domain: Option<ssi_eip712::Value>,
 }
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 pub struct Options {
     #[ld("eip712:eip712")]
@@ -105,7 +107,7 @@ impl Referencable for Options {
 
 impl<T: CryptographicSuite> CryptographicSuiteOptions<T> for Options {}
 
-#[derive(Debug, Default, Clone, Copy, serde::Serialize, LinkedData)]
+#[derive(Debug, Default, Clone, Copy, serde::Serialize, linked_data::Serialize)]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 #[serde(rename_all = "camelCase")]
 pub struct OptionsRef<'a> {
@@ -137,7 +139,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
     type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#EthereumEip712Signature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

@@ -47,6 +47,10 @@ use crate::{
 /// [2]: <https://github.com/multiformats/multibase>
 pub struct AleoSignature2021;
 
+impl AleoSignature2021 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#AleoSignature2021");
+}
+
 const BLOCKCHAIN_NETWORK_ID: &str = "1";
 const BLOCKCHAIN_NAMESPACE: &str = "aleo";
 
@@ -74,7 +78,7 @@ impl CryptographicSuite for AleoSignature2021 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#AleoSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

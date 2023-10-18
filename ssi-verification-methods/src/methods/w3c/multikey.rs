@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use ed25519_dalek::Signer;
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use ssi_multicodec::MultiEncodedBuf;
@@ -21,7 +20,7 @@ pub const MULTIKEY_TYPE: &str = "Multikey";
 /// Multikey verification method.
 ///
 /// See: <https://www.w3.org/TR/vc-data-integrity/#multikey>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "Multikey")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Multikey")]
@@ -128,6 +127,14 @@ impl VerificationMethod for Multikey {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

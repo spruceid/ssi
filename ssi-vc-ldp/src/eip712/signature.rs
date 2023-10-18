@@ -1,6 +1,6 @@
 use iref::UriBuf;
 use linked_data::{
-    LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
+    LinkedData, LinkedDataGraph
 };
 use rdf_types::{Interpretation, Vocabulary};
 use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature};
@@ -78,7 +78,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for Eip712SignatureRef<'a> {
 /// Meta-information about the signature generation process.
 ///
 /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021>
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, LinkedData)]
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -109,53 +109,22 @@ pub enum TypesOrURI {
     Object(ssi_eip712::Types),
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataResource<V, I> for TypesOrURI {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
-        linked_data::ResourceInterpretation::Uninterpreted(Some(linked_data::CowRdfTerm::Owned(
-            rdf_types::Term::Literal(linked_data::RdfLiteral::Json(
-                json_ld::syntax::to_value(self).unwrap(),
-            )),
-        )))
-    }
-}
+linked_data::json_literal!(TypesOrURI);
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for TypesOrURI {
-    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<V, I>,
-    {
-        serializer.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for TypesOrURI {
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for TypesOrURI {
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<I, V> for TypesOrURI {
     fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::GraphVisitor<V, I>,
+        S: linked_data::GraphVisitor<I, V>,
     {
         visitor.subject(self)?;
         visitor.end()
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for TypesOrURI {
+impl<V: Vocabulary, I: Interpretation> LinkedData<I, V> for TypesOrURI {
     fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::Visitor<V, I>,
+        S: linked_data::Visitor<I, V>,
     {
         visitor.default_graph(self)?;
         visitor.end()

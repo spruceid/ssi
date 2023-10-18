@@ -5,15 +5,15 @@ use iref::Iri;
 use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
 use pin_project::pin_project;
 use rdf_types::{
-    interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-    ExportedFromVocabulary, Interpretation, Quad, ReverseLiteralInterpretation, Vocabulary,
+    interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation, self},
+    ExportedFromVocabulary, Interpretation, Quad, ReverseLiteralInterpretation, Vocabulary, generator, InterpretationMut,
 };
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::urdna2015;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
     Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
-    VerificationMethod, VerificationMethodRef, Verifier,
+    VerificationMethod, Verifier,
 };
 
 use crate::{
@@ -162,10 +162,7 @@ pub trait CryptographicSuite: Sized {
         data: &'a Self::Hashed,
         verifier: &'a V,
         proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Options, Self::Signature>,
-    ) -> VerifyProof<'a, Self, V>
-    where
-        <Self::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
-    {
+    ) -> VerifyProof<'a, Self, V> {
         let algorithm = self.setup_signature_algorithm();
         VerifyProof {
             verify: verifier.verify(
@@ -269,8 +266,7 @@ pub struct VerifyProof<'a, S: CryptographicSuite, V: Verifier<S::VerificationMet
 impl<'a, S: CryptographicSuite, V: 'a + Verifier<S::VerificationMethod>> Future
     for VerifyProof<'a, S, V>
 where
-    S::VerificationMethod: VerificationMethod,
-    <S::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
+    S::VerificationMethod: VerificationMethod
 {
     type Output = Result<ProofValidity, VerificationError>;
 
@@ -313,8 +309,8 @@ fn sha256_hash<'a, T: CryptographicSuite>(
     proof_configuration: ProofConfigurationRef<'a, T::VerificationMethod, T::Options>,
 ) -> [u8; 64]
 where
-    <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataPredicateObjects,
-    <T::Options as Referencable>::Reference<'a>: LinkedDataSubject,
+    <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
+    <T::Options as Referencable>::Reference<'a>: LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
 {
     let generator = rdf_types::generator::Blank::new();
     let proof_config_quads = to_quads(generator, &proof_configuration.with_suite(suite)).unwrap();
@@ -331,55 +327,43 @@ where
     hash_data
 }
 
-pub struct LinkedDataInput<'a, V, I, G> {
-    pub vocabulary: &'a mut V,
-    pub interpretation: &'a mut I,
-    pub generator: G,
+#[derive(Default)]
+pub struct LinkedDataInput<I = (), V = ()> {
+    pub vocabulary: V,
+    pub interpretation: I
 }
 
-impl Default for LinkedDataInput<'static, (), (), rdf_types::generator::Blank> {
-    fn default() -> Self {
-        Self {
-            vocabulary: rdf_types::vocabulary::no_vocabulary_mut(),
-            interpretation: rdf_types::vocabulary::no_vocabulary_mut(),
-            generator: rdf_types::generator::Blank::new(),
-        }
-    }
-}
-
-impl<'a, V: Vocabulary, I: Interpretation, G> LinkedDataInput<'a, V, I, G>
+impl<V: Vocabulary, I: Interpretation> LinkedDataInput<I, V>
 where
-    I: ReverseIriInterpretation<Iri = V::Iri>
+    I: InterpretationMut<V>
+        + ReverseIriInterpretation<Iri = V::Iri>
         + ReverseBlankIdInterpretation<BlankId = V::BlankId>
         + ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    G: rdf_types::Generator<()>,
+    V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>
 {
-    pub fn new(vocabulary: &'a mut V, interpretation: &'a mut I, generator: G) -> Self {
+    pub fn new(vocabulary: V, interpretation: I) -> Self {
         Self {
             vocabulary,
-            interpretation,
-            generator,
+            interpretation
         }
     }
 
     /// Returns the list of quads in the dataset.
     ///
     /// The order in which quads are returned is unspecified.
-    pub fn into_quads<T: LinkedData<V, I>>(
-        self,
+    pub fn into_quads<T: LinkedData<I, V>>(
+        mut self,
         input: &T,
     ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
         linked_data::to_lexical_quads_with(
-            self.vocabulary,
-            self.interpretation,
-            self.generator,
+            &mut self.vocabulary,
+            &mut self.interpretation,
             input,
         )
     }
 
     /// Returns the canonical form of the dataset, in the N-Quads format.
-    pub fn into_canonical_form<T: LinkedData<V, I>>(
+    pub fn into_canonical_form<T: LinkedData<I, V>>(
         self,
         input: &T,
     ) -> Result<String, linked_data::IntoQuadsError> {
@@ -400,30 +384,30 @@ where
 #[macro_export]
 macro_rules! impl_rdf_input_urdna2015 {
     ($ty:ident) => {
-        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>
-            $crate::CryptographicSuiteInput<T, $crate::LinkedDataInput<'a, V, I, G>> for $ty
+        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>
+            $crate::CryptographicSuiteInput<T, $crate::LinkedDataInput<I, V>> for $ty
         where
-            I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+            I: rdf_types::interpretation::InterpretationMut<V>
+                + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
                 + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
                 + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
             V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-            G: rdf_types::Generator<()>,
-            T: linked_data::LinkedData<V, I>,
+            T: linked_data::LinkedData<I, V>,
         {
-            type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, $crate::LinkedDataInput<'a, V, I, G>: 't;
+            type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, $crate::LinkedDataInput<I, V>: 't;
 
             /// Transformation algorithm.
             fn transform<'t, 'c: 't>(
                 &'t self,
                 data: &'t T,
-                context: $crate::LinkedDataInput<'a, V, I, G>,
+                context: $crate::LinkedDataInput<I, V>,
                 _options: $crate::ProofConfigurationRef<'c,
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
                     <$ty as $crate::CryptographicSuite>::Options,
                 >,
             ) -> Self::Transform<'t>
             where
-                $crate::LinkedDataInput<'a, V, I, G>: 't
+                $crate::LinkedDataInput<I, V>: 't
             {
                 ::std::future::ready(context.into_canonical_form(data).map_err(Into::into))
             }

@@ -7,7 +7,6 @@
 //!   - Data Integrity Proofs, defined by the `ssi-ldp` library.
 use educe::Educe;
 use iref::Iri;
-use linked_data::LinkedData;
 use ssi_verification_methods::{VerificationError, Verifier};
 
 pub mod credential;
@@ -48,7 +47,7 @@ pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =
 // pub use schema::cred::*;
 
 /// Verifiable credential.
-#[derive(Educe, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Educe, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[educe(Clone(bound = "C: Clone, C::Proof: Clone"))]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Verifiable<C: VerifiableWith> {

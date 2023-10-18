@@ -24,6 +24,10 @@ pub use verification::method::Multikey;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EdDsa2022;
 
+impl EdDsa2022 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#DataIntegrityProof");
+}
+
 impl_rdf_input_urdna2015!(EdDsa2022);
 
 impl CryptographicSuite for EdDsa2022 {
@@ -41,7 +45,7 @@ impl CryptographicSuite for EdDsa2022 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#DataIntegrityProof")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

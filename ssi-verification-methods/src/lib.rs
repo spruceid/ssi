@@ -130,6 +130,10 @@ pub trait VerificationMethod: Referencable {
 
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Option<&Iri>; // Should be an URI.
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri;
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -259,39 +263,36 @@ pub trait TypedVerificationMethod: VerificationMethod {
     fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str;
 }
 
-pub trait VerificationMethodRef<'m> {
-    /// Identifier of the verification method.
-    fn id(&self) -> &'m Iri;
+// pub trait VerificationMethodRef<'m> {
+//     /// Identifier of the verification method.
+//     fn id(&self) -> &'m Iri;
 
-    /// Returns the IRI of the verification method controller.
-    fn controller(&self) -> Option<&'m Iri>; // Should be an URI.
-}
+//     /// Returns the IRI of the verification method controller.
+//     fn controller(&self) -> Option<&'m Iri>; // Should be an URI.
+// }
 
-impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
-    fn id(&self) -> &'m Iri {
-        M::id(self)
-    }
+// impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
+//     fn id(&self) -> &'m Iri {
+//         M::id(self)
+//     }
 
-    fn controller(&self) -> Option<&'m Iri> {
-        M::controller(self)
-    }
-}
+//     fn controller(&self) -> Option<&'m Iri> {
+//         M::controller(self)
+//     }
+// }
 
-impl<'m, M: VerificationMethod> Cow<'m, M>
-where
-    M::Reference<'m>: VerificationMethodRef<'m>,
-{
+impl<'m, M: VerificationMethod> Cow<'m, M> {
     fn id<'a>(&'a self) -> &'a Iri {
         match self {
             Self::Owned(m) => m.id(),
-            Self::Borrowed(b) => b.id(),
+            Self::Borrowed(b) => M::ref_id(*b),
         }
     }
 
     fn controller<'a>(&'a self) -> Option<&'a Iri> {
         match self {
             Self::Owned(m) => m.controller(),
-            Self::Borrowed(b) => b.controller(),
+            Self::Borrowed(b) => M::ref_controller(*b),
         }
     }
 }

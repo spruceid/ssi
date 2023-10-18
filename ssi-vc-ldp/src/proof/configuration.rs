@@ -1,7 +1,7 @@
 use chrono::Timelike;
 use iref::Iri;
-use linked_data::{LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
-use rdf_types::Quad;
+use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
+use rdf_types::{Quad, interpretation, generator};
 use serde::{Deserialize, Serialize};
 use ssi_verification_methods::{ProofPurpose, Referencable, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
@@ -84,7 +84,7 @@ impl<M> ProofConfiguration<M> {
     }
 }
 
-#[derive(LinkedData)]
+#[derive(linked_data::Serialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(prefix("dc" = "http://purl.org/dc/terms/"))]
 pub struct ProofConfigurationWithSuiteRef<'a, 'b, M: Referencable, O: 'a + Referencable> {
@@ -230,8 +230,8 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
     /// Returns the quads of the proof configuration, in canonical form.
     pub fn quads<T: CryptographicSuite>(&self, suite: &T) -> Vec<Quad>
     where
-        M::Reference<'a>: LinkedDataPredicateObjects,
-        O::Reference<'a>: LinkedDataSubject,
+        M::Reference<'a>: LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
+        O::Reference<'a>: LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
     {
         let generator =
             rdf_types::generator::Blank::new_with_prefix("proofConfiguration:".to_string());

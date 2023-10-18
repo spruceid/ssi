@@ -42,6 +42,10 @@ use crate::{
 /// The [`SolanaWallet`] protocol is used.
 pub struct SolanaSignature2021;
 
+impl SolanaSignature2021 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#SolanaSignature2021");
+}
+
 impl_rdf_input_urdna2015!(SolanaSignature2021);
 
 impl CryptographicSuite for SolanaSignature2021 {
@@ -59,7 +63,7 @@ impl CryptographicSuite for SolanaSignature2021 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#SolanaSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

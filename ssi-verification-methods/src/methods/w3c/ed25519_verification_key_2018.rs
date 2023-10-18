@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jws::CompactJWSString;
 
@@ -17,7 +16,7 @@ pub const ED25519_VERIFICATION_KEY_2018_TYPE: &str = "Ed25519VerificationKey2018
 /// Deprecated verification method for the `Ed25519Signature2018` suite.
 ///
 /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/#the-ed25519-key-format>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "Ed25519VerificationKey2018")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Ed25519VerificationKey2018")]
@@ -101,6 +100,14 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

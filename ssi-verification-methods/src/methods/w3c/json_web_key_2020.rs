@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
@@ -20,7 +19,7 @@ pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
 /// See: <https://w3c-ccg.github.io/lds-jws2020/#json-web-key-2020>
 ///
 /// [1]: <https://w3c-ccg.github.io/lds-jws2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "JsonWebKey2020")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:JsonWebKey2020")]
@@ -83,6 +82,14 @@ impl VerificationMethod for JsonWebKey2020 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

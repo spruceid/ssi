@@ -1,8 +1,6 @@
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::{future::Future, task};
-
-use linked_data::LinkedData;
 use pin_project::pin_project;
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_crypto::{MessageSignatureError, MessageSigner};
@@ -12,7 +10,7 @@ use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable, 
 
 use crate::eip712::Eip712Metadata;
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[serde(rename_all = "camelCase")]
 pub struct AnySignature {
@@ -74,7 +72,7 @@ pub struct AnySignatureRef<'a> {
 }
 
 /// Common signature format where the proof value is multibase-encoded.
-#[derive(Debug, Clone, LinkedData)]
+#[derive(Debug, Clone, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct MultibaseSignature {
     /// Multibase encoded signature.
@@ -120,7 +118,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for MultibaseSignatureRef<'a> {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct JwsSignature {
     #[ld("sec:jws")]
@@ -152,7 +150,7 @@ impl From<JwsSignature> for AnySignature {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, LinkedData)]
+#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct JwsSignatureRef<'a> {
     #[ld("sec:jws")]

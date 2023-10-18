@@ -1,114 +1,133 @@
-use std::{future::Future, task, pin::Pin};
+use std::{future::Future, pin::Pin, task};
 
-use pin_project::pin_project;
-use ssi_vc_ldp::{CryptographicSuiteInput, LinkedDataInput, suite::{TransformError, HashError}, ProofConfigurationRef, eip712::TypesProvider};
 use super::AnySuiteOptions;
+use pin_project::pin_project;
+use rdf_types::interpretation;
+use ssi_vc_ldp::{
+    eip712::TypesProvider,
+    suite::{HashError, TransformError},
+    CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
+};
 
-use crate::{AnySuite, AnyMethod};
+use crate::{AnyMethod, AnySuite};
 
 type JsonObject = serde_json::Map<String, serde_json::Value>;
 
 /// Input context for any cryptographic suite supported by `AnySuite`.
-pub struct AnyInputContext<'a, V, I, G, L = ()> {
-	/// The Linked-Data context used to interpret RDF terms.
-	pub ld: LinkedDataInput<'a, V, I, G>,
+pub struct AnyInputContext<I, V, L = ()> {
+    /// The Linked-Data context used to interpret RDF terms.
+    pub ld: LinkedDataInput<I, V>,
 
-	/// Remote resources loader.
-	/// 
-	/// Used for instance with the `EthereumEip712Signature2021` suite to load
-	/// EIP712 type definitions from the URI given in the proof options.
-	pub loader: L
+    /// Remote resources loader.
+    ///
+    /// Used for instance with the `EthereumEip712Signature2021` suite to load
+    /// EIP712 type definitions from the URI given in the proof options.
+    pub loader: L,
 }
 
-impl<'a, V, I, G> From<LinkedDataInput<'a, V, I, G>> for AnyInputContext<'a, V, I, G> {
-	fn from(value: LinkedDataInput<'a, V, I, G>) -> Self {
-		AnyInputContext {
-			ld: value,
-			loader: ()
-		}
-	}
+impl<'a, I, V> From<LinkedDataInput<I, V>> for AnyInputContext<I, V> {
+    fn from(value: LinkedDataInput<I, V>) -> Self {
+        AnyInputContext {
+            ld: value,
+            loader: (),
+        }
+    }
 }
 
-impl Default for AnyInputContext<'static, (), (), rdf_types::generator::Blank, ()> {
-	fn default() -> Self {
-		Self {
-			ld: LinkedDataInput::default(),
-			loader: ()
-		}
-	}
+impl Default
+    for AnyInputContext<interpretation::WithGenerator<rdf_types::generator::Blank>, (), ()>
+{
+    fn default() -> Self {
+        Self {
+            ld: LinkedDataInput {
+                vocabulary: (),
+                interpretation: interpretation::WithGenerator::new(
+                    (),
+                    rdf_types::generator::Blank::new(),
+                ),
+            },
+            loader: (),
+        }
+    }
 }
 
 #[pin_project(project = TransformProj)]
 pub enum Transform<'a, L: TypesProvider> {
-	Error(Option<TransformError>),
-	String(#[pin] std::future::Ready<Result<String, TransformError>>),
-	JsonObject(#[pin] std::future::Ready<Result<JsonObject, TransformError>>),
-	Eip712(#[pin] std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>),
+    Error(Option<TransformError>),
+    String(#[pin] std::future::Ready<Result<String, TransformError>>),
+    JsonObject(#[pin] std::future::Ready<Result<JsonObject, TransformError>>),
+    Eip712(#[pin] std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>),
 
-	#[cfg(feature = "w3c")]
-	EthereumEip712Signature2021(#[pin] ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Transform<'a, L>)
+    #[cfg(feature = "w3c")]
+    EthereumEip712Signature2021(
+        #[pin] ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Transform<'a, L>,
+    ),
 }
 
-impl<'a, L: TypesProvider> From<std::future::Ready<Result<String, TransformError>>> for Transform<'a, L> {
-	fn from(value: std::future::Ready<Result<String, TransformError>>) -> Self {
-		Self::String(value)
-	}
+impl<'a, L: TypesProvider> From<std::future::Ready<Result<String, TransformError>>>
+    for Transform<'a, L>
+{
+    fn from(value: std::future::Ready<Result<String, TransformError>>) -> Self {
+        Self::String(value)
+    }
 }
 
-impl<'a, L: TypesProvider> From<std::future::Ready<Result<JsonObject, TransformError>>> for Transform<'a, L> {
-	fn from(value: std::future::Ready<Result<JsonObject, TransformError>>) -> Self {
-		Self::JsonObject(value)
-	}
+impl<'a, L: TypesProvider> From<std::future::Ready<Result<JsonObject, TransformError>>>
+    for Transform<'a, L>
+{
+    fn from(value: std::future::Ready<Result<JsonObject, TransformError>>) -> Self {
+        Self::JsonObject(value)
+    }
 }
 
-impl<'a, L: TypesProvider> From<std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>> for Transform<'a, L> {
-	fn from(value: std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>) -> Self {
-		Self::Eip712(value)
-	}
+impl<'a, L: TypesProvider> From<std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>>
+    for Transform<'a, L>
+{
+    fn from(value: std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>) -> Self {
+        Self::Eip712(value)
+    }
 }
 
 impl<'a, L: TypesProvider> Future for Transform<'a, L> {
-	type Output = Result<Transformed, TransformError>;
+    type Output = Result<Transformed, TransformError>;
 
-	fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-		match self.project() {
-			TransformProj::Error(e) => task::Poll::Ready(Err(e.take().unwrap())),
-			TransformProj::String(f) => f.poll(cx).map(|r| r.map(Transformed::String)),
-			TransformProj::JsonObject(f) => f.poll(cx).map(|r| r.map(Transformed::JsonObject)),
-			TransformProj::Eip712(f) => f.poll(cx).map(|r| r.map(Transformed::Eip712)),
-			TransformProj::EthereumEip712Signature2021(f) => f.poll(cx).map(|r| r.map(Transformed::Eip712))
-		}
-	}
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        match self.project() {
+            TransformProj::Error(e) => task::Poll::Ready(Err(e.take().unwrap())),
+            TransformProj::String(f) => f.poll(cx).map(|r| r.map(Transformed::String)),
+            TransformProj::JsonObject(f) => f.poll(cx).map(|r| r.map(Transformed::JsonObject)),
+            TransformProj::Eip712(f) => f.poll(cx).map(|r| r.map(Transformed::Eip712)),
+            TransformProj::EthereumEip712Signature2021(f) => {
+                f.poll(cx).map(|r| r.map(Transformed::Eip712))
+            }
+        }
+    }
 }
 
-impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, L, T>
-	CryptographicSuiteInput<T, AnyInputContext<'a, V, I, G, L>> for AnySuite
+impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, L, T>
+    CryptographicSuiteInput<T, AnyInputContext<I, V, L>> for AnySuite
 where
-	I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
-		+ rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-		+ rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
-	V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-	G: rdf_types::Generator<()>,
-	T: serde::Serialize + linked_data::LinkedData<V, I>,
-	L: ssi_vc_ldp::eip712::TypesProvider
+    I: rdf_types::interpretation::InterpretationMut<V>
+        + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+        + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
+        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+    T: serde::Serialize + linked_data::LinkedData<I, V>,
+    L: ssi_vc_ldp::eip712::TypesProvider,
 {
-	type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<'a, V, I, G, L>: 't;
+    type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<I, V, L>: 't;
 
-	/// Transformation algorithm.
-	fn transform<'t, 'c: 't>(
-		&'t self,
-		data: &'t T,
-		context: AnyInputContext<'a, V, I, G, L>,
-		params: ProofConfigurationRef<
-			'c,
-			AnyMethod,
-			AnySuiteOptions,
-		>,
-	) -> Transform<'t, L>
-	where
-		AnyInputContext<'a, V, I, G, L>: 't
-	{
-		macro_rules! ld_crypto_suites {
+    /// Transformation algorithm.
+    fn transform<'t, 'c: 't>(
+        &'t self,
+        data: &'t T,
+        context: AnyInputContext<I, V, L>,
+        params: ProofConfigurationRef<'c, AnyMethod, AnySuiteOptions>,
+    ) -> Transform<'t, L>
+    where
+        AnyInputContext<I, V, L>: 't,
+    {
+        macro_rules! ld_crypto_suites {
             {
                 $(
                     $(#[cfg($($t:tt)*)])?
@@ -195,14 +214,14 @@ where
             ethereum_personal_signature_2021: EthereumPersonalSignature2021
             // ethereum_eip712_signature_2021: EthereumEip712Signature2021
         }
-	}
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Transformed {
     String(String),
     JsonObject(JsonObject),
-    Eip712(ssi_eip712::TypedData)
+    Eip712(ssi_eip712::TypedData),
 }
 
 impl From<String> for Transformed {
@@ -251,7 +270,7 @@ impl TryFrom<Transformed> for ssi_eip712::TypedData {
     fn try_from(value: Transformed) -> Result<Self, Self::Error> {
         match value {
             Transformed::Eip712(d) => Ok(d),
-            _ => Err(HashError::InvalidTransformedInput)
+            _ => Err(HashError::InvalidTransformedInput),
         }
     }
 }

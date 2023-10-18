@@ -15,6 +15,10 @@ use crate::{
 /// See: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/>
 pub struct EcdsaSecp256k1Signature2019;
 
+impl EcdsaSecp256k1Signature2019 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019");
+}
+
 impl_rdf_input_urdna2015!(EcdsaSecp256k1Signature2019);
 
 impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
@@ -32,7 +36,7 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

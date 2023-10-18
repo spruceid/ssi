@@ -4,9 +4,10 @@
 
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
+use rdf_types::{Vocabulary, Interpretation};
 use core::fmt;
 pub use error::Error;
-use linked_data::{LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef};
+use linked_data::{rdf_types, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef, LinkedDataDeserializeSubject, LinkedDataDeserializePredicateObjects};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::borrow::Cow;
@@ -432,12 +433,12 @@ impl FromStr for CompactJWSString {
     }
 }
 
-impl LinkedDataResource for CompactJWSString {
+impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for CompactJWSString {
     fn interpretation(
         &self,
-        _vocabulary: &mut (),
-        _interpretation: &mut (),
-    ) -> linked_data::ResourceInterpretation<(), ()> {
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
         use linked_data::{xsd_types::ValueRef, CowRdfTerm, RdfLiteralRef, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(RdfTermRef::Literal(
             RdfLiteralRef::Xsd(ValueRef::String(&self.0)),
@@ -445,22 +446,104 @@ impl LinkedDataResource for CompactJWSString {
     }
 }
 
-impl LinkedDataSubject for CompactJWSString {
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for CompactJWSString {
     fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<(), ()>,
+        S: linked_data::SubjectVisitor<I, V>,
     {
         serializer.end()
     }
 }
 
-impl LinkedDataPredicateObjects for CompactJWSString {
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for CompactJWSString
+where
+    V: linked_data::rdf_types::Vocabulary<Type = linked_data::rdf_types::literal::Type<<V as linked_data::rdf_types::IriVocabulary>::Iri, <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
+    V::Value: AsRef<str>,
+    I: linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+{
+    fn deserialize_subject<D>(
+        vocabulary: &V,
+        interpretation: &I,
+        _dataset: &D,
+        _graph: &D::Graph,
+        resource: &I::Resource,
+    ) -> Result<Self, linked_data::FromLinkedDataError>
+    where
+        D: linked_data::grdf::Dataset<
+            Subject = I::Resource,
+            Predicate = I::Resource,
+            Object = I::Resource,
+            GraphLabel = I::Resource,
+        >
+    {
+        use linked_data::rdf_types::literal;
+        let mut is_literal = false;
+
+        for l in interpretation.literals_of(resource) {
+            is_literal = true;
+            let literal = vocabulary.literal(l).unwrap();
+            if let literal::Type::Any(ty) = literal.type_() {
+                if let Some(ty_iri) = vocabulary.iri(ty) {
+                    if ty_iri == linked_data::xsd_types::XSD_STRING {
+                        return literal.value().as_ref().parse().map_err(|_| linked_data::FromLinkedDataError::InvalidLiteral)
+                    }
+                }
+            }
+        }
+
+        if is_literal {
+            Err(linked_data::FromLinkedDataError::LiteralTypeMismatch)
+        } else {
+            Err(linked_data::FromLinkedDataError::ExpectedLiteral)
+        }
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for CompactJWSString {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::PredicateObjectsVisitor<(), ()>,
+        S: linked_data::PredicateObjectsVisitor<I, V>,
     {
         visitor.object(self)?;
         visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V> for CompactJWSString
+where
+    V: linked_data::rdf_types::Vocabulary<Type = linked_data::rdf_types::literal::Type<<V as linked_data::rdf_types::IriVocabulary>::Iri, <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
+    V::Value: AsRef<str>,
+    I: linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+{
+    fn deserialize_objects<'a, D>(
+        vocabulary: &V,
+        interpretation: &I,
+        dataset: &D,
+        graph: &D::Graph,
+        objects: impl IntoIterator<Item = &'a I::Resource>,
+    ) -> Result<Self, linked_data::FromLinkedDataError>
+    where
+        I::Resource: 'a,
+        D: linked_data::grdf::Dataset<
+            Subject = I::Resource,
+            Predicate = I::Resource,
+            Object = I::Resource,
+            GraphLabel = I::Resource,
+        >
+    {
+        let mut objects = objects.into_iter();
+        match objects.next() {
+            Some(object) => {
+                if objects.next().is_none() {
+                    Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
+                } else {
+                    Err(linked_data::FromLinkedDataError::TooManyValues)
+                }
+            }
+            None => {
+                Err(linked_data::FromLinkedDataError::MissingRequiredValue)
+            }
+        }
     }
 }
 

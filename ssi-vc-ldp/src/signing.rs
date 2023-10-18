@@ -1,7 +1,7 @@
 use pin_project::pin_project;
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_vc::Verifiable;
-use ssi_verification_methods::{Referencable, SignatureError, Signer, VerificationMethodRef};
+use ssi_verification_methods::{SignatureError, Signer};
 use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use crate::{
@@ -185,7 +185,6 @@ where
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
     I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>, // TODO find a way to hide that bound, if possible.
 {
     type Output = Result<Verifiable<DataIntegrity<T, S>>, Error>;
 
@@ -246,7 +245,6 @@ where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
     T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
-    for<'m> <S::VerificationMethod as Referencable>::Reference<'m>: VerificationMethodRef<'m>,
 {
     type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
 

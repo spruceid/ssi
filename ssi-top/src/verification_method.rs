@@ -1,4 +1,7 @@
-use ssi_vc_ldp::suite::{aleo_signature_2021, ethereum_eip712_signature_2021, eip712_signature_2021, ethereum_personal_signature_2021};
+use ssi_vc_ldp::suite::{
+    aleo_signature_2021, eip712_signature_2021, ethereum_eip712_signature_2021,
+    ethereum_personal_signature_2021,
+};
 use ssi_verification_methods::{
     verification_method_union, AleoMethod2021, BlockchainVerificationMethod2021,
     EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
@@ -109,10 +112,14 @@ impl TryFrom<AnyMethod> for ethereum_eip712_signature_2021::VerificationMethod {
 
     fn try_from(value: AnyMethod) -> Result<Self, Self::Error> {
         match value {
-            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => Ok(Self::EcdsaSecp256k1VerificationKey2019(m)),
-            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m)),
+            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
             AnyMethod::JsonWebKey2020(m) => Ok(Self::JsonWebKey2020(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType)
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
         }
     }
 }
@@ -132,10 +139,14 @@ impl<'a> TryFrom<AnyMethodRef<'a>> for ethereum_eip712_signature_2021::Verificat
 
     fn try_from(value: AnyMethodRef<'a>) -> Result<Self, Self::Error> {
         match value {
-            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => Ok(Self::EcdsaSecp256k1VerificationKey2019(m)),
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m)),
+            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
             AnyMethodRef::JsonWebKey2020(m) => Ok(Self::JsonWebKey2020(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType)
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
         }
     }
 }
@@ -155,10 +166,14 @@ impl TryFrom<AnyMethod> for eip712_signature_2021::VerificationMethod {
 
     fn try_from(value: AnyMethod) -> Result<Self, Self::Error> {
         match value {
-            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => Ok(Self::EcdsaSecp256k1VerificationKey2019(m)),
-            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m)),
+            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
             AnyMethod::Eip712Method2021(m) => Ok(Self::Eip712Method2021(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType)
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
         }
     }
 }
@@ -166,9 +181,15 @@ impl TryFrom<AnyMethod> for eip712_signature_2021::VerificationMethod {
 impl From<eip712_signature_2021::VerificationMethod> for AnyMethod {
     fn from(value: eip712_signature_2021::VerificationMethod) -> Self {
         match value {
-            eip712_signature_2021::VerificationMethod::EcdsaSecp256k1VerificationKey2019(m) => Self::EcdsaSecp256k1VerificationKey2019(m),
-            eip712_signature_2021::VerificationMethod::EcdsaSecp256k1RecoveryMethod2020(m) => Self::EcdsaSecp256k1RecoveryMethod2020(m),
-            eip712_signature_2021::VerificationMethod::Eip712Method2021(m) => Self::Eip712Method2021(m)
+            eip712_signature_2021::VerificationMethod::EcdsaSecp256k1VerificationKey2019(m) => {
+                Self::EcdsaSecp256k1VerificationKey2019(m)
+            }
+            eip712_signature_2021::VerificationMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Self::EcdsaSecp256k1RecoveryMethod2020(m)
+            }
+            eip712_signature_2021::VerificationMethod::Eip712Method2021(m) => {
+                Self::Eip712Method2021(m)
+            }
         }
     }
 }
@@ -178,10 +199,14 @@ impl<'a> TryFrom<AnyMethodRef<'a>> for eip712_signature_2021::VerificationMethod
 
     fn try_from(value: AnyMethodRef<'a>) -> Result<Self, Self::Error> {
         match value {
-            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => Ok(Self::EcdsaSecp256k1VerificationKey2019(m)),
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m)),
+            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
             AnyMethodRef::Eip712Method2021(m) => Ok(Self::Eip712Method2021(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType)
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
         }
     }
 }
@@ -189,9 +214,15 @@ impl<'a> TryFrom<AnyMethodRef<'a>> for eip712_signature_2021::VerificationMethod
 impl<'a> From<eip712_signature_2021::VerificationMethodRef<'a>> for AnyMethodRef<'a> {
     fn from(value: eip712_signature_2021::VerificationMethodRef<'a>) -> Self {
         match value {
-            eip712_signature_2021::VerificationMethodRef::EcdsaSecp256k1VerificationKey2019(m) => Self::EcdsaSecp256k1VerificationKey2019(m),
-            eip712_signature_2021::VerificationMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => Self::EcdsaSecp256k1RecoveryMethod2020(m),
-            eip712_signature_2021::VerificationMethodRef::Eip712Method2021(m) => Self::Eip712Method2021(m)
+            eip712_signature_2021::VerificationMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
+                Self::EcdsaSecp256k1VerificationKey2019(m)
+            }
+            eip712_signature_2021::VerificationMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Self::EcdsaSecp256k1RecoveryMethod2020(m)
+            }
+            eip712_signature_2021::VerificationMethodRef::Eip712Method2021(m) => {
+                Self::Eip712Method2021(m)
+            }
         }
     }
 }
@@ -201,9 +232,13 @@ impl TryFrom<AnyMethod> for ethereum_personal_signature_2021::VerificationMethod
 
     fn try_from(value: AnyMethod) -> Result<Self, Self::Error> {
         match value {
-            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => Ok(Self::EcdsaSecp256k1VerificationKey2019(m)),
-            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType)
+            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
         }
     }
 }
@@ -222,9 +257,13 @@ impl<'a> TryFrom<AnyMethodRef<'a>> for ethereum_personal_signature_2021::Verific
 
     fn try_from(value: AnyMethodRef<'a>) -> Result<Self, Self::Error> {
         match value {
-            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => Ok(Self::EcdsaSecp256k1VerificationKey2019(m)),
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType)
+            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
         }
     }
 }

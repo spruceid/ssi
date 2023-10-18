@@ -16,6 +16,10 @@ use crate::{
 /// Ethereum Personal Signature 2021.
 pub struct EthereumPersonalSignature2021;
 
+impl EthereumPersonalSignature2021 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EthereumPersonalSignature2021");
+}
+
 verification_method_union! {
     pub enum VerificationMethod, VerificationMethodRef, VerificationMethodType {
         EcdsaSecp256k1VerificationKey2019,
@@ -41,7 +45,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#EthereumPersonalSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

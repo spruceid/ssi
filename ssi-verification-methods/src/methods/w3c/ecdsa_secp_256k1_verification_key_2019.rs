@@ -2,7 +2,6 @@ use std::{borrow::Cow, hash::Hash};
 
 use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
@@ -14,7 +13,7 @@ use crate::{
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[serde(rename = "publicKeyJwk")]
@@ -71,7 +70,7 @@ impl PublicKey {
 /// See: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/#key-format>
 ///
 /// [1]: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "EcdsaSecp256k1VerificationKey2019")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:EcdsaSecp256k1VerificationKey2019")]
@@ -140,6 +139,14 @@ impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

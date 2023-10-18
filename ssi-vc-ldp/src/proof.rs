@@ -1,6 +1,6 @@
 use linked_data::{
     LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
-    RdfLiteralValue,
+    RdfLiteralValue, LinkedDataDeserializeSubject,
 };
 
 use iref::{Iri, IriBuf};
@@ -37,14 +37,16 @@ impl AnyType {
 /// # Type parameters
 ///
 /// - `T`: proof type value type.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, linked_data::Deserialize)]
 pub struct Proof<T: CryptographicSuite> {
     /// Proof type.
     ///
     /// Also includes the cryptographic suite variant.
+    #[ld(type)]
     type_: T,
 
     /// Untyped proof.
+    #[ld(flatten)]
     untyped: UntypedProof<T::VerificationMethod, T::Options, T::Signature>,
 }
 
@@ -99,29 +101,29 @@ impl<T: CryptographicSuite> Proof<T> {
     }
 }
 
-impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataResource<V, I>
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataResource<I, V>
     for Proof<T>
 {
     fn interpretation(
         &self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
+    ) -> linked_data::ResourceInterpretation<I, V> {
         linked_data::ResourceInterpretation::Uninterpreted(None)
     }
 }
 
-impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Proof<T>
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for Proof<T>
 where
-    T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
-    T::Options: LinkedDataSubject<V, I>,
-    T::Signature: LinkedDataSubject<V, I>,
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
     V: VocabularyMut,
     V::Value: RdfLiteralValue,
 {
     fn visit_subject<S>(&self, mut serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<V, I>,
+        S: linked_data::SubjectVisitor<I, V>,
     {
         serializer.predicate(RDF_TYPE, self.type_.iri())?;
 
@@ -133,35 +135,55 @@ where
     }
 }
 
-impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I>
+// impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for Proof<T> {
+//     fn deserialize_subject<D>(
+//         vocabulary: &V,
+//         interpretation: &I,
+//         dataset: &D,
+//         graph: &D::Graph,
+//         resource: &I::Resource,
+//     ) -> Result<Self, linked_data::FromLinkedDataError>
+//     where
+//         D: grdf::Dataset<
+//             Subject = I::Resource,
+//             Predicate = I::Resource,
+//             Object = I::Resource,
+//             GraphLabel = I::Resource,
+//         >
+//     {
+//         // ...
+//     }
+// }
+
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V>
     for Proof<T>
 where
-    T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
-    T::Options: LinkedDataSubject<V, I>,
-    T::Signature: LinkedDataSubject<V, I>,
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
     V: VocabularyMut,
     V::Value: RdfLiteralValue,
 {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
+        S: linked_data::PredicateObjectsVisitor<I, V>,
     {
         visitor.object(self)?;
         visitor.end()
     }
 }
 
-impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Proof<T>
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataGraph<I, V> for Proof<T>
 where
-    T::VerificationMethod: LinkedDataPredicateObjects<V, I>,
-    T::Options: LinkedDataSubject<V, I>,
-    T::Signature: LinkedDataSubject<V, I>,
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
     V: VocabularyMut,
     V::Value: RdfLiteralValue,
 {
     fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::GraphVisitor<V, I>,
+        S: linked_data::GraphVisitor<I, V>,
     {
         visitor.subject(self)?;
         visitor.end()

@@ -18,6 +18,10 @@ use crate::{
 #[derive(Debug, Default, Clone, Copy)]
 pub struct RsaSignature2018;
 
+impl RsaSignature2018 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#RsaSignature2018");
+}
+
 impl_rdf_input_urdna2015!(RsaSignature2018);
 
 impl CryptographicSuite for RsaSignature2018 {
@@ -35,7 +39,7 @@ impl CryptographicSuite for RsaSignature2018 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#RsaSignature2018")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 
@@ -18,7 +17,7 @@ use crate::{
 pub const EIP712_METHOD_2021_TYPE: &str = "Eip712Method2021";
 
 /// `Eip712Method2021`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "Eip712Method2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Eip712Method2021")]
@@ -99,6 +98,14 @@ impl VerificationMethod for Eip712Method2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

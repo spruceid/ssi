@@ -1,4 +1,6 @@
+use linked_data::{LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject};
 use pin_project::pin_project;
+use rdf_types::{interpretation::ReverseIriInterpretation, Interpretation, Vocabulary};
 use ssi_core::futures::FailibleFuture;
 use ssi_crypto::{MessageSignatureError, MessageSigner, SignerAdapter};
 use ssi_jwk::JWK;
@@ -7,20 +9,53 @@ use ssi_vc_ldp::{
     CryptographicSuite, ProofConfigurationRef,
 };
 use ssi_verification_methods::{
-    Referencable, ReferenceOrOwned, SignatureAlgorithm, SignatureError,
-    SigningMethod, VerificationError,
+    Referencable, ReferenceOrOwned, SignatureAlgorithm, SignatureError, SigningMethod,
+    VerificationError,
 };
 use std::future::Future;
 use std::pin::Pin;
 use std::task;
 
-use crate::{AnyMethod, AnyMethodRef, AnySignatureProtocol};
 use super::{AnySuiteOptions, AnySuiteOptionsRef, Transformed};
+use crate::{AnyMethod, AnyMethodRef, AnySignatureProtocol};
 
 type SuiteMethod<S> = <S as CryptographicSuite>::VerificationMethod;
 type SuiteSign<'a, S, T> = <<S as CryptographicSuite>::SignatureAlgorithm as SignatureAlgorithm<
     SuiteMethod<S>,
 >>::Sign<'a, T>;
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V> for AnySuite
+where
+    I: ReverseIriInterpretation<Iri = V::Iri>,
+{
+    fn deserialize_objects<'a, D>(
+        vocabulary: &V,
+        interpretation: &I,
+        dataset: &D,
+        graph: &D::Graph,
+        objects: impl IntoIterator<Item = &'a I::Resource>,
+    ) -> Result<Self, linked_data::FromLinkedDataError>
+    where
+        I::Resource: 'a,
+        D: linked_data::grdf::Dataset<
+            Subject = I::Resource,
+            Predicate = I::Resource,
+            Object = I::Resource,
+            GraphLabel = I::Resource,
+        >,
+    {
+        let mut objects = objects.into_iter();
+        match objects.next() {
+            Some(object) => match objects.next() {
+                Some(_) => Err(linked_data::FromLinkedDataError::TooManyValues),
+                None => {
+                    Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
+                }
+            },
+            None => Err(linked_data::FromLinkedDataError::MissingRequiredValue),
+        }
+    }
+}
 
 macro_rules! crypto_suites {
     {
@@ -38,6 +73,40 @@ macro_rules! crypto_suites {
                 $(#[cfg($($t)*)])?
                 $name
             ),*
+        }
+
+        impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for AnySuite
+        where
+            I: ReverseIriInterpretation<Iri = V::Iri>
+        {
+            fn deserialize_subject<D>(
+                vocabulary: &V,
+                interpretation: &I,
+                dataset: &D,
+                graph: &D::Graph,
+                resource: &I::Resource,
+            ) -> Result<Self, linked_data::FromLinkedDataError>
+            where
+                D: linked_data::grdf::Dataset<
+                    Subject = I::Resource,
+                    Predicate = I::Resource,
+                    Object = I::Resource,
+                    GraphLabel = I::Resource,
+                >
+            {
+                for i in interpretation.iris_of(resource) {
+                    if let Some(iri) = vocabulary.iri(i) {
+                        $(
+                            $(#[cfg($($t)*)])?
+                            if iri == ssi_vc_ldp::suite::$name::IRI {
+                                return Ok(Self::$name)
+                            }
+                        )*
+                    }
+                }
+
+                Err(linked_data::FromLinkedDataError::InvalidSubject)
+            }
         }
 
         pub enum AnySignatureAlgorithm {
@@ -204,7 +273,7 @@ pub enum Hashed {
     Array32([u8; 32]),
     Array64([u8; 64]),
     Vec(Vec<u8>),
-    String(String)
+    String(String),
 }
 
 impl AsRef<[u8]> for Hashed {
@@ -213,7 +282,7 @@ impl AsRef<[u8]> for Hashed {
             Self::Array32(a) => a.as_ref(),
             Self::Array64(a) => a.as_ref(),
             Self::Vec(v) => v.as_ref(),
-            Self::String(s) => s.as_bytes()
+            Self::String(s) => s.as_bytes(),
         }
     }
 }
@@ -328,7 +397,11 @@ crypto_suites! {
 impl AnySuite {
     pub fn requires_public_key_jwk(&self) -> bool {
         if cfg!(feature = "tezos") {
-            matches!(self, Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 | Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021) 
+            matches!(
+                self,
+                Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    | Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+            )
         } else {
             false
         }

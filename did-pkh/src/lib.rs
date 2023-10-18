@@ -722,7 +722,7 @@ mod tests {
     use ssi_core::one_or_many::OneOrMany;
     use ssi_dids::{DIDResolver, resolution::ErrorKind, did, DIDVerifier};
     use ssi_jwk::Algorithm;
-    use ssi_vc_ldp::{Proof, ProofConfiguration, CryptographicSuiteInput, LinkedDataInput, CryptographicSuite, verification::{MethodReferenceOrOwned, method::{ProofPurpose, signer::SingleSecretSigner}}};
+    use ssi_vc_ldp::{Proof, ProofConfiguration, CryptographicSuiteInput, LinkedDataInput, CryptographicSuite, verification::{MethodReferenceOrOwned, method::{ProofPurpose, signer::SingleSecretSigner}}, DataIntegrity};
     use ssi_top::{AnySuite, AnyInputContext};
     // use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
@@ -1258,14 +1258,14 @@ mod tests {
         //     .is_empty());
     }
 
-    fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
-        // Simulate signing with a Tezos wallet
-        let micheline = match prep.signing_input {
-            ssi_ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
-            _ => panic!("Expected Micheline expression for signing"),
-        };
-        ssi_tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
-    }
+    // fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
+    //     // Simulate signing with a Tezos wallet
+    //     let micheline = match prep.signing_input {
+    //         ssi_ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
+    //         _ => panic!("Expected Micheline expression for signing"),
+    //     };
+    //     ssi_tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
+    // }
 
     #[tokio::test]
     #[cfg(all(feature = "eip", feature = "tezos"))]
@@ -1332,7 +1332,7 @@ mod tests {
         .await;
 
         // eth/Eip712
-        let eip712_domain: ssi_ldp::eip712::ProofInfo = serde_json::from_value(json!({
+        let eip712_domain = serde_json::from_value(json!({
           "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
@@ -1362,7 +1362,7 @@ mod tests {
           "primaryType": "VerifiableCredential"
         }))
         .unwrap();
-        let vp_eip712_domain: ssi_ldp::eip712::ProofInfo = serde_json::from_value(json!({
+        let vp_eip712_domain = serde_json::from_value(json!({
           "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
@@ -1575,6 +1575,13 @@ mod tests {
     }
 
     async fn test_verify_vc(vc_str: &str, num_warnings: usize) {
+        DataIntegrity::from_json_ld(
+            vocabulary,
+            generator,
+            interpretation,
+            input,
+            params
+        );
         let mut vc = ssi_vc::Credential::from_json_unsigned(vc_str).unwrap();
         vc.validate().unwrap();
         let mut context_loader = ssi_json_ld::ContextLoader::default();

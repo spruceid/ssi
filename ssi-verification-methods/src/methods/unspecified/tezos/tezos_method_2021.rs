@@ -1,5 +1,4 @@
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use static_iref::iri;
@@ -34,7 +33,7 @@ pub const TEZOS_METHOD_2021_TYPE: &str = "TezosMethod2021";
 /// `publicKeyMultibase` properties. Here `publicKeyMultibase` is used in a
 /// non-standard way, where the public key is encoded in base58 (`z` prefix) as
 /// a tezos key (so without multicodec, contrarily to the specification).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "TezosMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct TezosMethod2021 {
@@ -51,7 +50,7 @@ pub struct TezosMethod2021 {
     pub public_key: PublicKey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[serde(rename = "publicKeyJwk")]
@@ -129,6 +128,14 @@ impl VerificationMethod for TezosMethod2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

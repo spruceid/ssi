@@ -1,6 +1,4 @@
 use std::future;
-
-use linked_data::LinkedData;
 use ssi_crypto::MessageSigner;
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
@@ -41,6 +39,10 @@ use crate::{
 /// The [`TezosMethod2021`] verification method is used.
 pub struct TezosSignature2021;
 
+impl TezosSignature2021 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#TezosSignature2021");
+}
+
 impl_rdf_input_urdna2015!(TezosSignature2021);
 
 impl CryptographicSuite for TezosSignature2021 {
@@ -58,7 +60,7 @@ impl CryptographicSuite for TezosSignature2021 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#TezosSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -83,7 +85,7 @@ impl CryptographicSuite for TezosSignature2021 {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Signature {
     /// Base58-encoded signature.
@@ -178,7 +180,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[ld("sec:publicKeyJwk")]

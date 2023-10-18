@@ -1,13 +1,12 @@
 use crate::{
-    LinkedDataVerificationMethod, Referencable, VerificationMethod, VerificationMethodRef,
+    LinkedDataVerificationMethod, Referencable, VerificationMethod
 };
 use iref::{Iri, IriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 
 /// Reference to a verification method.
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, LinkedData,
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize,
 )]
 #[serde(untagged)]
 pub enum ReferenceOrOwned<M> {
@@ -70,7 +69,7 @@ impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference
 }
 
 /// Reference to a verification method.
-#[derive(Serialize, LinkedData)]
+#[derive(Serialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(untagged, bound(serialize = "M::Reference<'a>: Serialize"))]
 pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
     Reference(#[ld(id)] &'a Iri),
@@ -86,14 +85,11 @@ impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
     }
 }
 
-impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M>
-where
-    M::Reference<'a>: VerificationMethodRef<'a>,
-{
+impl<'a, M: VerificationMethod> ReferenceOrOwnedRef<'a, M> {
     pub fn id(&self) -> &'a Iri {
         match self {
             Self::Reference(r) => *r,
-            Self::Owned(m) => m.id(),
+            Self::Owned(m) => M::ref_id(*m),
         }
     }
 }

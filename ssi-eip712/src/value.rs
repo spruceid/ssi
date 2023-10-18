@@ -157,53 +157,22 @@ impl From<Value> for serde_json::Value {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataResource<V, I> for Value {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
-        linked_data::ResourceInterpretation::Uninterpreted(Some(linked_data::CowRdfTerm::Owned(
-            rdf_types::Term::Literal(linked_data::RdfLiteral::Json(
-                json_syntax::to_value(self).unwrap(),
-            )),
-        )))
-    }
-}
+linked_data::json_literal!(Value);
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Value {
-    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<V, I>,
-    {
-        serializer.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for Value {
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Value {
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<I, V> for Value {
     fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::GraphVisitor<V, I>,
+        S: linked_data::GraphVisitor<I, V>,
     {
         visitor.subject(self)?;
         visitor.end()
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for Value {
+impl<V: Vocabulary, I: Interpretation> LinkedData<I, V> for Value {
     fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::Visitor<V, I>,
+        S: linked_data::Visitor<I, V>,
     {
         visitor.default_graph(self)?;
         visitor.end()

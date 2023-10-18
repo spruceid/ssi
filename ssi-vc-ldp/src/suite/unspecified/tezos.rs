@@ -6,7 +6,6 @@ mod tezos_jcs_signature_2021;
 pub mod tezos_signature_2021;
 
 pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-use linked_data::LinkedData;
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 use ssi_jwk::JWK;
 use ssi_verification_methods::{covariance_rule, Referencable};
@@ -15,7 +14,7 @@ pub use tezos_signature_2021::TezosSignature2021;
 
 use crate::suite::CryptographicSuiteOptions;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Options {
     #[serde(rename = "publicKeyJwk")]
@@ -45,7 +44,7 @@ impl Referencable for Options {
     covariance_rule!();
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, LinkedData)]
+#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct OptionsRef<'a> {
     #[serde(rename = "publicKeyJwk")]

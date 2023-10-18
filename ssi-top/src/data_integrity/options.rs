@@ -1,12 +1,19 @@
-use linked_data::LinkedData;
 use ssi_jwk::JWK;
 use ssi_vc_ldp::suite::CryptographicSuiteOptions;
-use ssi_verification_methods::{Referencable, covariance_rule, VerificationError, SignatureError};
+use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, VerificationError};
 
 use crate::AnySuite;
 
 /// Options for all cryptographic suites.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 pub struct AnySuiteOptions {
@@ -16,7 +23,7 @@ pub struct AnySuiteOptions {
     pub public_key_jwk: Option<Box<JWK>>,
 
     #[ld("eip712:eip712")]
-    pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>
+    pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 }
 
 impl AnySuiteOptions {
@@ -27,13 +34,17 @@ impl AnySuiteOptions {
     pub fn with_public_key(jwk: JWK) -> Self {
         Self {
             public_key_jwk: Some(Box::new(jwk)),
-            eip712: None
+            eip712: None,
         }
     }
 }
 
-impl From<Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>> for AnySuiteOptions {
-    fn from(value: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>) -> Self {
+impl From<Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>>
+    for AnySuiteOptions
+{
+    fn from(
+        value: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
+    ) -> Self {
         Self {
             eip712: value,
             ..Default::default()
@@ -56,7 +67,7 @@ impl Referencable for AnySuiteOptions {
     fn as_reference(&self) -> Self::Reference<'_> {
         AnySuiteOptionsRef {
             public_key_jwk: self.public_key_jwk.as_deref(),
-            eip712: self.eip712.as_ref()
+            eip712: self.eip712.as_ref(),
         }
     }
 
@@ -64,10 +75,7 @@ impl Referencable for AnySuiteOptions {
 }
 
 impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
-    fn prepare(
-        &mut self,
-        suite: &AnySuite
-    ) {
+    fn prepare(&mut self, suite: &AnySuite) {
         if !suite.requires_public_key_jwk() {
             self.public_key_jwk = None
         }
@@ -78,7 +86,7 @@ impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
 pub struct AnySuiteOptionsRef<'a> {
     pub public_key_jwk: Option<&'a JWK>,
 
-    pub eip712: Option<&'a ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>
+    pub eip712: Option<&'a ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 }
 
 impl<'a> From<AnySuiteOptionsRef<'a>> for () {
@@ -101,10 +109,12 @@ impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptionsRe
 }
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
-impl<'a> From<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::ethereum_eip712_signature_2021::OptionsRef<'a> {
+impl<'a> From<AnySuiteOptionsRef<'a>>
+    for ssi_vc_ldp::suite::ethereum_eip712_signature_2021::OptionsRef<'a>
+{
     fn from(value: AnySuiteOptionsRef<'a>) -> Self {
         Self {
-            eip712: value.eip712
+            eip712: value.eip712,
         }
     }
 }

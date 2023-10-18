@@ -5,6 +5,7 @@ use ssi_verification_methods::{
     P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
 };
 use static_iref::iri;
+use iref::Iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
@@ -14,6 +15,10 @@ use crate::{
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz3` addresses.
 pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+
+impl P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    pub const IRI: &Iri = iri!("https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021");
+}
 
 impl_rdf_input_urdna2015!(P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
 
@@ -33,7 +38,7 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
     type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

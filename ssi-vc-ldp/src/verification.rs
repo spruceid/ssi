@@ -1,4 +1,4 @@
-use method::{Referencable, VerificationMethodRef, Verifier};
+use method::Verifier;
 
 use crate::{suite::VerifyProof, CryptographicSuite, DataIntegrity, Proof};
 
@@ -7,8 +7,7 @@ pub use ssi_verification_methods as method;
 
 impl<T, S: CryptographicSuite> ssi_vc::VerifiableWith for DataIntegrity<T, S>
 where
-    S::VerificationMethod: VerificationMethod,
-    for<'a> <S::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
+    S::VerificationMethod: VerificationMethod
 {
     type Proof = Proof<S>;
     type Method = S::VerificationMethod;

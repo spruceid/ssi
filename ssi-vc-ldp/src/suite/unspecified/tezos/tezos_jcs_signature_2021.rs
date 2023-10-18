@@ -1,5 +1,5 @@
 use std::future;
-
+use iref::Iri;
 use serde::Serialize;
 use ssi_crypto::MessageSigner;
 use ssi_tzkey::EncodeTezosSignedMessageError;
@@ -42,21 +42,25 @@ pub use super::tezos_signature_2021::{PublicKey, PublicKeyRef, Signature, Signat
 /// The [`TezosMethod2021`] verification method is used.
 pub struct TezosJcsSignature2021;
 
-impl<T: Serialize> CryptographicSuiteInput<T> for TezosJcsSignature2021 {
-    type Transform<'a> = std::future::Ready<Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a;
+impl TezosJcsSignature2021 {
+    pub const IRI: &Iri = iri!("https://w3id.org/security#TezosJcsSignature2021");
+}
+
+impl<C, T: Serialize> CryptographicSuiteInput<T, C> for TezosJcsSignature2021 {
+    type Transform<'a> = std::future::Ready<Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a, C: 'a;
 
     /// Transformation algorithm.
     fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
-        _context: (),
+        context: C,
         _options: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Self::Transform<'a> {
-        std::future::ready(transform(data))
+    ) -> Self::Transform<'a> where C: 'a {
+        std::future::ready(transform(data, context))
     }
 }
 
-fn transform<T: Serialize>(data: &T) -> Result<serde_json::Map<String, serde_json::Value>, TransformError> {
+fn transform<C, T: Serialize>(data: &T, _context: C) -> Result<serde_json::Map<String, serde_json::Value>, TransformError> {
     let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;
     match json {
         serde_json::Value::Object(obj) => Ok(obj),
@@ -79,7 +83,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#TezosJcsSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

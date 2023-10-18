@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
@@ -20,7 +19,7 @@ pub const ED25519_VERIFICATION_KEY_2020_TYPE: &str = "Ed25519VerificationKey2020
 /// Deprecated verification method for the `Ed25519Signature2020` suite.
 ///
 /// See: <https://w3c.github.io/vc-di-eddsa/#ed25519verificationkey2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "Ed25519VerificationKey2020")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Ed25519VerificationKey2020")]
@@ -140,6 +139,14 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

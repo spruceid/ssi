@@ -51,6 +51,10 @@ use crate::{
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Eip712Signature2021;
 
+impl Eip712Signature2021 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EthereumEip712Signature2021");
+}
+
 verification_method_union! {
     pub enum VerificationMethod, VerificationMethodRef, VerificationMethodType {
         Eip712Method2021,
@@ -75,7 +79,7 @@ impl CryptographicSuite for Eip712Signature2021 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#EthereumEip712Signature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -97,42 +101,42 @@ impl CryptographicSuite for Eip712Signature2021 {
     }
 }
 
-impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>
-    CryptographicSuiteInput<T, LinkedDataInput<'a, V, I, G>> for Eip712Signature2021
+impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>
+    CryptographicSuiteInput<T, LinkedDataInput<I, V>> for Eip712Signature2021
 where
-    I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+    I: rdf_types::interpretation::InterpretationMut<V>
+        + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
         + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    G: rdf_types::Generator<()>,
-    T: linked_data::LinkedData<V, I>,
+    T: linked_data::LinkedData<I, V>,
 {
-    type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, LinkedDataInput<'a, V, I, G>: 't;
+    type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, LinkedDataInput<I, V>: 't;
 
     /// Transformation algorithm.
     fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
-        context: LinkedDataInput<'a, V, I, G>,
+        context: LinkedDataInput<I, V>,
         options: ProofConfigurationRef<'c, VerificationMethod>,
-    ) -> Self::Transform<'t> where LinkedDataInput<'a, V, I, G>: 't {
+    ) -> Self::Transform<'t> where LinkedDataInput<I, V>: 't {
         std::future::ready(transform(self, data, context, options))
     }
 }
 
-fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>(
+fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>(
     suite: &Eip712Signature2021,
     data: &T,
-    context: LinkedDataInput<V, I, G>,
+    context: LinkedDataInput<I, V>,
     options: ProofConfigurationRef<VerificationMethod>,
 ) -> Result<ssi_eip712::TypedData, TransformError>
 where
-    I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+    I: rdf_types::interpretation::InterpretationMut<V>
+    + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
     + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
     + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    G: rdf_types::Generator<()>,
-    T: linked_data::LinkedData<V, I>,
+    T: linked_data::LinkedData<I, V>,
 {
     let document_quads = context.into_quads(data)?;
     let document_quads: Vec<_> = ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref())).collect();

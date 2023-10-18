@@ -14,6 +14,7 @@ pub mod suite;
 pub mod verification;
 pub mod eip712;
 
+pub use decode::*;
 pub use proof::*;
 pub use signing::sign;
 pub use suite::{CryptographicSuite, CryptographicSuiteInput, LinkedDataInput};
@@ -28,7 +29,7 @@ pub enum Error {
 }
 
 /// Data Integrity credential.
-#[derive(Educe, serde::Serialize, LinkedData)]
+#[derive(Educe, serde::Serialize, linked_data::Serialize)]
 #[educe(Clone(bound = "T: Clone, S::Hashed: Clone"))]
 #[serde(transparent)]
 pub struct DataIntegrity<T, S: CryptographicSuite> {
@@ -148,7 +149,8 @@ struct TransformParameters<'a, X, S: CryptographicSuite> {
 impl<'max, T: 'max, X: 'max, S: 'max + CryptographicSuiteInput<T, X>> RefFutureBinder<'max, UnboundedTransform<T, X, S>> for TransformParameters<'max, X, S> {
     fn bind<'a>(context: Self, value: &'a T) -> S::Transform<'a>
         where
-            'max: 'a {
+            'max: 'a
+    {
         context.suite.transform(value, context.context, context.params)
     }
 }

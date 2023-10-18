@@ -25,6 +25,10 @@ pub use verification::method::Ed25519VerificationKey2020;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Ed25519Signature2020;
 
+impl Ed25519Signature2020 {
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#Ed25519Signature2020");
+}
+
 impl_rdf_input_urdna2015!(Ed25519Signature2020);
 
 impl CryptographicSuite for Ed25519Signature2020 {
@@ -42,7 +46,7 @@ impl CryptographicSuite for Ed25519Signature2020 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#Ed25519Signature2020")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

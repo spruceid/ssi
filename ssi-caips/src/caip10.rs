@@ -85,14 +85,14 @@ impl<'de> Deserialize<'de> for BlockchainAccountId {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I>
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V>
     for BlockchainAccountId
 {
     fn interpretation(
         &self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
+    ) -> linked_data::ResourceInterpretation<I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
@@ -100,20 +100,20 @@ impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I>
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for BlockchainAccountId {
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for BlockchainAccountId {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
+        S: linked_data::PredicateObjectsVisitor<I, V>,
     {
         visitor.object(self)?;
         visitor.end()
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for BlockchainAccountId {
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for BlockchainAccountId {
     fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<V, I>,
+        S: linked_data::SubjectVisitor<I, V>,
     {
         visitor.end()
     }

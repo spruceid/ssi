@@ -2,7 +2,7 @@
 
 use core::fmt;
 use linked_data::rdf_types::{Interpretation, Vocabulary};
-use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
+use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject, LinkedDataDeserializeSubject, LinkedDataDeserializePredicateObjects};
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
@@ -96,41 +96,7 @@ impl fmt::Display for JWK {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for JWK {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
-        use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
-
-        let mut value = json_syntax::to_value(self).unwrap();
-        value.canonicalize();
-
-        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
-            RdfLiteral::Json(value),
-        ))))
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for JWK {
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for JWK {
-    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<V, I>,
-    {
-        visitor.end()
-    }
-}
+linked_data::json_literal!(JWK);
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 #[serde(tag = "kty")]

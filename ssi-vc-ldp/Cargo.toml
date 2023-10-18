@@ -76,7 +76,7 @@ multibase.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
-json-ld.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
 locspan.workspace = true
 grdf.workspace = true
 hex.workspace = true

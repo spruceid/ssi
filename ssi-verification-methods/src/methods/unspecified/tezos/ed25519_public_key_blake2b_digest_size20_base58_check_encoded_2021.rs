@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
@@ -14,7 +13,7 @@ use crate::{
 pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
     "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(
     tag = "type",
     rename = "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
@@ -66,6 +65,14 @@ impl VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncode
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 

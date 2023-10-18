@@ -2,6 +2,7 @@ use ssi_crypto::MessageSigner;
 use ssi_jwk::Algorithm;
 use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, VerificationError};
 use static_iref::iri;
+use iref::Iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
@@ -13,6 +14,10 @@ use crate::{
 ///
 /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
 pub struct EcdsaSecp256k1RecoverySignature2020;
+
+impl EcdsaSecp256k1RecoverySignature2020 {
+    pub const IRI: &'static Iri = iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020");
+}
 
 impl_rdf_input_urdna2015!(EcdsaSecp256k1RecoverySignature2020);
 
@@ -32,7 +37,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {

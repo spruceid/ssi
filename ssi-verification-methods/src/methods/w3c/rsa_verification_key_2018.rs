@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 
@@ -22,7 +21,7 @@ pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
 /// See: <https://www.w3.org/TR/did-spec-registries/#rsaverificationkey2018>
 ///
 /// [1]: <https://w3c-ccg.github.io/lds-rsa2018/>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[serde(tag = "type", rename = "RsaVerificationKey2018")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:RsaVerificationKey2018")]
@@ -70,6 +69,14 @@ impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
     }
 }
 
