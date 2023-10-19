@@ -27,11 +27,7 @@ pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
 ) -> Result<Claims, DecodeError> {
     let mut payload_claims: serde_json::Value = ssi_jwt::decode_verify(jwt, key)?;
 
-    let sd_alg = sd_alg(&payload_claims)?;
-    let _ = payload_claims
-        .as_object_mut()
-        .unwrap()
-        .remove(SD_ALG_CLAIM_NAME);
+    let sd_alg = extract_sd_alg(&mut payload_claims)?;
 
     let mut disclosures = translate_to_in_progress_disclosures(disclosures, sd_alg)?;
 
@@ -46,12 +42,16 @@ pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
     Ok(serde_json::from_value(payload_claims)?)
 }
 
-fn sd_alg(claims: &serde_json::Value) -> Result<SdAlg, DecodeError> {
-    let alg_name = claims[SD_ALG_CLAIM_NAME]
-        .as_str()
+fn extract_sd_alg(claims: &mut serde_json::Value) -> Result<SdAlg, DecodeError> {
+    let claims = claims.as_object_mut().ok_or(DecodeError::ClaimsWrongType)?;
+
+    let sd_alg_claim = claims
+        .remove(SD_ALG_CLAIM_NAME)
         .ok_or(DecodeError::MissingSdAlg)?;
 
-    SdAlg::try_from(alg_name)
+    let sd_alg = sd_alg_claim.as_str().ok_or(DecodeError::SdAlgWrongType)?;
+
+    SdAlg::try_from(sd_alg)
 }
 
 fn translate_to_in_progress_disclosures(

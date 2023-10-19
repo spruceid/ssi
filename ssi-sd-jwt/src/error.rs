@@ -5,6 +5,10 @@ pub enum DecodeError {
     #[error("Unable to deserialize string format of concatenated tildes")]
     UnableToDeserializeStringFormat,
 
+    /// JWT payload claims were not a JSON object
+    #[error("JWT payload claims were not a JSON object")]
+    ClaimsWrongType,
+
     /// JWT is missing _sd_alg property
     #[error("JWT is missing _sd_alg property")]
     MissingSdAlg,
@@ -12,6 +16,10 @@ pub enum DecodeError {
     /// Unknown value of _sd_alg
     #[error("Unknown value of _sd_alg {0}")]
     UnknownSdAlg(String),
+
+    /// Type of _sd_alg was not string
+    #[error("Type of _sd_alg was not string")]
+    SdAlgWrongType,
 
     /// Multiple disclosures given with the same hash
     #[error("Multiple disclosures given with the same hash")]
