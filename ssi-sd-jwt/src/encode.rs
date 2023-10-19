@@ -1,4 +1,4 @@
-use jose_b64::base64ct::{Base64UrlUnpadded, Encoding};
+use base64::URL_SAFE_NO_PAD;
 use rand::{CryptoRng, Rng};
 use serde::Serialize;
 use ssi_jwk::{Algorithm, JWK};
@@ -25,9 +25,9 @@ fn encode_disclosure_with_salt<ClaimValue: Serialize>(
         None => serde_json::json!([salt, claim_value]),
     };
 
-    let json_bytes = jose_b64::serde::Json::<serde_json::Value>::new(disclosure)?;
+    let json_string = serde_json::to_string(&disclosure)?;
 
-    Ok(Base64UrlUnpadded::encode_string(json_bytes.as_ref()))
+    Ok(base64::encode_config(json_string, URL_SAFE_NO_PAD))
 }
 
 pub fn encode_disclosure_with_rng<ClaimValue: Serialize, Rand: Rng + CryptoRng>(
@@ -42,7 +42,7 @@ pub fn encode_disclosure_with_rng<ClaimValue: Serialize, Rand: Rng + CryptoRng>(
 
     rng.fill_bytes(&mut salt_bytes);
 
-    let salt = Base64UrlUnpadded::encode_string(&salt_bytes);
+    let salt = base64::encode_config(salt_bytes, URL_SAFE_NO_PAD);
 
     encode_disclosure_with_salt(&salt, claim_name, claim_value)
 }

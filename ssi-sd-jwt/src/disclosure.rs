@@ -1,4 +1,4 @@
-use jose_b64::base64ct::{Base64UrlUnpadded, Encoding};
+use base64::URL_SAFE_NO_PAD;
 
 use crate::DecodeError;
 
@@ -19,8 +19,9 @@ pub enum DisclosureKind {
 
 impl DecodedDisclosure {
     pub fn new(encoded: &str) -> Result<Self, DecodeError> {
-        let bytes = Base64UrlUnpadded::decode_vec(encoded).unwrap();
-        let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let bytes = base64::decode_config(encoded, URL_SAFE_NO_PAD)
+            .map_err(|_| DecodeError::DisclosureMalformed)?;
+        let json: serde_json::Value = serde_json::from_slice(&bytes)?;
 
         match json {
             serde_json::Value::Array(values) => match values.len() {
