@@ -24,9 +24,9 @@ impl DecodedDisclosure {
         let json: serde_json::Value = serde_json::from_slice(&bytes)?;
 
         match json {
-            serde_json::Value::Array(values) => match values.len() {
-                3 => validate_property_disclosure(&values),
-                2 => validate_array_item_disclosure(&values),
+            serde_json::Value::Array(values) => match values.as_slice() {
+                [salt, name, value] => validate_property_disclosure(salt, name, value),
+                [salt, value] => validate_array_item_disclosure(salt, value),
                 _ => Err(DecodeError::DisclosureMalformed),
             },
             _ => Err(DecodeError::DisclosureMalformed),
@@ -35,29 +35,32 @@ impl DecodedDisclosure {
 }
 
 fn validate_property_disclosure(
-    values: &[serde_json::Value],
+    salt: &serde_json::Value,
+    name: &serde_json::Value,
+    value: &serde_json::Value,
 ) -> Result<DecodedDisclosure, DecodeError> {
-    let salt = values[0].as_str().ok_or(DecodeError::DisclosureMalformed)?;
+    let salt = salt.as_str().ok_or(DecodeError::DisclosureMalformed)?;
 
-    let name = values[1].as_str().ok_or(DecodeError::DisclosureMalformed)?;
+    let name = name.as_str().ok_or(DecodeError::DisclosureMalformed)?;
 
     Ok(DecodedDisclosure {
         salt: salt.to_owned(),
         kind: DisclosureKind::Property {
             name: name.to_owned(),
-            value: values[2].clone(),
+            value: value.clone(),
         },
     })
 }
 
 fn validate_array_item_disclosure(
-    values: &[serde_json::Value],
+    salt: &serde_json::Value,
+    value: &serde_json::Value,
 ) -> Result<DecodedDisclosure, DecodeError> {
-    let salt = values[0].as_str().ok_or(DecodeError::DisclosureMalformed)?;
+    let salt = salt.as_str().ok_or(DecodeError::DisclosureMalformed)?;
 
     Ok(DecodedDisclosure {
         salt: salt.to_owned(),
-        kind: DisclosureKind::ArrayItem(values[1].clone()),
+        kind: DisclosureKind::ArrayItem(value.clone()),
     })
 }
 
