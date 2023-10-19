@@ -21,8 +21,8 @@ pub struct ValidityClaims {
     pub exp: Option<NumericDate>,
 }
 
-/// High level API to decode a fuilly encoded SD-JWT.  That is a JWT and selective
-/// disclosures seperated by tildes
+/// High level API to decode a fully encoded SD-JWT.  That is a JWT and selective
+/// disclosures separated by tildes
 pub fn decode_verify<Claims: DeserializeOwned>(
     serialized: &str,
     key: &JWK,
@@ -33,7 +33,7 @@ pub fn decode_verify<Claims: DeserializeOwned>(
     decode_verify_disclosure_array(deserialized.jwt, key, &deserialized.disclosures)
 }
 
-/// Lower level API to decode an SD-JWT that has already been split into it's
+/// Lower level API to decode an SD-JWT that has already been split into its
 /// JWT and disclosure components
 pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
     jwt: &str,
