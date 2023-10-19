@@ -108,15 +108,11 @@ fn visit_claims(
     }
 
     // Process _sd claim
-    let new_claims = if let Some(sd_claims) = payload_claims.get(SD_CLAIM_NAME) {
-        decode_sd_claims(sd_claims, disclosures)?
+    let new_claims = if let Some(sd_claims) = payload_claims.remove(SD_CLAIM_NAME) {
+        decode_sd_claims(&sd_claims, disclosures)?
     } else {
         vec![]
     };
-
-    if payload_claims.contains_key(SD_CLAIM_NAME) {
-        payload_claims.remove(SD_CLAIM_NAME);
-    }
 
     for (new_claim_name, mut new_claim_value) in new_claims {
         visit_claims(&mut new_claim_value, disclosures)?;
