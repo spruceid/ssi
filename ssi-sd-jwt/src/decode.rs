@@ -2,8 +2,8 @@ use serde::de::DeserializeOwned;
 use ssi_jwk::JWK;
 use std::collections::BTreeMap;
 
+use crate::disclosure::{DecodedDisclosure, DisclosureKind};
 use crate::serialized::deserialize_string_format;
-use crate::verify::{DecodedDisclosure, DisclosureKind};
 use crate::*;
 
 /// High level API to decode a fully encoded SD-JWT.  That is a JWT and selective
@@ -15,21 +15,20 @@ pub fn decode_verify<Claims: DeserializeOwned>(
     let deserialized = deserialize_string_format(serialized)
         .ok_or(DecodeError::UnableToDeserializeStringFormat)?;
 
-    decode_verify_disclosure_array(deserialized.jwt, key, &deserialized.disclosures)
+    decode_verify_disclosure_array(deserialized, key)
 }
 
 /// Lower level API to decode an SD-JWT that has already been split into its
 /// JWT and disclosure components
 pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
-    jwt: &str,
+    deserialized: Deserialized<'_>,
     key: &JWK,
-    disclosures: &[&str],
 ) -> Result<Claims, DecodeError> {
-    let mut payload_claims: serde_json::Value = ssi_jwt::decode_verify(jwt, key)?;
+    let mut payload_claims: serde_json::Value = ssi_jwt::decode_verify(deserialized.jwt, key)?;
 
     let sd_alg = extract_sd_alg(&mut payload_claims)?;
 
-    let mut disclosures = translate_to_in_progress_disclosures(disclosures, sd_alg)?;
+    let mut disclosures = translate_to_in_progress_disclosures(&deserialized.disclosures, sd_alg)?;
 
     visit_claims(&mut payload_claims, &mut disclosures)?;
 

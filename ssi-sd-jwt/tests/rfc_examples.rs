@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use ssi_sd_jwt::decode_verify_disclosure_array;
+use ssi_sd_jwt::{decode_verify_disclosure_array, Deserialized};
 
 fn rfc_a_5_key() -> ssi_jwk::JWK {
     serde_json::from_value(serde_json::json!({
@@ -79,9 +79,14 @@ fn rfc_a_1_example_2_verification() {
         "WyJ5eXRWYmRBUEdjZ2wyckk0QzlHU29nIiwgImJpcnRoZGF0ZSIsICIxOTQwLTAxLTAxIl0";
 
     // Raw with no disclosures
-    let no_disclosures =
-        decode_verify_disclosure_array::<Example2Claims>(EXAMPLE_2_JWT, &rfc_a_5_key(), &[])
-            .unwrap();
+    let no_disclosures = decode_verify_disclosure_array::<Example2Claims>(
+        Deserialized {
+            jwt: EXAMPLE_2_JWT,
+            disclosures: vec![],
+        },
+        &rfc_a_5_key(),
+    )
+    .unwrap();
 
     assert_eq!(
         no_disclosures,
@@ -96,9 +101,11 @@ fn rfc_a_1_example_2_verification() {
 
     // Top level claim disclosed
     let sub_claim_disclosed = decode_verify_disclosure_array::<Example2Claims>(
-        EXAMPLE_2_JWT,
+        Deserialized {
+            jwt: EXAMPLE_2_JWT,
+            disclosures: vec![SUB_CLAIM_DISCLOSURE],
+        },
         &rfc_a_5_key(),
-        &[SUB_CLAIM_DISCLOSURE],
     )
     .unwrap();
 
@@ -116,9 +123,11 @@ fn rfc_a_1_example_2_verification() {
 
     // Address claim disclosed
     let address_country_disclosed = decode_verify_disclosure_array::<Example2Claims>(
-        EXAMPLE_2_JWT,
+        Deserialized {
+            jwt: EXAMPLE_2_JWT,
+            disclosures: vec![ADDRESS_COUNTRY_DISCLOSURE],
+        },
         &rfc_a_5_key(),
-        &[ADDRESS_COUNTRY_DISCLOSURE],
     )
     .unwrap();
 
@@ -138,20 +147,22 @@ fn rfc_a_1_example_2_verification() {
 
     // All claims disclosed
     let all_claims = decode_verify_disclosure_array::<Example2Claims>(
-        EXAMPLE_2_JWT,
+        Deserialized {
+            jwt: EXAMPLE_2_JWT,
+            disclosures: vec![
+                SUB_CLAIM_DISCLOSURE,
+                GIVEN_NAME_DISCLOSURE,
+                FAMILY_NAME_DISCLOSURE,
+                EMAIL_CLAIM_DISCLOSURE,
+                PHONE_NUMBER_DISCLOSURE,
+                ADDRESS_STREET_ADDRESS_DISCLOSURES,
+                ADDRESS_LOCALITY_DISCLOSURE,
+                ADDRESS_REGION_DISCLOSURE,
+                ADDRESS_COUNTRY_DISCLOSURE,
+                BIRTHDATE_DISCLOSURE,
+            ],
+        },
         &rfc_a_5_key(),
-        &[
-            SUB_CLAIM_DISCLOSURE,
-            GIVEN_NAME_DISCLOSURE,
-            FAMILY_NAME_DISCLOSURE,
-            EMAIL_CLAIM_DISCLOSURE,
-            PHONE_NUMBER_DISCLOSURE,
-            ADDRESS_STREET_ADDRESS_DISCLOSURES,
-            ADDRESS_LOCALITY_DISCLOSURE,
-            ADDRESS_REGION_DISCLOSURE,
-            ADDRESS_COUNTRY_DISCLOSURE,
-            BIRTHDATE_DISCLOSURE,
-        ],
     )
     .unwrap();
 
@@ -309,26 +320,28 @@ fn rfc_a_2_example_3_verification() {
 
     // All Claims
     let all_claims = decode_verify_disclosure_array::<Example3Claims>(
-        EXAMPLE_3_JWT,
+        Deserialized {
+            jwt: EXAMPLE_3_JWT,
+            disclosures: vec![
+                VERIFIED_CLAIMS_TIME_DISCLOSURE,
+                VERIFIED_CLAIMS_VERIFICATION_PROCESS_DISCLOSURE,
+                VERIFIED_CLAIMS_EVIDENCE_0_TYPE_DISCLOSURE,
+                VERIFIED_CLAIMS_EVIDENCE_0_METHOD_DISCLOSURE,
+                VERIFIED_CLAIMS_EVIDENCE_0_TIME_DISCLOSURE,
+                VERIFIED_CLAIMS_EVIDENCE_0_DOCUMENT_DISCLOSURE,
+                VERIFIED_CLAIMS_EVIDENCE_0_DISCLOSURE,
+                VERIFIED_CLAIMS_CLAIMS_GIVEN_NAME_DISCLOSURE,
+                VERIFIED_CLAIMS_CLAIMS_FAMILY_NAME_DISCLOSURE,
+                VERIFIED_CLAIMS_CLAIMS_NATIONALITIES_DISCLOSURE,
+                VERIFIED_CLAIMS_CLAIMS_BIRTHDATE_DISCLOSURE,
+                VERIFIED_CLAIMS_CLAIMS_PLACE_OF_BIRTH_DISCLOSURE,
+                VERIFIED_CLAIMS_CLAIMS_ADDRESS_DISCLOSURE,
+                BIRTH_MIDDLE_NAME_DISCLOSURE,
+                SALUTATION_DISCLOSURE,
+                MSISDN_DISCLOSURE,
+            ],
+        },
         &rfc_a_5_key(),
-        &[
-            VERIFIED_CLAIMS_TIME_DISCLOSURE,
-            VERIFIED_CLAIMS_VERIFICATION_PROCESS_DISCLOSURE,
-            VERIFIED_CLAIMS_EVIDENCE_0_TYPE_DISCLOSURE,
-            VERIFIED_CLAIMS_EVIDENCE_0_METHOD_DISCLOSURE,
-            VERIFIED_CLAIMS_EVIDENCE_0_TIME_DISCLOSURE,
-            VERIFIED_CLAIMS_EVIDENCE_0_DOCUMENT_DISCLOSURE,
-            VERIFIED_CLAIMS_EVIDENCE_0_DISCLOSURE,
-            VERIFIED_CLAIMS_CLAIMS_GIVEN_NAME_DISCLOSURE,
-            VERIFIED_CLAIMS_CLAIMS_FAMILY_NAME_DISCLOSURE,
-            VERIFIED_CLAIMS_CLAIMS_NATIONALITIES_DISCLOSURE,
-            VERIFIED_CLAIMS_CLAIMS_BIRTHDATE_DISCLOSURE,
-            VERIFIED_CLAIMS_CLAIMS_PLACE_OF_BIRTH_DISCLOSURE,
-            VERIFIED_CLAIMS_CLAIMS_ADDRESS_DISCLOSURE,
-            BIRTH_MIDDLE_NAME_DISCLOSURE,
-            SALUTATION_DISCLOSURE,
-            MSISDN_DISCLOSURE,
-        ],
     )
     .unwrap();
 

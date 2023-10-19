@@ -1,3 +1,5 @@
+use crate::Deserialized;
+
 /// Lower level API to encode a fully encoded SD-JWT given a JWT and disclosure array
 /// already fully encoded into their string representations
 pub fn serialize_string_format(jwt: &str, disclosures: &[&str]) -> String {
@@ -8,18 +10,6 @@ pub fn serialize_string_format(jwt: &str, disclosures: &[&str]) -> String {
     }
 
     serialized
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Deserialized<'a> {
-    pub jwt: &'a str,
-    pub disclosures: Vec<&'a str>,
-}
-
-impl<'a> Deserialized<'a> {
-    pub fn serialize(&self) -> String {
-        serialize_string_format(self.jwt, &self.disclosures)
-    }
 }
 
 /// Lower level API to seserialize a fully encoded SD-JWT into it's JWT and disclosure
