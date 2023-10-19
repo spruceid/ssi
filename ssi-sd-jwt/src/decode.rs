@@ -1,32 +1,17 @@
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
 use ssi_jwk::JWK;
-use ssi_jwt::NumericDate;
 use std::collections::BTreeMap;
 
 use crate::serialized::deserialize_string_format;
 use crate::verify::{DecodedDisclosure, DisclosureKind};
 use crate::*;
 
-/// Expiration validity claims that are sampled before expanding selective disclosures
-#[derive(Debug, Deserialize, PartialEq)]
-pub struct ValidityClaims {
-    /// Not Before claim
-    pub nbf: Option<NumericDate>,
-
-    /// Issued After claim
-    pub iat: Option<NumericDate>,
-
-    /// Expiration claim
-    pub exp: Option<NumericDate>,
-}
-
 /// High level API to decode a fully encoded SD-JWT.  That is a JWT and selective
 /// disclosures separated by tildes
 pub fn decode_verify<Claims: DeserializeOwned>(
     serialized: &str,
     key: &JWK,
-) -> Result<(ValidityClaims, Claims), DecodeError> {
+) -> Result<Claims, DecodeError> {
     let deserialized = deserialize_string_format(serialized)
         .ok_or(DecodeError::UnableToDeserializeStringFormat)?;
 
@@ -39,10 +24,8 @@ pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
     jwt: &str,
     key: &JWK,
     disclosures: &[&str],
-) -> Result<(ValidityClaims, Claims), DecodeError> {
+) -> Result<Claims, DecodeError> {
     let mut payload_claims: serde_json::Value = ssi_jwt::decode_verify(jwt, key)?;
-
-    let validity_claims: ValidityClaims = serde_json::from_value(payload_claims.clone())?;
 
     let sd_alg = sd_alg(&payload_claims)?;
     let _ = payload_claims
@@ -60,7 +43,7 @@ pub fn decode_verify_disclosure_array<Claims: DeserializeOwned>(
         }
     }
 
-    Ok((validity_claims, serde_json::from_value(payload_claims)?))
+    Ok(serde_json::from_value(payload_claims)?)
 }
 
 fn sd_alg(claims: &serde_json::Value) -> Result<SdAlg, DecodeError> {

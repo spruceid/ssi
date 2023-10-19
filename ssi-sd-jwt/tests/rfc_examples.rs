@@ -79,7 +79,7 @@ fn rfc_a_1_example_2_verification() {
         "WyJ5eXRWYmRBUEdjZ2wyckk0QzlHU29nIiwgImJpcnRoZGF0ZSIsICIxOTQwLTAxLTAxIl0";
 
     // Raw with no disclosures
-    let (_, no_disclosures) =
+    let no_disclosures =
         decode_verify_disclosure_array::<Example2Claims>(EXAMPLE_2_JWT, &rfc_a_5_key(), &[])
             .unwrap();
 
@@ -95,7 +95,7 @@ fn rfc_a_1_example_2_verification() {
     );
 
     // Top level claim disclosed
-    let (_, sub_claim_disclosed) = decode_verify_disclosure_array::<Example2Claims>(
+    let sub_claim_disclosed = decode_verify_disclosure_array::<Example2Claims>(
         EXAMPLE_2_JWT,
         &rfc_a_5_key(),
         &[SUB_CLAIM_DISCLOSURE],
@@ -115,7 +115,7 @@ fn rfc_a_1_example_2_verification() {
     );
 
     // Address claim disclosed
-    let (_, address_country_disclosed) = decode_verify_disclosure_array::<Example2Claims>(
+    let address_country_disclosed = decode_verify_disclosure_array::<Example2Claims>(
         EXAMPLE_2_JWT,
         &rfc_a_5_key(),
         &[ADDRESS_COUNTRY_DISCLOSURE],
@@ -137,7 +137,7 @@ fn rfc_a_1_example_2_verification() {
     );
 
     // All claims disclosed
-    let (_, all_claims) = decode_verify_disclosure_array::<Example2Claims>(
+    let all_claims = decode_verify_disclosure_array::<Example2Claims>(
         EXAMPLE_2_JWT,
         &rfc_a_5_key(),
         &[
@@ -308,7 +308,7 @@ fn rfc_a_2_example_3_verification() {
         "WyJreDVrRjE3Vi14MEptd1V4OXZndnR3IiwgIm1zaXNkbiIsICI0OTEyMzQ1Njc4OSJd";
 
     // All Claims
-    let (_, all_claims) = decode_verify_disclosure_array::<Example3Claims>(
+    let all_claims = decode_verify_disclosure_array::<Example3Claims>(
         EXAMPLE_3_JWT,
         &rfc_a_5_key(),
         &[

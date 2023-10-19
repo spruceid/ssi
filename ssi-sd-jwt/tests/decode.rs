@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jwt::NumericDate;
-use ssi_sd_jwt::{decode_verify_disclosure_array, ValidityClaims};
+use ssi_sd_jwt::decode_verify_disclosure_array;
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 struct ExampleClaims {
@@ -85,7 +85,7 @@ const NATIONALITY_DE_DISCLOSURE: &'static str = "WyJuUHVvUW5rUkZxM0JJZUFtN0FuWEZ
 
 #[test]
 fn decode_single() {
-    let (_, claims) = decode_verify_disclosure_array::<ExampleClaims>(
+    let claims = decode_verify_disclosure_array::<ExampleClaims>(
         &test_standard_sd_jwt(),
         &test_key(),
         &[EMAIL_DISCLOSURE],
@@ -105,7 +105,7 @@ fn decode_single() {
 
 #[test]
 fn decode_single_array_item() {
-    let (_, claims) = decode_verify_disclosure_array::<ExampleClaims>(
+    let claims = decode_verify_disclosure_array::<ExampleClaims>(
         &test_standard_sd_jwt(),
         &test_key(),
         &[NATIONALITY_DE_DISCLOSURE],
@@ -119,24 +119,5 @@ fn decode_single_array_item() {
             nationalities: Some(vec!["DE".to_owned()]),
             ..Default::default()
         },
-    )
-}
-
-#[test]
-fn validitity_decodes() {
-    let (validity, _) = decode_verify_disclosure_array::<serde_json::Value>(
-        &test_standard_sd_jwt(),
-        &test_key(),
-        &[],
-    )
-    .unwrap();
-
-    assert_eq!(
-        validity,
-        ValidityClaims {
-            nbf: None,
-            iat: Some(NumericDate::try_from_seconds(1683000000.0).unwrap()),
-            exp: Some(NumericDate::try_from_seconds(1883000000.0).unwrap()),
-        }
     )
 }

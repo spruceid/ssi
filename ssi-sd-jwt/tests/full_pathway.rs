@@ -44,7 +44,7 @@ fn full_pathway_regular_claim() {
     )
     .unwrap();
 
-    let (_, full_jwt_claims) = decode_verify_disclosure_array::<BaseClaims>(
+    let full_jwt_claims = decode_verify_disclosure_array::<BaseClaims>(
         &jwt,
         &test_key(),
         &[&disclosures[0].encoded, &disclosures[1].encoded],
@@ -60,7 +60,7 @@ fn full_pathway_regular_claim() {
         full_jwt_claims,
     );
 
-    let (_, one_sd_claim) =
+    let one_sd_claim =
         decode_verify_disclosure_array::<BaseClaims>(&jwt, &test_key(), &[&disclosures[1].encoded])
             .unwrap();
 
@@ -99,7 +99,7 @@ fn full_pathway_array() {
     )
     .unwrap();
 
-    let (_, full_jwt_claims) = decode_verify_disclosure_array::<BaseClaims>(
+    let full_jwt_claims = decode_verify_disclosure_array::<BaseClaims>(
         &jwt,
         &test_key(),
         &[&disclosures[0].encoded, &disclosures[1].encoded],
@@ -169,8 +169,7 @@ fn nested_claims() {
     .unwrap();
 
     // No claims provided
-    let (_, no_sd_claims) =
-        decode_verify_disclosure_array::<Claims>(&jwt, &test_key(), &[]).unwrap();
+    let no_sd_claims = decode_verify_disclosure_array::<Claims>(&jwt, &test_key(), &[]).unwrap();
     assert_eq!(
         no_sd_claims,
         Claims {
@@ -180,7 +179,7 @@ fn nested_claims() {
     );
 
     // Outer provided
-    let (_, outer_provided) =
+    let outer_provided =
         decode_verify_disclosure_array::<Claims>(&jwt, &test_key(), &[&outer_disclosure.encoded])
             .unwrap();
     assert_eq!(
@@ -192,7 +191,7 @@ fn nested_claims() {
     );
 
     // Inner and outer provided
-    let (_, inner_and_outer_provided) = decode_verify_disclosure_array::<Claims>(
+    let inner_and_outer_provided = decode_verify_disclosure_array::<Claims>(
         &jwt,
         &test_key(),
         &[&outer_disclosure.encoded, &inner_disclosure.encoded],

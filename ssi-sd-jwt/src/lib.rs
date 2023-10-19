@@ -9,7 +9,7 @@ mod error;
 pub(crate) mod serialized;
 pub(crate) mod verify;
 
-pub use decode::{decode_verify, decode_verify_disclosure_array, ValidityClaims};
+pub use decode::{decode_verify, decode_verify_disclosure_array};
 pub use digest::{hash_encoded_disclosure, SdAlg};
 pub use encode::{
     encode_array_disclosure, encode_property_disclosure, encode_sign, Disclosure,
