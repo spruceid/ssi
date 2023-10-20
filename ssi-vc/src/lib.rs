@@ -90,6 +90,39 @@ impl<C: VerifiableWith> Verifiable<C> {
 
         Verifiable { credential, proof }
     }
+
+    pub fn try_map<D: VerifiableWith, E>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> Result<(D, D::Proof), E>,
+    ) -> Result<Verifiable<D>, E> {
+        let (credential, proof) = f(self.credential, self.proof)?;
+
+        Ok(Verifiable { credential, proof })
+    }
+
+    pub async fn async_map<D: VerifiableWith, F>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> F,
+    ) -> Verifiable<D>
+    where
+        F: std::future::Future<Output = (D, D::Proof)>
+    {
+        let (credential, proof) = f(self.credential, self.proof).await;
+
+        Verifiable { credential, proof }
+    }
+
+    pub async fn async_try_map<D: VerifiableWith, E, F>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> F,
+    ) -> Result<Verifiable<D>, E>
+    where
+        F: std::future::Future<Output = Result<(D, D::Proof), E>>
+    {
+        let (credential, proof) = f(self.credential, self.proof).await?;
+
+        Ok(Verifiable { credential, proof })
+    }
 }
 
 impl<C: VerifiableWith> Verifiable<C> {

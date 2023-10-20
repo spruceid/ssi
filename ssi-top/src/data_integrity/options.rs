@@ -2,7 +2,7 @@ use ssi_jwk::JWK;
 use ssi_vc_ldp::suite::CryptographicSuiteOptions;
 use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, VerificationError};
 
-use crate::AnySuite;
+use super::AnySuite;
 
 /// Options for all cryptographic suites.
 #[derive(

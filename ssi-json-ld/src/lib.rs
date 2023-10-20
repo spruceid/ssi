@@ -7,83 +7,80 @@ use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 pub use json_ld::{syntax, Options, RemoteDocumentReference};
-use json_ld::{syntax::TryFromJson, Loader};
+use json_ld::{syntax::TryFromJson, Loader, RemoteContextReference, RemoteContext, RemoteDocument};
 use json_syntax::Parse;
-use locspan::{Meta, Span};
+use locspan::Meta;
 use rdf_types::IriVocabularyMut;
 use static_iref::iri;
 use thiserror::Error;
-
-/// Remote JSON-LD document.
-pub type RemoteDocument = json_ld::RemoteDocument<IriBuf, Span>;
 
 /// Error raised by the `json_to_dataset` function.
 pub type ToRdfError<
     E = UnknownContext,
     C = json_ld::loader::ContextLoaderError<
         UnknownContext,
-        Meta<json_ld::loader::ExtractContextError<Span>, Span>,
+        Meta<json_ld::loader::ExtractContextError>,
     >,
-> = json_ld::ToRdfError<Span, E, C>;
+> = json_ld::ToRdfError<(), E, C>;
 
-pub const CREDENTIALS_V1_CONTEXT: Iri = iri!("https://www.w3.org/2018/credentials/v1");
-pub const CREDENTIALS_V2_CONTEXT: Iri = iri!("https://www.w3.org/ns/credentials/v2");
-pub const CREDENTIALS_EXAMPLES_V1_CONTEXT: Iri =
+pub const CREDENTIALS_V1_CONTEXT: &Iri = iri!("https://www.w3.org/2018/credentials/v1");
+pub const CREDENTIALS_V2_CONTEXT: &Iri = iri!("https://www.w3.org/ns/credentials/v2");
+pub const CREDENTIALS_EXAMPLES_V1_CONTEXT: &Iri =
     iri!("https://www.w3.org/2018/credentials/examples/v1");
-pub const CREDENTIALS_EXAMPLES_V2_CONTEXT: Iri =
+pub const CREDENTIALS_EXAMPLES_V2_CONTEXT: &Iri =
     iri!("https://www.w3.org/ns/credentials/examples/v2");
-pub const ODRL_CONTEXT: Iri = iri!("https://www.w3.org/ns/odrl.jsonld");
-pub const SECURITY_V1_CONTEXT: Iri = iri!("https://w3id.org/security/v1");
-pub const SECURITY_V2_CONTEXT: Iri = iri!("https://w3id.org/security/v2");
-pub const SCHEMA_ORG_CONTEXT: Iri = iri!("https://schema.org/");
-pub const DID_V1_CONTEXT: Iri = iri!("https://www.w3.org/ns/did/v1");
-pub const DID_V1_CONTEXT_NO_WWW: Iri = iri!("https://w3.org/ns/did/v1");
-pub const W3ID_DID_V1_CONTEXT: Iri = iri!("https://w3id.org/did/v1");
-pub const DID_RESOLUTION_V1_CONTEXT: Iri = iri!("https://w3id.org/did-resolution/v1");
-pub const DIF_ESRS2020_CONTEXT: Iri = iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
+pub const ODRL_CONTEXT: &Iri = iri!("https://www.w3.org/ns/odrl.jsonld");
+pub const SECURITY_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/v1");
+pub const SECURITY_V2_CONTEXT: &Iri = iri!("https://w3id.org/security/v2");
+pub const SCHEMA_ORG_CONTEXT: &Iri = iri!("https://schema.org/");
+pub const DID_V1_CONTEXT: &Iri = iri!("https://www.w3.org/ns/did/v1");
+pub const DID_V1_CONTEXT_NO_WWW: &Iri = iri!("https://w3.org/ns/did/v1");
+pub const W3ID_DID_V1_CONTEXT: &Iri = iri!("https://w3id.org/did/v1");
+pub const DID_RESOLUTION_V1_CONTEXT: &Iri = iri!("https://w3id.org/did-resolution/v1");
+pub const DIF_ESRS2020_CONTEXT: &Iri = iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/lds-ecdsa-secp256k1-recovery2020-0.0.jsonld");
 #[deprecated(note = "Use W3ID_ESRS2020_V2_CONTEXT instead")]
-pub const ESRS2020_EXTRA_CONTEXT: Iri =
+pub const ESRS2020_EXTRA_CONTEXT: &Iri =
     iri!("https://demo.spruceid.com/EcdsaSecp256k1RecoverySignature2020/esrs2020-extra-0.0.jsonld");
-pub const W3ID_ESRS2020_V2_CONTEXT: Iri =
+pub const W3ID_ESRS2020_V2_CONTEXT: &Iri =
     iri!("https://w3id.org/security/suites/secp256k1recovery-2020/v2");
-pub const LDS_JWS2020_V1_CONTEXT: Iri =
+pub const LDS_JWS2020_V1_CONTEXT: &Iri =
     iri!("https://w3c-ccg.github.io/lds-jws2020/contexts/lds-jws2020-v1.json");
-pub const W3ID_JWS2020_V1_CONTEXT: Iri = iri!("https://w3id.org/security/suites/jws-2020/v1");
-pub const W3ID_ED2020_V1_CONTEXT: Iri = iri!("https://w3id.org/security/suites/ed25519-2020/v1");
-pub const W3ID_MULTIKEY_V1_CONTEXT: Iri = iri!("https://w3id.org/security/multikey/v1");
-pub const W3ID_DATA_INTEGRITY_V1_CONTEXT: Iri = iri!("https://w3id.org/security/data-integrity/v1");
-pub const BLOCKCHAIN2021_V1_CONTEXT: Iri =
+pub const W3ID_JWS2020_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/jws-2020/v1");
+pub const W3ID_ED2020_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/ed25519-2020/v1");
+pub const W3ID_MULTIKEY_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/multikey/v1");
+pub const W3ID_DATA_INTEGRITY_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/data-integrity/v1");
+pub const BLOCKCHAIN2021_V1_CONTEXT: &Iri =
     iri!("https://w3id.org/security/suites/blockchain-2021/v1");
-pub const CITIZENSHIP_V1_CONTEXT: Iri = iri!("https://w3id.org/citizenship/v1");
-pub const VACCINATION_V1_CONTEXT: Iri = iri!("https://w3id.org/vaccination/v1");
-pub const TRACEABILITY_CONTEXT: Iri = iri!("https://w3id.org/traceability/v1");
-pub const REVOCATION_LIST_2020_V1_CONTEXT: Iri =
+pub const CITIZENSHIP_V1_CONTEXT: &Iri = iri!("https://w3id.org/citizenship/v1");
+pub const VACCINATION_V1_CONTEXT: &Iri = iri!("https://w3id.org/vaccination/v1");
+pub const TRACEABILITY_CONTEXT: &Iri = iri!("https://w3id.org/traceability/v1");
+pub const REVOCATION_LIST_2020_V1_CONTEXT: &Iri =
     iri!("https://w3id.org/vc-revocation-list-2020/v1");
-pub const BBS_V1_CONTEXT: Iri = iri!("https://w3id.org/security/bbs/v1");
-pub const STATUS_LIST_2021_V1_CONTEXT: Iri = iri!("https://w3id.org/vc/status-list/2021/v1");
-pub const EIP712SIG_V0_1_CONTEXT: Iri =
+pub const BBS_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/bbs/v1");
+pub const STATUS_LIST_2021_V1_CONTEXT: &Iri = iri!("https://w3id.org/vc/status-list/2021/v1");
+pub const EIP712SIG_V0_1_CONTEXT: &Iri =
     iri!("https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld");
-pub const EIP712SIG_V1_CONTEXT: Iri = iri!("https://w3id.org/security/suites/eip712sig-2021/v1");
-pub const PRESENTATION_SUBMISSION_V1_CONTEXT: Iri =
+pub const EIP712SIG_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/eip712sig-2021/v1");
+pub const PRESENTATION_SUBMISSION_V1_CONTEXT: &Iri =
     iri!("https://identity.foundation/presentation-exchange/submission/v1");
-pub const VDL_V1_CONTEXT: Iri = iri!("https://w3id.org/vdl/v1");
-pub const WALLET_V1_CONTEXT: Iri = iri!("https://w3id.org/wallet/v1");
-pub const ZCAP_V1_CONTEXT: Iri = iri!("https://w3id.org/zcap/v1");
-pub const CACAO_ZCAP_V1_CONTEXT: Iri =
+pub const VDL_V1_CONTEXT: &Iri = iri!("https://w3id.org/vdl/v1");
+pub const WALLET_V1_CONTEXT: &Iri = iri!("https://w3id.org/wallet/v1");
+pub const ZCAP_V1_CONTEXT: &Iri = iri!("https://w3id.org/zcap/v1");
+pub const CACAO_ZCAP_V1_CONTEXT: &Iri =
     iri!("https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json");
-pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: Iri =
+pub const JFF_VC_EDU_PLUGFEST_2022_CONTEXT: &Iri =
     iri!("https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json");
-pub const DID_CONFIGURATION_V0_0_CONTEXT: Iri =
+pub const DID_CONFIGURATION_V0_0_CONTEXT: &Iri =
     iri!("https://identity.foundation/.well-known/contexts/did-configuration-v0.0.jsonld");
-pub const JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT: Iri =
+pub const JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT: &Iri =
     iri!("https://purl.imsglobal.org/spec/ob/v3p0/context.json");
 
 /// Load a remote context from its static definition.
-fn load_static_context(iri: Iri, content: &str) -> RemoteDocument {
+fn load_static_context(iri: &Iri, content: &str) -> RemoteDocument {
     RemoteDocument::new(
         Some(iri.to_owned()),
         Some("application/ld+json".parse().unwrap()),
-        json_syntax::Value::parse_str(content, |span| span).unwrap(),
+        json_syntax::Value::parse_str(content, |_| ()).unwrap(),
     )
 }
 
@@ -254,15 +251,15 @@ pub struct UnknownContext(IriBuf);
 #[derive(Clone)]
 pub struct StaticLoader;
 
-impl Loader<IriBuf, Span> for StaticLoader {
-    type Output = json_syntax::Value<Span>;
+impl Loader<IriBuf> for StaticLoader {
+    type Output = json_syntax::Value;
     type Error = UnknownContext;
 
     fn load_with<'a>(
         &'a mut self,
         _vocabulary: &'a mut (impl Sync + Send + IriVocabularyMut<Iri = IriBuf>),
         url: IriBuf,
-    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, Span, Self::Output, Self::Error>>
+    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, (), Self::Output, Self::Error>>
     where
         IriBuf: 'a,
     {
@@ -356,15 +353,15 @@ impl std::fmt::Debug for ContextLoader {
 #[derive(Debug, Error)]
 pub enum FromContextMapError {
     #[error(transparent)]
-    ParseError(#[from] Meta<json_ld::syntax::parse::Error<Span>, Span>),
+    ParseError(#[from] json_ld::syntax::parse::Error<()>),
 
-    #[error("invalid IRI `{0}`: {1}")]
-    InvalidIri(String, iref::Error),
+    #[error(transparent)]
+    InvalidIri(iref::InvalidIri<String>),
 }
 
-impl From<(iref::Error, String)> for FromContextMapError {
-    fn from((e, iri): (iref::Error, String)) -> Self {
-        Self::InvalidIri(iri, e)
+impl From<iref::InvalidIri<String>> for FromContextMapError {
+    fn from(e: iref::InvalidIri<String>) -> Self {
+        Self::InvalidIri(e)
     }
 }
 
@@ -393,8 +390,8 @@ impl ContextLoader {
             .into_iter()
             .map(
                 |(url, jsonld)| -> Result<(IriBuf, RemoteDocument), FromContextMapError> {
-                    let doc = json_syntax::Value::parse_str(&jsonld, |span| span)?;
-                    let iri = IriBuf::from_string(url)?;
+                    let doc = json_syntax::Value::parse_str(&jsonld, |_| ()).map_err(Meta::into_value)?;
+                    let iri = IriBuf::new(url)?;
                     let remote_doc = RemoteDocument::new(
                         Some(iri.clone()),
                         Some("application/ld+json".parse().unwrap()),
@@ -419,15 +416,15 @@ impl std::default::Default for ContextLoader {
     }
 }
 
-impl Loader<IriBuf, Span> for ContextLoader {
-    type Output = json_syntax::Value<Span>;
+impl Loader<IriBuf> for ContextLoader {
+    type Output = json_syntax::Value;
     type Error = UnknownContext;
 
     fn load_with<'a>(
         &'a mut self,
         _vocabulary: &'a mut (impl Sync + Send + IriVocabularyMut<Iri = IriBuf>),
         url: IriBuf,
-    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, Span, Self::Output, Self::Error>>
+    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, (), Self::Output, Self::Error>>
     where
         IriBuf: 'a,
     {
@@ -466,76 +463,30 @@ impl Loader<IriBuf, Span> for ContextLoader {
     }
 }
 
-/// Remote JSON-LD context document.
-pub type RemoteContext =
-    json_ld::RemoteDocument<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
+// /// Remote JSON-LD context document.
+// pub type RemoteContext =
+//     json_ld::RemoteDocument<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
 
-/// Remote JSON-LD context document reference.
-pub type RemoteContextReference =
-    RemoteDocumentReference<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
+// /// Remote JSON-LD context document reference.
+// pub type RemoteContextReference =
+//     RemoteDocumentReference<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ContextError {
     #[error("Invalid JSON: {0}")]
-    InvalidJson(#[from] json_syntax::parse::MetaError<Span>),
+    InvalidJson(#[from] json_syntax::parse::Error<()>),
 
     #[error("Invalid JSON-LD context: {0}")]
-    InvalidContext(#[from] Meta<json_ld::syntax::context::InvalidContext, Span>),
+    InvalidContext(#[from] json_ld::syntax::context::InvalidContext),
 }
 
 /// Parse a JSON-LD context.
 pub fn parse_ld_context(content: &str) -> Result<RemoteContextReference, ContextError> {
-    let json = json_syntax::Value::parse_str(content, |span| span)?;
-    let context = json_ld::syntax::context::Value::try_from_json(json)?;
+    let json = json_syntax::Value::parse_str(content, |_| ()).map_err(Meta::into_value)?;
+    let context = json_ld::syntax::Context::try_from_json(json).map_err(Meta::into_value)?;
     Ok(RemoteContextReference::Loaded(RemoteContext::new(
         None, None, context,
     )))
-}
-
-/// Converts the input JSON-LD document into an RDF dataset.
-///
-/// The input document will be expanded with the given `expand_context` with
-/// the [`Strict`] expansion policy as required by the [VC HTTP API Test Suite].
-///
-/// [`Strict`]: json_ld::expansion::Policy::Strict
-/// [VC HTTP API Test Suite]: https://github.com/w3c-ccg/vc-api-test-suite
-pub async fn json_to_dataset<L>(
-    json: json_ld::syntax::MetaValue<Span>,
-    loader: &mut L,
-    expand_context: Option<RemoteContextReference>,
-) -> Result<ssi_rdf::DataSet, Box<ToRdfError<L::Error, L::ContextError>>>
-where
-    L: json_ld::Loader<IriBuf, Span> + json_ld::ContextLoader<IriBuf, Span> + Send + Sync,
-    L::Output: Into<json_ld::syntax::Value<Span>>,
-    L::Error: Send,
-    L::Context: Into<json_ld::syntax::context::Value<Span>>,
-    L::ContextError: Send,
-{
-    use json_ld::JsonLdProcessor;
-
-    let options = Options {
-        expand_context,
-        // VC HTTP API Test Suite expect properties to not be silently dropped.
-        // More info: https://github.com/timothee-haudebourg/json-ld/issues/13
-        expansion_policy: json_ld::expansion::Policy::Strict,
-        ..Default::default()
-    };
-
-    let doc = json_ld::RemoteDocument::new(None, None, json);
-    let mut generator =
-        rdf_types::generator::Blank::new_with_prefix("b".to_string()).with_default_metadata();
-    let mut to_rdf = doc
-        .to_rdf_using(&mut generator, loader, options)
-        .await
-        .map_err(Box::new)?;
-    Ok(to_rdf
-        .cloned_quads()
-        .map(|q| {
-            // Since `produce_generalized_rdf` is set to `false`, it is guaranteed
-            // each predicate is an IRI.
-            q.map_predicate(|p| p.into_iri().unwrap())
-        })
-        .collect())
 }
 
 #[cfg(test)]
@@ -599,7 +550,7 @@ mod test {
                 .cloned()
                 .collect(),
                 ).unwrap() ;
-        cl.load_with(&mut (), IriBuf::new("https://w3id.org/age/v1").unwrap())
+        cl.load_with(&mut (), IriBuf::new("https://w3id.org/age/v1".to_string()).unwrap())
             .await
             .unwrap();
     }

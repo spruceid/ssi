@@ -37,10 +37,14 @@ bech32 = "0.8"
 ssi-core.workspace = true
 ssi-vc.workspace = true
 ssi-vc-ldp.workspace = true
-ssi-top.workspace = true
+ssi-json-ld.workspace = true
+ssi-top = { workspace = true, features = ["dif", "secp256k1"] }
 ssi-tzkey.workspace = true
-linked-data.workspace = true
+rdf-types.workspace = true
 xsd-types.workspace = true
+linked-data.workspace = true
+json-ld.workspace = true
+locspan.workspace = true
 # ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 # ssi-vc = { path = "../ssi-vc", default-features = false }
 # ssi-core = { path = "../ssi-core" }

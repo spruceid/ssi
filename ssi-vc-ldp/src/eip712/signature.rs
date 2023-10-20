@@ -3,7 +3,7 @@ use linked_data::{
     LinkedData, LinkedDataGraph
 };
 use rdf_types::{Interpretation, Vocabulary};
-use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature};
+use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature, VerificationError};
 
 use crate::suite::{AnySignature, AnySignatureRef};
 
@@ -16,6 +16,14 @@ pub struct Eip712Signature {
     /// Hex encoded output of the EIP712 signature function according to
     /// [EIP712](https://eips.ethereum.org/EIPS/eip-712).
     pub proof_value: String,
+}
+
+impl Eip712Signature {
+    pub fn from_bytes(signature_bytes: Vec<u8>) -> Self {
+        Self {
+            proof_value: format!("0x{}", hex::encode(signature_bytes))
+        }
+    }
 }
 
 impl Referencable for Eip712Signature {
@@ -54,6 +62,16 @@ impl TryFrom<AnySignature> for Eip712Signature {
 pub struct Eip712SignatureRef<'a> {
     /// Proof value
     pub proof_value: &'a str
+}
+
+impl<'a> Eip712SignatureRef<'a> {
+    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+        if self.proof_value.len() >= 4 && &self.proof_value[0..2] == "0x" {
+            hex::decode(&self.proof_value[2..]).map_err(|_| VerificationError::InvalidSignature)
+        } else {
+            Err(VerificationError::InvalidSignature)
+        }
+    }
 }
 
 impl<'a> From<Eip712SignatureRef<'a>> for AnySignatureRef<'a> {

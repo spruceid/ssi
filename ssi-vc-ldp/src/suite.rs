@@ -327,10 +327,24 @@ where
     hash_data
 }
 
-#[derive(Default)]
 pub struct LinkedDataInput<I = (), V = ()> {
     pub vocabulary: V,
     pub interpretation: I
+}
+
+impl Default for LinkedDataInput<interpretation::WithGenerator<rdf_types::generator::Blank>> {
+    fn default() -> Self {
+        Self::from_generator(rdf_types::generator::Blank::new())
+    }
+}
+
+impl<G> LinkedDataInput<interpretation::WithGenerator<G>> {
+    pub fn from_generator(generator: G) -> Self {
+        Self {
+            vocabulary: (),
+            interpretation: interpretation::WithGenerator::new((), generator)
+        }
+    }
 }
 
 impl<V: Vocabulary, I: Interpretation> LinkedDataInput<I, V>

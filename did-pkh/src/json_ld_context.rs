@@ -1,3 +1,4 @@
+use iref::Iri;
 use ssi_dids::{
     document::representation,
     json_ld::{
@@ -12,8 +13,12 @@ use static_iref::iri;
 
 use crate::{PkhVerificationMethod, PkhVerificationMethodType};
 
+const BLOCKCHAIN2021_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/blockchain-2021/v1");
+
 #[derive(Debug, Default)]
 pub struct JsonLdContext {
+    /// `https://w3id.org/security/suites/blockchain-2021/v1` context.
+    blockchain_2021_v1: bool,
     ed25519_verification_key_2018: bool,
     ecdsa_secp256k1_recovery_method_2020: bool,
     tezos_method_2021: bool,
@@ -26,6 +31,10 @@ pub struct JsonLdContext {
 }
 
 impl JsonLdContext {
+    pub fn add_blockchain_2021_v1(&mut self) {
+        self.blockchain_2021_v1 = true
+    }
+
     pub fn add_verification_method(&mut self, m: &PkhVerificationMethod) {
         // self.blockchain_account_id |= m.blockchain_account_id.is_some();
         self.blockchain_account_id = true;
@@ -60,12 +69,12 @@ impl JsonLdContext {
     }
 }
 
-impl From<JsonLdContext> for representation::json_ld::ContextEntry {
-    fn from(value: JsonLdContext) -> Self {
+impl JsonLdContext {
+    pub fn into_entries(self) -> Vec<representation::json_ld::ContextEntry> {
         use representation::json_ld::context::Definition;
         let mut def = Definition::new();
 
-        if value.ed25519_verification_key_2018 {
+        if self.ed25519_verification_key_2018 {
             let ty = PkhVerificationMethodType::Ed25519VerificationKey2018;
             def.bindings.insert(
                 ty.name().into(),
@@ -73,7 +82,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.ecdsa_secp256k1_recovery_method_2020 {
+        if self.ecdsa_secp256k1_recovery_method_2020 {
             let ty = PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020;
             def.bindings.insert(
                 ty.name().into(),
@@ -81,7 +90,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.ed_25519_public_key_blake2b_digest_size_20_base58_check_encoded2021 {
+        if self.ed_25519_public_key_blake2b_digest_size_20_base58_check_encoded2021 {
             let ty =
                 PkhVerificationMethodType::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
             def.bindings.insert(
@@ -90,7 +99,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.p256_public_key_blake2b_digest_size_20_base58_check_encoded2021 {
+        if self.p256_public_key_blake2b_digest_size_20_base58_check_encoded2021 {
             let ty =
                 PkhVerificationMethodType::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021;
             def.bindings.insert(
@@ -99,7 +108,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.tezos_method_2021 {
+        if self.tezos_method_2021 {
             let ty = PkhVerificationMethodType::TezosMethod2021;
             def.bindings.insert(
                 ty.name().into(),
@@ -107,7 +116,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.solana_method_2021 {
+        if self.solana_method_2021 {
             let ty = PkhVerificationMethodType::SolanaMethod2021;
             def.bindings.insert(
                 ty.name().into(),
@@ -115,7 +124,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.blockchain_account_id {
+        if self.blockchain_verification_method_2021 && !self.blockchain_2021_v1 {
             let ty = PkhVerificationMethodType::BlockchainVerificationMethod2021;
             def.bindings.insert(
                 ty.name().into(),
@@ -123,7 +132,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.blockchain_account_id {
+        if self.blockchain_account_id && !self.blockchain_2021_v1 {
             def.bindings.insert(
                 "blockchainAccountId".into(),
                 TermDefinition::Simple(
@@ -135,7 +144,7 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        if value.public_key_jwk {
+        if self.public_key_jwk {
             def.bindings.insert(
                 "publicKeyJwk".into(),
                 Nullable::Some(TermDefinition::Expanded(Box::new(Expanded {
@@ -150,6 +159,18 @@ impl From<JsonLdContext> for representation::json_ld::ContextEntry {
             );
         }
 
-        Self::Definition(def)
+        let mut entries = Vec::new();
+
+        if self.blockchain_2021_v1 {
+            entries.push(representation::json_ld::ContextEntry::IriRef(
+                BLOCKCHAIN2021_V1_CONTEXT.to_owned().into(),
+            ))
+        }
+
+        if !def.bindings.is_empty() {
+            entries.push(representation::json_ld::ContextEntry::Definition(def))
+        }
+
+        entries
     }
 }

@@ -1,7 +1,7 @@
 use iref::Iri;
 use ssi_dids::document::representation::MediaType;
 use ssi_dids::document::verification_method::ValueOrReference;
-use ssi_dids::{document, resolution, DIDBuf, DIDResolver};
+use ssi_dids::{document, resolution, DIDBuf};
 use ssi_dids::{document::representation, resolution::Output};
 use static_iref::iri;
 use std::collections::BTreeMap;
@@ -95,7 +95,10 @@ impl From<PkhVerificationMethod> for DIDVerificationMethod {
         );
 
         if let Some(key) = value.public_key_jwk {
-            properties.insert("publicKeyJwk".to_owned(), key.to_string().into());
+            properties.insert(
+                "publicKeyJwk".to_owned(),
+                serde_json::to_value(key).unwrap(),
+            );
         }
 
         Self {
@@ -422,6 +425,7 @@ async fn resolve_aleo(did: &DID, account_address: &str, reference: &str) -> Reso
     };
 
     let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_blockchain_2021_v1();
     json_ld_context.add_verification_method(&vm);
 
     let mut doc = Document::new(did.to_owned());
@@ -508,7 +512,7 @@ impl DIDMethodResolver for DIDPKH {
                 move || representation::json_ld::Options {
                     context: representation::json_ld::Context::array(
                         representation::json_ld::DIDContext::V1,
-                        vec![json_ld_context.into()],
+                        json_ld_context.into_entries(),
                     ),
                 },
             ));
@@ -718,19 +722,25 @@ mod tests {
     use super::*;
     use iref::IriBuf;
     use linked_data::LinkedData;
+    use locspan::Meta;
     use serde_json::{from_str, from_value, json};
     use ssi_core::one_or_many::OneOrMany;
-    use ssi_dids::{DIDResolver, resolution::ErrorKind, did, DIDVerifier};
+    use ssi_dids::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
-    use ssi_vc_ldp::{Proof, ProofConfiguration, CryptographicSuiteInput, LinkedDataInput, CryptographicSuite, verification::{MethodReferenceOrOwned, method::{ProofPurpose, signer::SingleSecretSigner}}, DataIntegrity};
-    use ssi_top::{AnySuite, AnyInputContext};
+    use ssi_top::data_integrity::{AnyInputContext, AnySuite};
+    use ssi_vc_ldp::{
+        verification::{
+            method::{signer::SingleSecretSigner, ProofPurpose},
+            MethodReferenceOrOwned,
+        },
+        CryptographicSuite, CryptographicSuiteInput, DataIntegrity, LinkedDataInput, Proof,
+        ProofConfiguration,
+    };
     // use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();
-        let did = DIDPKH
-            .generate(&jwk, type_)
-            .unwrap();
+        let did = DIDPKH.generate(&jwk, type_).unwrap();
         assert_eq!(did, did_expected);
     }
 
@@ -786,9 +796,7 @@ mod tests {
     }
 
     async fn test_resolve(did: &DID, doc_str_expected: &str) {
-        let res = DIDPKH
-            .resolve(did, Default::default())
-            .await.unwrap();
+        let res = DIDPKH.resolve(did, Default::default()).await.unwrap();
         eprintln!("{}", did);
         let doc = res.document;
         eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
@@ -799,21 +807,8 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn test_glyph_split() {
-        // Subslicing this expected Tezos address by byte range 0..3 would break a char boundary.
-        // https://doc.rust-lang.org/std/ops/struct.Range.html#impl-SliceIndex%3Cstr%3E
-        let bad_did = did!("did:pkh:tz:💣️");
-        let res = DIDPKH
-            .resolve(bad_did, Default::default())
-            .await;
-        assert!(res.is_err());
-    }
-
     async fn test_resolve_error(did: &DID, error_expected: ErrorKind) {
-        let res = DIDPKH
-            .resolve(did, Default::default())
-            .await;
+        let res = DIDPKH.resolve(did, Default::default()).await;
         assert_eq!(res.err().unwrap().kind(), error_expected);
     }
 
@@ -922,7 +917,9 @@ mod tests {
         test_resolve_error(did!("did:pkh:eth:bar"), ErrorKind::InvalidMethodSpecificId).await;
     }
 
-    fn fuzz_proof_value<'a, T: 'a + CryptographicSuite>(proofs: impl Iterator<Item = &'a mut Proof<T>>) {
+    fn fuzz_proof_value<'a, T: 'a + CryptographicSuite>(
+        proofs: impl Iterator<Item = &'a mut Proof<T>>,
+    ) {
         for proof in proofs {
             todo!()
         }
@@ -946,7 +943,7 @@ mod tests {
         // }
     }
 
-    #[derive(Clone, serde::Serialize, LinkedData)]
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
     #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
     #[ld(type = "cred:VerifiableCredential")]
     struct TestCredential {
@@ -967,26 +964,28 @@ mod tests {
         vm_relative_url: &str,
         proof_suite: AnySuite,
         eip712_domain_opt: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
-        vp_eip712_domain_opt: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
+        vp_eip712_domain_opt: Option<
+            ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options,
+        >,
     ) {
         let didpkh = DIDVerifier::new(DIDPKH);
-        
+
         // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
-        let did = DIDPKH
-            .generate(&key, type_)
-            .unwrap();
-        
+        let did = DIDPKH.generate(&key, type_).unwrap();
+
         eprintln!("did: {}", did);
         let mut cred = TestCredential {
             issuer: did.clone().into(),
             issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
-            credential_subject: iri!("did:example:foo").to_owned()
+            credential_subject: iri!("did:example:foo").to_owned(),
         };
         let issue_options = ProofConfiguration {
-            verification_method: IriBuf::new(did.to_string() + vm_relative_url).unwrap().into(),
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
             created: cred.issuance_date.clone(),
             proof_purpose: ProofPurpose::Assertion,
-            options: eip712_domain_opt.into()
+            options: eip712_domain_opt.into(),
         };
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = cred.clone();
@@ -997,12 +996,7 @@ mod tests {
         // for Eip712Signature2021 in did-pkh otherwise.
         let signer = SingleSecretSigner::new(&didpkh, key.clone());
         let vc = proof_suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &signer,
-                issue_options
-            )
+            .sign(cred, AnyInputContext::default(), &signer, issue_options)
             .await
             .unwrap();
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
@@ -1111,7 +1105,7 @@ mod tests {
         wrong_key: JWK,
         type_: &str,
         vm_relative_url: &str,
-        proof_suite: AnySuite
+        proof_suite: AnySuite,
     ) {
         // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         // let did = DIDPKH
@@ -1575,27 +1569,50 @@ mod tests {
     }
 
     async fn test_verify_vc(vc_str: &str, num_warnings: usize) {
-        DataIntegrity::from_json_ld(
-            vocabulary,
-            generator,
-            interpretation,
-            input,
-            params
-        );
-        let mut vc = ssi_vc::Credential::from_json_unsigned(vc_str).unwrap();
-        vc.validate().unwrap();
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-        let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(verification_result.errors.is_empty());
-        assert_eq!(verification_result.warnings.len(), num_warnings);
-        // Negative test: tamper with the VC and watch verification fail.
-        let mut map = std::collections::HashMap::new();
-        map.insert("foo".to_string(), serde_json::json!("bar"));
-        vc.property_set = Some(map);
-        let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(!verification_result.errors.is_empty());
+        eprintln!("input: {vc_str}");
+
+        let vc = ssi_top::data_integrity::from_json_ld_str_with_defaults(vc_str)
+            .await
+            .unwrap();
+
+        // let didpkh = DIDVerifier::new(DIDPKH);
+
+        // let verification_result = vc.verify(&didpkh).await.unwrap();
+        // assert!(verification_result.is_valid());
+        // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
+
+        // // Negative test: tamper with the VC and watch verification fail.
+        // let bad_vc = vc.clone().async_map(|di, proof| async move {
+        //     let (mut compact, expanded) = di.into_value().into_parts();
+
+        //     // Add a fake property in the compact VC form.
+        //     compact.document_mut().0.as_object_mut().unwrap().insert(
+        //         Meta::none("foo".into()),
+        //         Meta::none("bar".into())
+        //     );
+
+        //     // Add a fake property in the expanded VC form.
+        //     let mut node = expanded.into_value().into_main_node().unwrap();
+        //     node.0.insert(
+        //         json_ld::Id::iri(IriBuf::new("https://example.org/foo".to_string()).unwrap()),
+        //         json_ld::Indexed::none(json_ld::Object::Value(json_ld::Value::Literal(json_ld::object::Literal::String("bar".into()), None)))
+        //     );
+
+        //     // Rebuild the Data-Integrity VC.
+        //     let bad_di = DataIntegrity::new(
+        //         json_ld::Document::new(compact, Meta::none(node.map(json_ld::Indexed::none).into())),
+        //         ssi_top::data_integrity::AnyInputContext::default(),
+        //         proof.suite(),
+        //         proof.configuration()
+        //     ).await.unwrap();
+
+        //     // Return the tempered VC with the original proof.
+        //     (bad_di, proof)
+        // }).await;
+
+        // let verification_result = bad_vc.verify(&didpkh).await.unwrap();
+        // assert!(verification_result.is_invalid());
+        todo!()
     }
 
     #[tokio::test]

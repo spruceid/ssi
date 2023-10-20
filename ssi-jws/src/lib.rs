@@ -4,7 +4,7 @@
 
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
-use rdf_types::{Vocabulary, Interpretation};
+use rdf_types::{Vocabulary, Interpretation, RDF_LANG_STRING};
 use core::fmt;
 pub use error::Error;
 use linked_data::{rdf_types, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef, LinkedDataDeserializeSubject, LinkedDataDeserializePredicateObjects};
@@ -477,24 +477,38 @@ where
         >
     {
         use linked_data::rdf_types::literal;
-        let mut is_literal = false;
 
+        let mut literal_ty = None;
         for l in interpretation.literals_of(resource) {
-            is_literal = true;
             let literal = vocabulary.literal(l).unwrap();
-            if let literal::Type::Any(ty) = literal.type_() {
-                if let Some(ty_iri) = vocabulary.iri(ty) {
+            
+            match literal.type_() {
+                literal::Type::Any(ty) => {
+                    let ty_iri = vocabulary.iri(ty).unwrap();
+
                     if ty_iri == linked_data::xsd_types::XSD_STRING {
                         return literal.value().as_ref().parse().map_err(|_| linked_data::FromLinkedDataError::InvalidLiteral)
                     }
+
+                    literal_ty = Some(ty_iri)
+                }
+                literal::Type::LangString(_) => {
+                    literal_ty = Some(RDF_LANG_STRING)
                 }
             }
         }
 
-        if is_literal {
-            Err(linked_data::FromLinkedDataError::LiteralTypeMismatch)
-        } else {
-            Err(linked_data::FromLinkedDataError::ExpectedLiteral)
+        match literal_ty {
+            Some(ty) => {
+                Err(linked_data::FromLinkedDataError::LiteralTypeMismatch {
+                    property: None,
+                    expected: Some(linked_data::xsd_types::XSD_STRING.to_owned()),
+                    found: ty.to_owned()
+                })
+            }
+            None => {
+                Err(linked_data::FromLinkedDataError::ExpectedLiteral)
+            }
         }
     }
 }

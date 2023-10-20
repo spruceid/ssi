@@ -63,6 +63,7 @@ ssi-vc.workspace = true
 ssi-vc-ldp.workspace = true
 ssi-dids.workspace = true
 ssi-eip712 = { workspace = true, optional = true }
+ssi-json-ld.workspace = true
 pin-project.workspace = true
 thiserror.workspace = true
 iref.workspace = true
@@ -71,6 +72,7 @@ linked-data.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-ld.workspace = true
+locspan.workspace = true
 
 # use crate::{
 #     suite::{AnySignature, AnySignatureRef, HashError},

@@ -1,12 +1,11 @@
 use did_tz::DIDTz;
 use iref::{IriBuf, UriBuf};
-use linked_data::LinkedData;
 use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
 use ssi_dids::{did, resolution::Options, DIDResolver, DIDVerifier};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_top::{AnySuite, AnySuiteOptions, AnyInputContext};
+use ssi_top::data_integrity::{AnySuite, AnySuiteOptions, AnyInputContext};
 use ssi_vc::Verifiable;
 use ssi_vc_ldp::{
     verification::method::{signer::SingleSecretSigner, ProofPurpose},
@@ -162,7 +161,7 @@ async fn test_derivation_tz3() {
     )
 }
 
-#[derive(Clone, serde::Serialize, LinkedData)]
+#[derive(Clone, serde::Serialize, linked_data::Serialize)]
 #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
 #[ld(type = "cred:VerifiableCredential")]
 struct Credential {
@@ -277,7 +276,7 @@ async fn credential_prove_verify_did_tz1() {
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
     // Make it into a VP
-    #[derive(Clone, serde::Serialize, LinkedData)]
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
     #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
     #[ld(type = "cred:VerifiablePresentation")]
     struct Presentation {
@@ -410,7 +409,7 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
     // Make it into a VP
-    #[derive(Clone, serde::Serialize, LinkedData)]
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
     #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
     #[ld(type = "cred:VerifiablePresentation")]
     struct Presentation {
@@ -533,7 +532,7 @@ async fn credential_prove_verify_did_tz3() {
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
     // Make it into a VP
-    #[derive(Clone, serde::Serialize, LinkedData)]
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
     #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
     #[ld(type = "cred:VerifiablePresentation")]
     struct Presentation {

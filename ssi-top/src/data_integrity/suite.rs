@@ -82,8 +82,8 @@ macro_rules! crypto_suites {
             fn deserialize_subject<D>(
                 vocabulary: &V,
                 interpretation: &I,
-                dataset: &D,
-                graph: &D::Graph,
+                _dataset: &D,
+                _graph: &D::Graph,
                 resource: &I::Resource,
             ) -> Result<Self, linked_data::FromLinkedDataError>
             where

@@ -1,5 +1,4 @@
 use educe::Educe;
-use linked_data::LinkedData;
 use pin_project::pin_project;
 use ssi_core::futures::{UnboundedRefFuture, RefFutureBinder, SelfRefFuture};
 use std::marker::PhantomData;
@@ -35,7 +34,7 @@ pub enum Error {
 pub struct DataIntegrity<T, S: CryptographicSuite> {
     /// Credential value.
     #[ld(flatten)]
-    credential: T,
+    value: T,
 
     /// Hashed value.
     #[serde(skip)]
@@ -104,21 +103,29 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
 
     pub fn new_hashed(credential: T, hashed: S::Hashed) -> Self {
         Self {
-            credential,
+            value: credential,
             hash: hashed,
         }
     }
 
     pub fn value(&self) -> &T {
-        &self.credential
+        &self.value
     }
 
     pub fn hashed(&self) -> &S::Hashed {
         &self.hash
     }
 
+    pub fn into_value(self) -> T {
+        self.value
+    }
+
+    pub fn into_hashed(self) -> S::Hashed {
+        self.hash
+    }
+
     pub fn into_parts(self) -> (T, S::Hashed) {
-        (self.credential, self.hash)
+        (self.value, self.hash)
     }
 }
 
@@ -126,7 +133,7 @@ impl<T, S: CryptographicSuite> Deref for DataIntegrity<T, S> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.credential
+        &self.value
     }
 }
 

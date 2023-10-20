@@ -1,11 +1,14 @@
 //! EIP-712 Signature 2021 implementation.
-use std::future;
+use std::future::Future;
+use std::pin::Pin;
+use std::task;
 
+use pin_project::pin_project;
 use rdf_types::Quad;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    Eip712Method2021, SignatureError,
+    Eip712Method2021, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
@@ -60,6 +63,16 @@ verification_method_union! {
         Eip712Method2021,
         EcdsaSecp256k1VerificationKey2019,
         EcdsaSecp256k1RecoveryMethod2020
+    }
+}
+
+impl<'a> VerificationMethodRef<'a> {
+    pub fn verify_bytes(&self, signing_bytes: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+        match self {
+            Self::Eip712Method2021(m) => m.verify_bytes(signing_bytes, signature_bytes),
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(signing_bytes, signature_bytes),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(signing_bytes, signature_bytes)
+        }
     }
 }
 
@@ -249,17 +262,18 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
+    type Sign<'a, S: 'a + MessageSigner> = Eip712Sign<'a, S>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
         &self,
         _options: (),
-        method: VerificationMethodRef,
+        _method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        todo!()
+        Eip712Sign {
+            sign: signer.sign((), bytes)
+        }
     }
 
     fn verify(
@@ -269,44 +283,25 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         method: VerificationMethodRef,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes)
     }
 }
 
-// #[async_trait]
-// impl<'a> VerificationMethodRef<'a, Eip712Method2021, signature::Base58PublicKeyJwkOrMultibase> for &'a Eip712Method2021 {
-//     async fn verify<'s: 'async_trait>(
-//         self,
-//         controllers: &impl ControllerProvider,
-//         proof_purpose: ssi_crypto::ProofPurpose,
-//         signing_bytes: &[u8],
-//         signature: signature::
-//     ) -> Result<bool, VerificationError> {
-//         controllers
-//             .ensure_allows_verification_method(
-//                 self.controller.as_iri(),
-//                 self.id.as_iri(),
-//                 proof_purpose,
-//             )
-//             .await?;
+#[pin_project]
+pub struct Eip712Sign<'a, S: 'a + MessageSigner> {
+    #[pin]
+    sign: S::Sign<'a>
+}
 
-//         let (algorithm, signature_bytes) = ssi_tzkey::decode_tzsig(signature.proof_value)
-//             .map_err(|_| VerificationError::InvalidSignature)?;
+impl<'a, S: 'a + MessageSigner> Future for Eip712Sign<'a, S> {
+    type Output = Result<Eip712Signature, SignatureError>;
 
-//         let key = match signature.public_key.map(|k| k.as_jwk()).transpose()? {
-//             Some(key) => {
-//                 if !self.public_key.matches(&key)? {
-//                     return Err(VerificationError::InvalidProof);
-//                 }
-
-//                 key
-//             }
-//             None => match &self.public_key {
-//                 PublicKey::Jwk(key) => Cow::Borrowed(key.as_ref()),
-//                 _ => return Err(VerificationError::MissingPublicKey),
-//             },
-//         };
-
-//         Ok(ssi_jws::verify_bytes(algorithm, signing_bytes, &key, &signature_bytes).is_ok())
-//     }
-// }
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let this = self.project();
+        this.sign.poll(cx).map(|r| {
+            let signature = r?;
+            Ok(Eip712Signature::from_bytes(signature))
+        })
+    }
+}
