@@ -65,6 +65,7 @@ ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
 ssi-vc = { path = "./ssi-vc", version = "0.2.0" }
 ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1.2" }
 ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
+ssi-sd-jwt = { path = "./ssi-sd-jwt", version = "0.1" }
 
 [workspace]
 members = [
@@ -88,6 +89,7 @@ members = [
   "ssi-dids",
   "ssi-jws",
   "ssi-jwt",
+  "ssi-sd-jwt",
   "ssi-tzkey",
   "ssi-ssh",
   "ssi-ldp",
