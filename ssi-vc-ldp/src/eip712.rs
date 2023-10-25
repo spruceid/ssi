@@ -41,6 +41,8 @@ impl Input {
         let domain = self.domain.unwrap_or_else(Self::default_domain);
         let primary_type = self.primary_type.unwrap_or_else(Self::default_primary_type);
 
+        eprintln!("proof_configuration: {}", serde_json::to_string_pretty(&proof_configuration).unwrap());
+
         self.message.insert(
             "proof".to_string(),
             ssi_eip712::to_value(&proof_configuration).unwrap(),

@@ -1,6 +1,6 @@
 use linked_data::{
     LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
-    RdfLiteralValue, LinkedDataDeserializeSubject,
+    RdfLiteralValue
 };
 
 use iref::{Iri, IriBuf};

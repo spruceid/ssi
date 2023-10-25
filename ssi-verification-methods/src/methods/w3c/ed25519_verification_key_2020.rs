@@ -168,20 +168,22 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
     }
 }
 
-impl SigningMethod<ed25519_dalek::Keypair> for Ed25519VerificationKey2020 {
+impl SigningMethod<ed25519_dalek::Keypair, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2020 {
     fn sign_bytes_ref(
         this: &Self,
         secret: &ed25519_dalek::Keypair,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(this.sign_bytes(message, secret))
     }
 }
 
-impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
+impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2020 {
     fn sign_bytes_ref(
         this: &Self,
         secret_key: &JWK,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::EdDSA);
@@ -191,7 +193,7 @@ impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
             {
                 let keypair = ed25519_dalek::Keypair::try_from(p)
                     .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
-                Self::sign_bytes_ref(this, &keypair, message)
+                Self::sign_bytes_ref(this, &keypair, ssi_jwk::algorithm::EdDSA, message)
             }
             _ => Err(MessageSignatureError::InvalidSecretKey),
         }

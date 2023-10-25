@@ -124,6 +124,7 @@ impl SignatureProtocol for Base58Btc {
 /// suite. The signer (the Ethereum Wallet) must prefix the message with
 /// `\x19Ethereum Signed Message:\n` followed by the byte length of the message
 /// and send back the signature encoded in hexadecimal, with a `0x` prefix.
+/// The recovery ID in the signature must start at 27 instead of 0.
 pub struct EthereumWallet;
 
 impl EthereumWallet {
@@ -134,10 +135,19 @@ impl EthereumWallet {
     }
 
     pub fn encode_signature(signature: &[u8]) -> Vec<u8> {
+        assert_eq!(signature.len(), 65);
         let mut result = Vec::new();
         result.extend_from_slice(b"0x");
-        result.resize(2 + signature.len() * 2, 0);
-        hex::encode_to_slice(signature, &mut result[2..]).unwrap();
+        result.resize(132, 0);
+
+        // Encode without the recovery ID.
+        hex::encode_to_slice(&signature[..64], &mut result[2..130]).unwrap();
+        
+        // Encode the recovery ID, offset by 27.
+        let rec_id = signature[64] + 27;
+        hex::encode_to_slice(std::slice::from_ref(&rec_id), &mut result[130..]).unwrap();
+        
+        // Send back the result.
         result
     }
 
@@ -145,7 +155,11 @@ impl EthereumWallet {
         let hex = encoded_signature
             .strip_prefix(b"0x")
             .ok_or(InvalidProtocolSignature)?;
-        hex::decode(hex).map_err(|_| InvalidProtocolSignature)
+        
+        let mut signature = hex::decode(hex).map_err(|_| InvalidProtocolSignature)?;
+        signature[64] -= 27; // Offset the recovery ID by -27.
+
+        Ok(signature)
     }
 }
 

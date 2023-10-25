@@ -3,11 +3,13 @@ use std::hash::Hash;
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod,
+    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod, SigningMethod,
 };
 
 /// Ed25519 Verification Key 2018 type name.
@@ -133,6 +135,8 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
     type Error = InvalidVerificationMethod;
 
     fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+        eprintln!("generic vm: {}", serde_json::to_string_pretty(&m).unwrap());
+
         Ok(Self {
             id: m.id,
             controller: m.controller,
@@ -144,5 +148,17 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyBase58"))?
                 .to_owned(),
         })
+    }
+}
+
+impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2018 {
+    fn sign_bytes_ref(
+        _this: Self::Reference<'_>,
+        secret: &JWK,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, bytes, secret)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

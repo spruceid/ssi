@@ -1,6 +1,5 @@
 use super::{Options, OptionsRef};
 use ssi_crypto::MessageSigner;
-use ssi_jwk::Algorithm;
 use ssi_verification_methods::{
     Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
 };
@@ -34,6 +33,8 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
     type SignatureProtocol = ();
 
     type SignatureAlgorithm = SignatureAlgorithm;
+
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
 
     type Options = Options;
 
@@ -71,20 +72,23 @@ impl
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         options: OptionsRef<'a>,
         _method: &Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        let header = ssi_jws::Header::new_unencoded(
-            Algorithm::EdBlake2b,
+        SignIntoDetachedJws::new(
+            bytes,
+            signer,
             options.public_key_jwk.key_id.clone(),
-        );
-        SignIntoDetachedJws::new(header, bytes, signer)
+            ssi_jwk::algorithm::EdBlake2b
+        )
     }
 
     fn verify(

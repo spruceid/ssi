@@ -274,10 +274,11 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
     }
 }
 
-impl SigningMethod<JWK> for EcdsaSecp256k1RecoveryMethod2020 {
+impl SigningMethod<JWK, ssi_jwk::algorithm::ES256KR> for EcdsaSecp256k1RecoveryMethod2020 {
     fn sign_bytes_ref(
         this: Self::Reference<'_>,
         secret: &JWK,
+        _algorithm: ssi_jwk::algorithm::ES256KR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         this.sign(secret, bytes)

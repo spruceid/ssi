@@ -92,10 +92,6 @@ pub struct EcdsaSecp256k1VerificationKey2019 {
 impl EcdsaSecp256k1VerificationKey2019 {
     pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
         let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256K);
-        if algorithm != ssi_jwk::Algorithm::ES256K {
-            return Err(SignatureError::InvalidSecretKey);
-        }
-
         let header = ssi_jws::Header::new_unencoded(algorithm, None);
         let signing_bytes = header.encode_signing_bytes(data);
         let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)

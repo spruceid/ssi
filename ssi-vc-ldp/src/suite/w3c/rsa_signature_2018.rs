@@ -36,6 +36,8 @@ impl CryptographicSuite for RsaSignature2018 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::RS256;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
@@ -115,10 +117,12 @@ impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for Si
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::RS256;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         method: &RsaVerificationKey2018,

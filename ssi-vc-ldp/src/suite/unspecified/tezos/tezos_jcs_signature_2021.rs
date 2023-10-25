@@ -11,6 +11,7 @@ use crate::{
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
+use super::Blake2bAlgorithm;
 pub use super::tezos_signature_2021::{PublicKey, PublicKeyRef, Signature, SignatureRef};
 
 /// Tezos signature suite based on JCS.
@@ -80,6 +81,8 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = Blake2bAlgorithm;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
@@ -118,10 +121,12 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = Blake2bAlgorithm;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         options: (),
         method: &TezosMethod2021,

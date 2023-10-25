@@ -1,12 +1,9 @@
-use std::future;
-
 use ssi_crypto::MessageSigner;
-use ssi_verification_methods::SignatureError;
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfigurationRef};
 
-use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef};
+use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws};
 
 pub use verification::method::Ed25519VerificationKey2018;
 
@@ -33,6 +30,8 @@ impl CryptographicSuite for Ed25519Signature2018 {
     type SignatureProtocol = ();
 
     type SignatureAlgorithm = SignatureAlgorithm;
+
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
 
@@ -68,17 +67,19 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
-        method: &Ed25519VerificationKey2018,
+        _method: &Ed25519VerificationKey2018,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        todo!()
+        SignIntoDetachedJws::new(bytes, signer, None, ssi_jwk::algorithm::EdDSA)
     }
 
     fn verify(
@@ -86,8 +87,9 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
         _options: (),
         signature: JwsSignatureRef,
         method: &Ed25519VerificationKey2018,
-        bytes: &[u8],
+        message: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let (signing_bytes, signature_bytes) = signature.decode(message)?;
+        method.verify_bytes(&signing_bytes, &signature_bytes)
     }
 }

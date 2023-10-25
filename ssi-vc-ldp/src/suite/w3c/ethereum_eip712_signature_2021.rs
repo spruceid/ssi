@@ -1,18 +1,19 @@
 //! Ethereum EIP712 Signature 2021 implementation.
 //!
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
-use std::{future::{self, Future}, task, pin::Pin};
+use std::{future::Future, task, pin::Pin};
 use pin_project::pin_project;
-use ssi_crypto::MessageSigner;
+use ssi_crypto::{MessageSigner, MessageSignatureError};
+use ssi_jwk::algorithm::{AnyES256K, AlgorithmError};
 use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    JsonWebKey2020, Referencable, SignatureError,
+    JsonWebKey2020, Referencable, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
     suite::{HashError, TransformError, CryptographicSuiteOptions},
-    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef, eip712::{Input, Eip712Signature, Eip712SignatureRef, TypesOrURI, TypesProvider, TypesFetchError},
+    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef, eip712::{Input, Eip712Signature, Eip712SignatureRef, TypesOrURI, TypesProvider, TypesFetchError, Eip712Sign},
 };
 
 /// Ethereum EIP-712 Signature 2021.
@@ -123,6 +124,29 @@ verification_method_union! {
     }
 }
 
+impl<'a> VerificationMethodRef<'a> {
+    pub fn algorithm(&self) -> Result<AnyES256K, AlgorithmError> {
+        match self {
+            Self::EcdsaSecp256k1VerificationKey2019(_) => Ok(AnyES256K::ES256K),
+            Self::EcdsaSecp256k1RecoveryMethod2020(_) => Ok(AnyES256K::ES256KR),
+            Self::JsonWebKey2020(m) => match m.public_key.algorithm {
+                Some(ssi_jwk::Algorithm::ES256K) => Ok(AnyES256K::ES256K),
+                Some(ssi_jwk::Algorithm::ES256KR) => Ok(AnyES256K::ES256KR),
+                Some(other) => Err(AlgorithmError::Unsupported(other)),
+                None => Err(AlgorithmError::Missing)
+            }
+        }
+    }
+
+    pub fn verify_bytes(&self, bytes: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+        match self {
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(bytes, signature),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(bytes, signature),
+            Self::JsonWebKey2020(m) => m.verify_bytes(bytes, signature)
+        }
+    }
+}
+
 impl CryptographicSuite for EthereumEip712Signature2021 {
     type Transformed = ssi_eip712::TypedData;
 
@@ -135,6 +159,8 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
     type SignatureProtocol = ();
 
     type SignatureAlgorithm = SignatureAlgorithm;
+
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
 
     type Options = Options;
 
@@ -274,26 +300,32 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        Eip712Sign<'a, S>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: OptionsRef<'a>,
+        _options: OptionsRef<'a>,
         method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        todo!()
+        match method.algorithm() {
+            Ok(algorithm) => Eip712Sign::new(bytes, signer, algorithm),
+            Err(e) => Eip712Sign::err(MessageSignatureError::into(e.into()))
+        }
     }
 
     fn verify(
         &self,
-        options: OptionsRef,
+        _options: OptionsRef,
         signature: Eip712SignatureRef,
         method: VerificationMethodRef,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes)
     }
 }

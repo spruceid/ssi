@@ -1,21 +1,16 @@
 //! EIP-712 Signature 2021 implementation.
-use std::future::Future;
-use std::pin::Pin;
-use std::task;
-
-use pin_project::pin_project;
 use rdf_types::Quad;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    Eip712Method2021, SignatureError, VerificationError,
+    Eip712Method2021, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
     suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
-    eip712::{Eip712Signature, Eip712SignatureRef}, LinkedDataInput
+    eip712::{Eip712Signature, Eip712SignatureRef, Eip712Sign}, LinkedDataInput
 };
 
 /// EIP-712 Signature 2021.
@@ -67,6 +62,13 @@ verification_method_union! {
 }
 
 impl<'a> VerificationMethodRef<'a> {
+    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyES256K {
+        match self {
+            Self::EcdsaSecp256k1VerificationKey2019(_) => ssi_jwk::algorithm::AnyES256K::ES256K,
+            Self::Eip712Method2021(_) | Self::EcdsaSecp256k1RecoveryMethod2020(_) => ssi_jwk::algorithm::AnyES256K::ES256KR
+        }
+    }
+
     pub fn verify_bytes(&self, signing_bytes: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
         match self {
             Self::Eip712Method2021(m) => m.verify_bytes(signing_bytes, signature_bytes),
@@ -88,6 +90,8 @@ impl CryptographicSuite for Eip712Signature2021 {
     type SignatureProtocol = ();
 
     type SignatureAlgorithm = SignatureAlgorithm;
+
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
 
     type Options = ();
 
@@ -262,18 +266,18 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner> = Eip712Sign<'a, S>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm>> = Eip712Sign<'a, S>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
-        _method: VerificationMethodRef,
+        method: VerificationMethodRef,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        Eip712Sign {
-            sign: signer.sign((), bytes)
-        }
+        Eip712Sign::new(bytes, signer, method.algorithm())
     }
 
     fn verify(
@@ -285,23 +289,5 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
         let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes)
-    }
-}
-
-#[pin_project]
-pub struct Eip712Sign<'a, S: 'a + MessageSigner> {
-    #[pin]
-    sign: S::Sign<'a>
-}
-
-impl<'a, S: 'a + MessageSigner> Future for Eip712Sign<'a, S> {
-    type Output = Result<Eip712Signature, SignatureError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.sign.poll(cx).map(|r| {
-            let signature = r?;
-            Ok(Eip712Signature::from_bytes(signature))
-        })
     }
 }

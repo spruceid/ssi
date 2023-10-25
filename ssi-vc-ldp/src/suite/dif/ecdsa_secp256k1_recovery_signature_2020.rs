@@ -1,5 +1,4 @@
 use ssi_crypto::MessageSigner;
-use ssi_jwk::Algorithm;
 use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, VerificationError};
 use static_iref::iri;
 use iref::Iri;
@@ -33,6 +32,8 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
     type SignatureProtocol = ();
 
     type SignatureAlgorithm = SignatureAlgorithm;
+
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
     type Options = ();
 
@@ -68,20 +69,18 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         _method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        let header = ssi_jws::Header::new_unencoded(
-            Algorithm::ES256KR,
-            None, // TODO should we use method id as key id?
-        );
-        SignIntoDetachedJws::new(header, bytes, signer)
+        SignIntoDetachedJws::new(bytes, signer, None, ssi_jwk::algorithm::ES256KR)
     }
 
     fn verify(

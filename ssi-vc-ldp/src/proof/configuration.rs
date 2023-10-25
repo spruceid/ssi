@@ -1,4 +1,5 @@
 use chrono::Timelike;
+use educe::Educe;
 use iref::Iri;
 use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
 use rdf_types::{Quad, interpretation, generator};
@@ -107,7 +108,8 @@ pub struct ProofConfigurationWithSuiteRef<'a, 'b, M: Referencable, O: 'a + Refer
     pub options: O::Reference<'a>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Educe)]
+#[educe(Debug(bound = "M::Reference<'a>: core::fmt::Debug, O::Reference<'a>: core::fmt::Debug"))]
 #[serde(
     rename_all = "camelCase",
     bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize")
@@ -116,16 +118,18 @@ pub struct ProofConfigurationRef<'a, M: Referencable, O: 'a + Referencable = ()>
     pub created: &'a xsd_types::DateTime,
     pub verification_method: ReferenceOrOwnedRef<'a, M>,
     pub proof_purpose: ProofPurpose,
+
+    #[serde(flatten)]
     pub options: O::Reference<'a>,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ProofConfigurationCastError {
+pub enum ProofConfigurationCastError<M, O> {
     #[error("invalid verification method")]
-    VerificationMethod,
+    VerificationMethod(M),
 
     #[error("invalid options")]
-    Options,
+    Options(O),
 }
 
 impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
@@ -186,20 +190,20 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         )
     }
 
-    pub fn try_cast_verification_method<N: 'a + Referencable, P: 'a + Referencable>(
+    pub fn try_cast_verification_method<N: 'a + Referencable, P: 'a + Referencable, MError, OError>(
         self,
-    ) -> Result<ProofConfigurationRef<'a, N, P>, ProofConfigurationCastError>
+    ) -> Result<ProofConfigurationRef<'a, N, P>, ProofConfigurationCastError<MError, OError>>
     where
-        M::Reference<'a>: TryInto<N::Reference<'a>>,
-        O::Reference<'a>: TryInto<P::Reference<'a>>,
+        M::Reference<'a>: TryInto<N::Reference<'a>, Error = MError>,
+        O::Reference<'a>: TryInto<P::Reference<'a>, Error = OError>,
     {
         self.try_map_verification_method(|m, options| {
             let m = m
                 .try_cast()
-                .map_err(|_| ProofConfigurationCastError::VerificationMethod)?;
+                .map_err(ProofConfigurationCastError::VerificationMethod)?;
             let options = options
                 .try_into()
-                .map_err(|_| ProofConfigurationCastError::Options)?;
+                .map_err(ProofConfigurationCastError::Options)?;
             Ok((m, options))
         })
     }

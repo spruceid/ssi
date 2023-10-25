@@ -5,6 +5,7 @@ use linked_data::{
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
+use core::fmt;
 use std::hash::Hash;
 
 use crate::StructName;
@@ -84,6 +85,39 @@ impl FromIterator<(StructName, Value)> for Struct {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ValueKind {
+    String,
+    Bytes,
+    Array,
+    Struct,
+    Bool,
+    Integer
+}
+
+impl ValueKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Bytes => "bytes",
+            Self::Array => "array",
+            Self::Struct => "struct",
+            Self::Bool => "bool",
+            Self::Integer => "integer"
+        }
+    }
+
+    pub fn into_str(self) -> &'static str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for ValueKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
 /// EIP-712 values, JSON-compatible
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
@@ -96,6 +130,17 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn kind(&self) -> ValueKind {
+        match self {
+            Self::String(_) => ValueKind::String,
+            Self::Bytes(_) => ValueKind::Bytes,
+            Self::Array(_) => ValueKind::Array,
+            Self::Struct(_) => ValueKind::Struct,
+            Self::Bool(_) => ValueKind::Bool,
+            Self::Integer(_) => ValueKind::Integer
+        }
+    }
+
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),

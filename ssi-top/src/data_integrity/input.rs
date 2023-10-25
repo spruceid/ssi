@@ -139,6 +139,7 @@ where
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => {
+                            eprintln!("vm: {params:?}");
 							match params.try_cast_verification_method() {
 								Ok(params) => {
 									ssi_vc_ldp::suite::$name.transform(
@@ -147,7 +148,10 @@ where
 										params
 									).into()
 								}
-								Err(_) => Transform::Error(Some(TransformError::InvalidVerificationMethod))
+								Err(e) => {
+                                    eprintln!("invalid verification method: {e:?}");
+                                    Transform::Error(Some(e.into()))
+                                }
 							}
                         },
                     )*
@@ -161,7 +165,7 @@ where
 									params
 								).into()
 							}
-							Err(_) => Transform::Error(Some(TransformError::InvalidVerificationMethod))
+							Err(e) => Transform::Error(Some(e.into()))
 						}
 					}
 					#[cfg(feature = "w3c")]
@@ -174,7 +178,7 @@ where
 									params
 								))
 							}
-							Err(_) => Transform::Error(Some(TransformError::InvalidVerificationMethod))
+							Err(e) => Transform::Error(Some(e.into()))
 						}
 					}
                 }

@@ -1,5 +1,5 @@
 //! Cryptographic suites.
-use std::{future::Future, marker::PhantomData, pin::Pin, task};
+use std::{future::Future, marker::PhantomData, pin::Pin, task, convert::Infallible};
 
 use iref::Iri;
 use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
@@ -12,13 +12,13 @@ use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::urdna2015;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
-    Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
-    VerificationMethod, Verifier,
+    Referencable, SignatureAlgorithm, SignatureError, VerificationError,
+    VerificationMethod, Verifier, Signer, InvalidVerificationMethod,
 };
 
 use crate::{
     signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationRef,
-    UntypedProof, UntypedProofRef,
+    UntypedProof, UntypedProofRef, ProofConfigurationCastError,
 };
 
 mod signatures;
@@ -54,11 +54,32 @@ pub enum TransformError {
     #[error("unsupported input format")]
     UnsupportedInputFormat,
 
-    #[error("invalid verification method")]
-    InvalidVerificationMethod,
+    #[error("invalid proof options: {0}")]
+    InvalidProofOptions(InvalidOptions),
+
+    #[error("invalid verification method: {0}")]
+    InvalidVerificationMethod(InvalidVerificationMethod),
 
     #[error("internal error: `{0}`")]
     Internal(String)
+}
+
+impl From<ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>> for TransformError {
+    fn from(value: ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>) -> Self {
+        match value {
+            ProofConfigurationCastError::VerificationMethod(e) => Self::InvalidVerificationMethod(e),
+            ProofConfigurationCastError::Options(e) => Self::InvalidProofOptions(e)
+        }
+    }
+}
+
+impl From<ProofConfigurationCastError<InvalidVerificationMethod, Infallible>> for TransformError {
+    fn from(value: ProofConfigurationCastError<InvalidVerificationMethod, Infallible>) -> Self {
+        match value {
+            ProofConfigurationCastError::VerificationMethod(e) => Self::InvalidVerificationMethod(e),
+            ProofConfigurationCastError::Options(_) => unreachable!()
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -75,6 +96,29 @@ pub enum HashError {
     #[error("invalid transformed input")]
     InvalidTransformedInput,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidOptions {
+    #[error("missing public key")]
+    MissingPublicKey,
+}
+
+impl From<InvalidOptions> for VerificationError {
+    fn from(value: InvalidOptions) -> Self {
+        match value {
+            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey,
+        }
+    }
+}
+
+impl From<InvalidOptions> for SignatureError {
+    fn from(value: InvalidOptions) -> Self {
+        match value {
+            InvalidOptions::MissingPublicKey => SignatureError::MissingPublicKey,
+        }
+    }
+}
+
 
 pub trait FromRdfAndSuite<S> {
     // ...
@@ -113,6 +157,8 @@ pub trait CryptographicSuite: Sized {
     /// Signature.
     type Signature: Referencable;
 
+    type MessageSignatureAlgorithm;
+
     type SignatureProtocol: ssi_crypto::SignatureProtocol;
 
     /// Signature algorithm.
@@ -120,6 +166,7 @@ pub trait CryptographicSuite: Sized {
         Self::VerificationMethod,
         Options = Self::Options,
         Signature = Self::Signature,
+        MessageSignatureAlgorithm = Self::MessageSignatureAlgorithm,
         Protocol = Self::SignatureProtocol,
     >;
 
@@ -136,12 +183,15 @@ pub trait CryptographicSuite: Sized {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
 
-    fn generate_proof<'a, S: Signer<Self::VerificationMethod, Self::SignatureProtocol>>(
+    fn generate_proof<'a, S>(
         &'a self,
         data: &'a Self::Hashed,
         signer: &'a S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> GenerateProof<'a, Self, S> {
+    ) -> GenerateProof<'a, Self, S>
+    where
+        S: Signer<Self::VerificationMethod, Self::MessageSignatureAlgorithm, Self::SignatureProtocol>
+    {
         let algorithm = self.setup_signature_algorithm();
 
         GenerateProof {
@@ -180,7 +230,7 @@ pub trait CryptographicSuite: Sized {
 
 struct SignBounded<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
 
-impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: 'a + Signer<M, A::Protocol>>
+impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: 'a + Signer<M, A::MessageSignatureAlgorithm, A::Protocol>>
     UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
 where
     A::Signature: 'a,
@@ -198,7 +248,7 @@ struct Binder<'a, A, S> {
     data: &'a [u8],
 }
 
-impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: Signer<M, A::Protocol>>
+impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: Signer<M, A::MessageSignatureAlgorithm, A::Protocol>>
     RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
 where
     A::Signature: 'a,
@@ -221,7 +271,7 @@ where
 pub struct GenerateProof<
     'a,
     S: CryptographicSuite,
-    T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 > where
     S::VerificationMethod: 'a,
     S::SignatureAlgorithm: 'a,
@@ -234,7 +284,7 @@ pub struct GenerateProof<
     signature: SelfRefFuture<'a, SignBounded<'a, S::VerificationMethod, S::SignatureAlgorithm, T>>,
 }
 
-impl<'a, S: CryptographicSuite, T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>> Future
+impl<'a, S: CryptographicSuite, T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>> Future
     for GenerateProof<'a, S, T>
 where
     S::VerificationMethod: 'a,
@@ -296,7 +346,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     ) -> SignLinkedData<'max, T, Self, C, S>
     where
         Self::VerificationMethod: 'max,
-        S: 'max + Signer<Self::VerificationMethod, Self::SignatureProtocol>,
+        S: 'max + Signer<Self::VerificationMethod, Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     {
         DataIntegrity::sign(input, context, signer, self, params)
     }
@@ -324,6 +374,7 @@ where
     let mut hash_data = [0u8; 64];
     hash_data[..32].copy_from_slice(&proof_config_hash);
     hash_data[32..].copy_from_slice(&transformed_document_hash);
+
     hash_data
 }
 

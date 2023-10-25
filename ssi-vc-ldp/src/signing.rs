@@ -43,7 +43,7 @@ pub fn sign<'max, T, S: CryptographicSuite, X, I>(
 where
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
-    I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    I: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 {
     DataIntegrity::<T, S>::sign(input, context, signer, suite, params)
 }
@@ -67,7 +67,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     where
         S: CryptographicSuiteInput<T, X>,
         S::VerificationMethod: 'max,
-        I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+        I: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     {
         SignLinkedData {
             signer,
@@ -110,7 +110,7 @@ struct UnboundedGenerateProof<S, T>(PhantomData<(S, T)>);
 impl<
         'max,
         S: 'max + CryptographicSuite,
-        T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+        T: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     > UnboundedRefFuture<'max> for UnboundedGenerateProof<S, T>
 where
     S::Hashed: 'max,
@@ -135,7 +135,7 @@ struct Binder<'a, S: CryptographicSuite, T> {
 impl<
         'max,
         S: 'max + CryptographicSuite,
-        T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+        T: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     > RefFutureBinder<'max, UnboundedGenerateProof<S, T>> for Binder<'max, S, T>
 where
     S::Hashed: 'max,
@@ -169,7 +169,7 @@ where
     S::SignatureAlgorithm: 'max,
     S::Options: 'max,
     X: 'max,
-    I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    I: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 {
     signer: &'max I,
 
@@ -184,7 +184,7 @@ impl<'max, T, S, X, I> Future for SignLinkedData<'max, T, S, X, I>
 where
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
-    I: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    I: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 {
     type Output = Result<Verifiable<DataIntegrity<T, S>>, Error>;
 
@@ -232,7 +232,7 @@ where
     S::SignatureAlgorithm: 'max,
     S::Options: 'max,
     S::Signature: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    T: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 {
     payload: Option<C>,
 
@@ -244,7 +244,7 @@ impl<'max, C, S, T> Future for SignLinkedDataOk<'max, C, S, T>
 where
     S: CryptographicSuite,
     S::VerificationMethod: 'max,
-    T: 'max + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    T: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 {
     type Output = Result<Verifiable<DataIntegrity<C, S>>, Error>;
 

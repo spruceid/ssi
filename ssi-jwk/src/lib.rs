@@ -12,6 +12,10 @@ use zeroize::Zeroize;
 pub mod error;
 pub use error::Error;
 
+pub mod algorithm;
+
+pub use algorithm::Algorithm;
+
 #[cfg(feature = "ripemd-160")]
 pub mod ripemd160;
 
@@ -248,43 +252,6 @@ pub struct Prime {
 #[serde(into = "Base64urlUIntString")]
 pub struct Base64urlUInt(pub Vec<u8>);
 type Base64urlUIntString = String;
-
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
-pub enum Algorithm {
-    HS256,
-    HS384,
-    HS512,
-    RS256,
-    RS384,
-    RS512,
-    PS256,
-    PS384,
-    PS512,
-    EdDSA,
-    EdBlake2b,
-    ES256,
-    ES384,
-    ES256K,
-    /// <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    #[serde(rename = "ES256K-R")]
-    ES256KR,
-    /// like ES256K-R but using Keccak-256 instead of SHA-256
-    #[serde(rename = "ES256K-R")]
-    ESKeccakKR,
-    ESBlake2b,
-    ESBlake2bK,
-    #[doc(hidden)]
-    AleoTestnet1Signature,
-    // Per the specs it should only be `none` but `None` is kept for backwards compatibility
-    #[serde(rename = "none", alias = "None")]
-    None,
-}
-
-impl Default for Algorithm {
-    fn default() -> Self {
-        Self::None
-    }
-}
 
 impl JWK {
     #[cfg(feature = "ed25519")]

@@ -1,5 +1,5 @@
 use ssi_jwk::JWK;
-use ssi_vc_ldp::suite::CryptographicSuiteOptions;
+use ssi_vc_ldp::suite::{CryptographicSuiteOptions, InvalidOptions};
 use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, VerificationError};
 
 use super::AnySuite;
@@ -23,6 +23,7 @@ pub struct AnySuiteOptions {
     pub public_key_jwk: Option<Box<JWK>>,
 
     #[ld("eip712:eip712")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 }
 
@@ -82,7 +83,7 @@ impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
     }
 }
 
-#[derive(Clone, Default, Copy)]
+#[derive(Debug, Clone, Default, Copy)]
 pub struct AnySuiteOptionsRef<'a> {
     pub public_key_jwk: Option<&'a JWK>,
 
@@ -115,26 +116,6 @@ impl<'a> From<AnySuiteOptionsRef<'a>>
     fn from(value: AnySuiteOptionsRef<'a>) -> Self {
         Self {
             eip712: value.eip712,
-        }
-    }
-}
-
-pub enum InvalidOptions {
-    MissingPublicKey,
-}
-
-impl From<InvalidOptions> for VerificationError {
-    fn from(value: InvalidOptions) -> Self {
-        match value {
-            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey,
-        }
-    }
-}
-
-impl From<InvalidOptions> for SignatureError {
-    fn from(value: InvalidOptions) -> Self {
-        match value {
-            InvalidOptions::MissingPublicKey => SignatureError::MissingPublicKey,
         }
     }
 }

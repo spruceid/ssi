@@ -42,6 +42,8 @@ impl CryptographicSuite for EdDsa2022 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
@@ -75,10 +77,12 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         method: &Multikey,

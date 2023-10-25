@@ -810,7 +810,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     let secret_key = p256::SecretKey::try_from(ec)?;
                     let signing_key = p256::ecdsa::SigningKey::from(secret_key);
                     let sig: p256::ecdsa::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                        signing_key.try_sign(data)?; // Uses SHA-256 by default.
                     sig.as_bytes().to_vec()
                 }
                 #[cfg(feature = "secp256k1")]
@@ -820,7 +820,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     let secret_key = k256::SecretKey::try_from(ec)?;
                     let signing_key = k256::ecdsa::SigningKey::from(secret_key);
                     let sig: k256::ecdsa::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                        signing_key.try_sign(data)?; // Uses SHA-256 by default.
                     sig.as_bytes().to_vec()
                 }
                 #[cfg(feature = "secp256k1")]
@@ -829,6 +829,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                     let secret_key = k256::SecretKey::try_from(ec)?;
                     let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    // NOTE: in `k256` version 0.11, `recoverable::Signature`
+                    //       uses Keccack as default hash function, not sha256.
+                    //       See: <https://docs.rs/k256/0.11.0/k256/ecdsa/recoverable/struct.Signature.html#impl-PrehashSignature>
                     let sig: k256::ecdsa::recoverable::Signature = signing_key
                         .try_sign_digest(<sha2::Sha256 as Digest>::new_with_prefix(data))?;
                     sig.as_bytes().to_vec()
@@ -839,8 +842,11 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                     let secret_key = k256::SecretKey::try_from(ec)?;
                     let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                    // NOTE: in `k256` version 0.11, `recoverable::Signature`
+                    //       uses Keccack as default hash function, not sha256.
+                    //       See: <https://docs.rs/k256/0.11.0/k256/ecdsa/recoverable/struct.Signature.html#impl-PrehashSignature>
                     let sig: k256::ecdsa::recoverable::Signature =
-                        signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                        signing_key.try_sign(data)?; // Uses Keccak by default.
                     sig.as_bytes().to_vec()
                 }
                 #[cfg(feature = "p256")]

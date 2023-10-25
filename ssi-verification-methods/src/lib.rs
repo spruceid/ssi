@@ -193,34 +193,37 @@ impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodRe
     }
 }
 
-pub trait SigningMethod<S>: VerificationMethod + Referencable {
+pub trait SigningMethod<S, A>: VerificationMethod + Referencable {
     fn sign(
         &self,
         secret: &S,
+        algorithm: A,
         protocol: impl SignatureProtocol,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        Self::sign_ref(self.as_reference(), secret, protocol, bytes)
+        Self::sign_ref(self.as_reference(), secret, algorithm, protocol, bytes)
     }
 
     fn sign_ref(
         this: Self::Reference<'_>,
         secret: &S,
+        algorithm: A,
         protocol: impl SignatureProtocol,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         let prepared_bytes = protocol.prepare_message(bytes);
-        let signed_bytes = Self::sign_bytes_ref(this, secret, &prepared_bytes)?;
+        let signed_bytes = Self::sign_bytes_ref(this, secret, algorithm,&prepared_bytes)?;
         Ok(protocol.encode_signature(signed_bytes))
     }
 
-    fn sign_bytes(&self, secret: &S, bytes: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
-        Self::sign_bytes_ref(self.as_reference(), secret, bytes)
+    fn sign_bytes(&self, secret: &S, algorithm: A, bytes: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+        Self::sign_bytes_ref(self.as_reference(), secret, algorithm, bytes)
     }
 
     fn sign_bytes_ref(
         this: Self::Reference<'_>,
         secret: &S,
+        algorithm: A,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError>;
 }
@@ -236,19 +239,21 @@ impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
     }
 }
 
-impl<'m, 's, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S>, S> MessageSigner<P>
+impl<'m, 's, A, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S, A>, S> MessageSigner<A, P>
     for MethodWithSecret<'m, 's, M, S>
 {
     type Sign<'a> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where
     Self: 'a,
+    A: 'a,
     P: 'a;
 
-    fn sign<'a>(self, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
+    fn sign<'a>(self, algorithm: A, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
     where
         Self: 'a,
+        A: 'a,
         P: 'a,
     {
-        std::future::ready(M::sign_ref(self.method, self.secret, protocol, message))
+        std::future::ready(M::sign_ref(self.method, self.secret, algorithm, protocol, message))
     }
 }
 

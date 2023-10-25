@@ -1,9 +1,15 @@
+use std::future::Future;
+use std::task;
+use std::pin::Pin;
 use iref::UriBuf;
 use linked_data::{
     LinkedData, LinkedDataGraph
 };
+use pin_project::pin_project;
 use rdf_types::{Interpretation, Vocabulary};
-use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature, VerificationError};
+use ssi_crypto::MessageSigner;
+use ssi_jwk::algorithm::AnyES256K;
+use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature, VerificationError, SignatureError};
 
 use crate::suite::{AnySignature, AnySignatureRef};
 
@@ -146,5 +152,75 @@ impl<V: Vocabulary, I: Interpretation> LinkedData<I, V> for TypesOrURI {
     {
         visitor.default_graph(self)?;
         visitor.end()
+    }
+}
+
+#[pin_project]
+pub struct Eip712Sign<'a, S: 'a + MessageSigner<AnyES256K>> {
+    #[pin]
+    inner: Eip712SignInner<'a, S>
+}
+
+impl<'a, S: 'a + MessageSigner<AnyES256K>> Eip712Sign<'a, S> {
+    pub fn new(
+        bytes: &'a [u8],
+        signer: S,
+        algorithm: AnyES256K
+    ) -> Self {
+        Self {
+            inner: Eip712SignInner::Ok(Eip712SignOk {
+                sign: signer.sign(algorithm, (), bytes)
+            })
+        }
+    }
+
+    pub fn err(error: SignatureError) -> Self {
+        Self {
+            inner: Eip712SignInner::Err(Some(error))
+        }
+    }
+}
+
+impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712Sign<'a, S> {
+    type Output = Result<Eip712Signature, SignatureError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let this = self.project();
+        this.inner.poll(cx)
+    }
+}
+
+#[pin_project(project = Eip712SignInnerProject)]
+enum Eip712SignInner<'a, S: 'a + MessageSigner<AnyES256K>> {
+    Ok(#[pin] Eip712SignOk<'a, S>),
+    Err(Option<SignatureError>)
+}
+
+impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712SignInner<'a, S> {
+    type Output = Result<Eip712Signature, SignatureError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        match self.project() {
+            Eip712SignInnerProject::Ok(f) => f.poll(cx),
+            Eip712SignInnerProject::Err(e) => task::Poll::Ready(Err(e.take().unwrap()))
+        }
+    }
+}
+
+#[pin_project]
+struct Eip712SignOk<'a, S: 'a + MessageSigner<AnyES256K>> {
+    #[pin]
+    sign: S::Sign<'a>
+}
+
+impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712SignOk<'a, S> {
+    type Output = Result<Eip712Signature, SignatureError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        let this = self.project();
+        this.sign.poll(cx).map(|r| {
+            let signature = r?;
+            Ok(Eip712Signature::from_bytes(signature))
+        })
     }
 }

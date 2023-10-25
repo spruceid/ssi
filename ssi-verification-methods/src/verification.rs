@@ -32,9 +32,9 @@ pub enum VerificationError {
     #[error("invalid key")]
     InvalidKey,
 
-    /// The verification key is not the same as the signing key.
-    #[error("key mismatch")]
-    KeyMismatch,
+    // /// The verification key is not the same as the signing key.
+    // #[error("key mismatch")]
+    // KeyMismatch,
 
     /// Key not found.
     #[error("unknown key")]

@@ -51,3 +51,32 @@ pub struct OptionsRef<'a> {
     #[ld("sec:publicKeyJwk")]
     pub public_key_jwk: &'a JWK,
 }
+
+pub enum Blake2bAlgorithm {
+    EdBlake2b,
+    ESBlake2bK,
+    ESBlake2b
+}
+
+impl From<Blake2bAlgorithm> for ssi_jwk::Algorithm {
+    fn from(value: Blake2bAlgorithm) -> Self {
+        match value {
+            Blake2bAlgorithm::EdBlake2b => Self::EdBlake2b,
+            Blake2bAlgorithm::ESBlake2bK => Self::ESBlake2bK,
+            Blake2bAlgorithm::ESBlake2b => Self::ESBlake2b
+        }
+    }
+}
+
+impl TryFrom<ssi_jwk::Algorithm> for Blake2bAlgorithm {
+    type Error = ssi_jwk::algorithm::UnsupportedAlgorithm;
+    
+    fn try_from(value: ssi_jwk::Algorithm) -> Result<Self, Self::Error> {
+        match value {
+            ssi_jwk::Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
+            ssi_jwk::Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
+            ssi_jwk::Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
+            a => Err(ssi_jwk::algorithm::UnsupportedAlgorithm(a))
+        }
+    }
+}

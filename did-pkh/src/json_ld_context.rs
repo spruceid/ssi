@@ -11,7 +11,7 @@ use ssi_dids::{
 };
 use static_iref::iri;
 
-use crate::{PkhVerificationMethod, PkhVerificationMethodType};
+use crate::{PkhVerificationMethod, PkhVerificationMethodType, PublicKey};
 
 const BLOCKCHAIN2021_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/blockchain-2021/v1");
 
@@ -28,6 +28,7 @@ pub struct JsonLdContext {
     p256_public_key_blake2b_digest_size_20_base58_check_encoded2021: bool,
     blockchain_account_id: bool,
     public_key_jwk: bool,
+    public_key_base58: bool,
 }
 
 impl JsonLdContext {
@@ -38,7 +39,13 @@ impl JsonLdContext {
     pub fn add_verification_method(&mut self, m: &PkhVerificationMethod) {
         // self.blockchain_account_id |= m.blockchain_account_id.is_some();
         self.blockchain_account_id = true;
-        self.public_key_jwk |= m.public_key_jwk.is_some();
+
+        match &m.public_key {
+            Some(PublicKey::Jwk(_)) => self.public_key_jwk |= true,
+            Some(PublicKey::Base58(_)) => self.public_key_base58 |= true,
+            None => (),
+        }
+
         self.add_verification_method_type(m.type_);
     }
 
@@ -156,6 +163,18 @@ impl JsonLdContext {
                     type_: Some(Entry::new(Nullable::Some(Type::Keyword(TypeKeyword::Json)))),
                     ..Default::default()
                 }))),
+            );
+        }
+
+        if self.public_key_base58 {
+            def.bindings.insert(
+                "publicKeyBase58".into(),
+                TermDefinition::Simple(
+                    iri!("https://w3id.org/security#publicKeyBase58")
+                        .to_owned()
+                        .into(),
+                )
+                .into(),
             );
         }
 

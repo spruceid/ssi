@@ -129,10 +129,11 @@ impl TryFrom<GenericVerificationMethod>
     }
 }
 
-impl SigningMethod<JWK> for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl SigningMethod<JWK, ssi_jwk::algorithm::EdBlake2b> for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn sign_bytes_ref(
         _this: &Self,
         key: &JWK,
+        _algorithm: ssi_jwk::algorithm::EdBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(Algorithm::EdBlake2b, bytes, key)

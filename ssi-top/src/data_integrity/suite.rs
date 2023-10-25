@@ -117,14 +117,14 @@ macro_rules! crypto_suites {
         }
 
         #[pin_project(project = SignProj)]
-        pub enum Sign<'a, S: 'a + MessageSigner<AnySignatureProtocol>> {
+        pub enum Sign<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> {
             $(
                 $(#[cfg($($t)*)])?
-                $name(#[pin] SuiteSign<'a, ssi_vc_ldp::suite::$name, SignerAdapter<S, AnySignatureProtocol>>)
+                $name(#[pin] SuiteSign<'a, ssi_vc_ldp::suite::$name, SignerAdapter<S, ssi_jwk::Algorithm, AnySignatureProtocol>>)
             ),*
         }
 
-        impl<'a, S: 'a + MessageSigner<AnySignatureProtocol>> Future for Sign<'a, S> {
+        impl<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> Future for Sign<'a, S> {
             type Output = Result<AnySignature, SignatureError>;
 
             fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
@@ -146,9 +146,11 @@ macro_rules! crypto_suites {
 
             type Protocol = AnySignatureProtocol;
 
-            type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = FailibleFuture<Sign<'a, S>, SignatureError>;
+            type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
-            fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+            type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = FailibleFuture<Sign<'a, S>, SignatureError>;
+
+            fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
                 &self,
                 options: <Self::Options as Referencable>::Reference<'a>,
                 method: AnyMethodRef,
@@ -159,6 +161,7 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name(a) => {
+                            eprintln!(concat!("cs algorithm is ", stringify!($name)));
                             match method.try_into() {
                                 Ok(method) => {
                                     match options.try_into() {
@@ -219,6 +222,8 @@ macro_rules! crypto_suites {
             type SignatureProtocol = AnySignatureProtocol;
 
             type SignatureAlgorithm = AnySignatureAlgorithm;
+
+            type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
             type Options = AnySuiteOptions;
 
@@ -522,26 +527,31 @@ impl AnySuite {
     }
 }
 
-impl SigningMethod<JWK> for AnyMethod {
+impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
     fn sign_bytes_ref(
         this: AnyMethodRef,
         secret: &JWK,
+        algorithm: ssi_jwk::Algorithm,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match this {
             AnyMethodRef::RsaVerificationKey2018(_) => todo!(),
-            AnyMethodRef::Ed25519VerificationKey2018(_) => todo!(),
+            AnyMethodRef::Ed25519VerificationKey2018(m) => {
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            },
             AnyMethodRef::Ed25519VerificationKey2020(_) => todo!(),
             AnyMethodRef::EcdsaSecp256k1VerificationKey2019(_) => todo!(),
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => m.sign_bytes(secret, bytes),
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {                
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            },
             AnyMethodRef::EcdsaSecp256r1VerificationKey2019(_) => todo!(),
             AnyMethodRef::JsonWebKey2020(_) => todo!(),
             AnyMethodRef::Multikey(_) => todo!(),
             AnyMethodRef::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
-                m.sign_bytes(secret, bytes)
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
             AnyMethodRef::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
-                m.sign_bytes(secret, bytes)
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
             AnyMethodRef::TezosMethod2021(_) => todo!(),
             AnyMethodRef::AleoMethod2021(_) => todo!(),

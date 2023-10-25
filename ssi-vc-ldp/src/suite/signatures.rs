@@ -6,7 +6,7 @@ use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
-use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable, SignatureError};
+use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable, SignatureError, VerificationError};
 
 use crate::eip712::Eip712Metadata;
 
@@ -157,6 +157,20 @@ pub struct JwsSignatureRef<'a> {
     pub jws: &'a CompactJWSStr,
 }
 
+impl<'a> JwsSignatureRef<'a> {
+    /// Decodes the signature for the given message.
+    /// 
+    /// Returns the signing bytes and the signature bytes.
+    pub fn decode(&self, message: &[u8]) -> Result<(Vec<u8>, Vec<u8>), VerificationError> {
+        let (header, _, signature_bytes) = self
+            .jws
+            .decode()
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        let signing_bytes = header.encode_signing_bytes(message);
+        Ok((signing_bytes, signature_bytes))
+    }
+}
+
 impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
     type Error = InvalidSignature;
 
@@ -168,9 +182,9 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
     }
 }
 
-struct UnboundSignIntoDetachedJws<S>(PhantomData<S>);
+struct UnboundSignIntoDetachedJws<S, A>(PhantomData<(S, A)>);
 
-impl<'a, S: 'a + MessageSigner> UnboundedRefFuture<'a> for UnboundSignIntoDetachedJws<S> {
+impl<'a, A: 'a, S: 'a + MessageSigner<A>> UnboundedRefFuture<'a> for UnboundSignIntoDetachedJws<S, A> {
     type Owned = Vec<u8>;
 
     type Bound<'r> = S::Sign<'r> where 'a: 'r;
@@ -178,41 +192,53 @@ impl<'a, S: 'a + MessageSigner> UnboundedRefFuture<'a> for UnboundSignIntoDetach
     type Output = Result<Vec<u8>, MessageSignatureError>;
 }
 
-struct SignIntoDetachedJwsBinder<S> {
+struct SignIntoDetachedJwsBinder<S, A> {
     // signing_bytes: Vec<u8>
     signer: S,
+
+    algorithm: A
 }
 
-impl<'a, S: 'a + MessageSigner> RefFutureBinder<'a, UnboundSignIntoDetachedJws<S>>
-    for SignIntoDetachedJwsBinder<S>
+impl<'a, A: 'a, S: 'a + MessageSigner<A>> RefFutureBinder<'a, UnboundSignIntoDetachedJws<S, A>>
+    for SignIntoDetachedJwsBinder<S, A>
 {
     fn bind<'r>(context: Self, value: &'r Vec<u8>) -> S::Sign<'r>
     where
         'a: 'r,
     {
-        context.signer.sign((), value)
+        context.signer.sign(context.algorithm, (), value)
     }
 }
 
 #[pin_project]
-pub struct SignIntoDetachedJws<'a, S: 'a + MessageSigner> {
+pub struct SignIntoDetachedJws<'a, S: 'a + MessageSigner<A>, A: 'a> {
     header: Option<ssi_jws::Header>,
 
     #[pin]
-    sign: SelfRefFuture<'a, UnboundSignIntoDetachedJws<S>>,
+    sign: SelfRefFuture<'a, UnboundSignIntoDetachedJws<S, A>>,
 }
 
-impl<'a, S: 'a + MessageSigner> SignIntoDetachedJws<'a, S> {
-    pub fn new(header: ssi_jws::Header, payload: &[u8], signer: S) -> Self {
+impl<'a, A: Clone + Into<ssi_jwk::Algorithm>, S: 'a + MessageSigner<A>> SignIntoDetachedJws<'a, S, A> {
+    pub fn new(
+        payload: &[u8],
+        signer: S,
+        key_id: Option<String>,
+        algorithm: A
+    ) -> Self {
+        let header = ssi_jws::Header::new_unencoded(
+            algorithm.clone().into(),
+            key_id
+        );
+
         let signing_bytes = header.encode_signing_bytes(payload);
         Self {
             header: Some(header),
-            sign: SelfRefFuture::new(signing_bytes, SignIntoDetachedJwsBinder { signer }),
+            sign: SelfRefFuture::new(signing_bytes, SignIntoDetachedJwsBinder { signer, algorithm }),
         }
     }
 }
 
-impl<'a, S: 'a + MessageSigner> Future for SignIntoDetachedJws<'a, S> {
+impl<'a, A, S: 'a + MessageSigner<A>> Future for SignIntoDetachedJws<'a, S, A> {
     type Output = Result<JwsSignature, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {

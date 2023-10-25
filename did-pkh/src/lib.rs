@@ -83,7 +83,12 @@ pub struct PkhVerificationMethod {
     pub type_: PkhVerificationMethodType,
     pub controller: DIDBuf,
     pub blockchain_account_id: BlockchainAccountId,
-    pub public_key_jwk: Option<JWK>,
+    pub public_key: Option<PublicKey>,
+}
+
+pub enum PublicKey {
+    Jwk(JWK),
+    Base58(String),
 }
 
 impl From<PkhVerificationMethod> for DIDVerificationMethod {
@@ -94,11 +99,18 @@ impl From<PkhVerificationMethod> for DIDVerificationMethod {
             value.blockchain_account_id.to_string().into(),
         );
 
-        if let Some(key) = value.public_key_jwk {
-            properties.insert(
-                "publicKeyJwk".to_owned(),
-                serde_json::to_value(key).unwrap(),
-            );
+        if let Some(key) = value.public_key {
+            match key {
+                PublicKey::Jwk(jwk) => {
+                    properties.insert(
+                        "publicKeyJwk".to_owned(),
+                        serde_json::to_value(jwk).unwrap(),
+                    );
+                }
+                PublicKey::Base58(key) => {
+                    properties.insert("publicKeyBase58".to_owned(), key.into());
+                }
+            }
         }
 
         Self {
@@ -168,7 +180,7 @@ async fn resolve_tezos(did: &DID, account_address: &str, reference: &str) -> Res
         type_: vm_type,
         controller: did.to_owned(),
         blockchain_account_id: blockchain_account_id.clone(),
-        public_key_jwk: None,
+        public_key: None,
     };
 
     let vm2_url = DIDURLBuf::from_string(format!("{did}#TezosMethod2021")).unwrap();
@@ -177,7 +189,7 @@ async fn resolve_tezos(did: &DID, account_address: &str, reference: &str) -> Res
         type_: PkhVerificationMethodType::TezosMethod2021,
         controller: did.to_owned(),
         blockchain_account_id,
-        public_key_jwk: None,
+        public_key: None,
     };
 
     let mut json_ld_context = JsonLdContext::default();
@@ -230,7 +242,7 @@ async fn resolve_eip155(
         type_: PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
         controller: did.to_owned(),
         blockchain_account_id,
-        public_key_jwk: None,
+        public_key: None,
     };
 
     let mut json_ld_context = JsonLdContext::default();
@@ -290,7 +302,7 @@ async fn resolve_solana(did: &DID, account_address: &str, reference: &str) -> Re
     let vm = PkhVerificationMethod {
         id: vm_url.clone(),
         type_: PkhVerificationMethodType::Ed25519VerificationKey2018,
-        public_key_jwk: Some(pk_jwk.clone()),
+        public_key: Some(PublicKey::Base58(account_address.to_owned())),
         controller: did.to_owned(),
         blockchain_account_id: blockchain_account_id.clone(),
     };
@@ -298,7 +310,7 @@ async fn resolve_solana(did: &DID, account_address: &str, reference: &str) -> Re
     let solvm = PkhVerificationMethod {
         id: solvm_url.clone(),
         type_: PkhVerificationMethodType::SolanaMethod2021,
-        public_key_jwk: Some(pk_jwk),
+        public_key: Some(PublicKey::Jwk(pk_jwk)),
         controller: did.to_owned(),
         blockchain_account_id,
     };
@@ -354,7 +366,7 @@ async fn resolve_bip122(did: &DID, account_address: &str, reference: &str) -> Re
         type_: PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
         controller: did.to_owned(),
         blockchain_account_id,
-        public_key_jwk: None,
+        public_key: None,
     };
 
     let mut json_ld_context = JsonLdContext::default();
@@ -421,7 +433,7 @@ async fn resolve_aleo(did: &DID, account_address: &str, reference: &str) -> Reso
         type_: PkhVerificationMethodType::BlockchainVerificationMethod2021,
         controller: did.to_owned(),
         blockchain_account_id,
-        public_key_jwk: None,
+        public_key: None,
     };
 
     let mut json_ld_context = JsonLdContext::default();
@@ -727,7 +739,7 @@ mod tests {
     use ssi_core::one_or_many::OneOrMany;
     use ssi_dids::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
-    use ssi_top::data_integrity::{AnyInputContext, AnySuite};
+    use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
     use ssi_vc_ldp::{
         verification::{
             method::{signer::SingleSecretSigner, ProofPurpose},
@@ -946,6 +958,7 @@ mod tests {
     #[derive(Clone, serde::Serialize, linked_data::Serialize)]
     #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
     #[ld(type = "cred:VerifiableCredential")]
+    #[serde(rename_all = "camelCase")]
     struct TestCredential {
         #[ld("cred:issuer")]
         issuer: IriBuf,
@@ -954,7 +967,13 @@ mod tests {
         issuance_date: xsd_types::DateTime,
 
         #[ld("cred:credentialSubject")]
-        credential_subject: IriBuf,
+        credential_subject: CredentialSubject,
+    }
+
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    struct CredentialSubject {
+        #[ld(id)]
+        id: IriBuf,
     }
 
     async fn credential_prove_verify_did_pkh(
@@ -977,7 +996,9 @@ mod tests {
         let mut cred = TestCredential {
             issuer: did.clone().into(),
             issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
-            credential_subject: iri!("did:example:foo").to_owned(),
+            credential_subject: CredentialSubject {
+                id: iri!("did:example:foo").to_owned(),
+            },
         };
         let issue_options = ProofConfiguration {
             verification_method: IriBuf::new(did.to_string() + vm_relative_url)
@@ -985,7 +1006,10 @@ mod tests {
                 .into(),
             created: cred.issuance_date.clone(),
             proof_purpose: ProofPurpose::Assertion,
-            options: eip712_domain_opt.into(),
+            options: AnySuiteOptions {
+                eip712: eip712_domain_opt.into(),
+                public_key_jwk: Some(Box::new(key.to_public())),
+            },
         };
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = cred.clone();
@@ -995,6 +1019,8 @@ mod tests {
         // Sign with proof suite directly because there is not currently a way to do it
         // for Eip712Signature2021 in did-pkh otherwise.
         let signer = SingleSecretSigner::new(&didpkh, key.clone());
+        eprintln!("key: {key}");
+        eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
             .sign(cred, AnyInputContext::default(), &signer, issue_options)
             .await
@@ -1612,7 +1638,7 @@ mod tests {
 
         // let verification_result = bad_vc.verify(&didpkh).await.unwrap();
         // assert!(verification_result.is_invalid());
-        todo!()
+        // todo!()
     }
 
     #[tokio::test]

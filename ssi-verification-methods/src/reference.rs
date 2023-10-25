@@ -1,6 +1,7 @@
 use crate::{
     LinkedDataVerificationMethod, Referencable, VerificationMethod
 };
+use educe::Educe;
 use iref::{Iri, IriBuf};
 use serde::{Deserialize, Serialize};
 
@@ -69,7 +70,8 @@ impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference
 }
 
 /// Reference to a verification method.
-#[derive(Serialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(Serialize, linked_data::Serialize, linked_data::Deserialize, Educe)]
+#[educe(Debug(bound = "M::Reference<'a>: core::fmt::Debug"))]
 #[serde(untagged, bound(serialize = "M::Reference<'a>: Serialize"))]
 pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
     Reference(#[ld(id)] &'a Iri),

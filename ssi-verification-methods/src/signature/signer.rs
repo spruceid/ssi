@@ -8,8 +8,12 @@ pub use single_secret::SingleSecretSigner;
 use crate::{Referencable, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureError};
 
 /// Verification method signer.
-pub trait Signer<M: Referencable, P> {
-    type Sign<'a, A: SignatureAlgorithm<M, Protocol = P>>: 'a
+/// 
+/// `M` is the verification method type.
+/// `B` is the cryptographic signature algorithm to be used with the verification method.
+/// `P` is the signature protocol.
+pub trait Signer<M: Referencable, B, P> {
+    type Sign<'a, A: SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>>: 'a
         + Future<Output = Result<A::Signature, SignatureError>>
     where
         Self: 'a,
@@ -17,7 +21,7 @@ pub trait Signer<M: Referencable, P> {
         A: 'a,
         A::Signature: 'a;
 
-    fn sign<'a, 'o: 'a, 'm: 'a, A: SignatureAlgorithm<M, Protocol = P>>(
+    fn sign<'a, 'o: 'a, 'm: 'a, A: SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>>(
         &'a self,
         algorithm: A,
         options: <A::Options as Referencable>::Reference<'o>,
