@@ -136,8 +136,7 @@ json-syntax = "0.10"
 nquads-syntax = "0.17"
 multibase = "0.9.1"
 # json-ld = "0.15"
-# json-ld = { git = "https://github.com/timothee-haudebourg/json-ld.git" }
-json-ld = { path = "/home/work/Documents/Community/rdf/json-ld/json-ld" }
+json-ld = { git = "https://github.com/timothee-haudebourg/json-ld.git" }
 serde = "1.0"
 serde_json = "1.0"
 serde_jcs = "0.1.0"
@@ -147,7 +146,6 @@ educe = "0.4.22"
 pin-project = "1.1.3"
 futures = "0.3.28"
 linked-data = { git = "https://github.com/spruceid/linked-data-rs.git" }
-# linked-data = { path = "/home/work/Documents/Spruce/linked-data/linked-data" }
 rand_chacha = "0.3.1"
 contextual = "0.1.6"
 
