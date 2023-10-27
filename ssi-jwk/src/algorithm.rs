@@ -17,24 +17,32 @@ macro_rules! algorithms {
                 $(#[doc($doc_tag)])?
                 $(#[serde $serde])?
                 #[serde(rename = $name)]
-                $id
-            ),*
+                $id,
+            )*
+            /// No signature.
+            /// 
+            /// Per the specs it should only be `none` but `None` is kept for backwards
+            /// compatibility.
+            #[serde(alias = "None")]
+            None
         }
 
         impl Algorithm {
             pub fn as_str(&self) -> &'static str {
                 match self {
                     $(
-                        Self::$id => $name
-                    ),*
+                        Self::$id => $name,
+                    )*
+                    Self::None => "none"
                 }
             }
 
             pub fn into_str(self) -> &'static str {
                 match self {
                     $(
-                        Self::$id => $name
-                    ),*
+                        Self::$id => $name,
+                    )*
+                    Self::None => "none"
                 }
             }
         }
@@ -158,14 +166,7 @@ algorithms! {
     ESBlake2bK: "ESBlake2bK",
     
     #[doc(hidden)]
-    AleoTestnet1Signature: "AleoTestnet1Signature",
-    
-    /// No signature.
-    /// 
-    /// Per the specs it should only be `none` but `None` is kept for backwards
-    /// compatibility.
-    #[serde(alias = "None")]
-    None: "none"
+    AleoTestnet1Signature: "AleoTestnet1Signature"
 }
 
 impl Default for Algorithm {
@@ -217,6 +218,7 @@ impl From<UnsupportedAlgorithm> for ssi_crypto::MessageSignatureError {
 }
 
 /// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AnyES256K {
     /// ECDSA using secp256k1 (K-256) and SHA-256, without recovery bit.
     ES256K,
@@ -255,5 +257,49 @@ impl From<ES256K> for AnyES256K {
 impl From<ES256KR> for AnyES256K {
     fn from(_value: ES256KR) -> Self {
         Self::ES256KR
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AnyBlake2b {
+    EdBlake2b,
+    ESBlake2bK,
+    ESBlake2b
+}
+
+impl From<AnyBlake2b> for Algorithm {
+    fn from(value: AnyBlake2b) -> Self {
+        match value {
+            AnyBlake2b::EdBlake2b => Self::EdBlake2b,
+            AnyBlake2b::ESBlake2bK => Self::ESBlake2bK,
+            AnyBlake2b::ESBlake2b => Self::ESBlake2b
+        }
+    }
+}
+
+impl TryFrom<Algorithm> for AnyBlake2b {
+    type Error = UnsupportedAlgorithm;
+    
+    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
+        match value {
+            Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
+            Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
+            Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
+            a => Err(UnsupportedAlgorithm(a))
+        }
+    }
+}
+
+impl TryFrom<Option<Algorithm>> for AnyBlake2b {
+    type Error = AlgorithmError;
+    
+    fn try_from(value: Option<Algorithm>) -> Result<Self, Self::Error> {
+        match value {
+            Some(Algorithm::EdBlake2b) => Ok(Self::EdBlake2b),
+            Some(Algorithm::ESBlake2bK) => Ok(Self::ESBlake2bK),
+            Some(Algorithm::ESBlake2b) => Ok(Self::ESBlake2b),
+            Some(a) => Err(AlgorithmError::Unsupported(a)),
+            None => Err(AlgorithmError::Missing)
+        }
     }
 }

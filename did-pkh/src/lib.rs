@@ -1601,10 +1601,10 @@ mod tests {
             .await
             .unwrap();
 
-        // let didpkh = DIDVerifier::new(DIDPKH);
+        let didpkh = DIDVerifier::new(DIDPKH);
+        let verification_result = vc.verify(&didpkh).await.unwrap();
+        assert!(verification_result.is_valid());
 
-        // let verification_result = vc.verify(&didpkh).await.unwrap();
-        // assert!(verification_result.is_valid());
         // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
 
         // // Negative test: tamper with the VC and watch verification fail.

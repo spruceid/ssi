@@ -28,12 +28,13 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, 
 where
     I: ReverseIriInterpretation<Iri = V::Iri>,
 {
-    fn deserialize_objects<'a, D>(
+    fn deserialize_objects_in<'a, D>(
         vocabulary: &V,
         interpretation: &I,
         dataset: &D,
         graph: &D::Graph,
         objects: impl IntoIterator<Item = &'a I::Resource>,
+        context: linked_data::Context<I>
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         I::Resource: 'a,
@@ -47,12 +48,16 @@ where
         let mut objects = objects.into_iter();
         match objects.next() {
             Some(object) => match objects.next() {
-                Some(_) => Err(linked_data::FromLinkedDataError::TooManyValues),
+                Some(_) => Err(linked_data::FromLinkedDataError::TooManyValues(
+                    context.into_iris(vocabulary, interpretation)
+                )),
                 None => {
                     Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
                 }
             },
-            None => Err(linked_data::FromLinkedDataError::MissingRequiredValue),
+            None => Err(linked_data::FromLinkedDataError::MissingRequiredValue(
+                context.into_iris(vocabulary, interpretation)
+            )),
         }
     }
 }
@@ -79,12 +84,13 @@ macro_rules! crypto_suites {
         where
             I: ReverseIriInterpretation<Iri = V::Iri>
         {
-            fn deserialize_subject<D>(
+            fn deserialize_subject_in<D>(
                 vocabulary: &V,
                 interpretation: &I,
                 _dataset: &D,
                 _graph: &D::Graph,
                 resource: &I::Resource,
+                context: linked_data::Context<I>
             ) -> Result<Self, linked_data::FromLinkedDataError>
             where
                 D: linked_data::grdf::Dataset<
@@ -94,18 +100,37 @@ macro_rules! crypto_suites {
                     GraphLabel = I::Resource,
                 >
             {
+                let mut known_iri = None;
+
                 for i in interpretation.iris_of(resource) {
-                    if let Some(iri) = vocabulary.iri(i) {
-                        $(
-                            $(#[cfg($($t)*)])?
-                            if iri == ssi_vc_ldp::suite::$name::IRI {
-                                return Ok(Self::$name)
-                            }
-                        )*
-                    }
+                    let iri = vocabulary.iri(i).unwrap();
+                    known_iri = Some(iri);
+                    $(
+                        $(#[cfg($($t)*)])?
+                        if iri == ssi_vc_ldp::suite::$name::IRI {
+                            return Ok(Self::$name)
+                        }
+                    )*
                 }
 
-                Err(linked_data::FromLinkedDataError::InvalidSubject)
+                match known_iri {
+                    Some(iri) => {
+                        Err(linked_data::FromLinkedDataError::UnsupportedIri {
+                            context: context.into_iris(vocabulary, interpretation),
+                            found: iri.to_owned(),
+                            supported: Some(vec![
+                                $(
+                                    ssi_vc_ldp::suite::$name::IRI.to_owned()
+                                ),*
+                            ])
+                        })
+                    }
+                    None => {
+                        Err(linked_data::FromLinkedDataError::ExpectedIri(
+                            context.into_iris(vocabulary, interpretation)
+                        ))
+                    }
+                }
             }
         }
 
@@ -362,6 +387,9 @@ crypto_suites! {
     #[cfg(feature = "w3c")]
     ethereum_eip712_signature_2021: EthereumEip712Signature2021,
 
+    #[cfg(feature = "w3c")]
+    ethereum_eip712_signature_2021_v0_1: EthereumEip712Signature2021v0_1,
+
     /// DIF Ecdsa Secp256k1 Recovery Signature 2020.
     ///
     /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
@@ -396,7 +424,9 @@ crypto_suites! {
     eip712_signature_2021: Eip712Signature2021,
 
     // #[cfg(feature = "ethereum")]
-    ethereum_personal_signature_2021: EthereumPersonalSignature2021
+    ethereum_personal_signature_2021: EthereumPersonalSignature2021,
+
+    ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
 }
 
 impl AnySuite {

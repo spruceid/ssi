@@ -459,14 +459,15 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for Co
 where
     V: linked_data::rdf_types::Vocabulary<Type = linked_data::rdf_types::literal::Type<<V as linked_data::rdf_types::IriVocabulary>::Iri, <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
     V::Value: AsRef<str>,
-    I: linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+    I: linked_data::rdf_types::ReverseIriInterpretation<Iri = V::Iri> + linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
 {
-    fn deserialize_subject<D>(
+    fn deserialize_subject_in<D>(
         vocabulary: &V,
         interpretation: &I,
         _dataset: &D,
         _graph: &D::Graph,
         resource: &I::Resource,
+        context: linked_data::Context<I>
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         D: linked_data::grdf::Dataset<
@@ -487,7 +488,9 @@ where
                     let ty_iri = vocabulary.iri(ty).unwrap();
 
                     if ty_iri == linked_data::xsd_types::XSD_STRING {
-                        return literal.value().as_ref().parse().map_err(|_| linked_data::FromLinkedDataError::InvalidLiteral)
+                        return literal.value().as_ref().parse().map_err(|_| linked_data::FromLinkedDataError::InvalidLiteral(
+                            context.into_iris(vocabulary, interpretation)
+                        ))
                     }
 
                     literal_ty = Some(ty_iri)
@@ -501,13 +504,15 @@ where
         match literal_ty {
             Some(ty) => {
                 Err(linked_data::FromLinkedDataError::LiteralTypeMismatch {
-                    property: None,
+                    context: context.into_iris(vocabulary, interpretation),
                     expected: Some(linked_data::xsd_types::XSD_STRING.to_owned()),
                     found: ty.to_owned()
                 })
             }
             None => {
-                Err(linked_data::FromLinkedDataError::ExpectedLiteral)
+                Err(linked_data::FromLinkedDataError::ExpectedLiteral(
+                    context.into_iris(vocabulary, interpretation)
+                ))
             }
         }
     }
@@ -527,14 +532,15 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, 
 where
     V: linked_data::rdf_types::Vocabulary<Type = linked_data::rdf_types::literal::Type<<V as linked_data::rdf_types::IriVocabulary>::Iri, <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag>>,
     V::Value: AsRef<str>,
-    I: linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
+    I: linked_data::rdf_types::ReverseIriInterpretation<Iri = V::Iri> + linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>
 {
-    fn deserialize_objects<'a, D>(
+    fn deserialize_objects_in<'a, D>(
         vocabulary: &V,
         interpretation: &I,
         dataset: &D,
         graph: &D::Graph,
         objects: impl IntoIterator<Item = &'a I::Resource>,
+        context: linked_data::Context<I>
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         I::Resource: 'a,
@@ -551,11 +557,15 @@ where
                 if objects.next().is_none() {
                     Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
                 } else {
-                    Err(linked_data::FromLinkedDataError::TooManyValues)
+                    Err(linked_data::FromLinkedDataError::TooManyValues(
+                        context.into_iris(vocabulary, interpretation)
+                    ))
                 }
             }
             None => {
-                Err(linked_data::FromLinkedDataError::MissingRequiredValue)
+                Err(linked_data::FromLinkedDataError::MissingRequiredValue(
+                    context.into_iris(vocabulary, interpretation)
+                ))
             }
         }
     }

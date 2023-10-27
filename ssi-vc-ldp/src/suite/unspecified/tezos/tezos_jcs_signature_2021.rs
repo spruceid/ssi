@@ -1,9 +1,9 @@
-use std::future;
 use iref::Iri;
 use serde::Serialize;
 use ssi_crypto::MessageSigner;
+use ssi_jwk::algorithm::AnyBlake2b;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{SignatureError, TezosMethod2021};
+use ssi_verification_methods::TezosMethod2021;
 use static_iref::iri;
 
 use crate::{
@@ -11,8 +11,8 @@ use crate::{
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
-use super::Blake2bAlgorithm;
-pub use super::tezos_signature_2021::{PublicKey, PublicKeyRef, Signature, SignatureRef};
+use super::{TezosWallet, TezosSign};
+pub use super::{Signature, SignatureRef, OptKeyOptions, OptKeyOptionsRef};
 
 /// Tezos signature suite based on JCS.
 ///
@@ -77,13 +77,13 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 
     type Signature = Signature;
 
-    type SignatureProtocol = ();
+    type SignatureProtocol = TezosWallet;
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
-    type MessageSignatureAlgorithm = Blake2bAlgorithm;
+    type MessageSignatureAlgorithm = AnyBlake2b;
 
-    type Options = ();
+    type Options = OptKeyOptions;
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI
@@ -115,34 +115,35 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
-    type Options = ();
+    type Options = OptKeyOptions;
 
     type Signature = Signature;
 
-    type Protocol = ();
+    type Protocol = TezosWallet;
 
-    type MessageSignatureAlgorithm = Blake2bAlgorithm;
+    type MessageSignatureAlgorithm = AnyBlake2b;
 
     type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
+        TezosSign<'a, S>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: (),
+        options: OptKeyOptionsRef<'a>,
         method: &TezosMethod2021,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        todo!()
+        TezosSign::new(method.public_key.as_jwk().or(options.public_key_jwk), bytes, signer)
     }
 
     fn verify(
         &self,
-        options: (),
+        options: OptKeyOptionsRef,
         signature: SignatureRef,
         method: &TezosMethod2021,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let (algorithm, signature_bytes) = signature.decode()?;
+        method.verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
     }
 }

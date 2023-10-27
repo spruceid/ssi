@@ -6,6 +6,7 @@ use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_security::{MultibaseBuf, Multibase};
 use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable, SignatureError, VerificationError};
 
 use crate::eip712::Eip712Metadata;
@@ -30,13 +31,13 @@ pub struct AnySignature {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<Eip712Metadata>,
 
-    #[ld("sec:publicKeyJwk")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key_jwk: Option<Box<JWK>>,
+    // #[ld("sec:publicKeyJwk")]
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub public_key_jwk: Option<Box<JWK>>,
 
-    #[ld("sec:publicKeyMultibase")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key_multibase: Option<String>,
+    // #[ld("sec:publicKeyMultibase")]
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub public_key_multibase: Option<MultibaseBuf>,
 }
 
 impl Referencable for AnySignature {
@@ -48,8 +49,8 @@ impl Referencable for AnySignature {
             signature_value: self.signature_value.as_deref(),
             jws: self.jws.as_deref(),
             eip712: self.eip712.as_ref(),
-            public_key_jwk: self.public_key_jwk.as_deref(),
-            public_key_multibase: self.public_key_multibase.as_deref(),
+            // public_key_jwk: self.public_key_jwk.as_deref(),
+            // public_key_multibase: self.public_key_multibase.as_deref(),
         }
     }
 
@@ -66,9 +67,9 @@ pub struct AnySignatureRef<'a> {
 
     pub eip712: Option<&'a Eip712Metadata>,
 
-    pub public_key_jwk: Option<&'a JWK>,
+    // pub public_key_jwk: Option<&'a JWK>,
 
-    pub public_key_multibase: Option<&'a str>,
+    // pub public_key_multibase: Option<&'a Multibase>,
 }
 
 /// Common signature format where the proof value is multibase-encoded.

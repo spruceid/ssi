@@ -16,6 +16,9 @@ use crate::{
     impl_rdf_input_urdna2015, suite::{HashError, AnySignature, AnySignatureRef}, CryptographicSuite, ProofConfigurationRef,
 };
 
+mod v0_1;
+pub use v0_1::*;
+
 /// Ethereum Personal Signature 2021.
 /// 
 /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>

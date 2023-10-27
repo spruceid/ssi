@@ -169,7 +169,7 @@ where
 						}
 					}
 					#[cfg(feature = "w3c")]
-					Self::EthereumEip712Signature2021 => {
+					Self::EthereumEip712Signature2021 | Self::EthereumEip712Signature2021v0_1 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
 								Transform::EthereumEip712Signature2021(ssi_vc_ldp::suite::EthereumEip712Signature2021.transform(
@@ -216,7 +216,8 @@ where
             tezos_signature_2021: TezosSignature2021,
             #[cfg(feature = "eip712")]
             eip712_signature_2021: Eip712Signature2021,
-            ethereum_personal_signature_2021: EthereumPersonalSignature2021
+            ethereum_personal_signature_2021: EthereumPersonalSignature2021,
+            ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
             // ethereum_eip712_signature_2021: EthereumEip712Signature2021
         }
     }

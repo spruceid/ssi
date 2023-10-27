@@ -27,7 +27,7 @@ impl<R, S> SingleSecretSigner<R, S> {
     }
 }
 
-impl<M: Referencable, B, P: SignatureProtocol, V, S> Signer<M, B, P> for SingleSecretSigner<V, S>
+impl<M: Referencable, B: Copy, P: SignatureProtocol<B>, V, S> Signer<M, B, P> for SingleSecretSigner<V, S>
 where
     M: SigningMethod<S, B>,
     V: VerificationMethodResolver<M>,

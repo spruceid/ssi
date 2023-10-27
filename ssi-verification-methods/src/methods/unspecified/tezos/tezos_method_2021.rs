@@ -1,6 +1,6 @@
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_jwk::JWK;
+use ssi_jwk::{JWK, algorithm::AnyBlake2b};
 use static_iref::iri;
 use std::{collections::BTreeMap, hash::Hash};
 
@@ -50,6 +50,18 @@ pub struct TezosMethod2021 {
     pub public_key: PublicKey,
 }
 
+impl TezosMethod2021 {
+    pub fn verify_bytes(
+        &self,
+        public_key_jwk: Option<&JWK>,
+        message: &[u8],
+        algorithm: AnyBlake2b,
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
+        self.public_key.verify_bytes(public_key_jwk, message, algorithm, signature)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
@@ -63,6 +75,13 @@ pub enum PublicKey {
 }
 
 impl PublicKey {
+    pub fn as_jwk(&self) -> Option<&JWK> {
+        match self {
+            Self::Jwk(jwk) => Some(jwk),
+            Self::BlockchainAccountId(_) => None
+        }
+    }
+
     pub fn matches(&self, other: &JWK) -> Result<bool, VerificationError> {
         use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
         match self {
@@ -89,15 +108,44 @@ impl PublicKey {
             Some(_) => Err(InvalidVerificationMethod::invalid_property("publicKeyJwk")),
             None => match properties.get("blockchainAccountId") {
                 Some(serde_json::Value::String(value)) => {
-                    Ok(Self::Jwk(Box::new(value.parse().map_err(|_| {
+                    Ok(Self::BlockchainAccountId(value.parse().map_err(|_| {
                         InvalidVerificationMethod::invalid_property("blockchainAccountId")
-                    })?)))
+                    })?))
                 }
                 Some(_) => Err(InvalidVerificationMethod::invalid_property(
                     "blockchainAccountId",
                 )),
                 None => Err(InvalidVerificationMethod::missing_property("publicKeyJwk")),
             },
+        }
+    }
+
+    pub fn verify_bytes(
+        &self,
+        public_key_jwk: Option<&JWK>,
+        message: &[u8],
+        algorithm: AnyBlake2b,
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
+        match self {
+            Self::BlockchainAccountId(account_id) => {
+                match public_key_jwk {
+                    Some(jwk) => {
+                        match account_id.verify(jwk) {
+                            Ok(()) => {
+                                Ok(ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature).is_ok())
+                            }
+                            Err(_) => Ok(false)
+                        }
+                    }
+                    None => {
+                        Err(VerificationError::MissingPublicKey)
+                    }
+                }
+            }
+            Self::Jwk(jwk) => {
+                Ok(ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature).is_ok())
+            }
         }
     }
 

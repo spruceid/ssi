@@ -157,9 +157,9 @@ pub trait CryptographicSuite: Sized {
     /// Signature.
     type Signature: Referencable;
 
-    type MessageSignatureAlgorithm;
+    type MessageSignatureAlgorithm: Copy;
 
-    type SignatureProtocol: ssi_crypto::SignatureProtocol;
+    type SignatureProtocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
 
     /// Signature algorithm.
     type SignatureAlgorithm: SignatureAlgorithm<

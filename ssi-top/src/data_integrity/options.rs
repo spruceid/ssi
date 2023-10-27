@@ -1,6 +1,6 @@
 use ssi_jwk::JWK;
 use ssi_vc_ldp::suite::{CryptographicSuiteOptions, InvalidOptions};
-use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, VerificationError};
+use ssi_verification_methods::{covariance_rule, Referencable};
 
 use super::AnySuite;
 
@@ -22,7 +22,7 @@ pub struct AnySuiteOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_jwk: Option<Box<JWK>>,
 
-    #[ld("eip712:eip712")]
+    #[ld("eip712:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 }
@@ -106,6 +106,16 @@ impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptionsRe
                 .public_key_jwk
                 .ok_or(InvalidOptions::MissingPublicKey)?,
         })
+    }
+}
+
+#[cfg(feature = "tezos")]
+impl<'a> From<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptKeyOptionsRef<'a> {
+    fn from(value: AnySuiteOptionsRef<'a>) -> Self {
+        Self {
+            public_key_jwk: value
+                .public_key_jwk
+        }
     }
 }
 

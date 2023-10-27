@@ -50,7 +50,7 @@ use crate::{
 pub struct Eip712Signature2021;
 
 impl Eip712Signature2021 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EthereumEip712Signature2021");
+    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#Eip712Signature2021");
 }
 
 verification_method_union! {

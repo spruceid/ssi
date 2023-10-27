@@ -36,7 +36,7 @@ impl MessageSignatureError {
     }
 }
 
-pub trait MessageSigner<A, P: SignatureProtocol = ()> {
+pub trait MessageSigner<A, P: SignatureProtocol<A> = ()> {
     type Sign<'a>: 'a + Future<Output = Result<Vec<u8>, MessageSignatureError>>
     where
         Self: 'a,
@@ -78,7 +78,7 @@ impl<S, A, P> SignerAdapter<S, A, P> {
     }
 }
 
-impl<S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtocol> MessageSigner<B, Q>
+impl<S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> MessageSigner<B, Q>
     for SignerAdapter<S, A, P>
 where
     P: TryFrom<Q>,
@@ -115,12 +115,12 @@ where
 }
 
 #[pin_project]
-pub struct SignerAdapterSign<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtocol> {
+pub struct SignerAdapterSign<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> {
     #[pin]
     inner: SignerAdapterSignInner<'a, S, A, B, P, Q>,
 }
 
-impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtocol> Future
+impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
     for SignerAdapterSign<'a, S, A, B, P, Q>
 {
     type Output = Result<Vec<u8>, MessageSignatureError>;
@@ -135,12 +135,12 @@ impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtoco
 }
 
 #[pin_project(project = SignerAdapterSignProj)]
-enum SignerAdapterSignInner<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtocol> {
+enum SignerAdapterSignInner<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> {
     Ok(#[pin] SignerAdapterSignOk<'a, S, A, B, P, Q>),
     Err(Option<MessageSignatureError>),
 }
 
-impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtocol> Future
+impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
     for SignerAdapterSignInner<'a, S, A, B, P, Q>
 {
     type Output = Result<Vec<u8>, MessageSignatureError>;
@@ -162,15 +162,15 @@ pub struct SignerAdapterSignOk<
     S: 'a + MessageSigner<A, P>,
     A: 'a,
     B,
-    P: 'a + SignatureProtocol,
-    Q: SignatureProtocol,
+    P: 'a + SignatureProtocol<A>,
+    Q: SignatureProtocol<B>,
 > {
     #[pin]
     inner: S::Sign<'a>,
     pq: PhantomData<(A, B, P, Q)>,
 }
 
-impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol, Q: SignatureProtocol> Future
+impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
     for SignerAdapterSignOk<'a, S, A, B, P, Q>
 {
     type Output = Result<Vec<u8>, MessageSignatureError>;

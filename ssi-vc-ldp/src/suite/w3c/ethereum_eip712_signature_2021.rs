@@ -16,6 +16,9 @@ use crate::{
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef, eip712::{Input, Eip712Signature, Eip712SignatureRef, TypesOrURI, TypesProvider, TypesFetchError, Eip712Sign},
 };
 
+mod v0_1;
+pub use v0_1::EthereumEip712Signature2021v0_1;
+
 /// Ethereum EIP-712 Signature 2021.
 ///
 /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
@@ -54,7 +57,9 @@ use crate::{
 ///
 /// This suite is not a Linked-Data cryptographic suite.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct EthereumEip712Signature2021; // TODO add LD support
+pub struct EthereumEip712Signature2021;
+
+// https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021
 
 impl EthereumEip712Signature2021 {
     pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EthereumEip712Signature2021");
@@ -69,12 +74,12 @@ pub struct Eip712Options {
     ///
     // Allow messageSchema for backwards-compatibility since
     // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
-    #[ld("eip712:types")]
+    #[ld("eip712:message-schema")]
     #[serde(alias = "messageSchema")]
     pub types: Option<crate::eip712::TypesOrURI>,
 
     /// Value of the `primaryType` property of the `TypedData` object.
-    #[ld("eip712:primaryType")]
+    #[ld("eip712:primary-type")]
     pub primary_type: Option<ssi_eip712::StructName>,
 
     /// Value of the `domain` property of the `TypedData` object.
@@ -85,7 +90,7 @@ pub struct Eip712Options {
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 pub struct Options {
-    #[ld("eip712:eip712")]
+    #[ld("eip712:eip712-domain")]
     pub eip712: Option<Eip712Options>
 }
 
@@ -112,7 +117,7 @@ impl<T: CryptographicSuite> CryptographicSuiteOptions<T> for Options {}
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 #[serde(rename_all = "camelCase")]
 pub struct OptionsRef<'a> {
-    #[ld("eip712:eip712")]
+    #[ld("eip712:eip712-domain")]
     pub eip712: Option<&'a Eip712Options>
 }
 

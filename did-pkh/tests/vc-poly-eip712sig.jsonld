@@ -17,7 +17,7 @@
     "proofValue": "0x1902d56716f6ef4c79935e0ac85acc6fdf21c4df1711183a037e3b3a0193e5ca149e42764ff7f9990c6b9c2b11f57d5d7f3e48be0fd80d477480d57f959c89c11b",
     "verificationMethod": "did:pkh:eip155:137:0x3a692a1a163657a0f53bc5c9f1d284b3ce2f4941#blockchainAccountId",
     "created": "2022-03-21T20:16:09.284Z",
-    "eip712Domain": {
+    "eip712": {
       "domain": {
         "name": "Polygon Example Credential"
       },

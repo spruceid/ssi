@@ -112,12 +112,12 @@ pub struct Eip712Metadata {
     ///
     // Allow messageSchema for backwards-compatibility since
     // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
-    #[ld("eip712:types")]
+    #[ld("eip712:message-schema")]
     #[serde(rename = "types", alias = "messageSchema")]
     pub types_or_uri: TypesOrURI,
 
     /// Value of the `primaryType` property of the `TypedData` object.
-    #[ld("eip712:primaryType")]
+    #[ld("eip712:primary-type")]
     pub primary_type: ssi_eip712::StructName,
 
     /// Value of the `domain` property of the `TypedData` object.
