@@ -64,6 +64,8 @@ ssi-vc-ldp.workspace = true
 ssi-dids.workspace = true
 ssi-eip712 = { workspace = true, optional = true }
 ssi-json-ld.workspace = true
+ssi-security.workspace = true
+ssi-jws.workspace = true
 pin-project.workspace = true
 thiserror.workspace = true
 iref.workspace = true

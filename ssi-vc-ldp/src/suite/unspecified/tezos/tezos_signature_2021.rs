@@ -1,17 +1,17 @@
 use ssi_crypto::MessageSigner;
-use ssi_jwk::algorithm::AnyBlake2b;
+use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::TezosMethod2021;
+use ssi_verification_methods::{TezosMethod2021, Referencable, covariance_rule};
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::HashError,
+    suite::{HashError, CryptographicSuiteOptions},
     CryptographicSuite, ProofConfigurationRef,
 };
 
-use super::{TezosWallet, Signature, SignatureRef, OptKeyOptions, OptKeyOptionsRef, TezosSign};
+use super::{TezosWallet, Signature, SignatureRef, TezosSign};
 
 /// Tezos signature suite based on URDNA2015.
 ///
@@ -58,7 +58,7 @@ impl CryptographicSuite for TezosSignature2021 {
 
     type MessageSignatureAlgorithm = AnyBlake2b;
 
-    type Options = OptKeyOptions;
+    type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI
@@ -74,7 +74,7 @@ impl CryptographicSuite for TezosSignature2021 {
         proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         let proof_quads = proof_configuration.quads(self).into_nquads();
-        let message = format!("\n{data}\n{proof_quads}");
+        let message = format!("\n{proof_quads}\n{data}");
         match ssi_tzkey::encode_tezos_signed_message(&message) {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
@@ -89,7 +89,7 @@ impl CryptographicSuite for TezosSignature2021 {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
-    type Options = OptKeyOptions;
+    type Options = Options;
 
     type Signature = Signature;
 
@@ -102,7 +102,7 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: OptKeyOptionsRef<'a>,
+        options: OptionsRef<'a>,
         method: &TezosMethod2021,
         bytes: &'a [u8],
         signer: S,
@@ -112,12 +112,51 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn verify(
         &self,
-        options: OptKeyOptionsRef,
+        options: OptionsRef,
         signature: SignatureRef,
         method: &TezosMethod2021,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        eprintln!("message: {}", hex::encode(bytes));
         let (algorithm, signature_bytes) = signature.decode()?;
         method.verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+pub struct Options {
+    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
+    #[ld("sec:publicKeyJwk")]
+    pub public_key_jwk: Option<Box<JWK>>,
+}
+
+impl Options {
+    pub fn new(public_key_jwk: Option<JWK>) -> Self {
+        Self {
+            public_key_jwk: public_key_jwk.map(Box::new)
+        }
+    }
+}
+
+impl<T> CryptographicSuiteOptions<T>for Options {}
+
+impl Referencable for Options {
+    type Reference<'a> = OptionsRef<'a>;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        OptionsRef {
+            public_key_jwk: self.public_key_jwk.as_deref(),
+        }
+    }
+
+    covariance_rule!();
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+pub struct OptionsRef<'a> {
+    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
+    #[ld("sec:publicKeyJwk")]
+    pub public_key_jwk: Option<&'a JWK>,
 }

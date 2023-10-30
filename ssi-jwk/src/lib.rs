@@ -382,6 +382,10 @@ impl JWK {
         key
     }
 
+    pub fn is_public(&self) -> bool {
+        self.params.is_public()
+    }
+
     /// Compare JWK equality by public key properties.
     /// Equivalent to comparing by [JWK Thumbprint][Self::thumbprint].
     pub fn equals_public(&self, other: &JWK) -> bool {
@@ -527,6 +531,15 @@ impl ToASN1 for JWK {
 }
 
 impl Params {
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::EC(params) => params.is_public(),
+            Self::RSA(params) => params.is_public(),
+            Self::Symmetric(params) => params.is_public(),
+            Self::OKP(params) => params.is_public(),
+        }
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         match self {
@@ -539,6 +552,10 @@ impl Params {
 }
 
 impl ECParams {
+    pub fn is_public(&self) -> bool {
+        self.ecc_private_key.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self {
@@ -551,6 +568,10 @@ impl ECParams {
 }
 
 impl RSAParams {
+    pub fn is_public(&self) -> bool {
+        self.private_exponent.is_none() && self.first_prime_factor.is_none() && self.second_prime_factor.is_none() && self.first_prime_factor_crt_exponent.is_none() && self.second_prime_factor_crt_exponent.is_none() && self.first_crt_coefficient.is_none() && self.other_primes_info.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self {
@@ -641,6 +662,10 @@ impl ToASN1 for RSAParams {
 }
 
 impl SymmetricParams {
+    pub fn is_public(&self) -> bool {
+        self.key_value.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self { key_value: None }
@@ -648,6 +673,10 @@ impl SymmetricParams {
 }
 
 impl OctetParams {
+    pub fn is_public(&self) -> bool {
+        self.private_key.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self {

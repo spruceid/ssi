@@ -495,7 +495,7 @@ async fn credential_prove_verify_did_tz3() {
             .unwrap()
             .into(),
         ProofPurpose::Assertion,
-        AnySuiteOptions::with_public_key(key.to_public()),
+        AnySuiteOptions::default().with_public_key(key.to_public()).unwrap(),
     );
     let suite = AnySuite::pick(&key, Some(&vc_issue_options.verification_method)).unwrap();
     eprintln!("suite {suite:?}");
@@ -558,7 +558,7 @@ async fn credential_prove_verify_did_tz3() {
             .unwrap()
             .into(),
         ProofPurpose::Authentication,
-        AnySuiteOptions::with_public_key(key.to_public()),
+        AnySuiteOptions::default().with_public_key(key.to_public()).unwrap(),
     );
     let suite = AnySuite::pick(&key, Some(&vp_issue_options.verification_method)).unwrap();
     let vp = suite

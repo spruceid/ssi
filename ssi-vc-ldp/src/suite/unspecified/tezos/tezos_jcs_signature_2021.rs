@@ -2,17 +2,18 @@ use iref::Iri;
 use serde::Serialize;
 use ssi_crypto::MessageSigner;
 use ssi_jwk::algorithm::AnyBlake2b;
+use ssi_security::{Multibase, MultibaseBuf};
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::TezosMethod2021;
+use ssi_verification_methods::{TezosMethod2021, covariance_rule, Referencable, VerificationError, SignatureError};
 use static_iref::iri;
 
 use crate::{
-    suite::{HashError, TransformError},
+    suite::{HashError, TransformError, CryptographicSuiteOptions},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
-use super::{TezosWallet, TezosSign};
-pub use super::{Signature, SignatureRef, OptKeyOptions, OptKeyOptionsRef};
+use super::{TezosWallet, TezosSign, decode_jwk_from_multibase};
+pub use super::{Signature, SignatureRef};
 
 /// Tezos signature suite based on JCS.
 ///
@@ -83,7 +84,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 
     type MessageSignatureAlgorithm = AnyBlake2b;
 
-    type Options = OptKeyOptions;
+    type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI
@@ -101,6 +102,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
         let json_proof_configuration = serde_json::to_value(proof_configuration).unwrap();
         data.insert("proof".to_string(), json_proof_configuration);
         let msg = serde_jcs::to_string(&data).unwrap();
+        eprintln!("unencoded message:\n{msg}\nEND");
         match ssi_tzkey::encode_tezos_signed_message(&msg) {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
@@ -115,7 +117,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 pub struct SignatureAlgorithm;
 
 impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
-    type Options = OptKeyOptions;
+    type Options = Options;
 
     type Signature = Signature;
 
@@ -128,22 +130,77 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: OptKeyOptionsRef<'a>,
+        options: OptionsRef<'a>,
         method: &TezosMethod2021,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        TezosSign::new(method.public_key.as_jwk().or(options.public_key_jwk), bytes, signer)
+        let public_key_jwk = options.public_key_multibase.map(|k| {
+            decode_jwk_from_multibase(k)
+                    .map_err(|_| SignatureError::InvalidPublicKey)
+        }).transpose();
+
+        match public_key_jwk {
+            Ok(key) => {
+                TezosSign::new(method.public_key.as_jwk().or(key.as_ref()), bytes, signer)
+            }
+            Err(e) => {
+                TezosSign::err(e)
+            }
+        }
     }
 
     fn verify(
         &self,
-        options: OptKeyOptionsRef,
+        options: OptionsRef,
         signature: SignatureRef,
         method: &TezosMethod2021,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        let public_key_jwk = options.public_key_multibase.map(|k| {
+            decode_jwk_from_multibase(k)
+                    .map_err(|_| VerificationError::InvalidKey)
+        }).transpose()?;
+
         let (algorithm, signature_bytes) = signature.decode()?;
-        method.verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
+        method.verify_bytes(public_key_jwk.as_ref(), bytes, algorithm, &signature_bytes)
     }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+pub struct Options {
+    #[serde(rename = "publicKeyMultibase", skip_serializing_if = "Option::is_none")]
+    #[ld("sec:publicKeyMultibase")]
+    pub public_key_multibase: Option<MultibaseBuf>,
+}
+
+impl Options {
+    pub fn new(public_key_multibase: Option<MultibaseBuf>) -> Self {
+        Self {
+            public_key_multibase
+        }
+    }
+}
+
+impl<T> CryptographicSuiteOptions<T>for Options {}
+
+impl Referencable for Options {
+    type Reference<'a> = OptionsRef<'a>;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        OptionsRef {
+            public_key_multibase: self.public_key_multibase.as_deref(),
+        }
+    }
+
+    covariance_rule!();
+}
+
+#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+pub struct OptionsRef<'a> {
+    #[serde(rename = "publicKeyMultibase", skip_serializing_if = "Option::is_none")]
+    #[ld("sec:publicKeyMultibase")]
+    pub public_key_multibase: Option<&'a Multibase>,
 }

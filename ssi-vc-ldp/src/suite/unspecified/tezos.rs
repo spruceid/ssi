@@ -2,7 +2,7 @@
 
 pub mod ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021;
 pub mod p256_blake2b_digest_size20_base58_check_encoded_signature_2021;
-mod tezos_jcs_signature_2021;
+pub mod tezos_jcs_signature_2021;
 pub mod tezos_signature_2021;
 
 use std::future::Future;
@@ -15,11 +15,12 @@ pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed255
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 use ssi_crypto::{protocol::InvalidProtocolSignature, SignatureProtocol, MessageSigner, MessageSignatureError};
 use ssi_jwk::{JWK, algorithm::AnyBlake2b};
+use ssi_security::{MultibaseBuf, Multibase};
 use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, VerificationError, InvalidSignature};
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
 
-use crate::suite::{CryptographicSuiteOptions, AnySignature, AnySignatureRef};
+use crate::suite::{AnySignature, AnySignatureRef, CryptographicSuiteOptions};
 
 const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
@@ -61,44 +62,6 @@ pub struct OptionsRef<'a> {
     #[serde(rename = "publicKeyJwk")]
     #[ld("sec:publicKeyJwk")]
     pub public_key_jwk: &'a JWK,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct OptKeyOptions {
-    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
-    #[ld("sec:publicKeyJwk")]
-    pub public_key_jwk: Option<Box<JWK>>,
-}
-
-impl OptKeyOptions {
-    pub fn new(public_key_jwk: Option<JWK>) -> Self {
-        Self {
-            public_key_jwk: public_key_jwk.map(Box::new)
-        }
-    }
-}
-
-impl<T> CryptographicSuiteOptions<T>for OptKeyOptions {}
-
-impl Referencable for OptKeyOptions {
-    type Reference<'a> = OptKeyOptionsRef<'a>;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        OptKeyOptionsRef {
-            public_key_jwk: self.public_key_jwk.as_deref(),
-        }
-    }
-
-    covariance_rule!();
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct OptKeyOptionsRef<'a> {
-    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
-    #[ld("sec:publicKeyJwk")]
-    pub public_key_jwk: Option<&'a JWK>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
@@ -268,6 +231,12 @@ impl<'a, S: MessageSigner<AnyBlake2b, TezosWallet>> TezosSign<'a, S> {
             inner
         }
     }
+
+    pub fn err(e: SignatureError) -> Self {
+        Self {
+            inner: TezosSignInner::Err(Some(e))
+        }
+    }
 }
 
 impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSign<'a, S> {
@@ -313,5 +282,29 @@ impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignOk<
                 Err(_) => Err(SignatureError::InvalidSignature)
             }
         })
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("invalid Tezos multibase-encoded key")]
+pub struct InvalidTezosMultibaseKey;
+
+/// Encodes the given public JWK into a multibase Tezos-style base58 key.
+pub fn encode_jwk_to_multibase(public_key: &JWK) -> Result<MultibaseBuf, ssi_jws::Error> {
+    assert!(public_key.is_public());
+    let tzkey = ssi_tzkey::jwk_to_tezos_key(&public_key.to_public())?;
+    let mut result = String::with_capacity(1 + tzkey.len());
+    result.push('z'); // base58 multibase prefix.
+    result.push_str(&tzkey);
+    Ok(MultibaseBuf::new(result))
+}
+
+/// Deocdes a public JWK from a multibase Tezos-style base58 key.
+pub fn decode_jwk_from_multibase(key: &Multibase) -> Result<JWK, InvalidTezosMultibaseKey> {
+    if key.as_str().starts_with('z') {
+        ssi_tzkey::jwk_from_tezos_key(&key.as_str()[1..])
+            .map_err(|_| InvalidTezosMultibaseKey)
+    } else {
+        Err(InvalidTezosMultibaseKey)
     }
 }

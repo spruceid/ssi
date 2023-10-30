@@ -89,6 +89,10 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for Multibase {
 pub struct MultibaseBuf(String);
 
 impl MultibaseBuf {
+    pub fn new(value: String) -> Self {
+        Self(value)
+    }
+
     pub fn encode(base: Base, input: impl AsRef<[u8]>) -> Self {
         Self(multibase::encode(base, input))
     }

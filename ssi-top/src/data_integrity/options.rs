@@ -1,4 +1,5 @@
 use ssi_jwk::JWK;
+use ssi_security::{MultibaseBuf, Multibase};
 use ssi_vc_ldp::suite::{CryptographicSuiteOptions, InvalidOptions};
 use ssi_verification_methods::{covariance_rule, Referencable};
 
@@ -22,6 +23,11 @@ pub struct AnySuiteOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_jwk: Option<Box<JWK>>,
 
+    #[serde(rename = "publicKeyMultibase")]
+    #[ld("sec:publicKeyMultibase")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_multibase: Option<MultibaseBuf>,
+
     #[ld("eip712:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
@@ -32,11 +38,13 @@ impl AnySuiteOptions {
         Self::default()
     }
 
-    pub fn with_public_key(jwk: JWK) -> Self {
-        Self {
+    pub fn with_public_key(self, jwk: JWK) -> Result<Self, ssi_jws::Error> {
+        let public_key_multibase = Some(ssi_vc_ldp::suite::tezos::encode_jwk_to_multibase(&jwk)?);
+        Ok(Self {
             public_key_jwk: Some(Box::new(jwk)),
+            public_key_multibase,
             eip712: None,
-        }
+        })
     }
 }
 
@@ -68,6 +76,7 @@ impl Referencable for AnySuiteOptions {
     fn as_reference(&self) -> Self::Reference<'_> {
         AnySuiteOptionsRef {
             public_key_jwk: self.public_key_jwk.as_deref(),
+            public_key_multibase: self.public_key_multibase.as_deref(),
             eip712: self.eip712.as_ref(),
         }
     }
@@ -86,6 +95,8 @@ impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
 #[derive(Debug, Clone, Default, Copy)]
 pub struct AnySuiteOptionsRef<'a> {
     pub public_key_jwk: Option<&'a JWK>,
+
+    pub public_key_multibase: Option<&'a Multibase>,
 
     pub eip712: Option<&'a ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 }
@@ -110,11 +121,21 @@ impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptionsRe
 }
 
 #[cfg(feature = "tezos")]
-impl<'a> From<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::OptKeyOptionsRef<'a> {
+impl<'a> From<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::tezos_signature_2021::OptionsRef<'a> {
     fn from(value: AnySuiteOptionsRef<'a>) -> Self {
         Self {
             public_key_jwk: value
                 .public_key_jwk
+        }
+    }
+}
+
+#[cfg(feature = "tezos")]
+impl<'a> From<AnySuiteOptionsRef<'a>> for ssi_vc_ldp::suite::tezos::tezos_jcs_signature_2021::OptionsRef<'a> {
+    fn from(value: AnySuiteOptionsRef<'a>) -> Self {
+        Self {
+            public_key_multibase: value
+                .public_key_multibase
         }
     }
 }
