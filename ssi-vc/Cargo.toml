@@ -37,6 +37,7 @@ ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-dids = { path = "../ssi-dids", version = "0.1.1" }
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.2", default-features = false }
 ssi-ldp = { path = "../ssi-ldp", version = "0.3.0", default-features = false }
+serde_with = "2.3.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
