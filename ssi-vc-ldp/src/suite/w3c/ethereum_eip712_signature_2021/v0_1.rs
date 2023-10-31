@@ -1,9 +1,76 @@
+use lazy_static::lazy_static;
+use locspan::Meta;
+use ssi_crypto::{MessageSigner, MessageSignatureError};
 use ssi_verification_methods::Referencable;
-use static_iref::iri;
+use static_iref::{iri, iri_ref};
 
-use crate::{CryptographicSuite, eip712::{Eip712Signature, TypesProvider}, ProofConfigurationRef, suite::HashError, CryptographicSuiteInput};
+use crate::{CryptographicSuite, eip712::{Eip712Signature, TypesProvider, Eip712Sign, Eip712SignatureRef}, ProofConfigurationRef, suite::{HashError, CryptographicSuiteOptions}, CryptographicSuiteInput};
 
-use super::{VerificationMethod, SignatureAlgorithm, Options, Transform};
+use super::{VerificationMethod, Transform, VerificationMethodRef};
+
+lazy_static! {
+    static ref PROOF_CONTEXT: json_ld::syntax::Context = {
+        json_ld::syntax::Context::One(Meta::none(
+            json_ld::syntax::ContextEntry::IriRef(iri_ref!("https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld").to_owned())
+        ))
+    };
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq, linked_data::Serialize, linked_data::Deserialize)]
+#[ld(prefix("eip712" = "https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#"))]
+#[serde(rename_all = "camelCase")]
+pub struct Eip712Options {
+    /// URI to an object containing the JSON schema describing the message to
+    /// be signed.
+    ///
+    // Allow messageSchema for backwards-compatibility since
+    // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
+    #[ld("eip712:message-schema")]
+    #[serde(alias = "messageSchema")]
+    pub types: Option<crate::eip712::TypesOrURI>,
+
+    /// Value of the `primaryType` property of the `TypedData` object.
+    #[ld("eip712:primary-type")]
+    pub primary_type: Option<ssi_eip712::StructName>,
+
+    /// Value of the `domain` property of the `TypedData` object.
+    #[ld("eip712:domain")]
+    pub domain: Option<ssi_eip712::Value>,
+}
+
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[ld(prefix("eip712" = "https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#"))]
+pub struct Options {
+    #[ld("eip712:eip712-domain")]
+    pub eip712: Option<Eip712Options>
+}
+
+impl Referencable for Options {
+    type Reference<'a> = OptionsRef<'a>;
+
+    fn as_reference(&self) -> Self::Reference<'_> {
+        OptionsRef {
+            eip712: self.eip712.as_ref()
+        }
+    }
+
+    fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small>
+    where
+        Self: 'big,
+    {
+        r
+    }
+}
+
+impl<T: CryptographicSuite> CryptographicSuiteOptions<T> for Options {}
+
+#[derive(Debug, Default, Clone, Copy, serde::Serialize, linked_data::Serialize)]
+#[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
+#[serde(rename_all = "camelCase")]
+pub struct OptionsRef<'a> {
+    #[ld("eip712:eip712-domain")]
+    pub eip712: Option<&'a Eip712Options>
+}
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EthereumEip712Signature2021v0_1;
@@ -65,11 +132,46 @@ where
         context: C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
     ) -> Self::Transform<'a> where C: 'a {
-        super::EthereumEip712Signature2021::transform(
-			&super::EthereumEip712Signature2021,
-			data,
-			context,
-			params
-		)
+        eprintln!("TRANSFORM v0.1");
+        Transform::new(data, context, params, &PROOF_CONTEXT, "EthereumEip712Signature2021")
+    }
+}
+
+pub struct SignatureAlgorithm;
+
+impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
+    type Options = Options;
+
+    type Signature = Eip712Signature;
+
+    type Protocol = ();
+
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        Eip712Sign<'a, S>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+        &self,
+        _options: OptionsRef<'a>,
+        method: VerificationMethodRef,
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        match method.algorithm() {
+            Ok(algorithm) => Eip712Sign::new(bytes, signer, algorithm),
+            Err(e) => Eip712Sign::err(MessageSignatureError::into(e.into()))
+        }
+    }
+
+    fn verify(
+        &self,
+        _options: OptionsRef,
+        signature: Eip712SignatureRef,
+        method: VerificationMethodRef,
+        bytes: &[u8],
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes)
     }
 }

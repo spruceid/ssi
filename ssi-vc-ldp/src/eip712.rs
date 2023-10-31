@@ -1,6 +1,7 @@
 use std::future::Future;
 use iref::Uri;
 use ssi_verification_methods::Referencable;
+use serde::Serialize;
 
 use crate::ProofConfigurationRef;
 
@@ -32,6 +33,8 @@ pub enum InvalidInput {
 impl Input {
     pub fn try_into_typed_data<'a, M: Referencable, O: Referencable>(
         mut self,
+        proof_context: &'static json_ld::syntax::Context,
+        proof_type: &'static str,
         proof_configuration: ProofConfigurationRef<'a, M, O>,
     ) -> Result<ssi_eip712::TypedData, InvalidInput>
     where
@@ -41,14 +44,33 @@ impl Input {
         let domain = self.domain.unwrap_or_else(Self::default_domain);
         let primary_type = self.primary_type.unwrap_or_else(Self::default_primary_type);
 
-        eprintln!("proof_configuration: {}", serde_json::to_string_pretty(&proof_configuration).unwrap());
+        #[derive(Serialize)]
+        #[serde(bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize"))]
+        struct ProofConfigurationWithContext<'a, M: Referencable, O: Referencable> {
+            #[serde(rename = "@context")]
+            proof_context: &'static json_ld::syntax::Context,
+
+            #[serde(rename = "type")]
+            proof_type: &'static str,
+
+            #[serde(flatten)]
+            proof_configuration: ProofConfigurationRef<'a, M, O>
+        }
+
+        let proof = ProofConfigurationWithContext {
+            proof_context,
+            proof_type,
+            proof_configuration
+        };
 
         self.message.insert(
             "proof".to_string(),
-            ssi_eip712::to_value(&proof_configuration).unwrap(),
+            ssi_eip712::to_value(&proof).unwrap(),
         );
 
         let message = ssi_eip712::Value::Struct(self.message);
+
+        eprintln!("message: {}", serde_json::to_string_pretty(&message).unwrap());
 
         let types = match self.types {
             Some(types) => types,
@@ -59,12 +81,16 @@ impl Input {
             )?,
         };
 
-        Ok(ssi_eip712::TypedData {
+        let result = ssi_eip712::TypedData {
             types,
             primary_type,
             domain,
             message,
-        })
+        };
+
+        eprintln!("EIP712 typed data: {}", serde_json::to_string_pretty(&result).unwrap());
+
+        Ok(result)
     }
 
     pub fn default_domain() -> ssi_eip712::Value {

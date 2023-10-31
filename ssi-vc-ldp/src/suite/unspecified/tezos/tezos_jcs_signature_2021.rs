@@ -1,4 +1,5 @@
 use iref::Iri;
+use lazy_static::lazy_static;
 use serde::Serialize;
 use ssi_crypto::MessageSigner;
 use ssi_jwk::algorithm::AnyBlake2b;
@@ -15,6 +16,14 @@ use crate::{
 use super::{TezosWallet, TezosSign, decode_jwk_from_multibase};
 pub use super::{Signature, SignatureRef};
 
+pub const TZ_JCS_PROOF_CONTEXT_STR: &str = include_str!("tzjcsvm-2021-v1.jsonld");
+
+lazy_static! {
+    pub static ref TZ_JCS_PROOF_CONTEXT: serde_json::Value = {
+        serde_json::from_str(TZ_JCS_PROOF_CONTEXT_STR).unwrap()
+    };
+}
+
 /// Tezos signature suite based on JCS.
 ///
 /// This is not a Linked-Data suite. The credential is processed as a
@@ -28,14 +37,15 @@ pub use super::{Signature, SignatureRef};
 /// # Hashing algorithm
 ///
 /// The proof configuration is serialized into JSON and added to the JSON
-/// credential under the `proof` field. The result is then normalized using the
-/// [JSON Canonicalization Scheme (JCS)][1] and prefixed by the string:
-/// `Tezos Signed Message: ` (terminated by a space character) to form a
-/// message.
+/// credential under the `proof` field with `type` set to
+/// `TezosJcsSignature2021` and its associated `@context` definition. The result
+/// is then normalized using the [JSON Canonicalization Scheme (JCS)][1] and
+/// prefixed by the string: `Tezos Signed Message: ` (terminated by a space
+/// character) to form a message.
 ///
 /// The output is a bytes string composed of the byte 0x5, followed by the byte
-/// 0x1, followed by the 4 bytes encoding the message lenght in big endian,
-/// followd by the message.
+/// 0x1, followed by the 4 bytes encoding the message length in big endian,
+/// followed by the message.
 ///
 /// [1]: <https://tools.ietf.org/html/rfc8785>
 ///
@@ -99,7 +109,25 @@ impl CryptographicSuite for TezosJcsSignature2021 {
         mut data: serde_json::Map<String, serde_json::Value>,
         proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
-        let json_proof_configuration = serde_json::to_value(proof_configuration).unwrap();
+        #[derive(Serialize)]
+        #[serde(bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize"))]
+        struct ProofConfigurationWithContext<'a, M: Referencable, O: Referencable> {
+            #[serde(rename = "@context")]
+            context: &'static serde_json::Value,
+
+            #[serde(rename = "type")]
+            type_: &'static str,
+
+            #[serde(flatten)]
+            proof_configuration: ProofConfigurationRef<'a, M, O>
+        }
+
+        let mut json_proof_configuration = serde_json::to_value(ProofConfigurationWithContext {
+            context: &TZ_JCS_PROOF_CONTEXT,
+            type_: "TezosJcsSignature2021",
+            proof_configuration
+        }).unwrap();
+        
         data.insert("proof".to_string(), json_proof_configuration);
         let msg = serde_jcs::to_string(&data).unwrap();
         eprintln!("unencoded message:\n{msg}\nEND");

@@ -169,10 +169,23 @@ where
 						}
 					}
 					#[cfg(feature = "w3c")]
-					Self::EthereumEip712Signature2021 | Self::EthereumEip712Signature2021v0_1 => {
+					Self::EthereumEip712Signature2021 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
 								Transform::EthereumEip712Signature2021(ssi_vc_ldp::suite::EthereumEip712Signature2021.transform(
+									data,
+									context.loader,
+									params
+								))
+							}
+							Err(e) => Transform::Error(Some(e.into()))
+						}
+					}
+                    #[cfg(feature = "w3c")]
+					Self::EthereumEip712Signature2021v0_1 => {
+						match params.try_cast_verification_method() {
+							Ok(params) => {
+								Transform::EthereumEip712Signature2021(ssi_vc_ldp::suite::EthereumEip712Signature2021v0_1.transform(
 									data,
 									context.loader,
 									params

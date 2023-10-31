@@ -1644,8 +1644,8 @@ mod tests {
     async fn verify_vc() {
         // TODO: update these to use CAIP-10 did:pkh issuers
         // test_verify_vc(include_str!("../tests/vc-tz1.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
-        // test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld"), 0).await;
+        // test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
+        test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld"), 0).await;
         // test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld"), 0).await;
         // test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld"), 0).await;
         // test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld"), 0).await;

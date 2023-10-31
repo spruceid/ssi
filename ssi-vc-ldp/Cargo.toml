@@ -87,6 +87,7 @@ educe.workspace = true
 futures.workspace = true
 self_cell = "1.0.1"
 contextual.workspace = true
+lazy_static.workspace = true
 
 bs58 = { version = "0.4", optional = true }
 

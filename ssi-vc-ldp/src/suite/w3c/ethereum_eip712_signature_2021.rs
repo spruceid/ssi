@@ -2,6 +2,8 @@
 //!
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 use std::{future::Future, task, pin::Pin};
+use lazy_static::lazy_static;
+use locspan::Meta;
 use pin_project::pin_project;
 use ssi_crypto::{MessageSigner, MessageSignatureError};
 use ssi_jwk::algorithm::{AnyES256K, AlgorithmError};
@@ -9,7 +11,7 @@ use ssi_verification_methods::{
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
     JsonWebKey2020, Referencable, VerificationError,
 };
-use static_iref::iri;
+use static_iref::{iri, iri_ref};
 
 use crate::{
     suite::{HashError, TransformError, CryptographicSuiteOptions},
@@ -18,6 +20,14 @@ use crate::{
 
 mod v0_1;
 pub use v0_1::EthereumEip712Signature2021v0_1;
+
+lazy_static! {
+    static ref PROOF_CONTEXT: json_ld::syntax::Context = {
+        json_ld::syntax::Context::One(Meta::none(
+            json_ld::syntax::ContextEntry::IriRef(iri_ref!("https://w3id.org/security/suites/eip712sig-2021/v1").to_owned())
+        ))
+    };
+}
 
 /// Ethereum EIP-712 Signature 2021.
 ///
@@ -215,30 +225,8 @@ where
         context: C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
     ) -> Self::Transform<'a> where C: 'a {
-        let (types, primary_type, domain) = match params.options.eip712 {
-            Some(eip712) => {
-                let types = match &eip712.types {
-                    Some(TypesOrURI::Object(types)) => {
-                        FetchTypes::Ready(Some(types.clone()))
-                    }
-                    Some(TypesOrURI::URI(uri)) => {
-                        FetchTypes::Pending(context.fetch_types(uri))
-                    }
-                    None => FetchTypes::Ready(None)
-                };
-
-                (types, eip712.primary_type.clone(), eip712.domain.clone())
-            }
-            None => (FetchTypes::Ready(None), None, None)
-        };
-
-        Transform {
-            params: params.without_options().shorten_lifetime(),
-            types,
-            primary_type,
-            domain,
-            message: Some(ssi_eip712::to_struct(data).map_err(|_| TransformError::InvalidData))
-        }
+        eprintln!("TRANSFORM v1.0");
+        Transform::new(data, context, params, &PROOF_CONTEXT, "EthereumEip712Signature2021")
     }
 }
 
@@ -267,7 +255,48 @@ pub struct Transform<'a, C: TypesProvider> {
     types: FetchTypes<C>,
     primary_type: Option<String>,
     domain: Option<ssi_eip712::Value>,
-    message: Option<Result<ssi_eip712::Struct, TransformError>>
+    message: Option<Result<ssi_eip712::Struct, TransformError>>,
+    proof_context: &'static json_ld::syntax::Context,
+    proof_type: &'static str
+}
+
+impl<'a, C: TypesProvider> Transform<'a, C> {
+    pub fn new<'c: 'a, T: serde::Serialize>(
+        data: &'a T,
+        context: C,
+        params: ProofConfigurationRef<'c, VerificationMethod, Options>,
+        proof_context: &'static json_ld::syntax::Context,
+        proof_type: &'static str
+    ) -> Self {
+        let (types, primary_type, domain) = match params.options.eip712 {
+            Some(eip712) => {
+                let types = match &eip712.types {
+                    Some(TypesOrURI::Object(types)) => {
+                        FetchTypes::Ready(Some(types.clone()))
+                    }
+                    Some(TypesOrURI::URI(uri)) => {
+                        FetchTypes::Pending(context.fetch_types(uri))
+                    }
+                    None => FetchTypes::Ready(None)
+                };
+
+                (types, eip712.primary_type.clone(), eip712.domain.clone())
+            }
+            None => (FetchTypes::Ready(None), None, None)
+        };
+
+        eprintln!("primary type: {primary_type:?}");
+
+        Self {
+            params: params.without_options().shorten_lifetime(),
+            types,
+            primary_type,
+            domain,
+            message: Some(ssi_eip712::to_struct(data).map_err(|_| TransformError::InvalidData)),
+            proof_context,
+            proof_type
+        }
+    }
 }
 
 impl<'a, C: TypesProvider> Future for Transform<'a, C> {
@@ -289,7 +318,7 @@ impl<'a, C: TypesProvider> Future for Transform<'a, C> {
                         message: this.message.take().unwrap().ok().unwrap()
                     };
 
-                    task::Poll::Ready(input.try_into_typed_data(*this.params).map_err(|_| TransformError::InvalidData))
+                    task::Poll::Ready(input.try_into_typed_data(this.proof_context, this.proof_type, *this.params).map_err(|_| TransformError::InvalidData))
                 }
             }
         }

@@ -108,6 +108,7 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         if iri == ssi_vc_ldp::suite::$name::IRI {
+                            eprintln!("MATCHING: {iri} as `{}`", stringify!($name));
                             return Ok(Self::$name)
                         }
                     )*
