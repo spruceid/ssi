@@ -1009,7 +1009,7 @@ impl Credential {
         for proof in proofs {
             let mut result = proof.verify(self, resolver, context_loader).await;
             results.append(&mut result);
-            if result.errors.is_empty() {
+            if results.errors.is_empty() {
                 results.checks.push(Check::Proof);
                 break;
             };
