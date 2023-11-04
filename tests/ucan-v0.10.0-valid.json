@@ -1,0 +1,61 @@
+[
+    {
+        "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnt9LCJleHAiOm51bGwsImlzcyI6ImRpZDprZXk6ejZNa24yQ0dudnlWRUN6aXNFQU5Ib2ZEbzNDMlFMdFV6MWt6bmhueUhtejd6S3VLIiwidWN2IjoiMC4yLjAifQ.KfsbfN8D5wh5Jciu7sFN8B_IfOVYsnjvX-6Ib1EQ-Kfa8n_ETrqoiGH1Vp7JvPUqaVOq8cd4WcudiUxsFLE7Cg",
+        "assertions": {
+            "payload": {
+                "ucv": "0.2.0",
+                "iss": "did:key:z6Mkn2CGnvyVECzisEANHofDo3C2QLtUz1kznhnyHmz7zKuK",
+                "aud": "did:example:123",
+                "exp": null,
+                "cap": {}
+            },
+            "header": {
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }
+        }
+    },
+    {
+        "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnt9LCJleHAiOjE2ODkxNjAwMjcsImlzcyI6ImRpZDprZXk6ejZNa3JqZjZVVnIxTlRwTmFuWkZQZmROZ1V6aE53VGV1S0V6M2RNUjJOZm9meWZmIiwibmJmIjoxNjg5MTU5OTA3LCJ1Y3YiOiIwLjIuMCJ9.pPOWu9qchivhnUqNFhTD7sTSMLdUzGTzBeOl8nrlACHgrgKq5t00yI8vCaF6ykM533MOExI2vhcryiiH5MdtAQ",
+        "assertions": {
+            "payload": {
+                "ucv": "0.2.0",
+                "iss": "did:key:z6Mkrjf6UVr1NTpNanZFPfdNgUzhNwTeuKEz3dMR2Nfofyff",
+                "aud": "did:example:123",
+                "nbf": 1689159907,
+                "exp": 1689160027,
+                "cap": {}
+            },
+            "header": {
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }
+        }
+    },
+    {
+        "token": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJjYXAiOnsiaHR0cHM6Ly9leGFtcGxlLmNvbS9yZXNvdXJjZSI6eyJodHRwcy9nZXQiOlt7fV19fSwiZXhwIjoxNjg5MTYwMDU5LCJpc3MiOiJkaWQ6a2V5Ono2TWt1WHRkcWNKUFpYVW5TRHZ4RUQ4Zkp5THQxcGk4ODdtUXdiSDE3Mno5REtXUiIsIm5iZiI6MTY4OTE1OTkzOSwicHJmIjpbImJhZmtyZWlibTZqZzN1eDVxdW1oY24yYjNmbGMzdHl1NmRtbGI0eGE3dTViZjQ0eWVnbnJqaGM0eWVxIl0sInVjdiI6IjAuMi4wIn0.1NGP4X41R-hwnEJ-jM0iGLjQtbBx35KtqkmElCSzMB776P1hLKNGPmTmrSfb4G5uHnh24NkZm7oum98Mi3WDAA",
+        "assertions": {
+            "payload": {
+                "ucv": "0.2.0",
+                "iss": "did:key:z6MkuXtdqcJPZXUnSDvxED8fJyLt1pi887mQwbH172z9DKWR",
+                "aud": "did:example:123",
+                "nbf": 1689159939,
+                "exp": 1689160059,
+                "prf": [
+                    "bafkreibm6jg3ux5qumhcn2b3flc3tyu6dmlb4xa7u5bf44yegnrjhc4yeq"
+                ],
+                "cap": {
+                    "https://example.com/resource": {
+                        "https/get": [
+                            {}
+                        ]
+                    }
+                }
+            },
+            "header": {
+                "alg": "EdDSA",
+                "typ": "JWT"
+            }
+        }
+    }
+]
