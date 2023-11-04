@@ -6,6 +6,7 @@ pub mod error;
 pub use error::Error;
 mod cacao;
 pub mod revocation;
+pub mod schema;
 
 use cacao::BindingDelegation;
 use serde_with::{formats::PreferMany, serde_as, OneOrMany as SerdeWithOneOrMany};
@@ -227,6 +228,24 @@ pub struct Schema {
     pub type_: String,
     #[serde(flatten)]
     pub property_set: Option<Map<String, Value>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type")]
+pub enum CheckableSchema {
+    #[serde(rename = "1EdTechJsonSchemaValidator2019")]
+    OneEdTechJsonSchemaValidator2019(schema::OneEdTechJsonSchemaValidator2019),
+}
+
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+pub trait CredentialSchema: Sync {
+    async fn check(
+        &self,
+        credential: &Credential,
+        resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
+    ) -> VerificationResult;
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -1017,6 +1036,10 @@ impl Credential {
         if checks.contains(&Check::Status) {
             results.append(&mut self.check_status(resolver, context_loader).await);
         }
+
+        if checks.contains(&Check::Schema) {
+            results.append(&mut self.check_schema(resolver, context_loader).await);
+        }
         results
     }
 
@@ -1089,6 +1112,53 @@ impl Credential {
         result.checks.push(Check::Status);
         result
     }
+
+    /// Check the credentials [schema](http://www.imsglobal.org/spec/vccs/v1p0/#credentialschema)
+    pub async fn check_schema(
+        &self,
+        resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
+    ) -> VerificationResult {
+        let schema = match self.credential_schema {
+            Some(ref status) => status,
+            None => return VerificationResult::error("Missing credentialSchema"),
+        };
+
+        let status_value = match serde_json::to_value(schema.clone()) {
+            Ok(status) => status,
+            Err(e) => {
+                return VerificationResult::error(&format!(
+                    "Unable to convert credentialSchema: {}",
+                    e
+                ))
+            }
+        };
+
+        let checkable_schemas: OneOrMany<CheckableSchema> =
+            match serde_json::from_value(status_value.clone()) {
+                Ok(checkable_status) => checkable_status,
+                Err(e) => {
+                    return VerificationResult::error(&format!(
+                        "Unable to parse credentialSchema: {} ({})",
+                        e, status_value
+                    ))
+                }
+            };
+
+        for checkable_schema in checkable_schemas.into_iter() {
+            let result = checkable_schema.check(self, resolver, context_loader).await;
+
+            if !result.errors.is_empty() {
+                return result;
+            }
+        }
+
+        let mut result = VerificationResult::new();
+
+        result.checks.push(Check::Schema);
+
+        result
+    }
 }
 
 impl CheckableStatus {
@@ -1103,6 +1173,21 @@ impl CheckableStatus {
                 status.check(credential, resolver, context_loader).await
             }
             Self::StatusList2021Entry(status) => {
+                status.check(credential, resolver, context_loader).await
+            }
+        }
+    }
+}
+
+impl CheckableSchema {
+    async fn check(
+        &self,
+        credential: &Credential,
+        resolver: &dyn DIDResolver,
+        context_loader: &mut ContextLoader,
+    ) -> VerificationResult {
+        match self {
+            Self::OneEdTechJsonSchemaValidator2019(status) => {
                 status.check(credential, resolver, context_loader).await
             }
         }
@@ -1847,7 +1932,7 @@ pub(crate) mod tests {
     use ssi_dids::{
         did_resolve::DereferencingInputMetadata, example::DIDExample, VerificationMethodMap,
     };
-    use ssi_json_ld::urdna2015;
+    use ssi_json_ld::{urdna2015, CLR_V2_CONTEXT};
     use ssi_jws::sign_bytes_b64;
     use ssi_ldp::{ProofSuite, ProofSuiteType};
 
@@ -1927,6 +2012,10 @@ pub(crate) mod tests {
 
     pub const EXAMPLE_STATUS_LIST_2021_URL: &str = "https://example.com/credentials/status/3";
     pub const EXAMPLE_STATUS_LIST_2021: &[u8] = include_bytes!("../../tests/statusList.json");
+
+    pub const EXAMPLE_CREDENTIAL_SCHEMA_URL: &str =
+        "https://purl.imsglobal.org/spec/clr/v2p0/schema/json/clr_v2p0_clrcredential_schema.json";
+    pub const EXAMPLE_CREDENTIAL_SCHEMA: &[u8] = include_bytes!("../../tests/clrSchema.json");
 
     const JWK_JSON: &str = include_str!("../../tests/rsa2048-2020-08-25.json");
     const JWK_JSON_BAR: &str = include_str!("../../tests/ed25519-2021-06-16.json");
@@ -2841,6 +2930,66 @@ _:c14n0 <https://w3id.org/security#verificationMethod> <https://example.org/foo/
             .await;
         println!("{:#?}", vres);
         assert_ne!(vres.errors.len(), 0);
+    }
+
+    #[async_std::test]
+    async fn credential_schema() {
+        let mut context_loader = ssi_json_ld::ContextLoader::default()
+            .with_context_map_from(
+                [(
+                    CLR_V2_CONTEXT.as_str().to_string(),
+                    ssi_contexts::CLR_V2.to_string(),
+                )]
+                .iter()
+                .cloned()
+                .collect(),
+            )
+            .unwrap();
+        let mut options = LinkedDataProofOptions::default();
+        options.checks = Some(vec![Check::Schema]);
+
+        let vc = Credential::from_json(include_str!("../../examples/vc-clr.jsonld")).unwrap();
+        let result = vc
+            .verify(Some(options), &DIDExample, &mut context_loader)
+            .await;
+
+        println!("{:#?}", result);
+        assert!(result.errors.is_empty());
+        assert!(result.warnings.is_empty());
+    }
+
+    #[async_std::test]
+    async fn invalid_credential_schema() {
+        let mut context_loader = ssi_json_ld::ContextLoader::default()
+            .with_context_map_from(
+                [(
+                    CLR_V2_CONTEXT.as_str().to_string(),
+                    ssi_contexts::CLR_V2.to_string(),
+                )]
+                .iter()
+                .cloned()
+                .collect(),
+            )
+            .unwrap();
+        let mut options = LinkedDataProofOptions::default();
+        options.checks = Some(vec![Check::Schema]);
+
+        let vc = Credential::from_json(include_str!("../../examples/vc-clr-invalid-schema.jsonld"))
+            .unwrap();
+        let result = vc
+            .verify(Some(options), &DIDExample, &mut context_loader)
+            .await;
+
+        println!("{:#?}", result);
+        assert!(!result.errors.is_empty());
+        assert!(
+            result
+                .errors
+                .iter()
+                .filter(|error| error.contains(&"Schema validation error"))
+                .count()
+                > 0
+        );
     }
 
     #[async_std::test]

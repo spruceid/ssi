@@ -30,6 +30,7 @@ multihash = { version = "0.16", default-features = false, features = [
   "blake3",
 ] }
 iref = "2.2.2"
+jsonschema = "0.17"
 ssi-jwt = { path = "../ssi-jwt", version = "0.1", default-features = false }
 ssi-jws = { path = "../ssi-jws", version = "0.1", default-features = false }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1.1", default-features = false }
@@ -60,6 +61,7 @@ ssi-ldp = { path = "../ssi-ldp", features = [
   "secp384r1",
 ] }
 ssi-dids = { path = "../ssi-dids", version = "0.1", features = ["example"] }
+ssi-contexts = { version = "0.1.5", path = "../contexts/" }
 josekit = "0.8.2"
 time = "0.3.20"
 rstest = "0.17.0"

@@ -69,6 +69,12 @@ pub const CACAO_ZCAP_V1: &str = include_str!("../cacao-zcap-v1.jsonld");
 pub const JFF_VC_EDU_PLUGFEST_2022: &str = include_str!("../jff-vc-edu-plugfest-1-context.json");
 pub const DID_CONFIGURATION_V0_0: &str = include_str!("../did-configuration-v0.0.jsonld");
 pub const JFF_VC_EDU_PLUGFEST_2022_2: &str = include_str!("../jff-vc-edu-plugfest-2-context.json");
+/// <https://purl.imsglobal.org/spec/ob/v3p0/context-3.0.1.json>
+pub const OBV301: &str = include_str!("../openbadges-v3.0.1.json");
+/// <https://purl.imsglobal.org/spec/ob/v3p0/extensions.json>
+pub const OBV3_EXTENSIONS: &str = include_str!("../openbadges-v3-extensions.json");
+/// <https://purl.imsglobal.org/spec/clr/v2p0/context.json>
+pub const CLR_V2: &str = include_str!("../clr-2.0.json");
 
 pub const TZ_V2: &str = include_str!("../tz-2021-v2.jsonld");
 pub const TZVM_V1: &str = include_str!("../tzvm-2021-v1.jsonld");
