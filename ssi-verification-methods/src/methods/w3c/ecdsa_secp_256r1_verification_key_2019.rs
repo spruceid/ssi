@@ -33,7 +33,17 @@ pub enum InvalidPublicKey {
 /// See: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1verificationkey2019>
 ///
 /// [1]: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1signature2019>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "EcdsaSecp256r1VerificationKey2019")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:EcdsaSecp256r1VerificationKey2019")]

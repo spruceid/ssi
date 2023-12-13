@@ -36,10 +36,12 @@ bech32 = "0.8"
 # ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "eip", "w3c"] }
 ssi-core.workspace = true
 ssi-vc.workspace = true
-ssi-vc-ldp.workspace = true
+ssi-vc-ldp = { workspace = true, features = ["eip712"] }
 ssi-json-ld.workspace = true
 ssi-top = { workspace = true, features = ["dif", "secp256k1"] }
 ssi-tzkey.workspace = true
+ssi-eip712.workspace = true
+ssi-jws.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true

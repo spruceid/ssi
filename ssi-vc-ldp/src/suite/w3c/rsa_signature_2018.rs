@@ -19,7 +19,7 @@ use crate::{
 pub struct RsaSignature2018;
 
 impl RsaSignature2018 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#RsaSignature2018");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#RsaSignature2018");
 }
 
 impl_rdf_input_urdna2015!(RsaSignature2018);

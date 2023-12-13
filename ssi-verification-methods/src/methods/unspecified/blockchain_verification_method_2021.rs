@@ -16,7 +16,17 @@ pub const BLOCKCHAIN_VERIFICATION_METHOD_2021_TYPE: &str = "BlockchainVerificati
 /// BlockchainVerificationMethod2021.
 ///
 /// See: <https://w3id.org/security#BlockchainVerificationMethod2021>.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "BlockchainVerificationMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:BlockchainVerificationMethod2021")]

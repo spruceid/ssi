@@ -7,7 +7,7 @@ use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
 pub use json_ld::{syntax, Options, RemoteDocumentReference};
-use json_ld::{syntax::TryFromJson, Loader, RemoteContextReference, RemoteContext, RemoteDocument};
+use json_ld::{syntax::TryFromJson, Loader, RemoteContext, RemoteContextReference, RemoteDocument};
 use json_syntax::Parse;
 use locspan::Meta;
 use rdf_types::IriVocabularyMut;
@@ -48,7 +48,8 @@ pub const LDS_JWS2020_V1_CONTEXT: &Iri =
 pub const W3ID_JWS2020_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/jws-2020/v1");
 pub const W3ID_ED2020_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/ed25519-2020/v1");
 pub const W3ID_MULTIKEY_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/multikey/v1");
-pub const W3ID_DATA_INTEGRITY_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/data-integrity/v1");
+pub const W3ID_DATA_INTEGRITY_V1_CONTEXT: &Iri =
+    iri!("https://w3id.org/security/data-integrity/v1");
 pub const BLOCKCHAIN2021_V1_CONTEXT: &Iri =
     iri!("https://w3id.org/security/suites/blockchain-2021/v1");
 pub const CITIZENSHIP_V1_CONTEXT: &Iri = iri!("https://w3id.org/citizenship/v1");
@@ -390,7 +391,8 @@ impl ContextLoader {
             .into_iter()
             .map(
                 |(url, jsonld)| -> Result<(IriBuf, RemoteDocument), FromContextMapError> {
-                    let doc = json_syntax::Value::parse_str(&jsonld, |_| ()).map_err(Meta::into_value)?;
+                    let doc =
+                        json_syntax::Value::parse_str(&jsonld, |_| ()).map_err(Meta::into_value)?;
                     let iri = IriBuf::new(url)?;
                     let remote_doc = RemoteDocument::new(
                         Some(iri.clone()),
@@ -550,8 +552,11 @@ mod test {
                 .cloned()
                 .collect(),
                 ).unwrap() ;
-        cl.load_with(&mut (), IriBuf::new("https://w3id.org/age/v1".to_string()).unwrap())
-            .await
-            .unwrap();
+        cl.load_with(
+            &mut (),
+            IriBuf::new("https://w3id.org/age/v1".to_string()).unwrap(),
+        )
+        .await
+        .unwrap();
     }
 }

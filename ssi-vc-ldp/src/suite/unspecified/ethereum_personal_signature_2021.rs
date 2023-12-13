@@ -1,31 +1,36 @@
-use std::future::Future;
-use std::task;
-use std::pin::Pin;
 use pin_project::pin_project;
+use std::future::Future;
+use std::pin::Pin;
+use std::task;
 
 use ssi_crypto::{protocol::EthereumWallet, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
-    covariance_rule, verification_method_union, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, Referencable, SignatureError, VerificationError, InvalidSignature,
+    covariance_rule, ecdsa_secp_256k1_recovery_method_2020::DigestFunction,
+    ecdsa_secp_256k1_verification_key_2019, verification_method_union,
+    EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019, InvalidSignature,
+    Referencable, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
-    impl_rdf_input_urdna2015, suite::{HashError, AnySignature, AnySignatureRef}, CryptographicSuite, ProofConfigurationRef,
+    impl_rdf_input_urdna2015,
+    suite::{AnySignature, AnySignatureRef, HashError},
+    CryptographicSuite, ProofConfigurationRef,
 };
 
 mod v0_1;
 pub use v0_1::*;
 
 /// Ethereum Personal Signature 2021.
-/// 
+///
 /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 pub struct EthereumPersonalSignature2021;
 
 impl EthereumPersonalSignature2021 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EthereumPersonalSignature2021");
+    pub const IRI: &'static iref::Iri =
+        iri!("https://w3id.org/security#EthereumPersonalSignature2021");
 }
 
 verification_method_union! {
@@ -36,17 +41,31 @@ verification_method_union! {
 }
 
 impl<'a> VerificationMethodRef<'a> {
-    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyES256K {
+    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyESKeccakK {
         match self {
-            Self::EcdsaSecp256k1VerificationKey2019(_) => ssi_jwk::algorithm::AnyES256K::ES256K,
-            Self::EcdsaSecp256k1RecoveryMethod2020(_) => ssi_jwk::algorithm::AnyES256K::ES256KR
+            Self::EcdsaSecp256k1VerificationKey2019(_) => {
+                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakK
+            }
+            Self::EcdsaSecp256k1RecoveryMethod2020(_) => {
+                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakKR
+            }
         }
     }
 
-    pub fn verify_bytes(&self, message: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        message: &[u8],
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
         match self {
-            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(message, signature),
-            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(message, signature)
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
+                message,
+                signature,
+                ecdsa_secp_256k1_verification_key_2019::DigestFunction::Keccack,
+            ),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                m.verify_bytes(message, signature, DigestFunction::Keccack)
+            }
         }
     }
 }
@@ -66,7 +85,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = ();
 
@@ -102,9 +121,7 @@ pub struct Signature {
 
 impl Signature {
     pub fn new(proof_value: String) -> Self {
-        Self {
-            proof_value
-        }
+        Self { proof_value }
     }
 }
 
@@ -134,7 +151,7 @@ impl TryFrom<AnySignature> for Signature {
 
     fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
         Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
         })
     }
 }
@@ -146,7 +163,8 @@ pub struct SignatureRef<'a> {
 
 impl<'a> SignatureRef<'a> {
     pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
-        EthereumWallet::decode_signature(self.proof_value.as_bytes()).map_err(|_| VerificationError::InvalidSignature)
+        EthereumWallet::decode_signature(self.proof_value.as_bytes())
+            .map_err(|_| VerificationError::InvalidSignature)
     }
 }
 
@@ -164,7 +182,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
         Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
         })
     }
 }
@@ -196,11 +214,12 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Signature = Signature;
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Protocol = EthereumWallet;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = EthereumWalletSign<'a, S>;
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        EthereumWalletSign<'a, S>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
@@ -209,10 +228,6 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        let signing_string = std::str::from_utf8(bytes).unwrap();
-        eprintln!("signing string:\n{signing_string}");
-        eprintln!("end of signing string");
-
         EthereumWalletSign::new(signer.sign(method.algorithm().into(), EthereumWallet, bytes))
     }
 
@@ -223,11 +238,6 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         method: VerificationMethodRef,
         bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        let signing_string = std::str::from_utf8(bytes).unwrap();
-        eprintln!("signing string (verification): {signing_string}");
-
-        eprintln!("vm type: {:?}", method.type_());
-
         let message = EthereumWallet::prepare_message(bytes);
         let signature_bytes = signature.decode()?;
         method.verify_bytes(&message, &signature_bytes)
@@ -237,9 +247,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 impl<'a> VerificationMethodRef<'a> {
     pub fn check_jwk(&self, jwk: &JWK) -> Result<bool, VerificationError> {
         match self {
-            Self::EcdsaSecp256k1RecoveryMethod2020(m) => {
-                Ok(m.public_key.matches(jwk)?)
-            }
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(m.public_key.matches(jwk)?),
             Self::EcdsaSecp256k1VerificationKey2019(m) => {
                 Ok(m.public_key.jwk()?.equals_public(jwk))
             }
@@ -248,20 +256,25 @@ impl<'a> VerificationMethodRef<'a> {
 }
 
 #[pin_project]
-pub struct EthereumWalletSign<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyES256K, EthereumWallet>> {
+pub struct EthereumWalletSign<
+    'a,
+    S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>,
+> {
     #[pin]
-    inner: S::Sign<'a>
+    inner: S::Sign<'a>,
 }
 
-impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyES256K, EthereumWallet>> EthereumWalletSign<'a, S> {
+impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>>
+    EthereumWalletSign<'a, S>
+{
     pub fn new(inner: S::Sign<'a>) -> Self {
-        Self {
-            inner
-        }
+        Self { inner }
     }
 }
 
-impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyES256K, EthereumWallet>> Future for EthereumWalletSign<'a, S> {
+impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>> Future
+    for EthereumWalletSign<'a, S>
+{
     type Output = Result<Signature, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
@@ -270,7 +283,7 @@ impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyES256K, EthereumWallet>> F
             let proof_value = r?;
             match String::from_utf8(proof_value) {
                 Ok(proof_value) => Ok(Signature::new(proof_value)),
-                Err(_) => Err(SignatureError::InvalidSignature)
+                Err(_) => Err(SignatureError::InvalidSignature),
             }
         })
     }

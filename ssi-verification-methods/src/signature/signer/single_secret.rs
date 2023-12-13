@@ -27,14 +27,20 @@ impl<R, S> SingleSecretSigner<R, S> {
     }
 }
 
-impl<M: Referencable, B: Copy, P: SignatureProtocol<B>, V, S> Signer<M, B, P> for SingleSecretSigner<V, S>
+impl<M: Referencable, B: Copy, P: SignatureProtocol<B>, V, S> Signer<M, B, P>
+    for SingleSecretSigner<V, S>
 where
     M: SigningMethod<S, B>,
     V: VerificationMethodResolver<M>,
 {
     type Sign<'a, A: crate::SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>> = Sign<'a, M, V, A, S> where Self: 'a, M: 'a, A: 'a, A::Signature: 'a;
 
-    fn sign<'a, 'o: 'a, 'm: 'a, A: crate::SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>>(
+    fn sign<
+        'a,
+        'o: 'a,
+        'm: 'a,
+        A: crate::SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>,
+    >(
         &'a self,
         algorithm: A,
         options: <A::Options as Referencable>::Reference<'o>,

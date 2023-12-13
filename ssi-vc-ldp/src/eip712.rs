@@ -1,7 +1,7 @@
-use std::future::Future;
 use iref::Uri;
-use ssi_verification_methods::Referencable;
 use serde::Serialize;
+use ssi_verification_methods::Referencable;
+use std::future::Future;
 
 use crate::ProofConfigurationRef;
 
@@ -39,7 +39,7 @@ impl Input {
     ) -> Result<ssi_eip712::TypedData, InvalidInput>
     where
         M::Reference<'a>: serde::Serialize,
-        O::Reference<'a>: serde::Serialize
+        O::Reference<'a>: serde::Serialize,
     {
         let domain = self.domain.unwrap_or_else(Self::default_domain);
         let primary_type = self.primary_type.unwrap_or_else(Self::default_primary_type);
@@ -54,23 +54,24 @@ impl Input {
             proof_type: &'static str,
 
             #[serde(flatten)]
-            proof_configuration: ProofConfigurationRef<'a, M, O>
+            proof_configuration: ProofConfigurationRef<'a, M, O>,
         }
 
         let proof = ProofConfigurationWithContext {
             proof_context,
             proof_type,
-            proof_configuration
+            proof_configuration,
         };
 
-        self.message.insert(
-            "proof".to_string(),
-            ssi_eip712::to_value(&proof).unwrap(),
-        );
+        self.message
+            .insert("proof".to_string(), ssi_eip712::to_value(&proof).unwrap());
 
         let message = ssi_eip712::Value::Struct(self.message);
 
-        eprintln!("message: {}", serde_json::to_string_pretty(&message).unwrap());
+        eprintln!(
+            "message: {}",
+            serde_json::to_string_pretty(&message).unwrap()
+        );
 
         let types = match self.types {
             Some(types) => types,
@@ -88,7 +89,10 @@ impl Input {
             message,
         };
 
-        eprintln!("EIP712 typed data: {}", serde_json::to_string_pretty(&result).unwrap());
+        eprintln!(
+            "EIP712 typed data: {}",
+            serde_json::to_string_pretty(&result).unwrap()
+        );
 
         Ok(result)
     }
@@ -120,15 +124,15 @@ impl Input {
 #[derive(Debug, thiserror::Error)]
 pub enum TypesFetchError {
     /// Error for applications that do not support remote types.
-    /// 
-    /// This is the error always returned by the `()` implementation of 
+    ///
+    /// This is the error always returned by the `()` implementation of
     /// `TypesProvider`.
     #[error("remote EIP712 types are not supported")]
-    Unsupported
+    Unsupported,
 }
 
 /// Type providing remote EIP712 type definitions from an URI.
-/// 
+///
 /// A default implementation is provided for the `()` type that always return
 /// `TypesFetchError::Unsupported`.
 pub trait TypesProvider {
@@ -136,7 +140,7 @@ pub trait TypesProvider {
     type Fetch: Future<Output = Result<ssi_eip712::Types, TypesFetchError>>;
 
     /// Fetches the type definitions located behind the given `uri`.
-    /// 
+    ///
     /// This is an asynchronous function returning a `Self::Fetch` future that
     /// resolves into ether the EIP712 [`Types`](ssi_eip712::Types) or an error
     /// of type `TypesFetchError`.

@@ -13,7 +13,17 @@ use crate::{
 pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
     "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(
     tag = "type",
     rename = "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
@@ -129,7 +139,9 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
     }
 }
 
-impl SigningMethod<JWK, ssi_jwk::algorithm::ESBlake2b> for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl SigningMethod<JWK, ssi_jwk::algorithm::ESBlake2b>
+    for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+{
     fn sign_bytes_ref(
         _this: &Self,
         key: &JWK,

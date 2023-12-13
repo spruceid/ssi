@@ -43,7 +43,7 @@ use crate::{
 pub struct SolanaSignature2021;
 
 impl SolanaSignature2021 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#SolanaSignature2021");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#SolanaSignature2021");
 }
 
 impl_rdf_input_urdna2015!(SolanaSignature2021);

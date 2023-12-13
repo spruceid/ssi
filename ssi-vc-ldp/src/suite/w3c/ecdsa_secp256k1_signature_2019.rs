@@ -16,7 +16,8 @@ use crate::{
 pub struct EcdsaSecp256k1Signature2019;
 
 impl EcdsaSecp256k1Signature2019 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019");
+    pub const IRI: &'static iref::Iri =
+        iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019");
 }
 
 impl_rdf_input_urdna2015!(EcdsaSecp256k1Signature2019);

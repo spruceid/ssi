@@ -1,6 +1,6 @@
 use linked_data::{
     LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
-    RdfLiteralValue
+    RdfLiteralValue,
 };
 
 use iref::{Iri, IriBuf};
@@ -78,6 +78,12 @@ impl<T: CryptographicSuite> Proof<T> {
 
     pub fn untyped(&self) -> &UntypedProof<T::VerificationMethod, T::Options, T::Signature> {
         &self.untyped
+    }
+
+    pub fn untyped_mut(
+        &mut self,
+    ) -> &mut UntypedProof<T::VerificationMethod, T::Options, T::Signature> {
+        &mut self.untyped
     }
 
     pub fn configuration(&self) -> ProofConfigurationRef<T::VerificationMethod, T::Options> {

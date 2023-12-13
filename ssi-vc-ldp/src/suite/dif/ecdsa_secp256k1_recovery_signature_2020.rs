@@ -1,7 +1,10 @@
-use ssi_crypto::MessageSigner;
-use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, VerificationError};
-use static_iref::iri;
 use iref::Iri;
+use ssi_crypto::MessageSigner;
+use ssi_verification_methods::{
+    ecdsa_secp_256k1_recovery_method_2020::DigestFunction, EcdsaSecp256k1RecoveryMethod2020,
+    VerificationError,
+};
+use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
@@ -71,7 +74,8 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
@@ -96,6 +100,6 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
             .map_err(|_| VerificationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(bytes);
 
-        method.verify_bytes(&signing_bytes, &signature)
+        method.verify_bytes(&signing_bytes, &signature, DigestFunction::Sha256)
     }
 }

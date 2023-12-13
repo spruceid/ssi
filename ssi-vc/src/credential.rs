@@ -6,7 +6,9 @@ use ssi_core::one_or_many::OneOrMany;
 use static_iref::iri_ref;
 
 /// Generic credential type.
-#[derive(Debug, Default, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug, Default, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize,
+)]
 #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
 #[serde(rename_all = "camelCase")]
 pub struct Credential<

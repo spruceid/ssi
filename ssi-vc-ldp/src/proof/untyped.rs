@@ -6,7 +6,14 @@ use ssi_verification_methods::{
 use crate::{CryptographicSuite, Proof, ProofConfiguration, ProofConfigurationRef};
 
 /// Untyped Data Integrity Proof.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(prefix("dc" = "http://purl.org/dc/terms/"))]
 #[serde(rename_all = "camelCase")]

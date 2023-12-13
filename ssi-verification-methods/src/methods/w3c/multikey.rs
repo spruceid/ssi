@@ -20,7 +20,17 @@ pub const MULTIKEY_TYPE: &str = "Multikey";
 /// Multikey verification method.
 ///
 /// See: <https://www.w3.org/TR/vc-data-integrity/#multikey>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "Multikey")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Multikey")]

@@ -42,7 +42,7 @@ pub enum SignatureError {
     InvalidAlgorithm,
 
     #[error("missing signature algorithm")]
-    MissingAlgorithm
+    MissingAlgorithm,
 }
 
 impl From<std::convert::Infallible> for SignatureError {

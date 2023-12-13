@@ -48,7 +48,7 @@ use crate::{
 pub struct AleoSignature2021;
 
 impl AleoSignature2021 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#AleoSignature2021");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#AleoSignature2021");
 }
 
 const BLOCKCHAIN_NETWORK_ID: &str = "1";

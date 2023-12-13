@@ -6,7 +6,7 @@ use std::{future::Future, marker::PhantomData, pin::Pin, task};
 
 use crate::{
     suite::{CryptographicSuiteInput, GenerateProof, HashError, TransformError},
-    CryptographicSuite, DataIntegrity, ProofConfiguration, UntypedProof, BuildDataIntegrity,
+    BuildDataIntegrity, CryptographicSuite, DataIntegrity, ProofConfiguration, UntypedProof,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -71,15 +71,20 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     {
         SignLinkedData {
             signer,
-            build: SelfRefFuture::new(BuildBounds { suite, params }, BuildParameters { input, context }),
-            inner: None
+            build: SelfRefFuture::new(
+                BuildBounds { suite, params },
+                BuildParameters { input, context },
+            ),
+            inner: None,
         }
     }
 }
 
 struct UnboundedBuild<T, S, X>(PhantomData<(T, S, X)>);
 
-impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max> UnboundedRefFuture<'max> for UnboundedBuild<T, S, X> {
+impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max> UnboundedRefFuture<'max>
+    for UnboundedBuild<T, S, X>
+{
     type Bound<'a> = BuildDataIntegrity<'a, T, S, X> where 'max: 'a;
 
     type Owned = BuildBounds<S>;
@@ -89,7 +94,7 @@ impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max> UnboundedR
 
 struct BuildBounds<S: CryptographicSuite> {
     suite: S,
-    params: ProofConfiguration<S::VerificationMethod, S::Options>
+    params: ProofConfiguration<S::VerificationMethod, S::Options>,
 }
 
 struct BuildParameters<T, X> {
@@ -97,11 +102,19 @@ struct BuildParameters<T, X> {
     context: X,
 }
 
-impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max> RefFutureBinder<'max, UnboundedBuild<T, S, X>> for BuildParameters<T, X> {
+impl<'max, T: 'max, S: 'max + CryptographicSuiteInput<T, X>, X: 'max>
+    RefFutureBinder<'max, UnboundedBuild<T, S, X>> for BuildParameters<T, X>
+{
     fn bind<'a>(context: Self, bounds: &'a BuildBounds<S>) -> BuildDataIntegrity<'a, T, S, X>
-        where
-            'max: 'a {
-        DataIntegrity::new(context.input, context.context, &bounds.suite, bounds.params.borrowed())
+    where
+        'max: 'a,
+    {
+        DataIntegrity::new(
+            context.input,
+            context.context,
+            &bounds.suite,
+            bounds.params.borrowed(),
+        )
     }
 }
 
@@ -148,8 +161,7 @@ where
     where
         'max: 'a,
     {
-        suite
-            .generate_proof(hash, context.signer, context.params)
+        suite.generate_proof(hash, context.signer, context.params)
     }
 }
 
@@ -190,17 +202,17 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let mut this = self.project();
-        
+
         loop {
             if this.inner.is_some() {
                 let inner = this.inner.as_pin_mut().unwrap();
-                break inner.poll(cx)
+                break inner.poll(cx);
             } else {
                 match this.build.as_mut().poll(cx) {
                     task::Poll::Pending => break task::Poll::Pending,
                     task::Poll::Ready((Ok(di), BuildBounds { suite, params })) => {
                         let (input, hash) = di.into_parts();
-        
+
                         let sign = SelfRefFuture::new(
                             (suite, hash),
                             Binder {
@@ -208,13 +220,13 @@ where
                                 signer: *this.signer,
                             },
                         );
-        
+
                         this.inner.set(Some(SignLinkedDataOk {
                             payload: Some(input),
                             sign,
                         }));
                     }
-                    task::Poll::Ready((Err(e), _)) => break task::Poll::Ready(Err(e.into()))
+                    task::Poll::Ready((Err(e), _)) => break task::Poll::Ready(Err(e.into())),
                 }
             }
         }

@@ -7,7 +7,7 @@ pub use ssi_verification_methods as method;
 
 impl<T, S: CryptographicSuite> ssi_vc::VerifiableWith for DataIntegrity<T, S>
 where
-    S::VerificationMethod: VerificationMethod
+    S::VerificationMethod: VerificationMethod,
 {
     type Proof = Proof<S>;
     type Method = S::VerificationMethod;

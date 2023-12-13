@@ -1,10 +1,10 @@
 use super::{Options, OptionsRef};
+use iref::Iri;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
 };
 use static_iref::iri;
-use iref::Iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
@@ -17,7 +17,8 @@ use crate::{
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 
 impl Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
-    pub const IRI: &Iri = iri!("https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021");
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021");
 }
 
 impl_rdf_input_urdna2015!(Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
@@ -74,7 +75,8 @@ impl
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
 
     fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
@@ -87,7 +89,7 @@ impl
             bytes,
             signer,
             options.public_key_jwk.key_id.clone(),
-            ssi_jwk::algorithm::EdBlake2b
+            ssi_jwk::algorithm::EdBlake2b,
         )
     }
 

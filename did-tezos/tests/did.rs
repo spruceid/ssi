@@ -5,7 +5,7 @@ use serde_json::json;
 use ssi_dids::{did, resolution::Options, DIDResolver, DIDVerifier};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_top::data_integrity::{AnySuite, AnySuiteOptions, AnyInputContext};
+use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
 use ssi_vc::Verifiable;
 use ssi_vc_ldp::{
     verification::method::{signer::SingleSecretSigner, ProofPurpose},
@@ -238,7 +238,9 @@ async fn credential_prove_verify_did_tz1() {
         LinkedDataInput::default(),
         proof.suite(),
         proof.configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
 
     let vc = ssi_vc::Verifiable::new(ldp_cred, proof);
 
@@ -253,7 +255,9 @@ async fn credential_prove_verify_did_tz1() {
         LinkedDataInput::default(),
         vc.proof().suite(),
         vc.proof().configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
 
     let vc_bad_issuer = ssi_vc::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
 
@@ -319,7 +323,9 @@ async fn credential_prove_verify_did_tz1() {
         LinkedDataInput::default(),
         vp_proof.suite(),
         vp_proof.configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
 
     let vp = ssi_vc::Verifiable::new(ldp_vp, vp_proof.clone());
 
@@ -341,7 +347,9 @@ async fn credential_prove_verify_did_tz1() {
         LinkedDataInput::default(),
         vp_proof.suite(),
         vp_proof.configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let vp2 = ssi_vc::Verifiable::new(ldp_vp2, vp_proof);
     assert!(vp2.verify(&didtz).await.unwrap().is_invalid());
 }
@@ -390,7 +398,9 @@ async fn credential_prove_verify_did_tz2() {
         AnyInputContext::default(),
         vc.proof().suite(),
         vc.proof().configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let vc_bad_issuer = ssi_vc::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
@@ -466,7 +476,9 @@ async fn credential_prove_verify_did_tz2() {
         AnyInputContext::default(),
         vp.proof().suite(),
         vp.proof().configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let vp2 = ssi_vc::Verifiable::new(ldp_vp2, vp.proof().clone());
     assert!(vp2.verify(&didtz).await.unwrap().is_invalid());
 }
@@ -495,7 +507,9 @@ async fn credential_prove_verify_did_tz3() {
             .unwrap()
             .into(),
         ProofPurpose::Assertion,
-        AnySuiteOptions::default().with_public_key(key.to_public()).unwrap(),
+        AnySuiteOptions::default()
+            .with_public_key(key.to_public())
+            .unwrap(),
     );
     let suite = AnySuite::pick(&key, Some(&vc_issue_options.verification_method)).unwrap();
     eprintln!("suite {suite:?}");
@@ -514,7 +528,9 @@ async fn credential_prove_verify_did_tz3() {
         AnyInputContext::default(),
         vc.proof().suite(),
         vc.proof().configuration(),
-    ).await.unwrap();
+    )
+    .await
+    .unwrap();
     let vc_bad_issuer = ssi_vc::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
@@ -558,7 +574,9 @@ async fn credential_prove_verify_did_tz3() {
             .unwrap()
             .into(),
         ProofPurpose::Authentication,
-        AnySuiteOptions::default().with_public_key(key.to_public()).unwrap(),
+        AnySuiteOptions::default()
+            .with_public_key(key.to_public())
+            .unwrap(),
     );
     let suite = AnySuite::pick(&key, Some(&vp_issue_options.verification_method)).unwrap();
     let vp = suite

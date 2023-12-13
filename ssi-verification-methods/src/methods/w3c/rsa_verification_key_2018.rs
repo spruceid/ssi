@@ -21,7 +21,17 @@ pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
 /// See: <https://www.w3.org/TR/did-spec-registries/#rsaverificationkey2018>
 ///
 /// [1]: <https://w3c-ccg.github.io/lds-rsa2018/>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "RsaVerificationKey2018")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:RsaVerificationKey2018")]

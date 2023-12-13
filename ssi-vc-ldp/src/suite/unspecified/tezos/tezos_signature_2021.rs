@@ -2,16 +2,16 @@ use ssi_crypto::MessageSigner;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{TezosMethod2021, Referencable, covariance_rule};
+use ssi_verification_methods::{covariance_rule, Referencable, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{HashError, CryptographicSuiteOptions},
+    suite::{CryptographicSuiteOptions, HashError},
     CryptographicSuite, ProofConfigurationRef,
 };
 
-use super::{TezosWallet, Signature, SignatureRef, TezosSign};
+use super::{Signature, SignatureRef, TezosSign, TezosWallet};
 
 /// Tezos signature suite based on URDNA2015.
 ///
@@ -39,7 +39,7 @@ use super::{TezosWallet, Signature, SignatureRef, TezosSign};
 pub struct TezosSignature2021;
 
 impl TezosSignature2021 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#TezosSignature2021");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#TezosSignature2021");
 }
 
 impl_rdf_input_urdna2015!(TezosSignature2021);
@@ -107,7 +107,11 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        TezosSign::new(method.public_key.as_jwk().or(options.public_key_jwk), bytes, signer)
+        TezosSign::new(
+            method.public_key.as_jwk().or(options.public_key_jwk),
+            bytes,
+            signer,
+        )
     }
 
     fn verify(
@@ -117,13 +121,19 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
         method: &TezosMethod2021,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        eprintln!("message: {}", hex::encode(bytes));
         let (algorithm, signature_bytes) = signature.decode()?;
         method.verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Options {
     #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
@@ -134,12 +144,12 @@ pub struct Options {
 impl Options {
     pub fn new(public_key_jwk: Option<JWK>) -> Self {
         Self {
-            public_key_jwk: public_key_jwk.map(Box::new)
+            public_key_jwk: public_key_jwk.map(Box::new),
         }
     }
 }
 
-impl<T> CryptographicSuiteOptions<T>for Options {}
+impl<T> CryptographicSuiteOptions<T> for Options {}
 
 impl Referencable for Options {
     type Reference<'a> = OptionsRef<'a>;

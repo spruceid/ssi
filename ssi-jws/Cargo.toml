@@ -49,6 +49,7 @@ ring = { version = "0.16", optional = true }
 ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 linked-data.workspace = true
+hex.workspace = true
 
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

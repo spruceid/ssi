@@ -47,7 +47,9 @@ pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =
 // pub use schema::cred::*;
 
 /// Verifiable credential.
-#[derive(Educe, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Educe, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize,
+)]
 #[educe(Clone(bound = "C: Clone, C::Proof: Clone"))]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Verifiable<C: VerifiableWith> {
@@ -105,7 +107,7 @@ impl<C: VerifiableWith> Verifiable<C> {
         f: impl FnOnce(C, C::Proof) -> F,
     ) -> Verifiable<D>
     where
-        F: std::future::Future<Output = (D, D::Proof)>
+        F: std::future::Future<Output = (D, D::Proof)>,
     {
         let (credential, proof) = f(self.credential, self.proof).await;
 
@@ -117,7 +119,7 @@ impl<C: VerifiableWith> Verifiable<C> {
         f: impl FnOnce(C, C::Proof) -> F,
     ) -> Result<Verifiable<D>, E>
     where
-        F: std::future::Future<Output = Result<(D, D::Proof), E>>
+        F: std::future::Future<Output = Result<(D, D::Proof), E>>,
     {
         let (credential, proof) = f(self.credential, self.proof).await?;
 

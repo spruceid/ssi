@@ -1,6 +1,6 @@
 use core::fmt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 macro_rules! algorithms {
     ($(
@@ -20,7 +20,7 @@ macro_rules! algorithms {
                 $id,
             )*
             /// No signature.
-            /// 
+            ///
             /// Per the specs it should only be `none` but `None` is kept for backwards
             /// compatibility.
             #[serde(alias = "None")]
@@ -54,7 +54,7 @@ macro_rules! algorithms {
 
             impl TryFrom<Algorithm> for $id {
                 type Error = UnsupportedAlgorithm;
-                
+
                 fn try_from(a: Algorithm) -> Result<Self, Self::Error> {
                     match a {
                         Algorithm::$id => Ok(Self),
@@ -74,56 +74,56 @@ macro_rules! algorithms {
 
 algorithms! {
     /// HMAC using SHA-256.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     HS256: "HS256",
 
     /// HMAC using SHA-384.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     HS384: "HS384",
 
     /// HMAC using SHA-512.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     HS512: "HS512",
 
     /// RSASSA-PKCS1-v1_5 using SHA-256.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     RS256: "RS256",
 
     /// RSASSA-PKCS1-v1_5 using SHA-384.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     RS384: "RS384",
 
     /// RSASSA-PKCS1-v1_5 using SHA-512.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     RS512: "RS512",
 
     /// RSASSA-PSS using SHA-256 and MGF1 with SHA-256.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     PS256: "PS256",
 
     /// RSASSA-PSS using SHA-384 and MGF1 with SHA-384.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     PS384: "PS384",
 
     /// RSASSA-PSS using SHA-512 and MGF1 with SHA-512.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     PS512: "PS512",
 
     /// Edwards-curve Digital Signature Algorithm (EdDSA) using SHA-256.
-    /// 
+    ///
     /// The following curves are defined for use with `EdDSA`:
     ///  - `Ed25519`
     ///  - `Ed448`
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc8037>
     EdDSA: "EdDSA",
 
@@ -131,31 +131,36 @@ algorithms! {
     EdBlake2b: "EdBlake2b", // TODO Blake2b is supposed to replace SHA-256
 
     /// ECDSA using P-256 and SHA-256.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     ES256: "ES256",
 
     /// ECDSA using P-384 and SHA-384.
-    /// 
+    ///
     /// See: <https://www.rfc-editor.org/rfc/rfc7518.txt>
     ES384: "ES384",
 
     /// ECDSA using secp256k1 (K-256) and SHA-256.
-    /// 
+    ///
     /// See: <https://datatracker.ietf.org/doc/html/rfc8812>
     ES256K: "ES256K",
 
     /// ECDSA using secp256k1 (K-256) and SHA-256 with a recovery bit.
-    /// 
+    ///
     /// `ES256K-R` is similar to `ES256K` with the recovery bit appended, making
     /// the signature 65 bytes instead of 64. The recovery bit is used to
     /// extract the public key from the signature.
-    /// 
+    ///
     /// See: <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
     ES256KR: "ES256K-R",
-    
+
+    /// ECDSA using secp256k1 (K-256) and Keccak-256.
+    ///
+    /// Like `ES256K` but using Keccak-256 instead of SHA-256.
+    ESKeccakK: "ESKeccakK",
+
     /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
-    /// 
+    ///
     /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
     ESKeccakKR: "ESKeccakKR",
 
@@ -164,9 +169,25 @@ algorithms! {
 
     /// ECDSA using secp256k1 (K-256) and Blake2b.
     ESBlake2bK: "ESBlake2bK",
-    
+
     #[doc(hidden)]
     AleoTestnet1Signature: "AleoTestnet1Signature"
+}
+
+impl Algorithm {
+    /// Checks if this algorithm is compatible with the `other` algorithm.
+    ///
+    /// An algorithm `A` is compatible with `B` if `A` can be used to verify a
+    /// signature created from `B`.
+    pub fn is_compatible_with(&self, other: Self) -> bool {
+        match self {
+            Self::ES256K | Self::ES256KR | Self::ESKeccakK | Self::ESKeccakKR => matches!(
+                other,
+                Self::ES256K | Self::ES256KR | Self::ESKeccakK | Self::ESKeccakKR
+            ),
+            a => *a == other,
+        }
+    }
 }
 
 impl Default for Algorithm {
@@ -195,14 +216,14 @@ pub enum AlgorithmError {
 
     /// Unsupported algorithm.
     #[error("unsupported signature algorithm `{0}`")]
-    Unsupported(Algorithm)
+    Unsupported(Algorithm),
 }
 
 impl From<AlgorithmError> for ssi_crypto::MessageSignatureError {
     fn from(value: AlgorithmError) -> Self {
         match value {
             AlgorithmError::Missing => Self::MissingAlgorithm,
-            AlgorithmError::Unsupported(a) => Self::UnsupportedAlgorithm(a.to_string())
+            AlgorithmError::Unsupported(a) => Self::UnsupportedAlgorithm(a.to_string()),
         }
     }
 }
@@ -224,7 +245,7 @@ pub enum AnyES256K {
     ES256K,
 
     /// ECDSA using secp256k1 (K-256) and SHA-256, with recovery bit.
-    ES256KR
+    ES256KR,
 }
 
 impl TryFrom<Algorithm> for AnyES256K {
@@ -234,7 +255,7 @@ impl TryFrom<Algorithm> for AnyES256K {
         match value {
             Algorithm::ES256K => Ok(Self::ES256K),
             Algorithm::ES256KR => Ok(Self::ES256KR),
-            other => Err(UnsupportedAlgorithm(other))
+            other => Err(UnsupportedAlgorithm(other)),
         }
     }
 }
@@ -243,7 +264,7 @@ impl From<AnyES256K> for Algorithm {
     fn from(value: AnyES256K) -> Self {
         match value {
             AnyES256K::ES256K => Self::ES256K,
-            AnyES256K::ES256KR => Self::ES256KR
+            AnyES256K::ES256KR => Self::ES256KR,
         }
     }
 }
@@ -260,11 +281,110 @@ impl From<ES256KR> for AnyES256K {
     }
 }
 
+/// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AnyESKeccakK {
+    /// ECDSA using secp256k1 (K-256) and Keccak-256.
+    ///
+    /// Like `ES256K` but using Keccak-256 instead of SHA-256.
+    ESKeccakK,
+
+    /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
+    ///
+    /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
+    ESKeccakKR,
+}
+
+impl TryFrom<Algorithm> for AnyESKeccakK {
+    type Error = UnsupportedAlgorithm;
+
+    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
+        match value {
+            Algorithm::ESKeccakK => Ok(Self::ESKeccakK),
+            Algorithm::ESKeccakKR => Ok(Self::ESKeccakKR),
+            other => Err(UnsupportedAlgorithm(other)),
+        }
+    }
+}
+
+impl From<AnyESKeccakK> for Algorithm {
+    fn from(value: AnyESKeccakK) -> Self {
+        match value {
+            AnyESKeccakK::ESKeccakK => Self::ESKeccakK,
+            AnyESKeccakK::ESKeccakKR => Self::ESKeccakKR,
+        }
+    }
+}
+
+impl From<ESKeccakK> for AnyESKeccakK {
+    fn from(_value: ESKeccakK) -> Self {
+        Self::ESKeccakK
+    }
+}
+
+impl From<ESKeccakKR> for AnyESKeccakK {
+    fn from(_value: ESKeccakKR) -> Self {
+        Self::ESKeccakKR
+    }
+}
+
+/// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AnyES {
+    /// ECDSA using secp256k1 (K-256) and SHA-256, without recovery bit.
+    ES256K,
+
+    /// ECDSA using secp256k1 (K-256) and SHA-256, with recovery bit.
+    ES256KR,
+
+    ESKeccakK,
+
+    /// ECDSA using secp256k1 (K-256) and Keccak-256 with a recovery bit.
+    ///
+    /// Like `ES256K-R` but using Keccak-256 instead of SHA-256.
+    ESKeccakKR,
+}
+
+impl TryFrom<Algorithm> for AnyES {
+    type Error = UnsupportedAlgorithm;
+
+    fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
+        match value {
+            Algorithm::ES256K => Ok(Self::ES256K),
+            Algorithm::ES256KR => Ok(Self::ES256KR),
+            other => Err(UnsupportedAlgorithm(other)),
+        }
+    }
+}
+
+impl From<AnyES> for Algorithm {
+    fn from(value: AnyES) -> Self {
+        match value {
+            AnyES::ES256K => Self::ES256K,
+            AnyES::ES256KR => Self::ES256KR,
+            AnyES::ESKeccakK => Self::ESKeccakK,
+            AnyES::ESKeccakKR => Self::ESKeccakKR,
+        }
+    }
+}
+
+impl From<ES256K> for AnyES {
+    fn from(_value: ES256K) -> Self {
+        Self::ES256K
+    }
+}
+
+impl From<ES256KR> for AnyES {
+    fn from(_value: ES256KR) -> Self {
+        Self::ES256KR
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AnyBlake2b {
     EdBlake2b,
     ESBlake2bK,
-    ESBlake2b
+    ESBlake2b,
 }
 
 impl From<AnyBlake2b> for Algorithm {
@@ -272,34 +392,59 @@ impl From<AnyBlake2b> for Algorithm {
         match value {
             AnyBlake2b::EdBlake2b => Self::EdBlake2b,
             AnyBlake2b::ESBlake2bK => Self::ESBlake2bK,
-            AnyBlake2b::ESBlake2b => Self::ESBlake2b
+            AnyBlake2b::ESBlake2b => Self::ESBlake2b,
         }
     }
 }
 
 impl TryFrom<Algorithm> for AnyBlake2b {
     type Error = UnsupportedAlgorithm;
-    
+
     fn try_from(value: Algorithm) -> Result<Self, Self::Error> {
         match value {
             Algorithm::EdBlake2b => Ok(Self::EdBlake2b),
             Algorithm::ESBlake2bK => Ok(Self::ESBlake2bK),
             Algorithm::ESBlake2b => Ok(Self::ESBlake2b),
-            a => Err(UnsupportedAlgorithm(a))
+            a => Err(UnsupportedAlgorithm(a)),
         }
     }
 }
 
 impl TryFrom<Option<Algorithm>> for AnyBlake2b {
     type Error = AlgorithmError;
-    
+
     fn try_from(value: Option<Algorithm>) -> Result<Self, Self::Error> {
         match value {
             Some(Algorithm::EdBlake2b) => Ok(Self::EdBlake2b),
             Some(Algorithm::ESBlake2bK) => Ok(Self::ESBlake2bK),
             Some(Algorithm::ESBlake2b) => Ok(Self::ESBlake2b),
             Some(a) => Err(AlgorithmError::Unsupported(a)),
-            None => Err(AlgorithmError::Missing)
+            None => Err(AlgorithmError::Missing),
         }
     }
 }
+
+// pub enum CryptoAlgorithm {
+//     HS,
+//     RS,
+//     ES
+// }
+
+// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub enum DigestAlgorithm {
+//     Sha256,
+//     Keccack
+// }
+
+// impl DigestAlgorithm {
+//     pub fn into_full_algorithm(
+//         self,
+//         crypto_algorithm: CryptoAlgorithm,
+//         recovery: bool
+//     ) -> Option<Algorithm> {
+//         match self {
+//             Self::Sha256 => ssi_jwk::Algorithm::ES256KR,
+//             Self::Keccack => ssi_jwk::Algorithm::ESKeccakKR
+//         }
+//     }
+// }

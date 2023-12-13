@@ -144,7 +144,10 @@ impl Value {
                 let array = match self {
                     Value::Array(array) => array,
                     _ => {
-                        return Err(TypedDataHashError::ExpectedArray(member_type.to_string(), self.kind()));
+                        return Err(TypedDataHashError::ExpectedArray(
+                            member_type.to_string(),
+                            self.kind(),
+                        ));
                     }
                 };
                 let mut enc = Vec::with_capacity(32 * array.len());
@@ -158,7 +161,10 @@ impl Value {
                 let array = match self {
                     Value::Array(array) => array,
                     _ => {
-                        return Err(TypedDataHashError::ExpectedArray(member_type.to_string(), self.kind()));
+                        return Err(TypedDataHashError::ExpectedArray(
+                            member_type.to_string(),
+                            self.kind(),
+                        ));
                     }
                 };
                 let n = *n;
@@ -180,7 +186,10 @@ impl Value {
                 let hash_map = match self {
                     Value::Struct(hash_map) => hash_map,
                     _ => {
-                        return Err(TypedDataHashError::ExpectedObject(struct_name.to_string(), self.kind()));
+                        return Err(TypedDataHashError::ExpectedObject(
+                            struct_name.to_string(),
+                            self.kind(),
+                        ));
                     }
                 };
                 let mut enc = Vec::with_capacity(32 * (struct_type.member_variables().len() + 1));

@@ -1,13 +1,21 @@
-use crate::{
-    LinkedDataVerificationMethod, Referencable, VerificationMethod
-};
+use crate::{LinkedDataVerificationMethod, Referencable, VerificationMethod};
 use educe::Educe;
 use iref::{Iri, IriBuf};
 use serde::{Deserialize, Serialize};
 
 /// Reference to a verification method.
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
 )]
 #[serde(untagged)]
 pub enum ReferenceOrOwned<M> {
@@ -79,10 +87,13 @@ pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
 }
 
 impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
-    pub fn shorten_lifetime<'b>(self) -> ReferenceOrOwnedRef<'b, M> where 'a: 'b {
+    pub fn shorten_lifetime<'b>(self) -> ReferenceOrOwnedRef<'b, M>
+    where
+        'a: 'b,
+    {
         match self {
             Self::Reference(i) => ReferenceOrOwnedRef::Reference(i),
-            Self::Owned(r) => ReferenceOrOwnedRef::Owned(M::apply_covariance(r))
+            Self::Owned(r) => ReferenceOrOwnedRef::Owned(M::apply_covariance(r)),
         }
     }
 }

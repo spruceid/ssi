@@ -27,7 +27,7 @@ pub enum MessageSignatureError {
     MissingAlgorithm,
 
     #[error("unsupported signature algorithm `{0}`")]
-    UnsupportedAlgorithm(String)
+    UnsupportedAlgorithm(String),
 }
 
 impl MessageSignatureError {
@@ -78,11 +78,11 @@ impl<S, A, P> SignerAdapter<S, A, P> {
     }
 }
 
-impl<S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> MessageSigner<B, Q>
-    for SignerAdapter<S, A, P>
+impl<S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>>
+    MessageSigner<B, Q> for SignerAdapter<S, A, P>
 where
     P: TryFrom<Q>,
-    A: TryFrom<B>
+    A: TryFrom<B>,
 {
     type Sign<'a> = SignerAdapterSign<'a, S, A, B, P, Q> where Self: 'a, B: 'a, Q: 'a;
 
@@ -92,11 +92,14 @@ where
         B: 'a,
         Q: 'a,
     {
-        let inner = match algorithm.try_into().map_err(|_| MessageSignatureError::InvalidQuery) {
-            Ok(algorithm) => {
-                match protocol
+        let inner = match algorithm
             .try_into()
             .map_err(|_| MessageSignatureError::InvalidQuery)
+        {
+            Ok(algorithm) => {
+                match protocol
+                    .try_into()
+                    .map_err(|_| MessageSignatureError::InvalidQuery)
                 {
                     Ok(protocol) => SignerAdapterSignInner::Ok(SignerAdapterSignOk {
                         inner: self.signer.sign(algorithm, protocol, message),
@@ -105,9 +108,7 @@ where
                     Err(e) => SignerAdapterSignInner::Err(Some(e)),
                 }
             }
-            Err(e) => {
-                SignerAdapterSignInner::Err(Some(e))
-            }
+            Err(e) => SignerAdapterSignInner::Err(Some(e)),
         };
 
         SignerAdapterSign { inner }
@@ -115,7 +116,14 @@ where
 }
 
 #[pin_project]
-pub struct SignerAdapterSign<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> {
+pub struct SignerAdapterSign<
+    'a,
+    S: MessageSigner<A, P>,
+    A,
+    B,
+    P: SignatureProtocol<A>,
+    Q: SignatureProtocol<B>,
+> {
     #[pin]
     inner: SignerAdapterSignInner<'a, S, A, B, P, Q>,
 }
@@ -135,7 +143,14 @@ impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProt
 }
 
 #[pin_project(project = SignerAdapterSignProj)]
-enum SignerAdapterSignInner<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> {
+enum SignerAdapterSignInner<
+    'a,
+    S: MessageSigner<A, P>,
+    A,
+    B,
+    P: SignatureProtocol<A>,
+    Q: SignatureProtocol<B>,
+> {
     Ok(#[pin] SignerAdapterSignOk<'a, S, A, B, P, Q>),
     Err(Option<MessageSignatureError>),
 }

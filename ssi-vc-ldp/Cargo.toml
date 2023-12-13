@@ -46,7 +46,7 @@ tezos = ["serde_json", "serde_jcs", "ssi-tzkey", "bs58"]
 aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo"]
 
 # Enables `Eip712Signature2021`
-eip712 = ["ssi-eip712"]
+eip712 = ["ssi-eip712", "ssi-jws/eip"]
 
 # Enables `SolanaSignature2021`
 solana = ["ssi-verification-methods/solana"]

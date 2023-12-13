@@ -25,7 +25,7 @@ pub use verification::method::Multikey;
 pub struct EdDsa2022;
 
 impl EdDsa2022 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#DataIntegrityProof");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#DataIntegrityProof");
 }
 
 impl_rdf_input_urdna2015!(EdDsa2022);

@@ -114,7 +114,7 @@ macro_rules! verification_method_union {
 					),*
 				}
 			}
-		
+
 			fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a iref::Iri> {
 				match r {
 					$(

@@ -5,18 +5,22 @@ pub mod p256_blake2b_digest_size20_base58_check_encoded_signature_2021;
 pub mod tezos_jcs_signature_2021;
 pub mod tezos_signature_2021;
 
-use std::future::Future;
-use std::task;
-use std::pin::Pin;
-use std::borrow::Cow;
 use pin_project::pin_project;
+use std::borrow::Cow;
+use std::future::Future;
+use std::pin::Pin;
+use std::task;
 
 pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-use ssi_crypto::{protocol::InvalidProtocolSignature, SignatureProtocol, MessageSigner, MessageSignatureError};
-use ssi_jwk::{JWK, algorithm::AnyBlake2b};
-use ssi_security::{MultibaseBuf, Multibase};
-use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, VerificationError, InvalidSignature};
+use ssi_crypto::{
+    protocol::InvalidProtocolSignature, MessageSignatureError, MessageSigner, SignatureProtocol,
+};
+use ssi_jwk::{algorithm::AnyBlake2b, JWK};
+use ssi_security::{Multibase, MultibaseBuf};
+use ssi_verification_methods::{
+    covariance_rule, InvalidSignature, Referencable, SignatureError, VerificationError,
+};
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
 
@@ -26,7 +30,14 @@ const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
 const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Options {
     #[serde(rename = "publicKeyJwk")]
@@ -42,7 +53,7 @@ impl Options {
     }
 }
 
-impl<T> CryptographicSuiteOptions<T>for Options {}
+impl<T> CryptographicSuiteOptions<T> for Options {}
 
 impl Referencable for Options {
     type Reference<'a> = OptionsRef<'a>;
@@ -64,24 +75,27 @@ pub struct OptionsRef<'a> {
     pub public_key_jwk: &'a JWK,
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Signature {
     /// Base58check-encoded signature.
-    /// 
+    ///
     /// Before encoding, the signature bytes are prefixed by a unique value
     /// identifying the cryptographic signature algorithm used.
     #[ld("sec:proofValue")]
-    pub proof_value: String
+    pub proof_value: String,
 }
 
 impl Signature {
-    pub fn new(
-        proof_value: String
-    ) -> Self {
-        Self {
-            proof_value
-        }
+    pub fn new(proof_value: String) -> Self {
+        Self { proof_value }
     }
 }
 
@@ -90,7 +104,7 @@ impl Referencable for Signature {
 
     fn as_reference(&self) -> Self::Reference<'_> {
         SignatureRef {
-            proof_value: &self.proof_value
+            proof_value: &self.proof_value,
         }
     }
 
@@ -109,12 +123,13 @@ impl From<Signature> for AnySignature {
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base58-encoded signature.
-    pub proof_value: &'a str
+    pub proof_value: &'a str,
 }
 
 impl<'a> SignatureRef<'a> {
     pub fn decode(&self) -> Result<(AnyBlake2b, Vec<u8>), VerificationError> {
-        TezosWallet::decode_signature(self.proof_value.as_bytes()).map_err(|_| VerificationError::InvalidSignature)
+        TezosWallet::decode_signature(self.proof_value.as_bytes())
+            .map_err(|_| VerificationError::InvalidSignature)
     }
 }
 
@@ -132,7 +147,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
         Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
         })
     }
 }
@@ -141,19 +156,16 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
 ///
 /// Used in combination with the `TezosSignature2021` and
 /// `TezosJcsSignature2021` cryptographic suites. The signer (the Tezos Wallet)
-/// must prefix the signature with a unique value identifying the signature 
+/// must prefix the signature with a unique value identifying the signature
 /// algorithm used, and encode the result in base58check.
 pub struct TezosWallet;
 
 impl TezosWallet {
-    pub fn encode_signature(
-        algorithm: AnyBlake2b,
-        signature: &[u8]
-    ) -> Vec<u8> {
+    pub fn encode_signature(algorithm: AnyBlake2b, signature: &[u8]) -> Vec<u8> {
         let prefix: &[u8] = match algorithm {
             AnyBlake2b::EdBlake2b => &EDSIG_PREFIX,
             AnyBlake2b::ESBlake2bK => &SPSIG_PREFIX,
-            AnyBlake2b::ESBlake2b => &P2SIG_PREFIX
+            AnyBlake2b::ESBlake2b => &P2SIG_PREFIX,
         };
 
         let mut sig_prefixed = Vec::with_capacity(prefix.len() + signature.len());
@@ -163,19 +175,23 @@ impl TezosWallet {
         bs58::encode(sig_prefixed).with_check().into_vec()
     }
 
-    pub fn decode_signature(encoded_signature: &[u8]) -> Result<(AnyBlake2b, Vec<u8>), InvalidProtocolSignature> {
-        let sig_prefixed = bs58::decode(encoded_signature).with_check(None).into_vec()
+    pub fn decode_signature(
+        encoded_signature: &[u8],
+    ) -> Result<(AnyBlake2b, Vec<u8>), InvalidProtocolSignature> {
+        let sig_prefixed = bs58::decode(encoded_signature)
+            .with_check(None)
+            .into_vec()
             .map_err(|_| InvalidProtocolSignature)?;
 
         if sig_prefixed.len() < 5 {
-            return Err(InvalidProtocolSignature)
+            return Err(InvalidProtocolSignature);
         }
 
         match &encoded_signature[0..5] {
             b"edsig" => Ok((AnyBlake2b::EdBlake2b, sig_prefixed[5..].to_vec())),
             b"spsig" => Ok((AnyBlake2b::ESBlake2bK, sig_prefixed[5..].to_vec())),
             b"p2sig" => Ok((AnyBlake2b::ESBlake2b, sig_prefixed[4..].to_vec())),
-            _ => Err(InvalidProtocolSignature)
+            _ => Err(InvalidProtocolSignature),
         }
     }
 }
@@ -184,7 +200,7 @@ impl SignatureProtocol<AnyBlake2b> for TezosWallet {
     fn encode_signature(
         &self,
         algorithm: AnyBlake2b,
-        signature: Vec<u8>
+        signature: Vec<u8>,
     ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(Self::encode_signature(algorithm, &signature))
     }
@@ -200,41 +216,27 @@ impl SignatureProtocol<AnyBlake2b> for TezosWallet {
 #[pin_project]
 pub struct TezosSign<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> {
     #[pin]
-    inner: TezosSignInner<'a, S>
+    inner: TezosSignInner<'a, S>,
 }
 
 impl<'a, S: MessageSigner<AnyBlake2b, TezosWallet>> TezosSign<'a, S> {
-    pub fn new(
-        public_key: Option<&JWK>,
-        message: &'a [u8],
-        signer: S
-    ) -> Self {
+    pub fn new(public_key: Option<&JWK>, message: &'a [u8], signer: S) -> Self {
         let inner = match public_key {
             Some(jwk) => match jwk.algorithm.try_into() {
-                Ok(algorithm) => {
-                    TezosSignInner::Ok(TezosSignOk { sign: signer.sign(
-                        algorithm,
-                        TezosWallet,
-                        message
-                    ) })
-                }
-                Err(e) => {
-                    TezosSignInner::Err(Some(MessageSignatureError::from(e).into()))
-                }
-            }
-            None => {
-                TezosSignInner::Err(Some(SignatureError::MissingPublicKey))
-            }
+                Ok(algorithm) => TezosSignInner::Ok(TezosSignOk {
+                    sign: signer.sign(algorithm, TezosWallet, message),
+                }),
+                Err(e) => TezosSignInner::Err(Some(MessageSignatureError::from(e).into())),
+            },
+            None => TezosSignInner::Err(Some(SignatureError::MissingPublicKey)),
         };
 
-        Self {
-            inner
-        }
+        Self { inner }
     }
 
     pub fn err(e: SignatureError) -> Self {
         Self {
-            inner: TezosSignInner::Err(Some(e))
+            inner: TezosSignInner::Err(Some(e)),
         }
     }
 }
@@ -251,7 +253,7 @@ impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSign<'a
 #[pin_project(project = TezosSignInnerProj)]
 enum TezosSignInner<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> {
     Ok(#[pin] TezosSignOk<'a, S>),
-    Err(Option<SignatureError>)
+    Err(Option<SignatureError>),
 }
 
 impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignInner<'a, S> {
@@ -260,7 +262,7 @@ impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignInn
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         match self.project() {
             TezosSignInnerProj::Ok(f) => f.poll(cx),
-            TezosSignInnerProj::Err(e) => task::Poll::Ready(Err(e.take().unwrap()))
+            TezosSignInnerProj::Err(e) => task::Poll::Ready(Err(e.take().unwrap())),
         }
     }
 }
@@ -268,7 +270,7 @@ impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignInn
 #[pin_project]
 struct TezosSignOk<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> {
     #[pin]
-    sign: S::Sign<'a>
+    sign: S::Sign<'a>,
 }
 
 impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignOk<'a, S> {
@@ -276,11 +278,9 @@ impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignOk<
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
-        this.sign.poll(cx).map(|r| {
-            match String::from_utf8(r?) {
-                Ok(proof_value) => Ok(Signature::new(proof_value)),
-                Err(_) => Err(SignatureError::InvalidSignature)
-            }
+        this.sign.poll(cx).map(|r| match String::from_utf8(r?) {
+            Ok(proof_value) => Ok(Signature::new(proof_value)),
+            Err(_) => Err(SignatureError::InvalidSignature),
         })
     }
 }
@@ -302,8 +302,7 @@ pub fn encode_jwk_to_multibase(public_key: &JWK) -> Result<MultibaseBuf, ssi_jws
 /// Deocdes a public JWK from a multibase Tezos-style base58 key.
 pub fn decode_jwk_from_multibase(key: &Multibase) -> Result<JWK, InvalidTezosMultibaseKey> {
     if key.as_str().starts_with('z') {
-        ssi_tzkey::jwk_from_tezos_key(&key.as_str()[1..])
-            .map_err(|_| InvalidTezosMultibaseKey)
+        ssi_tzkey::jwk_from_tezos_key(&key.as_str()[1..]).map_err(|_| InvalidTezosMultibaseKey)
     } else {
         Err(InvalidTezosMultibaseKey)
     }

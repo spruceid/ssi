@@ -2,7 +2,10 @@
 
 use core::fmt;
 use linked_data::rdf_types::{Interpretation, Vocabulary};
-use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject, LinkedDataDeserializeSubject, LinkedDataDeserializePredicateObjects};
+use linked_data::{
+    LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
+    LinkedDataPredicateObjects, LinkedDataSubject,
+};
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
@@ -569,7 +572,13 @@ impl ECParams {
 
 impl RSAParams {
     pub fn is_public(&self) -> bool {
-        self.private_exponent.is_none() && self.first_prime_factor.is_none() && self.second_prime_factor.is_none() && self.first_prime_factor_crt_exponent.is_none() && self.second_prime_factor_crt_exponent.is_none() && self.first_crt_coefficient.is_none() && self.other_primes_info.is_none()
+        self.private_exponent.is_none()
+            && self.first_prime_factor.is_none()
+            && self.second_prime_factor.is_none()
+            && self.first_prime_factor_crt_exponent.is_none()
+            && self.second_prime_factor_crt_exponent.is_none()
+            && self.first_crt_coefficient.is_none()
+            && self.other_primes_info.is_none()
     }
 
     /// Strip private key material

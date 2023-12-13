@@ -9,7 +9,8 @@ use ssi_jws::CompactJWSString;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod, SigningMethod,
+    Referencable, SignatureError, SigningMethod, TypedVerificationMethod, VerificationError,
+    VerificationMethod,
 };
 
 /// Ed25519 Verification Key 2018 type name.
@@ -18,7 +19,17 @@ pub const ED25519_VERIFICATION_KEY_2018_TYPE: &str = "Ed25519VerificationKey2018
 /// Deprecated verification method for the `Ed25519Signature2018` suite.
 ///
 /// See: <https://w3c-ccg.github.io/lds-ed25519-2018/#the-ed25519-key-format>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "Ed25519VerificationKey2018")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Ed25519VerificationKey2018")]

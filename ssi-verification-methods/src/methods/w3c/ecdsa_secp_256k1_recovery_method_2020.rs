@@ -15,7 +15,17 @@ pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1Reco
 /// EcdsaSecp256k1RecoveryMethod2020 verification method.
 ///
 /// See: <https://w3c-ccg.github.io/security-vocab/#EcdsaSecp256k1RecoveryMethod2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "EcdsaSecp256k1RecoveryMethod2020")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:EcdsaSecp256k1RecoveryMethod2020")]
@@ -93,10 +103,31 @@ pub enum SignatureError {
     InvalidSecretKey,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DigestFunction {
+    Sha256,
+    Keccack,
+}
+
+impl DigestFunction {
+    pub fn into_crypto_algorithm(self) -> ssi_jwk::Algorithm {
+        match self {
+            Self::Sha256 => ssi_jwk::Algorithm::ES256KR,
+            Self::Keccack => ssi_jwk::Algorithm::ESKeccakKR,
+        }
+    }
+}
+
 impl EcdsaSecp256k1RecoveryMethod2020 {
-    pub fn sign(&self, secret_key: &JWK, data: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256KR);
-        if algorithm != ssi_jwk::Algorithm::ES256KR {
+    pub fn sign(
+        &self,
+        secret_key: &JWK,
+        data: &[u8],
+        digest_function: DigestFunction,
+    ) -> Result<Vec<u8>, SignatureError> {
+        let algorithm = digest_function.into_crypto_algorithm();
+        let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
+        if !algorithm.is_compatible_with(key_algorithm) {
             return Err(SignatureError::InvalidSecretKey);
         }
 
@@ -108,9 +139,11 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
         &self,
         signing_bytes: &[u8],
         signature: &[u8],
+        digest_function: DigestFunction,
     ) -> Result<bool, VerificationError> {
         // Recover the key used to sign the message.
-        let key = ssi_jws::recover(ssi_jwk::Algorithm::ES256KR, signing_bytes, signature)
+        let algorithm = digest_function.into_crypto_algorithm();
+        let key = ssi_jws::recover(algorithm, signing_bytes, signature)
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         // Check the validity of the signing key.
@@ -118,20 +151,26 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
             .public_key
             .matches(&key)
             .map_err(|_| VerificationError::InvalidProof)?;
-        let algorithm = key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256KR);
-        if !matching_keys || algorithm != ssi_jwk::Algorithm::ES256KR {
+        if !matching_keys {
             return Ok(false);
         }
 
         // Verify the signature.
-        Ok(
-            ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256KR, signing_bytes, &key, signature)
-                .is_ok(),
-        )
+        Ok(ssi_jws::verify_bytes(algorithm, signing_bytes, &key, signature).is_ok())
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[serde(rename = "publicKeyJwk")]
@@ -281,7 +320,19 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::ES256KR> for EcdsaSecp256k1RecoveryM
         _algorithm: ssi_jwk::algorithm::ES256KR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        this.sign(secret, bytes)
+        this.sign(secret, bytes, DigestFunction::Sha256)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+    }
+}
+
+impl SigningMethod<JWK, ssi_jwk::algorithm::ESKeccakKR> for EcdsaSecp256k1RecoveryMethod2020 {
+    fn sign_bytes_ref(
+        this: Self::Reference<'_>,
+        secret: &JWK,
+        _algorithm: ssi_jwk::algorithm::ESKeccakKR,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        this.sign(secret, bytes, DigestFunction::Keccack)
             .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

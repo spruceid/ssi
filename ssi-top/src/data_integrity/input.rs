@@ -9,8 +9,8 @@ use ssi_vc_ldp::{
     CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
 };
 
-use crate::AnyMethod;
 use super::AnySuite;
+use crate::AnyMethod;
 
 type JsonObject = serde_json::Map<String, serde_json::Value>;
 

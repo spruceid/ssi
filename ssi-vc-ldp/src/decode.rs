@@ -1,23 +1,28 @@
 // pub mod rdf;
-use std::hash::Hash;
+use crate::{
+    suite::{CryptographicSuiteInput, HashError, TransformError},
+    CryptographicSuite, DataIntegrity, LinkedDataInput, Proof,
+};
 use futures::Future;
 use iref::Iri;
-use linked_data::{FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource, LinkedDataSubject, IntoQuadsError, RdfLiteralValue, RdfLiteralType, LinkedDataGraph};
+use linked_data::{
+    FromLinkedDataError, IntoQuadsError, LinkedDataDeserializeSubject, LinkedDataGraph,
+    LinkedDataResource, LinkedDataSubject, RdfLiteralType, RdfLiteralValue,
+};
 use rdf_types::{
-    Triple, VocabularyMut, Vocabulary, IriVocabularyMut, InterpretationMut, IriInterpretationMut, BlankIdInterpretationMut, LiteralInterpretationMut, LiteralVocabularyMut, Interpretation, Generator, interpretation,
+    interpretation, BlankIdInterpretationMut, Generator, Interpretation, InterpretationMut,
+    IriInterpretationMut, IriVocabularyMut, LiteralInterpretationMut, LiteralVocabularyMut, Triple,
+    Vocabulary, VocabularyMut,
 };
 use ssi_vc::Verifiable;
 use static_iref::iri;
-use crate::{
-    suite::{CryptographicSuiteInput, HashError, TransformError},
-    CryptographicSuite, DataIntegrity, Proof, LinkedDataInput,
-};
+use std::hash::Hash;
 
-pub mod from_json_ld;
 pub mod deserialized_from_json_ld;
+pub mod from_json_ld;
 
-pub use from_json_ld::JsonLdInput;
 pub use deserialized_from_json_ld::DeserializedJsonLdInput;
+pub use from_json_ld::JsonLdInput;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError<I> {
@@ -47,9 +52,9 @@ pub enum DecodeError<I> {
 
     #[error("hash failed: {0}")]
     HashFailed(#[from] HashError),
-    
+
     #[error(transparent)]
-    Input(I)
+    Input(I),
 }
 
 impl<I> DecodeError<I> {
@@ -64,7 +69,7 @@ impl<I> DecodeError<I> {
             Self::InvalidCredential(e) => DecodeError::InvalidCredential(e),
             Self::Transform(e) => DecodeError::Transform(e),
             Self::HashFailed(e) => DecodeError::HashFailed(e),
-            Self::Input(e) => DecodeError::Input(f(e))
+            Self::Input(e) => DecodeError::Input(f(e)),
         }
     }
 }
@@ -75,7 +80,7 @@ const PROOF_IRI: &Iri = iri!("https://w3id.org/security#proof");
 const PROOF_VALUE_IRI: &Iri = iri!("https://w3id.org/security#proofValue");
 
 /// Data-Integrity input document.
-/// 
+///
 /// This trait is implemented by any type that represents a Data-Integrity
 /// credential or presentation with the embedded proof. It provides a method to
 /// extract the Data-Integrity proof from the document.
@@ -83,21 +88,28 @@ pub trait DataIntegrityInput<I: Interpretation = (), V: Vocabulary = ()> {
     type Error;
 
     type Data;
-    
+
     type Proof: LinkedDataGraph<I, V> + LinkedDataResource<I, V>;
 
-    type ExtractProof<'a>: 'a + Future<Output = Result<(Self::Data, Self::Proof), DecodeError<Self::Error>>> where Self: 'a, V: 'a, I: 'a;
+    type ExtractProof<'a>: 'a
+        + Future<Output = Result<(Self::Data, Self::Proof), DecodeError<Self::Error>>>
+    where
+        Self: 'a,
+        V: 'a,
+        I: 'a;
 
     fn extract_proof<'a>(
         self,
         vocabulary: &'a mut V,
-        interpretation: &'a mut I
-    ) -> Self::ExtractProof<'a> where Self: 'a;
+        interpretation: &'a mut I,
+    ) -> Self::ExtractProof<'a>
+    where
+        Self: 'a;
 }
 
 impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     /// Imports a Data Integrity credential or presentation.
-    /// 
+    ///
     /// This will extract the Data Integrity proof embedded in the input,
     /// decode the proof graph into a `Proof<S>` value and finally hash the
     /// proof-less input using the correct cryptographic suite. The result is a
@@ -110,17 +122,18 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     where
         Proof<S>: LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
         S: CryptographicSuiteInput<T, X>,
-        U: DataIntegrityInput<interpretation::WithGenerator<G>, Data = T>
+        U: DataIntegrityInput<interpretation::WithGenerator<G>, Data = T>,
     {
         Self::from_linked_data_with(
             LinkedDataInput::from_generator(generator),
             input,
-            make_context
-        ).await
+            make_context,
+        )
+        .await
     }
 
     /// Imports a Data Integrity credential or presentation.
-    /// 
+    ///
     /// This will extract the Data Integrity proof embedded in the input,
     /// decode the proof graph into a `Proof<S>` value and finally hash the
     /// proof-less input using the correct cryptographic suite. The result is a
@@ -144,27 +157,30 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         V::LanguageTag: Clone,
         Proof<S>: LinkedDataDeserializeSubject<I, V>,
         S: CryptographicSuiteInput<T, X>,
-        U: DataIntegrityInput<I, V, Data = T>
+        U: DataIntegrityInput<I, V, Data = T>,
     {
         // Extract the proof.
-        let (data, proof) = input.extract_proof(&mut ld_context.vocabulary, &mut ld_context.interpretation).await?;
+        let (data, proof) = input
+            .extract_proof(&mut ld_context.vocabulary, &mut ld_context.interpretation)
+            .await?;
 
         // Turn the proof into RDF quads.
         let (proof_graph_id, quads) = linked_data::to_interpreted_graph_quads(
             &mut ld_context.vocabulary,
             &mut ld_context.interpretation,
-            &proof
-        ).map_err(DecodeError::InvalidLinkedData)?;
+            &proof,
+        )
+        .map_err(DecodeError::InvalidLinkedData)?;
 
         // Organize the quads.
-        let mut dataset: HashDataset<I::Resource> = quads
-            .into_iter()
-            .collect();
+        let mut dataset: HashDataset<I::Resource> = quads.into_iter().collect();
 
         // Process the proof graph.
         match dataset.remove_graph(&proof_graph_id) {
             Some(proof_graph) => {
-                let proof_value_property = ld_context.interpretation.interpret_iri(ld_context.vocabulary.insert(PROOF_VALUE_IRI));
+                let proof_value_property = ld_context
+                    .interpretation
+                    .interpret_iri(ld_context.vocabulary.insert(PROOF_VALUE_IRI));
                 match proof_graph.any_match(Triple(None, Some(&proof_value_property), None)) {
                     Some(Triple(proof_id, _, _)) => {
                         let proof = Proof::deserialize_subject(
@@ -172,13 +188,14 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
                             &mut ld_context.interpretation,
                             &dataset,
                             &proof_graph,
-                            &proof_id
+                            &proof_id,
                         )
                         .map_err(DecodeError::InvalidProof)?;
-                        
+
                         let transformed = proof
                             .suite()
-                            .transform(&data, make_context(ld_context), proof.configuration()).await
+                            .transform(&data, make_context(ld_context), proof.configuration())
+                            .await
                             .map_err(DecodeError::Transform)?;
                         let hashed = proof.suite().hash(transformed, proof.configuration())?;
 
@@ -187,23 +204,19 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
                             proof,
                         ))
                     }
-                    None => {
-                        Err(DecodeError::MissingProofValue)
-                    }
+                    None => Err(DecodeError::MissingProofValue),
                 }
             }
-            None => {
-                Err(DecodeError::MissingProofGraph)
-            }
+            None => Err(DecodeError::MissingProofGraph),
         }
     }
 
     /// Imports a Data Integrity credential from a JSON-LD document.
-    /// 
+    ///
     /// This will expand the input document, put it in canonical form, give a
     /// name to all anonymous nodes using `generator` and finally call the
     /// `from_linked_data` function.
-    /// 
+    ///
     /// The JSON-LD expansion algorithm is called with the [`Strictest`] key
     /// expansion policy. If it fails to expand a key in the input document,
     /// it will not be ignored and the whole process will fail.
@@ -223,22 +236,23 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         //      avoided until `async fn` in traits are stabilized.
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send
+        L::ContextError: Send,
     {
         Self::deserialize_from_json_ld_with(
             LinkedDataInput::from_generator(generator),
             loader,
             document,
-            make_context
-        ).await
+            make_context,
+        )
+        .await
     }
-    
+
     /// Imports a Data Integrity credential from a JSON-LD document.
-    /// 
+    ///
     /// This will expand the input document, put it in canonical form, give a
     /// name to all anonymous nodes using `generator` and finally call the
     /// `from_linked_data` function.
-    /// 
+    ///
     /// The JSON-LD expansion algorithm is called with the [`Strictest`] key
     /// expansion policy. If it fails to expand a key in the input document,
     /// it will not be ignored and the whole process will fail.
@@ -272,23 +286,24 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         V::BlankId: Send + Sync,
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send
+        L::ContextError: Send,
     {
         Self::from_linked_data_with(
             ld_context,
             DeserializedJsonLdInput::new(loader, document),
-            make_context
-        ).await
+            make_context,
+        )
+        .await
     }
 }
 
 impl<S: CryptographicSuite> DataIntegrity<json_ld::Document, S> {
     /// Imports a Data Integrity credential from a JSON-LD document.
-    /// 
+    ///
     /// This will expand the input document, put it in canonical form, give a
     /// name to all anonymous nodes using `generator` and finally call the
     /// `from_linked_data` function.
-    /// 
+    ///
     /// The JSON-LD expansion algorithm is called with the [`Strictest`] key
     /// expansion policy. If it fails to expand a key in the input document,
     /// it will not be ignored and the whole process will fail.
@@ -307,24 +322,25 @@ impl<S: CryptographicSuite> DataIntegrity<json_ld::Document, S> {
         //      avoided until `async fn` in traits are stabilized.
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send
+        L::ContextError: Send,
     {
         Self::from_json_ld_with(
             LinkedDataInput::new((), interpretation::WithGenerator::new((), generator)),
             loader,
             document,
-            make_context
-        ).await
+            make_context,
+        )
+        .await
     }
 }
 
 impl<Iri, B, S: CryptographicSuite> DataIntegrity<json_ld::Document<Iri, B>, S> {
     /// Imports a Data Integrity credential from a JSON-LD document.
-    /// 
+    ///
     /// This will expand the input document, put it in canonical form, give a
     /// name to all anonymous nodes using `generator` and finally call the
     /// `from_linked_data` function.
-    /// 
+    ///
     /// The JSON-LD expansion algorithm is called with the [`Strictest`] key
     /// expansion policy. If it fails to expand a key in the input document,
     /// it will not be ignored and the whole process will fail.
@@ -357,12 +373,9 @@ impl<Iri, B, S: CryptographicSuite> DataIntegrity<json_ld::Document<Iri, B>, S> 
         B: Send + Sync,
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send
+        L::ContextError: Send,
     {
-        Self::from_linked_data_with(
-            ld_context,
-            JsonLdInput::new(loader, document),
-            make_context
-        ).await
+        Self::from_linked_data_with(ld_context, JsonLdInput::new(loader, document), make_context)
+            .await
     }
 }

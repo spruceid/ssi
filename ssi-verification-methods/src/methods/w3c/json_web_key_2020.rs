@@ -19,7 +19,17 @@ pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
 /// See: <https://w3c-ccg.github.io/lds-jws2020/#json-web-key-2020>
 ///
 /// [1]: <https://w3c-ccg.github.io/lds-jws2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "JsonWebKey2020")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:JsonWebKey2020")]

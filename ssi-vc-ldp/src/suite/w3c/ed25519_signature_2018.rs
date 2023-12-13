@@ -14,7 +14,7 @@ pub use verification::method::Ed25519VerificationKey2018;
 pub struct Ed25519Signature2018;
 
 impl Ed25519Signature2018 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#Ed25519Signature2018");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Ed25519Signature2018");
 }
 
 impl_rdf_input_urdna2015!(Ed25519Signature2018);

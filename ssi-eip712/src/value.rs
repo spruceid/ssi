@@ -1,3 +1,4 @@
+use core::fmt;
 use indexmap::{Equivalent, IndexMap};
 use linked_data::{
     LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
@@ -5,7 +6,6 @@ use linked_data::{
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
-use core::fmt;
 use std::hash::Hash;
 
 use crate::StructName;
@@ -92,7 +92,7 @@ pub enum ValueKind {
     Array,
     Struct,
     Bool,
-    Integer
+    Integer,
 }
 
 impl ValueKind {
@@ -103,7 +103,7 @@ impl ValueKind {
             Self::Array => "array",
             Self::Struct => "struct",
             Self::Bool => "bool",
-            Self::Integer => "integer"
+            Self::Integer => "integer",
         }
     }
 
@@ -137,7 +137,7 @@ impl Value {
             Self::Array(_) => ValueKind::Array,
             Self::Struct(_) => ValueKind::Struct,
             Self::Bool(_) => ValueKind::Bool,
-            Self::Integer(_) => ValueKind::Integer
+            Self::Integer(_) => ValueKind::Integer,
         }
     }
 

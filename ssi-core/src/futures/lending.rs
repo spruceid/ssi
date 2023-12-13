@@ -10,15 +10,19 @@ pub struct LendingMutFuture<T, R: Lending> {
     t: T,
     ptr: R::Ptr,
 
-	/// Flag to make sure the `t` future is not polled again after completion
-	/// so that the lent references are not touched ever again.
-	is_done: bool
+    /// Flag to make sure the `t` future is not polled again after completion
+    /// so that the lent references are not touched ever again.
+    is_done: bool,
 }
 
 impl<T, R: Lending> LendingMutFuture<T, R> {
     pub fn new(mut r: R, t: impl FnOnce(R) -> T) -> Self {
         let ptr = r.as_mut_ptr();
-        Self { t: t(r), ptr, is_done: false }
+        Self {
+            t: t(r),
+            ptr,
+            is_done: false,
+        }
     }
 }
 
@@ -27,16 +31,16 @@ impl<T: Future, R: Lending> Future for LendingMutFuture<T, R> {
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         let this = self.project();
-		
-		if *this.is_done {
-			panic!("polled completed future")
-		} else {
-			this.t.poll(cx).map(|output| {
-				*this.is_done = true;
-				let r = unsafe { R::from_mut_ptr(*this.ptr) };
-				(output, r)
-			})
-		}
+
+        if *this.is_done {
+            panic!("polled completed future")
+        } else {
+            this.t.poll(cx).map(|output| {
+                *this.is_done = true;
+                let r = unsafe { R::from_mut_ptr(*this.ptr) };
+                (output, r)
+            })
+        }
     }
 }
 

@@ -1,17 +1,17 @@
 use educe::Educe;
 use pin_project::pin_project;
-use ssi_core::futures::{UnboundedRefFuture, RefFutureBinder, SelfRefFuture};
+use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use std::marker::PhantomData;
 use std::ops::Deref;
-use std::{future::Future, task, pin::Pin};
+use std::{future::Future, pin::Pin, task};
 use suite::{HashError, TransformError};
 
 mod decode;
+pub mod eip712;
 mod proof;
 pub mod signing;
 pub mod suite;
 pub mod verification;
-pub mod eip712;
 
 pub use decode::*;
 pub use proof::*;
@@ -49,10 +49,12 @@ pub struct BuildDataIntegrity<'a, T: 'a, S: 'a + CryptographicSuiteInput<T, X>, 
     params: ProofConfigurationRef<'a, S::VerificationMethod, S::Options>,
 
     #[pin]
-    transform: SelfRefFuture<'a, UnboundedTransform<T, X, S>>
+    transform: SelfRefFuture<'a, UnboundedTransform<T, X, S>>,
 }
 
-impl<'a, T: 'a, S: 'a + CryptographicSuiteInput<T, X>, X: 'a> Future for BuildDataIntegrity<'a, T, S, X> {
+impl<'a, T: 'a, S: 'a + CryptographicSuiteInput<T, X>, X: 'a> Future
+    for BuildDataIntegrity<'a, T, S, X>
+{
     type Output = Result<DataIntegrity<T, S>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
@@ -63,10 +65,7 @@ impl<'a, T: 'a, S: 'a + CryptographicSuiteInput<T, X>, X: 'a> Future for BuildDa
             task::Poll::Ready((Ok(transformed), input)) => {
                 match this.suite.hash(transformed, *this.params) {
                     Err(e) => task::Poll::Ready(Err(Error::HashFailed(e))),
-                    Ok(hashed) => task::Poll::Ready(Ok(DataIntegrity::new_hashed(
-                        input,
-                        hashed
-                    )))
+                    Ok(hashed) => task::Poll::Ready(Ok(DataIntegrity::new_hashed(input, hashed))),
                 }
             }
         }
@@ -93,11 +92,14 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
             suite,
             params,
             // input: Some(input),
-            transform: SelfRefFuture::new(input, TransformParameters {
-                suite,
-                context,
-                params
-            })
+            transform: SelfRefFuture::new(
+                input,
+                TransformParameters {
+                    suite,
+                    context,
+                    params,
+                },
+            ),
         }
     }
 
@@ -127,6 +129,19 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
     pub fn into_parts(self) -> (T, S::Hashed) {
         (self.value, self.hash)
     }
+
+    pub fn map<'a, 'c: 'a, U: 'a, X: 'a>(
+        self,
+        context: X,
+        suite: &'a S,
+        params: ProofConfigurationRef<'c, S::VerificationMethod, S::Options>,
+        f: impl FnOnce(T) -> U,
+    ) -> BuildDataIntegrity<'a, U, S, X>
+    where
+        S: CryptographicSuiteInput<U, X>,
+    {
+        DataIntegrity::new(f(self.value), context, suite, params)
+    }
 }
 
 impl<T, S: CryptographicSuite> Deref for DataIntegrity<T, S> {
@@ -139,7 +154,9 @@ impl<T, S: CryptographicSuite> Deref for DataIntegrity<T, S> {
 
 struct UnboundedTransform<T, X, S>(PhantomData<(T, X, S)>);
 
-impl<'max, T: 'max, X: 'max, S: 'max + CryptographicSuiteInput<T, X>> UnboundedRefFuture<'max> for UnboundedTransform<T, X, S> {
+impl<'max, T: 'max, X: 'max, S: 'max + CryptographicSuiteInput<T, X>> UnboundedRefFuture<'max>
+    for UnboundedTransform<T, X, S>
+{
     type Bound<'a> = S::Transform<'a> where 'max: 'a;
 
     type Owned = T;
@@ -153,11 +170,15 @@ struct TransformParameters<'a, X, S: CryptographicSuite> {
     params: ProofConfigurationRef<'a, S::VerificationMethod, S::Options>,
 }
 
-impl<'max, T: 'max, X: 'max, S: 'max + CryptographicSuiteInput<T, X>> RefFutureBinder<'max, UnboundedTransform<T, X, S>> for TransformParameters<'max, X, S> {
+impl<'max, T: 'max, X: 'max, S: 'max + CryptographicSuiteInput<T, X>>
+    RefFutureBinder<'max, UnboundedTransform<T, X, S>> for TransformParameters<'max, X, S>
+{
     fn bind<'a>(context: Self, value: &'a T) -> S::Transform<'a>
-        where
-            'max: 'a
+    where
+        'max: 'a,
     {
-        context.suite.transform(value, context.context, context.params)
+        context
+            .suite
+            .transform(value, context.context, context.params)
     }
 }

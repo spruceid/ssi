@@ -69,7 +69,7 @@ impl Error {
             Self::InvalidData(_) => ErrorKind::InvalidData,
             Self::InvalidMethodSpecificId(_) => ErrorKind::InvalidMethodSpecificId,
             Self::InvalidOptions => ErrorKind::InvalidOptions,
-            Self::Internal(_) => ErrorKind::Internal
+            Self::Internal(_) => ErrorKind::Internal,
         }
     }
 }
@@ -90,7 +90,7 @@ pub enum ErrorKind {
     InvalidData,
     InvalidMethodSpecificId,
     InvalidOptions,
-    Internal
+    Internal,
 }
 
 #[pin_project]

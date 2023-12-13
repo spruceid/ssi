@@ -17,7 +17,17 @@ use crate::{
 pub const EIP712_METHOD_2021_TYPE: &str = "Eip712Method2021";
 
 /// `Eip712Method2021`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "Eip712Method2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Eip712Method2021")]

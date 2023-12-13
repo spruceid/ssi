@@ -19,7 +19,17 @@ pub const ED25519_VERIFICATION_KEY_2020_TYPE: &str = "Ed25519VerificationKey2020
 /// Deprecated verification method for the `Ed25519Signature2020` suite.
 ///
 /// See: <https://w3c.github.io/vc-di-eddsa/#ed25519verificationkey2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "Ed25519VerificationKey2020")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Ed25519VerificationKey2020")]
@@ -162,13 +172,15 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
-    
+
     fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
 }
 
-impl SigningMethod<ed25519_dalek::Keypair, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2020 {
+impl SigningMethod<ed25519_dalek::Keypair, ssi_jwk::algorithm::EdDSA>
+    for Ed25519VerificationKey2020
+{
     fn sign_bytes_ref(
         this: &Self,
         secret: &ed25519_dalek::Keypair,

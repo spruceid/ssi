@@ -1,8 +1,13 @@
 use core::fmt;
 use linked_data::{
-    rdf_types::{RDF_LANG_STRING, Interpretation, Vocabulary, IriVocabulary, IriVocabularyMut, LanguageTagVocabulary, LiteralVocabulary, ReverseIriInterpretation, ReverseLiteralInterpretation, literal},
-    LinkedDataPredicateObjects, LinkedDataSubject, RdfLiteral, LinkedDataDeserializeSubject,
-    grdf, FromLinkedDataError, Context
+    grdf,
+    rdf_types::{
+        literal, Interpretation, IriVocabulary, IriVocabularyMut, LanguageTagVocabulary,
+        LiteralVocabulary, ReverseIriInterpretation, ReverseLiteralInterpretation, Vocabulary,
+        RDF_LANG_STRING,
+    },
+    Context, FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataPredicateObjects,
+    LinkedDataSubject, RdfLiteral,
 };
 use serde::{Deserialize, Serialize};
 use std::{ops::Deref, str::FromStr};
@@ -17,9 +22,9 @@ use crate::MULTIBASE;
 pub struct Multibase(str);
 
 impl Multibase {
-	pub fn new(value: &str) -> &Self {
-		unsafe { std::mem::transmute(value) }
-	}
+    pub fn new(value: &str) -> &Self {
+        unsafe { std::mem::transmute(value) }
+    }
 
     pub fn as_str(&self) -> &str {
         &self.0
@@ -44,7 +49,7 @@ impl fmt::Display for Multibase {
 
 impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V> for Multibase
 where
-	V: IriVocabularyMut
+    V: IriVocabularyMut,
 {
     fn interpretation(
         &self,
@@ -54,16 +59,16 @@ where
         use linked_data::{rdf_types::Term, CowRdfTerm, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Any(
-				self.0.to_owned(),
-				literal::Type::Any(vocabulary.insert(MULTIBASE))
-			),
+                self.0.to_owned(),
+                literal::Type::Any(vocabulary.insert(MULTIBASE)),
+            ),
         ))))
     }
 }
 
 impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for Multibase
 where
-	V: IriVocabularyMut
+    V: IriVocabularyMut,
 {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
@@ -97,9 +102,9 @@ impl MultibaseBuf {
         Self(multibase::encode(base, input))
     }
 
-	pub fn as_multibase(&self) -> &Multibase {
-		Multibase::new(self.0.as_str())
-	}
+    pub fn as_multibase(&self) -> &Multibase {
+        Multibase::new(self.0.as_str())
+    }
 }
 
 impl FromStr for MultibaseBuf {
@@ -130,10 +135,9 @@ impl fmt::Display for MultibaseBuf {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V>
-    for MultibaseBuf
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V> for MultibaseBuf
 where
-	V: IriVocabularyMut
+    V: IriVocabularyMut,
 {
     fn interpretation(
         &self,
@@ -143,16 +147,16 @@ where
         use linked_data::{rdf_types::Term, CowRdfTerm, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Any(
-				self.0.to_owned(),
-				literal::Type::Any(vocabulary.insert(MULTIBASE))
-			),
+                self.0.to_owned(),
+                literal::Type::Any(vocabulary.insert(MULTIBASE)),
+            ),
         ))))
     }
 }
 
 impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for MultibaseBuf
 where
-	V: IriVocabularyMut
+    V: IriVocabularyMut,
 {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
@@ -174,12 +178,11 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for MultibaseBuf 
 
 impl<V: Vocabulary, I> LinkedDataDeserializeSubject<I, V> for MultibaseBuf
 where
-    V: LiteralVocabulary<Type = literal::Type<
-        <V as IriVocabulary>::Iri,
-        <V as LanguageTagVocabulary>::LanguageTag,
-    >>,
+    V: LiteralVocabulary<
+        Type = literal::Type<<V as IriVocabulary>::Iri, <V as LanguageTagVocabulary>::LanguageTag>,
+    >,
     V::Value: AsRef<str>,
-    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>
+    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
 {
     fn deserialize_subject_in<D>(
         vocabulary: &V,
@@ -187,7 +190,7 @@ where
         _dataset: &D,
         _graph: &D::Graph,
         resource: &<I as Interpretation>::Resource,
-        context: Context<I>
+        context: Context<I>,
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         D: grdf::Dataset<
@@ -195,7 +198,7 @@ where
             Predicate = <I as Interpretation>::Resource,
             Object = <I as Interpretation>::Resource,
             GraphLabel = <I as Interpretation>::Resource,
-        >
+        >,
     {
         let mut literal_ty = None;
         for l in interpretation.literals_of(resource) {
@@ -207,32 +210,26 @@ where
                         return match l.value().as_ref().parse() {
                             Ok(value) => Ok(value),
                             Err(_) => Err(FromLinkedDataError::InvalidLiteral(
-                                context.into_iris(vocabulary, interpretation)
-                            ))
-                        }
+                                context.into_iris(vocabulary, interpretation),
+                            )),
+                        };
                     }
 
                     literal_ty = Some(ty_iri)
                 }
-                literal::Type::LangString(_) => {
-                    literal_ty = Some(RDF_LANG_STRING)
-                }
+                literal::Type::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
             }
         }
 
         match literal_ty {
-            Some(ty) => {
-                Err(FromLinkedDataError::LiteralTypeMismatch {
-                    context: context.into_iris(vocabulary, interpretation),
-                    expected: Some(MULTIBASE.to_owned()),
-                    found: ty.to_owned()
-                })
-            }
-            None => {
-                Err(FromLinkedDataError::ExpectedLiteral(
-                    context.into_iris(vocabulary, interpretation)
-                ))
-            }
+            Some(ty) => Err(FromLinkedDataError::LiteralTypeMismatch {
+                context: context.into_iris(vocabulary, interpretation),
+                expected: Some(MULTIBASE.to_owned()),
+                found: ty.to_owned(),
+            }),
+            None => Err(FromLinkedDataError::ExpectedLiteral(
+                context.into_iris(vocabulary, interpretation),
+            )),
         }
     }
 }

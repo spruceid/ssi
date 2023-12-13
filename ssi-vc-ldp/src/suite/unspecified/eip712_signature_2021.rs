@@ -1,16 +1,18 @@
 //! EIP-712 Signature 2021 implementation.
 use rdf_types::Quad;
 use ssi_crypto::MessageSigner;
+use ssi_rdf::NQuadsStatement;
 use ssi_verification_methods::{
+    ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
     Eip712Method2021, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
+    eip712::{Eip712Sign, Eip712Signature, Eip712SignatureRef},
     suite::{HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
-    eip712::{Eip712Signature, Eip712SignatureRef, Eip712Sign}, LinkedDataInput
+    CryptographicSuite, CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
 };
 
 /// EIP-712 Signature 2021.
@@ -37,7 +39,7 @@ use crate::{
 ///
 /// # Signature algorithm
 ///
-/// The hashed input is signed using the `ECDSA K-256` signature algorithm.
+/// The hashed input is signed using the `ECDSA KeccakK` signature algorithm.
 ///
 /// # Verification methods
 ///
@@ -50,7 +52,7 @@ use crate::{
 pub struct Eip712Signature2021;
 
 impl Eip712Signature2021 {
-    pub const IRI: &iref::Iri = iri!("https://w3id.org/security#Eip712Signature2021");
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Eip712Signature2021");
 }
 
 verification_method_union! {
@@ -62,18 +64,34 @@ verification_method_union! {
 }
 
 impl<'a> VerificationMethodRef<'a> {
-    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyES256K {
+    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyESKeccakK {
         match self {
-            Self::EcdsaSecp256k1VerificationKey2019(_) => ssi_jwk::algorithm::AnyES256K::ES256K,
-            Self::Eip712Method2021(_) | Self::EcdsaSecp256k1RecoveryMethod2020(_) => ssi_jwk::algorithm::AnyES256K::ES256KR
+            Self::EcdsaSecp256k1VerificationKey2019(_) => {
+                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakK
+            }
+            Self::Eip712Method2021(_) | Self::EcdsaSecp256k1RecoveryMethod2020(_) => {
+                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakKR
+            }
         }
     }
 
-    pub fn verify_bytes(&self, signing_bytes: &[u8], signature_bytes: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        signing_bytes: &[u8],
+        signature_bytes: &[u8],
+    ) -> Result<bool, VerificationError> {
         match self {
             Self::Eip712Method2021(m) => m.verify_bytes(signing_bytes, signature_bytes),
-            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(signing_bytes, signature_bytes),
-            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(signing_bytes, signature_bytes)
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
+                signing_bytes,
+                signature_bytes,
+                ecdsa_secp_256k1_verification_key_2019::DigestFunction::Keccack,
+            ),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(
+                signing_bytes,
+                signature_bytes,
+                ecdsa_secp_256k1_recovery_method_2020::DigestFunction::Keccack,
+            ),
         }
     }
 }
@@ -81,7 +99,7 @@ impl<'a> VerificationMethodRef<'a> {
 impl CryptographicSuite for Eip712Signature2021 {
     type Transformed = ssi_eip712::TypedData;
 
-    type Hashed = [u8; 32];
+    type Hashed = [u8; 66];
 
     type VerificationMethod = VerificationMethod;
 
@@ -91,7 +109,7 @@ impl CryptographicSuite for Eip712Signature2021 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = ();
 
@@ -109,7 +127,7 @@ impl CryptographicSuite for Eip712Signature2021 {
         data: ssi_eip712::TypedData,
         _proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
-        data.hash()
+        data.encode()
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
     }
 
@@ -136,7 +154,10 @@ where
         data: &'t T,
         context: LinkedDataInput<I, V>,
         options: ProofConfigurationRef<'c, VerificationMethod>,
-    ) -> Self::Transform<'t> where LinkedDataInput<I, V>: 't {
+    ) -> Self::Transform<'t>
+    where
+        LinkedDataInput<I, V>: 't,
+    {
         std::future::ready(transform(self, data, context, options))
     }
 }
@@ -149,14 +170,16 @@ fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>(
 ) -> Result<ssi_eip712::TypedData, TransformError>
 where
     I: rdf_types::interpretation::InterpretationMut<V>
-    + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
-    + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-    + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+        + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+        + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
+        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
     T: linked_data::LinkedData<I, V>,
 {
     let document_quads = context.into_quads(data)?;
-    let document_quads: Vec<_> = ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref())).collect();
+    let document_quads: Vec<_> =
+        ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref()))
+            .collect();
     let proof_quads = options.quads(suite);
     Ok(new_ldp_siging_request(document_quads, proof_quads))
 }
@@ -181,10 +204,13 @@ where
 /// }
 /// ```
 pub fn new_ldp_siging_request(
-    document: Vec<Quad>,
-    proof_configuration: Vec<Quad>,
+    mut document: Vec<Quad>,
+    mut proof_configuration: Vec<Quad>,
 ) -> ssi_eip712::TypedData {
     use ssi_eip712::{TypeRef, Value};
+
+    document.sort_by_cached_key(|x| NQuadsStatement(x).to_string());
+    proof_configuration.sort_by_cached_key(|x| NQuadsStatement(x).to_string());
 
     let types = ssi_eip712::Types {
         eip712_domain: ssi_eip712::TypeDefinition::new(vec![ssi_eip712::MemberVariable {
@@ -266,7 +292,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = ();
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyES256K;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm>> = Eip712Sign<'a, S>;
 

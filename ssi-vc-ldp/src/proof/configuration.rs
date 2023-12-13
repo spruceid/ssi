@@ -2,7 +2,7 @@ use chrono::Timelike;
 use educe::Educe;
 use iref::Iri;
 use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
-use rdf_types::{Quad, interpretation, generator};
+use rdf_types::{generator, interpretation, Quad};
 use serde::{Deserialize, Serialize};
 use ssi_verification_methods::{ProofPurpose, Referencable, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
@@ -148,12 +148,15 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
     }
 
     /// Apply covariance rules to shorten the `'a` lifetime.
-    pub fn shorten_lifetime<'b>(self) -> ProofConfigurationRef<'b, M, O> where 'a: 'b {
+    pub fn shorten_lifetime<'b>(self) -> ProofConfigurationRef<'b, M, O>
+    where
+        'a: 'b,
+    {
         ProofConfigurationRef {
             created: self.created,
             verification_method: self.verification_method.shorten_lifetime(),
             proof_purpose: self.proof_purpose,
-            options: O::apply_covariance(self.options)
+            options: O::apply_covariance(self.options),
         }
     }
 
@@ -174,6 +177,18 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         ))
     }
 
+    pub fn map_options<P: 'a + Referencable>(
+        self,
+        f: impl FnOnce(O::Reference<'a>) -> P::Reference<'a>,
+    ) -> ProofConfigurationRef<'a, M, P> {
+        ProofConfigurationRef::new(
+            self.created,
+            self.verification_method,
+            self.proof_purpose,
+            f(self.options),
+        )
+    }
+
     pub fn map_verification_method<N: 'a + Referencable, P: 'a + Referencable>(
         self,
         f: impl FnOnce(
@@ -190,7 +205,12 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         )
     }
 
-    pub fn try_cast_verification_method<N: 'a + Referencable, P: 'a + Referencable, MError, OError>(
+    pub fn try_cast_verification_method<
+        N: 'a + Referencable,
+        P: 'a + Referencable,
+        MError,
+        OError,
+    >(
         self,
     ) -> Result<ProofConfigurationRef<'a, N, P>, ProofConfigurationCastError<MError, OError>>
     where
@@ -227,14 +247,15 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
             created: self.created,
             verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
-            options: ()
+            options: (),
         }
     }
 
     /// Returns the quads of the proof configuration, in canonical form.
     pub fn quads<T: CryptographicSuite>(&self, suite: &T) -> Vec<Quad>
     where
-        M::Reference<'a>: LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
+        M::Reference<'a>:
+            LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
         O::Reference<'a>: LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
     {
         let generator =

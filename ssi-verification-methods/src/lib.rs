@@ -216,7 +216,12 @@ pub trait SigningMethod<S, A: Copy>: VerificationMethod + Referencable {
         protocol.encode_signature(algorithm, signed_bytes)
     }
 
-    fn sign_bytes(&self, secret: &S, algorithm: A, bytes: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+    fn sign_bytes(
+        &self,
+        secret: &S,
+        algorithm: A,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         Self::sign_bytes_ref(self.as_reference(), secret, algorithm, bytes)
     }
 
@@ -239,8 +244,8 @@ impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
     }
 }
 
-impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMethod<S, A>, S> MessageSigner<A, P>
-    for MethodWithSecret<'m, 's, M, S>
+impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMethod<S, A>, S>
+    MessageSigner<A, P> for MethodWithSecret<'m, 's, M, S>
 {
     type Sign<'a> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where
     Self: 'a,
@@ -253,7 +258,13 @@ impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMet
         A: 'a,
         P: 'a,
     {
-        std::future::ready(M::sign_ref(self.method, self.secret, algorithm, protocol, message))
+        std::future::ready(M::sign_ref(
+            self.method,
+            self.secret,
+            algorithm,
+            protocol,
+            message,
+        ))
     }
 }
 

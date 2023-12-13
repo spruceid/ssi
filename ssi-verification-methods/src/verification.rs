@@ -35,7 +35,6 @@ pub enum VerificationError {
     // /// The verification key is not the same as the signing key.
     // #[error("key mismatch")]
     // KeyMismatch,
-
     /// Key not found.
     #[error("unknown key")]
     UnknownKey,

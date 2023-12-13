@@ -25,7 +25,17 @@ pub const ALEO_METHOD_2021_TYPE: &str = "AleoMethod2021";
 /// network id "1" (CAIP-2 "aleo:1" / [Aleo Testnet I][testnet1]) is supported. The account
 /// address format is documented in [Aleo
 /// documentation](https://developer.aleo.org/aleo/concepts/accounts#account-address).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "AleoMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:AleoMethod2021")]

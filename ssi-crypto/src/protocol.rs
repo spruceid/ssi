@@ -24,7 +24,11 @@ pub trait SignatureProtocol<A> {
         Cow::Borrowed(bytes)
     }
 
-    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(signature)
     }
 
@@ -73,7 +77,11 @@ impl Base58BtcMultibase {
 }
 
 impl<A> SignatureProtocol<A> for Base58BtcMultibase {
-    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(Self::encode_signature(&signature))
     }
 
@@ -108,7 +116,11 @@ impl Base58Btc {
 impl<A> SignatureProtocol<A> for Base58Btc {
     /// Encode the signature in base58 (bitcoin alphabet) as required by this
     /// protocol.
-    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(Self::encode_signature(&signature))
     }
 
@@ -144,11 +156,11 @@ impl EthereumWallet {
 
         // Encode without the recovery ID.
         hex::encode_to_slice(&signature[..64], &mut result[2..130]).unwrap();
-        
+
         // Encode the recovery ID, offset by 27.
         let rec_id = signature[64] + 27;
         hex::encode_to_slice(std::slice::from_ref(&rec_id), &mut result[130..]).unwrap();
-        
+
         // Send back the result.
         result
     }
@@ -157,7 +169,7 @@ impl EthereumWallet {
         let hex = encoded_signature
             .strip_prefix(b"0x")
             .ok_or(InvalidProtocolSignature)?;
-        
+
         let mut signature = hex::decode(hex).map_err(|_| InvalidProtocolSignature)?;
         signature[64] -= 27; // Offset the recovery ID by -27.
 
@@ -170,7 +182,11 @@ impl<A> SignatureProtocol<A> for EthereumWallet {
         Cow::Owned(Self::prepare_message(bytes))
     }
 
-    fn encode_signature(&self, _algorithm: A, signature: Vec<u8>) -> Result<Vec<u8>, MessageSignatureError> {
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(Self::encode_signature(&signature))
     }
 

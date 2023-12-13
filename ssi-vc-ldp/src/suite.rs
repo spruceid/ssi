@@ -1,24 +1,26 @@
 //! Cryptographic suites.
-use std::{future::Future, marker::PhantomData, pin::Pin, task, convert::Infallible};
+use std::{convert::Infallible, future::Future, marker::PhantomData, pin::Pin, task};
 
 use iref::Iri;
 use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
 use pin_project::pin_project;
 use rdf_types::{
-    interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation, self},
-    ExportedFromVocabulary, Interpretation, Quad, ReverseLiteralInterpretation, Vocabulary, generator, InterpretationMut,
+    generator,
+    interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
+    ExportedFromVocabulary, Interpretation, InterpretationMut, Quad, ReverseLiteralInterpretation,
+    Vocabulary,
 };
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::urdna2015;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
-    Referencable, SignatureAlgorithm, SignatureError, VerificationError,
-    VerificationMethod, Verifier, Signer, InvalidVerificationMethod,
+    InvalidVerificationMethod, Referencable, SignatureAlgorithm, SignatureError, Signer,
+    VerificationError, VerificationMethod, Verifier,
 };
 
 use crate::{
-    signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationRef,
-    UntypedProof, UntypedProofRef, ProofConfigurationCastError,
+    signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationCastError,
+    ProofConfigurationRef, UntypedProof, UntypedProofRef,
 };
 
 mod signatures;
@@ -61,14 +63,18 @@ pub enum TransformError {
     InvalidVerificationMethod(InvalidVerificationMethod),
 
     #[error("internal error: `{0}`")]
-    Internal(String)
+    Internal(String),
 }
 
-impl From<ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>> for TransformError {
+impl From<ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>>
+    for TransformError
+{
     fn from(value: ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>) -> Self {
         match value {
-            ProofConfigurationCastError::VerificationMethod(e) => Self::InvalidVerificationMethod(e),
-            ProofConfigurationCastError::Options(e) => Self::InvalidProofOptions(e)
+            ProofConfigurationCastError::VerificationMethod(e) => {
+                Self::InvalidVerificationMethod(e)
+            }
+            ProofConfigurationCastError::Options(e) => Self::InvalidProofOptions(e),
         }
     }
 }
@@ -76,8 +82,10 @@ impl From<ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>
 impl From<ProofConfigurationCastError<InvalidVerificationMethod, Infallible>> for TransformError {
     fn from(value: ProofConfigurationCastError<InvalidVerificationMethod, Infallible>) -> Self {
         match value {
-            ProofConfigurationCastError::VerificationMethod(e) => Self::InvalidVerificationMethod(e),
-            ProofConfigurationCastError::Options(_) => unreachable!()
+            ProofConfigurationCastError::VerificationMethod(e) => {
+                Self::InvalidVerificationMethod(e)
+            }
+            ProofConfigurationCastError::Options(_) => unreachable!(),
         }
     }
 }
@@ -119,21 +127,17 @@ impl From<InvalidOptions> for SignatureError {
     }
 }
 
-
 pub trait FromRdfAndSuite<S> {
     // ...
 }
 
 pub trait CryptographicSuiteOptions<T>: Referencable {
     /// Prepare the options to be put in the generated proof.
-    /// 
+    ///
     /// This means filtering out options that should not appear in the proof, or
     /// adding in implicit options values used to generate the proof that should
     /// explicitly appear in the proof.
-    fn prepare(
-        &mut self,
-        _suite: &T
-    ) {
+    fn prepare(&mut self, _suite: &T) {
         // filter nothing.
     }
 }
@@ -190,7 +194,11 @@ pub trait CryptographicSuite: Sized {
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> GenerateProof<'a, Self, S>
     where
-        S: Signer<Self::VerificationMethod, Self::MessageSignatureAlgorithm, Self::SignatureProtocol>
+        S: Signer<
+            Self::VerificationMethod,
+            Self::MessageSignatureAlgorithm,
+            Self::SignatureProtocol,
+        >,
     {
         let algorithm = self.setup_signature_algorithm();
 
@@ -230,8 +238,12 @@ pub trait CryptographicSuite: Sized {
 
 struct SignBounded<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
 
-impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: 'a + Signer<M, A::MessageSignatureAlgorithm, A::Protocol>>
-    UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
+impl<
+        'a,
+        M: 'a + Referencable,
+        A: 'a + SignatureAlgorithm<M>,
+        S: 'a + Signer<M, A::MessageSignatureAlgorithm, A::Protocol>,
+    > UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
 where
     A::Signature: 'a,
 {
@@ -248,8 +260,12 @@ struct Binder<'a, A, S> {
     data: &'a [u8],
 }
 
-impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: Signer<M, A::MessageSignatureAlgorithm, A::Protocol>>
-    RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
+impl<
+        'a,
+        M: 'a + Referencable,
+        A: 'a + SignatureAlgorithm<M>,
+        S: Signer<M, A::MessageSignatureAlgorithm, A::Protocol>,
+    > RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
 where
     A::Signature: 'a,
 {
@@ -284,8 +300,11 @@ pub struct GenerateProof<
     signature: SelfRefFuture<'a, SignBounded<'a, S::VerificationMethod, S::SignatureAlgorithm, T>>,
 }
 
-impl<'a, S: CryptographicSuite, T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>> Future
-    for GenerateProof<'a, S, T>
+impl<
+        'a,
+        S: CryptographicSuite,
+        T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
+    > Future for GenerateProof<'a, S, T>
 where
     S::VerificationMethod: 'a,
 {
@@ -316,7 +335,7 @@ pub struct VerifyProof<'a, S: CryptographicSuite, V: Verifier<S::VerificationMet
 impl<'a, S: CryptographicSuite, V: 'a + Verifier<S::VerificationMethod>> Future
     for VerifyProof<'a, S, V>
 where
-    S::VerificationMethod: VerificationMethod
+    S::VerificationMethod: VerificationMethod,
 {
     type Output = Result<ProofValidity, VerificationError>;
 
@@ -327,7 +346,11 @@ where
 }
 
 pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
-    type Transform<'a>: 'a + Future<Output = Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a, C: 'a;
+    type Transform<'a>: 'a + Future<Output = Result<Self::Transformed, TransformError>>
+    where
+        Self: 'a,
+        T: 'a,
+        C: 'a;
 
     /// Transformation algorithm.
     fn transform<'a, 'c: 'a>(
@@ -335,7 +358,9 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         data: &'a T,
         context: C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Self::Transform<'a> where C: 'a;
+    ) -> Self::Transform<'a>
+    where
+        C: 'a;
 
     fn sign<'max, S>(
         self,
@@ -346,7 +371,12 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     ) -> SignLinkedData<'max, T, Self, C, S>
     where
         Self::VerificationMethod: 'max,
-        S: 'max + Signer<Self::VerificationMethod, Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+        S: 'max
+            + Signer<
+                Self::VerificationMethod,
+                Self::MessageSignatureAlgorithm,
+                Self::SignatureProtocol,
+            >,
     {
         DataIntegrity::sign(input, context, signer, self, params)
     }
@@ -359,8 +389,10 @@ fn sha256_hash<'a, T: CryptographicSuite>(
     proof_configuration: ProofConfigurationRef<'a, T::VerificationMethod, T::Options>,
 ) -> [u8; 64]
 where
-    <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
-    <T::Options as Referencable>::Reference<'a>: LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
+    <T::VerificationMethod as Referencable>::Reference<'a>:
+        LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
+    <T::Options as Referencable>::Reference<'a>:
+        LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
 {
     let generator = rdf_types::generator::Blank::new();
     let proof_config_quads = to_quads(generator, &proof_configuration.with_suite(suite)).unwrap();
@@ -380,7 +412,7 @@ where
 
 pub struct LinkedDataInput<I = (), V = ()> {
     pub vocabulary: V,
-    pub interpretation: I
+    pub interpretation: I,
 }
 
 impl Default for LinkedDataInput<interpretation::WithGenerator<rdf_types::generator::Blank>> {
@@ -393,7 +425,7 @@ impl<G> LinkedDataInput<interpretation::WithGenerator<G>> {
     pub fn from_generator(generator: G) -> Self {
         Self {
             vocabulary: (),
-            interpretation: interpretation::WithGenerator::new((), generator)
+            interpretation: interpretation::WithGenerator::new((), generator),
         }
     }
 }
@@ -404,12 +436,12 @@ where
         + ReverseIriInterpretation<Iri = V::Iri>
         + ReverseBlankIdInterpretation<BlankId = V::BlankId>
         + ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>
+    V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
 {
     pub fn new(vocabulary: V, interpretation: I) -> Self {
         Self {
             vocabulary,
-            interpretation
+            interpretation,
         }
     }
 
@@ -420,11 +452,7 @@ where
         mut self,
         input: &T,
     ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
-        linked_data::to_lexical_quads_with(
-            &mut self.vocabulary,
-            &mut self.interpretation,
-            input,
-        )
+        linked_data::to_lexical_quads_with(&mut self.vocabulary, &mut self.interpretation, input)
     }
 
     /// Returns the canonical form of the dataset, in the N-Quads format.

@@ -1,20 +1,20 @@
-use std::future::Future;
-use std::task;
-use std::pin::Pin;
 use iref::UriBuf;
-use linked_data::{
-    LinkedData, LinkedDataGraph
-};
+use linked_data::{LinkedData, LinkedDataGraph};
 use pin_project::pin_project;
 use rdf_types::{Interpretation, Vocabulary};
 use ssi_crypto::MessageSigner;
-use ssi_jwk::algorithm::AnyES256K;
-use ssi_verification_methods::{covariance_rule, Referencable, InvalidSignature, VerificationError, SignatureError};
+use ssi_jwk::algorithm::AnyESKeccakK;
+use ssi_verification_methods::{
+    covariance_rule, InvalidSignature, Referencable, SignatureError, VerificationError,
+};
+use std::future::Future;
+use std::pin::Pin;
+use std::task;
 
 use crate::suite::{AnySignature, AnySignatureRef};
 
 /// Common signature format for EIP-712-based cryptographic suites.
-/// 
+///
 /// See: <https://eips.ethereum.org/EIPS/eip-712>
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,9 +25,10 @@ pub struct Eip712Signature {
 }
 
 impl Eip712Signature {
-    pub fn from_bytes(signature_bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(mut signature_bytes: Vec<u8>) -> Self {
+        signature_bytes[64] += 27;
         Self {
-            proof_value: format!("0x{}", hex::encode(signature_bytes))
+            proof_value: format!("0x{}", hex::encode(signature_bytes)),
         }
     }
 }
@@ -37,7 +38,7 @@ impl Referencable for Eip712Signature {
 
     fn as_reference(&self) -> Self::Reference<'_> {
         Eip712SignatureRef {
-            proof_value: &self.proof_value
+            proof_value: &self.proof_value,
         }
     }
 
@@ -58,7 +59,7 @@ impl TryFrom<AnySignature> for Eip712Signature {
 
     fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
         Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
         })
     }
 }
@@ -67,13 +68,16 @@ impl TryFrom<AnySignature> for Eip712Signature {
 #[derive(Debug, Clone, Copy)]
 pub struct Eip712SignatureRef<'a> {
     /// Proof value
-    pub proof_value: &'a str
+    pub proof_value: &'a str,
 }
 
 impl<'a> Eip712SignatureRef<'a> {
     pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
         if self.proof_value.len() >= 4 && &self.proof_value[0..2] == "0x" {
-            hex::decode(&self.proof_value[2..]).map_err(|_| VerificationError::InvalidSignature)
+            let mut bytes = hex::decode(&self.proof_value[2..])
+                .map_err(|_| VerificationError::InvalidSignature)?;
+            bytes[64] -= 27;
+            Ok(bytes)
         } else {
             Err(VerificationError::InvalidSignature)
         }
@@ -94,7 +98,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for Eip712SignatureRef<'a> {
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
         Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?
+            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
         })
     }
 }
@@ -102,7 +106,14 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for Eip712SignatureRef<'a> {
 /// Meta-information about the signature generation process.
 ///
 /// See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021>
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("eip712" = "https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#"))]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
@@ -156,32 +167,28 @@ impl<V: Vocabulary, I: Interpretation> LinkedData<I, V> for TypesOrURI {
 }
 
 #[pin_project]
-pub struct Eip712Sign<'a, S: 'a + MessageSigner<AnyES256K>> {
+pub struct Eip712Sign<'a, S: 'a + MessageSigner<AnyESKeccakK>> {
     #[pin]
-    inner: Eip712SignInner<'a, S>
+    inner: Eip712SignInner<'a, S>,
 }
 
-impl<'a, S: 'a + MessageSigner<AnyES256K>> Eip712Sign<'a, S> {
-    pub fn new(
-        bytes: &'a [u8],
-        signer: S,
-        algorithm: AnyES256K
-    ) -> Self {
+impl<'a, S: 'a + MessageSigner<AnyESKeccakK>> Eip712Sign<'a, S> {
+    pub fn new(bytes: &'a [u8], signer: S, algorithm: AnyESKeccakK) -> Self {
         Self {
             inner: Eip712SignInner::Ok(Eip712SignOk {
-                sign: signer.sign(algorithm, (), bytes)
-            })
+                sign: signer.sign(algorithm, (), bytes),
+            }),
         }
     }
 
     pub fn err(error: SignatureError) -> Self {
         Self {
-            inner: Eip712SignInner::Err(Some(error))
+            inner: Eip712SignInner::Err(Some(error)),
         }
     }
 }
 
-impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712Sign<'a, S> {
+impl<'a, S: 'a + MessageSigner<AnyESKeccakK>> Future for Eip712Sign<'a, S> {
     type Output = Result<Eip712Signature, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
@@ -191,29 +198,29 @@ impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712Sign<'a, S> {
 }
 
 #[pin_project(project = Eip712SignInnerProject)]
-enum Eip712SignInner<'a, S: 'a + MessageSigner<AnyES256K>> {
+enum Eip712SignInner<'a, S: 'a + MessageSigner<AnyESKeccakK>> {
     Ok(#[pin] Eip712SignOk<'a, S>),
-    Err(Option<SignatureError>)
+    Err(Option<SignatureError>),
 }
 
-impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712SignInner<'a, S> {
+impl<'a, S: 'a + MessageSigner<AnyESKeccakK>> Future for Eip712SignInner<'a, S> {
     type Output = Result<Eip712Signature, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
         match self.project() {
             Eip712SignInnerProject::Ok(f) => f.poll(cx),
-            Eip712SignInnerProject::Err(e) => task::Poll::Ready(Err(e.take().unwrap()))
+            Eip712SignInnerProject::Err(e) => task::Poll::Ready(Err(e.take().unwrap())),
         }
     }
 }
 
 #[pin_project]
-struct Eip712SignOk<'a, S: 'a + MessageSigner<AnyES256K>> {
+struct Eip712SignOk<'a, S: 'a + MessageSigner<AnyESKeccakK>> {
     #[pin]
-    sign: S::Sign<'a>
+    sign: S::Sign<'a>,
 }
 
-impl<'a, S: 'a + MessageSigner<AnyES256K>> Future for Eip712SignOk<'a, S> {
+impl<'a, S: 'a + MessageSigner<AnyESKeccakK>> Future for Eip712SignOk<'a, S> {
     type Output = Result<Eip712Signature, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {

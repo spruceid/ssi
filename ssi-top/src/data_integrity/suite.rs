@@ -34,7 +34,7 @@ where
         dataset: &D,
         graph: &D::Graph,
         objects: impl IntoIterator<Item = &'a I::Resource>,
-        context: linked_data::Context<I>
+        context: linked_data::Context<I>,
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         I::Resource: 'a,
@@ -49,14 +49,14 @@ where
         match objects.next() {
             Some(object) => match objects.next() {
                 Some(_) => Err(linked_data::FromLinkedDataError::TooManyValues(
-                    context.into_iris(vocabulary, interpretation)
+                    context.into_iris(vocabulary, interpretation),
                 )),
                 None => {
                     Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
                 }
             },
             None => Err(linked_data::FromLinkedDataError::MissingRequiredValue(
-                context.into_iris(vocabulary, interpretation)
+                context.into_iris(vocabulary, interpretation),
             )),
         }
     }
@@ -303,6 +303,7 @@ macro_rules! crypto_suites {
 pub enum Hashed {
     Array32([u8; 32]),
     Array64([u8; 64]),
+    Array66([u8; 66]),
     Vec(Vec<u8>),
     String(String),
 }
@@ -312,6 +313,7 @@ impl AsRef<[u8]> for Hashed {
         match self {
             Self::Array32(a) => a.as_ref(),
             Self::Array64(a) => a.as_ref(),
+            Self::Array66(a) => a.as_ref(),
             Self::Vec(v) => v.as_ref(),
             Self::String(s) => s.as_bytes(),
         }
@@ -327,6 +329,12 @@ impl From<[u8; 32]> for Hashed {
 impl From<[u8; 64]> for Hashed {
     fn from(value: [u8; 64]) -> Self {
         Self::Array64(value)
+    }
+}
+
+impl From<[u8; 66]> for Hashed {
+    fn from(value: [u8; 66]) -> Self {
+        Self::Array66(value)
     }
 }
 
@@ -437,6 +445,7 @@ impl AnySuite {
                 self,
                 Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                     | Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                    | Self::TezosSignature2021
             )
         } else {
             false
@@ -569,11 +578,19 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             AnyMethodRef::RsaVerificationKey2018(_) => todo!(),
             AnyMethodRef::Ed25519VerificationKey2018(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
-            },
+            }
             AnyMethodRef::Ed25519VerificationKey2020(_) => todo!(),
             AnyMethodRef::EcdsaSecp256k1VerificationKey2019(_) => todo!(),
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {                
-                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
+                ssi_jwk::Algorithm::ES256KR => {
+                    m.sign_bytes(secret, ssi_jwk::algorithm::ES256KR, bytes)
+                }
+                ssi_jwk::Algorithm::ESKeccakKR => {
+                    m.sign_bytes(secret, ssi_jwk::algorithm::ESKeccakKR, bytes)
+                }
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
             },
             AnyMethodRef::EcdsaSecp256r1VerificationKey2019(_) => todo!(),
             AnyMethodRef::JsonWebKey2020(_) => todo!(),
@@ -584,7 +601,7 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             AnyMethodRef::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
-            AnyMethodRef::TezosMethod2021(_) => todo!(),
+            AnyMethodRef::TezosMethod2021(m) => m.sign_bytes(secret, algorithm.try_into()?, bytes),
             AnyMethodRef::AleoMethod2021(_) => todo!(),
             AnyMethodRef::BlockchainVerificationMethod2021(_) => todo!(),
             AnyMethodRef::Eip712Method2021(_) => todo!(),

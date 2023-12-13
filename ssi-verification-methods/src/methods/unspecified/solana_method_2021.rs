@@ -15,7 +15,17 @@ pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
 // pub const SOLANA_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#SolanaMethod2021");
 
 /// Solana Method 2021.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "SolanaMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:SolanaMethod2021")]

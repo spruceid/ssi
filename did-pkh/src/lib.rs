@@ -733,20 +733,15 @@ impl DIDPKH {
 mod tests {
     use super::*;
     use iref::IriBuf;
-    use linked_data::LinkedData;
     use locspan::Meta;
     use serde_json::{from_str, from_value, json};
-    use ssi_core::one_or_many::OneOrMany;
     use ssi_dids::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
+    use ssi_jws::CompactJWSString;
     use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
     use ssi_vc_ldp::{
-        verification::{
-            method::{signer::SingleSecretSigner, ProofPurpose},
-            MethodReferenceOrOwned,
-        },
-        CryptographicSuite, CryptographicSuiteInput, DataIntegrity, LinkedDataInput, Proof,
-        ProofConfiguration,
+        verification::method::{signer::SingleSecretSigner, ProofPurpose},
+        CryptographicSuiteInput, DataIntegrity, Proof, ProofConfiguration,
     };
     // use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
@@ -811,8 +806,12 @@ mod tests {
         let res = DIDPKH.resolve(did, Default::default()).await.unwrap();
         eprintln!("{}", did);
         let doc = res.document;
-        eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
+        eprintln!("resolved:\n{}", serde_json::to_string_pretty(&doc).unwrap());
         let doc_expected: Document = serde_json::from_str(doc_str_expected).unwrap();
+        eprintln!(
+            "expected:\n{}",
+            serde_json::to_string_pretty(&doc_expected).unwrap()
+        );
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
             serde_json::to_value(doc_expected).unwrap()
@@ -929,30 +928,19 @@ mod tests {
         test_resolve_error(did!("did:pkh:eth:bar"), ErrorKind::InvalidMethodSpecificId).await;
     }
 
-    fn fuzz_proof_value<'a, T: 'a + CryptographicSuite>(
-        proofs: impl Iterator<Item = &'a mut Proof<T>>,
-    ) {
-        for proof in proofs {
-            todo!()
+    fn fuzz_proof_value(proof: &mut Proof<AnySuite>) {
+        let signature = proof.signature_mut();
+        if let Some(value) = &mut signature.proof_value {
+            value.insert(0, 'x');
         }
-        // match proof {
-        //     Some(OneOrMany::One(ref mut proof)) => match proof {
-        //         Proof {
-        //             jws: Some(ref mut jws),
-        //             ..
-        //         } => {
-        //             jws.insert(0, 'x');
-        //         }
-        //         Proof {
-        //             proof_value: Some(ref mut value),
-        //             ..
-        //         } => {
-        //             value.insert(0, 'x');
-        //         }
-        //         _ => unreachable!(),
-        //     },
-        //     _ => unreachable!(),
-        // }
+
+        if let Some(value) = &mut signature.signature_value {
+            value.insert(0, 'x');
+        }
+
+        if let Some(value) = &mut signature.jws {
+            *value = CompactJWSString::from_string(format!("{value}ff")).unwrap();
+        }
     }
 
     #[derive(Clone, serde::Serialize, linked_data::Serialize)]
@@ -1007,9 +995,11 @@ mod tests {
             created: cred.issuance_date.clone(),
             proof_purpose: ProofPurpose::Assertion,
             options: AnySuiteOptions {
-                eip712: eip712_domain_opt.into(),
+                eip712: eip712_domain_opt.map(Into::into),
                 ..Default::default()
-            }.with_public_key(key.to_public()).unwrap(),
+            }
+            .with_public_key(key.to_public())
+            .unwrap(),
         };
         eprintln!("vm {:?}", issue_options.verification_method);
         let vc_no_proof = cred.clone();
@@ -1126,68 +1116,72 @@ mod tests {
     }
 
     async fn credential_prepare_complete_verify_did_pkh_tz(
-        algorithm: Algorithm,
         key: JWK,
         wrong_key: JWK,
         type_: &str,
         vm_relative_url: &str,
         proof_suite: AnySuite,
     ) {
-        // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
-        // let did = DIDPKH
-        //     .generate(&Source::KeyAndPattern(&key, type_))
-        //     .unwrap();
-        // eprintln!("did: {}", did);
-        // let mut vc: Credential = from_value(json!({
-        //     "@context": "https://www.w3.org/2018/credentials/v1",
-        //     "type": "VerifiableCredential",
-        //     "issuer": did.clone(),
-        //     "issuanceDate": "2021-03-18T16:38:25Z",
-        //     "credentialSubject": {
-        //         "id": "did:example:foo"
-        //     }
-        // }))
-        // .unwrap();
-        // vc.validate_unsigned().unwrap();
-        // let issue_options = LinkedDataProofOptions {
-        //     verification_method: Some(URI::String(did.to_string() + vm_relative_url)),
-        //     ..Default::default()
-        // };
-        // eprintln!("vm {:?}", issue_options.verification_method);
-        // let mut context_loader = ssi_json_ld::ContextLoader::default();
-        // let vc_no_proof = vc.clone();
-        // let prep = proof_suite
-        //     .prepare(
-        //         &vc,
-        //         &issue_options,
-        //         &DIDPKH,
-        //         &mut context_loader,
-        //         &key,
-        //         None,
-        //     )
-        //     .await
-        //     .unwrap();
+        let didpkh = DIDVerifier::new(DIDPKH);
+        let did = DIDPKH.generate(&key, type_).unwrap();
 
-        // let sig = sign_tezos(&prep, algorithm, &key);
-        // eprintln!("sig: {}", sig);
+        eprintln!("did: {}", did);
+        let cred = TestCredential {
+            issuer: did.clone().into(),
+            issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
+            credential_subject: CredentialSubject {
+                id: iri!("did:example:foo").to_owned(),
+            },
+        };
+        let issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: cred.issuance_date.clone(),
+            proof_purpose: ProofPurpose::Assertion,
+            options: AnySuiteOptions::default()
+                .with_public_key(key.to_public())
+                .unwrap(),
+        };
+        eprintln!("vm {:?}", issue_options.verification_method);
+        let signer = SingleSecretSigner::new(&didpkh, key.clone());
+        eprintln!("key: {key}");
+        eprintln!("suite: {proof_suite:?}");
+        let vc = proof_suite
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &signer,
+                issue_options.clone(),
+            )
+            .await
+            .unwrap();
+        println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
+        assert!(vc.verify(&didpkh).await.unwrap().is_valid());
 
-        // // Complete issuance
-        // let proof = proof_suite.complete(&prep, &sig).await.unwrap();
-        // println!("{}", serde_json::to_string_pretty(&proof).unwrap());
-        // vc.add_proof(proof);
-        // vc.validate().unwrap();
-        // let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        // println!("{:#?}", verification_result);
-        // assert!(verification_result.errors.is_empty());
+        // test that issuer property is used for verification
+        let vc_bad_issuer = vc
+            .clone()
+            .async_map(|di, proof| async {
+                // Change the issuer in the Data Integrity credential.
+                let bad_di = di
+                    .map(
+                        AnyInputContext::default(),
+                        &proof_suite,
+                        issue_options.borrowed(),
+                        |mut t| {
+                            t.issuer = iri!("did:pkh:example:bad").to_owned();
+                            t
+                        },
+                    )
+                    .await
+                    .unwrap();
 
-        // // test that issuer property is used for verification
-        // let mut vc_bad_issuer = vc.clone();
-        // vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
-        // assert!(!vc_bad_issuer
-        //     .verify(None, &DIDPKH, &mut context_loader)
-        //     .await
-        //     .errors
-        //     .is_empty());
+                // Return the changed credential but with the same proof.
+                (bad_di, proof)
+            })
+            .await;
+        assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_valid());
 
         // // Check that proof JWK must match proof verificationMethod
         // let mut vc_wrong_key = vc_no_proof.clone();
@@ -1210,12 +1204,11 @@ mod tests {
         //     .errors
         //     .is_empty());
 
-        // // Mess with proof signature to make verify fail
-        // let mut vc_fuzzed = vc.clone();
-        // fuzz_proof_value(&mut vc_fuzzed.proof);
-        // let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH, &mut context_loader).await;
-        // println!("{:#?}", vp_verification_result);
-        // assert!(!vp_verification_result.errors.is_empty());
+        // Mess with proof signature to make verify fail
+        let mut vc_fuzzed = vc.clone();
+        fuzz_proof_value(vc_fuzzed.proof_mut());
+        let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
+        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // // Make it into a VP
         // use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
@@ -1554,7 +1547,6 @@ mod tests {
         key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
         other_key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::EdBlake2b,
             key_ed25519.clone(),
             other_key_ed25519.clone(),
             "tz",
@@ -1582,7 +1574,6 @@ mod tests {
         key_p256.algorithm = Some(Algorithm::ESBlake2b);
         other_key_p256.algorithm = Some(Algorithm::ESBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::ESBlake2b,
             key_p256.clone(),
             other_key_p256.clone(),
             "tz",
@@ -1608,33 +1599,65 @@ mod tests {
         // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
 
         // Negative test: tamper with the VC and watch verification fail.
-        let bad_vc = vc.clone().async_map(|di, proof| async move {
-            let (mut compact, expanded) = di.into_value().into_parts();
+        let bad_vc = vc
+            .clone()
+            .async_map(|di, mut proof| async move {
+                let (mut compact, expanded) = di.into_value().into_parts();
 
-            // Add a fake property in the compact VC form.
-            compact.document_mut().0.as_object_mut().unwrap().insert(
-                Meta::none("foo".into()),
-                Meta::none("bar".into())
-            );
+                // Add a fake property in the compact VC form.
+                let obj = compact.document_mut().0.as_object_mut().unwrap();
+                obj.insert(Meta::none("foo".into()), Meta::none("bar".into()));
 
-            // Add a fake property in the expanded VC form.
-            let mut node = expanded.into_value().into_main_node().unwrap();
-            node.0.insert(
-                json_ld::Id::iri(IriBuf::new("https://example.org/foo".to_string()).unwrap()),
-                json_ld::Indexed::none(json_ld::Object::Value(json_ld::Value::Literal(json_ld::object::Literal::String("bar".into()), None)))
-            );
+                // Add the `foo` field to the EIP712 VC schema if necessary.
+                // This is required so hashing can succeed.
+                if let Some(eip712) = &mut proof.untyped_mut().options.eip712 {
+                    if let Some(ssi_vc_ldp::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
+                        let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
+                        vc_schema.push(ssi_eip712::MemberVariable::new(
+                            "foo".to_owned(),
+                            ssi_eip712::TypeRef::String,
+                        ));
+                    }
+                }
 
-            // Rebuild the Data-Integrity VC.
-            let bad_di = DataIntegrity::new(
-                json_ld::Document::new(compact, Meta::none(node.map(json_ld::Indexed::none).into())),
-                ssi_top::data_integrity::AnyInputContext::default(),
-                proof.suite(),
-                proof.configuration()
-            ).await.unwrap();
+                // Same as above but for the legacy EIP712 cryptosuite (v0.1).
+                if let Some(eip712) = &mut proof.untyped_mut().options.eip712_v0_1 {
+                    if let Some(ssi_vc_ldp::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
+                        let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
+                        vc_schema.push(ssi_eip712::MemberVariable::new(
+                            "foo".to_owned(),
+                            ssi_eip712::TypeRef::String,
+                        ));
+                    }
+                }
 
-            // Return the tempered VC with the original proof.
-            (bad_di, proof)
-        }).await;
+                // Add a fake property in the expanded VC form.
+                let mut node = expanded.into_value().into_main_node().unwrap();
+                node.0.insert(
+                    json_ld::Id::iri(IriBuf::new("https://example.org/foo".to_string()).unwrap()),
+                    json_ld::Indexed::none(json_ld::Object::Value(json_ld::Value::Literal(
+                        json_ld::object::Literal::String("bar".into()),
+                        None,
+                    ))),
+                );
+
+                // Rebuild the Data-Integrity VC.
+                let bad_di = DataIntegrity::new(
+                    json_ld::Document::new(
+                        compact,
+                        Meta::none(node.map(json_ld::Indexed::none).into()),
+                    ),
+                    ssi_top::data_integrity::AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                .unwrap();
+
+                // Return the tempered VC with the original proof.
+                (bad_di, proof)
+            })
+            .await;
 
         let verification_result = bad_vc.verify(&didpkh).await.unwrap();
         assert!(verification_result.is_invalid());
@@ -1643,13 +1666,13 @@ mod tests {
     #[tokio::test]
     async fn verify_vc() {
         // TODO: update these to use CAIP-10 did:pkh issuers
-        // test_verify_vc(include_str!("../tests/vc-tz1.jsonld"), 0).await;
-        // test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
+        test_verify_vc(include_str!("../tests/vc-tz1.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
         test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld"), 0).await;
-        // test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld"), 0).await;
-        // test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld"), 0).await;
-        // test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld"), 0).await;
-        // test_verify_vc(include_str!("../tests/vc-poly-epsig.jsonld"), 0).await;
-        // test_verify_vc(include_str!("../tests/vc-poly-eip712sig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-poly-epsig.jsonld"), 0).await;
+        test_verify_vc(include_str!("../tests/vc-poly-eip712sig.jsonld"), 0).await;
     }
 }
