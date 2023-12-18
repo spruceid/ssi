@@ -1,5 +1,6 @@
 use super::super::*;
 use crate::eip712::TypedData;
+use k256::ecdsa::VerifyingKey;
 use serde_json::Value;
 use ssi_dids::did_resolve::{resolve_vm, DIDResolver};
 use ssi_json_ld::ContextLoader;
@@ -15,7 +16,6 @@ impl Eip712Signature2021 {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EIP712VM_CONTEXT.clone()]),
             ..Proof::new(ProofSuiteType::Eip712Signature2021)
@@ -31,11 +31,12 @@ impl Eip712Signature2021 {
         };
         let secret_key = k256::SecretKey::try_from(ec_params)?;
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let sig: k256::ecdsa::recoverable::Signature =
-            signing_key.try_sign(&bytes).map_err(ssi_jwk::Error::from)?;
-        let sig_bytes = &mut sig.as_ref().to_vec();
+        let (sig, rec_id) = signing_key
+            .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(bytes))
+            .map_err(ssi_jwk::Error::from)?;
+        let sig_bytes = &mut sig.to_vec();
         // Recovery ID starts at 27 instead of 0.
-        sig_bytes[64] += 27;
+        sig_bytes.push(rec_id.to_byte() + 27);
         let sig_hex = ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes);
         proof.proof_value = Some(sig_hex);
         Ok(proof)
@@ -90,18 +91,18 @@ impl Eip712Signature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
+        let rec_id =
+            k256::ecdsa::RecoveryId::try_from(dec_sig[64] % 27).map_err(ssi_jwk::Error::from)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64]).map_err(ssi_jwk::Error::from)?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)
-            .map_err(ssi_jwk::Error::from)?;
-        let sig =
-            k256::ecdsa::recoverable::Signature::new(&sig, rec_id).map_err(ssi_jwk::Error::from)?;
-        // TODO this step needs keccak-hash, may need better features management
-        let recovered_key = sig
-            .recover_verifying_key(&bytes)
-            .map_err(ssi_jwk::Error::from)?;
+        let recovered_key = VerifyingKey::recover_from_digest(
+            sha3::Keccak256::new_with_prefix(bytes),
+            &sig,
+            rec_id,
+        )
+        .map_err(ssi_jwk::Error::from)?;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(
-                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
             )?),
             public_key_use: None,
@@ -126,7 +127,6 @@ impl EthereumEip712Signature2021 {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        use k256::ecdsa::signature::Signer;
         // TODO: conform to spec: no domain
         let mut props = extra_proof_properties.clone();
         if let Some(ref eip712_domain) = options.eip712_domain {
@@ -149,11 +149,12 @@ impl EthereumEip712Signature2021 {
         };
         let secret_key = k256::SecretKey::try_from(ec_params)?;
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let sig: k256::ecdsa::recoverable::Signature =
-            signing_key.try_sign(&bytes).map_err(ssi_jwk::Error::from)?;
-        let sig_bytes = &mut sig.as_ref().to_vec();
+        let (sig, rec_id) = signing_key
+            .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(bytes))
+            .map_err(ssi_jwk::Error::from)?;
+        let sig_bytes = &mut sig.to_vec();
         // Recovery ID starts at 27 instead of 0.
-        sig_bytes[64] += 27;
+        sig_bytes.push(rec_id.to_byte() + 27);
         let sig_hex = ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes);
         proof.proof_value = Some(sig_hex);
         Ok(proof)
@@ -208,19 +209,20 @@ impl EthereumEip712Signature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)
-            .map_err(ssi_jwk::Error::from)?;
+        let rec_id =
+            k256::ecdsa::RecoveryId::try_from(dec_sig[64] % 27).map_err(ssi_jwk::Error::from)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64]).map_err(ssi_jwk::Error::from)?;
-        let sig =
-            k256::ecdsa::recoverable::Signature::new(&sig, rec_id).map_err(ssi_jwk::Error::from)?;
         let typed_data = TypedData::from_document_and_options_json(document, proof).await?;
         let bytes = typed_data.bytes()?;
-        let recovered_key = sig
-            .recover_verifying_key(&bytes)
-            .map_err(ssi_jwk::Error::from)?;
+        let recovered_key = VerifyingKey::recover_from_digest(
+            sha3::Keccak256::new_with_prefix(bytes),
+            &sig,
+            rec_id,
+        )
+        .map_err(ssi_jwk::Error::from)?;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(
-                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
             )?),
             public_key_use: None,
@@ -246,7 +248,6 @@ impl EthereumPersonalSignature2021 {
         key: &JWK,
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
-        use k256::ecdsa::signature::Signer;
         let mut proof = Proof {
             context: serde_json::json!([EPSIG_CONTEXT.clone()]),
             ..Proof::new(ProofSuiteType::EthereumPersonalSignature2021)
@@ -262,11 +263,12 @@ impl EthereumPersonalSignature2021 {
         };
         let secret_key = k256::SecretKey::try_from(ec_params)?;
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let sig: k256::ecdsa::recoverable::Signature =
-            signing_key.try_sign(&hash).map_err(ssi_jwk::Error::from)?;
-        let sig_bytes = &mut sig.as_ref().to_vec();
+        let (sig, rec_id) = signing_key
+            .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(hash))
+            .map_err(ssi_jwk::Error::from)?;
+        let sig_bytes = &mut sig.to_vec();
         // Recovery ID starts at 27 instead of 0.
-        sig_bytes[64] += 27;
+        sig_bytes.push(rec_id.to_byte() + 27);
         let sig_hex = ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes);
         proof.proof_value = Some(sig_hex);
         Ok(proof)
@@ -319,20 +321,18 @@ impl EthereumPersonalSignature2021 {
             return Err(Error::HexString);
         }
         let dec_sig = hex::decode(&sig_hex[2..])?;
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(dec_sig[64] % 27)
-            .map_err(ssi_jwk::Error::from)?;
+        let rec_id =
+            k256::ecdsa::RecoveryId::try_from(dec_sig[64] % 27).map_err(ssi_jwk::Error::from)?;
         let sig = k256::ecdsa::Signature::try_from(&dec_sig[..64]).map_err(ssi_jwk::Error::from)?;
-        let sig =
-            k256::ecdsa::recoverable::Signature::new(&sig, rec_id).map_err(ssi_jwk::Error::from)?;
         let signing_string =
             string_from_document_and_options(document, proof, context_loader).await?;
         let hash = ssi_crypto::hashes::keccak::prefix_personal_message(&signing_string);
-        let recovered_key = sig
-            .recover_verifying_key(&hash)
-            .map_err(ssi_jwk::Error::from)?;
+        let recovered_key =
+            VerifyingKey::recover_from_digest(sha3::Keccak256::new_with_prefix(hash), &sig, rec_id)
+                .map_err(ssi_jwk::Error::from)?;
         let jwk = JWK {
             params: JWKParams::EC(ECParams::try_from(
-                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes())
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
             )?),
             public_key_use: None,

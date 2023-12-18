@@ -182,7 +182,7 @@ impl DIDMethod for DIDSol {
         let did = match jwk.params {
             Params::OKP(ref params) if params.curve == "Ed25519" => {
                 let addr = bs58::encode(&params.public_key.0).into_string();
-                format!("did:sol:{}", addr)
+                format!("did:sol:{addr}")
             }
             _ => {
                 dbg!(&jwk.params);

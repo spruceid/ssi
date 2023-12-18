@@ -320,8 +320,8 @@ pub enum UcanResource {
 impl Display for UcanResource {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
-            Self::Proof(p) => write!(f, "{}", p),
-            Self::URI(u) => write!(f, "{}", u),
+            Self::Proof(p) => write!(f, "{p}"),
+            Self::URI(u) => write!(f, "{u}"),
         }
     }
 }
@@ -398,7 +398,11 @@ pub struct Capability<A = JsonValue> {
 }
 
 fn now() -> f64 {
-    (chrono::prelude::Utc::now().timestamp_nanos() as f64) / 1e+9_f64
+    (chrono::prelude::Utc::now()
+        .timestamp_nanos_opt()
+        .expect("value can not be represented in a timestamp with nanosecond precision.")
+        as f64)
+        / 1e+9_f64
 }
 
 #[serde_as]
@@ -422,7 +426,7 @@ impl UcanRevocation {
         Ok(Self {
             issuer,
             revoke,
-            challenge: sign_bytes(algorithm, format!("REVOKE:{}", revoke).as_bytes(), jwk)?,
+            challenge: sign_bytes(algorithm, format!("REVOKE:{revoke}").as_bytes(), jwk)?,
         })
     }
     pub async fn verify_signature(

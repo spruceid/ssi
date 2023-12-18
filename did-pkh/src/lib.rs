@@ -631,7 +631,7 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
         "aleo" => generate_caip10_aleo(key, reference_opt)?,
         _ => return Err("Namespace not supported".to_string()),
     };
-    Ok(format!("did:pkh:{}", account_id))
+    Ok(format!("did:pkh:{account_id}"))
 }
 
 impl DIDMethod for DIDPKH {
@@ -665,7 +665,7 @@ impl DIDMethod for DIDPKH {
             Some(addr) => addr,
             None => return None,
         };
-        let did = format!("did:pkh:{}:{}", pkh_name, addr);
+        let did = format!("did:pkh:{pkh_name}:{addr}");
         Some(did)
     }
 

@@ -64,6 +64,7 @@ pub use ssi_ldp as ldp;
 pub use ssi_ldp::eip712;
 #[deprecated = "Use ssi::ldp::soltx"]
 pub use ssi_ldp::soltx;
+pub use ssi_sd_jwt as sd_jwt;
 pub use ssi_ssh as ssh;
 pub use ssi_tzkey as tzkey;
 pub use ssi_ucan as ucan;

@@ -135,7 +135,7 @@ pub struct HashNDegreeQuadsOutput {
 fn digest_to_lowerhex(digest: &[u8]) -> String {
     digest
         .iter()
-        .map(|byte| format!("{:02x}", byte))
+        .map(|byte| format!("{byte:02x}"))
         .collect::<String>()
 }
 

@@ -240,19 +240,19 @@ impl fmt::Display for EIP712Type {
         match self {
             EIP712Type::Bytes => write!(f, "bytes"),
             EIP712Type::String => write!(f, "string"),
-            EIP712Type::BytesN(n) => write!(f, "bytes{}", n),
-            EIP712Type::UintN(n) => write!(f, "uint{}", n),
-            EIP712Type::IntN(n) => write!(f, "int{}", n),
+            EIP712Type::BytesN(n) => write!(f, "bytes{n}"),
+            EIP712Type::UintN(n) => write!(f, "uint{n}"),
+            EIP712Type::IntN(n) => write!(f, "int{n}"),
             EIP712Type::Bool => write!(f, "bool"),
             EIP712Type::Address => write!(f, "address"),
             EIP712Type::Array(type_) => {
                 write!(f, "{}[]", *type_)
             }
             EIP712Type::ArrayN(type_, n) => {
-                write!(f, "{}[{}]", *type_, n)
+                write!(f, "{}[{n}]", *type_)
             }
             EIP712Type::Struct(name) => {
-                write!(f, "{}", name)
+                write!(f, "{name}")
             }
         }
     }
@@ -1615,7 +1615,7 @@ mod tests {
         let sk_bytes = bytes_from_hex(sk_hex).unwrap();
         use ssi_jwk::{Base64urlUInt, ECParams, Params, JWK};
 
-        let sk = k256::SecretKey::from_be_bytes(&sk_bytes).unwrap();
+        let sk = k256::SecretKey::from_bytes(sk_bytes.as_slice().into()).unwrap();
         let pk = sk.public_key();
         let mut ec_params = ECParams::try_from(&pk).unwrap();
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));

@@ -1024,10 +1024,10 @@ impl fmt::Display for DIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{}", self.did, self.path_abempty)?;
         if let Some(ref query) = self.query {
-            write!(f, "?{}", query)?;
+            write!(f, "?{query}")?;
         }
         if let Some(ref fragment) = self.fragment {
-            write!(f, "#{}", fragment)?;
+            write!(f, "#{fragment}")?;
         }
         Ok(())
     }
@@ -1038,10 +1038,10 @@ impl fmt::Display for RelativeDIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.path.fmt(f)?;
         if let Some(ref query) = self.query {
-            write!(f, "?{}", query)?;
+            write!(f, "?{query}")?;
         }
         if let Some(ref fragment) = self.fragment {
-            write!(f, "#{}", fragment)?;
+            write!(f, "#{fragment}")?;
         }
         Ok(())
     }
@@ -1063,10 +1063,10 @@ impl fmt::Display for PrimaryDIDURL {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.did)?;
         if let Some(ref path) = self.path {
-            write!(f, "{}", path)?;
+            write!(f, "{path}")?;
         }
         if let Some(ref query) = self.query {
-            write!(f, "?{}", query)?;
+            write!(f, "?{query}")?;
         }
         Ok(())
     }
@@ -1083,7 +1083,7 @@ impl TryFrom<String> for DIDURL {
 /// needed for #[serde(into = "String")]
 impl From<DIDURL> for String {
     fn from(didurl: DIDURL) -> String {
-        format!("{}", didurl)
+        format!("{didurl}")
     }
 }
 
@@ -1102,7 +1102,7 @@ impl From<PrimaryDIDURL> for DIDURL {
 /// needed for #[serde(into = "String")]
 impl From<PrimaryDIDURL> for String {
     fn from(didurl: PrimaryDIDURL) -> String {
-        format!("{}", didurl)
+        format!("{didurl}")
     }
 }
 
@@ -1339,7 +1339,7 @@ impl Document {
             VerificationRelationship::KeyAgreement => &self.key_agreement,
             VerificationRelationship::CapabilityInvocation => &self.capability_invocation,
             VerificationRelationship::CapabilityDelegation => &self.capability_delegation,
-            rel => return Err(format!("Unsupported verification relationship: {:?}", rel)),
+            rel => return Err(format!("Unsupported verification relationship: {rel:?}")),
         };
         let vm_ids = vms.iter().flatten().map(|vm| vm.get_id(did)).collect();
         Ok(vm_ids)

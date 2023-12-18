@@ -103,14 +103,14 @@ async fn main() {
             (true, "--jwt-no-jws") => jwt_no_jws = true,
             (true, "--jwt-presentation") => jwt_presentation = true,
             (true, "--jwt-decode") => jwt_decode = true,
-            (true, _) => panic!("Unexpected option '{}'", arg),
+            (true, _) => panic!("Unexpected option '{arg}'"),
             (false, _) => {
                 if cmd.is_none() {
                     cmd = Option::Some(arg);
                 } else if filename.is_none() {
                     filename = Option::Some(arg);
                 } else {
-                    panic!("Unexpected argument '{}'", arg);
+                    panic!("Unexpected argument '{arg}'");
                 }
             }
         }
@@ -157,7 +157,7 @@ async fn main() {
             write_out(output);
         }
         _ => {
-            eprintln!("Unexpected command '{}'", cmd_str);
+            eprintln!("Unexpected command '{cmd_str}'");
             std::process::exit(1);
         }
     }

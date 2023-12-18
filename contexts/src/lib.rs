@@ -2,9 +2,13 @@
 
 /// <https://www.w3.org/2018/credentials/v1>
 pub const CREDENTIALS_V1: &str = include_str!("../w3c-2018-credentials-v1.jsonld");
+/// <https://www.w3.org/ns/credentials/v2>
+pub const CREDENTIALS_V2: &str = include_str!("../w3c-ns-credentials-v2.jsonld");
 /// <https://www.w3.org/2018/credentials/examples/v1>
 pub const CREDENTIALS_EXAMPLES_V1: &str =
     include_str!("../w3c-2018-credentials-examples-v1.jsonld");
+/// <https://www.w3.org/ns/credentials/examples/v2>
+pub const CREDENTIALS_EXAMPLES_V2: &str = include_str!("../w3c-ns-credentials-examples-v2.jsonld");
 /// <https://www.w3.org/ns/odrl.jsonld>
 pub const ODRL: &str = include_str!("../w3c-odrl.jsonld");
 /// <https://schema.org/>
@@ -28,6 +32,10 @@ pub const LDS_JWS2020_V1: &str = include_str!("../lds-jws2020-v1.jsonld");
 pub const W3ID_JWS2020_V1: &str = include_str!("../w3id-jws2020-v1.jsonld");
 /// <https://w3id.org/security/suites/ed25519-2020/v1>
 pub const W3ID_ED2020_V1: &str = include_str!("../w3id-ed25519-signature-2020-v1.jsonld");
+/// <https://w3id.org/security/multikey/v1>
+pub const W3ID_MULTIKEY_V1: &str = include_str!("../w3id-multikey-v1.jsonld");
+/// <https://w3id.org/security/data-integrity/v1>
+pub const W3ID_DATA_INTEGRITY_V1: &str = include_str!("../w3id-data-integrity-v1.jsonld");
 /// <https://w3id.org/security/suites/blockchain-2021/v1>
 pub const BLOCKCHAIN2021_V1: &str = include_str!("../w3id-blockchain-2021-v1.jsonld");
 /// <https://w3id.org/citizenship/v1>

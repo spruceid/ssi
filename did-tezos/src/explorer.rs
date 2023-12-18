@@ -54,7 +54,7 @@ pub async fn execute_service_view(tzkt_url: &str, did: &str, contract: &str) -> 
         .build()?;
     let url = Url::parse(tzkt_url)?;
     let service_result: ServiceResult = client
-        .get(url.join(&format!("/v1/contracts/{}/storage", contract))?)
+        .get(url.join(&format!("/v1/contracts/{contract}/storage"))?)
         .send()
         .await?
         .json()
@@ -78,7 +78,7 @@ pub async fn execute_auth_view(tzkt_url: &str, contract: &str) -> Result<Verific
     let client = reqwest::Client::builder().build()?;
     let url = Url::parse(tzkt_url)?;
     let auth_result: AuthResult = client
-        .get(url.join(&format!("/v1/contracts/{}/storage", contract))?)
+        .get(url.join(&format!("/v1/contracts/{contract}/storage"))?)
         .send()
         .await?
         .json()

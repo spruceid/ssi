@@ -38,13 +38,18 @@ fn did_web_url(did: &str) -> Result<String, ResolutionMetadata> {
         None => ".well-known".to_string(),
     };
     // Use http for localhost, for testing purposes.
-    let proto = if domain_name == "localhost" {
+    let proto = if domain_name.starts_with("localhost") {
         "http"
     } else {
         "https"
     };
     #[allow(unused_mut)]
-    let mut url = format!("{}://{}/{}/did.json", proto, domain_name, path);
+    let mut url = format!(
+        "{}://{}/{}/did.json",
+        proto,
+        domain_name.replacen("%3A", ":", 1),
+        path
+    );
     #[cfg(test)]
     PROXY.with(|proxy| {
         if let Some(ref proxy) = *proxy.borrow() {
@@ -113,7 +118,7 @@ impl DIDResolver for DIDWeb {
             Ok(c) => c,
             Err(err) => {
                 return (
-                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {}", err)),
+                    ResolutionMetadata::from_error(&format!("Error building HTTP client: {err}")),
                     Vec::new(),
                     None,
                 )
@@ -128,8 +133,7 @@ impl DIDResolver for DIDWeb {
             Err(err) => {
                 return (
                     ResolutionMetadata::from_error(&format!(
-                        "Error sending HTTP request : {}",
-                        err
+                        "Error sending HTTP request ({url}): {err}"
                     )),
                     Vec::new(),
                     None,
@@ -205,6 +209,11 @@ mod tests {
         assert_eq!(
             did_web_url("did:web:example.com:u:bob").unwrap(),
             "https://example.com/u/bob/did.json"
+        );
+        // https://w3c-ccg.github.io/did-method-web/#example-creating-the-did-with-optional-path-and-port
+        assert_eq!(
+            did_web_url("did:web:example.com%3A443:u:bob").unwrap(),
+            "https://example.com:443/u/bob/did.json"
         );
     }
 
