@@ -154,10 +154,19 @@ impl Proof {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> VerificationResult {
-        LinkedDataProofs::verify(self, document, resolver, context_loader)
-            .await
-            .into()
+        LinkedDataProofs::verify(
+            self,
+            document,
+            resolver,
+            context_loader,
+            nonce,
+            disclosed_message_indices,
+        )
+        .await
+        .into()
     }
 }
 
@@ -224,6 +233,12 @@ pub struct LinkedDataProofOptions {
     /// The challenge of the proof.
     pub challenge: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// The nonce of the proof.
+    pub nonce: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Indices of disclosed messages
+    pub disclosed_message_indices: Option<Vec<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     /// The domain of the proof.
     pub domain: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -251,6 +266,8 @@ impl Default for LinkedDataProofOptions {
             eip712_domain: None,
             type_: None,
             cryptosuite: None,
+            nonce: None,
+            disclosed_message_indices: None,
         }
     }
 }

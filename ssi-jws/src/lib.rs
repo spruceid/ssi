@@ -1,10 +1,11 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-
 // TODO reinstate Error::MissingFeatures ?
 
 pub mod error;
+use bbs::prelude::*;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
+use ssi_crypto::hashes::sha256::sha256;
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -70,6 +71,63 @@ pub struct Header {
 fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
     let json = serde_json::to_string(&object)?;
     Ok(base64::encode_config(json, base64::URL_SAFE_NO_PAD))
+}
+
+pub fn create_bbs_sig_input(payload: &JWSPayload) -> Vec<SignatureMessage> {
+    let mut messages: Vec<SignatureMessage> = Vec::new();
+    messages.push(SignatureMessage::hash(payload.header.as_bytes()));
+    messages.push(SignatureMessage::hash(payload.sigopts_digest.as_ref()));
+
+    for i in 0..payload.messages.len() {
+        let message = payload.messages[i].as_bytes();
+        messages.push(SignatureMessage::hash(message));
+    }
+
+    let mut num_messages = payload.messages.len() + 2;
+    while num_messages < 100 {
+        // todo 100 is hardcoded; use config
+        messages.push(SignatureMessage::hash(b""));
+        num_messages += 1;
+    }
+    messages
+}
+
+pub fn sign_bytes_v2(
+    algorithm: Algorithm,
+    key: &JWK,
+    payload: &JWSPayload,
+) -> Result<Vec<u8>, Error> {
+    if let JWKParams::OKP(okp) = &key.params {
+        if let Algorithm::BLS12381G2 = algorithm {
+            let messages = create_bbs_sig_input(payload);
+
+            let Base64urlUInt(pk_bytes) = &okp.public_key;
+            let Base64urlUInt(sk_bytes) = okp.private_key.as_ref().unwrap();
+            let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
+            let sk = bbs::prelude::SecretKey::try_from(sk_bytes.as_slice()).unwrap();
+
+            let signature = Signature::new(messages.as_slice(), &sk, &pk).unwrap();
+            return Ok(signature.to_bytes_compressed_form().to_vec());
+        }
+    }
+
+    let messages_str = payload.messages.join("");
+    let messages_hash = sha256(messages_str.as_bytes());
+    let data = [
+        payload.header.as_bytes(),
+        b".",
+        payload.sigopts_digest.as_slice(),
+        messages_hash.as_slice(),
+    ]
+    .concat();
+    sign_bytes(algorithm, data.as_slice(), key)
+}
+
+pub fn generate_proof_nonce() -> String {
+    let proof_nonce = Verifier::generate_proof_nonce();
+    let proof_nonce_bytes = proof_nonce.to_bytes_compressed_form();
+    let proof_nonce_str = base64::encode(proof_nonce_bytes.as_ref());
+    proof_nonce_str
 }
 
 pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8>, Error> {
@@ -249,6 +307,142 @@ pub fn sign_bytes_b64(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<St
     let signature = sign_bytes(algorithm, data, key)?;
     let sig_b64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
     Ok(sig_b64)
+}
+
+pub fn sign_bytes_b64_v2(
+    algorithm: Algorithm,
+    key: &JWK,
+    payload: &JWSPayload,
+) -> Result<String, Error> {
+    let signature = sign_bytes_v2(algorithm, key, payload)?;
+    let sig_b64 = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+    Ok(sig_b64)
+}
+
+pub fn verify_payload(
+    algorithm: Algorithm,
+    key: &JWK,
+    payload: &JWSPayload,
+    signature: &[u8],
+    disclosed_message_indices: Option<&Vec<usize>>,
+    nonce: Option<&String>,
+) -> Result<VerificationWarnings, Error> {
+    let warnings = VerificationWarnings::default();
+
+    match algorithm {
+        Algorithm::BLS12381G2 => (),
+        _ => {
+            return Err(Error::UnsupportedAlgorithm);
+        }
+    }
+
+    match &key.params {
+        JWKParams::OKP(okp) => {
+            match nonce {
+                Some(n) => {
+                    let proof = SignatureProof::try_from(signature).unwrap();
+
+                    let Base64urlUInt(pk_bytes) = &okp.public_key;
+                    let issuer_pk = PublicKey::try_from(pk_bytes.as_slice()).unwrap();
+                    let proof_request = Verifier::new_proof_request(
+                        disclosed_message_indices.unwrap().as_slice(),
+                        &issuer_pk,
+                    )
+                    .unwrap();
+                    let proof_nonce_bytes = base64::decode(n).unwrap();
+                    assert!(proof_nonce_bytes.len() == 32);
+                    let mut proof_nonce_bytes_sized: [u8; 32] = [0; 32];
+                    proof_nonce_bytes_sized.clone_from_slice(proof_nonce_bytes.as_slice());
+                    let proof_nonce = ProofNonce::from(proof_nonce_bytes_sized);
+
+                    let result =
+                        Verifier::verify_signature_pok(&proof_request, &proof, &proof_nonce);
+                    match result {
+                        Ok(message_hashes) => {
+                            //eprintln!("Signature pok check passes");
+                            let mut i = 0;
+                            let mut credential_subject_id = "";
+                            while i < payload.messages.len() {
+                                let m = payload.messages[i].as_str();
+                                if m.contains(
+                                    "<https://www.w3.org/2018/credentials#credentialSubject>",
+                                ) {
+                                    let m_parts: Vec<&str> = m.split(' ').collect();
+                                    credential_subject_id = m_parts[2];
+                                    break;
+                                }
+                                i += 1;
+                            }
+                            assert!(
+                                !credential_subject_id.is_empty(),
+                                "credentialSubject node not found"
+                            );
+
+                            let mut first_claim_found = false;
+
+                            i = 0;
+                            while i < payload.messages.len() {
+                                let m = payload.messages[i].as_str();
+                                if m.starts_with(credential_subject_id) {
+                                    first_claim_found = true;
+                                    break;
+                                }
+                                i += 1;
+                            }
+                            assert!(first_claim_found, "No claims in derived credential");
+
+                            /*for nq in payload.messages.iter() {
+                                eprintln!("Message: {}", nq);
+                            }*/
+
+                            for revealed_hash in message_hashes {
+                                //eprintln!("Checking hash for: {}", payload.messages[i].as_str());
+                                let target_hash =
+                                    SignatureMessage::hash(payload.messages[i].as_bytes());
+                                if revealed_hash != target_hash {
+                                    eprintln!("Hashes do not match");
+                                    return Err(Error::InvalidSignature);
+                                }
+
+                                i += 1;
+                            }
+                        }
+                        Err(_) => {
+                            eprintln!("Signature pok check did not pass");
+                            return Err(Error::InvalidSignature);
+                        }
+                    }
+                }
+                None => {
+                    if signature.len() != 112 {
+                        return Err(Error::InvalidSignature);
+                    } else {
+                        if disclosed_message_indices.is_some() {
+                            return Err(Error::NonceNotProvided);
+                        }
+
+                        let mut signature_sized: [u8; 112] = [0; 112];
+                        signature_sized.clone_from_slice(signature);
+                        let bbs_sig = bbs::prelude::Signature::from(&signature_sized);
+
+                        let messages = create_bbs_sig_input(payload);
+                        let Base64urlUInt(pk_bytes) = &okp.public_key;
+                        let pk = bbs::prelude::PublicKey::try_from(pk_bytes.as_slice()).unwrap();
+                        let result = bbs_sig.verify(messages.as_slice(), &pk).unwrap();
+
+                        if !result {
+                            return Err(Error::InvalidSignature);
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            return Err(Error::UnsupportedAlgorithm);
+        }
+    }
+
+    Ok(warnings)
 }
 
 pub fn verify_bytes_warnable(
@@ -597,6 +791,30 @@ pub fn detached_sign_unencoded_payload(
     Ok(jws)
 }
 
+pub fn generate_header(algorithm: Algorithm, key: &JWK) -> Result<(Header, String), Error> {
+    let header = Header {
+        algorithm,
+        key_id: key.key_id.clone(),
+        critical: Some(vec!["b64".to_string()]),
+        base64urlencode_payload: Some(false),
+        ..Default::default()
+    };
+    let header_str = base64_encode_json(&header)?;
+    Ok((header, header_str))
+}
+
+pub fn detached_sign_unencoded_payload_v2(
+    algorithm: Algorithm,
+    payload: &mut JWSPayload,
+    key: &JWK,
+) -> Result<String, Error> {
+    let (header, header_b64) = generate_header(algorithm, key)?;
+    payload.header = header_b64;
+    let sig_b64 = sign_bytes_b64_v2(header.algorithm, key, payload)?;
+    let jws = payload.header.clone() + ".." + &sig_b64;
+    Ok(jws)
+}
+
 pub fn prepare_detached_unencoded_payload(
     algorithm: Algorithm,
     payload: &[u8],
@@ -674,6 +892,12 @@ pub struct DecodedJWS {
     pub signing_input: Vec<u8>,
     pub payload: Vec<u8>,
     pub signature: Vec<u8>,
+}
+
+pub struct JWSPayload {
+    pub header: String,
+    pub messages: Vec<String>,
+    pub sigopts_digest: [u8; 32],
 }
 
 /// Decode JWS parts (JOSE header, payload, and signature) into useful values.

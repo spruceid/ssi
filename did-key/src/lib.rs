@@ -197,7 +197,9 @@ impl DIDResolver for DIDKey {
             && data[1] == DID_KEY_BLS12381_G2_PREFIX[1]
         {
             {
-                if data.len() - 2 != 96 {
+                // A BBS+ public key may have more than one generator; hence, the length may
+                // exceed 96
+                if data.len() - 2 < 96 {
                     return (
                         ResolutionMetadata::from_error(ERROR_INVALID_DID),
                         None,

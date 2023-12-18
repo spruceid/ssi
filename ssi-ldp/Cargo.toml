@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-ldp/"
 
 [features]
-default = ["eip", "tezos", "w3c", "solana"]
+default = ["eip", "tezos", "w3c", "solana", "bbsplus"]
 ## enable LDPs from the W3C linked data proof registry: ed25519, secp256k1, rsa2018, secp256r1
 w3c = ["secp256k1", "secp256r1", "rsa", "ed25519"]
 secp256k1 = ["ssi-jws/secp256k1", "k256"]
@@ -31,11 +31,14 @@ tezos = [
 aleo = ["ssi-jws/aleo", "ssi-caips/aleo"]
 ## enable LDPs from the Solana Ecosystem
 solana = []
+bbsplus = []
 
 example-http-issuer = []
 test = []
 
 [dependencies]
+bbs = { version = "0.4.1" }
+base64 = "0.12"
 thiserror = "1.0"
 async-trait = "0.1"
 lazy_static = "1.4"

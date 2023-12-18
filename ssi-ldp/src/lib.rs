@@ -8,11 +8,13 @@ pub mod proof;
 use iref::{Iri, IriBuf};
 pub use proof::{Check, LinkedDataProofOptions, Proof};
 use sha2::{Digest, Sha384};
+use ssi_json_ld::rdf::IntoNQuads;
 use static_iref::iri;
 pub mod error;
 pub use error::Error;
 pub mod context;
 pub mod soltx;
+use bbs::prelude::*;
 pub use context::Context;
 
 #[cfg(feature = "eip")]
@@ -28,7 +30,7 @@ use ssi_dids::did_resolve::{resolve_key, DIDResolver};
 use ssi_dids::VerificationRelationship as ProofPurpose;
 use ssi_json_ld::{rdf::DataSet, urdna2015, ContextLoader};
 use ssi_jwk::{Algorithm, Base64urlUInt, JWK};
-use ssi_jws::Header;
+use ssi_jws::{Header, JWSPayload};
 
 pub mod suites;
 pub use suites::*;
@@ -187,6 +189,8 @@ pub trait ProofSuite {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> Result<VerificationWarnings, Error>;
 }
 
@@ -342,6 +346,7 @@ impl LinkedDataProofs {
         extra_proof_properties: Option<Map<String, Value>>,
     ) -> Result<Proof, Error> {
         let mut options = options.clone();
+
         ensure_or_pick_verification_relationship(&mut options, document, key, resolver).await?;
         // Use type property if present
         let suite = if let Some(ref type_) = options.type_ {
@@ -402,10 +407,19 @@ impl LinkedDataProofs {
         document: &(dyn LinkedDataDocument + Sync),
         resolver: &dyn DIDResolver,
         context_loader: &mut ContextLoader,
+        nonce: Option<&String>,
+        disclosed_message_indices: Option<&Vec<usize>>,
     ) -> Result<VerificationWarnings, Error> {
         let suite = &proof.type_;
         suite
-            .verify(proof, document, resolver, context_loader)
+            .verify(
+                proof,
+                document,
+                resolver,
+                context_loader,
+                nonce,
+                disclosed_message_indices,
+            )
             .await
     }
 }
@@ -428,6 +442,7 @@ async fn urdna2015_normalize(
     let sigopts_dataset = proof
         .to_dataset_for_signing(Some(document), context_loader)
         .await?;
+    // this line is the issue, never makes it to 2
     let doc_dataset = document
         .to_dataset_for_signing(None, context_loader)
         .await?;
@@ -475,6 +490,258 @@ fn sha384_normalized(doc_normalized: String, sigopts_normalized: String) -> Resu
     Ok(data)
 }
 
+pub async fn generate_bbs_signature_pok(
+    document: &(dyn LinkedDataDocument + Sync),
+    nonce: &str,
+    proof: &Proof,
+    did_resolver: &dyn DIDResolver,
+    selectors: &[String],
+) -> Result<Proof, Error> {
+    let signature_with_header = proof
+        .jws
+        .as_ref()
+        .ok_or(Error::MissingProofSignature)?
+        .as_str();
+    let verification_method = proof
+        .verification_method
+        .as_ref()
+        .ok_or(Error::MissingVerificationMethod)?
+        .as_str();
+
+    let key = ssi_dids::did_resolve::resolve_key(verification_method, did_resolver).await?;
+
+    use ssi_jwk::Params as JWKParams;
+    let pk = match &key.params {
+        JWKParams::OKP(okp) => {
+            let Base64urlUInt(pk_bytes) = &okp.public_key;
+            PublicKey::try_from(pk_bytes.as_slice()).unwrap()
+        }
+        _ => {
+            return Err(Error::UnsupportedCurve);
+        }
+    };
+
+    let mut proof_without_jws = proof.clone();
+    proof_without_jws.jws = None;
+    let mut context_loader = ssi_json_ld::ContextLoader::default();
+    let payload =
+        to_jws_payload_v2(document, &proof_without_jws, &mut context_loader, true).await?;
+    let (_header, header_str) = ssi_jws::generate_header(Algorithm::BLS12381G2, &key).unwrap();
+
+    let start_index = signature_with_header.find("..").unwrap() + 2; // +2 for ..; todo: switch to ok_or
+    let signature_str = &signature_with_header[start_index..];
+
+    let signature_byte_vec = base64::decode_config(signature_str, base64::URL_SAFE_NO_PAD).unwrap();
+    assert!(
+        signature_byte_vec.len() == 112,
+        "Unexpected length for signature byte vector: {}",
+        signature_byte_vec.len()
+    );
+    let mut signature_bytes: [u8; 112] = [0; 112];
+    signature_bytes[..112].copy_from_slice(&signature_byte_vec[..112]);
+    let signature = Signature::from(&signature_bytes);
+
+    let mut proof_messages: Vec<ProofMessage> = Vec::new();
+    proof_messages.push(bbs::pm_hidden!(header_str.as_bytes()));
+    proof_messages.push(bbs::pm_hidden!(payload.sigopts_digest.as_ref()));
+
+    let mut revealed_message_indices = Vec::new();
+    for i in 0..payload.messages.len() {
+        let message_index = i + 2;
+
+        let message_bytes = payload.messages[i].as_bytes();
+
+        let mut disclose = false;
+        for s in selectors {
+            let m = payload.messages[i].as_str();
+            let needle = format!("/{}>", s);
+            if m.contains(needle.as_str()) {
+                disclose = true;
+                break;
+            }
+        }
+
+        if disclose {
+            revealed_message_indices.push(message_index);
+            let pm = bbs::pm_revealed!(message_bytes);
+            proof_messages.push(pm);
+        } else {
+            let pm = bbs::pm_hidden!(message_bytes);
+            proof_messages.push(pm);
+        }
+    }
+
+    let mut num_messages = payload.messages.len() + 2;
+    while num_messages < 100 {
+        proof_messages.push(bbs::pm_hidden!(b""));
+        num_messages += 1;
+    }
+
+    let proof_request =
+        Verifier::new_proof_request(revealed_message_indices.as_slice(), &pk).unwrap();
+    let pok = Prover::commit_signature_pok(&proof_request, proof_messages.as_slice(), &signature)
+        .unwrap();
+
+    let mut challenge_bytes = Vec::new();
+    challenge_bytes.extend_from_slice(pok.to_bytes().as_slice());
+    let nonce_bytes = base64::decode(nonce).unwrap();
+    challenge_bytes.extend_from_slice(nonce_bytes.as_slice());
+    let challenge = ProofChallenge::hash(&challenge_bytes);
+
+    let bbs_proof = Prover::generate_signature_pok(pok, &challenge).unwrap();
+    let bbs_proof_bytes = bbs_proof.to_bytes_compressed_form();
+    let bbs_proof_str = base64::encode_config(bbs_proof_bytes.as_slice(), base64::URL_SAFE_NO_PAD);
+    let proof_str = header_str + ".." + bbs_proof_str.as_str();
+
+    let mut proof_with_new_sig = proof.clone();
+    proof_with_new_sig.jws = Some(proof_str); // todo: change to proof/proofValue
+    Ok(proof_with_new_sig)
+}
+
+fn rename_blank_node_labels(orig: &[String]) -> Vec<String> {
+    use std::collections::HashMap;
+
+    // hash maps for properties, parents, and substitutions
+    let mut blank_node_props: HashMap<String, String> = HashMap::new();
+    let mut blank_node_parents: HashMap<String, String> = HashMap::new();
+    let mut blank_node_subs: HashMap<String, String> = HashMap::new();
+
+    let mut root_node: Option<&str> = None;
+
+    for nq in orig.iter() {
+        let split: Vec<&str> = nq.split(' ').collect();
+        let left = split[0];
+        let middle = split[1];
+        let _right = split[2];
+
+        if middle.ends_with("/credentials#credentialSubject>") {
+            root_node = Some(left);
+        }
+    }
+
+    blank_node_subs.insert(root_node.unwrap().to_owned(), "_d:0".to_owned());
+
+    for nq in orig.iter() {
+        let split: Vec<&str> = nq.split(' ').collect();
+        let left = split[0];
+        let middle = split[1];
+        let right = split[2];
+        if right.starts_with("_:c") {
+            //eprintln!("property={}, blank node label={}", middle, right);
+            blank_node_props.insert(right.to_owned(), middle.to_owned());
+            blank_node_parents.insert(right.to_owned(), left.to_owned());
+        }
+    }
+
+    //eprintln!("properties map: {:?}", &blank_node_props);
+    //eprintln!("parents map: {:?}", &blank_node_parents);
+
+    for (key, _value) in blank_node_parents.iter() {
+        //eprintln!("key: {}, value: {}", &key, &value);
+
+        let mut path = String::from("");
+        let mut curr = key.as_str();
+        while curr != root_node.unwrap() {
+            let prop = blank_node_props[curr].as_str();
+            path.push_str(prop);
+            path.push(':');
+
+            let parent = blank_node_parents[curr].as_str();
+            if parent.starts_with("_:c") {
+                curr = blank_node_parents[curr].as_str();
+            } else {
+                path.push_str(parent);
+                path.push(':');
+                break;
+            }
+        }
+
+        let hash = sha256(path.as_bytes());
+        let hash_string = base64::encode_config(hash.as_slice(), base64::URL_SAFE_NO_PAD);
+        let new_blank_node_label = "_d:".to_owned() + hash_string.as_str();
+        //eprintln!("key: {}, path: {:?}", key, new_blank_node_label.as_str());
+
+        assert!(!blank_node_subs.contains_key(key) || blank_node_subs[key] == new_blank_node_label, "This credential uses unsupported features. Please file an issue at https://github.com/spruceid/ssi/issues for assistance.");
+        blank_node_subs.insert(key.to_owned(), new_blank_node_label);
+    }
+
+    let mut rewritten: Vec<String> = Vec::new();
+
+    for nq in orig.iter() {
+        let split: Vec<&str> = nq.split(' ').collect();
+        let mut left = split[0];
+        let middle = split[1];
+        let mut right = split[2];
+
+        if left.starts_with("_:c") {
+            left = blank_node_subs[left].as_str();
+        }
+
+        if right.starts_with("_:c") {
+            right = blank_node_subs[right].as_str();
+        }
+
+        let nq_rewritten = vec![left, middle, right, "."].join(" ");
+        rewritten.push(nq_rewritten);
+    }
+
+    /*for nq in rewritten.iter() {
+        eprintln!("n-quad: {}", nq);
+    }*/
+
+    rewritten
+}
+
+pub async fn to_nquads(
+    document: &(dyn LinkedDataDocument + Sync),
+    context_loader: &mut ContextLoader,
+) -> Result<Vec<String>, Error> {
+    let doc_dataset = document
+        .to_dataset_for_signing(None, context_loader)
+        .await?;
+    let doc_normalized =
+        urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
+    Ok(doc_normalized)
+}
+
+async fn to_jws_payload_v2(
+    document: &(dyn LinkedDataDocument + Sync),
+    proof: &Proof,
+    context_loader: &mut ContextLoader,
+    stable_blank_node_labels: bool,
+) -> Result<JWSPayload, Error> {
+    let mut payload = JWSPayload {
+        header: String::new(),
+        messages: Vec::new(),
+        sigopts_digest: [0; 32],
+    };
+
+    let sigopts_dataset = proof
+        .to_dataset_for_signing(Some(document), context_loader)
+        .await?;
+    let sigopts_normalized =
+        urdna2015::normalize(sigopts_dataset.quads().map(QuadRef::from)).into_nquads();
+    payload.sigopts_digest = sha256(sigopts_normalized.as_bytes());
+    let doc_dataset = document
+        .to_dataset_for_signing(None, context_loader)
+        .await?;
+    let doc_normalized =
+        urdna2015::normalize(doc_dataset.quads().map(QuadRef::from)).into_nquads_vec();
+    if stable_blank_node_labels {
+        payload.messages = rename_blank_node_labels(&doc_normalized);
+    } else {
+        payload.messages = doc_normalized;
+    }
+
+    /*
+    for message in payload.messages.iter() {
+        eprintln!("[message] {}", message);
+    }*/
+
+    Ok(payload)
+}
+
+#[allow(clippy::too_many_arguments)]
 async fn sign(
     document: &(dyn LinkedDataDocument + Sync),
     options: &LinkedDataProofOptions,
@@ -492,7 +759,8 @@ async fn sign(
     let proof = Proof::new(type_)
         .with_options(options)
         .with_properties(extra_proof_properties);
-    sign_proof(document, proof, key, algorithm, context_loader).await
+    sign_proof_v2(document, proof, key, algorithm, context_loader).await
+    //sign_proof(document, proof, key, algorithm, context_loader).await
 }
 
 async fn sign_proof(
@@ -504,6 +772,21 @@ async fn sign_proof(
 ) -> Result<Proof, Error> {
     let message = to_jws_payload(document, &proof, context_loader).await?;
     let jws = ssi_jws::detached_sign_unencoded_payload(algorithm, &message, key)?;
+    proof.jws = Some(jws);
+    Ok(proof)
+}
+
+async fn sign_proof_v2(
+    document: &(dyn LinkedDataDocument + Sync),
+    mut proof: Proof,
+    key: &JWK,
+    algorithm: Algorithm,
+    context_loader: &mut ContextLoader,
+) -> Result<Proof, Error> {
+    let stable_blank_nodes = matches!(algorithm, Algorithm::BLS12381G2);
+    let mut jws_payload =
+        to_jws_payload_v2(document, &proof, context_loader, stable_blank_nodes).await?;
+    let jws = ssi_jws::detached_sign_unencoded_payload_v2(algorithm, &mut jws_payload, key)?;
     proof.jws = Some(jws);
     Ok(proof)
 }
@@ -640,6 +923,39 @@ async fn verify_nojws(
     let (_base, sig) = multibase::decode(proof_value)?;
     Ok(ssi_jws::verify_bytes_warnable(
         algorithm, &message, &key, &sig,
+    )?)
+}
+
+async fn verify_bbs_proof(
+    proof: &Proof,
+    document: &(dyn LinkedDataDocument + Sync),
+    resolver: &dyn DIDResolver,
+    context_loader: &mut ContextLoader,
+    algorithm: Algorithm,
+    nonce: Option<&String>,
+    disclosed_message_indices: Option<&Vec<usize>>,
+) -> Result<VerificationWarnings, Error> {
+    let proof_value = proof.jws.as_ref().ok_or(Error::MissingProofSignature)?;
+    let start_index = proof_value.find("..").unwrap() + 2;
+    let sig_str = &proof_value[start_index..];
+    let sig = base64::decode_config(sig_str, base64::URL_SAFE_NO_PAD).unwrap();
+
+    let verification_method = proof
+        .verification_method
+        .as_ref()
+        .ok_or(Error::MissingVerificationMethod)?;
+    let key = resolve_key(verification_method, resolver).await?;
+    let mut payload = to_jws_payload_v2(document, proof, context_loader, true).await?;
+    let (_, header_b64) = ssi_jws::generate_header(algorithm, &key)?;
+    payload.header = header_b64;
+
+    Ok(ssi_jws::verify_payload(
+        algorithm,
+        &key,
+        &payload,
+        sig.as_slice(),
+        disclosed_message_indices,
+        nonce,
     )?)
 }
 
