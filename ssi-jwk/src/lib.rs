@@ -525,13 +525,11 @@ impl JWK {
                 },
                 Err(_) => Err(Error::MultibaseKeyPrefix),
             },
-            "Bls12381G2Key2020" => {
-                Ok(Self::from(Params::OKP(OctetParams {
-                    curve: "Bls12381G2".to_string(),
-                    public_key: Base64urlUInt(pk_bytes[2..].to_owned()),
-                    private_key: None,
-                })))
-            },
+            "Bls12381G2Key2020" => Ok(Self::from(Params::OKP(OctetParams {
+                curve: "Bls12381G2".to_string(),
+                public_key: Base64urlUInt(pk_bytes[2..].to_owned()),
+                private_key: None,
+            }))),
             _ => Err(Error::UnsupportedKeyType),
         }
     }
