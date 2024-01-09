@@ -2,7 +2,10 @@
 
 use core::fmt;
 use linked_data::rdf_types::{Interpretation, Vocabulary};
-use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
+use linked_data::{
+    LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
+    LinkedDataPredicateObjects, LinkedDataSubject,
+};
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
@@ -11,6 +14,10 @@ use std::{convert::TryFrom, str::FromStr};
 use zeroize::Zeroize;
 pub mod error;
 pub use error::Error;
+
+pub mod algorithm;
+
+pub use algorithm::Algorithm;
 
 #[cfg(feature = "ripemd-160")]
 pub mod ripemd160;
@@ -96,41 +103,7 @@ impl fmt::Display for JWK {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for JWK {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
-        use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
-
-        let mut value = json_syntax::to_value(self).unwrap();
-        value.canonicalize();
-
-        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
-            RdfLiteral::Json(value),
-        ))))
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for JWK {
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for JWK {
-    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<V, I>,
-    {
-        visitor.end()
-    }
-}
+linked_data::json_literal!(JWK);
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq, Zeroize)]
 #[serde(tag = "kty")]
@@ -283,43 +256,6 @@ pub struct Prime {
 pub struct Base64urlUInt(pub Vec<u8>);
 type Base64urlUIntString = String;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Hash, Eq)]
-pub enum Algorithm {
-    HS256,
-    HS384,
-    HS512,
-    RS256,
-    RS384,
-    RS512,
-    PS256,
-    PS384,
-    PS512,
-    EdDSA,
-    EdBlake2b,
-    ES256,
-    ES384,
-    ES256K,
-    /// <https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r>
-    #[serde(rename = "ES256K-R")]
-    ES256KR,
-    /// like ES256K-R but using Keccak-256 instead of SHA-256
-    #[serde(rename = "ES256K-R")]
-    ESKeccakKR,
-    ESBlake2b,
-    ESBlake2bK,
-    #[doc(hidden)]
-    AleoTestnet1Signature,
-    // Per the specs it should only be `none` but `None` is kept for backwards compatibility
-    #[serde(rename = "none", alias = "None")]
-    None,
-}
-
-impl Default for Algorithm {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
 impl JWK {
     #[cfg(feature = "ed25519")]
     pub fn generate_ed25519() -> Result<JWK, Error> {
@@ -448,6 +384,10 @@ impl JWK {
         let mut key = self.clone();
         key.params = key.params.to_public();
         key
+    }
+
+    pub fn is_public(&self) -> bool {
+        self.params.is_public()
     }
 
     /// Compare JWK equality by public key properties.
@@ -595,6 +535,15 @@ impl ToASN1 for JWK {
 }
 
 impl Params {
+    pub fn is_public(&self) -> bool {
+        match self {
+            Self::EC(params) => params.is_public(),
+            Self::RSA(params) => params.is_public(),
+            Self::Symmetric(params) => params.is_public(),
+            Self::OKP(params) => params.is_public(),
+        }
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         match self {
@@ -607,6 +556,10 @@ impl Params {
 }
 
 impl ECParams {
+    pub fn is_public(&self) -> bool {
+        self.ecc_private_key.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self {
@@ -619,6 +572,16 @@ impl ECParams {
 }
 
 impl RSAParams {
+    pub fn is_public(&self) -> bool {
+        self.private_exponent.is_none()
+            && self.first_prime_factor.is_none()
+            && self.second_prime_factor.is_none()
+            && self.first_prime_factor_crt_exponent.is_none()
+            && self.second_prime_factor_crt_exponent.is_none()
+            && self.first_crt_coefficient.is_none()
+            && self.other_primes_info.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self {
@@ -709,6 +672,10 @@ impl ToASN1 for RSAParams {
 }
 
 impl SymmetricParams {
+    pub fn is_public(&self) -> bool {
+        self.key_value.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self { key_value: None }
@@ -716,6 +683,10 @@ impl SymmetricParams {
 }
 
 impl OctetParams {
+    pub fn is_public(&self) -> bool {
+        self.private_key.is_none()
+    }
+
     /// Strip private key material
     pub fn to_public(&self) -> Self {
         Self {

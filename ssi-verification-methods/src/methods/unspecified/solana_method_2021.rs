@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
@@ -16,7 +15,17 @@ pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
 // pub const SOLANA_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#SolanaMethod2021");
 
 /// Solana Method 2021.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "SolanaMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:SolanaMethod2021")]
@@ -75,6 +84,14 @@ impl VerificationMethod for SolanaMethod2021 {
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for SolanaMethod2021 {
@@ -88,6 +105,10 @@ impl TypedVerificationMethod for SolanaMethod2021 {
 
     /// Returns the type of the key.
     fn type_(&self) -> &str {
+        SOLANA_METHOD_2021_TYPE
+    }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         SOLANA_METHOD_2021_TYPE
     }
 }

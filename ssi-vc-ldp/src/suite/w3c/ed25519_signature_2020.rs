@@ -25,6 +25,10 @@ pub use verification::method::Ed25519VerificationKey2020;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Ed25519Signature2020;
 
+impl Ed25519Signature2020 {
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Ed25519Signature2020");
+}
+
 impl_rdf_input_urdna2015!(Ed25519Signature2020);
 
 impl CryptographicSuite for Ed25519Signature2020 {
@@ -39,10 +43,12 @@ impl CryptographicSuite for Ed25519Signature2020 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#Ed25519Signature2020")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -93,17 +99,21 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         futures::future::Map<S::Sign<'a>, MessageBuilder>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
-        method: &Ed25519VerificationKey2020,
+        _method: &Ed25519VerificationKey2020,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        signer.sign((), bytes).map(build_signature)
+        signer
+            .sign(ssi_jwk::algorithm::EdDSA, (), bytes)
+            .map(build_signature)
     }
 
     fn verify(

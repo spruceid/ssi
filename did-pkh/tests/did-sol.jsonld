@@ -3,6 +3,7 @@
     "https://www.w3.org/ns/did/v1",
     {
       "blockchainAccountId": "https://w3id.org/security#blockchainAccountId",
+      "publicKeyBase58": "https://w3id.org/security#publicKeyBase58",
       "publicKeyJwk": {
         "@id": "https://w3id.org/security#publicKeyJwk",
         "@type": "@json"
@@ -18,11 +19,7 @@
       "type": "Ed25519VerificationKey2018",
       "controller": "did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
       "blockchainAccountId": "solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
-      "publicKeyJwk": {
-        "kty": "OKP",
-        "crv": "Ed25519",
-        "x": "qDkywhH-S6nNxQhA6SHKsoFW7A2gX-X0b3TtwVBMHm8"
-      }
+      "publicKeyBase58": "CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev"
     },
     {
       "id": "did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev#SolanaMethod2021",

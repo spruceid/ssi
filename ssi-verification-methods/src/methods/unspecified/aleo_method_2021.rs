@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -26,7 +25,17 @@ pub const ALEO_METHOD_2021_TYPE: &str = "AleoMethod2021";
 /// network id "1" (CAIP-2 "aleo:1" / [Aleo Testnet I][testnet1]) is supported. The account
 /// address format is documented in [Aleo
 /// documentation](https://developer.aleo.org/aleo/concepts/accounts#account-address).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "AleoMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:AleoMethod2021")]
@@ -63,6 +72,14 @@ impl VerificationMethod for AleoMethod2021 {
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for AleoMethod2021 {
@@ -75,6 +92,10 @@ impl TypedVerificationMethod for AleoMethod2021 {
     }
 
     fn type_(&self) -> &str {
+        ALEO_METHOD_2021_TYPE
+    }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         ALEO_METHOD_2021_TYPE
     }
 }

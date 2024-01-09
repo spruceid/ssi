@@ -57,14 +57,14 @@ impl fmt::Display for EthereumAddressBuf {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I>
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V>
     for EthereumAddressBuf
 {
     fn interpretation(
         &self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
+    ) -> linked_data::ResourceInterpretation<I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
@@ -72,20 +72,20 @@ impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I>
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for EthereumAddressBuf {
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for EthereumAddressBuf {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
+        S: linked_data::PredicateObjectsVisitor<I, V>,
     {
         visitor.object(self)?;
         visitor.end()
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for EthereumAddressBuf {
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for EthereumAddressBuf {
     fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<V, I>,
+        S: linked_data::SubjectVisitor<I, V>,
     {
         visitor.end()
     }
@@ -114,12 +114,12 @@ impl EthereumAddress {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for EthereumAddress {
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V> for EthereumAddress {
     fn interpretation(
         &self,
         _vocabulary: &mut V,
         _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
+    ) -> linked_data::ResourceInterpretation<I, V> {
         use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteralRef, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(Term::Literal(
             RdfLiteralRef::Xsd(xsd_types::ValueRef::String(&self.0)),
@@ -127,20 +127,20 @@ impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<V, I> for
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for EthereumAddress {
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for EthereumAddress {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
+        S: linked_data::PredicateObjectsVisitor<I, V>,
     {
         visitor.object(self)?;
         visitor.end()
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for EthereumAddress {
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for EthereumAddress {
     fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<V, I>,
+        S: linked_data::SubjectVisitor<I, V>,
     {
         visitor.end()
     }

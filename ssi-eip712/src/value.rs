@@ -1,3 +1,4 @@
+use core::fmt;
 use indexmap::{Equivalent, IndexMap};
 use linked_data::{
     LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
@@ -15,7 +16,7 @@ mod serialize;
 pub use serialize::{to_struct, to_value, InvalidValue};
 
 /// EIP-712 structure instance.
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(transparent)]
 pub struct Struct(IndexMap<String, Value>);
 
@@ -84,8 +85,41 @@ impl FromIterator<(StructName, Value)> for Struct {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ValueKind {
+    String,
+    Bytes,
+    Array,
+    Struct,
+    Bool,
+    Integer,
+}
+
+impl ValueKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Bytes => "bytes",
+            Self::Array => "array",
+            Self::Struct => "struct",
+            Self::Bool => "bool",
+            Self::Integer => "integer",
+        }
+    }
+
+    pub fn into_str(self) -> &'static str {
+        self.as_str()
+    }
+}
+
+impl fmt::Display for ValueKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
 /// EIP-712 values, JSON-compatible
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Value {
     String(String),
     Bytes(Vec<u8>),
@@ -96,6 +130,17 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn kind(&self) -> ValueKind {
+        match self {
+            Self::String(_) => ValueKind::String,
+            Self::Bytes(_) => ValueKind::Bytes,
+            Self::Array(_) => ValueKind::Array,
+            Self::Struct(_) => ValueKind::Struct,
+            Self::Bool(_) => ValueKind::Bool,
+            Self::Integer(_) => ValueKind::Integer,
+        }
+    }
+
     pub fn as_bool(&self) -> Option<bool> {
         match self {
             Value::Bool(b) => Some(*b),
@@ -157,53 +202,22 @@ impl From<Value> for serde_json::Value {
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataResource<V, I> for Value {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<V, I> {
-        linked_data::ResourceInterpretation::Uninterpreted(Some(linked_data::CowRdfTerm::Owned(
-            rdf_types::Term::Literal(linked_data::RdfLiteral::Json(
-                json_syntax::to_value(self).unwrap(),
-            )),
-        )))
-    }
-}
+linked_data::json_literal!(Value);
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<V, I> for Value {
-    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<V, I>,
-    {
-        serializer.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<V, I> for Value {
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<V, I>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<V, I> for Value {
+impl<V: Vocabulary, I: Interpretation> LinkedDataGraph<I, V> for Value {
     fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::GraphVisitor<V, I>,
+        S: linked_data::GraphVisitor<I, V>,
     {
         visitor.subject(self)?;
         visitor.end()
     }
 }
 
-impl<V: Vocabulary, I: Interpretation> LinkedData<V, I> for Value {
+impl<V: Vocabulary, I: Interpretation> LinkedData<I, V> for Value {
     fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::Visitor<V, I>,
+        S: linked_data::Visitor<I, V>,
     {
         visitor.default_graph(self)?;
         visitor.end()

@@ -16,3 +16,4 @@ static-iref.workspace = true
 serde.workspace = true
 linked-data.workspace = true
 xsd-types.workspace = true
+multibase.workspace = true

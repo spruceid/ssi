@@ -94,8 +94,13 @@ impl DIDTz {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 pub type ResolveMethodRepresentation<'a> =
     Pin<Box<dyn 'a + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type ResolveMethodRepresentation<'a> =
+    Pin<Box<dyn 'a + Send + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
 
 impl DIDMethodResolver for DIDTz {
     type ResolveMethodRepresentation<'a> = ResolveMethodRepresentation<'a>;

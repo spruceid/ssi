@@ -47,6 +47,10 @@ use crate::{
 /// [2]: <https://github.com/multiformats/multibase>
 pub struct AleoSignature2021;
 
+impl AleoSignature2021 {
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#AleoSignature2021");
+}
+
 const BLOCKCHAIN_NETWORK_ID: &str = "1";
 const BLOCKCHAIN_NAMESPACE: &str = "aleo";
 
@@ -71,10 +75,12 @@ impl CryptographicSuite for AleoSignature2021 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#AleoSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -112,10 +118,12 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = Base58BtcMultibase;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         method: VerificationMethodRef,

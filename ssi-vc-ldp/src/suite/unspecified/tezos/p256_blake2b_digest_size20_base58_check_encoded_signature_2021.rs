@@ -1,6 +1,6 @@
 use super::{Options, OptionsRef};
+use iref::Iri;
 use ssi_crypto::MessageSigner;
-use ssi_jwk::Algorithm;
 use ssi_verification_methods::{
     P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
 };
@@ -14,6 +14,11 @@ use crate::{
 
 /// Proof type used with [did:tz](https://github.com/spruceid/did-tezos/) `tz3` addresses.
 pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+
+impl P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021");
+}
 
 impl_rdf_input_urdna2015!(P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
 
@@ -30,10 +35,12 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ESBlake2b;
+
     type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -131,20 +138,24 @@ impl
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ESBlake2b;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         options: OptionsRef<'a>,
         _method: &P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        let header = ssi_jws::Header::new_unencoded(
-            Algorithm::ESBlake2b,
+        SignIntoDetachedJws::new(
+            bytes,
+            signer,
             options.public_key_jwk.key_id.clone(),
-        );
-        SignIntoDetachedJws::new(header, bytes, signer)
+            ssi_jwk::algorithm::ESBlake2b,
+        )
     }
 
     fn verify(

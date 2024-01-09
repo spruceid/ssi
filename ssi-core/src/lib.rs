@@ -26,12 +26,6 @@ pub trait ProofConstruction<P, C, I, O, S> {
     fn complete(payload: P, context_properties: C, proof: S) -> Result<O, Self::Error>;
 }
 
-#[async_trait]
-pub trait Verifiable<V, C> {
-    type Error;
-    async fn verify_with(&self, vm: V, c: C) -> Result<(), Self::Error>;
-}
-
 pub trait Authenticated {
     type Id;
     fn authenticator(&self) -> Self::Id;

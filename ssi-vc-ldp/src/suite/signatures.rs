@@ -1,20 +1,25 @@
+use pin_project::pin_project;
+use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
+use ssi_crypto::{MessageSignatureError, MessageSigner};
+use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_verification_methods::{
+    covariance_rule, InvalidSignature, Referencable, SignatureError, VerificationError,
+};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::{future::Future, task};
 
-use linked_data::LinkedData;
-use pin_project::pin_project;
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
-use ssi_crypto::{MessageSignatureError, MessageSigner};
-use ssi_jwk::JWK;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
-use ssi_verification_methods::{covariance_rule, InvalidSignature, Referencable, SignatureError};
+use crate::eip712::Eip712Metadata;
 
-mod eip712;
-
-pub use eip712::*;
-
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[serde(rename_all = "camelCase")]
 pub struct AnySignature {
@@ -33,14 +38,13 @@ pub struct AnySignature {
     #[ld("https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<Eip712Metadata>,
+    // #[ld("sec:publicKeyJwk")]
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub public_key_jwk: Option<Box<JWK>>,
 
-    #[ld("sec:publicKeyJwk")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key_jwk: Option<Box<JWK>>,
-
-    #[ld("sec:publicKeyMultibase")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub public_key_multibase: Option<String>,
+    // #[ld("sec:publicKeyMultibase")]
+    // #[serde(skip_serializing_if = "Option::is_none")]
+    // pub public_key_multibase: Option<MultibaseBuf>,
 }
 
 impl Referencable for AnySignature {
@@ -52,8 +56,8 @@ impl Referencable for AnySignature {
             signature_value: self.signature_value.as_deref(),
             jws: self.jws.as_deref(),
             eip712: self.eip712.as_ref(),
-            public_key_jwk: self.public_key_jwk.as_deref(),
-            public_key_multibase: self.public_key_multibase.as_deref(),
+            // public_key_jwk: self.public_key_jwk.as_deref(),
+            // public_key_multibase: self.public_key_multibase.as_deref(),
         }
     }
 
@@ -69,14 +73,13 @@ pub struct AnySignatureRef<'a> {
     pub jws: Option<&'a CompactJWSStr>,
 
     pub eip712: Option<&'a Eip712Metadata>,
+    // pub public_key_jwk: Option<&'a JWK>,
 
-    pub public_key_jwk: Option<&'a JWK>,
-
-    pub public_key_multibase: Option<&'a str>,
+    // pub public_key_multibase: Option<&'a Multibase>,
 }
 
 /// Common signature format where the proof value is multibase-encoded.
-#[derive(Debug, Clone, LinkedData)]
+#[derive(Debug, Clone, linked_data::Serialize, linked_data::Deserialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct MultibaseSignature {
     /// Multibase encoded signature.
@@ -122,7 +125,14 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for MultibaseSignatureRef<'a> {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct JwsSignature {
     #[ld("sec:jws")]
@@ -154,11 +164,27 @@ impl From<JwsSignature> for AnySignature {
     }
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, LinkedData)]
+#[derive(
+    Debug, Clone, Copy, serde::Serialize, linked_data::Serialize, linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct JwsSignatureRef<'a> {
     #[ld("sec:jws")]
     pub jws: &'a CompactJWSStr,
+}
+
+impl<'a> JwsSignatureRef<'a> {
+    /// Decodes the signature for the given message.
+    ///
+    /// Returns the signing bytes and the signature bytes.
+    pub fn decode(&self, message: &[u8]) -> Result<(Vec<u8>, Vec<u8>), VerificationError> {
+        let (header, _, signature_bytes) = self
+            .jws
+            .decode()
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        let signing_bytes = header.encode_signing_bytes(message);
+        Ok((signing_bytes, signature_bytes))
+    }
 }
 
 impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
@@ -172,9 +198,11 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
     }
 }
 
-struct UnboundSignIntoDetachedJws<S>(PhantomData<S>);
+struct UnboundSignIntoDetachedJws<S, A>(PhantomData<(S, A)>);
 
-impl<'a, S: 'a + MessageSigner> UnboundedRefFuture<'a> for UnboundSignIntoDetachedJws<S> {
+impl<'a, A: 'a, S: 'a + MessageSigner<A>> UnboundedRefFuture<'a>
+    for UnboundSignIntoDetachedJws<S, A>
+{
     type Owned = Vec<u8>;
 
     type Bound<'r> = S::Sign<'r> where 'a: 'r;
@@ -182,41 +210,50 @@ impl<'a, S: 'a + MessageSigner> UnboundedRefFuture<'a> for UnboundSignIntoDetach
     type Output = Result<Vec<u8>, MessageSignatureError>;
 }
 
-struct SignIntoDetachedJwsBinder<S> {
+struct SignIntoDetachedJwsBinder<S, A> {
     // signing_bytes: Vec<u8>
     signer: S,
+
+    algorithm: A,
 }
 
-impl<'a, S: 'a + MessageSigner> RefFutureBinder<'a, UnboundSignIntoDetachedJws<S>>
-    for SignIntoDetachedJwsBinder<S>
+impl<'a, A: 'a, S: 'a + MessageSigner<A>> RefFutureBinder<'a, UnboundSignIntoDetachedJws<S, A>>
+    for SignIntoDetachedJwsBinder<S, A>
 {
     fn bind<'r>(context: Self, value: &'r Vec<u8>) -> S::Sign<'r>
     where
         'a: 'r,
     {
-        context.signer.sign((), value)
+        context.signer.sign(context.algorithm, (), value)
     }
 }
 
 #[pin_project]
-pub struct SignIntoDetachedJws<'a, S: 'a + MessageSigner> {
+pub struct SignIntoDetachedJws<'a, S: 'a + MessageSigner<A>, A: 'a> {
     header: Option<ssi_jws::Header>,
 
     #[pin]
-    sign: SelfRefFuture<'a, UnboundSignIntoDetachedJws<S>>,
+    sign: SelfRefFuture<'a, UnboundSignIntoDetachedJws<S, A>>,
 }
 
-impl<'a, S: 'a + MessageSigner> SignIntoDetachedJws<'a, S> {
-    pub fn new(header: ssi_jws::Header, payload: &[u8], signer: S) -> Self {
+impl<'a, A: Clone + Into<ssi_jwk::Algorithm>, S: 'a + MessageSigner<A>>
+    SignIntoDetachedJws<'a, S, A>
+{
+    pub fn new(payload: &[u8], signer: S, key_id: Option<String>, algorithm: A) -> Self {
+        let header = ssi_jws::Header::new_unencoded(algorithm.clone().into(), key_id);
+
         let signing_bytes = header.encode_signing_bytes(payload);
         Self {
             header: Some(header),
-            sign: SelfRefFuture::new(signing_bytes, SignIntoDetachedJwsBinder { signer }),
+            sign: SelfRefFuture::new(
+                signing_bytes,
+                SignIntoDetachedJwsBinder { signer, algorithm },
+            ),
         }
     }
 }
 
-impl<'a, S: 'a + MessageSigner> Future for SignIntoDetachedJws<'a, S> {
+impl<'a, A, S: 'a + MessageSigner<A>> Future for SignIntoDetachedJws<'a, S, A> {
     type Output = Result<JwsSignature, SignatureError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {

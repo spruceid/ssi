@@ -42,6 +42,10 @@ use crate::{
 /// The [`SolanaWallet`] protocol is used.
 pub struct SolanaSignature2021;
 
+impl SolanaSignature2021 {
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#SolanaSignature2021");
+}
+
 impl_rdf_input_urdna2015!(SolanaSignature2021);
 
 impl CryptographicSuite for SolanaSignature2021 {
@@ -56,10 +60,12 @@ impl CryptographicSuite for SolanaSignature2021 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#SolanaSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -180,10 +186,12 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     type Protocol = Base58Btc;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         method: &SolanaMethod2021,

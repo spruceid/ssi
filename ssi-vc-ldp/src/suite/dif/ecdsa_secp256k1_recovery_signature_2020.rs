@@ -1,6 +1,9 @@
+use iref::Iri;
 use ssi_crypto::MessageSigner;
-use ssi_jwk::Algorithm;
-use ssi_verification_methods::{EcdsaSecp256k1RecoveryMethod2020, VerificationError};
+use ssi_verification_methods::{
+    ecdsa_secp_256k1_recovery_method_2020::DigestFunction, EcdsaSecp256k1RecoveryMethod2020,
+    VerificationError,
+};
 use static_iref::iri;
 
 use crate::{
@@ -13,6 +16,10 @@ use crate::{
 ///
 /// See: <https://identity.foundation/EcdsaSecp256k1RecoverySignature2020/>
 pub struct EcdsaSecp256k1RecoverySignature2020;
+
+impl EcdsaSecp256k1RecoverySignature2020 {
+    pub const IRI: &'static Iri = iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020");
+}
 
 impl_rdf_input_urdna2015!(EcdsaSecp256k1RecoverySignature2020);
 
@@ -29,10 +36,12 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -63,20 +72,19 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         _method: &EcdsaSecp256k1RecoveryMethod2020,
         bytes: &[u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        let header = ssi_jws::Header::new_unencoded(
-            Algorithm::ES256KR,
-            None, // TODO should we use method id as key id?
-        );
-        SignIntoDetachedJws::new(header, bytes, signer)
+        SignIntoDetachedJws::new(bytes, signer, None, ssi_jwk::algorithm::ES256KR)
     }
 
     fn verify(
@@ -92,6 +100,6 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
             .map_err(|_| VerificationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(bytes);
 
-        method.verify_bytes(&signing_bytes, &signature)
+        method.verify_bytes(&signing_bytes, &signature, DigestFunction::Sha256)
     }
 }

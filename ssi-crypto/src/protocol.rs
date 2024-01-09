@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use crate::MessageSignatureError;
+
 /// Signature protocol.
 ///
 /// Specifies how the client and signer communicates together to produce a
@@ -17,13 +19,17 @@ use std::borrow::Cow;
 /// The simplest protocol is described by the unit `()` type, where the raw
 /// message is transmitted to the signer, which must sign it and return the
 /// raw bytes.
-pub trait SignatureProtocol {
+pub trait SignatureProtocol<A> {
     fn prepare_message<'b>(&self, bytes: &'b [u8]) -> Cow<'b, [u8]> {
         Cow::Borrowed(bytes)
     }
 
-    fn encode_signature(&self, signature: Vec<u8>) -> Vec<u8> {
-        signature
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(signature)
     }
 
     fn decode_signature<'s>(
@@ -38,7 +44,7 @@ pub trait SignatureProtocol {
 #[error("invalid protocol signature")]
 pub struct InvalidProtocolSignature;
 
-impl SignatureProtocol for () {}
+impl<A> SignatureProtocol<A> for () {}
 
 /// Base58Btc Multibase protocol.
 ///
@@ -70,9 +76,13 @@ impl Base58BtcMultibase {
     }
 }
 
-impl SignatureProtocol for Base58BtcMultibase {
-    fn encode_signature(&self, signature: Vec<u8>) -> Vec<u8> {
-        Self::encode_signature(&signature)
+impl<A> SignatureProtocol<A> for Base58BtcMultibase {
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(Self::encode_signature(&signature))
     }
 
     fn decode_signature<'s>(
@@ -103,11 +113,15 @@ impl Base58Btc {
     }
 }
 
-impl SignatureProtocol for Base58Btc {
+impl<A> SignatureProtocol<A> for Base58Btc {
     /// Encode the signature in base58 (bitcoin alphabet) as required by this
     /// protocol.
-    fn encode_signature(&self, signature: Vec<u8>) -> Vec<u8> {
-        Self::encode_signature(&signature)
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(Self::encode_signature(&signature))
     }
 
     fn decode_signature<'s>(
@@ -124,6 +138,7 @@ impl SignatureProtocol for Base58Btc {
 /// suite. The signer (the Ethereum Wallet) must prefix the message with
 /// `\x19Ethereum Signed Message:\n` followed by the byte length of the message
 /// and send back the signature encoded in hexadecimal, with a `0x` prefix.
+/// The recovery ID in the signature must start at 27 instead of 0.
 pub struct EthereumWallet;
 
 impl EthereumWallet {
@@ -134,10 +149,19 @@ impl EthereumWallet {
     }
 
     pub fn encode_signature(signature: &[u8]) -> Vec<u8> {
+        assert_eq!(signature.len(), 65);
         let mut result = Vec::new();
         result.extend_from_slice(b"0x");
-        result.resize(2 + signature.len() * 2, 0);
-        hex::encode_to_slice(signature, &mut result[2..]).unwrap();
+        result.resize(132, 0);
+
+        // Encode without the recovery ID.
+        hex::encode_to_slice(&signature[..64], &mut result[2..130]).unwrap();
+
+        // Encode the recovery ID, offset by 27.
+        let rec_id = signature[64] + 27;
+        hex::encode_to_slice(std::slice::from_ref(&rec_id), &mut result[130..]).unwrap();
+
+        // Send back the result.
         result
     }
 
@@ -145,17 +169,25 @@ impl EthereumWallet {
         let hex = encoded_signature
             .strip_prefix(b"0x")
             .ok_or(InvalidProtocolSignature)?;
-        hex::decode(hex).map_err(|_| InvalidProtocolSignature)
+
+        let mut signature = hex::decode(hex).map_err(|_| InvalidProtocolSignature)?;
+        signature[64] -= 27; // Offset the recovery ID by -27.
+
+        Ok(signature)
     }
 }
 
-impl SignatureProtocol for EthereumWallet {
+impl<A> SignatureProtocol<A> for EthereumWallet {
     fn prepare_message<'b>(&self, bytes: &'b [u8]) -> Cow<'b, [u8]> {
         Cow::Owned(Self::prepare_message(bytes))
     }
 
-    fn encode_signature(&self, signature: Vec<u8>) -> Vec<u8> {
-        Self::encode_signature(&signature)
+    fn encode_signature(
+        &self,
+        _algorithm: A,
+        signature: Vec<u8>,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(Self::encode_signature(&signature))
     }
 
     fn decode_signature<'s>(

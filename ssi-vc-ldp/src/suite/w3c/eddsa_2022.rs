@@ -24,6 +24,10 @@ pub use verification::method::Multikey;
 #[derive(Debug, Default, Clone, Copy)]
 pub struct EdDsa2022;
 
+impl EdDsa2022 {
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#DataIntegrityProof");
+}
+
 impl_rdf_input_urdna2015!(EdDsa2022);
 
 impl CryptographicSuite for EdDsa2022 {
@@ -38,10 +42,12 @@ impl CryptographicSuite for EdDsa2022 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#DataIntegrityProof")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -71,10 +77,12 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         method: &Multikey,

@@ -1,6 +1,6 @@
 use super::{Options, OptionsRef};
+use iref::Iri;
 use ssi_crypto::MessageSigner;
-use ssi_jwk::Algorithm;
 use ssi_verification_methods::{
     Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
 };
@@ -16,6 +16,11 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 
+impl Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021");
+}
+
 impl_rdf_input_urdna2015!(Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
 
 impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
@@ -30,10 +35,12 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
+
     type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -66,20 +73,24 @@ impl
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> = SignIntoDetachedJws<'a, S>;
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         options: OptionsRef<'a>,
         _method: &Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
         bytes: &'a [u8],
         signer: S,
     ) -> Self::Sign<'a, S> {
-        let header = ssi_jws::Header::new_unencoded(
-            Algorithm::EdBlake2b,
+        SignIntoDetachedJws::new(
+            bytes,
+            signer,
             options.public_key_jwk.key_id.clone(),
-        );
-        SignIntoDetachedJws::new(header, bytes, signer)
+            ssi_jwk::algorithm::EdBlake2b,
+        )
     }
 
     fn verify(

@@ -6,7 +6,11 @@ pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
 use core::fmt;
 pub use error::Error;
-use linked_data::{LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef};
+use linked_data::{
+    rdf_types, LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
+    LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef,
+};
+use rdf_types::{Interpretation, Vocabulary, RDF_LANG_STRING};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use std::borrow::Cow;
@@ -432,12 +436,12 @@ impl FromStr for CompactJWSString {
     }
 }
 
-impl LinkedDataResource for CompactJWSString {
+impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for CompactJWSString {
     fn interpretation(
         &self,
-        _vocabulary: &mut (),
-        _interpretation: &mut (),
-    ) -> linked_data::ResourceInterpretation<(), ()> {
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
         use linked_data::{xsd_types::ValueRef, CowRdfTerm, RdfLiteralRef, ResourceInterpretation};
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(RdfTermRef::Literal(
             RdfLiteralRef::Xsd(ValueRef::String(&self.0)),
@@ -445,22 +449,135 @@ impl LinkedDataResource for CompactJWSString {
     }
 }
 
-impl LinkedDataSubject for CompactJWSString {
+impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for CompactJWSString {
     fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::SubjectVisitor<(), ()>,
+        S: linked_data::SubjectVisitor<I, V>,
     {
         serializer.end()
     }
 }
 
-impl LinkedDataPredicateObjects for CompactJWSString {
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for CompactJWSString
+where
+    V: linked_data::rdf_types::Vocabulary<
+        Type = linked_data::rdf_types::literal::Type<
+            <V as linked_data::rdf_types::IriVocabulary>::Iri,
+            <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag,
+        >,
+    >,
+    V::Value: AsRef<str>,
+    I: linked_data::rdf_types::ReverseIriInterpretation<Iri = V::Iri>
+        + linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+{
+    fn deserialize_subject_in<D>(
+        vocabulary: &V,
+        interpretation: &I,
+        _dataset: &D,
+        _graph: &D::Graph,
+        resource: &I::Resource,
+        context: linked_data::Context<I>,
+    ) -> Result<Self, linked_data::FromLinkedDataError>
+    where
+        D: linked_data::grdf::Dataset<
+            Subject = I::Resource,
+            Predicate = I::Resource,
+            Object = I::Resource,
+            GraphLabel = I::Resource,
+        >,
+    {
+        use linked_data::rdf_types::literal;
+
+        let mut literal_ty = None;
+        for l in interpretation.literals_of(resource) {
+            let literal = vocabulary.literal(l).unwrap();
+
+            match literal.type_() {
+                literal::Type::Any(ty) => {
+                    let ty_iri = vocabulary.iri(ty).unwrap();
+
+                    if ty_iri == linked_data::xsd_types::XSD_STRING {
+                        return literal.value().as_ref().parse().map_err(|_| {
+                            linked_data::FromLinkedDataError::InvalidLiteral(
+                                context.into_iris(vocabulary, interpretation),
+                            )
+                        });
+                    }
+
+                    literal_ty = Some(ty_iri)
+                }
+                literal::Type::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
+            }
+        }
+
+        match literal_ty {
+            Some(ty) => Err(linked_data::FromLinkedDataError::LiteralTypeMismatch {
+                context: context.into_iris(vocabulary, interpretation),
+                expected: Some(linked_data::xsd_types::XSD_STRING.to_owned()),
+                found: ty.to_owned(),
+            }),
+            None => Err(linked_data::FromLinkedDataError::ExpectedLiteral(
+                context.into_iris(vocabulary, interpretation),
+            )),
+        }
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for CompactJWSString {
     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
     where
-        S: linked_data::PredicateObjectsVisitor<(), ()>,
+        S: linked_data::PredicateObjectsVisitor<I, V>,
     {
         visitor.object(self)?;
         visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V>
+    for CompactJWSString
+where
+    V: linked_data::rdf_types::Vocabulary<
+        Type = linked_data::rdf_types::literal::Type<
+            <V as linked_data::rdf_types::IriVocabulary>::Iri,
+            <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag,
+        >,
+    >,
+    V::Value: AsRef<str>,
+    I: linked_data::rdf_types::ReverseIriInterpretation<Iri = V::Iri>
+        + linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+{
+    fn deserialize_objects_in<'a, D>(
+        vocabulary: &V,
+        interpretation: &I,
+        dataset: &D,
+        graph: &D::Graph,
+        objects: impl IntoIterator<Item = &'a I::Resource>,
+        context: linked_data::Context<I>,
+    ) -> Result<Self, linked_data::FromLinkedDataError>
+    where
+        I::Resource: 'a,
+        D: linked_data::grdf::Dataset<
+            Subject = I::Resource,
+            Predicate = I::Resource,
+            Object = I::Resource,
+            GraphLabel = I::Resource,
+        >,
+    {
+        let mut objects = objects.into_iter();
+        match objects.next() {
+            Some(object) => {
+                if objects.next().is_none() {
+                    Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
+                } else {
+                    Err(linked_data::FromLinkedDataError::TooManyValues(
+                        context.into_iris(vocabulary, interpretation),
+                    ))
+                }
+            }
+            None => Err(linked_data::FromLinkedDataError::MissingRequiredValue(
+                context.into_iris(vocabulary, interpretation),
+            )),
+        }
     }
 }
 
@@ -712,7 +829,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let secret_key = p256::SecretKey::try_from(ec)?;
                 let signing_key = p256::ecdsa::SigningKey::from(secret_key);
                 let sig: p256::ecdsa::Signature =
-                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                    signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?; // Uses SHA-256 by default.
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256k1")]
@@ -721,7 +838,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-                let sig: Signature = signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
+                let sig: Signature = signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?; // Uses SHA-256 by default.
                 sig.to_bytes().to_vec()
             }
             #[cfg(feature = "secp256k1")]
@@ -733,6 +850,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let curve = ec.curve.as_ref().ok_or(Error::MissingCurve)?;
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                // NOTE: in `k256` version 0.11, `recoverable::Signature`
+                //       uses Keccack as default hash function, not sha256.
+                //       See: <https://docs.rs/k256/0.11.0/k256/ecdsa/recoverable/struct.Signature.html#impl-PrehashSignature>
                 let (sig, rec_id) =
                     signing_key.sign_digest_recoverable(sha2::Sha256::new_with_prefix(data))?;
                 let mut res = sig.to_bytes().to_vec();
@@ -748,6 +868,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
                 let secret_key = k256::SecretKey::try_from(ec)?;
                 let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+                // NOTE: in `k256` version 0.11, `recoverable::Signature`
+                //       uses Keccack as default hash function, not sha256.
+                //       See: <https://docs.rs/k256/0.11.0/k256/ecdsa/recoverable/struct.Signature.html#impl-PrehashSignature>
                 let (sig, rec_id) = signing_key
                     .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data))
                     .map_err(ssi_jwk::Error::from)?;
@@ -1082,6 +1205,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = VerifyingKey::recover_from_prehash(digest, &sig, rec_id)
                 .map_err(ssi_jwk::Error::from)?;
+            eprintln!("recovered key");
             use ssi_jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(
@@ -1097,6 +1221,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 x509_thumbprint_sha1: None,
                 x509_thumbprint_sha256: None,
             };
+            eprintln!("{}", jwk.to_string());
             Ok(jwk)
         }
         #[cfg(feature = "secp256k1")]
@@ -1120,6 +1245,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
             )?));
+            eprintln!("{}", jwk.to_string());
             Ok(jwk)
         }
         _ => {

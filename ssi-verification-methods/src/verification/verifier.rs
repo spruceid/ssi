@@ -1,7 +1,7 @@
 use crate::{
     ControllerProvider, Cow, EnsureAllowsVerificationMethod, ProofPurpose, Referencable,
     ReferenceOrOwnedRef, SignatureAlgorithm, VerificationError, VerificationMethod,
-    VerificationMethodRef, VerificationMethodResolver,
+    VerificationMethodResolver,
 };
 use iref::Iri;
 use pin_project::pin_project;
@@ -83,7 +83,6 @@ impl<'max, M: 'max + Referencable, C: 'max + ?Sized + ControllerProvider>
     RefFutureBinder<'max, UnboundedVerifyProofPurpose<M, C>> for SetupVerifyProofPurpose<'max, C>
 where
     M: VerificationMethod,
-    M::Reference<'max>: VerificationMethodRef<'max>,
 {
     fn bind<'a>(context: Self, method: &'a Cow<'max, M>) -> VerifyProofPurpose<'a, M, C>
     where
@@ -133,7 +132,6 @@ impl<'f, M: 'f + Referencable, V: 'f + ?Sized + Verifier<M>, A: SignatureAlgorit
     for Verify<'f, M, V, A>
 where
     M: VerificationMethod,
-    M::Reference<'f>: VerificationMethodRef<'f>,
 {
     type Output = Result<bool, VerificationError>;
 

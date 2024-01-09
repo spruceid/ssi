@@ -1,5 +1,6 @@
-mod data_integrity;
+pub mod data_integrity;
+mod protocol;
 mod verification_method;
 
-pub use data_integrity::*;
+pub use protocol::*;
 pub use verification_method::*;

@@ -1,20 +1,17 @@
-use std::future;
-
-use linked_data::LinkedData;
 use ssi_crypto::MessageSigner;
-use ssi_jwk::JWK;
+use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{
-    covariance_rule, InvalidSignature, Referencable, SignatureError, TezosMethod2021,
-};
+use ssi_verification_methods::{covariance_rule, Referencable, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{AnySignature, AnySignatureRef, HashError},
+    suite::{CryptographicSuiteOptions, HashError},
     CryptographicSuite, ProofConfigurationRef,
 };
+
+use super::{Signature, SignatureRef, TezosSign, TezosWallet};
 
 /// Tezos signature suite based on URDNA2015.
 ///
@@ -41,6 +38,10 @@ use crate::{
 /// The [`TezosMethod2021`] verification method is used.
 pub struct TezosSignature2021;
 
+impl TezosSignature2021 {
+    pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#TezosSignature2021");
+}
+
 impl_rdf_input_urdna2015!(TezosSignature2021);
 
 impl CryptographicSuite for TezosSignature2021 {
@@ -51,14 +52,16 @@ impl CryptographicSuite for TezosSignature2021 {
 
     type Signature = Signature;
 
-    type SignatureProtocol = ();
+    type SignatureProtocol = TezosWallet;
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
-    type Options = ();
+    type MessageSignatureAlgorithm = AnyBlake2b;
+
+    type Options = Options;
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#TezosSignature2021")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -71,7 +74,7 @@ impl CryptographicSuite for TezosSignature2021 {
         proof_configuration: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         let proof_quads = proof_configuration.quads(self).into_nquads();
-        let message = format!("\n{data}\n{proof_quads}");
+        let message = format!("\n{proof_quads}\n{data}");
         match ssi_tzkey::encode_tezos_signed_message(&message) {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
@@ -83,146 +86,87 @@ impl CryptographicSuite for TezosSignature2021 {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct Signature {
-    /// Base58-encoded signature.
-    #[ld("sec:proofValue")]
-    pub proof_value: String,
+pub struct SignatureAlgorithm;
 
-    /// Signing key.
-    #[ld(flatten)]
-    pub public_key: Option<PublicKey>,
+impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
+    type Options = Options;
+
+    type Signature = Signature;
+
+    type Protocol = TezosWallet;
+
+    type MessageSignatureAlgorithm = AnyBlake2b;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
+        TezosSign<'a, S>;
+
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+        &self,
+        options: OptionsRef<'a>,
+        method: &TezosMethod2021,
+        bytes: &'a [u8],
+        signer: S,
+    ) -> Self::Sign<'a, S> {
+        TezosSign::new(
+            method.public_key.as_jwk().or(options.public_key_jwk),
+            bytes,
+            signer,
+        )
+    }
+
+    fn verify(
+        &self,
+        options: OptionsRef,
+        signature: SignatureRef,
+        method: &TezosMethod2021,
+        bytes: &[u8],
+    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        let (algorithm, signature_bytes) = signature.decode()?;
+        method.verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
+    }
 }
 
-impl Referencable for Signature {
-    type Reference<'a> = SignatureRef<'a> where Self: 'a;
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
+#[ld(prefix("sec" = "https://w3id.org/security#"))]
+pub struct Options {
+    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
+    #[ld("sec:publicKeyJwk")]
+    pub public_key_jwk: Option<Box<JWK>>,
+}
+
+impl Options {
+    pub fn new(public_key_jwk: Option<JWK>) -> Self {
+        Self {
+            public_key_jwk: public_key_jwk.map(Box::new),
+        }
+    }
+}
+
+impl<T> CryptographicSuiteOptions<T> for Options {}
+
+impl Referencable for Options {
+    type Reference<'a> = OptionsRef<'a>;
 
     fn as_reference(&self) -> Self::Reference<'_> {
-        SignatureRef {
-            proof_value: &self.proof_value,
-            public_key: self.public_key.as_ref().map(|k| match k {
-                PublicKey::Jwk(jwk) => PublicKeyRef::Jwk(jwk),
-                PublicKey::Multibase(m) => PublicKeyRef::Multibase(m),
-            }),
+        OptionsRef {
+            public_key_jwk: self.public_key_jwk.as_deref(),
         }
     }
 
     covariance_rule!();
 }
 
-impl From<Signature> for AnySignature {
-    fn from(value: Signature) -> Self {
-        let mut public_key_jwk = None;
-        let mut public_key_multibase = None;
-
-        match value.public_key {
-            Some(PublicKey::Jwk(k)) => public_key_jwk = Some(k),
-            Some(PublicKey::Multibase(k)) => public_key_multibase = Some(k),
-            None => (),
-        }
-
-        Self {
-            proof_value: Some(value.proof_value),
-            public_key_jwk,
-            public_key_multibase,
-            ..Default::default()
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SignatureRef<'a> {
-    /// Base58-encoded signature.
-    pub proof_value: &'a str,
-
-    /// Signing key.
-    pub public_key: Option<PublicKeyRef<'a>>,
-}
-
-impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: SignatureRef<'a>) -> Self {
-        let mut public_key_jwk = None;
-        let mut public_key_multibase = None;
-
-        match value.public_key {
-            Some(PublicKeyRef::Jwk(k)) => public_key_jwk = Some(k),
-            Some(PublicKeyRef::Multibase(k)) => public_key_multibase = Some(k),
-            None => (),
-        }
-
-        Self {
-            proof_value: Some(value.proof_value),
-            public_key_jwk,
-            public_key_multibase,
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        let public_key = match (value.public_key_jwk, value.public_key_multibase) {
-            (Some(k), None) => Some(PublicKeyRef::Jwk(k)),
-            (None, Some(k)) => Some(PublicKeyRef::Multibase(k)),
-            (Some(_), Some(_)) => return Err(InvalidSignature::AmbiguousPublicKey),
-            (None, None) => None,
-        };
-
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-            public_key,
-        })
-    }
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub enum PublicKey {
+pub struct OptionsRef<'a> {
+    #[serde(rename = "publicKeyJwk", skip_serializing_if = "Option::is_none")]
     #[ld("sec:publicKeyJwk")]
-    Jwk(Box<JWK>),
-
-    #[ld("sec:publicKeyMultibase")]
-    Multibase(String),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum PublicKeyRef<'a> {
-    Jwk(&'a JWK),
-    Multibase(&'a str),
-}
-
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = Signature;
-
-    type Protocol = ();
-
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
-        &self,
-        options: (),
-        method: &TezosMethod2021,
-        bytes: &[u8],
-        signer: S,
-    ) -> Self::Sign<'a, S> {
-        todo!()
-    }
-
-    fn verify(
-        &self,
-        options: (),
-        signature: SignatureRef,
-        method: &TezosMethod2021,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
-    }
+    pub public_key_jwk: Option<&'a JWK>,
 }

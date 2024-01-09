@@ -1,19 +1,123 @@
-use async_trait::async_trait;
-use serde_json::Value;
-use static_iref::iref;
+use iref::Iri;
+use ssi_dids::document::representation::MediaType;
+use ssi_dids::document::verification_method::ValueOrReference;
+use ssi_dids::{document, resolution, DIDBuf};
+use ssi_dids::{document::representation, resolution::Output};
+use static_iref::iri;
 use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::Pin;
 use std::str::FromStr;
 
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_caips::caip2::ChainId;
-use ssi_dids::did_resolve::{
-    DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-};
 use ssi_dids::{
-    Context, Contexts, DIDMethod, Document, Source, VerificationMethod, VerificationMethodMap,
-    DEFAULT_CONTEXT, DIDURL,
+    document::DIDVerificationMethod,
+    resolution::{DIDMethodResolver, Error},
+    DIDURLBuf, Document, DID,
 };
 use ssi_jwk::{Base64urlUInt, OctetParams, Params, JWK};
+
+mod json_ld_context;
+
+pub use json_ld_context::*;
+
+#[derive(Debug, Clone, Copy)]
+pub enum PkhVerificationMethodType {
+    Ed25519VerificationKey2018,
+    EcdsaSecp256k1RecoveryMethod2020,
+    TezosMethod2021,
+    SolanaMethod2021,
+    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
+    BlockchainVerificationMethod2021,
+}
+
+impl PkhVerificationMethodType {
+    // pub fn from_prefix(prefix: Prefix) -> Self {
+    //     match prefix {
+    //         Prefix::TZ1 | Prefix::KT1 => {
+    //             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+    //         }
+    //         Prefix::TZ2 => VerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
+    //         Prefix::TZ3 => {
+    //             VerificationMethodType::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+    //         }
+    //     }
+    // }
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Ed25519VerificationKey2018 => "Ed25519VerificationKey2018",
+            Self::TezosMethod2021 => "TezosMethod2021",
+            Self::SolanaMethod2021 => "SolanaMethod2021",
+            Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
+                "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+            }
+            Self::EcdsaSecp256k1RecoveryMethod2020 => "EcdsaSecp256k1RecoveryMethod2020",
+            Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => {
+                "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
+            }
+            Self::BlockchainVerificationMethod2021 => "BlockchainVerificationMethod2021",
+        }
+    }
+
+    pub fn as_iri(&self) -> &'static Iri {
+        match self {
+            Self::Ed25519VerificationKey2018 => iri!("https://w3id.org/security#Ed25519VerificationKey2018"),
+            Self::TezosMethod2021 => iri!("https://w3id.org/security#TezosMethod2021"),
+            Self::SolanaMethod2021 => iri!("https://w3id.org/security#SolanaMethod2021"),
+            Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => iri!("https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
+            Self::EcdsaSecp256k1RecoveryMethod2020 => iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
+            Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 => iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
+            Self::BlockchainVerificationMethod2021 => iri!("https://w3id.org/security#BlockchainVerificationMethod2021")
+        }
+    }
+}
+
+pub struct PkhVerificationMethod {
+    pub id: DIDURLBuf,
+    pub type_: PkhVerificationMethodType,
+    pub controller: DIDBuf,
+    pub blockchain_account_id: BlockchainAccountId,
+    pub public_key: Option<PublicKey>,
+}
+
+pub enum PublicKey {
+    Jwk(JWK),
+    Base58(String),
+}
+
+impl From<PkhVerificationMethod> for DIDVerificationMethod {
+    fn from(value: PkhVerificationMethod) -> Self {
+        let mut properties: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+        properties.insert(
+            "blockchainAccountId".to_owned(),
+            value.blockchain_account_id.to_string().into(),
+        );
+
+        if let Some(key) = value.public_key {
+            match key {
+                PublicKey::Jwk(jwk) => {
+                    properties.insert(
+                        "publicKeyJwk".to_owned(),
+                        serde_json::to_value(jwk).unwrap(),
+                    );
+                }
+                PublicKey::Base58(key) => {
+                    properties.insert("publicKeyBase58".to_owned(), key.into());
+                }
+            }
+        }
+
+        Self {
+            id: value.id,
+            type_: value.type_.name().to_owned(),
+            controller: value.controller,
+            properties,
+        }
+    }
+}
 
 // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-3.md
 const REFERENCE_EIP155_ETHEREUM_MAINNET: &str = "1";
@@ -35,120 +139,88 @@ const REFERENCE_SOLANA_MAINNET: &str = "4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ";
 /// did:pkh DID Method
 pub struct DIDPKH;
 
-type ResolutionResult = (
-    ResolutionMetadata,
-    Option<Document>,
-    Option<DocumentMetadata>,
-);
+type ResolutionResult = Result<(Document, JsonLdContext), Error>;
 
-fn resolution_result(doc: Document) -> ResolutionResult {
-    let res_meta = ResolutionMetadata {
-        ..Default::default()
-    };
-    let doc_meta = DocumentMetadata {
-        ..Default::default()
-    };
-    (res_meta, Some(doc), Some(doc_meta))
-}
-
-fn resolution_error(err: &str) -> ResolutionResult {
-    (ResolutionMetadata::from_error(err), None, None)
-}
-
-async fn resolve_tezos(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_tezos(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     if account_address.len() < 3 {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
-    let (vm_type, vm_type_iri) = match account_address.get(0..3) {
-        Some("tz1") => ("Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
-        Some("tz2") => ("EcdsaSecp256k1RecoveryMethod2020", "https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020"),
-        Some("tz3") => ("P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021", "https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"),
-        _ => return resolution_error(ERROR_INVALID_DID),
+
+    let vm_type = match account_address.get(0..3) {
+        Some("tz1") => {
+            PkhVerificationMethodType::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+        }
+        Some("tz2") => PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
+        Some("tz3") => {
+            PkhVerificationMethodType::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+        }
+        _ => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
     };
+
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "tezos".to_string(),
             reference: reference.to_string(),
         },
     };
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(vm_type.to_string(), Value::String(vm_type_iri.to_string()));
-    context.insert(
-        "TezosMethod2021".to_string(),
-        Value::String("https://w3id.org/security#TezosMethod2021".to_string()),
-    );
 
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("blockchainAccountId".to_string()),
-        ..Default::default()
+    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
+    let vm = PkhVerificationMethod {
+        id: vm_url.clone(),
+        type_: vm_type,
+        controller: did.to_owned(),
+        blockchain_account_id: blockchain_account_id.clone(),
+        public_key: None,
     };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: String::from(vm_url.clone()),
-        type_: vm_type.to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
 
-    let vm2_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("TezosMethod2021".to_string()),
-        ..Default::default()
+    let vm2_url = DIDURLBuf::from_string(format!("{did}#TezosMethod2021")).unwrap();
+    let vm2 = PkhVerificationMethod {
+        id: vm2_url.clone(),
+        type_: PkhVerificationMethodType::TezosMethod2021,
+        controller: did.to_owned(),
+        blockchain_account_id,
+        public_key: None,
     };
-    let vm2 = VerificationMethod::Map(VerificationMethodMap {
-        id: String::from(vm2_url.clone()),
-        type_: "TezosMethod2021".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
 
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.into()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm, vm2]),
-        authentication: Some(vec![
-            VerificationMethod::DIDURL(vm_url.clone()),
-            VerificationMethod::DIDURL(vm2_url.clone()),
-        ]),
-        assertion_method: Some(vec![
-            VerificationMethod::DIDURL(vm_url),
-            VerificationMethod::DIDURL(vm2_url),
-        ]),
-        ..Default::default()
-    };
-    resolution_result(doc)
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
+    json_ld_context.add_verification_method(&vm2);
+
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.extend([vm.into(), vm2.into()]);
+    doc.verification_relationships.authentication.extend([
+        ValueOrReference::Reference(vm_url.clone().into()),
+        ValueOrReference::Reference(vm2_url.clone().into()),
+    ]);
+    doc.verification_relationships.assertion_method.extend([
+        ValueOrReference::Reference(vm_url.into()),
+        ValueOrReference::Reference(vm2_url.into()),
+    ]);
+
+    Ok((doc, json_ld_context))
 }
 
 async fn resolve_eip155(
-    did: &str,
-    account_address: String,
+    did: &DID,
+    account_address: &str,
     reference: &str,
     legacy: bool,
 ) -> ResolutionResult {
     if !account_address.starts_with("0x") {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
+
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "eip155".to_string(),
             reference: reference.to_string(),
@@ -161,88 +233,49 @@ async fn resolve_eip155(
     } else {
         "blockchainAccountId"
     };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some(vm_fragment.to_string()),
-        ..Default::default()
+    let vm_url = DIDURLBuf::from_string(format!("{did}#{vm_fragment}")).unwrap();
+    let vm = PkhVerificationMethod {
+        id: vm_url.clone(),
+        type_: PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
+        controller: did.to_owned(),
+        blockchain_account_id,
+        public_key: None,
     };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: vm_url.to_string(),
-        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    /*
-    let eip712vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("Eip712Method2021".to_string()),
-        ..Default::default()
-    };
-    let eip712vm = VerificationMethod::Map(VerificationMethodMap {
-        id: eip712vm_url.to_string(),
-        type_: "Eip712Method2021".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    */
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.into()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm /*, eip712vm*/]),
-        authentication: Some(vec![
-            VerificationMethod::DIDURL(vm_url.clone()),
-            /*
-            VerificationMethod::DIDURL(eip712vm_url.clone()),
-            */
-        ]),
-        assertion_method: Some(vec![
-            VerificationMethod::DIDURL(vm_url),
-            /*
-            VerificationMethod::DIDURL(eip712vm_url),
-            */
-        ]),
-        ..Default::default()
-    };
-    resolution_result(doc)
+
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
+
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.push(vm.into());
+    doc.verification_relationships
+        .authentication
+        .push(ValueOrReference::Reference(vm_url.clone().into()));
+    doc.verification_relationships
+        .assertion_method
+        .push(ValueOrReference::Reference(vm_url.into()));
+
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_solana(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_solana(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     let public_key_bytes = match bs58::decode(&account_address).into_vec() {
         Ok(bytes) => bytes,
-        Err(_) => return resolution_error(ERROR_INVALID_DID),
+        Err(_) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
     };
     if public_key_bytes.len() != 32 {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     let chain_id = ChainId {
         namespace: "solana".to_string(),
         reference: reference.to_string(),
     };
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "publicKeyJwk".to_string(),
-        serde_json::json!({
-            "@id": "https://w3id.org/security#publicKeyJwk",
-            "@type": "@json"
-        }),
-    );
-    context.insert(
-        "Ed25519VerificationKey2018".to_string(),
-        Value::String("https://w3id.org/security#Ed25519VerificationKey2018".to_string()),
-    );
-    context.insert(
-        "SolanaMethod2021".to_string(),
-        Value::String("https://w3id.org/security#SolanaMethod2021".to_string()),
-    );
+
     let pk_jwk = JWK {
         params: Params::OKP(OctetParams {
             curve: "Ed25519".to_string(),
@@ -259,65 +292,58 @@ async fn resolve_solana(did: &str, account_address: String, reference: &str) -> 
         x509_thumbprint_sha256: None,
     };
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id,
     };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("controller".to_string()),
-        ..Default::default()
+    let vm_url = DIDURLBuf::from_string(format!("{did}#controller")).unwrap();
+    let vm = PkhVerificationMethod {
+        id: vm_url.clone(),
+        type_: PkhVerificationMethodType::Ed25519VerificationKey2018,
+        public_key: Some(PublicKey::Base58(account_address.to_owned())),
+        controller: did.to_owned(),
+        blockchain_account_id: blockchain_account_id.clone(),
     };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: vm_url.to_string(),
-        type_: "Ed25519VerificationKey2018".to_string(),
-        public_key_jwk: Some(pk_jwk.clone()),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let solvm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("SolanaMethod2021".to_string()),
-        ..Default::default()
+    let solvm_url = DIDURLBuf::from_string(format!("{did}#SolanaMethod2021")).unwrap();
+    let solvm = PkhVerificationMethod {
+        id: solvm_url.clone(),
+        type_: PkhVerificationMethodType::SolanaMethod2021,
+        public_key: Some(PublicKey::Jwk(pk_jwk)),
+        controller: did.to_owned(),
+        blockchain_account_id,
     };
-    let solvm = VerificationMethod::Map(VerificationMethodMap {
-        id: solvm_url.to_string(),
-        type_: "SolanaMethod2021".to_string(),
-        public_key_jwk: Some(pk_jwk),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.into()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm, solvm]),
-        authentication: Some(vec![
-            VerificationMethod::DIDURL(vm_url.clone()),
-            VerificationMethod::DIDURL(solvm_url.clone()),
-        ]),
-        assertion_method: Some(vec![
-            VerificationMethod::DIDURL(vm_url),
-            VerificationMethod::DIDURL(solvm_url),
-        ]),
-        ..Default::default()
-    };
-    resolution_result(doc)
+
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
+    json_ld_context.add_verification_method(&solvm);
+
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.extend([vm.into(), solvm.into()]);
+    doc.verification_relationships.authentication.extend([
+        ValueOrReference::Reference(vm_url.clone().into()),
+        ValueOrReference::Reference(solvm_url.clone().into()),
+    ]);
+    doc.verification_relationships.assertion_method.extend([
+        ValueOrReference::Reference(vm_url.into()),
+        ValueOrReference::Reference(solvm_url.into()),
+    ]);
+
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_bip122(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     match reference {
         REFERENCE_BIP122_BITCOIN_MAINNET => {
             if !account_address.starts_with('1') {
-                return resolution_error(ERROR_INVALID_DID);
+                return Err(Error::InvalidMethodSpecificId(
+                    did.method_specific_id().to_owned(),
+                ));
             }
         }
         REFERENCE_BIP122_DOGECOIN_MAINNET => {
             if !account_address.starts_with('D') {
-                return resolution_error(ERROR_INVALID_DID);
+                return Err(Error::InvalidMethodSpecificId(
+                    did.method_specific_id().to_owned(),
+                ));
             }
         }
         _ => {
@@ -325,148 +351,187 @@ async fn resolve_bip122(did: &str, account_address: String, reference: &str) -> 
         }
     }
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id: ChainId {
             namespace: "bip122".to_string(),
             reference: reference.to_string(),
         },
     };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("blockchainAccountId".to_string()),
-        ..Default::default()
+    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
+    let vm = PkhVerificationMethod {
+        id: vm_url.clone(),
+        type_: PkhVerificationMethodType::EcdsaSecp256k1RecoveryMethod2020,
+        controller: did.to_owned(),
+        blockchain_account_id,
+        public_key: None,
     };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: String::from(vm_url.clone()),
-        type_: "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let mut context = BTreeMap::new();
-    context.insert(
-        "blockchainAccountId".to_string(),
-        Value::String("https://w3id.org/security#blockchainAccountId".to_string()),
-    );
-    context.insert(
-        "EcdsaSecp256k1RecoveryMethod2020".to_string(),
-        Value::String("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoveryMethod2020".to_string()),
-    );
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.into()),
-            Context::Object(context),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm]),
-        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
-        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
-        ..Default::default()
-    };
-    resolution_result(doc)
+
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_verification_method(&vm);
+
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.push(vm.into());
+    doc.verification_relationships
+        .authentication
+        .push(ValueOrReference::Reference(vm_url.clone().into()));
+    doc.verification_relationships
+        .assertion_method
+        .push(ValueOrReference::Reference(vm_url.into()));
+
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_aleo(did: &str, account_address: String, reference: &str) -> ResolutionResult {
+async fn resolve_aleo(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     use bech32::FromBase32;
     let (hrp, data, _variant) = match bech32::decode(&account_address) {
-        Err(_e) => return resolution_error(ERROR_INVALID_DID),
+        Err(_e) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
         Ok(data) => data,
     };
     if data.is_empty() {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     if hrp != "aleo" {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     let data = match Vec::<u8>::from_base32(&data) {
-        Err(_e) => return resolution_error(ERROR_INVALID_DID),
+        Err(_e) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
         Ok(data) => data,
     };
     // Address data is decoded for validation only.
     // The verification method object just uses the account address in blockchainAccountId.
     if data.len() != 32 {
-        return resolution_error(ERROR_INVALID_DID);
+        return Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        ));
     }
     let chain_id = ChainId {
         namespace: "aleo".to_string(),
         reference: reference.to_string(),
     };
     let blockchain_account_id = BlockchainAccountId {
-        account_address,
+        account_address: account_address.to_owned(),
         chain_id,
     };
-    let vm_url = DIDURL {
-        did: did.to_string(),
-        fragment: Some("blockchainAccountId".to_string()),
-        ..Default::default()
+    let vm_url = DIDURLBuf::from_string(format!("{did}#blockchainAccountId")).unwrap();
+    let vm = PkhVerificationMethod {
+        id: vm_url.clone(),
+        type_: PkhVerificationMethodType::BlockchainVerificationMethod2021,
+        controller: did.to_owned(),
+        blockchain_account_id,
+        public_key: None,
     };
-    let vm = VerificationMethod::Map(VerificationMethodMap {
-        id: vm_url.to_string(),
-        type_: "BlockchainVerificationMethod2021".to_string(),
-        controller: did.to_string(),
-        blockchain_account_id: Some(blockchain_account_id.to_string()),
-        ..Default::default()
-    });
-    let doc = Document {
-        context: Contexts::Many(vec![
-            Context::URI(DEFAULT_CONTEXT.into()),
-            Context::URI(iref!("https://w3id.org/security/suites/blockchain-2021/v1").to_owned()),
-        ]),
-        id: did.to_string(),
-        verification_method: Some(vec![vm]),
-        authentication: Some(vec![VerificationMethod::DIDURL(vm_url.clone())]),
-        assertion_method: Some(vec![VerificationMethod::DIDURL(vm_url)]),
-        ..Default::default()
-    };
-    resolution_result(doc)
+
+    let mut json_ld_context = JsonLdContext::default();
+    json_ld_context.add_blockchain_2021_v1();
+    json_ld_context.add_verification_method(&vm);
+
+    let mut doc = Document::new(did.to_owned());
+    doc.verification_method.push(vm.into());
+    doc.verification_relationships
+        .authentication
+        .push(ValueOrReference::Reference(vm_url.clone().into()));
+    doc.verification_relationships
+        .assertion_method
+        .push(ValueOrReference::Reference(vm_url.into()));
+
+    Ok((doc, json_ld_context))
 }
 
-async fn resolve_caip10(did: &str, account_id: String) -> ResolutionResult {
-    let account_id = match BlockchainAccountId::from_str(&account_id) {
+async fn resolve_caip10(did: &DID, account_id: &str) -> ResolutionResult {
+    let account_id = match BlockchainAccountId::from_str(account_id) {
         Ok(account_id) => account_id,
-        Err(_) => return resolution_error(ERROR_INVALID_DID),
+        Err(_) => {
+            return Err(Error::InvalidMethodSpecificId(
+                did.method_specific_id().to_owned(),
+            ))
+        }
     };
+
     let namespace = account_id.chain_id.namespace;
     let reference = account_id.chain_id.reference;
     match &namespace[..] {
-        "tezos" => resolve_tezos(did, account_id.account_address, &reference).await,
-        "eip155" => resolve_eip155(did, account_id.account_address, &reference, false).await,
-        "bip122" => resolve_bip122(did, account_id.account_address, &reference).await,
-        "solana" => resolve_solana(did, account_id.account_address, &reference).await,
-        "aleo" => resolve_aleo(did, account_id.account_address, &reference).await,
-        _ => resolution_error(ERROR_INVALID_DID),
+        "tezos" => resolve_tezos(did, &account_id.account_address, &reference).await,
+        "eip155" => resolve_eip155(did, &account_id.account_address, &reference, false).await,
+        "bip122" => resolve_bip122(did, &account_id.account_address, &reference).await,
+        "solana" => resolve_solana(did, &account_id.account_address, &reference).await,
+        "aleo" => resolve_aleo(did, &account_id.account_address, &reference).await,
+        _ => Err(Error::InvalidMethodSpecificId(
+            did.method_specific_id().to_owned(),
+        )),
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl DIDResolver for DIDPKH {
-    async fn resolve(
-        &self,
-        did: &str,
-        _input_metadata: &ResolutionInputMetadata,
-    ) -> ResolutionResult {
-        let (type_, data) = match did.splitn(4, ':').collect::<Vec<&str>>().as_slice() {
-            ["did", "pkh", type_, data] => (type_.to_string(), data.to_string()),
-            _ => return resolution_error(ERROR_INVALID_DID),
-        };
+#[cfg(target_arch = "wasm32")]
+pub type ResolveMethodRepresentation<'a> =
+    Pin<Box<dyn 'a + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
 
-        match &type_[..] {
-            // Non-CAIP-10 (deprecated)
-            "tz" => resolve_tezos(did, data, REFERENCE_TEZOS_MAINNET).await,
-            "eth" => resolve_eip155(did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
-            "celo" => resolve_eip155(did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
-            "poly" => resolve_eip155(did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
-            "sol" => resolve_solana(did, data, REFERENCE_SOLANA_MAINNET).await,
-            "btc" => resolve_bip122(did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
-            "doge" => resolve_bip122(did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
-            // CAIP-10
-            _ => resolve_caip10(did, type_ + ":" + &data).await,
-        }
+#[cfg(not(target_arch = "wasm32"))]
+pub type ResolveMethodRepresentation<'a> =
+    Pin<Box<dyn 'a + Send + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
+
+impl DIDMethodResolver for DIDPKH {
+    type ResolveMethodRepresentation<'a> = ResolveMethodRepresentation<'a>;
+
+    fn method_name(&self) -> &str {
+        "pkh"
     }
 
-    fn to_did_method(&self) -> Option<&dyn DIDMethod> {
-        Some(self)
+    fn resolve_method_representation<'a>(
+        &'a self,
+        id: &'a str,
+        options: ssi_dids::resolution::Options,
+    ) -> Self::ResolveMethodRepresentation<'a> {
+        Box::pin(async move {
+            let (type_, data) = id
+                .split_once(':')
+                .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))?;
+
+            let did = DIDBuf::from_string(format!("did:pkh:{id}")).unwrap();
+            let (doc, json_ld_context) = match type_ {
+                // Non-CAIP-10 (deprecated)
+                "tz" => resolve_tezos(&did, data, REFERENCE_TEZOS_MAINNET).await,
+                "eth" => resolve_eip155(&did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
+                "celo" => resolve_eip155(&did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
+                "poly" => resolve_eip155(&did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
+                "sol" => resolve_solana(&did, data, REFERENCE_SOLANA_MAINNET).await,
+                "btc" => resolve_bip122(&did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
+                "doge" => resolve_bip122(&did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
+                // CAIP-10
+                _ => {
+                    let account_id = type_.to_string() + ":" + data;
+                    resolve_caip10(&did, &account_id).await
+                }
+            }?;
+
+            let content_type = options.accept.unwrap_or(MediaType::JsonLd);
+            let represented = doc.into_representation(representation::Options::from_media_type(
+                content_type,
+                move || representation::json_ld::Options {
+                    context: representation::json_ld::Context::array(
+                        representation::json_ld::DIDContext::V1,
+                        json_ld_context.into_entries(),
+                    ),
+                },
+            ));
+
+            Ok(Output::new(
+                represented.to_bytes(),
+                document::Metadata::default(),
+                resolution::Metadata::from_content_type(Some(content_type.to_string())),
+            ))
+        })
     }
 }
 
@@ -608,7 +673,7 @@ fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<Blockchain
     })
 }
 
-fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
+fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
     // Require name to be a either CAIP-2 namespace or a
     // full CAIP-2 string - namespace and reference (e.g. internal
     // chain id or genesis hash).
@@ -631,19 +696,11 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<String, String> {
         "aleo" => generate_caip10_aleo(key, reference_opt)?,
         _ => return Err("Namespace not supported".to_string()),
     };
-    Ok(format!("did:pkh:{account_id}"))
+    Ok(DIDBuf::from_string(format!("did:pkh:{}", account_id)).unwrap())
 }
 
-impl DIDMethod for DIDPKH {
-    fn name(&self) -> &'static str {
-        "pkh"
-    }
-
-    fn generate(&self, source: &Source) -> Option<String> {
-        let (key, pkh_name) = match source {
-            Source::KeyAndPattern(key, pattern) => (key, pattern),
-            _ => return None,
-        };
+impl DIDPKH {
+    pub fn generate(&self, key: &JWK, pkh_name: &str) -> Option<DIDBuf> {
         let addr = match match &pkh_name[..] {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
             #[cfg(feature = "tezos")]
@@ -665,28 +722,31 @@ impl DIDMethod for DIDPKH {
             Some(addr) => addr,
             None => return None,
         };
-        let did = format!("did:pkh:{pkh_name}:{addr}");
-        Some(did)
-    }
-
-    fn to_resolver(&self) -> &dyn DIDResolver {
-        self
+        Some(DIDBuf::from_string(format!("did:pkh:{}:{}", pkh_name, addr)).unwrap())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use iref::{IriBuf, UriBuf};
+    use locspan::Meta;
     use serde_json::{from_str, from_value, json};
-    use ssi_core::one_or_many::OneOrMany;
+    use ssi_dids::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
-    use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
+    use ssi_jws::CompactJWSString;
+    use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
+    use ssi_vc::Verifiable;
+    use ssi_vc_ldp::{
+        verification::method::{signer::SingleSecretSigner, ProofPurpose},
+        CryptographicSuiteInput, DataIntegrity, Proof, ProofConfiguration,
+    };
+    use static_iref::uri;
+    // use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
-    fn test_generate(jwk_value: Value, type_: &str, did_expected: &str) {
+    fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();
-        let did = DIDPKH
-            .generate(&Source::KeyAndPattern(&jwk, type_))
-            .unwrap();
+        let did = DIDPKH.generate(&jwk, type_).unwrap();
         assert_eq!(did, did_expected);
     }
 
@@ -741,164 +801,178 @@ mod tests {
         );
     }
 
-    async fn test_resolve(did: &str, doc_str_expected: &str) {
-        let (res_meta, doc_opt, _meta_opt) = DIDPKH
-            .resolve(did, &ResolutionInputMetadata::default())
-            .await;
+    async fn test_resolve(did: &DID, doc_str_expected: &str) {
+        let res = DIDPKH.resolve(did, Default::default()).await.unwrap();
         eprintln!("{}", did);
-        assert_eq!(res_meta.error, None);
-        let doc = doc_opt.unwrap();
-        eprintln!("{}", serde_json::to_string_pretty(&doc).unwrap());
+        let doc = res.document;
+        eprintln!("resolved:\n{}", serde_json::to_string_pretty(&doc).unwrap());
         let doc_expected: Document = serde_json::from_str(doc_str_expected).unwrap();
+        eprintln!(
+            "expected:\n{}",
+            serde_json::to_string_pretty(&doc_expected).unwrap()
+        );
         assert_eq!(
             serde_json::to_value(doc).unwrap(),
             serde_json::to_value(doc_expected).unwrap()
         );
     }
 
-    #[tokio::test]
-    async fn test_glyph_split() {
-        // Subslicing this expected Tezos address by byte range 0..3 would break a char boundary.
-        // https://doc.rust-lang.org/std/ops/struct.Range.html#impl-SliceIndex%3Cstr%3E
-        let bad_did = "did:pkh:tz:💣️";
-        let (res_meta, _doc_opt, _meta_opt) = DIDPKH
-            .resolve(bad_did, &ResolutionInputMetadata::default())
-            .await;
-        assert_ne!(res_meta.error, None);
-    }
-
-    async fn test_resolve_error(did: &str, error_expected: &str) {
-        let (res_meta, doc_opt, _meta_opt) = DIDPKH
-            .resolve(did, &ResolutionInputMetadata::default())
-            .await;
-        assert_eq!(doc_opt, None);
-        assert_eq!(res_meta.error.unwrap(), error_expected);
+    async fn test_resolve_error(did: &DID, error_expected: ErrorKind) {
+        let res = DIDPKH.resolve(did, Default::default()).await;
+        assert_eq!(res.err().unwrap().kind(), error_expected);
     }
 
     #[tokio::test]
     async fn resolve_did_pkh() {
         // CAIP-10-based
         test_resolve(
-            "did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+            did!("did:pkh:tezos:NetXdQprcVkpaWU:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"),
             include_str!("../tests/did-tz1.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+            did!("did:pkh:tezos:NetXdQprcVkpaWU:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"),
             include_str!("../tests/did-tz2.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
+            did!("did:pkh:tezos:NetXdQprcVkpaWU:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"),
             include_str!("../tests/did-tz3.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+            did!("did:pkh:eip155:1:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
             include_str!("../tests/did-eth.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+            did!("did:pkh:eip155:42220:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011"),
             include_str!("../tests/did-celo.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:eip155:137:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
+            did!("did:pkh:eip155:137:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5"),
             include_str!("../tests/did-poly.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
+            did!("did:pkh:solana:4sGjMW1sUnHzSxGspuhpqLDx6wiyjNtZ:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev"),
             include_str!("../tests/did-sol.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:bip122:000000000019d6689c085ae165831e93:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
+            did!("did:pkh:bip122:000000000019d6689c085ae165831e93:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6"),
             include_str!("../tests/did-btc.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
+            did!("did:pkh:bip122:1a91e3dace36e2be3bf030a65679fe82:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"),
             include_str!("../tests/did-doge.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:aleo:1:aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348",
+            did!("did:pkh:aleo:1:aleo1y90yg3yzs4g7q25f9nn8khuu00m8ysynxmcw8aca2d0phdx8dgpq4vw348"),
             include_str!("../tests/did-aleo.jsonld"),
         )
         .await;
 
         // non-CAIP-10 (deprecated)
         test_resolve(
-            "did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8",
+            did!("did:pkh:tz:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"),
             include_str!("../tests/did-tz1-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq",
+            did!("did:pkh:tz:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"),
             include_str!("../tests/did-tz2-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX",
+            did!("did:pkh:tz:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"),
             include_str!("../tests/did-tz3-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a",
+            did!("did:pkh:eth:0xb9c5714089478a327f09197987f16f9e5d936e8a"),
             include_str!("../tests/did-eth-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011",
+            did!("did:pkh:celo:0xa0ae58da58dfa46fa55c3b86545e7065f90ff011"),
             include_str!("../tests/did-celo-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5",
+            did!("did:pkh:poly:0x4e90e8a8191c1c23a24a598c3ab4fb47ce926ff5"),
             include_str!("../tests/did-poly-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev",
+            did!("did:pkh:sol:CKg5d12Jhpej1JqtmxLJgaFqqeYjxgPqToJ4LBdvG9Ev"),
             include_str!("../tests/did-sol-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6",
+            did!("did:pkh:btc:128Lkh3S7CkDTBZ8W7BbpsN3YYizJMp8p6"),
             include_str!("../tests/did-btc-legacy.jsonld"),
         )
         .await;
         test_resolve(
-            "did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L",
+            did!("did:pkh:doge:DH5yaieqoZN36fDVciNyRueRGvGLR3mr7L"),
             include_str!("../tests/did-doge-legacy.jsonld"),
         )
         .await;
 
-        test_resolve_error("did:pkh:tz:foo", ERROR_INVALID_DID).await;
-        test_resolve_error("did:pkh:eth:bar", ERROR_INVALID_DID).await;
+        test_resolve_error(did!("did:pkh:tz:foo"), ErrorKind::InvalidMethodSpecificId).await;
+        test_resolve_error(did!("did:pkh:eth:bar"), ErrorKind::InvalidMethodSpecificId).await;
     }
 
-    fn fuzz_proof_value(proof: &mut Option<OneOrMany<Proof>>) {
-        match proof {
-            Some(OneOrMany::One(ref mut proof)) => match proof {
-                Proof {
-                    jws: Some(ref mut jws),
-                    ..
-                } => {
-                    jws.insert(0, 'x');
-                }
-                Proof {
-                    proof_value: Some(ref mut value),
-                    ..
-                } => {
-                    value.insert(0, 'x');
-                }
-                _ => unreachable!(),
-            },
-            _ => unreachable!(),
+    fn fuzz_proof_value(proof: &mut Proof<AnySuite>) {
+        let signature = proof.signature_mut();
+        if let Some(value) = &mut signature.proof_value {
+            value.insert(0, 'x');
         }
+
+        if let Some(value) = &mut signature.signature_value {
+            value.insert(0, 'x');
+        }
+
+        if let Some(value) = &mut signature.jws {
+            *value = CompactJWSString::from_string(format!("{value}ff")).unwrap();
+        }
+    }
+
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
+    #[ld(type = "cred:VerifiableCredential")]
+    #[serde(rename_all = "camelCase")]
+    struct TestCredential {
+        #[ld("cred:issuer")]
+        issuer: IriBuf,
+
+        #[ld("cred:issuanceDate")]
+        issuance_date: xsd_types::DateTime,
+
+        #[ld("cred:credentialSubject")]
+        credential_subject: CredentialSubject,
+    }
+
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    struct CredentialSubject {
+        #[ld(id)]
+        id: IriBuf,
+    }
+
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
+    #[ld(type = "cred:VerifiablePresentation")]
+    #[serde(rename_all = "camelCase")]
+    struct TestPresentation {
+        #[ld("cred:holder")]
+        holder: linked_data::Ref<UriBuf>,
+
+        #[ld("cred:verifiableCredential", graph)]
+        verifiable_credential: Verifiable<DataIntegrity<TestCredential, AnySuite>>,
     }
 
     async fn credential_prove_verify_did_pkh(
@@ -906,316 +980,321 @@ mod tests {
         wrong_key: JWK,
         type_: &str,
         vm_relative_url: &str,
-        proof_suite: &dyn ProofSuite,
-        eip712_domain_opt: Option<ssi_ldp::eip712::ProofInfo>,
-        vp_eip712_domain_opt: Option<ssi_ldp::eip712::ProofInfo>,
+        proof_suite: AnySuite,
+        eip712_domain_opt: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
+        vp_eip712_domain_opt: Option<
+            ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options,
+        >,
     ) {
-        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
-        let did = DIDPKH
-            .generate(&Source::KeyAndPattern(&key, type_))
-            .unwrap();
+        let didpkh = DIDVerifier::new(DIDPKH);
+
+        // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
+        let did = DIDPKH.generate(&key, type_).unwrap();
+
         eprintln!("did: {}", did);
-        let mut vc: Credential = from_value(json!({
-            "@context": ["https://www.w3.org/2018/credentials/v1"],
-            "type": ["VerifiableCredential"],
-            "issuer": did.clone(),
-            "issuanceDate": "2021-03-18T16:38:25Z",
-            "credentialSubject": {
-                "id": "did:example:foo"
+        let cred = TestCredential {
+            issuer: did.clone().into(),
+            issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
+            credential_subject: CredentialSubject {
+                id: iri!("did:example:foo").to_owned(),
+            },
+        };
+        let issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: cred.issuance_date.clone(),
+            proof_purpose: ProofPurpose::Assertion,
+            options: AnySuiteOptions {
+                eip712: eip712_domain_opt.clone(),
+                // eip712_v0_1: eip712_domain_opt.clone().map(Into::into),
+                ..Default::default()
             }
-        }))
-        .unwrap();
-        vc.validate_unsigned().unwrap();
-        let issue_options = LinkedDataProofOptions {
-            verification_method: Some(URI::String(did.to_string() + vm_relative_url)),
-            eip712_domain: eip712_domain_opt,
-            ..Default::default()
+            .with_public_key(key.to_public())
+            .unwrap(),
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-        let vc_no_proof = vc.clone();
         /*
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         */
         // Sign with proof suite directly because there is not currently a way to do it
         // for Eip712Signature2021 in did-pkh otherwise.
-        let proof = proof_suite
+        let signer = SingleSecretSigner::new(&didpkh, key.clone());
+        eprintln!("key: {key}");
+        eprintln!("suite: {proof_suite:?}");
+        let vc = proof_suite
             .sign(
-                &vc,
-                &issue_options,
-                &DIDPKH,
-                &mut context_loader,
-                &key,
-                None,
+                cred.clone(),
+                AnyInputContext::default(),
+                &signer,
+                issue_options.clone(),
             )
             .await
             .unwrap();
-        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
-        vc.add_proof(proof);
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
-        vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(verification_result.errors.is_empty());
+        assert!(vc.verify(&didpkh).await.unwrap().is_valid());
 
-        // test that issuer property is used for verification
-        let mut vc_bad_issuer = vc.clone();
-        vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
-        assert!(!vc_bad_issuer
-            .verify(None, &DIDPKH, &mut context_loader)
+        // Test that issuer property is used for verification.
+        let vc_bad_issuer = vc
+            .clone()
+            .async_try_map(|di, proof| async {
+                let mut cred = di.into_value();
+                cred.issuer = iri!("did:pkh:example:bad").to_owned();
+                // Rebuild the data-integrity credential with the bad issuer.
+                // This will use the cryptosuite to hash the credential.
+                DataIntegrity::new(
+                    cred,
+                    AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                // Return it with the original proof.
+                .map(|di| (di, proof))
+            })
             .await
-            .errors
-            .is_empty());
+            .unwrap();
+        // It should fail.
+        assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_invalid());
 
         // Check that proof JWK must match proof verificationMethod
-        let mut vc_wrong_key = vc_no_proof.clone();
-        let proof_bad = proof_suite
+        let wrong_signer = SingleSecretSigner::new(&didpkh, wrong_key.clone());
+        let vc_wrong_key = proof_suite
             .sign(
-                &vc_no_proof,
-                &issue_options,
-                &DIDPKH,
-                &mut context_loader,
-                &wrong_key,
-                None,
+                cred,
+                AnyInputContext::default(),
+                &wrong_signer,
+                issue_options,
             )
             .await
             .unwrap();
-        vc_wrong_key.add_proof(proof_bad);
-        vc_wrong_key.validate().unwrap();
-        assert!(!vc_wrong_key
-            .verify(None, &DIDPKH, &mut context_loader)
-            .await
-            .errors
-            .is_empty());
+        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_invalid());
 
-        // Mess with proof signature to make verify fail
+        // Mess with proof signature to make verify fail.
         let mut vc_fuzzed = vc.clone();
-        fuzz_proof_value(&mut vc_fuzzed.proof);
-        let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", vp_verification_result);
-        assert!(!vp_verification_result.errors.is_empty());
+        fuzz_proof_value(vc_fuzzed.proof_mut());
+        let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
+        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
-        // Make it into a VP
-        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
-        let mut vp = Presentation {
-            id: None,
-            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
-                DEFAULT_CONTEXT.to_string(),
-            ))]),
-
-            type_: OneOrMany::One("VerifiablePresentation".to_string()),
-            verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
-            proof: None,
-            holder: None,
-            property_set: None,
-            holder_binding: None,
+        // Make it into a VP.
+        let presentation = TestPresentation {
+            holder: linked_data::Ref(did.clone().into()),
+            verifiable_credential: vc,
         };
-        let mut vp_issue_options = LinkedDataProofOptions::default();
-        vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(URI::String(did.to_string() + vm_relative_url));
-        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        vp_issue_options.eip712_domain = vp_eip712_domain_opt;
-        // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
-        let vp_proof = proof_suite
+
+        let vp_issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: "2021-03-18T16:38:25Z".parse().unwrap(),
+            proof_purpose: ProofPurpose::Authentication,
+            options: AnySuiteOptions {
+                eip712: vp_eip712_domain_opt.clone(),
+                // eip712_v0_1: vp_eip712_domain_opt.map(Into::into),
+                ..Default::default()
+            }
+            .with_public_key(key.to_public())
+            .unwrap(),
+        };
+
+        let vp = proof_suite
             .sign(
-                &vp,
-                &vp_issue_options,
-                &DIDPKH,
-                &mut context_loader,
-                &key,
-                None,
+                presentation,
+                AnyInputContext::default(),
+                &signer,
+                vp_issue_options,
             )
             .await
             .unwrap();
-        vp.add_proof(vp_proof);
+
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        vp.validate().unwrap();
-        let vp_verification_result = vp
-            .verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader)
-            .await;
-        println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.is_empty());
+        assert!(vp.verify(&didpkh).await.unwrap().is_valid());
 
-        // Mess with proof signature to make verify fail
+        // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        fuzz_proof_value(&mut vp_fuzzed.proof);
-        let vp_verification_result = vp_fuzzed
-            .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
-            .await;
-        println!("{:#?}", vp_verification_result);
-        assert!(!vp_verification_result.errors.is_empty());
+        fuzz_proof_value(vp_fuzzed.proof_mut());
+        let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
-        // Test that holder is verified
-        let mut vp2 = vp.clone();
-        vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
-        assert!(!vp2
-            .verify(None, &DIDPKH, &mut context_loader)
+        // Test that holder is verified.
+        let vp_bad_holder = vp
+            .clone()
+            .async_try_map(|di, proof| async {
+                let mut pres = di.into_value();
+                pres.holder = uri!("did:pkh:example:bad").to_owned().into();
+                // Rebuild the data-integrity presentation with the bad holder.
+                // This will use the cryptosuite to hash the presentation.
+                DataIntegrity::new(
+                    pres,
+                    AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                // Return it with the original proof.
+                .map(|di| (di, proof))
+            })
             .await
-            .errors
-            .is_empty());
+            .unwrap();
+        // It should fail.
+        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
 
     async fn credential_prepare_complete_verify_did_pkh_tz(
-        algorithm: Algorithm,
         key: JWK,
         wrong_key: JWK,
         type_: &str,
         vm_relative_url: &str,
-        proof_suite: &dyn ProofSuite,
+        proof_suite: AnySuite,
     ) {
-        use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
-        let did = DIDPKH
-            .generate(&Source::KeyAndPattern(&key, type_))
-            .unwrap();
+        let didpkh = DIDVerifier::new(DIDPKH);
+        let did = DIDPKH.generate(&key, type_).unwrap();
+
         eprintln!("did: {}", did);
-        let mut vc: Credential = from_value(json!({
-            "@context": "https://www.w3.org/2018/credentials/v1",
-            "type": "VerifiableCredential",
-            "issuer": did.clone(),
-            "issuanceDate": "2021-03-18T16:38:25Z",
-            "credentialSubject": {
-                "id": "did:example:foo"
-            }
-        }))
-        .unwrap();
-        vc.validate_unsigned().unwrap();
-        let issue_options = LinkedDataProofOptions {
-            verification_method: Some(URI::String(did.to_string() + vm_relative_url)),
-            ..Default::default()
+        let cred = TestCredential {
+            issuer: did.clone().into(),
+            issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
+            credential_subject: CredentialSubject {
+                id: iri!("did:example:foo").to_owned(),
+            },
+        };
+        let issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: cred.issuance_date.clone(),
+            proof_purpose: ProofPurpose::Assertion,
+            options: AnySuiteOptions::default()
+                .with_public_key(key.to_public())
+                .unwrap(),
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-        let vc_no_proof = vc.clone();
-        let prep = proof_suite
-            .prepare(
-                &vc,
-                &issue_options,
-                &DIDPKH,
-                &mut context_loader,
-                &key,
-                None,
+        let signer = SingleSecretSigner::new(&didpkh, key.clone());
+        eprintln!("key: {key}");
+        eprintln!("suite: {proof_suite:?}");
+        let vc = proof_suite
+            .sign(
+                cred.clone(),
+                AnyInputContext::default(),
+                &signer,
+                issue_options.clone(),
             )
             .await
             .unwrap();
-
-        let sig = sign_tezos(&prep, algorithm, &key);
-        eprintln!("sig: {}", sig);
-
-        // Complete issuance
-        let proof = proof_suite.complete(&prep, &sig).await.unwrap();
-        println!("{}", serde_json::to_string_pretty(&proof).unwrap());
-        vc.add_proof(proof);
-        vc.validate().unwrap();
-        let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(verification_result.errors.is_empty());
+        println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
+        assert!(vc.verify(&didpkh).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
-        let mut vc_bad_issuer = vc.clone();
-        vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
-        assert!(!vc_bad_issuer
-            .verify(None, &DIDPKH, &mut context_loader)
-            .await
-            .errors
-            .is_empty());
+        let vc_bad_issuer = vc
+            .clone()
+            .async_map(|di, proof| async {
+                // Change the issuer in the Data Integrity credential.
+                let bad_di = di
+                    .map(
+                        AnyInputContext::default(),
+                        &proof_suite,
+                        issue_options.borrowed(),
+                        |mut t| {
+                            t.issuer = iri!("did:pkh:example:bad").to_owned();
+                            t
+                        },
+                    )
+                    .await
+                    .unwrap();
 
-        // Check that proof JWK must match proof verificationMethod
-        let mut vc_wrong_key = vc_no_proof.clone();
-        let proof_bad = proof_suite
+                // Return the changed credential but with the same proof.
+                (bad_di, proof)
+            })
+            .await;
+        assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_valid());
+
+        // Check that proof JWK must match proof verificationMethod.
+        let wrong_signer = SingleSecretSigner::new(&didpkh, wrong_key.clone());
+        let vc_wrong_key = proof_suite
             .sign(
-                &vc_no_proof,
-                &issue_options,
-                &DIDPKH,
-                &mut context_loader,
-                &wrong_key,
-                None,
+                cred,
+                AnyInputContext::default(),
+                &wrong_signer,
+                issue_options,
             )
             .await
             .unwrap();
-        vc_wrong_key.add_proof(proof_bad);
-        vc_wrong_key.validate().unwrap();
-        assert!(!vc_wrong_key
-            .verify(None, &DIDPKH, &mut context_loader)
-            .await
-            .errors
-            .is_empty());
+        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_invalid());
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
-        fuzz_proof_value(&mut vc_fuzzed.proof);
-        let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", vp_verification_result);
-        assert!(!vp_verification_result.errors.is_empty());
+        fuzz_proof_value(vc_fuzzed.proof_mut());
+        let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
+        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
-        // Make it into a VP
-        use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
-        let mut vp = Presentation {
-            id: None,
-            context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
-                DEFAULT_CONTEXT.to_string(),
-            ))]),
-
-            type_: OneOrMany::One("VerifiablePresentation".to_string()),
-            verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
-            proof: None,
-            holder: None,
-            property_set: None,
-            holder_binding: None,
+        // // Make it into a VP
+        let presentation = TestPresentation {
+            holder: linked_data::Ref(did.clone().into()),
+            verifiable_credential: vc,
         };
-        let mut vp_issue_options = LinkedDataProofOptions::default();
-        vp.holder = Some(URI::String(did.to_string()));
-        vp_issue_options.verification_method = Some(URI::String(did.to_string() + vm_relative_url));
-        vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
 
-        let prep = proof_suite
-            .prepare(
-                &vp,
-                &vp_issue_options,
-                &DIDPKH,
-                &mut context_loader,
-                &key,
-                None,
+        let vp_issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: "2021-03-18T16:38:25Z".parse().unwrap(),
+            proof_purpose: ProofPurpose::Authentication,
+            options: AnySuiteOptions::default()
+                .with_public_key(key.to_public())
+                .unwrap(),
+        };
+
+        let vp = proof_suite
+            .sign(
+                presentation,
+                AnyInputContext::default(),
+                &signer,
+                vp_issue_options,
             )
             .await
             .unwrap();
-        let sig = sign_tezos(&prep, algorithm, &key);
-        let vp_proof = proof_suite.complete(&prep, &sig).await.unwrap();
-        vp.add_proof(vp_proof);
+
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        vp.validate().unwrap();
-        let vp_verification_result = vp
-            .verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader)
-            .await;
-        println!("{:#?}", vp_verification_result);
-        assert!(vp_verification_result.errors.is_empty());
+        assert!(vp.verify(&didpkh).await.unwrap().is_valid());
 
-        // Mess with proof signature to make verify fail
+        // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        fuzz_proof_value(&mut vp_fuzzed.proof);
-        let vp_verification_result = vp_fuzzed
-            .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
-            .await;
-        println!("{:#?}", vp_verification_result);
-        assert!(!vp_verification_result.errors.is_empty());
+        fuzz_proof_value(vp_fuzzed.proof_mut());
+        let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
-        // Test that holder is verified
-        let mut vp2 = vp.clone();
-        vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
-        assert!(!vp2
-            .verify(None, &DIDPKH, &mut context_loader)
+        // Test that holder is verified.
+        let vp_bad_holder = vp
+            .clone()
+            .async_try_map(|di, proof| async {
+                let mut pres = di.into_value();
+                pres.holder = uri!("did:pkh:example:bad").to_owned().into();
+                // Rebuild the data-integrity presentation with the bad holder.
+                // This will use the cryptosuite to hash the presentation.
+                DataIntegrity::new(
+                    pres,
+                    AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                // Return it with the original proof.
+                .map(|di| (di, proof))
+            })
             .await
-            .errors
-            .is_empty());
+            .unwrap();
+        // It should fail.
+        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
 
-    fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
-        // Simulate signing with a Tezos wallet
-        let micheline = match prep.signing_input {
-            ssi_ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
-            _ => panic!("Expected Micheline expression for signing"),
-        };
-        ssi_tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
-    }
+    // fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
+    //     // Simulate signing with a Tezos wallet
+    //     let micheline = match prep.signing_input {
+    //         ssi_ldp::SigningInput::Micheline { ref micheline } => hex::decode(micheline).unwrap(),
+    //         _ => panic!("Expected Micheline expression for signing"),
+    //     };
+    //     ssi_tzkey::sign_tezos(&micheline, algorithm, key).unwrap()
+    // }
 
     #[tokio::test]
     #[cfg(all(feature = "eip", feature = "tezos"))]
@@ -1251,7 +1330,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ProofSuiteType::EcdsaSecp256k1RecoverySignature2020,
+            AnySuite::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1263,7 +1342,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ProofSuiteType::Eip712Signature2021,
+            AnySuite::Eip712Signature2021,
             None,
             None,
         )
@@ -1275,14 +1354,14 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ProofSuiteType::EthereumPersonalSignature2021,
+            AnySuite::EthereumPersonalSignature2021,
             None,
             None,
         )
         .await;
 
         // eth/Eip712
-        let eip712_domain: ssi_ldp::eip712::ProofInfo = serde_json::from_value(json!({
+        let eip712_domain = serde_json::from_value(json!({
           "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
@@ -1312,7 +1391,7 @@ mod tests {
           "primaryType": "VerifiableCredential"
         }))
         .unwrap();
-        let vp_eip712_domain: ssi_ldp::eip712::ProofInfo = serde_json::from_value(json!({
+        let vp_eip712_domain = serde_json::from_value(json!({
           "types": {
             "EIP712Domain": [
               { "name": "name", "type": "string" }
@@ -1371,7 +1450,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ProofSuiteType::EthereumEip712Signature2021,
+            AnySuite::EthereumEip712Signature2021,
             Some(eip712_domain),
             Some(vp_eip712_domain),
         )
@@ -1383,7 +1462,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "eip155",
             "#blockchainAccountId",
-            &ProofSuiteType::Eip712Signature2021,
+            AnySuite::Eip712Signature2021,
             None,
             None,
         )
@@ -1397,7 +1476,7 @@ mod tests {
             other_key_ed25519.clone(),
             "tz",
             "#blockchainAccountId",
-            &ProofSuiteType::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            AnySuite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             None,
             None,
         )
@@ -1424,7 +1503,7 @@ mod tests {
             other_key_p256.clone(),
             "tz",
             "#blockchainAccountId",
-            &ProofSuiteType::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            AnySuite::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             None,
             None,
         )
@@ -1438,7 +1517,7 @@ mod tests {
             other_key_ed25519.clone(),
             "sol",
             "#controller",
-            &ProofSuiteType::Ed25519Signature2018,
+            AnySuite::Ed25519Signature2018,
             None,
             None,
         )
@@ -1462,7 +1541,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "btc",
             "#blockchainAccountId",
-            &ProofSuiteType::EcdsaSecp256k1RecoverySignature2020,
+            AnySuite::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1474,7 +1553,7 @@ mod tests {
             other_key_secp256k1.clone(),
             "doge",
             "#blockchainAccountId",
-            &ProofSuiteType::EcdsaSecp256k1RecoverySignature2020,
+            AnySuite::EcdsaSecp256k1RecoverySignature2020,
             None,
             None,
         )
@@ -1484,12 +1563,11 @@ mod tests {
         key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
         other_key_ed25519.algorithm = Some(Algorithm::EdBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::EdBlake2b,
             key_ed25519.clone(),
             other_key_ed25519.clone(),
             "tz",
             "#TezosMethod2021",
-            &ProofSuiteType::TezosSignature2021,
+            AnySuite::TezosSignature2021,
         )
         .await;
         key_ed25519.algorithm = Some(Algorithm::EdDSA);
@@ -1512,12 +1590,11 @@ mod tests {
         key_p256.algorithm = Some(Algorithm::ESBlake2b);
         other_key_p256.algorithm = Some(Algorithm::ESBlake2b);
         credential_prepare_complete_verify_did_pkh_tz(
-            Algorithm::ESBlake2b,
             key_p256.clone(),
             other_key_p256.clone(),
             "tz",
             "#TezosMethod2021",
-            &ProofSuiteType::TezosSignature2021,
+            AnySuite::TezosSignature2021,
         )
         .await;
         key_p256.algorithm = Some(Algorithm::ES256);
@@ -1525,20 +1602,81 @@ mod tests {
     }
 
     async fn test_verify_vc(vc_str: &str, num_warnings: usize) {
-        let mut vc = ssi_vc::Credential::from_json_unsigned(vc_str).unwrap();
-        vc.validate().unwrap();
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
-        let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(verification_result.errors.is_empty());
-        assert_eq!(verification_result.warnings.len(), num_warnings);
+        eprintln!("input: {vc_str}");
+
+        let vc = ssi_top::data_integrity::from_json_ld_str_with_defaults(vc_str)
+            .await
+            .unwrap();
+
+        let didpkh = DIDVerifier::new(DIDPKH);
+        let verification_result = vc.verify(&didpkh).await.unwrap();
+        assert!(verification_result.is_valid());
+
+        // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
+
         // Negative test: tamper with the VC and watch verification fail.
-        let mut map = std::collections::HashMap::new();
-        map.insert("foo".to_string(), serde_json::json!("bar"));
-        vc.property_set = Some(map);
-        let verification_result = vc.verify(None, &DIDPKH, &mut context_loader).await;
-        println!("{:#?}", verification_result);
-        assert!(!verification_result.errors.is_empty());
+        let bad_vc = vc
+            .clone()
+            .async_map(|di, mut proof| async move {
+                let (mut compact, expanded) = di.into_value().into_parts();
+
+                // Add a fake property in the compact VC form.
+                let obj = compact.document_mut().0.as_object_mut().unwrap();
+                obj.insert(Meta::none("foo".into()), Meta::none("bar".into()));
+
+                // Add the `foo` field to the EIP712 VC schema if necessary.
+                // This is required so hashing can succeed.
+                if let Some(eip712) = &mut proof.untyped_mut().options.eip712 {
+                    if let Some(ssi_vc_ldp::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
+                        let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
+                        vc_schema.push(ssi_eip712::MemberVariable::new(
+                            "foo".to_owned(),
+                            ssi_eip712::TypeRef::String,
+                        ));
+                    }
+                }
+
+                // Same as above but for the legacy EIP712 cryptosuite (v0.1).
+                if let Some(eip712) = &mut proof.untyped_mut().options.eip712_v0_1 {
+                    if let Some(ssi_vc_ldp::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
+                        let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
+                        vc_schema.push(ssi_eip712::MemberVariable::new(
+                            "foo".to_owned(),
+                            ssi_eip712::TypeRef::String,
+                        ));
+                    }
+                }
+
+                // Add a fake property in the expanded VC form.
+                let mut node = expanded.into_value().into_main_node().unwrap();
+                node.0.insert(
+                    json_ld::Id::iri(IriBuf::new("https://example.org/foo".to_string()).unwrap()),
+                    json_ld::Indexed::none(json_ld::Object::Value(json_ld::Value::Literal(
+                        json_ld::object::Literal::String("bar".into()),
+                        None,
+                    ))),
+                );
+
+                // Rebuild the Data-Integrity VC.
+                let bad_di = DataIntegrity::new(
+                    json_ld::Document::new(
+                        compact,
+                        Meta::none(node.map(json_ld::Indexed::none).into()),
+                    ),
+                    ssi_top::data_integrity::AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                .unwrap();
+
+                // Return the tempered VC with the original proof.
+                (bad_di, proof)
+            })
+            .await;
+
+        let verification_result = bad_vc.verify(&didpkh).await.unwrap();
+        assert!(verification_result.is_invalid());
     }
 
     #[tokio::test]
