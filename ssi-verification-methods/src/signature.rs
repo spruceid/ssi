@@ -37,6 +37,12 @@ pub enum SignatureError {
 
     #[error("invalid received signature")]
     InvalidSignature,
+
+    #[error("invalid signature algorithm")]
+    InvalidAlgorithm,
+
+    #[error("missing signature algorithm")]
+    MissingAlgorithm,
 }
 
 impl From<std::convert::Infallible> for SignatureError {
@@ -71,14 +77,18 @@ pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
 
     type Signature: Referencable;
 
+    /// Cryptographic signature algorithm to be used with the verification
+    /// method by a remote message signer.
+    type MessageSignatureAlgorithm: Copy;
+
     /// Signature protocol.
-    type Protocol: ssi_crypto::SignatureProtocol;
+    type Protocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
 
     /// Future returned by the `sign` method.
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>>: 'a
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>: 'a
         + Future<Output = Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         options: <Self::Options as Referencable>::Reference<'a>,
         method: M::Reference<'_>,

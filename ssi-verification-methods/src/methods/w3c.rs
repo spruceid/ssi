@@ -14,12 +14,12 @@ mod ed25519_verification_key_2020;
 pub use ed25519_verification_key_2020::Ed25519VerificationKey2020;
 
 #[cfg(feature = "secp256k1")]
-mod ecdsa_secp_256k1_verification_key_2019;
+pub mod ecdsa_secp_256k1_verification_key_2019;
 #[cfg(feature = "secp256k1")]
 pub use ecdsa_secp_256k1_verification_key_2019::EcdsaSecp256k1VerificationKey2019;
 
 #[cfg(feature = "secp256k1")]
-mod ecdsa_secp_256k1_recovery_method_2020;
+pub mod ecdsa_secp_256k1_recovery_method_2020;
 #[cfg(feature = "secp256k1")]
 pub use ecdsa_secp_256k1_recovery_method_2020::EcdsaSecp256k1RecoveryMethod2020;
 

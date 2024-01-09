@@ -2,7 +2,6 @@ use std::{borrow::Cow, hash::Hash};
 
 use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
@@ -14,7 +13,17 @@ use crate::{
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[serde(rename = "publicKeyJwk")]
@@ -66,12 +75,37 @@ impl PublicKey {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum DigestFunction {
+    Sha256,
+    Keccack,
+}
+
+impl DigestFunction {
+    pub fn into_crypto_algorithm(self) -> ssi_jwk::Algorithm {
+        match self {
+            Self::Sha256 => ssi_jwk::Algorithm::ES256K,
+            Self::Keccack => ssi_jwk::Algorithm::ESKeccakK,
+        }
+    }
+}
+
 /// Key for [Ecdsa Secp256k1 Signature 2019][1].
 ///
 /// See: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/#key-format>
 ///
 /// [1]: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "EcdsaSecp256k1VerificationKey2019")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:EcdsaSecp256k1VerificationKey2019")]
@@ -91,9 +125,17 @@ pub struct EcdsaSecp256k1VerificationKey2019 {
 }
 
 impl EcdsaSecp256k1VerificationKey2019 {
-    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
-        let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256K);
-        if algorithm != ssi_jwk::Algorithm::ES256K {
+    pub fn sign(
+        &self,
+        data: &[u8],
+        secret_key: &JWK,
+        digest_function: DigestFunction,
+    ) -> Result<CompactJWSString, SignatureError> {
+        let algorithm = secret_key
+            .algorithm
+            .unwrap_or(digest_function.into_crypto_algorithm());
+        let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
+        if !algorithm.is_compatible_with(key_algorithm) {
             return Err(SignatureError::InvalidSecretKey);
         }
 
@@ -104,13 +146,18 @@ impl EcdsaSecp256k1VerificationKey2019 {
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature: &[u8],
+        digest_function: DigestFunction,
+    ) -> Result<bool, VerificationError> {
         let public_key = self
             .public_key
             .jwk()
             .map_err(|_| VerificationError::InvalidKey)?;
-        if public_key.algorithm.unwrap_or(ssi_jwk::Algorithm::ES256K) != ssi_jwk::Algorithm::ES256K
-        {
+        let algorithm = digest_function.into_crypto_algorithm();
+        if !algorithm.is_compatible_with(public_key.algorithm.unwrap_or(algorithm)) {
             return Err(VerificationError::InvalidKey);
         }
 
@@ -141,6 +188,14 @@ impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
@@ -158,6 +213,10 @@ impl TypedVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
 
     /// Returns the type of the key.
     fn type_(&self) -> &str {
+        ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE
+    }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE
     }
 }

@@ -1,7 +1,8 @@
 use chrono::Timelike;
+use educe::Educe;
 use iref::Iri;
-use linked_data::{LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
-use rdf_types::Quad;
+use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
+use rdf_types::{generator, interpretation, Quad};
 use serde::{Deserialize, Serialize};
 use ssi_verification_methods::{ProofPurpose, Referencable, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
@@ -84,7 +85,7 @@ impl<M> ProofConfiguration<M> {
     }
 }
 
-#[derive(LinkedData)]
+#[derive(linked_data::Serialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(prefix("dc" = "http://purl.org/dc/terms/"))]
 pub struct ProofConfigurationWithSuiteRef<'a, 'b, M: Referencable, O: 'a + Referencable> {
@@ -107,7 +108,8 @@ pub struct ProofConfigurationWithSuiteRef<'a, 'b, M: Referencable, O: 'a + Refer
     pub options: O::Reference<'a>,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Educe)]
+#[educe(Debug(bound = "M::Reference<'a>: core::fmt::Debug, O::Reference<'a>: core::fmt::Debug"))]
 #[serde(
     rename_all = "camelCase",
     bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize")
@@ -116,16 +118,18 @@ pub struct ProofConfigurationRef<'a, M: Referencable, O: 'a + Referencable = ()>
     pub created: &'a xsd_types::DateTime,
     pub verification_method: ReferenceOrOwnedRef<'a, M>,
     pub proof_purpose: ProofPurpose,
+
+    #[serde(flatten)]
     pub options: O::Reference<'a>,
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ProofConfigurationCastError {
+pub enum ProofConfigurationCastError<M, O> {
     #[error("invalid verification method")]
-    VerificationMethod,
+    VerificationMethod(M),
 
     #[error("invalid options")]
-    Options,
+    Options(O),
 }
 
 impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
@@ -140,6 +144,19 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
             verification_method,
             proof_purpose,
             options,
+        }
+    }
+
+    /// Apply covariance rules to shorten the `'a` lifetime.
+    pub fn shorten_lifetime<'b>(self) -> ProofConfigurationRef<'b, M, O>
+    where
+        'a: 'b,
+    {
+        ProofConfigurationRef {
+            created: self.created,
+            verification_method: self.verification_method.shorten_lifetime(),
+            proof_purpose: self.proof_purpose,
+            options: O::apply_covariance(self.options),
         }
     }
 
@@ -160,6 +177,18 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         ))
     }
 
+    pub fn map_options<P: 'a + Referencable>(
+        self,
+        f: impl FnOnce(O::Reference<'a>) -> P::Reference<'a>,
+    ) -> ProofConfigurationRef<'a, M, P> {
+        ProofConfigurationRef::new(
+            self.created,
+            self.verification_method,
+            self.proof_purpose,
+            f(self.options),
+        )
+    }
+
     pub fn map_verification_method<N: 'a + Referencable, P: 'a + Referencable>(
         self,
         f: impl FnOnce(
@@ -176,20 +205,25 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         )
     }
 
-    pub fn try_cast_verification_method<N: 'a + Referencable, P: 'a + Referencable>(
+    pub fn try_cast_verification_method<
+        N: 'a + Referencable,
+        P: 'a + Referencable,
+        MError,
+        OError,
+    >(
         self,
-    ) -> Result<ProofConfigurationRef<'a, N, P>, ProofConfigurationCastError>
+    ) -> Result<ProofConfigurationRef<'a, N, P>, ProofConfigurationCastError<MError, OError>>
     where
-        M::Reference<'a>: TryInto<N::Reference<'a>>,
-        O::Reference<'a>: TryInto<P::Reference<'a>>,
+        M::Reference<'a>: TryInto<N::Reference<'a>, Error = MError>,
+        O::Reference<'a>: TryInto<P::Reference<'a>, Error = OError>,
     {
         self.try_map_verification_method(|m, options| {
             let m = m
                 .try_cast()
-                .map_err(|_| ProofConfigurationCastError::VerificationMethod)?;
+                .map_err(ProofConfigurationCastError::VerificationMethod)?;
             let options = options
                 .try_into()
-                .map_err(|_| ProofConfigurationCastError::Options)?;
+                .map_err(ProofConfigurationCastError::Options)?;
             Ok((m, options))
         })
     }
@@ -208,11 +242,21 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         }
     }
 
+    pub fn without_options(self) -> ProofConfigurationRef<'a, M> {
+        ProofConfigurationRef {
+            created: self.created,
+            verification_method: self.verification_method,
+            proof_purpose: self.proof_purpose,
+            options: (),
+        }
+    }
+
     /// Returns the quads of the proof configuration, in canonical form.
     pub fn quads<T: CryptographicSuite>(&self, suite: &T) -> Vec<Quad>
     where
-        M::Reference<'a>: LinkedDataPredicateObjects,
-        O::Reference<'a>: LinkedDataSubject,
+        M::Reference<'a>:
+            LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
+        O::Reference<'a>: LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
     {
         let generator =
             rdf_types::generator::Blank::new_with_prefix("proofConfiguration:".to_string());

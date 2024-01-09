@@ -1,6 +1,6 @@
 use keccak_hash::keccak;
 
-use crate::{StructName, TypeDefinition, TypeRef, Types, Value};
+use crate::{StructName, TypeDefinition, TypeRef, Types, Value, ValueKind};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TypedDataHashError {
@@ -14,10 +14,10 @@ pub enum TypedDataHashError {
     ExpectedBytes,
     #[error("Expected boolean")]
     ExpectedBoolean,
-    #[error("Expected array with type '{0}'")]
-    ExpectedArray(String),
-    #[error("Expected object with type '{0}'")]
-    ExpectedObject(String),
+    #[error("Expected `{0}` array, found {1}")]
+    ExpectedArray(String, ValueKind),
+    #[error("Expected `{0}` struct, found {1}")]
+    ExpectedObject(String, ValueKind),
     #[error("Expected integer")]
     ExpectedInteger,
     #[error("Expected address length 20 but found {0}")]

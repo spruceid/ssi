@@ -4,6 +4,9 @@
 //! data model, and representations][did-core].
 //!
 //! [did-core]: https://www.w3.org/TR/did-core/
+use iref::Iri;
+use static_iref::iri;
+
 mod did;
 pub mod document;
 pub mod resolution;
@@ -15,3 +18,6 @@ pub use resolution::DIDResolver;
 pub use verifier::DIDVerifier;
 
 pub use json_ld;
+
+/// URI [required](https://www.w3.org/TR/did-core/#production-0) as the first value of the `@context` property for a DID Document in JSON-LD representation.
+pub const JSON_LD_CONTEXT_IRI: &Iri = iri!("https://www.w3.org/ns/did/v1");

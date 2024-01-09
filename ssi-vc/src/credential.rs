@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
 use iref::{Iri, IriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_core::one_or_many::OneOrMany;
 use static_iref::iri_ref;
 
 /// Generic credential type.
-#[derive(Debug, Default, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug, Default, Serialize, Deserialize, linked_data::Serialize, linked_data::Deserialize,
+)]
 #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
 #[serde(rename_all = "camelCase")]
 pub struct Credential<

@@ -15,6 +15,11 @@ use crate::{
 /// See: <https://w3c-ccg.github.io/lds-ecdsa-secp256k1-2019/>
 pub struct EcdsaSecp256k1Signature2019;
 
+impl EcdsaSecp256k1Signature2019 {
+    pub const IRI: &'static iref::Iri =
+        iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019");
+}
+
 impl_rdf_input_urdna2015!(EcdsaSecp256k1Signature2019);
 
 impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
@@ -29,10 +34,12 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
 
     type SignatureAlgorithm = SignatureAlgorithm;
 
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256K;
+
     type Options = ();
 
     fn iri(&self) -> &iref::Iri {
-        iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019")
+        Self::IRI
     }
 
     fn cryptographic_suite(&self) -> Option<&str> {
@@ -63,10 +70,12 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<Self::Protocol>> =
+    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256K;
+
+    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
         future::Ready<Result<Self::Signature, SignatureError>>;
 
-    fn sign<'a, S: 'a + MessageSigner<Self::Protocol>>(
+    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
         _options: (),
         method: &EcdsaSecp256k1VerificationKey2019,

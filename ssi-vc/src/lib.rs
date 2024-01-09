@@ -7,7 +7,6 @@
 //!   - Data Integrity Proofs, defined by the `ssi-ldp` library.
 use educe::Educe;
 use iref::Iri;
-use linked_data::LinkedData;
 use ssi_verification_methods::{VerificationError, Verifier};
 
 pub mod credential;
@@ -48,7 +47,9 @@ pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =
 // pub use schema::cred::*;
 
 /// Verifiable credential.
-#[derive(Educe, serde::Serialize, serde::Deserialize, LinkedData)]
+#[derive(
+    Educe, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize,
+)]
 #[educe(Clone(bound = "C: Clone, C::Proof: Clone"))]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Verifiable<C: VerifiableWith> {
@@ -90,6 +91,39 @@ impl<C: VerifiableWith> Verifiable<C> {
         let (credential, proof) = f(self.credential, self.proof);
 
         Verifiable { credential, proof }
+    }
+
+    pub fn try_map<D: VerifiableWith, E>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> Result<(D, D::Proof), E>,
+    ) -> Result<Verifiable<D>, E> {
+        let (credential, proof) = f(self.credential, self.proof)?;
+
+        Ok(Verifiable { credential, proof })
+    }
+
+    pub async fn async_map<D: VerifiableWith, F>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> F,
+    ) -> Verifiable<D>
+    where
+        F: std::future::Future<Output = (D, D::Proof)>,
+    {
+        let (credential, proof) = f(self.credential, self.proof).await;
+
+        Verifiable { credential, proof }
+    }
+
+    pub async fn async_try_map<D: VerifiableWith, E, F>(
+        self,
+        f: impl FnOnce(C, C::Proof) -> F,
+    ) -> Result<Verifiable<D>, E>
+    where
+        F: std::future::Future<Output = Result<(D, D::Proof), E>>,
+    {
+        let (credential, proof) = f(self.credential, self.proof).await?;
+
+        Ok(Verifiable { credential, proof })
     }
 }
 

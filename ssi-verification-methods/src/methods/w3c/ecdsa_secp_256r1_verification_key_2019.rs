@@ -1,5 +1,4 @@
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_multicodec::MultiEncodedBuf;
 use std::hash::Hash;
@@ -34,7 +33,17 @@ pub enum InvalidPublicKey {
 /// See: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1verificationkey2019>
 ///
 /// [1]: <https://www.w3.org/community/reports/credentials/CG-FINAL-di-ecdsa-2019-20220724/#ecdsasecp256r1signature2019>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "EcdsaSecp256r1VerificationKey2019")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:EcdsaSecp256r1VerificationKey2019")]
@@ -120,6 +129,14 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
@@ -137,6 +154,10 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
 
     /// Returns the type of the key.
     fn type_(&self) -> &str {
+        ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
+    }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
     }
 }

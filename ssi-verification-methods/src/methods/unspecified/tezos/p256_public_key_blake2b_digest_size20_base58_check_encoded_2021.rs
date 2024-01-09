@@ -1,7 +1,6 @@
 use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
@@ -14,7 +13,17 @@ use crate::{
 pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
     "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(
     tag = "type",
     rename = "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021"
@@ -67,6 +76,14 @@ impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded20
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
@@ -83,6 +100,10 @@ impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEnco
     }
 
     fn type_(&self) -> &str {
+        P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+    }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
 }
@@ -118,10 +139,13 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
     }
 }
 
-impl SigningMethod<JWK> for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+impl SigningMethod<JWK, ssi_jwk::algorithm::ESBlake2b>
+    for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+{
     fn sign_bytes_ref(
         _this: &Self,
         key: &JWK,
+        _algorithm: ssi_jwk::algorithm::ESBlake2b,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(Algorithm::ESBlake2b, bytes, key)

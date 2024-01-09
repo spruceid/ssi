@@ -40,13 +40,13 @@ rsa = ["ssi-verification-methods/rsa"]
 # - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
 # - `TezosJcsSignature2021`
 # - `TezosSignature2021`
-tezos = ["serde_json", "serde_jcs", "ssi-tzkey"]
+tezos = ["serde_json", "serde_jcs", "ssi-tzkey", "bs58"]
 
 # Enables `AleoSignature2021`
 aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo"]
 
 # Enables `Eip712Signature2021`
-eip712 = ["ssi-eip712"]
+eip712 = ["ssi-eip712", "ssi-jws/eip"]
 
 # Enables `SolanaSignature2021`
 solana = ["ssi-verification-methods/solana"]
@@ -76,7 +76,7 @@ multibase.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
-json-ld.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
 locspan.workspace = true
 grdf.workspace = true
 hex.workspace = true
@@ -86,6 +86,10 @@ derivative.workspace = true
 educe.workspace = true
 futures.workspace = true
 self_cell = "1.0.1"
+contextual.workspace = true
+lazy_static.workspace = true
+
+bs58 = { version = "0.4", optional = true }
 
 ed25519-dalek = { version = "1", optional = true }
 k256 = { version = "0.11", optional = true, features = ["ecdsa", "sha256"] }

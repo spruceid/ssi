@@ -75,7 +75,7 @@ members = [
   # "did-web",
   # "did-ethr",
   # "did-sol",
-  # "did-pkh",
+  "did-pkh",
   # "did-onion",
   # "did-ion",
   # "did-webkey",
@@ -86,7 +86,7 @@ members = [
   "ssi-jwk",
   "ssi-core",
   "ssi-crypto",
-  # "ssi-json-ld",
+  "ssi-json-ld",
   "ssi-dids",
   "ssi-jws",
   "ssi-jwt",
@@ -115,6 +115,7 @@ ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
 ssi-tzkey = { path = "./ssi-tzkey", version = "0.1" }
 ssi-eip712 = { path = "./ssi-eip712", version = "0.1" }
 ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
+ssi-json-ld = { path = "./ssi-json-ld", version = "0.2.2" }
 ssi-dids = { path = "./ssi-dids", version = "0.1" }
 ssi-security = { path = "./ssi-security", version = "0.1" }
 ssi-caips = { path = "./ssi-caips", version = "0.1" }
@@ -126,14 +127,13 @@ thiserror = "1.0.40"
 chrono = "0.4.24"
 iref = "3.1.2"
 static-iref = "3.0"
-rdf-types = "0.16.1"
+rdf-types = "0.18"
 # xsd-types = "0.7.6"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
-# grdf = "0.20"
-grdf = { git = "https://github.com/timothee-haudebourg/grdf.git" }
-locspan = "0.7.15"
-json-syntax = "0.9.6"
-nquads-syntax = "0.15"
+grdf = "0.22"
+locspan = "0.8"
+json-syntax = "0.10"
+nquads-syntax = "0.17"
 multibase = "0.9.1"
 # json-ld = "0.15"
 json-ld = { git = "https://github.com/timothee-haudebourg/json-ld.git" }
@@ -147,6 +147,8 @@ pin-project = "1.1.3"
 futures = "0.3.28"
 linked-data = { git = "https://github.com/spruceid/linked-data-rs.git" }
 rand_chacha = "0.3.1"
+contextual = "0.1.6"
+lazy_static = "1.4.0"
 
 # [dev-dependencies]
 # async-std = { version = "1.9", features = ["attributes"] }

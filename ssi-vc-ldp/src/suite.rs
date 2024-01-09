@@ -1,24 +1,26 @@
 //! Cryptographic suites.
-use std::{future::Future, marker::PhantomData, pin::Pin, task};
+use std::{convert::Infallible, future::Future, marker::PhantomData, pin::Pin, task};
 
 use iref::Iri;
 use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
 use pin_project::pin_project;
 use rdf_types::{
-    interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
-    ExportedFromVocabulary, Interpretation, Quad, ReverseLiteralInterpretation, Vocabulary,
+    generator,
+    interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
+    ExportedFromVocabulary, Interpretation, InterpretationMut, Quad, ReverseLiteralInterpretation,
+    Vocabulary,
 };
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::urdna2015;
 use ssi_vc::ProofValidity;
 use ssi_verification_methods::{
-    Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
-    VerificationMethod, VerificationMethodRef, Verifier,
+    InvalidVerificationMethod, Referencable, SignatureAlgorithm, SignatureError, Signer,
+    VerificationError, VerificationMethod, Verifier,
 };
 
 use crate::{
-    signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationRef,
-    UntypedProof, UntypedProofRef,
+    signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationCastError,
+    ProofConfigurationRef, UntypedProof, UntypedProofRef,
 };
 
 mod signatures;
@@ -45,14 +47,47 @@ pub enum TransformError {
     #[error("JSON serialization failed: {0}")]
     JsonSerialization(serde_json::Error),
 
-    #[error("expected JSON object")]
+    #[error("expected JSON object")] // TODO merge it with `InvalidData`.
     ExpectedJsonObject,
+
+    #[error("invalid data")]
+    InvalidData,
 
     #[error("unsupported input format")]
     UnsupportedInputFormat,
 
-    #[error("invalid verification method")]
-    InvalidVerificationMethod,
+    #[error("invalid proof options: {0}")]
+    InvalidProofOptions(InvalidOptions),
+
+    #[error("invalid verification method: {0}")]
+    InvalidVerificationMethod(InvalidVerificationMethod),
+
+    #[error("internal error: `{0}`")]
+    Internal(String),
+}
+
+impl From<ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>>
+    for TransformError
+{
+    fn from(value: ProofConfigurationCastError<InvalidVerificationMethod, InvalidOptions>) -> Self {
+        match value {
+            ProofConfigurationCastError::VerificationMethod(e) => {
+                Self::InvalidVerificationMethod(e)
+            }
+            ProofConfigurationCastError::Options(e) => Self::InvalidProofOptions(e),
+        }
+    }
+}
+
+impl From<ProofConfigurationCastError<InvalidVerificationMethod, Infallible>> for TransformError {
+    fn from(value: ProofConfigurationCastError<InvalidVerificationMethod, Infallible>) -> Self {
+        match value {
+            ProofConfigurationCastError::VerificationMethod(e) => {
+                Self::InvalidVerificationMethod(e)
+            }
+            ProofConfigurationCastError::Options(_) => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -70,9 +105,44 @@ pub enum HashError {
     InvalidTransformedInput,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidOptions {
+    #[error("missing public key")]
+    MissingPublicKey,
+}
+
+impl From<InvalidOptions> for VerificationError {
+    fn from(value: InvalidOptions) -> Self {
+        match value {
+            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey,
+        }
+    }
+}
+
+impl From<InvalidOptions> for SignatureError {
+    fn from(value: InvalidOptions) -> Self {
+        match value {
+            InvalidOptions::MissingPublicKey => SignatureError::MissingPublicKey,
+        }
+    }
+}
+
 pub trait FromRdfAndSuite<S> {
     // ...
 }
+
+pub trait CryptographicSuiteOptions<T>: Referencable {
+    /// Prepare the options to be put in the generated proof.
+    ///
+    /// This means filtering out options that should not appear in the proof, or
+    /// adding in implicit options values used to generate the proof that should
+    /// explicitly appear in the proof.
+    fn prepare(&mut self, _suite: &T) {
+        // filter nothing.
+    }
+}
+
+impl<T: CryptographicSuite> CryptographicSuiteOptions<T> for () {}
 
 /// Cryptographic suite.
 pub trait CryptographicSuite: Sized {
@@ -85,18 +155,22 @@ pub trait CryptographicSuite: Sized {
     /// Verification method.
     type VerificationMethod: VerificationMethod;
 
-    type Options: Referencable;
+    /// Cryptography suite options used to generate the proof.
+    type Options: CryptographicSuiteOptions<Self>;
 
     /// Signature.
     type Signature: Referencable;
 
-    type SignatureProtocol: ssi_crypto::SignatureProtocol;
+    type MessageSignatureAlgorithm: Copy;
+
+    type SignatureProtocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
 
     /// Signature algorithm.
     type SignatureAlgorithm: SignatureAlgorithm<
         Self::VerificationMethod,
         Options = Self::Options,
         Signature = Self::Signature,
+        MessageSignatureAlgorithm = Self::MessageSignatureAlgorithm,
         Protocol = Self::SignatureProtocol,
     >;
 
@@ -113,15 +187,23 @@ pub trait CryptographicSuite: Sized {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
 
-    fn generate_proof<'a, S: Signer<Self::VerificationMethod, Self::SignatureProtocol>>(
-        &self,
+    fn generate_proof<'a, S>(
+        &'a self,
         data: &'a Self::Hashed,
         signer: &'a S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> GenerateProof<'a, Self, S> {
+    ) -> GenerateProof<'a, Self, S>
+    where
+        S: Signer<
+            Self::VerificationMethod,
+            Self::MessageSignatureAlgorithm,
+            Self::SignatureProtocol,
+        >,
+    {
         let algorithm = self.setup_signature_algorithm();
 
         GenerateProof {
+            suite: self,
             signature: SelfRefFuture::new(
                 params,
                 Binder {
@@ -138,10 +220,7 @@ pub trait CryptographicSuite: Sized {
         data: &'a Self::Hashed,
         verifier: &'a V,
         proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Options, Self::Signature>,
-    ) -> VerifyProof<'a, Self, V>
-    where
-        <Self::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
-    {
+    ) -> VerifyProof<'a, Self, V> {
         let algorithm = self.setup_signature_algorithm();
         VerifyProof {
             verify: verifier.verify(
@@ -159,8 +238,12 @@ pub trait CryptographicSuite: Sized {
 
 struct SignBounded<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
 
-impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: 'a + Signer<M, A::Protocol>>
-    UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
+impl<
+        'a,
+        M: 'a + Referencable,
+        A: 'a + SignatureAlgorithm<M>,
+        S: 'a + Signer<M, A::MessageSignatureAlgorithm, A::Protocol>,
+    > UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
 where
     A::Signature: 'a,
 {
@@ -177,8 +260,12 @@ struct Binder<'a, A, S> {
     data: &'a [u8],
 }
 
-impl<'a, M: 'a + Referencable, A: 'a + SignatureAlgorithm<M>, S: Signer<M, A::Protocol>>
-    RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
+impl<
+        'a,
+        M: 'a + Referencable,
+        A: 'a + SignatureAlgorithm<M>,
+        S: Signer<M, A::MessageSignatureAlgorithm, A::Protocol>,
+    > RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
 where
     A::Signature: 'a,
 {
@@ -200,19 +287,24 @@ where
 pub struct GenerateProof<
     'a,
     S: CryptographicSuite,
-    T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>,
+    T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
 > where
     S::VerificationMethod: 'a,
     S::SignatureAlgorithm: 'a,
     S::Options: 'a,
     S::Signature: 'a,
 {
+    suite: &'a S,
+
     #[pin]
     signature: SelfRefFuture<'a, SignBounded<'a, S::VerificationMethod, S::SignatureAlgorithm, T>>,
 }
 
-impl<'a, S: CryptographicSuite, T: 'a + Signer<S::VerificationMethod, S::SignatureProtocol>> Future
-    for GenerateProof<'a, S, T>
+impl<
+        'a,
+        S: CryptographicSuite,
+        T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
+    > Future for GenerateProof<'a, S, T>
 where
     S::VerificationMethod: 'a,
 {
@@ -226,7 +318,8 @@ where
 
         match signature_state {
             task::Poll::Pending => task::Poll::Pending,
-            task::Poll::Ready((result, params)) => {
+            task::Poll::Ready((result, mut params)) => {
+                params.options.prepare(this.suite);
                 task::Poll::Ready(result.map(|signature| params.into_proof(signature)))
             }
         }
@@ -243,7 +336,6 @@ impl<'a, S: CryptographicSuite, V: 'a + Verifier<S::VerificationMethod>> Future
     for VerifyProof<'a, S, V>
 where
     S::VerificationMethod: VerificationMethod,
-    <S::VerificationMethod as Referencable>::Reference<'a>: VerificationMethodRef<'a>,
 {
     type Output = Result<ProofValidity, VerificationError>;
 
@@ -254,13 +346,21 @@ where
 }
 
 pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
+    type Transform<'a>: 'a + Future<Output = Result<Self::Transformed, TransformError>>
+    where
+        Self: 'a,
+        T: 'a,
+        C: 'a;
+
     /// Transformation algorithm.
-    fn transform(
-        &self,
-        data: &T,
+    fn transform<'a, 'c: 'a>(
+        &'a self,
+        data: &'a T,
         context: C,
-        params: ProofConfigurationRef<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Transformed, TransformError>;
+        params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
+    ) -> Self::Transform<'a>
+    where
+        C: 'a;
 
     fn sign<'max, S>(
         self,
@@ -268,10 +368,15 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         context: C,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> SignLinkedData<'max, T, Self, S>
+    ) -> SignLinkedData<'max, T, Self, C, S>
     where
         Self::VerificationMethod: 'max,
-        S: 'max + Signer<Self::VerificationMethod, Self::SignatureProtocol>,
+        S: 'max
+            + Signer<
+                Self::VerificationMethod,
+                Self::MessageSignatureAlgorithm,
+                Self::SignatureProtocol,
+            >,
     {
         DataIntegrity::sign(input, context, signer, self, params)
     }
@@ -284,8 +389,10 @@ fn sha256_hash<'a, T: CryptographicSuite>(
     proof_configuration: ProofConfigurationRef<'a, T::VerificationMethod, T::Options>,
 ) -> [u8; 64]
 where
-    <T::VerificationMethod as Referencable>::Reference<'a>: LinkedDataPredicateObjects,
-    <T::Options as Referencable>::Reference<'a>: LinkedDataSubject,
+    <T::VerificationMethod as Referencable>::Reference<'a>:
+        LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
+    <T::Options as Referencable>::Reference<'a>:
+        LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
 {
     let generator = rdf_types::generator::Blank::new();
     let proof_config_quads = to_quads(generator, &proof_configuration.with_suite(suite)).unwrap();
@@ -299,58 +406,57 @@ where
     let mut hash_data = [0u8; 64];
     hash_data[..32].copy_from_slice(&proof_config_hash);
     hash_data[32..].copy_from_slice(&transformed_document_hash);
+
     hash_data
 }
 
-pub struct LinkedDataInput<'a, V, I, G> {
-    pub vocabulary: &'a mut V,
-    pub interpretation: &'a mut I,
-    pub generator: G,
+pub struct LinkedDataInput<I = (), V = ()> {
+    pub vocabulary: V,
+    pub interpretation: I,
 }
 
-impl Default for LinkedDataInput<'static, (), (), rdf_types::generator::Blank> {
+impl Default for LinkedDataInput<interpretation::WithGenerator<rdf_types::generator::Blank>> {
     fn default() -> Self {
+        Self::from_generator(rdf_types::generator::Blank::new())
+    }
+}
+
+impl<G> LinkedDataInput<interpretation::WithGenerator<G>> {
+    pub fn from_generator(generator: G) -> Self {
         Self {
-            vocabulary: rdf_types::vocabulary::no_vocabulary_mut(),
-            interpretation: rdf_types::vocabulary::no_vocabulary_mut(),
-            generator: rdf_types::generator::Blank::new(),
+            vocabulary: (),
+            interpretation: interpretation::WithGenerator::new((), generator),
         }
     }
 }
 
-impl<'a, V: Vocabulary, I: Interpretation, G> LinkedDataInput<'a, V, I, G>
+impl<V: Vocabulary, I: Interpretation> LinkedDataInput<I, V>
 where
-    I: ReverseIriInterpretation<Iri = V::Iri>
+    I: InterpretationMut<V>
+        + ReverseIriInterpretation<Iri = V::Iri>
         + ReverseBlankIdInterpretation<BlankId = V::BlankId>
         + ReverseLiteralInterpretation<Literal = V::Literal>,
     V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    G: rdf_types::Generator<()>,
 {
-    pub fn new(vocabulary: &'a mut V, interpretation: &'a mut I, generator: G) -> Self {
+    pub fn new(vocabulary: V, interpretation: I) -> Self {
         Self {
             vocabulary,
             interpretation,
-            generator,
         }
     }
 
     /// Returns the list of quads in the dataset.
     ///
     /// The order in which quads are returned is unspecified.
-    pub fn into_quads<T: LinkedData<V, I>>(
-        self,
+    pub fn into_quads<T: LinkedData<I, V>>(
+        mut self,
         input: &T,
     ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
-        linked_data::to_lexical_quads_with(
-            self.vocabulary,
-            self.interpretation,
-            self.generator,
-            input,
-        )
+        linked_data::to_lexical_quads_with(&mut self.vocabulary, &mut self.interpretation, input)
     }
 
     /// Returns the canonical form of the dataset, in the N-Quads format.
-    pub fn into_canonical_form<T: LinkedData<V, I>>(
+    pub fn into_canonical_form<T: LinkedData<I, V>>(
         self,
         input: &T,
     ) -> Result<String, linked_data::IntoQuadsError> {
@@ -371,27 +477,32 @@ where
 #[macro_export]
 macro_rules! impl_rdf_input_urdna2015 {
     ($ty:ident) => {
-        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, G, T>
-            $crate::CryptographicSuiteInput<T, $crate::LinkedDataInput<'a, V, I, G>> for $ty
+        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>
+            $crate::CryptographicSuiteInput<T, $crate::LinkedDataInput<I, V>> for $ty
         where
-            I: rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
+            I: rdf_types::interpretation::InterpretationMut<V>
+                + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
                 + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
                 + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
             V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-            G: rdf_types::Generator<()>,
-            T: linked_data::LinkedData<V, I>,
+            T: linked_data::LinkedData<I, V>,
         {
+            type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, $crate::LinkedDataInput<I, V>: 't;
+
             /// Transformation algorithm.
-            fn transform(
-                &self,
-                data: &T,
-                context: $crate::LinkedDataInput<'a, V, I, G>,
-                _options: $crate::ProofConfigurationRef<
+            fn transform<'t, 'c: 't>(
+                &'t self,
+                data: &'t T,
+                context: $crate::LinkedDataInput<I, V>,
+                _options: $crate::ProofConfigurationRef<'c,
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
                     <$ty as $crate::CryptographicSuite>::Options,
                 >,
-            ) -> Result<Self::Transformed, $crate::suite::TransformError> {
-                Ok(context.into_canonical_form(data)?)
+            ) -> Self::Transform<'t>
+            where
+                $crate::LinkedDataInput<I, V>: 't
+            {
+                ::std::future::ready(context.into_canonical_form(data).map_err(Into::into))
             }
         }
     };

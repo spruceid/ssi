@@ -7,7 +7,7 @@ use pin_project::pin_project;
 use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_verification_methods::{
     ControllerError, GenericVerificationMethod, InvalidVerificationMethod, ProofPurposes,
-    Referencable, ReferenceOrOwnedRef, VerificationMethodRef, VerificationMethodResolutionError,
+    Referencable, ReferenceOrOwnedRef, VerificationMethodResolutionError,
 };
 use std::future::Future;
 use std::marker::PhantomData;
@@ -215,7 +215,6 @@ impl<'max, T: 'max + ?Sized + DIDResolver> RefFutureBinder<'max, UnboundedDerefe
 impl<T: DIDResolver, M> ssi_verification_methods::Verifier<M> for DIDVerifier<T>
 where
     M: ssi_verification_methods::VerificationMethod,
-    for<'a> M::Reference<'a>: VerificationMethodRef<'a>,
     M: TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
 }
@@ -224,7 +223,6 @@ where
 impl<T: DIDResolver, M> ssi_verification_methods::VerificationMethodResolver<M> for DIDVerifier<T>
 where
     M: ssi_verification_methods::VerificationMethod,
-    for<'a> M::Reference<'a>: VerificationMethodRef<'a>,
     M: TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
     type ResolveVerificationMethod<'a> = ResolveVerificationMethod<'a, M, T> where Self: 'a, M: 'a;

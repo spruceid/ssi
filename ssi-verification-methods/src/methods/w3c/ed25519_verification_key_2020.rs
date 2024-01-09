@@ -2,7 +2,6 @@ use std::hash::Hash;
 
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
@@ -20,7 +19,17 @@ pub const ED25519_VERIFICATION_KEY_2020_TYPE: &str = "Ed25519VerificationKey2020
 /// Deprecated verification method for the `Ed25519Signature2020` suite.
 ///
 /// See: <https://w3c.github.io/vc-di-eddsa/#ed25519verificationkey2020>
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "Ed25519VerificationKey2020")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 #[ld(type = "sec:Ed25519VerificationKey2020")]
@@ -141,6 +150,14 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for Ed25519VerificationKey2020 {
@@ -155,22 +172,30 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+        ED25519_VERIFICATION_KEY_2020_TYPE
+    }
 }
 
-impl SigningMethod<ed25519_dalek::Keypair> for Ed25519VerificationKey2020 {
+impl SigningMethod<ed25519_dalek::Keypair, ssi_jwk::algorithm::EdDSA>
+    for Ed25519VerificationKey2020
+{
     fn sign_bytes_ref(
         this: &Self,
         secret: &ed25519_dalek::Keypair,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         Ok(this.sign_bytes(message, secret))
     }
 }
 
-impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
+impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2020 {
     fn sign_bytes_ref(
         this: &Self,
         secret_key: &JWK,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         let algorithm = secret_key.algorithm.unwrap_or(ssi_jwk::Algorithm::EdDSA);
@@ -180,7 +205,7 @@ impl SigningMethod<JWK> for Ed25519VerificationKey2020 {
             {
                 let keypair = ed25519_dalek::Keypair::try_from(p)
                     .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
-                Self::sign_bytes_ref(this, &keypair, message)
+                Self::sign_bytes_ref(this, &keypair, ssi_jwk::algorithm::EdDSA, message)
             }
             _ => Err(MessageSignatureError::InvalidSecretKey),
         }

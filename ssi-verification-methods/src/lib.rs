@@ -130,6 +130,10 @@ pub trait VerificationMethod: Referencable {
 
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Option<&Iri>; // Should be an URI.
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri;
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -189,34 +193,42 @@ impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodRe
     }
 }
 
-pub trait SigningMethod<S>: VerificationMethod + Referencable {
+pub trait SigningMethod<S, A: Copy>: VerificationMethod + Referencable {
     fn sign(
         &self,
         secret: &S,
-        protocol: impl SignatureProtocol,
+        algorithm: A,
+        protocol: impl SignatureProtocol<A>,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        Self::sign_ref(self.as_reference(), secret, protocol, bytes)
+        Self::sign_ref(self.as_reference(), secret, algorithm, protocol, bytes)
     }
 
     fn sign_ref(
         this: Self::Reference<'_>,
         secret: &S,
-        protocol: impl SignatureProtocol,
+        algorithm: A,
+        protocol: impl SignatureProtocol<A>,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         let prepared_bytes = protocol.prepare_message(bytes);
-        let signed_bytes = Self::sign_bytes_ref(this, secret, &prepared_bytes)?;
-        Ok(protocol.encode_signature(signed_bytes))
+        let signed_bytes = Self::sign_bytes_ref(this, secret, algorithm, &prepared_bytes)?;
+        protocol.encode_signature(algorithm, signed_bytes)
     }
 
-    fn sign_bytes(&self, secret: &S, bytes: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
-        Self::sign_bytes_ref(self.as_reference(), secret, bytes)
+    fn sign_bytes(
+        &self,
+        secret: &S,
+        algorithm: A,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Self::sign_bytes_ref(self.as_reference(), secret, algorithm, bytes)
     }
 
     fn sign_bytes_ref(
         this: Self::Reference<'_>,
         secret: &S,
+        algorithm: A,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError>;
 }
@@ -232,19 +244,27 @@ impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
     }
 }
 
-impl<'m, 's, P: SignatureProtocol, M: 'm + Referencable + SigningMethod<S>, S> MessageSigner<P>
-    for MethodWithSecret<'m, 's, M, S>
+impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMethod<S, A>, S>
+    MessageSigner<A, P> for MethodWithSecret<'m, 's, M, S>
 {
     type Sign<'a> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where
     Self: 'a,
+    A: 'a,
     P: 'a;
 
-    fn sign<'a>(self, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
+    fn sign<'a>(self, algorithm: A, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
     where
         Self: 'a,
+        A: 'a,
         P: 'a,
     {
-        std::future::ready(M::sign_ref(self.method, self.secret, protocol, message))
+        std::future::ready(M::sign_ref(
+            self.method,
+            self.secret,
+            algorithm,
+            protocol,
+            message,
+        ))
     }
 }
 
@@ -255,41 +275,40 @@ pub trait TypedVerificationMethod: VerificationMethod {
 
     /// Returns the name of the verification method's type.
     fn type_(&self) -> &str;
+
+    fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str;
 }
 
-pub trait VerificationMethodRef<'m> {
-    /// Identifier of the verification method.
-    fn id(&self) -> &'m Iri;
+// pub trait VerificationMethodRef<'m> {
+//     /// Identifier of the verification method.
+//     fn id(&self) -> &'m Iri;
 
-    /// Returns the IRI of the verification method controller.
-    fn controller(&self) -> Option<&'m Iri>; // Should be an URI.
-}
+//     /// Returns the IRI of the verification method controller.
+//     fn controller(&self) -> Option<&'m Iri>; // Should be an URI.
+// }
 
-impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
-    fn id(&self) -> &'m Iri {
-        M::id(self)
-    }
+// impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
+//     fn id(&self) -> &'m Iri {
+//         M::id(self)
+//     }
 
-    fn controller(&self) -> Option<&'m Iri> {
-        M::controller(self)
-    }
-}
+//     fn controller(&self) -> Option<&'m Iri> {
+//         M::controller(self)
+//     }
+// }
 
-impl<'m, M: VerificationMethod> Cow<'m, M>
-where
-    M::Reference<'m>: VerificationMethodRef<'m>,
-{
+impl<'m, M: VerificationMethod> Cow<'m, M> {
     fn id<'a>(&'a self) -> &'a Iri {
         match self {
             Self::Owned(m) => m.id(),
-            Self::Borrowed(b) => b.id(),
+            Self::Borrowed(b) => M::ref_id(*b),
         }
     }
 
     fn controller<'a>(&'a self) -> Option<&'a Iri> {
         match self {
             Self::Owned(m) => m.controller(),
-            Self::Borrowed(b) => b.controller(),
+            Self::Borrowed(b) => M::ref_controller(*b),
         }
     }
 }

@@ -4,7 +4,6 @@ use std::{
 };
 
 use iref::{Iri, IriBuf};
-use linked_data::LinkedData;
 use static_iref::iri;
 
 use crate::{InvalidVerificationMethod, VerificationMethodResolutionError};
@@ -33,10 +32,9 @@ pub enum VerificationError {
     #[error("invalid key")]
     InvalidKey,
 
-    /// The verification key is not the same as the signing key.
-    #[error("key mismatch")]
-    KeyMismatch,
-
+    // /// The verification key is not the same as the signing key.
+    // #[error("key mismatch")]
+    // KeyMismatch,
     /// Key not found.
     #[error("unknown key")]
     UnknownKey,
@@ -93,7 +91,7 @@ impl From<std::convert::Infallible> for VerificationError {
 macro_rules! proof_purposes {
     ($($(#[$doc:meta])* $id:ident: $variant:ident = $iri:literal),*) => {
         /// Proof purposes.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, LinkedData)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, linked_data::Serialize, linked_data::Deserialize)]
         #[derive(serde::Serialize, serde::Deserialize)]
         pub enum ProofPurpose {
             $(

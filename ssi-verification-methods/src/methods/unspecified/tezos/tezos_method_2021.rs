@@ -1,13 +1,13 @@
 use iref::{Iri, IriBuf, UriBuf};
-use linked_data::LinkedData;
 use serde::{Deserialize, Serialize};
-use ssi_jwk::JWK;
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use static_iref::iri;
 use std::{collections::BTreeMap, hash::Hash};
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, TypedVerificationMethod, VerificationError, VerificationMethod,
+    Referencable, SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const TEZOS_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#TezosMethod2021");
@@ -34,7 +34,17 @@ pub const TEZOS_METHOD_2021_TYPE: &str = "TezosMethod2021";
 /// `publicKeyMultibase` properties. Here `publicKeyMultibase` is used in a
 /// non-standard way, where the public key is encoded in base58 (`z` prefix) as
 /// a tezos key (so without multicodec, contrarily to the specification).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[serde(tag = "type", rename = "TezosMethod2021")]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct TezosMethod2021 {
@@ -51,7 +61,30 @@ pub struct TezosMethod2021 {
     pub public_key: PublicKey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, LinkedData)]
+impl TezosMethod2021 {
+    pub fn verify_bytes(
+        &self,
+        public_key_jwk: Option<&JWK>,
+        message: &[u8],
+        algorithm: AnyBlake2b,
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
+        self.public_key
+            .verify_bytes(public_key_jwk, message, algorithm, signature)
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub enum PublicKey {
     #[serde(rename = "publicKeyJwk")]
@@ -64,6 +97,13 @@ pub enum PublicKey {
 }
 
 impl PublicKey {
+    pub fn as_jwk(&self) -> Option<&JWK> {
+        match self {
+            Self::Jwk(jwk) => Some(jwk),
+            Self::BlockchainAccountId(_) => None,
+        }
+    }
+
     pub fn matches(&self, other: &JWK) -> Result<bool, VerificationError> {
         use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
         match self {
@@ -90,15 +130,38 @@ impl PublicKey {
             Some(_) => Err(InvalidVerificationMethod::invalid_property("publicKeyJwk")),
             None => match properties.get("blockchainAccountId") {
                 Some(serde_json::Value::String(value)) => {
-                    Ok(Self::Jwk(Box::new(value.parse().map_err(|_| {
+                    Ok(Self::BlockchainAccountId(value.parse().map_err(|_| {
                         InvalidVerificationMethod::invalid_property("blockchainAccountId")
-                    })?)))
+                    })?))
                 }
                 Some(_) => Err(InvalidVerificationMethod::invalid_property(
                     "blockchainAccountId",
                 )),
                 None => Err(InvalidVerificationMethod::missing_property("publicKeyJwk")),
             },
+        }
+    }
+
+    pub fn verify_bytes(
+        &self,
+        public_key_jwk: Option<&JWK>,
+        message: &[u8],
+        algorithm: AnyBlake2b,
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
+        match self {
+            Self::BlockchainAccountId(account_id) => match public_key_jwk {
+                Some(jwk) => match account_id.verify(jwk) {
+                    Ok(()) => Ok(
+                        ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature).is_ok(),
+                    ),
+                    Err(_) => Ok(false),
+                },
+                None => Err(VerificationError::MissingPublicKey),
+            },
+            Self::Jwk(jwk) => {
+                Ok(ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature).is_ok())
+            }
         }
     }
 
@@ -130,6 +193,14 @@ impl VerificationMethod for TezosMethod2021 {
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
     }
+
+    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+        r.id.as_iri()
+    }
+
+    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+        Some(r.controller.as_iri())
+    }
 }
 
 impl TypedVerificationMethod for TezosMethod2021 {
@@ -142,6 +213,10 @@ impl TypedVerificationMethod for TezosMethod2021 {
     }
 
     fn type_(&self) -> &str {
+        TEZOS_METHOD_2021_TYPE
+    }
+
+    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
         TEZOS_METHOD_2021_TYPE
     }
 }
@@ -159,5 +234,17 @@ impl TryFrom<GenericVerificationMethod> for TezosMethod2021 {
         } else {
             Err(InvalidVerificationMethod::InvalidTypeName(value.type_))
         }
+    }
+}
+
+impl SigningMethod<JWK, ssi_jwk::algorithm::AnyBlake2b> for TezosMethod2021 {
+    fn sign_bytes_ref(
+        _this: &Self,
+        key: &JWK,
+        algorithm: ssi_jwk::algorithm::AnyBlake2b,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(algorithm.into(), bytes, key)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

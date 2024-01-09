@@ -5,6 +5,9 @@ use static_iref::iri;
 mod ethereum_adress;
 pub use ethereum_adress::*;
 
+mod multibase;
+pub use multibase::{Multibase, MultibaseBuf};
+
 // #[tldr("ssi-vc/src/schema/sec.ttl")]
 // pub mod schema {
 //     #[prefix("http://www.w3.org/2002/07/owl#")]

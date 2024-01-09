@@ -15,7 +15,7 @@ ssi-verification-methods.workspace = true
 ssi-rdf.workspace = true
 ssi-security.workspace = true
 linked-data.workspace = true
-json-ld.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
 rdf-types.workspace = true
 xsd-types = { workspace = true, features = ["serde"] }
 iref.workspace = true

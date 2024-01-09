@@ -25,7 +25,7 @@ thiserror.workspace = true
 iref = { workspace = true, features = ["serde"] }
 static-iref.workspace = true
 pin-project.workspace = true
-json-ld.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
 
 # for the `http` feature.
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"], optional = true }

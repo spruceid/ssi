@@ -58,11 +58,40 @@ pub enum Error {
     Internal(Box<DynInternalError>),
 }
 
+impl Error {
+    pub fn kind(&self) -> ErrorKind {
+        match self {
+            Self::MethodNotSupported(_) => ErrorKind::MethodNotSupported,
+            Self::NotFound => ErrorKind::NotFound,
+            Self::NoRepresentation => ErrorKind::NoRepresentation,
+            Self::UnknownRepresentation(_) => ErrorKind::UnknownRepresentation,
+            Self::RepresentationNotSupported(_) => ErrorKind::RepresentationNotSupported,
+            Self::InvalidData(_) => ErrorKind::InvalidData,
+            Self::InvalidMethodSpecificId(_) => ErrorKind::InvalidMethodSpecificId,
+            Self::InvalidOptions => ErrorKind::InvalidOptions,
+            Self::Internal(_) => ErrorKind::Internal,
+        }
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 pub type DynInternalError = dyn Send + std::error::Error;
 
 #[cfg(target_arch = "wasm32")]
 pub type DynInternalError = dyn std::error::Error;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ErrorKind {
+    MethodNotSupported,
+    NotFound,
+    NoRepresentation,
+    UnknownRepresentation,
+    RepresentationNotSupported,
+    InvalidData,
+    InvalidMethodSpecificId,
+    InvalidOptions,
+    Internal,
+}
 
 #[pin_project]
 pub struct Resolve<'a, T: 'a + ?Sized + DIDResolver> {
