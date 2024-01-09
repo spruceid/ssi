@@ -61,6 +61,16 @@ impl Eip712Options {
     }
 }
 
+impl From<super::Eip712Options> for Eip712Options {
+    fn from(value: super::Eip712Options) -> Self {
+        Self {
+            types: value.types.clone(),
+            primary_type: value.primary_type.clone(),
+            domain: value.domain.clone()
+        }
+    }
+}
+
 #[derive(
     Debug,
     serde::Serialize,

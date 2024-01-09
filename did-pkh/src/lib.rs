@@ -11,9 +11,6 @@ use std::str::FromStr;
 
 use ssi_caips::caip10::BlockchainAccountId;
 use ssi_caips::caip2::ChainId;
-// use ssi_dids::resolve::{
-//     DIDResolver, DocumentMetadata, ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-// };
 use ssi_dids::{
     document::DIDVerificationMethod,
     resolution::{DIDMethodResolver, Error},
@@ -732,17 +729,19 @@ impl DIDPKH {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iref::IriBuf;
+    use iref::{IriBuf, UriBuf};
     use locspan::Meta;
     use serde_json::{from_str, from_value, json};
     use ssi_dids::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
     use ssi_jws::CompactJWSString;
     use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
+    use ssi_vc::Verifiable;
     use ssi_vc_ldp::{
         verification::method::{signer::SingleSecretSigner, ProofPurpose},
         CryptographicSuiteInput, DataIntegrity, Proof, ProofConfiguration,
     };
+    use static_iref::uri;
     // use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
@@ -964,6 +963,18 @@ mod tests {
         id: IriBuf,
     }
 
+    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
+    #[ld(type = "cred:VerifiablePresentation")]
+    #[serde(rename_all = "camelCase")]
+    struct TestPresentation {
+        #[ld("cred:holder")]
+        holder: linked_data::Ref<UriBuf>,
+
+        #[ld("cred:verifiableCredential", graph)]
+        verifiable_credential: Verifiable<DataIntegrity<TestCredential, AnySuite>>,
+    }
+
     async fn credential_prove_verify_did_pkh(
         key: JWK,
         wrong_key: JWK,
@@ -981,7 +992,7 @@ mod tests {
         let did = DIDPKH.generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
-        let mut cred = TestCredential {
+        let cred = TestCredential {
             issuer: did.clone().into(),
             issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
             credential_subject: CredentialSubject {
@@ -995,14 +1006,14 @@ mod tests {
             created: cred.issuance_date.clone(),
             proof_purpose: ProofPurpose::Assertion,
             options: AnySuiteOptions {
-                eip712: eip712_domain_opt.map(Into::into),
+                eip712: eip712_domain_opt.clone(),
+                // eip712_v0_1: eip712_domain_opt.clone().map(Into::into),
                 ..Default::default()
             }
             .with_public_key(key.to_public())
             .unwrap(),
         };
         eprintln!("vm {:?}", issue_options.verification_method);
-        let vc_no_proof = cred.clone();
         /*
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
         */
@@ -1012,107 +1023,121 @@ mod tests {
         eprintln!("key: {key}");
         eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
-            .sign(cred, AnyInputContext::default(), &signer, issue_options)
+            .sign(
+                cred.clone(),
+                AnyInputContext::default(),
+                &signer,
+                issue_options.clone(),
+            )
             .await
             .unwrap();
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         assert!(vc.verify(&didpkh).await.unwrap().is_valid());
 
-        // // test that issuer property is used for verification
-        // let mut vc_bad_issuer = vc.clone();
-        // vc_bad_issuer.issuer = Some(Issuer::URI(URI::String("did:pkh:example:bad".to_string())));
-        // assert!(!vc_bad_issuer
-        //     .verify(None, &DIDPKH, &mut context_loader)
-        //     .await
-        //     .errors
-        //     .is_empty());
+        // Test that issuer property is used for verification.
+        let vc_bad_issuer = vc
+            .clone()
+            .async_try_map(|di, proof| async {
+                let mut cred = di.into_value();
+                cred.issuer = iri!("did:pkh:example:bad").to_owned();
+                // Rebuild the data-integrity credential with the bad issuer.
+                // This will use the cryptosuite to hash the credential.
+                DataIntegrity::new(
+                    cred,
+                    AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                // Return it with the original proof.
+                .map(|di| (di, proof))
+            })
+            .await
+            .unwrap();
+        // It should fail.
+        assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_invalid());
 
-        // // Check that proof JWK must match proof verificationMethod
-        // let mut vc_wrong_key = vc_no_proof.clone();
-        // let proof_bad = proof_suite
-        //     .sign(
-        //         &vc_no_proof,
-        //         &issue_options,
-        //         &DIDPKH,
-        //         &mut context_loader,
-        //         &wrong_key,
-        //         None,
-        //     )
-        //     .await
-        //     .unwrap();
-        // vc_wrong_key.add_proof(proof_bad);
-        // vc_wrong_key.validate().unwrap();
-        // assert!(!vc_wrong_key
-        //     .verify(None, &DIDPKH, &mut context_loader)
-        //     .await
-        //     .errors
-        //     .is_empty());
+        // Check that proof JWK must match proof verificationMethod
+        let wrong_signer = SingleSecretSigner::new(&didpkh, wrong_key.clone());
+        let vc_wrong_key = proof_suite
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &wrong_signer,
+                issue_options,
+            )
+            .await
+            .unwrap();
+        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_invalid());
 
-        // // Mess with proof signature to make verify fail
-        // let mut vc_fuzzed = vc.clone();
-        // fuzz_proof_value(&mut vc_fuzzed.proof);
-        // let vp_verification_result = vc_fuzzed.verify(None, &DIDPKH, &mut context_loader).await;
-        // println!("{:#?}", vp_verification_result);
-        // assert!(!vp_verification_result.errors.is_empty());
+        // Mess with proof signature to make verify fail.
+        let mut vc_fuzzed = vc.clone();
+        fuzz_proof_value(vc_fuzzed.proof_mut());
+        let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
+        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
-        // // Make it into a VP
-        // use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
-        // let mut vp = Presentation {
-        //     id: None,
-        //     context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
-        //         DEFAULT_CONTEXT.to_string(),
-        //     ))]),
+        // Make it into a VP.
+        let presentation = TestPresentation {
+            holder: linked_data::Ref(did.clone().into()),
+            verifiable_credential: vc,
+        };
 
-        //     type_: OneOrMany::One("VerifiablePresentation".to_string()),
-        //     verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
-        //     proof: None,
-        //     holder: None,
-        //     property_set: None,
-        //     holder_binding: None,
-        // };
-        // let mut vp_issue_options = LinkedDataProofOptions::default();
-        // vp.holder = Some(URI::String(did.to_string()));
-        // vp_issue_options.verification_method = Some(URI::String(did.to_string() + vm_relative_url));
-        // vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
-        // vp_issue_options.eip712_domain = vp_eip712_domain_opt;
-        // // let vp_proof = vp.generate_proof(&key, &vp_issue_options).await.unwrap();
-        // let vp_proof = proof_suite
-        //     .sign(
-        //         &vp,
-        //         &vp_issue_options,
-        //         &DIDPKH,
-        //         &mut context_loader,
-        //         &key,
-        //         None,
-        //     )
-        //     .await
-        //     .unwrap();
-        // vp.add_proof(vp_proof);
-        // println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        // vp.validate().unwrap();
-        // let vp_verification_result = vp
-        //     .verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader)
-        //     .await;
-        // println!("{:#?}", vp_verification_result);
-        // assert!(vp_verification_result.errors.is_empty());
+        let vp_issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: "2021-03-18T16:38:25Z".parse().unwrap(),
+            proof_purpose: ProofPurpose::Authentication,
+            options: AnySuiteOptions {
+                eip712: vp_eip712_domain_opt.clone(),
+                // eip712_v0_1: vp_eip712_domain_opt.map(Into::into),
+                ..Default::default()
+            }
+            .with_public_key(key.to_public())
+            .unwrap(),
+        };
 
-        // // Mess with proof signature to make verify fail
-        // let mut vp_fuzzed = vp.clone();
-        // fuzz_proof_value(&mut vp_fuzzed.proof);
-        // let vp_verification_result = vp_fuzzed
-        //     .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
-        //     .await;
-        // println!("{:#?}", vp_verification_result);
-        // assert!(!vp_verification_result.errors.is_empty());
+        let vp = proof_suite
+            .sign(
+                presentation,
+                AnyInputContext::default(),
+                &signer,
+                vp_issue_options,
+            )
+            .await
+            .unwrap();
 
-        // // Test that holder is verified
-        // let mut vp2 = vp.clone();
-        // vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
-        // assert!(!vp2
-        //     .verify(None, &DIDPKH, &mut context_loader)
-        //     .await
-        //     .errors
-        //     .is_empty());
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        assert!(vp.verify(&didpkh).await.unwrap().is_valid());
+
+        // Mess with proof signature to make verify fail.
+        let mut vp_fuzzed = vp.clone();
+        fuzz_proof_value(vp_fuzzed.proof_mut());
+        let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+
+        // Test that holder is verified.
+        let vp_bad_holder = vp
+            .clone()
+            .async_try_map(|di, proof| async {
+                let mut pres = di.into_value();
+                pres.holder = uri!("did:pkh:example:bad").to_owned().into();
+                // Rebuild the data-integrity presentation with the bad holder.
+                // This will use the cryptosuite to hash the presentation.
+                DataIntegrity::new(
+                    pres,
+                    AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                // Return it with the original proof.
+                .map(|di| (di, proof))
+            })
+            .await
+            .unwrap();
+        // It should fail.
+        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
 
     async fn credential_prepare_complete_verify_did_pkh_tz(
@@ -1149,7 +1174,7 @@ mod tests {
         eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
             .sign(
-                cred,
+                cred.clone(),
                 AnyInputContext::default(),
                 &signer,
                 issue_options.clone(),
@@ -1183,26 +1208,18 @@ mod tests {
             .await;
         assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_valid());
 
-        // // Check that proof JWK must match proof verificationMethod
-        // let mut vc_wrong_key = vc_no_proof.clone();
-        // let proof_bad = proof_suite
-        //     .sign(
-        //         &vc_no_proof,
-        //         &issue_options,
-        //         &DIDPKH,
-        //         &mut context_loader,
-        //         &wrong_key,
-        //         None,
-        //     )
-        //     .await
-        //     .unwrap();
-        // vc_wrong_key.add_proof(proof_bad);
-        // vc_wrong_key.validate().unwrap();
-        // assert!(!vc_wrong_key
-        //     .verify(None, &DIDPKH, &mut context_loader)
-        //     .await
-        //     .errors
-        //     .is_empty());
+        // Check that proof JWK must match proof verificationMethod.
+        let wrong_signer = SingleSecretSigner::new(&didpkh, wrong_key.clone());
+        let vc_wrong_key = proof_suite
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &wrong_signer,
+                issue_options,
+            )
+            .await
+            .unwrap();
+        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_invalid());
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
@@ -1211,64 +1228,63 @@ mod tests {
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // // Make it into a VP
-        // use ssi_vc::{CredentialOrJWT, Presentation, ProofPurpose, DEFAULT_CONTEXT};
-        // let mut vp = Presentation {
-        //     id: None,
-        //     context: ssi_vc::Contexts::Many(vec![ssi_vc::Context::URI(ssi_vc::URI::String(
-        //         DEFAULT_CONTEXT.to_string(),
-        //     ))]),
+        let presentation = TestPresentation {
+            holder: linked_data::Ref(did.clone().into()),
+            verifiable_credential: vc,
+        };
 
-        //     type_: OneOrMany::One("VerifiablePresentation".to_string()),
-        //     verifiable_credential: Some(OneOrMany::One(CredentialOrJWT::Credential(vc))),
-        //     proof: None,
-        //     holder: None,
-        //     property_set: None,
-        //     holder_binding: None,
-        // };
-        // let mut vp_issue_options = LinkedDataProofOptions::default();
-        // vp.holder = Some(URI::String(did.to_string()));
-        // vp_issue_options.verification_method = Some(URI::String(did.to_string() + vm_relative_url));
-        // vp_issue_options.proof_purpose = Some(ProofPurpose::Authentication);
+        let vp_issue_options = ProofConfiguration {
+            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+                .unwrap()
+                .into(),
+            created: "2021-03-18T16:38:25Z".parse().unwrap(),
+            proof_purpose: ProofPurpose::Authentication,
+            options: AnySuiteOptions::default()
+                .with_public_key(key.to_public())
+                .unwrap(),
+        };
 
-        // let prep = proof_suite
-        //     .prepare(
-        //         &vp,
-        //         &vp_issue_options,
-        //         &DIDPKH,
-        //         &mut context_loader,
-        //         &key,
-        //         None,
-        //     )
-        //     .await
-        //     .unwrap();
-        // let sig = sign_tezos(&prep, algorithm, &key);
-        // let vp_proof = proof_suite.complete(&prep, &sig).await.unwrap();
-        // vp.add_proof(vp_proof);
-        // println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        // vp.validate().unwrap();
-        // let vp_verification_result = vp
-        //     .verify(Some(vp_issue_options.clone()), &DIDPKH, &mut context_loader)
-        //     .await;
-        // println!("{:#?}", vp_verification_result);
-        // assert!(vp_verification_result.errors.is_empty());
+        let vp = proof_suite
+            .sign(
+                presentation,
+                AnyInputContext::default(),
+                &signer,
+                vp_issue_options,
+            )
+            .await
+            .unwrap();
 
-        // // Mess with proof signature to make verify fail
-        // let mut vp_fuzzed = vp.clone();
-        // fuzz_proof_value(&mut vp_fuzzed.proof);
-        // let vp_verification_result = vp_fuzzed
-        //     .verify(Some(vp_issue_options), &DIDPKH, &mut context_loader)
-        //     .await;
-        // println!("{:#?}", vp_verification_result);
-        // assert!(!vp_verification_result.errors.is_empty());
+        println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
+        assert!(vp.verify(&didpkh).await.unwrap().is_valid());
 
-        // // Test that holder is verified
-        // let mut vp2 = vp.clone();
-        // vp2.holder = Some(URI::String("did:pkh:example:bad".to_string()));
-        // assert!(!vp2
-        //     .verify(None, &DIDPKH, &mut context_loader)
-        //     .await
-        //     .errors
-        //     .is_empty());
+        // Mess with proof signature to make verify fail.
+        let mut vp_fuzzed = vp.clone();
+        fuzz_proof_value(vp_fuzzed.proof_mut());
+        let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+
+        // Test that holder is verified.
+        let vp_bad_holder = vp
+            .clone()
+            .async_try_map(|di, proof| async {
+                let mut pres = di.into_value();
+                pres.holder = uri!("did:pkh:example:bad").to_owned().into();
+                // Rebuild the data-integrity presentation with the bad holder.
+                // This will use the cryptosuite to hash the presentation.
+                DataIntegrity::new(
+                    pres,
+                    AnyInputContext::default(),
+                    proof.suite(),
+                    proof.configuration(),
+                )
+                .await
+                // Return it with the original proof.
+                .map(|di| (di, proof))
+            })
+            .await
+            .unwrap();
+        // It should fail.
+        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
 
     // fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {

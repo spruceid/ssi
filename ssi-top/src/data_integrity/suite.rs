@@ -439,6 +439,28 @@ crypto_suites! {
 }
 
 impl AnySuite {
+    pub fn requires_eip721(&self) -> bool {
+        if cfg!(feature = "w3c") {
+            matches!(
+                self,
+                Self::EthereumEip712Signature2021
+            )
+        } else {
+            false
+        }
+    }
+
+    pub fn requires_eip721_v0_1(&self) -> bool {
+        if cfg!(feature = "w3c") {
+            matches!(
+                self,
+                Self::EthereumEip712Signature2021v0_1
+            )
+        } else {
+            false
+        }
+    }
+
     pub fn requires_public_key_jwk(&self) -> bool {
         if cfg!(feature = "tezos") {
             matches!(
@@ -446,6 +468,17 @@ impl AnySuite {
                 Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                     | Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                     | Self::TezosSignature2021
+            )
+        } else {
+            false
+        }
+    }
+
+    pub fn requires_public_key_multibase(&self) -> bool {
+        if cfg!(feature = "tezos") {
+            matches!(
+                self,
+                Self::TezosJcsSignature2021
             )
         } else {
             false

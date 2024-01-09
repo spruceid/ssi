@@ -31,10 +31,12 @@ pub struct AnySuiteOptions {
 
     #[ld("eip712:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename="eip712Domain")]
     pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 
     #[ld("eip712v0.1:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename="eip712Domain")]
     pub eip712_v0_1: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::v0_1::Eip712Options>,
 }
 
@@ -48,8 +50,7 @@ impl AnySuiteOptions {
         Ok(Self {
             public_key_jwk: Some(Box::new(jwk)),
             public_key_multibase,
-            eip712: None,
-            eip712_v0_1: None,
+            ..self
         })
     }
 }
@@ -61,7 +62,7 @@ impl From<Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Option
         value: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
     ) -> Self {
         Self {
-            eip712: value.map(Into::into),
+            eip712: value.clone(),
             ..Default::default()
         }
     }
@@ -70,7 +71,7 @@ impl From<Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Option
 impl From<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options> for AnySuiteOptions {
     fn from(value: ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options) -> Self {
         Self {
-            eip712: Some(value.into()),
+            eip712: Some(value.clone()),
             ..Default::default()
         }
     }
@@ -80,7 +81,7 @@ impl Referencable for AnySuiteOptions {
     type Reference<'a> = AnySuiteOptionsRef<'a>;
 
     fn as_reference(&self) -> Self::Reference<'_> {
-        AnySuiteOptionsRef {
+                AnySuiteOptionsRef {
             public_key_jwk: self.public_key_jwk.as_deref(),
             public_key_multibase: self.public_key_multibase.as_deref(),
             eip712: self
@@ -100,6 +101,18 @@ impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
     fn prepare(&mut self, suite: &AnySuite) {
         if !suite.requires_public_key_jwk() {
             self.public_key_jwk = None
+        }
+
+        if !suite.requires_public_key_multibase() {
+            self.public_key_multibase = None
+        }
+
+        if !suite.requires_eip721() {
+            self.eip712 = None
+        }
+
+        if !suite.requires_eip721_v0_1() {
+            self.eip712_v0_1 = None
         }
     }
 }
