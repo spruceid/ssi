@@ -1,8 +1,6 @@
 use core::fmt;
 use indexmap::{Equivalent, IndexMap};
-use linked_data::{
-    LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
-};
+use linked_data::{LinkedData, LinkedDataGraph};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::hashes::keccak::bytes_to_lowerhex;

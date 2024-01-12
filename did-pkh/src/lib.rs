@@ -1597,7 +1597,8 @@ mod tests {
         other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
-    async fn test_verify_vc(vc_str: &str, num_warnings: usize) {
+    async fn test_verify_vc(vc_str: &str, _num_warnings: usize) {
+        // TODO check warnings maybe?
         eprintln!("input: {vc_str}");
 
         let vc = ssi_top::data_integrity::from_json_ld_str_with_defaults(vc_str)

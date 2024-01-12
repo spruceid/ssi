@@ -97,7 +97,7 @@ impl Signature {
     pub async fn sign<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>>(
         public_key: Option<&JWK>,
         message: &'a [u8],
-        signer: S
+        signer: S,
     ) -> Result<Self, SignatureError> {
         match public_key {
             Some(jwk) => match jwk.algorithm.try_into() {
@@ -107,10 +107,10 @@ impl Signature {
                         Ok(proof_value) => Ok(Signature::new(proof_value)),
                         Err(_) => Err(SignatureError::InvalidSignature),
                     }
-                },
-                Err(e) => Err(MessageSignatureError::from(e).into())
+                }
+                Err(e) => Err(MessageSignatureError::from(e).into()),
             },
-            None => Err(SignatureError::MissingPublicKey)
+            None => Err(SignatureError::MissingPublicKey),
         }
     }
 }

@@ -1,5 +1,3 @@
-use std::future;
-
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_verification_key_2019::DigestFunction, EcdsaSecp256k1VerificationKey2019,

@@ -220,7 +220,9 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         bytes: &[u8],
         signer: S,
     ) -> Result<Self::Signature, SignatureError> {
-        let proof_value_bytes = signer.sign(method.algorithm().into(), EthereumWallet, bytes).await?;
+        let proof_value_bytes = signer
+            .sign(method.algorithm().into(), EthereumWallet, bytes)
+            .await?;
         match String::from_utf8(proof_value_bytes) {
             Ok(proof_value) => Ok(Signature::new(proof_value)),
             Err(_) => Err(SignatureError::InvalidSignature),

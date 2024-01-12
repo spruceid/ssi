@@ -224,10 +224,7 @@ mod tests {
     #[cfg(feature = "secp256r1")]
     async fn from_p256() {
         let did_url = DIDURL::new(b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9#0").unwrap();
-        let resolved = JWKMethod
-            .dereference(did_url)
-            .await
-            .unwrap();
+        let resolved = JWKMethod.dereference(did_url).await.unwrap();
 
         let vm: JsonWebKey2020Ref = resolved
             .content
@@ -284,10 +281,7 @@ mod tests {
     #[async_std::test]
     async fn from_x25519() {
         let did_url = DIDURL::new(b"did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9#0").unwrap();
-        let resolved = JWKMethod
-            .dereference(did_url)
-            .await
-            .unwrap();
+        let resolved = JWKMethod.dereference(did_url).await.unwrap();
 
         let vm: JsonWebKey2020Ref = resolved
             .content

@@ -1,5 +1,3 @@
-use std::future;
-
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     covariance_rule, InvalidSignature, Referencable, RsaVerificationKey2018, SignatureError,

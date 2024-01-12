@@ -161,6 +161,7 @@ pub enum VerificationMethodResolutionError {
 
 pub trait VerificationMethodResolver<M: Referencable> {
     /// Resolve the verification method reference.
+    #[allow(async_fn_in_trait)]
     async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         issuer: Option<&'a Iri>,
@@ -234,14 +235,13 @@ impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
 impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMethod<S, A>, S>
     MessageSigner<A, P> for MethodWithSecret<'m, 's, M, S>
 {
-    async fn sign(self, algorithm: A, protocol: P, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
-        M::sign_ref(
-            self.method,
-            self.secret,
-            algorithm,
-            protocol,
-            message,
-        )
+    async fn sign(
+        self,
+        algorithm: A,
+        protocol: P,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        M::sign_ref(self.method, self.secret, algorithm, protocol, message)
     }
 }
 

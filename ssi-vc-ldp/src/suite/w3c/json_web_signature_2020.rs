@@ -1,5 +1,3 @@
-use std::future;
-
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{JsonWebKey2020, SignatureError};
 use static_iref::iri;

@@ -16,8 +16,7 @@ use std::{future::Future, pin::Pin, task};
 
 use crate::{
     eip712::{
-        Eip712Signature, Eip712SignatureRef, Input, TypesFetchError, TypesOrURI,
-        TypesProvider,
+        Eip712Signature, Eip712SignatureRef, Input, TypesFetchError, TypesOrURI, TypesProvider,
     },
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,

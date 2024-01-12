@@ -34,6 +34,7 @@ pub trait ControllerProvider {
         Self: 'a;
 
     /// Returns the controller with the given identifier, if it can be found.
+    #[allow(async_fn_in_trait)]
     async fn get_controller<'a>(
         &'a self,
         id: &'a Iri,
@@ -41,6 +42,7 @@ pub trait ControllerProvider {
 
     /// Returns the controller with the given identifier, or fails if it cannot
     /// be found.
+    #[allow(async_fn_in_trait)]
     async fn require_controller<'a>(
         &'a self,
         id: &'a Iri,
@@ -52,6 +54,7 @@ pub trait ControllerProvider {
 
     /// Checks that the controller identified by `controller_id` allows the use
     /// of the verification method `method_id` with the given proof purposes.
+    #[allow(async_fn_in_trait)]
     async fn allows_verification_method<'a>(
         &'a self,
         controller_id: &'a Iri,
@@ -67,6 +70,7 @@ pub trait ControllerProvider {
     ///
     /// Contrarily to the [`allows_verification_method`] function, this function
     /// returns an error if one of the input proof purposes is not allowed.
+    #[allow(async_fn_in_trait)]
     async fn ensure_allows_verification_method<'a>(
         &'a self,
         controller_id: &'a Iri,

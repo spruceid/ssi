@@ -6,7 +6,7 @@ use crate::{
     DIDURLBuf, Fragment, PrimaryDIDURL, DIDURL,
 };
 
-use super::{DIDResolver, Error, Metadata, Options, Output, Parameters, MEDIA_TYPE_URL};
+use super::{DIDResolver, Error, Metadata, Output, Parameters, MEDIA_TYPE_URL};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DerefError {

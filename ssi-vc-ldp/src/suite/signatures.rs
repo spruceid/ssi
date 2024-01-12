@@ -165,7 +165,7 @@ impl JwsSignature {
         payload: &[u8],
         signer: S,
         key_id: Option<String>,
-        algorithm: A
+        algorithm: A,
     ) -> Result<Self, SignatureError> {
         let header = ssi_jws::Header::new_unencoded(algorithm.clone().into(), key_id);
         let signing_bytes = header.encode_signing_bytes(payload);

@@ -11,14 +11,7 @@ use crate::{Referencable, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureErro
 /// `B` is the cryptographic signature algorithm to be used with the verification method.
 /// `P` is the signature protocol.
 pub trait Signer<M: Referencable, B, P> {
-    // type Sign<'a, A: SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>>: 'a
-    //     + Future<Output = Result<A::Signature, SignatureError>>
-    // where
-    //     Self: 'a,
-    //     M: 'a,
-    //     A: 'a,
-    //     A::Signature: 'a;
-
+    #[allow(async_fn_in_trait)]
     async fn sign<
         'a,
         'o: 'a,

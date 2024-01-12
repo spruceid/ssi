@@ -103,8 +103,8 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
-        method: <Ed25519VerificationKey2020 as ssi_verification_methods::Referencable>::Reference<
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <Ed25519VerificationKey2020 as ssi_verification_methods::Referencable>::Reference<
             '_,
         >,
         bytes: &[u8],

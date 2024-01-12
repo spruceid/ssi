@@ -31,7 +31,7 @@ impl Eip712Signature {
     pub async fn sign<'a, S: MessageSigner<AnyESKeccakK>>(
         bytes: &'a [u8],
         signer: S,
-        algorithm: AnyESKeccakK
+        algorithm: AnyESKeccakK,
     ) -> Result<Self, SignatureError> {
         let signature = signer.sign(algorithm, (), bytes).await?;
         Ok(Eip712Signature::from_bytes(signature))

@@ -10,6 +10,7 @@ pub trait VerifiableWith {
     /// Proof type.
     type Proof;
 
+    #[allow(async_fn_in_trait)]
     async fn verify_with<'a, V: Verifier<Self::Method>>(
         &'a self,
         verifier: &'a V,

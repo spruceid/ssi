@@ -4,10 +4,8 @@ pub mod hashes;
 pub mod protocol;
 pub mod signatures;
 
-use std::{future::Future, marker::PhantomData};
-
-use pin_project::pin_project;
 pub use protocol::SignatureProtocol;
+use std::marker::PhantomData;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MessageSignatureError {
@@ -37,20 +35,14 @@ impl MessageSignatureError {
 }
 
 pub trait MessageSigner<A, P: SignatureProtocol<A> = ()> {
-    async fn sign(self, algorithm: A, protocol: P, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError>;
+    #[allow(async_fn_in_trait)]
+    async fn sign(
+        self,
+        algorithm: A,
+        protocol: P,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError>;
 }
-
-// impl<'a, F, P: SignatureProtocol> MessageSigner<'a, P> for F
-// where
-//     P::Output: 'a,
-//     F: 'a + FnOnce(P, &'a [u8]) -> Result<P::Output, MessageSignatureError>,
-// {
-//     type Sign = future::Ready<Result<P::Output, MessageSignatureError>>;
-
-//     fn sign(self, protocol: P, message: &'a [u8]) -> Self::Sign {
-//         future::ready((self)(protocol, message))
-//     }
-// }
 
 pub struct SignerAdapter<S, A, P> {
     // Underlying signer.
@@ -74,7 +66,12 @@ where
     P: TryFrom<Q>,
     A: TryFrom<B>,
 {
-    async fn sign(self, algorithm: B, protocol: Q, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+    async fn sign(
+        self,
+        algorithm: B,
+        protocol: Q,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         match algorithm
             .try_into()
             .map_err(|_| MessageSignatureError::InvalidQuery)
@@ -84,13 +81,11 @@ where
                     .try_into()
                     .map_err(|_| MessageSignatureError::InvalidQuery)
                 {
-                    Ok(protocol) => {
-                        self.signer.sign(algorithm, protocol, message).await
-                    },
-                    Err(e) => Err(e)
+                    Ok(protocol) => self.signer.sign(algorithm, protocol, message).await,
+                    Err(e) => Err(e),
                 }
             }
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 }

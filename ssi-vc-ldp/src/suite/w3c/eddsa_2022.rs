@@ -3,8 +3,6 @@
 //! This is the successor of the EdDSA Cryptosuite v2020.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/>
-use std::future;
-
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::SignatureError;
 use static_iref::iri;

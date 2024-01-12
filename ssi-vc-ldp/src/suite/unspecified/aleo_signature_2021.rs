@@ -1,5 +1,3 @@
-use std::future;
-
 use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
@@ -122,10 +120,10 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
-        method: <VerificationMethod as ssi_verification_methods::Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <VerificationMethod as ssi_verification_methods::Referencable>::Reference<'_>,
+        _bytes: &[u8],
+        _signer: S,
     ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }

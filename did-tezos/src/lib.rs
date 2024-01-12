@@ -23,7 +23,7 @@ use json_patch::patch;
 use serde::Deserialize;
 use ssi_jwk::{p256_parse, secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK};
 use ssi_jws::{decode_unverified, decode_verify};
-use std::{collections::BTreeMap, future::Future, pin::Pin};
+use std::{collections::BTreeMap, future::Future};
 
 mod explorer;
 mod prefix;
@@ -532,7 +532,7 @@ impl DIDTz {
                         let curve = VerificationMethodType::from_prefix(prefix)
                             .curve()
                             .to_string();
-    
+
                         let kid = match patch_metadata.key_id {
                             Some(k) => DIDURLBuf::from_string(k)
                                 .map_err(|e| UpdateError::InvalidPatchKeyId(e.0)),
@@ -541,7 +541,7 @@ impl DIDTz {
                                 Err(UpdateError::MissingPatchKeyId)
                             }
                         }?;
-    
+
                         // TODO need to compare address + network instead of the String
                         // did:tz:tz1blahblah == did:tz:mainnet:tz1blahblah
                         let kid_doc = if kid.did() == &doc.id {
@@ -559,12 +559,12 @@ impl DIDTz {
                                 }
                             }
                         };
-    
+
                         if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
                             let jwk = match prefix {
                                 Prefix::TZ1 | Prefix::KT1 => {
                                     let pk = decode_public_key(public_key)?;
-    
+
                                     JWK {
                                         params: Params::OKP(OctetParams {
                                             curve,
@@ -601,8 +601,8 @@ impl DIDTz {
                                     return Err(UpdateError::PrefixNotEnabled(p));
                                 }
                             };
-                            let (_, patch_) =
-                                decode_verify(&jws, &jwk).map_err(|e| UpdateError::InvalidJws(e))?;
+                            let (_, patch_) = decode_verify(&jws, &jwk)
+                                .map_err(|e| UpdateError::InvalidJws(e))?;
                             patch(
                                 &mut doc_json,
                                 &serde_json::from_slice(
@@ -615,7 +615,7 @@ impl DIDTz {
                                 .map_err(|e| UpdateError::InvalidPatch(e))?,
                             )
                             .map_err(|e| UpdateError::Patch(e))?;
-    
+
                             *doc = serde_json::from_value(doc_json)
                                 .map_err(|e| UpdateError::InvalidPatchedDocument(e))?;
                         } else {
@@ -625,7 +625,7 @@ impl DIDTz {
                     }
                 }
             }
-    
+
             Ok(())
         })
     }

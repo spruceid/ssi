@@ -8,6 +8,7 @@ use iref::Iri;
 pub trait Verifier<M: Referencable>: VerificationMethodResolver<M> + ControllerProvider {
     /// Verify the given `signature`, signed using the given `algorithm`,
     /// against the input `signing`.
+    #[allow(async_fn_in_trait)]
     async fn verify<'f, 'o: 'f, 'm: 'f, 's: 'f, A: SignatureAlgorithm<M>>(
         &'f self,
         algorithm: A,

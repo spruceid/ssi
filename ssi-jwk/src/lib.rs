@@ -1,11 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use core::fmt;
-use linked_data::rdf_types::{Interpretation, Vocabulary};
-use linked_data::{
-    LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
-    LinkedDataPredicateObjects, LinkedDataSubject,
-};
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
