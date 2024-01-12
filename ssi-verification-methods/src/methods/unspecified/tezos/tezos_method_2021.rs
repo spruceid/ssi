@@ -122,12 +122,10 @@ impl PublicKey {
         properties: &BTreeMap<String, serde_json::Value>,
     ) -> Result<Self, InvalidVerificationMethod> {
         match properties.get("publicKeyJwk") {
-            Some(serde_json::Value::String(value)) => {
-                Ok(Self::Jwk(Box::new(value.parse().map_err(|_| {
-                    InvalidVerificationMethod::invalid_property("publicKeyJwk")
-                })?)))
-            }
-            Some(_) => Err(InvalidVerificationMethod::invalid_property("publicKeyJwk")),
+            Some(value) => Ok(Self::Jwk(Box::new(
+                serde_json::from_value(value.clone())
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
+            ))),
             None => match properties.get("blockchainAccountId") {
                 Some(serde_json::Value::String(value)) => {
                     Ok(Self::BlockchainAccountId(value.parse().map_err(|_| {

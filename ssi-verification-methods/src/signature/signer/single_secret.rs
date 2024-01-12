@@ -1,10 +1,7 @@
-use pin_project::pin_project;
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_crypto::SignatureProtocol;
-use std::{future::Future, marker::PhantomData, task::Poll};
 
 use crate::{
-    Cow, MethodWithSecret, Referencable, SignatureAlgorithm, SignatureError, Signer, SigningMethod,
+    MethodWithSecret, Referencable, SignatureError, Signer, SigningMethod,
     VerificationMethodResolver,
 };
 
@@ -33,9 +30,7 @@ where
     M: SigningMethod<S, B>,
     V: VerificationMethodResolver<M>,
 {
-    type Sign<'a, A: crate::SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>> = Sign<'a, M, V, A, S> where Self: 'a, M: 'a, A: 'a, A::Signature: 'a;
-
-    fn sign<
+    async fn sign<
         'a,
         'o: 'a,
         'm: 'a,
@@ -47,159 +42,28 @@ where
         issuer: Option<&'a iref::Iri>,
         method: Option<crate::ReferenceOrOwnedRef<'m, M>>,
         bytes: &'a [u8],
-    ) -> Self::Sign<'a, A>
+    ) -> Result<A::Signature, SignatureError>
     where
         A: 'a,
         A::Signature: 'a,
     {
         match method {
-            Some(_) => Sign::Ok(ResolveAndSign {
-                resolve: self.resolver.resolve_verification_method(issuer, method),
-                algorithm: Some(algorithm),
-                options: <A::Options as Referencable>::apply_covariance(options),
-                bytes,
-                secret: &self.secret,
-                sign: None,
-            }),
-            None => Sign::Err(Some(SignatureError::MissingVerificationMethod)),
-        }
-    }
-}
-
-#[pin_project(project = SignProj)]
-pub enum Sign<'a, M: 'a + Referencable, V: 'a + VerificationMethodResolver<M>, A, S>
-where
-    M: 'a + Referencable + SigningMethod<S, A::MessageSignatureAlgorithm>,
-    V: 'a + VerificationMethodResolver<M>,
-    A: 'a + SignatureAlgorithm<M>,
-    S: 'a,
-{
-    Err(Option<SignatureError>),
-    Ok(#[pin] ResolveAndSign<'a, M, V, A, S>),
-}
-
-impl<'a, M, V, A, S> Future for Sign<'a, M, V, A, S>
-where
-    M: 'a + Referencable + SigningMethod<S, A::MessageSignatureAlgorithm>,
-    V: 'a + VerificationMethodResolver<M>,
-    A: 'a + SignatureAlgorithm<M>,
-    S: 'a,
-{
-    type Output = Result<A::Signature, SignatureError>;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        match self.project() {
-            SignProj::Ok(f) => f.poll(cx),
-            SignProj::Err(e) => std::task::Poll::Ready(Err(e.take().unwrap())),
-        }
-    }
-}
-
-#[pin_project]
-pub struct ResolveAndSign<'a, M, V, A, S>
-where
-    M: 'a + Referencable + SigningMethod<S, A::MessageSignatureAlgorithm>,
-    V: 'a + VerificationMethodResolver<M>,
-    A: 'a + SignatureAlgorithm<M>,
-    S: 'a,
-{
-    #[pin]
-    resolve: V::ResolveVerificationMethod<'a>,
-    algorithm: Option<A>,
-    options: <A::Options as Referencable>::Reference<'a>,
-    bytes: &'a [u8],
-    secret: &'a S,
-
-    #[pin]
-    sign: Option<SelfRefFuture<'a, UnboundSignWithMethodAndSecret<'a, M, A, S>>>,
-}
-
-impl<'a, M, V, A, S> Future for ResolveAndSign<'a, M, V, A, S>
-where
-    M: 'a + Referencable + SigningMethod<S, A::MessageSignatureAlgorithm>,
-    V: 'a + VerificationMethodResolver<M>,
-    A: SignatureAlgorithm<M>,
-    S: 'a,
-{
-    type Output = Result<A::Signature, SignatureError>;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let mut this = self.project();
-
-        if this.sign.is_none() {
-            match this.resolve.poll(cx) {
-                Poll::Ready(Ok(method)) => this.sign.set(Some(SelfRefFuture::new(
-                    Owned::<M, A> {
-                        algorithm: this.algorithm.take().unwrap(),
+            Some(m) => {
+                let method = self
+                    .resolver
+                    .resolve_verification_method(issuer, Some(m))
+                    .await?;
+                let method = method.as_reference();
+                algorithm
+                    .sign(
+                        <A::Options as Referencable>::apply_covariance(options),
                         method,
-                    },
-                    Binder::<A::Options, S> {
-                        options: *this.options,
-                        bytes: this.bytes,
-                        secret: *this.secret,
-                    },
-                ))),
-                Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
-                Poll::Pending => return Poll::Pending,
+                        bytes,
+                        MethodWithSecret::<M, _>::new(method, &self.secret),
+                    )
+                    .await
             }
+            None => Err(SignatureError::MissingVerificationMethod),
         }
-
-        let sign = Option::as_pin_mut(this.sign).unwrap();
-        sign.poll(cx).map(|(r, _)| r)
-    }
-}
-
-struct UnboundSignWithMethodAndSecret<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
-
-impl<'a, M, A, S> UnboundedRefFuture<'a> for UnboundSignWithMethodAndSecret<'a, M, A, S>
-where
-    M: 'a + Referencable + SigningMethod<S, A::MessageSignatureAlgorithm>,
-    A: 'a + SignatureAlgorithm<M>,
-    S: 'a,
-{
-    type Bound<'m> = A::Sign<'m, MethodWithSecret<'m, 'a, M, S>> where 'a: 'm;
-
-    type Owned = Owned<'a, M, A>;
-
-    type Output = Result<A::Signature, SignatureError>;
-}
-
-struct Owned<'a, M: 'a + Referencable, A> {
-    algorithm: A,
-    method: Cow<'a, M>,
-}
-
-struct Binder<'a, O: 'a + Referencable, S> {
-    options: O::Reference<'a>,
-    bytes: &'a [u8],
-    secret: &'a S,
-}
-
-impl<'a, M, A, S> RefFutureBinder<'a, UnboundSignWithMethodAndSecret<'a, M, A, S>>
-    for Binder<'a, A::Options, S>
-where
-    M: 'a + Referencable + SigningMethod<S, A::MessageSignatureAlgorithm>,
-    A: 'a + SignatureAlgorithm<M>,
-    S: 'a,
-{
-    fn bind<'m>(
-        context: Self,
-        value: &'m Owned<'a, M, A>,
-    ) -> A::Sign<'m, MethodWithSecret<'m, 'a, M, S>>
-    where
-        'a: 'm,
-    {
-        value.algorithm.sign(
-            <A::Options as Referencable>::apply_covariance(context.options),
-            value.method.as_reference(),
-            context.bytes,
-            MethodWithSecret::new(value.method.as_reference(), context.secret),
-        )
     }
 }

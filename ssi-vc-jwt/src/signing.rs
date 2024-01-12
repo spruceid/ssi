@@ -155,15 +155,13 @@ impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm 
 
     type Protocol = ();
 
-    type Sign<'a, S: 'a + MessageSigner<()>> = Sign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<()>>(
+    async fn sign<S: MessageSigner<()>>(
         &self,
         options: (),
         method: verification::AnyJwkMethodRef,
-        payload: &'a [u8],
+        payload: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
+    ) -> Result<Self::Signature, SignatureError> {
         // Prepare JWS header.
         let header = ssi_jws::Header {
             algorithm: method.public_key_jwk.algorithm.unwrap_or_default(),

@@ -1,6 +1,7 @@
-use method::Verifier;
+use method::{VerificationError, Verifier};
+use ssi_vc::ProofValidity;
 
-use crate::{suite::VerifyProof, CryptographicSuite, DataIntegrity, Proof};
+use crate::{CryptographicSuite, DataIntegrity, Proof};
 
 pub use method::{ReferenceOrOwned as MethodReferenceOrOwned, VerificationMethod};
 pub use ssi_verification_methods as method;
@@ -12,14 +13,14 @@ where
     type Proof = Proof<S>;
     type Method = S::VerificationMethod;
 
-    type VerifyWith<'a, V: Verifier<S::VerificationMethod>> = VerifyProof<'a, S, V> where Self: 'a, V: 'a;
-
-    fn verify_with<'a, V: Verifier<Self::Method>>(
+    async fn verify_with<'a, V: Verifier<Self::Method>>(
         &'a self,
         verifier: &'a V,
         proof: &'a Self::Proof,
-    ) -> VerifyProof<'a, S, V> {
+    ) -> Result<ProofValidity, VerificationError> {
         let suite = proof.suite();
-        suite.verify_proof(&self.hash, verifier, proof.untyped().borrowed())
+        suite
+            .verify_proof(&self.hash, verifier, proof.untyped().borrowed())
+            .await
     }
 }

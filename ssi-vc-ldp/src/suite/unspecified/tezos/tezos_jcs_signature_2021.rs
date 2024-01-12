@@ -15,14 +15,14 @@ use crate::{
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
-use super::{decode_jwk_from_multibase, TezosSign, TezosWallet};
+use super::{decode_jwk_from_multibase, TezosWallet};
 pub use super::{Signature, SignatureRef};
 
 pub const TZ_JCS_PROOF_CONTEXT_STR: &str = include_str!("tzjcsvm-2021-v1.jsonld");
 
 lazy_static! {
     pub static ref TZ_JCS_PROOF_CONTEXT: serde_json::Value =
-        { serde_json::from_str(TZ_JCS_PROOF_CONTEXT_STR).unwrap() };
+        serde_json::from_str(TZ_JCS_PROOF_CONTEXT_STR).unwrap();
 }
 
 /// Tezos signature suite based on JCS.
@@ -160,24 +160,23 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     type MessageSignatureAlgorithm = AnyBlake2b;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        TezosSign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: OptionsRef<'a>,
-        method: &TezosMethod2021,
-        bytes: &'a [u8],
+        options: <Self::Options as Referencable>::Reference<'_>,
+        method: <TezosMethod2021 as Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
+    ) -> Result<Self::Signature, SignatureError> {
         let public_key_jwk = options
             .public_key_multibase
             .map(|k| decode_jwk_from_multibase(k).map_err(|_| SignatureError::InvalidPublicKey))
             .transpose();
 
         match public_key_jwk {
-            Ok(key) => TezosSign::new(method.public_key.as_jwk().or(key.as_ref()), bytes, signer),
-            Err(e) => TezosSign::err(e),
+            Ok(key) => {
+                Signature::sign(method.public_key.as_jwk().or(key.as_ref()), bytes, signer).await
+            }
+            Err(e) => Err(e),
         }
     }
 

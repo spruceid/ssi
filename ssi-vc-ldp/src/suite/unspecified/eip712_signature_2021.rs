@@ -5,12 +5,12 @@ use ssi_rdf::NQuadsStatement;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    Eip712Method2021, VerificationError,
+    Eip712Method2021, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
-    eip712::{Eip712Sign, Eip712Signature, Eip712SignatureRef},
+    eip712::{Eip712Signature, Eip712SignatureRef},
     suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
 };
@@ -294,16 +294,14 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm>> = Eip712Sign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: VerificationMethodRef,
-        bytes: &'a [u8],
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        method: <VerificationMethod as ssi_verification_methods::Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        Eip712Sign::new(bytes, signer, method.algorithm())
+    ) -> Result<Self::Signature, SignatureError> {
+        Eip712Signature::sign(bytes, signer, method.algorithm()).await
     }
 
     fn verify(

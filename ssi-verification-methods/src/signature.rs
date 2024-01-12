@@ -1,4 +1,3 @@
-use futures::Future;
 use ssi_crypto::MessageSigner;
 
 use crate::{
@@ -84,17 +83,14 @@ pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
     /// Signature protocol.
     type Protocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
 
-    /// Future returned by the `sign` method.
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>: 'a
-        + Future<Output = Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    #[allow(async_fn_in_trait)]
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: <Self::Options as Referencable>::Reference<'a>,
+        options: <Self::Options as Referencable>::Reference<'_>,
         method: M::Reference<'_>,
-        bytes: &'a [u8],
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S>;
+    ) -> Result<Self::Signature, SignatureError>;
 
     fn verify<'o, 's, 'm>(
         &self,

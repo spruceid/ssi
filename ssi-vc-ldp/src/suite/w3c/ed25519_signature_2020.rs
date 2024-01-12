@@ -101,19 +101,19 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        futures::future::Map<S::Sign<'a>, MessageBuilder>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        _method: &Ed25519VerificationKey2020,
-        bytes: &'a [u8],
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <Ed25519VerificationKey2020 as ssi_verification_methods::Referencable>::Reference<
+            '_,
+        >,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
+    ) -> Result<Self::Signature, SignatureError> {
         signer
             .sign(ssi_jwk::algorithm::EdDSA, (), bytes)
             .map(build_signature)
+            .await
     }
 
     fn verify(
@@ -123,8 +123,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
         method: &Ed25519VerificationKey2020,
         bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        let (_, signature_bytes) = multibase::decode(signature.proof_value)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+        let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes)
     }
 }

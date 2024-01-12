@@ -1,18 +1,12 @@
 use iref::{Iri, IriBuf};
-use pin_project::pin_project;
 use ssi_core::one_or_many::OneOrMany;
-use std::future::Future;
-use std::pin::Pin;
-use std::task;
 
 use crate::{
     document::{self, representation, service, DIDVerificationMethod, Represented, Resource},
     DIDURLBuf, Fragment, PrimaryDIDURL, DIDURL,
 };
 
-use super::{
-    DIDResolver, DereferencePrimary, Error, Metadata, Options, Output, Parameters, MEDIA_TYPE_URL,
-};
+use super::{DIDResolver, Error, Metadata, Output, Parameters, MEDIA_TYPE_URL};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DerefError {
@@ -37,19 +31,11 @@ pub enum DerefError {
     #[error("tried to dereference null primary content")]
     NullDereference,
 
+    #[error("DID document not found")]
+    NotFound,
+
     #[error("could not find resource `{0}` in DID document")]
     ResourceNotFound(DIDURLBuf),
-}
-
-#[derive(Debug, Default)]
-pub struct DerefOptions {
-    // ...
-}
-
-impl From<Options> for DerefOptions {
-    fn from(_value: Options) -> Self {
-        Self {}
-    }
 }
 
 pub struct DerefOutput<T = Content> {
@@ -113,6 +99,7 @@ impl From<IriBuf> for PrimaryContent {
     }
 }
 
+#[derive(Debug)]
 pub enum Content {
     Null,
     Url(IriBuf), // TODO must be an URL
@@ -152,53 +139,13 @@ pub struct ContentMetadata {
     // ...
 }
 
-#[pin_project(project = DereferencePrimaryResourceProj)]
-pub(crate) enum DereferencePrimaryResource<'a, R: ?Sized + DIDResolver> {
-    Ready(Option<Result<DerefOutput<PrimaryContent>, DerefError>>),
-    Pending(#[pin] Pin<Box<DereferencePrimary<'a, R>>>),
-}
-
-impl<'a, R: ?Sized + DIDResolver> DereferencePrimaryResource<'a, R> {
-    fn err(e: DerefError) -> Self {
-        Self::Ready(Some(Err(e)))
-    }
-
-    fn ok(o: DerefOutput<PrimaryContent>) -> Self {
-        Self::Ready(Some(Ok(o)))
-    }
-}
-
-impl<'a, R: ?Sized + DIDResolver> Future for DereferencePrimaryResource<'a, R> {
-    type Output = Result<DerefOutput<PrimaryContent>, DerefError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        match self.project() {
-            DereferencePrimaryResourceProj::Ready(r) => task::Poll::Ready(r.take().unwrap()),
-            DereferencePrimaryResourceProj::Pending(f) => {
-                // 3.1
-                f.poll(cx).map(|result| match result {
-                    Ok(output) => Ok(output),
-                    Err(DerefError::Resolution(Error::MethodNotSupported(_))) => {
-                        Ok(DerefOutput::null())
-                    }
-                    Err(e) => Err(e),
-                })
-
-                // 3.2
-                // TODO: enable the client to dereference the DID URL
-            }
-        }
-    }
-}
-
 /// [Dereferencing the Primary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) - a subalgorithm of [DID URL dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm)
-pub(crate) fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
+pub(crate) async fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
     resolver: &'a R,
     primary_did_url: &'a PrimaryDIDURL,
     parameters: Parameters,
-    options: &'a DerefOptions,
     resolution_output: Output,
-) -> DereferencePrimaryResource<'a, R> {
+) -> Result<DerefOutput<PrimaryContent>, DerefError> {
     // 1
     match &parameters.service {
         Some(id) => {
@@ -208,21 +155,13 @@ pub(crate) fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
                     // 1.2, 1.2.1
                     // TODO: support these other cases?
                     let input_service_endpoint_url = match &service.service_endpoint {
-                        None => {
-                            return DereferencePrimaryResource::err(
-                                DerefError::MissingServiceEndpoint(id.clone()),
-                            )
-                        }
+                        None => return Err(DerefError::MissingServiceEndpoint(id.clone())),
                         Some(OneOrMany::One(service::Endpoint::Uri(uri))) => uri.as_iri(),
                         Some(OneOrMany::One(service::Endpoint::Map(_))) => {
-                            return DereferencePrimaryResource::err(
-                                DerefError::UnsupportedServiceEndpointMap,
-                            )
+                            return Err(DerefError::UnsupportedServiceEndpointMap)
                         }
                         Some(OneOrMany::Many(_)) => {
-                            return DereferencePrimaryResource::err(
-                                DerefError::UnsupportedMultipleServiceEndpoints,
-                            )
+                            return Err(DerefError::UnsupportedMultipleServiceEndpoints)
                         }
                     };
 
@@ -236,21 +175,19 @@ pub(crate) fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
                     match r {
                         Ok(output_service_endpoint_url) => {
                             // 1.3
-                            DereferencePrimaryResource::ok(DerefOutput::url(
-                                output_service_endpoint_url,
-                            ))
+                            Ok(DerefOutput::url(output_service_endpoint_url))
                         }
-                        Err(e) => DereferencePrimaryResource::err(e.into()),
+                        Err(e) => Err(e.into()),
                     }
                 }
-                None => DereferencePrimaryResource::ok(DerefOutput::null()),
+                None => Err(DerefError::MissingServiceEndpoint(id.clone())),
             }
         }
         None => {
             // 2
             if primary_did_url.path().is_empty() && primary_did_url.query().is_none() {
                 // 2.1
-                return DereferencePrimaryResource::ok(DerefOutput::new(
+                return Ok(DerefOutput::new(
                     PrimaryContent::Document(resolution_output.document),
                     ContentMetadata::default(),
                     resolution_output.metadata,
@@ -259,13 +196,13 @@ pub(crate) fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
 
             // 3
             if !primary_did_url.path().is_empty() || primary_did_url.query().is_some() {
-                return DereferencePrimaryResource::Pending(Box::pin(
-                    resolver.dereference_primary(primary_did_url, options),
-                ));
+                return resolver
+                    .dereference_primary_with_path_or_query(primary_did_url)
+                    .await;
             }
 
             // 4
-            DereferencePrimaryResource::ok(DerefOutput::null())
+            Err(DerefError::NotFound)
         }
     }
 }
@@ -327,7 +264,6 @@ impl Represented {
         self,
         primary_did_url: &PrimaryDIDURL,
         fragment: &Fragment,
-        options: &DerefOptions,
         content_metadata: ContentMetadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
@@ -335,14 +271,12 @@ impl Represented {
             Self::Json(d) => d.dereference_secondary_resource(
                 primary_did_url,
                 fragment,
-                options,
                 content_metadata,
                 metadata,
             ),
             Self::JsonLd(d) => d.dereference_secondary_resource(
                 primary_did_url,
                 fragment,
-                options,
                 content_metadata,
                 metadata,
             ),
@@ -355,7 +289,6 @@ impl representation::Json {
         self,
         primary_did_url: &PrimaryDIDURL,
         fragment: &Fragment,
-        _options: &DerefOptions,
         content_metadata: ContentMetadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
@@ -376,7 +309,6 @@ impl representation::JsonLd {
         self,
         primary_did_url: &PrimaryDIDURL,
         fragment: &Fragment,
-        _options: &DerefOptions,
         content_metadata: ContentMetadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
@@ -400,7 +332,6 @@ impl representation::JsonLd {
 pub(crate) fn dereference_secondary_resource(
     primary_did_url: &PrimaryDIDURL,
     fragment: &Fragment,
-    options: &DerefOptions,
     primary_deref_output: DerefOutput<PrimaryContent>,
 ) -> Result<DerefOutput, DerefError> {
     // 1
@@ -408,7 +339,6 @@ pub(crate) fn dereference_secondary_resource(
         PrimaryContent::Document(doc) => doc.dereference_secondary_resource(
             primary_did_url,
             fragment,
-            options,
             primary_deref_output.content_metadata,
             primary_deref_output.metadata,
         ),

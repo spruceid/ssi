@@ -4,10 +4,8 @@ pub mod hashes;
 pub mod protocol;
 pub mod signatures;
 
-use std::{future::Future, marker::PhantomData};
-
-use pin_project::pin_project;
 pub use protocol::SignatureProtocol;
+use std::marker::PhantomData;
 
 #[derive(Debug, thiserror::Error)]
 pub enum MessageSignatureError {
@@ -37,30 +35,14 @@ impl MessageSignatureError {
 }
 
 pub trait MessageSigner<A, P: SignatureProtocol<A> = ()> {
-    type Sign<'a>: 'a + Future<Output = Result<Vec<u8>, MessageSignatureError>>
-    where
-        Self: 'a,
-        A: 'a,
-        P: 'a;
-
-    fn sign<'a>(self, algorithm: A, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
-    where
-        Self: 'a,
-        A: 'a,
-        P: 'a;
+    #[allow(async_fn_in_trait)]
+    async fn sign(
+        self,
+        algorithm: A,
+        protocol: P,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError>;
 }
-
-// impl<'a, F, P: SignatureProtocol> MessageSigner<'a, P> for F
-// where
-//     P::Output: 'a,
-//     F: 'a + FnOnce(P, &'a [u8]) -> Result<P::Output, MessageSignatureError>,
-// {
-//     type Sign = future::Ready<Result<P::Output, MessageSignatureError>>;
-
-//     fn sign(self, protocol: P, message: &'a [u8]) -> Self::Sign {
-//         future::ready((self)(protocol, message))
-//     }
-// }
 
 pub struct SignerAdapter<S, A, P> {
     // Underlying signer.
@@ -84,15 +66,13 @@ where
     P: TryFrom<Q>,
     A: TryFrom<B>,
 {
-    type Sign<'a> = SignerAdapterSign<'a, S, A, B, P, Q> where Self: 'a, B: 'a, Q: 'a;
-
-    fn sign<'a>(self, algorithm: B, protocol: Q, message: &'a [u8]) -> Self::Sign<'a>
-    where
-        Self: 'a,
-        B: 'a,
-        Q: 'a,
-    {
-        let inner = match algorithm
+    async fn sign(
+        self,
+        algorithm: B,
+        protocol: Q,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match algorithm
             .try_into()
             .map_err(|_| MessageSignatureError::InvalidQuery)
         {
@@ -101,100 +81,95 @@ where
                     .try_into()
                     .map_err(|_| MessageSignatureError::InvalidQuery)
                 {
-                    Ok(protocol) => SignerAdapterSignInner::Ok(SignerAdapterSignOk {
-                        inner: self.signer.sign(algorithm, protocol, message),
-                        pq: PhantomData,
-                    }),
-                    Err(e) => SignerAdapterSignInner::Err(Some(e)),
+                    Ok(protocol) => self.signer.sign(algorithm, protocol, message).await,
+                    Err(e) => Err(e),
                 }
             }
-            Err(e) => SignerAdapterSignInner::Err(Some(e)),
-        };
-
-        SignerAdapterSign { inner }
-    }
-}
-
-#[pin_project]
-pub struct SignerAdapterSign<
-    'a,
-    S: MessageSigner<A, P>,
-    A,
-    B,
-    P: SignatureProtocol<A>,
-    Q: SignatureProtocol<B>,
-> {
-    #[pin]
-    inner: SignerAdapterSignInner<'a, S, A, B, P, Q>,
-}
-
-impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
-    for SignerAdapterSign<'a, S, A, B, P, Q>
-{
-    type Output = Result<Vec<u8>, MessageSignatureError>;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let this = self.project();
-        this.inner.poll(cx)
-    }
-}
-
-#[pin_project(project = SignerAdapterSignProj)]
-enum SignerAdapterSignInner<
-    'a,
-    S: MessageSigner<A, P>,
-    A,
-    B,
-    P: SignatureProtocol<A>,
-    Q: SignatureProtocol<B>,
-> {
-    Ok(#[pin] SignerAdapterSignOk<'a, S, A, B, P, Q>),
-    Err(Option<MessageSignatureError>),
-}
-
-impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
-    for SignerAdapterSignInner<'a, S, A, B, P, Q>
-{
-    type Output = Result<Vec<u8>, MessageSignatureError>;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        match self.project() {
-            SignerAdapterSignProj::Ok(f) => f.poll(cx),
-            SignerAdapterSignProj::Err(e) => std::task::Poll::Ready(Err(e.take().unwrap())),
+            Err(e) => Err(e),
         }
     }
 }
 
-#[pin_project]
-pub struct SignerAdapterSignOk<
-    'a,
-    S: 'a + MessageSigner<A, P>,
-    A: 'a,
-    B,
-    P: 'a + SignatureProtocol<A>,
-    Q: SignatureProtocol<B>,
-> {
-    #[pin]
-    inner: S::Sign<'a>,
-    pq: PhantomData<(A, B, P, Q)>,
-}
+// #[pin_project]
+// pub struct SignerAdapterSign<
+//     'a,
+//     S: MessageSigner<A, P>,
+//     A,
+//     B,
+//     P: SignatureProtocol<A>,
+//     Q: SignatureProtocol<B>,
+// > {
+//     #[pin]
+//     inner: SignerAdapterSignInner<'a, S, A, B, P, Q>,
+// }
 
-impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
-    for SignerAdapterSignOk<'a, S, A, B, P, Q>
-{
-    type Output = Result<Vec<u8>, MessageSignatureError>;
+// impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
+//     for SignerAdapterSign<'a, S, A, B, P, Q>
+// {
+//     type Output = Result<Vec<u8>, MessageSignatureError>;
 
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let this = self.project();
-        this.inner.poll(cx)
-    }
-}
+//     fn poll(
+//         self: std::pin::Pin<&mut Self>,
+//         cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<Self::Output> {
+//         let this = self.project();
+//         this.inner.poll(cx)
+//     }
+// }
+
+// #[pin_project(project = SignerAdapterSignProj)]
+// enum SignerAdapterSignInner<
+//     'a,
+//     S: MessageSigner<A, P>,
+//     A,
+//     B,
+//     P: SignatureProtocol<A>,
+//     Q: SignatureProtocol<B>,
+// > {
+//     Ok(#[pin] SignerAdapterSignOk<'a, S, A, B, P, Q>),
+//     Err(Option<MessageSignatureError>),
+// }
+
+// impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
+//     for SignerAdapterSignInner<'a, S, A, B, P, Q>
+// {
+//     type Output = Result<Vec<u8>, MessageSignatureError>;
+
+//     fn poll(
+//         self: std::pin::Pin<&mut Self>,
+//         cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<Self::Output> {
+//         match self.project() {
+//             SignerAdapterSignProj::Ok(f) => f.poll(cx),
+//             SignerAdapterSignProj::Err(e) => std::task::Poll::Ready(Err(e.take().unwrap())),
+//         }
+//     }
+// }
+
+// #[pin_project]
+// pub struct SignerAdapterSignOk<
+//     'a,
+//     S: 'a + MessageSigner<A, P>,
+//     A: 'a,
+//     B,
+//     P: 'a + SignatureProtocol<A>,
+//     Q: SignatureProtocol<B>,
+// > {
+//     #[pin]
+//     inner: S::Sign<'a>,
+//     pq: PhantomData<(A, B, P, Q)>,
+// }
+
+// impl<'a, S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>> Future
+//     for SignerAdapterSignOk<'a, S, A, B, P, Q>
+// {
+//     type Output = Result<Vec<u8>, MessageSignatureError>;
+
+//     fn poll(
+//         self: std::pin::Pin<&mut Self>,
+//         cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<Self::Output> {
+//         let this = self.project();
+//         this.inner.poll(cx)
+//     }
+// }

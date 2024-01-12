@@ -1,5 +1,7 @@
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use std::hash::Hash;
 
@@ -68,13 +70,30 @@ pub struct EcdsaSecp256r1VerificationKey2019 {
     pub public_key_multibase: String,
 }
 
+pub enum SecretKeyRef<'a> {
+    P256(&'a p256::SecretKey),
+    JWK(&'a JWK),
+}
+
+impl<'a> From<&'a p256::SecretKey> for SecretKeyRef<'a> {
+    fn from(value: &'a p256::SecretKey) -> Self {
+        Self::P256(value)
+    }
+}
+
+impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
+    fn from(value: &'a JWK) -> Self {
+        Self::JWK(value)
+    }
+}
+
 impl EcdsaSecp256r1VerificationKey2019 {
     pub fn decode_public_key(&self) -> Result<p256::PublicKey, InvalidPublicKey> {
         let pk_multi_encoded =
             MultiEncodedBuf::new(multibase::decode(&self.public_key_multibase)?.1)?;
 
         let (pk_codec, pk_data) = pk_multi_encoded.parts();
-        if pk_codec == ssi_multicodec::ES256 {
+        if pk_codec == ssi_multicodec::P256_PUB {
             let pk = p256::PublicKey::from_sec1_bytes(pk_data)?;
             Ok(pk)
         } else {
@@ -82,12 +101,33 @@ impl EcdsaSecp256r1VerificationKey2019 {
         }
     }
 
-    pub fn sign(&self, data: &[u8], secret_key: &p256::SecretKey) -> String {
+    pub fn sign_bytes<'a>(
+        &self,
+        secret_key: impl Into<SecretKeyRef<'a>>,
+        signing_bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         use p256::ecdsa::signature::{Signature, Signer};
-        let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-        let signature: p256::ecdsa::Signature = signing_key.try_sign(data).unwrap();
 
-        multibase::encode(multibase::Base::Base58Btc, signature.as_bytes())
+        match secret_key.into() {
+            SecretKeyRef::P256(secret_key) => {
+                let signing_key = p256::ecdsa::SigningKey::from(secret_key);
+                Ok(signing_key
+                    .try_sign(signing_bytes)
+                    .unwrap()
+                    .as_bytes()
+                    .to_vec())
+            }
+            SecretKeyRef::JWK(secret_key) => {
+                let algorithm = ssi_jwk::Algorithm::ES256;
+                let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
+                if !algorithm.is_compatible_with(key_algorithm) {
+                    return Err(MessageSignatureError::InvalidSecretKey);
+                }
+
+                ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
+                    .map_err(|_| MessageSignatureError::InvalidSecretKey)
+            }
+        }
     }
 
     pub fn verify_bytes(
