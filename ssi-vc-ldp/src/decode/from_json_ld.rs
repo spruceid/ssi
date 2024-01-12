@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::task;
 
 use futures::future::BoxFuture;
+use iref::IriBuf;
 use json_ld::{ContextLoader, IntoDocumentResult, Loader, RemoteDocumentReference};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use locspan::{Meta, Stripped};
@@ -17,7 +18,7 @@ use super::{DataIntegrityInput, DecodeError, PROOF_IRI};
 /// This is a simple wrapper around [`RemoteDocumentReference<I>`] that adds
 /// the ability to expand and extract a Data-Integrity proof from the wrapped
 /// (remote) JSON-LD document.
-pub struct JsonLdInput<'l, I, L> {
+pub struct JsonLdInput<'l, I = IriBuf, L = ssi_json_ld::ContextLoader> {
     document: RemoteDocumentReference<I>,
     loader: &'l mut L,
 }

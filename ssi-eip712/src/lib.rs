@@ -6,7 +6,6 @@ mod hashing;
 mod ty;
 mod value;
 
-pub use encode::*;
 pub use hashing::TypedDataHashError;
 pub use ty::*;
 pub use value::*;

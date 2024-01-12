@@ -5,11 +5,7 @@ pub mod p256_blake2b_digest_size20_base58_check_encoded_signature_2021;
 pub mod tezos_jcs_signature_2021;
 pub mod tezos_signature_2021;
 
-use pin_project::pin_project;
 use std::borrow::Cow;
-use std::future::Future;
-use std::pin::Pin;
-use std::task;
 
 pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
@@ -96,6 +92,26 @@ pub struct Signature {
 impl Signature {
     pub fn new(proof_value: String) -> Self {
         Self { proof_value }
+    }
+
+    pub async fn sign<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>>(
+        public_key: Option<&JWK>,
+        message: &'a [u8],
+        signer: S,
+    ) -> Result<Self, SignatureError> {
+        match public_key {
+            Some(jwk) => match jwk.algorithm.try_into() {
+                Ok(algorithm) => {
+                    let proof_value_bytes = signer.sign(algorithm, TezosWallet, message).await?;
+                    match String::from_utf8(proof_value_bytes) {
+                        Ok(proof_value) => Ok(Signature::new(proof_value)),
+                        Err(_) => Err(SignatureError::InvalidSignature),
+                    }
+                }
+                Err(e) => Err(MessageSignatureError::from(e).into()),
+            },
+            None => Err(SignatureError::MissingPublicKey),
+        }
     }
 }
 
@@ -210,78 +226,6 @@ impl SignatureProtocol<AnyBlake2b> for TezosWallet {
         encoded_signature: &'s [u8],
     ) -> Result<Cow<'s, [u8]>, InvalidProtocolSignature> {
         Self::decode_signature(encoded_signature).map(|(_, s)| Cow::Owned(s))
-    }
-}
-
-#[pin_project]
-pub struct TezosSign<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> {
-    #[pin]
-    inner: TezosSignInner<'a, S>,
-}
-
-impl<'a, S: MessageSigner<AnyBlake2b, TezosWallet>> TezosSign<'a, S> {
-    pub fn new(public_key: Option<&JWK>, message: &'a [u8], signer: S) -> Self {
-        let inner = match public_key {
-            Some(jwk) => match jwk.algorithm.try_into() {
-                Ok(algorithm) => TezosSignInner::Ok(TezosSignOk {
-                    sign: signer.sign(algorithm, TezosWallet, message),
-                }),
-                Err(e) => TezosSignInner::Err(Some(MessageSignatureError::from(e).into())),
-            },
-            None => TezosSignInner::Err(Some(SignatureError::MissingPublicKey)),
-        };
-
-        Self { inner }
-    }
-
-    pub fn err(e: SignatureError) -> Self {
-        Self {
-            inner: TezosSignInner::Err(Some(e)),
-        }
-    }
-}
-
-impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSign<'a, S> {
-    type Output = Result<Signature, SignatureError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.inner.poll(cx)
-    }
-}
-
-#[pin_project(project = TezosSignInnerProj)]
-enum TezosSignInner<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> {
-    Ok(#[pin] TezosSignOk<'a, S>),
-    Err(Option<SignatureError>),
-}
-
-impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignInner<'a, S> {
-    type Output = Result<Signature, SignatureError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        match self.project() {
-            TezosSignInnerProj::Ok(f) => f.poll(cx),
-            TezosSignInnerProj::Err(e) => task::Poll::Ready(Err(e.take().unwrap())),
-        }
-    }
-}
-
-#[pin_project]
-struct TezosSignOk<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> {
-    #[pin]
-    sign: S::Sign<'a>,
-}
-
-impl<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>> Future for TezosSignOk<'a, S> {
-    type Output = Result<Signature, SignatureError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.sign.poll(cx).map(|r| match String::from_utf8(r?) {
-            Ok(proof_value) => Ok(Signature::new(proof_value)),
-            Err(_) => Err(SignatureError::InvalidSignature),
-        })
     }
 }
 

@@ -2,7 +2,7 @@ use ssi_crypto::MessageSigner;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{covariance_rule, Referencable, TezosMethod2021};
+use ssi_verification_methods::{covariance_rule, Referencable, SignatureError, TezosMethod2021};
 use static_iref::iri;
 
 use crate::{
@@ -11,7 +11,7 @@ use crate::{
     CryptographicSuite, ProofConfigurationRef,
 };
 
-use super::{Signature, SignatureRef, TezosSign, TezosWallet};
+use super::{Signature, SignatureRef, TezosWallet};
 
 /// Tezos signature suite based on URDNA2015.
 ///
@@ -97,21 +97,19 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     type MessageSignatureAlgorithm = AnyBlake2b;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        TezosSign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: OptionsRef<'a>,
-        method: &TezosMethod2021,
-        bytes: &'a [u8],
+        options: <Self::Options as Referencable>::Reference<'_>,
+        method: <TezosMethod2021 as Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        TezosSign::new(
+    ) -> Result<Self::Signature, SignatureError> {
+        Signature::sign(
             method.public_key.as_jwk().or(options.public_key_jwk),
             bytes,
             signer,
         )
+        .await
     }
 
     fn verify(

@@ -1,8 +1,3 @@
-use pin_project::pin_project;
-use std::future::Future;
-use std::pin::Pin;
-use std::task;
-
 use ssi_crypto::{protocol::EthereumWallet, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
@@ -218,17 +213,20 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type Protocol = EthereumWallet;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        EthereumWalletSign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: VerificationMethodRef,
-        bytes: &'a [u8],
+        _options: <() as Referencable>::Reference<'_>,
+        method: <VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        EthereumWalletSign::new(signer.sign(method.algorithm().into(), EthereumWallet, bytes))
+    ) -> Result<Self::Signature, SignatureError> {
+        let proof_value_bytes = signer
+            .sign(method.algorithm().into(), EthereumWallet, bytes)
+            .await?;
+        match String::from_utf8(proof_value_bytes) {
+            Ok(proof_value) => Ok(Signature::new(proof_value)),
+            Err(_) => Err(SignatureError::InvalidSignature),
+        }
     }
 
     fn verify(
@@ -255,36 +253,36 @@ impl<'a> VerificationMethodRef<'a> {
     }
 }
 
-#[pin_project]
-pub struct EthereumWalletSign<
-    'a,
-    S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>,
-> {
-    #[pin]
-    inner: S::Sign<'a>,
-}
+// #[pin_project]
+// pub struct EthereumWalletSign<
+//     'a,
+//     S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>,
+// > {
+//     #[pin]
+//     inner: S::Sign<'a>,
+// }
 
-impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>>
-    EthereumWalletSign<'a, S>
-{
-    pub fn new(inner: S::Sign<'a>) -> Self {
-        Self { inner }
-    }
-}
+// impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>>
+//     EthereumWalletSign<'a, S>
+// {
+//     pub fn new(inner: S::Sign<'a>) -> Self {
+//         Self { inner }
+//     }
+// }
 
-impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>> Future
-    for EthereumWalletSign<'a, S>
-{
-    type Output = Result<Signature, SignatureError>;
+// impl<'a, S: 'a + MessageSigner<ssi_jwk::algorithm::AnyESKeccakK, EthereumWallet>> Future
+//     for EthereumWalletSign<'a, S>
+// {
+//     type Output = Result<Signature, SignatureError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.inner.poll(cx).map(|r| {
-            let proof_value = r?;
-            match String::from_utf8(proof_value) {
-                Ok(proof_value) => Ok(Signature::new(proof_value)),
-                Err(_) => Err(SignatureError::InvalidSignature),
-            }
-        })
-    }
-}
+//     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+//         let this = self.project();
+//         this.inner.poll(cx).map(|r| {
+//             let proof_value = r?;
+//             match String::from_utf8(proof_value) {
+//                 Ok(proof_value) => Ok(Signature::new(proof_value)),
+//                 Err(_) => Err(SignatureError::InvalidSignature),
+//             }
+//         })
+//     }
+// }

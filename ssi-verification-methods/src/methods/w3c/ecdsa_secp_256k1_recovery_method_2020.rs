@@ -265,19 +265,18 @@ impl PublicKey {
 impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
     type Error = InvalidVerificationMethod;
 
-    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(mut m: GenericVerificationMethod) -> Result<Self, Self::Error> {
         let public_key = match (
-            m.properties.get("publicKeyJwk"),
+            m.properties.remove("publicKeyJwk"),
             m.properties.get("publicKeyHex"),
             m.properties.get("ethereumAddress"),
             m.properties.get("blockchainAccountId"),
         ) {
-            (Some(k), None, None, None) => PublicKey::Jwk(Box::new(
-                k.as_str()
-                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
-                    .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
-            )),
+            (Some(k), None, None, None) => {
+                PublicKey::Jwk(Box::new(serde_json::from_value(k).map_err(|_| {
+                    InvalidVerificationMethod::invalid_property("publicKeyJwk")
+                })?))
+            }
             (None, Some(k), None, None) => PublicKey::Hex(
                 k.as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyHex"))?

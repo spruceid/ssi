@@ -9,15 +9,14 @@ use ssi_jwk::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
-    JsonWebKey2020, Referencable, VerificationError,
+    JsonWebKey2020, Referencable, SignatureError, VerificationError,
 };
 use static_iref::{iri, iri_ref};
 use std::{future::Future, pin::Pin, task};
 
 use crate::{
     eip712::{
-        Eip712Sign, Eip712Signature, Eip712SignatureRef, Input, TypesFetchError, TypesOrURI,
-        TypesProvider,
+        Eip712Signature, Eip712SignatureRef, Input, TypesFetchError, TypesOrURI, TypesProvider,
     },
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
@@ -417,19 +416,16 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        Eip712Sign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: OptionsRef<'a>,
-        method: VerificationMethodRef,
-        bytes: &'a [u8],
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
+    ) -> Result<Self::Signature, SignatureError> {
         match method.algorithm() {
-            Ok(algorithm) => Eip712Sign::new(bytes, signer, algorithm),
-            Err(e) => Eip712Sign::err(MessageSignatureError::into(e.into())),
+            Ok(algorithm) => Eip712Signature::sign(bytes, signer, algorithm).await,
+            Err(e) => Err(MessageSignatureError::into(e.into())),
         }
     }
 

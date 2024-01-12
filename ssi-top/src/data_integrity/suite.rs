@@ -1,7 +1,5 @@
 use linked_data::{LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject};
-use pin_project::pin_project;
 use rdf_types::{interpretation::ReverseIriInterpretation, Interpretation, Vocabulary};
-use ssi_core::futures::FailibleFuture;
 use ssi_crypto::{MessageSignatureError, MessageSigner, SignerAdapter};
 use ssi_jwk::JWK;
 use ssi_vc_ldp::{
@@ -12,17 +10,9 @@ use ssi_verification_methods::{
     Referencable, ReferenceOrOwned, SignatureAlgorithm, SignatureError, SigningMethod,
     VerificationError,
 };
-use std::future::Future;
-use std::pin::Pin;
-use std::task;
 
 use super::{AnySuiteOptions, AnySuiteOptionsRef, Transformed};
 use crate::{AnyMethod, AnyMethodRef, AnySignatureProtocol};
-
-type SuiteMethod<S> = <S as CryptographicSuite>::VerificationMethod;
-type SuiteSign<'a, S, T> = <<S as CryptographicSuite>::SignatureAlgorithm as SignatureAlgorithm<
-    SuiteMethod<S>,
->>::Sign<'a, T>;
 
 impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V> for AnySuite
 where
@@ -121,8 +111,9 @@ macro_rules! crypto_suites {
                             found: iri.to_owned(),
                             supported: Some(vec![
                                 $(
-                                    ssi_vc_ldp::suite::$name::IRI.to_owned()
-                                ),*
+                                    $(#[cfg($($t)*)])?
+                                    ssi_vc_ldp::suite::$name::IRI.to_owned(),
+                                )*
                             ])
                         })
                     }
@@ -142,28 +133,28 @@ macro_rules! crypto_suites {
             ),*
         }
 
-        #[pin_project(project = SignProj)]
-        pub enum Sign<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> {
-            $(
-                $(#[cfg($($t)*)])?
-                $name(#[pin] SuiteSign<'a, ssi_vc_ldp::suite::$name, SignerAdapter<S, ssi_jwk::Algorithm, AnySignatureProtocol>>)
-            ),*
-        }
+        // #[pin_project(project = SignProj)]
+        // pub enum Sign<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> {
+        //     $(
+        //         $(#[cfg($($t)*)])?
+        //         $name(#[pin] SuiteSign<'a, ssi_vc_ldp::suite::$name, SignerAdapter<S, ssi_jwk::Algorithm, AnySignatureProtocol>>)
+        //     ),*
+        // }
 
-        impl<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> Future for Sign<'a, S> {
-            type Output = Result<AnySignature, SignatureError>;
+        // impl<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> Future for Sign<'a, S> {
+        //     type Output = Result<AnySignature, SignatureError>;
 
-            fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-                match self.project() {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        SignProj::$name(s) => {
-                            s.poll(cx).map_ok(Into::into)
-                        }
-                    ),*
-                }
-            }
-        }
+        //     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+        //         match self.project() {
+        //             $(
+        //                 $(#[cfg($($t)*)])?
+        //                 SignProj::$name(s) => {
+        //                     s.poll(cx).map_ok(Into::into)
+        //                 }
+        //             ),*
+        //         }
+        //     }
+        // }
 
         impl SignatureAlgorithm<AnyMethod> for AnySignatureAlgorithm {
             type Options = AnySuiteOptions;
@@ -174,15 +165,15 @@ macro_rules! crypto_suites {
 
             type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
-            type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = FailibleFuture<Sign<'a, S>, SignatureError>;
+            // type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = FailibleFuture<Sign<'a, S>, SignatureError>;
 
-            fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+            async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
                 &self,
-                options: <Self::Options as Referencable>::Reference<'a>,
-                method: AnyMethodRef,
-                bytes: &'a [u8],
+                options: <Self::Options as Referencable>::Reference<'_>,
+                method: <AnyMethod as Referencable>::Reference<'_>,
+                bytes: &[u8],
                 signer: S
-            ) -> Self::Sign<'a, S> {
+            ) -> Result<Self::Signature, SignatureError> {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
@@ -192,20 +183,20 @@ macro_rules! crypto_suites {
                                 Ok(method) => {
                                     match options.try_into() {
                                         Ok(options) => {
-                                            FailibleFuture::ok(Sign::$name(a.sign(
+                                            Ok(a.sign(
                                                 options,
                                                 method,
                                                 bytes,
                                                 SignerAdapter::new(signer)
-                                            )))
+                                            ).await?.into())
                                         }
                                         Err(e) => {
-                                            FailibleFuture::err(e.into())
+                                            Err(e.into())
                                         }
                                     }
                                 }
                                 Err(e) => {
-                                    FailibleFuture::err(e.into())
+                                    Err(e.into())
                                 }
                             }
                         }
@@ -441,10 +432,7 @@ crypto_suites! {
 impl AnySuite {
     pub fn requires_eip721(&self) -> bool {
         if cfg!(feature = "w3c") {
-            matches!(
-                self,
-                Self::EthereumEip712Signature2021
-            )
+            matches!(self, Self::EthereumEip712Signature2021)
         } else {
             false
         }
@@ -452,10 +440,7 @@ impl AnySuite {
 
     pub fn requires_eip721_v0_1(&self) -> bool {
         if cfg!(feature = "w3c") {
-            matches!(
-                self,
-                Self::EthereumEip712Signature2021v0_1
-            )
+            matches!(self, Self::EthereumEip712Signature2021v0_1)
         } else {
             false
         }
@@ -476,10 +461,7 @@ impl AnySuite {
 
     pub fn requires_public_key_multibase(&self) -> bool {
         if cfg!(feature = "tezos") {
-            matches!(
-                self,
-                Self::TezosJcsSignature2021
-            )
+            matches!(self, Self::TezosJcsSignature2021)
         } else {
             false
         }
@@ -613,7 +595,20 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
             AnyMethodRef::Ed25519VerificationKey2020(_) => todo!(),
-            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(_) => todo!(),
+            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
+                match algorithm {
+                    ssi_jwk::Algorithm::ES256K => {
+                        m.sign_bytes(
+                            secret,
+                            ssi_verification_methods::ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
+                            bytes
+                        )
+                    }
+                    _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                        algorithm.to_string(),
+                    )),
+                }
+            },
             AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
                 ssi_jwk::Algorithm::ES256KR => {
                     m.sign_bytes(secret, ssi_jwk::algorithm::ES256KR, bytes)
@@ -625,7 +620,16 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
                     algorithm.to_string(),
                 )),
             },
-            AnyMethodRef::EcdsaSecp256r1VerificationKey2019(_) => todo!(),
+            AnyMethodRef::EcdsaSecp256r1VerificationKey2019(m) => {
+                match algorithm {
+                    ssi_jwk::Algorithm::ES256 => {
+                        m.sign_bytes(secret, bytes)
+                    }
+                    _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                        algorithm.to_string(),
+                    ))
+                }
+            },
             AnyMethodRef::JsonWebKey2020(_) => todo!(),
             AnyMethodRef::Multikey(_) => todo!(),
             AnyMethodRef::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {

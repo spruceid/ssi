@@ -11,7 +11,6 @@
 use iref::{Iri, IriBuf};
 use ssi_crypto::{MessageSignatureError, MessageSigner, SignatureProtocol};
 use static_iref::iri;
-use std::future::Future;
 
 mod controller;
 mod methods;
@@ -161,35 +160,24 @@ pub enum VerificationMethodResolutionError {
 }
 
 pub trait VerificationMethodResolver<M: Referencable> {
-    /// Future returned by the `resolve_verification_method` method.
-    type ResolveVerificationMethod<'a>: 'a
-        + Future<Output = Result<Cow<'a, M>, VerificationMethodResolutionError>>
-    where
-        Self: 'a,
-        M: 'a;
-
     /// Resolve the verification method reference.
-    fn resolve_verification_method<'a, 'm: 'a>(
+    #[allow(async_fn_in_trait)]
+    async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Self::ResolveVerificationMethod<'a>;
+    ) -> Result<Cow<'a, M>, VerificationMethodResolutionError>;
 }
 
 impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodResolver<M>
     for &'t T
 {
-    type ResolveVerificationMethod<'a> = T::ResolveVerificationMethod<'a>
-    where
-        Self: 'a,
-        M: 'a;
-
-    fn resolve_verification_method<'a, 'm: 'a>(
+    async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Self::ResolveVerificationMethod<'a> {
-        T::resolve_verification_method(self, issuer, method)
+    ) -> Result<Cow<'a, M>, VerificationMethodResolutionError> {
+        T::resolve_verification_method(self, issuer, method).await
     }
 }
 
@@ -247,24 +235,13 @@ impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
 impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMethod<S, A>, S>
     MessageSigner<A, P> for MethodWithSecret<'m, 's, M, S>
 {
-    type Sign<'a> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where
-    Self: 'a,
-    A: 'a,
-    P: 'a;
-
-    fn sign<'a>(self, algorithm: A, protocol: P, message: &'a [u8]) -> Self::Sign<'a>
-    where
-        Self: 'a,
-        A: 'a,
-        P: 'a,
-    {
-        std::future::ready(M::sign_ref(
-            self.method,
-            self.secret,
-            algorithm,
-            protocol,
-            message,
-        ))
+    async fn sign(
+        self,
+        algorithm: A,
+        protocol: P,
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        M::sign_ref(self.method, self.secret, algorithm, protocol, message)
     }
 }
 

@@ -1,6 +1,4 @@
 use iref::Iri;
-use pin_project::pin_project;
-use std::{future::Future, pin::Pin, task};
 
 use crate::{ProofPurpose, ProofPurposes, VerificationError};
 
@@ -35,36 +33,36 @@ pub trait ControllerProvider {
     where
         Self: 'a;
 
-    /// Future returned by the `get_controller` method.
-    type GetController<'a>: Future<Output = Result<Option<Self::Controller<'a>>, ControllerError>>
-    where
-        Self: 'a;
-
     /// Returns the controller with the given identifier, if it can be found.
-    fn get_controller<'a>(&'a self, id: &'a Iri) -> Self::GetController<'a>;
+    #[allow(async_fn_in_trait)]
+    async fn get_controller<'a>(
+        &'a self,
+        id: &'a Iri,
+    ) -> Result<Option<Self::Controller<'a>>, ControllerError>;
 
     /// Returns the controller with the given identifier, or fails if it cannot
     /// be found.
-    fn require_controller<'a>(&'a self, id: &'a Iri) -> RequireController<'a, Self> {
-        RequireController {
-            id,
-            get: self.get_controller(id),
-        }
+    #[allow(async_fn_in_trait)]
+    async fn require_controller<'a>(
+        &'a self,
+        id: &'a Iri,
+    ) -> Result<Self::Controller<'a>, ControllerError> {
+        self.get_controller(id)
+            .await?
+            .ok_or_else(|| ControllerError::NotFound(id.to_string()))
     }
 
     /// Checks that the controller identified by `controller_id` allows the use
     /// of the verification method `method_id` with the given proof purposes.
-    fn allows_verification_method<'a>(
+    #[allow(async_fn_in_trait)]
+    async fn allows_verification_method<'a>(
         &'a self,
         controller_id: &'a Iri,
         method_id: &'a Iri,
         proof_purposes: ProofPurposes,
-    ) -> AllowsVerificationMethod<'a, Self> {
-        AllowsVerificationMethod {
-            method_id,
-            proof_purposes,
-            require: self.require_controller(controller_id),
-        }
+    ) -> Result<bool, ControllerError> {
+        let controller = self.require_controller(controller_id).await?;
+        Ok(controller.allows_verification_method(method_id, proof_purposes))
     }
 
     /// Ensures that the controller identified by `controller_id` allows the use
@@ -72,83 +70,19 @@ pub trait ControllerProvider {
     ///
     /// Contrarily to the [`allows_verification_method`] function, this function
     /// returns an error if one of the input proof purposes is not allowed.
-    fn ensure_allows_verification_method<'a>(
+    #[allow(async_fn_in_trait)]
+    async fn ensure_allows_verification_method<'a>(
         &'a self,
         controller_id: &'a Iri,
         method_id: &'a Iri,
         proof_purpose: ProofPurpose,
-    ) -> EnsureAllowsVerificationMethod<'a, Self> {
-        EnsureAllowsVerificationMethod {
-            method_id,
-            proof_purpose,
-            require: self.require_controller(controller_id),
+    ) -> Result<(), VerificationError> {
+        let controller = self.require_controller(controller_id).await?;
+        if controller.allows_verification_method(method_id, proof_purpose.into()) {
+            Ok(())
+        } else {
+            Err(VerificationError::InvalidKeyUse(proof_purpose))
         }
-    }
-}
-
-#[pin_project]
-pub struct RequireController<'a, C: 'a + ?Sized + ControllerProvider> {
-    id: &'a Iri,
-
-    #[pin]
-    get: C::GetController<'a>,
-}
-
-impl<'a, C: 'a + ?Sized + ControllerProvider> Future for RequireController<'a, C> {
-    type Output = Result<C::Controller<'a>, ControllerError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.get.poll(cx).map(|result| {
-            result.and_then(|c| c.ok_or_else(|| ControllerError::NotFound(this.id.to_string())))
-        })
-    }
-}
-
-#[pin_project]
-pub struct AllowsVerificationMethod<'a, C: 'a + ?Sized + ControllerProvider> {
-    method_id: &'a Iri,
-
-    proof_purposes: ProofPurposes,
-
-    #[pin]
-    require: RequireController<'a, C>,
-}
-
-impl<'a, C: 'a + ?Sized + ControllerProvider> Future for AllowsVerificationMethod<'a, C> {
-    type Output = Result<bool, ControllerError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.require
-            .poll(cx)
-            .map_ok(|c| c.allows_verification_method(*this.method_id, *this.proof_purposes))
-    }
-}
-
-#[pin_project]
-pub struct EnsureAllowsVerificationMethod<'a, C: 'a + ?Sized + ControllerProvider> {
-    method_id: &'a Iri,
-
-    proof_purpose: ProofPurpose,
-
-    #[pin]
-    require: RequireController<'a, C>,
-}
-
-impl<'a, C: 'a + ?Sized + ControllerProvider> Future for EnsureAllowsVerificationMethod<'a, C> {
-    type Output = Result<(), VerificationError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.require
-            .poll(cx)
-            .map_ok(|c| c.allows_verification_method(*this.method_id, (*this.proof_purpose).into()))
-            .map(|result| match result {
-                Ok(true) => Ok(()),
-                Ok(false) => Err(VerificationError::InvalidKeyUse(*this.proof_purpose)),
-                Err(e) => Err(e.into()),
-            })
     }
 }
 

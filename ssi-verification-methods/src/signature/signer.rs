@@ -1,6 +1,4 @@
 use iref::Iri;
-use std::future::Future;
-
 pub mod single_secret;
 
 pub use single_secret::SingleSecretSigner;
@@ -13,15 +11,8 @@ use crate::{Referencable, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureErro
 /// `B` is the cryptographic signature algorithm to be used with the verification method.
 /// `P` is the signature protocol.
 pub trait Signer<M: Referencable, B, P> {
-    type Sign<'a, A: SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>>: 'a
-        + Future<Output = Result<A::Signature, SignatureError>>
-    where
-        Self: 'a,
-        M: 'a,
-        A: 'a,
-        A::Signature: 'a;
-
-    fn sign<
+    #[allow(async_fn_in_trait)]
+    async fn sign<
         'a,
         'o: 'a,
         'm: 'a,
@@ -33,7 +24,7 @@ pub trait Signer<M: Referencable, B, P> {
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
         bytes: &'a [u8],
-    ) -> Self::Sign<'a, A>
+    ) -> Result<A::Signature, SignatureError>
     where
         A: 'a,
         A::Signature: 'a;

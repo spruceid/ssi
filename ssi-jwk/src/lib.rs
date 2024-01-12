@@ -1,11 +1,6 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 use core::fmt;
-use linked_data::rdf_types::{Interpretation, Vocabulary};
-use linked_data::{
-    LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
-    LinkedDataPredicateObjects, LinkedDataSubject,
-};
 use num_bigint::{BigInt, Sign};
 use simple_asn1::{ASN1Block, ASN1Class, ToASN1};
 use ssi_multicodec::MultiEncoded;
@@ -286,6 +281,19 @@ impl JWK {
                 private_key: Some(Base64urlUInt(secret.to_bytes().to_vec())),
             })))
         }
+    }
+
+    #[cfg(feature = "ed25519")]
+    #[cfg(not(feature = "ring"))]
+    pub fn generate_ed25519_from(
+        rng: &mut (impl rand_old::CryptoRng + rand_old::RngCore),
+    ) -> Result<JWK, Error> {
+        let keypair = ed25519_dalek::Keypair::generate(rng);
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
+            private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
+        })))
     }
 
     #[cfg(feature = "secp256k1")]

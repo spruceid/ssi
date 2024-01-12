@@ -2,13 +2,13 @@ use iref::Iri;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, EcdsaSecp256k1RecoveryMethod2020,
-    VerificationError,
+    Referencable, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws},
+    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef},
     CryptographicSuite, ProofConfigurationRef,
 };
 
@@ -74,17 +74,14 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod20
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        _method: &EcdsaSecp256k1RecoveryMethod2020,
+        _options: <() as Referencable>::Reference<'_>,
+        _method: <EcdsaSecp256k1RecoveryMethod2020 as Referencable>::Reference<'_>,
         bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        SignIntoDetachedJws::new(bytes, signer, None, ssi_jwk::algorithm::ES256KR)
+    ) -> Result<Self::Signature, SignatureError> {
+        JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::ES256KR).await
     }
 
     fn verify(

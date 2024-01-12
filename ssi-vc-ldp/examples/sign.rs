@@ -11,7 +11,7 @@ use locspan::Meta;
 use rdf_types::{vocabulary::IriIndex, IndexVocabulary, IriVocabularyMut};
 use ssi_core::futures::FailibleFuture;
 use ssi_crypto::MessageSignatureError;
-use ssi_vc_ldp::{suite::Ed25519Signature2020, DataIntegrity};
+use ssi_vc_ldp::{suite::Ed25519Signature2020, CryptographicSuiteInput, DataIntegrity};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
     ProofPurposes, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureError, Signer,
@@ -20,14 +20,14 @@ use ssi_verification_methods::{
 };
 use static_iref::{iri, iri_ref, uri};
 
-#[derive(LinkedData)]
+#[derive(linked_data::Serialize)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct Credential {
     #[ld("sec:credentialSubject")]
     subject: CredentialSubject,
 }
 
-#[derive(LinkedData)]
+#[derive(linked_data::Serialize)]
 #[ld(prefix("ex" = "https://example.org/sign#"))]
 pub struct CredentialSubject {
     #[ld("ex:content")]
@@ -74,9 +74,10 @@ async fn main() {
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
     let proof_options = ssi_vc_ldp::ProofConfiguration::new(
-        Utc::now().fixed_offset(),
+        Utc::now().fixed_offset().into(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::Assertion,
+        (),
     );
 
     // We use the Linked-Data-based cryptographic suite `Ed25519Signature2020`.
@@ -85,19 +86,13 @@ async fn main() {
     // dataset.
     let mut vocabulary: IndexVocabulary = Default::default();
     let mut interpretation = rdf_types::interpretation::Indexed::new();
+    let rdf = ssi_vc_ldp::LinkedDataInput::new(vocabulary, interpretation);
 
     // Sign the credential.
-    let verifiable_credential = DataIntegrity::sign_ld(
-        &mut vocabulary,
-        &mut interpretation,
-        &keyring,
-        credential,
-        Ed25519Signature2020,
-        proof_options.clone(),
-        (),
-    )
-    .await
-    .expect("signing failed");
+    let verifiable_credential = Ed25519Signature2020
+        .sign(credential, rdf, &keyring, proof_options.clone())
+        .await
+        .expect("signing failed");
 
     // Verify the generated verifiable credential.
     verifiable_credential
@@ -213,34 +208,37 @@ impl Keyring {
     }
 }
 
-impl Signer<Ed25519VerificationKey2020, ()> for Keyring {
-    type Sign<'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>> = FailibleFuture<A::Sign<'a, MessageSigner<'a>>, SignatureError> where A: 'a, A::Signature: 'a;
-
-    fn sign<'a, 'm: 'a, A: SignatureAlgorithm<Ed25519VerificationKey2020, Protocol = ()>>(
+impl Signer<Ed25519VerificationKey2020, ssi_jwk::algorithm::EdDSA, ()> for Keyring {
+    async fn sign<'a, 'o: 'a, 'm: 'a, A>(
         &'a self,
         algorithm: A,
-        _issuer: Option<&'a Iri>,
+        options: <A::Options as ssi_verification_methods::Referencable>::Reference<'o>,
+        issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
         bytes: &'a [u8],
-    ) -> Self::Sign<'a, A>
+    ) -> Result<A::Signature, SignatureError>
     where
         A: 'a,
         A::Signature: 'a,
+        A: SignatureAlgorithm<
+            Ed25519VerificationKey2020,
+            MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA,
+            Protocol = (),
+        >,
     {
         let id = match method {
             Some(ReferenceOrOwnedRef::Owned(key)) => key.id(),
             Some(ReferenceOrOwnedRef::Reference(id)) => id,
-            None => return FailibleFuture::err(SignatureError::MissingVerificationMethod),
+            None => return Err(SignatureError::MissingVerificationMethod),
         };
 
         match self.keys.get(id) {
-            Some((method, key_pair)) => FailibleFuture::ok(algorithm.sign(
-                (),
-                method,
-                bytes,
-                MessageSigner { method, key_pair },
-            )),
-            None => FailibleFuture::err(SignatureError::UnknownVerificationMethod),
+            Some((method, key_pair)) => {
+                algorithm
+                    .sign(options, method, bytes, MessageSigner { method, key_pair })
+                    .await
+            }
+            None => Err(SignatureError::UnknownVerificationMethod),
         }
     }
 }
@@ -250,41 +248,38 @@ pub struct MessageSigner<'a> {
     key_pair: &'a ssi_verification_methods::ed25519_dalek::Keypair,
 }
 
-impl<'a> ssi_crypto::MessageSigner for MessageSigner<'a> {
-    type Sign<'s> = std::future::Ready<Result<Vec<u8>, MessageSignatureError>> where Self: 's;
-
-    fn sign<'s>(self, _protocol: (), message: &'s [u8]) -> Self::Sign<'s>
-    where
-        Self: 's,
-    {
-        std::future::ready(Ok(self.method.sign_bytes(message, self.key_pair)))
+impl<'a> ssi_crypto::MessageSigner<ssi_jwk::algorithm::EdDSA> for MessageSigner<'a> {
+    async fn sign(
+        self,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
+        _protocol: (),
+        message: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        Ok(self.method.sign_bytes(message, self.key_pair))
     }
 }
 
 impl ControllerProvider for Keyring {
     type Controller<'a> = &'a KeyController;
 
-    type GetController<'a> = future::Ready<Result<Option<Self::Controller<'a>>, ControllerError>>;
-
-    fn get_controller(&self, id: &Iri) -> Self::GetController<'_> {
-        future::ready(Ok(self.controllers.get(&id.to_owned())))
+    async fn get_controller<'a>(
+        &'a self,
+        id: &'a Iri,
+    ) -> Result<Option<Self::Controller<'a>>, ControllerError> {
+        Ok(self.controllers.get(&id.to_owned()))
     }
 }
 
 impl VerificationMethodResolver<Ed25519VerificationKey2020> for Keyring {
-    type ResolveVerificationMethod<'a> = future::Ready<
-        Result<
-            ssi_verification_methods::Cow<'a, Ed25519VerificationKey2020>,
-            VerificationMethodResolutionError,
-        >,
-    >;
-
-    fn resolve_verification_method<'a, 'm: 'a>(
+    async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
-        _issuer: Option<&Iri>,
+        _issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
-    ) -> Self::ResolveVerificationMethod<'a> {
-        let result = match method {
+    ) -> Result<
+        ssi_verification_methods::Cow<'a, Ed25519VerificationKey2020>,
+        VerificationMethodResolutionError,
+    > {
+        match method {
             Some(ReferenceOrOwnedRef::Owned(_key)) => {
                 // If we get here, this means the VC embeds the public key used
                 // to sign itself. It cannot really be trusted then.
@@ -297,8 +292,6 @@ impl VerificationMethodResolver<Ed25519VerificationKey2020> for Keyring {
                 None => Err(VerificationMethodResolutionError::UnknownKey),
             },
             None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
-        };
-
-        future::ready(result)
+        }
     }
 }

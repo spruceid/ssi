@@ -72,7 +72,7 @@ ssi-vc.workspace = true
 members = [
   "did-tezos",
   "did-jwk",
-  # "did-key",
+  "did-key",
   # "did-web",
   # "did-ethr",
   # "did-sol",

@@ -1,26 +1,24 @@
 //! Cryptographic suites.
-use std::{convert::Infallible, future::Future, marker::PhantomData, pin::Pin, task};
+use std::{convert::Infallible, future::Future};
 
 use iref::Iri;
 use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
-use pin_project::pin_project;
 use rdf_types::{
     generator,
     interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
     ExportedFromVocabulary, Interpretation, InterpretationMut, Quad, ReverseLiteralInterpretation,
     Vocabulary,
 };
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
 use ssi_rdf::urdna2015;
-use ssi_vc::ProofValidity;
+use ssi_vc::{ProofValidity, Verifiable};
 use ssi_verification_methods::{
     InvalidVerificationMethod, Referencable, SignatureAlgorithm, SignatureError, Signer,
     VerificationError, VerificationMethod, Verifier,
 };
 
 use crate::{
-    signing::SignLinkedData, DataIntegrity, ProofConfiguration, ProofConfigurationCastError,
-    ProofConfigurationRef, UntypedProof, UntypedProofRef,
+    signing, DataIntegrity, ProofConfiguration, ProofConfigurationCastError, ProofConfigurationRef,
+    UntypedProof, UntypedProofRef,
 };
 
 mod signatures;
@@ -187,12 +185,16 @@ pub trait CryptographicSuite: Sized {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
 
-    fn generate_proof<'a, S>(
+    #[allow(async_fn_in_trait)]
+    async fn generate_proof<'a, S>(
         &'a self,
         data: &'a Self::Hashed,
         signer: &'a S,
-        params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> GenerateProof<'a, Self, S>
+        mut params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
+    ) -> Result<
+        UntypedProof<Self::VerificationMethod, Self::Options, Self::Signature>,
+        SignatureError,
+    >
     where
         S: Signer<
             Self::VerificationMethod,
@@ -201,29 +203,30 @@ pub trait CryptographicSuite: Sized {
         >,
     {
         let algorithm = self.setup_signature_algorithm();
+        let signature = signer
+            .sign(
+                algorithm,
+                params.options.as_reference(),
+                None,
+                Some(params.verification_method.borrowed()),
+                data.as_ref(),
+            )
+            .await?;
 
-        GenerateProof {
-            suite: self,
-            signature: SelfRefFuture::new(
-                params,
-                Binder {
-                    signer,
-                    algorithm,
-                    data: data.as_ref(),
-                },
-            ),
-        }
+        params.options.prepare(self);
+        Ok(params.into_proof(signature))
     }
 
-    fn verify_proof<'a, 'p: 'a, V: Verifier<Self::VerificationMethod>>(
+    #[allow(async_fn_in_trait)]
+    async fn verify_proof<'a, 'p: 'a, V: Verifier<Self::VerificationMethod>>(
         &self,
         data: &'a Self::Hashed,
         verifier: &'a V,
         proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Options, Self::Signature>,
-    ) -> VerifyProof<'a, Self, V> {
+    ) -> Result<ProofValidity, VerificationError> {
         let algorithm = self.setup_signature_algorithm();
-        VerifyProof {
-            verify: verifier.verify(
+        verifier
+            .verify(
                 algorithm,
                 proof.options,
                 None,
@@ -231,117 +234,9 @@ pub trait CryptographicSuite: Sized {
                 proof.proof_purpose,
                 data.as_ref(),
                 proof.signature,
-            ),
-        }
-    }
-}
-
-struct SignBounded<'a, M, A, S>(PhantomData<(&'a (), M, A, S)>);
-
-impl<
-        'a,
-        M: 'a + Referencable,
-        A: 'a + SignatureAlgorithm<M>,
-        S: 'a + Signer<M, A::MessageSignatureAlgorithm, A::Protocol>,
-    > UnboundedRefFuture<'a> for SignBounded<'a, M, A, S>
-where
-    A::Signature: 'a,
-{
-    type Owned = ProofConfiguration<M, A::Options>;
-
-    type Bound<'m> = S::Sign<'m, A> where 'a: 'm;
-
-    type Output = Result<A::Signature, SignatureError>;
-}
-
-struct Binder<'a, A, S> {
-    signer: &'a S,
-    algorithm: A,
-    data: &'a [u8],
-}
-
-impl<
-        'a,
-        M: 'a + Referencable,
-        A: 'a + SignatureAlgorithm<M>,
-        S: Signer<M, A::MessageSignatureAlgorithm, A::Protocol>,
-    > RefFutureBinder<'a, SignBounded<'a, M, A, S>> for Binder<'a, A, S>
-where
-    A::Signature: 'a,
-{
-    fn bind<'m>(context: Self, params: &'m ProofConfiguration<M, A::Options>) -> S::Sign<'m, A>
-    where
-        'a: 'm,
-    {
-        context.signer.sign(
-            context.algorithm,
-            params.options.as_reference(),
-            None,
-            Some(params.verification_method.borrowed()),
-            context.data,
-        )
-    }
-}
-
-#[pin_project]
-pub struct GenerateProof<
-    'a,
-    S: CryptographicSuite,
-    T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
-> where
-    S::VerificationMethod: 'a,
-    S::SignatureAlgorithm: 'a,
-    S::Options: 'a,
-    S::Signature: 'a,
-{
-    suite: &'a S,
-
-    #[pin]
-    signature: SelfRefFuture<'a, SignBounded<'a, S::VerificationMethod, S::SignatureAlgorithm, T>>,
-}
-
-impl<
-        'a,
-        S: CryptographicSuite,
-        T: 'a + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
-    > Future for GenerateProof<'a, S, T>
-where
-    S::VerificationMethod: 'a,
-{
-    type Output =
-        Result<UntypedProof<S::VerificationMethod, S::Options, S::Signature>, SignatureError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        // Ok(params.into_proof(signature))
-        let this = self.project();
-        let signature_state = this.signature.poll(cx);
-
-        match signature_state {
-            task::Poll::Pending => task::Poll::Pending,
-            task::Poll::Ready((result, mut params)) => {
-                params.options.prepare(this.suite);
-                task::Poll::Ready(result.map(|signature| params.into_proof(signature)))
-            }
-        }
-    }
-}
-
-#[pin_project]
-pub struct VerifyProof<'a, S: CryptographicSuite, V: Verifier<S::VerificationMethod>> {
-    #[pin]
-    verify: ssi_verification_methods::Verify<'a, S::VerificationMethod, V, S::SignatureAlgorithm>,
-}
-
-impl<'a, S: CryptographicSuite, V: 'a + Verifier<S::VerificationMethod>> Future
-    for VerifyProof<'a, S, V>
-where
-    S::VerificationMethod: VerificationMethod,
-{
-    type Output = Result<ProofValidity, VerificationError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.verify.poll(cx).map_ok(Into::into)
+            )
+            .await
+            .map(Into::into)
     }
 }
 
@@ -362,13 +257,14 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     where
         C: 'a;
 
-    fn sign<'max, S>(
+    #[allow(async_fn_in_trait)]
+    async fn sign<'max, S>(
         self,
         input: T,
         context: C,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> SignLinkedData<'max, T, Self, C, S>
+    ) -> Result<Verifiable<DataIntegrity<T, Self>>, signing::Error>
     where
         Self::VerificationMethod: 'max,
         S: 'max
@@ -378,7 +274,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
                 Self::SignatureProtocol,
             >,
     {
-        DataIntegrity::sign(input, context, signer, self, params)
+        DataIntegrity::sign(input, context, signer, self, params).await
     }
 }
 

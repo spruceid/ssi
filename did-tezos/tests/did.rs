@@ -44,13 +44,16 @@ fn jwk_to_tz3() {
 async fn test_too_short_did() {
     // Subslicing this method-specific id by byte range 0..3 would overflow.
     let bad_did = did!("did:tz:tz");
-    assert!(DIDTZ.resolve(bad_did, Options::default()).await.is_err())
+    assert!(DIDTZ
+        .resolve_with(bad_did, Options::default())
+        .await
+        .is_err())
 }
 
 #[tokio::test]
 async fn test_derivation_tz1() {
     let output = DIDTZ
-        .resolve(
+        .resolve_with(
             did!("did:tz:mainnet:tz1TzrmTBSuiVHV2VfMnGRMYvTEPCP42oSM8"),
             Options::default(),
         )
@@ -88,7 +91,7 @@ async fn test_derivation_tz1() {
 #[tokio::test]
 async fn test_derivation_tz2() {
     let output = DIDTZ
-        .resolve(
+        .resolve_with(
             did!("did:tz:mainnet:tz2BFTyPeYRzxd5aiBchbXN3WCZhx7BqbMBq"),
             Options::default(),
         )
@@ -126,7 +129,7 @@ async fn test_derivation_tz2() {
 #[tokio::test]
 async fn test_derivation_tz3() {
     let resolved = DIDTZ
-        .resolve(
+        .resolve_with(
             did!("did:tz:mainnet:tz3agP9LGe2cXmKQyYn6T68BHKjjktDbbSWX"),
             Options::default(),
         )

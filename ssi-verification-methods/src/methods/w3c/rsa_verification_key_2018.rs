@@ -112,18 +112,17 @@ impl TypedVerificationMethod for RsaVerificationKey2018 {
 impl TryFrom<GenericVerificationMethod> for RsaVerificationKey2018 {
     type Error = InvalidVerificationMethod;
 
-    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(mut m: GenericVerificationMethod) -> Result<Self, Self::Error> {
         Ok(Self {
             id: m.id,
             controller: m.controller,
             public_key: Box::new(
-                m.properties
-                    .get("publicKeyJwk")
-                    .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyJwk"))?
-                    .as_str()
-                    .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
-                    .parse()
-                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
+                serde_json::from_value(
+                    m.properties.remove("publicKeyJwk").ok_or_else(|| {
+                        InvalidVerificationMethod::missing_property("publicKeyJwk")
+                    })?,
+                )
+                .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
             ),
         })
     }
