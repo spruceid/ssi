@@ -5,13 +5,15 @@ use ssi_dids::{
         self,
         representation::{self, MediaType},
         verification_method::DIDVerificationMethod,
-        DIDVerificationMethod, VerificationRelationships,
+        VerificationRelationships,
     },
+    json_ld::syntax::ContextEntry,
     resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
     DIDBuf, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
 };
 use ssi_jwk::JWK;
 use ssi_verification_methods::ProofPurposes;
+use static_iref::iri_ref;
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
 
@@ -34,20 +36,6 @@ impl DIDJsonWebKey2020 {
             controller,
             public_key,
         }
-    }
-}
-
-impl DIDVerificationMethod for DIDJsonWebKey2020 {
-    fn id(&self) -> &DIDURL {
-        &self.id
-    }
-
-    fn type_(&self) -> &str {
-        JSON_WEB_KEY_2020_TYPE
-    }
-
-    fn controller(&self) -> &DID {
-        &self.controller
     }
 }
 
@@ -161,18 +149,16 @@ impl JWKMethod {
 }
 
 impl DIDMethodResolver for JWKMethod {
-    type ResolveMethodRepresentation<'a> = std::future::Ready<Result<Output<Vec<u8>>, Error>>;
-
     fn method_name(&self) -> &str {
         "jwk"
     }
 
-    fn resolve_method_representation<'a>(
+    async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,
         options: Options,
-    ) -> Self::ResolveMethodRepresentation<'a> {
-        std::future::ready(resolve_method_representation(method_specific_id, options))
+    ) -> Result<Output<Vec<u8>>, Error> {
+        resolve_method_representation(method_specific_id, options)
     }
 }
 
@@ -215,8 +201,8 @@ fn resolve_method_representation(
         || representation::json_ld::Options {
             context: representation::json_ld::Context::array(
                 representation::json_ld::DIDContext::V1,
-                vec![serde_json::Value::String(
-                    "https://w3id.org/security/suites/jws-2020/v1".to_string(),
+                vec![ContextEntry::IriRef(
+                    iri_ref!("https://w3id.org/security/suites/jws-2020/v1").to_owned(),
                 )],
             ),
         },
@@ -239,7 +225,7 @@ mod tests {
     async fn from_p256() {
         let did_url = DIDURL::new(b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9#0").unwrap();
         let resolved = JWKMethod
-            .dereference(did_url, &resolution::DerefOptions::default())
+            .dereference(did_url)
             .await
             .unwrap();
 
@@ -280,7 +266,7 @@ mod tests {
         assert_eq!(did, expected);
 
         let resolved = JWKMethod
-            .resolve(&did, resolution::Options::default())
+            .resolve_with(&did, resolution::Options::default())
             .await
             .unwrap();
 
@@ -299,7 +285,7 @@ mod tests {
     async fn from_x25519() {
         let did_url = DIDURL::new(b"did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9#0").unwrap();
         let resolved = JWKMethod
-            .dereference(did_url, &resolution::DerefOptions::default())
+            .dereference(did_url)
             .await
             .unwrap();
 
@@ -338,7 +324,7 @@ mod tests {
         assert_eq!(did, expected);
 
         let resolved = JWKMethod
-            .resolve(&did, resolution::Options::default())
+            .resolve_with(&did, resolution::Options::default())
             .await
             .unwrap();
 

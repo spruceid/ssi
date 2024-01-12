@@ -1,5 +1,3 @@
-use std::future;
-
 use ssi_crypto::{protocol::Base58Btc, MessageSignatureError, MessageSigner};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
@@ -188,16 +186,13 @@ impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for Signatur
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: &SolanaMethod2021,
-        bytes: &'a [u8],
-        signer: S,
-    ) -> Self::Sign<'a, S> {
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        _method: <SolanaMethod2021 as Referencable>::Reference<'_>,
+        _bytes: &[u8],
+        _signer: S,
+    ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }
 

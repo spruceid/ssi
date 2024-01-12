@@ -1,13 +1,8 @@
-use pin_project::pin_project;
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
-use ssi_crypto::{MessageSignatureError, MessageSigner};
+use ssi_crypto::MessageSigner;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_verification_methods::{
     covariance_rule, InvalidSignature, Referencable, SignatureError, VerificationError,
 };
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::{future::Future, task};
 
 use crate::eip712::Eip712Metadata;
 
@@ -87,6 +82,20 @@ pub struct MultibaseSignature {
     pub proof_value: String,
 }
 
+impl MultibaseSignature {
+    pub fn new_base58btc(signature: Vec<u8>) -> Self {
+        Self {
+            proof_value: multibase::encode(multibase::Base::Base58Btc, signature),
+        }
+    }
+
+    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+        multibase::decode(&self.proof_value)
+            .map(|(_, data)| data)
+            .map_err(|_| VerificationError::InvalidSignature)
+    }
+}
+
 impl Referencable for MultibaseSignature {
     type Reference<'a> = MultibaseSignatureRef<'a> where Self: 'a;
 
@@ -112,6 +121,14 @@ impl From<MultibaseSignature> for AnySignature {
 pub struct MultibaseSignatureRef<'a> {
     /// Multibase encoded signature.
     pub proof_value: &'a str,
+}
+
+impl<'a> MultibaseSignatureRef<'a> {
+    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+        multibase::decode(self.proof_value)
+            .map(|(_, data)| data)
+            .map_err(|_| VerificationError::InvalidSignature)
+    }
 }
 
 impl<'a> TryFrom<AnySignatureRef<'a>> for MultibaseSignatureRef<'a> {
@@ -142,6 +159,19 @@ pub struct JwsSignature {
 impl JwsSignature {
     pub fn new(jws: CompactJWSString) -> Self {
         Self { jws }
+    }
+
+    pub async fn sign_detached<A: Clone + Into<ssi_jwk::Algorithm>, S: MessageSigner<A>>(
+        payload: &[u8],
+        signer: S,
+        key_id: Option<String>,
+        algorithm: A
+    ) -> Result<Self, SignatureError> {
+        let header = ssi_jws::Header::new_unencoded(algorithm.clone().into(), key_id);
+        let signing_bytes = header.encode_signing_bytes(payload);
+        let signature = signer.sign(algorithm, (), &signing_bytes).await?;
+        let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
+        Ok(JwsSignature::new(jws))
     }
 }
 
@@ -198,73 +228,73 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
     }
 }
 
-struct UnboundSignIntoDetachedJws<S, A>(PhantomData<(S, A)>);
+// struct UnboundSignIntoDetachedJws<S, A>(PhantomData<(S, A)>);
 
-impl<'a, A: 'a, S: 'a + MessageSigner<A>> UnboundedRefFuture<'a>
-    for UnboundSignIntoDetachedJws<S, A>
-{
-    type Owned = Vec<u8>;
+// impl<'a, A: 'a, S: 'a + MessageSigner<A>> UnboundedRefFuture<'a>
+//     for UnboundSignIntoDetachedJws<S, A>
+// {
+//     type Owned = Vec<u8>;
 
-    type Bound<'r> = S::Sign<'r> where 'a: 'r;
+//     type Bound<'r> = S::Sign<'r> where 'a: 'r;
 
-    type Output = Result<Vec<u8>, MessageSignatureError>;
-}
+//     type Output = Result<Vec<u8>, MessageSignatureError>;
+// }
 
-struct SignIntoDetachedJwsBinder<S, A> {
-    // signing_bytes: Vec<u8>
-    signer: S,
+// struct SignIntoDetachedJwsBinder<S, A> {
+//     // signing_bytes: Vec<u8>
+//     signer: S,
 
-    algorithm: A,
-}
+//     algorithm: A,
+// }
 
-impl<'a, A: 'a, S: 'a + MessageSigner<A>> RefFutureBinder<'a, UnboundSignIntoDetachedJws<S, A>>
-    for SignIntoDetachedJwsBinder<S, A>
-{
-    fn bind<'r>(context: Self, value: &'r Vec<u8>) -> S::Sign<'r>
-    where
-        'a: 'r,
-    {
-        context.signer.sign(context.algorithm, (), value)
-    }
-}
+// impl<'a, A: 'a, S: 'a + MessageSigner<A>> RefFutureBinder<'a, UnboundSignIntoDetachedJws<S, A>>
+//     for SignIntoDetachedJwsBinder<S, A>
+// {
+//     fn bind<'r>(context: Self, value: &'r Vec<u8>) -> S::Sign<'r>
+//     where
+//         'a: 'r,
+//     {
+//         context.signer.sign(context.algorithm, (), value)
+//     }
+// }
 
-#[pin_project]
-pub struct SignIntoDetachedJws<'a, S: 'a + MessageSigner<A>, A: 'a> {
-    header: Option<ssi_jws::Header>,
+// #[pin_project]
+// pub struct SignIntoDetachedJws<'a, S: 'a + MessageSigner<A>, A: 'a> {
+//     header: Option<ssi_jws::Header>,
 
-    #[pin]
-    sign: SelfRefFuture<'a, UnboundSignIntoDetachedJws<S, A>>,
-}
+//     #[pin]
+//     sign: SelfRefFuture<'a, UnboundSignIntoDetachedJws<S, A>>,
+// }
 
-impl<'a, A: Clone + Into<ssi_jwk::Algorithm>, S: 'a + MessageSigner<A>>
-    SignIntoDetachedJws<'a, S, A>
-{
-    pub fn new(payload: &[u8], signer: S, key_id: Option<String>, algorithm: A) -> Self {
-        let header = ssi_jws::Header::new_unencoded(algorithm.clone().into(), key_id);
+// impl<'a, A: Clone + Into<ssi_jwk::Algorithm>, S: 'a + MessageSigner<A>>
+//     SignIntoDetachedJws<'a, S, A>
+// {
+//     pub fn new(payload: &[u8], signer: S, key_id: Option<String>, algorithm: A) -> Self {
+//         let header = ssi_jws::Header::new_unencoded(algorithm.clone().into(), key_id);
 
-        let signing_bytes = header.encode_signing_bytes(payload);
-        Self {
-            header: Some(header),
-            sign: SelfRefFuture::new(
-                signing_bytes,
-                SignIntoDetachedJwsBinder { signer, algorithm },
-            ),
-        }
-    }
-}
+//         let signing_bytes = header.encode_signing_bytes(payload);
+//         Self {
+//             header: Some(header),
+//             sign: SelfRefFuture::new(
+//                 signing_bytes,
+//                 SignIntoDetachedJwsBinder { signer, algorithm },
+//             ),
+//         }
+//     }
+// }
 
-impl<'a, A, S: 'a + MessageSigner<A>> Future for SignIntoDetachedJws<'a, S, A> {
-    type Output = Result<JwsSignature, SignatureError>;
+// impl<'a, A, S: 'a + MessageSigner<A>> Future for SignIntoDetachedJws<'a, S, A> {
+//     type Output = Result<JwsSignature, SignatureError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.sign.poll(cx).map(|(r, _)| match r {
-            Ok(signature) => {
-                let header = this.header.take().unwrap();
-                let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
-                Ok(JwsSignature::new(jws))
-            }
-            Err(e) => Err(e.into()),
-        })
-    }
-}
+//     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+//         let this = self.project();
+//         this.sign.poll(cx).map(|(r, _)| match r {
+//             Ok(signature) => {
+//                 let header = this.header.take().unwrap();
+//                 let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
+//                 Ok(JwsSignature::new(jws))
+//             }
+//             Err(e) => Err(e.into()),
+//         })
+//     }
+// }

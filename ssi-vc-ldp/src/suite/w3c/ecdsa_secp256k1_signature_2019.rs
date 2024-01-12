@@ -1,7 +1,10 @@
 use std::future;
 
 use ssi_crypto::MessageSigner;
-use ssi_verification_methods::{EcdsaSecp256k1VerificationKey2019, SignatureError};
+use ssi_verification_methods::{
+    ecdsa_secp_256k1_verification_key_2019::DigestFunction, EcdsaSecp256k1VerificationKey2019,
+    SignatureError,
+};
 use static_iref::iri;
 
 use crate::{
@@ -72,17 +75,15 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256K;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: &EcdsaSecp256k1VerificationKey2019,
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <EcdsaSecp256k1VerificationKey2019 as ssi_verification_methods::Referencable>::Reference<'_>,
         bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        todo!()
+    ) -> Result<Self::Signature, SignatureError> {
+        eprintln!("message: {}", hex::encode(bytes));
+        JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::ES256K).await
     }
 
     fn verify(
@@ -92,6 +93,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
         method: &EcdsaSecp256k1VerificationKey2019,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let (signing_bytes, signature_bytes) = signature.decode(bytes)?;
+        method.verify_bytes(&signing_bytes, &signature_bytes, DigestFunction::Sha256)
     }
 }

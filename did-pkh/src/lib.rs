@@ -482,56 +482,52 @@ pub type ResolveMethodRepresentation<'a> =
     Pin<Box<dyn 'a + Send + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
 
 impl DIDMethodResolver for DIDPKH {
-    type ResolveMethodRepresentation<'a> = ResolveMethodRepresentation<'a>;
-
     fn method_name(&self) -> &str {
         "pkh"
     }
 
-    fn resolve_method_representation<'a>(
+    async fn resolve_method_representation<'a>(
         &'a self,
         id: &'a str,
         options: ssi_dids::resolution::Options,
-    ) -> Self::ResolveMethodRepresentation<'a> {
-        Box::pin(async move {
-            let (type_, data) = id
-                .split_once(':')
-                .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))?;
+    ) -> Result<Output<Vec<u8>>, Error> {
+        let (type_, data) = id
+            .split_once(':')
+            .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))?;
 
-            let did = DIDBuf::from_string(format!("did:pkh:{id}")).unwrap();
-            let (doc, json_ld_context) = match type_ {
-                // Non-CAIP-10 (deprecated)
-                "tz" => resolve_tezos(&did, data, REFERENCE_TEZOS_MAINNET).await,
-                "eth" => resolve_eip155(&did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
-                "celo" => resolve_eip155(&did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
-                "poly" => resolve_eip155(&did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
-                "sol" => resolve_solana(&did, data, REFERENCE_SOLANA_MAINNET).await,
-                "btc" => resolve_bip122(&did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
-                "doge" => resolve_bip122(&did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
-                // CAIP-10
-                _ => {
-                    let account_id = type_.to_string() + ":" + data;
-                    resolve_caip10(&did, &account_id).await
-                }
-            }?;
+        let did = DIDBuf::from_string(format!("did:pkh:{id}")).unwrap();
+        let (doc, json_ld_context) = match type_ {
+            // Non-CAIP-10 (deprecated)
+            "tz" => resolve_tezos(&did, data, REFERENCE_TEZOS_MAINNET).await,
+            "eth" => resolve_eip155(&did, data, REFERENCE_EIP155_ETHEREUM_MAINNET, true).await,
+            "celo" => resolve_eip155(&did, data, REFERENCE_EIP155_CELO_MAINNET, true).await,
+            "poly" => resolve_eip155(&did, data, REFERENCE_EIP155_POLYGON_MAINNET, true).await,
+            "sol" => resolve_solana(&did, data, REFERENCE_SOLANA_MAINNET).await,
+            "btc" => resolve_bip122(&did, data, REFERENCE_BIP122_BITCOIN_MAINNET).await,
+            "doge" => resolve_bip122(&did, data, REFERENCE_BIP122_DOGECOIN_MAINNET).await,
+            // CAIP-10
+            _ => {
+                let account_id = type_.to_string() + ":" + data;
+                resolve_caip10(&did, &account_id).await
+            }
+        }?;
 
-            let content_type = options.accept.unwrap_or(MediaType::JsonLd);
-            let represented = doc.into_representation(representation::Options::from_media_type(
-                content_type,
-                move || representation::json_ld::Options {
-                    context: representation::json_ld::Context::array(
-                        representation::json_ld::DIDContext::V1,
-                        json_ld_context.into_entries(),
-                    ),
-                },
-            ));
+        let content_type = options.accept.unwrap_or(MediaType::JsonLd);
+        let represented = doc.into_representation(representation::Options::from_media_type(
+            content_type,
+            move || representation::json_ld::Options {
+                context: representation::json_ld::Context::array(
+                    representation::json_ld::DIDContext::V1,
+                    json_ld_context.into_entries(),
+                ),
+            },
+        ));
 
-            Ok(Output::new(
-                represented.to_bytes(),
-                document::Metadata::default(),
-                resolution::Metadata::from_content_type(Some(content_type.to_string())),
-            ))
-        })
+        Ok(Output::new(
+            represented.to_bytes(),
+            document::Metadata::default(),
+            resolution::Metadata::from_content_type(Some(content_type.to_string())),
+        ))
     }
 }
 
@@ -802,7 +798,7 @@ mod tests {
     }
 
     async fn test_resolve(did: &DID, doc_str_expected: &str) {
-        let res = DIDPKH.resolve(did, Default::default()).await.unwrap();
+        let res = DIDPKH.resolve_with(did, Default::default()).await.unwrap();
         eprintln!("{}", did);
         let doc = res.document;
         eprintln!("resolved:\n{}", serde_json::to_string_pretty(&doc).unwrap());
@@ -818,7 +814,7 @@ mod tests {
     }
 
     async fn test_resolve_error(did: &DID, error_expected: ErrorKind) {
-        let res = DIDPKH.resolve(did, Default::default()).await;
+        let res = DIDPKH.resolve(did).await;
         assert_eq!(res.err().unwrap().kind(), error_expected);
     }
 

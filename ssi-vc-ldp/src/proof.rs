@@ -141,26 +141,6 @@ where
     }
 }
 
-// impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for Proof<T> {
-//     fn deserialize_subject<D>(
-//         vocabulary: &V,
-//         interpretation: &I,
-//         dataset: &D,
-//         graph: &D::Graph,
-//         resource: &I::Resource,
-//     ) -> Result<Self, linked_data::FromLinkedDataError>
-//     where
-//         D: grdf::Dataset<
-//             Subject = I::Resource,
-//             Predicate = I::Resource,
-//             Object = I::Resource,
-//             GraphLabel = I::Resource,
-//         >
-//     {
-//         // ...
-//     }
-// }
-
 impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V>
     for Proof<T>
 where

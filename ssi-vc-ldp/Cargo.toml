@@ -66,6 +66,7 @@ ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
 ssi-vc.workspace = true
 ssi-security.workspace = true
 ssi-tzkey = { workspace = true, optional = true }

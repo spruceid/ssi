@@ -3,12 +3,12 @@ use std::{borrow::Cow, hash::Hash};
 use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWSString;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod,
+    Referencable, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
@@ -125,25 +125,23 @@ pub struct EcdsaSecp256k1VerificationKey2019 {
 }
 
 impl EcdsaSecp256k1VerificationKey2019 {
-    pub fn sign(
+    pub fn sign_bytes(
         &self,
-        data: &[u8],
         secret_key: &JWK,
         digest_function: DigestFunction,
-    ) -> Result<CompactJWSString, SignatureError> {
-        let algorithm = secret_key
-            .algorithm
-            .unwrap_or(digest_function.into_crypto_algorithm());
+        signing_bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = digest_function.into_crypto_algorithm();
         let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
         if !algorithm.is_compatible_with(key_algorithm) {
-            return Err(SignatureError::InvalidSecretKey);
+            return Err(MessageSignatureError::InvalidSecretKey);
         }
 
-        let header = ssi_jws::Header::new_unencoded(algorithm, None);
-        let signing_bytes = header.encode_signing_bytes(data);
-        let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)
-            .map_err(|_| SignatureError::InvalidSecretKey)?;
-        Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
+        // let header = ssi_jws::Header::new_unencoded(algorithm, None);
+        // let signing_bytes = header.encode_signing_bytes(data);
+        ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
+            .map_err(|_| MessageSignatureError::InvalidSecretKey)
+        // Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
 
     pub fn verify_bytes(
@@ -224,16 +222,13 @@ impl TypedVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
 impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1VerificationKey2019 {
     type Error = InvalidVerificationMethod;
 
-    fn try_from(m: GenericVerificationMethod) -> Result<Self, Self::Error> {
+    fn try_from(mut m: GenericVerificationMethod) -> Result<Self, Self::Error> {
         let public_key = match (
-            m.properties.get("publicKeyJwk"),
+            m.properties.remove("publicKeyJwk"),
             m.properties.get("publicKeyHex"),
         ) {
-            (Some(k), None) => k
-                .as_str()
-                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?
-                .parse()
-                .map(|jwk| PublicKey::Jwk(Box::new(jwk)))
+            (Some(k), None) => serde_json::from_value(k)
+                .map(|k| PublicKey::Jwk(k))
                 .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyJwk"))?,
             (None, Some(k)) => k
                 .as_str()

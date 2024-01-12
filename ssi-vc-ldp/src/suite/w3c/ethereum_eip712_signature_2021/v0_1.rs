@@ -1,11 +1,11 @@
 use lazy_static::lazy_static;
 use locspan::Meta;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
-use ssi_verification_methods::Referencable;
+use ssi_verification_methods::{Referencable, SignatureError};
 use static_iref::{iri, iri_ref};
 
 use crate::{
-    eip712::{Eip712Sign, Eip712Signature, Eip712SignatureRef, TypesProvider},
+    eip712::{Eip712Signature, Eip712SignatureRef, TypesProvider},
     suite::{CryptographicSuiteOptions, HashError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
@@ -66,7 +66,7 @@ impl From<super::Eip712Options> for Eip712Options {
         Self {
             types: value.types.clone(),
             primary_type: value.primary_type.clone(),
-            domain: value.domain.clone()
+            domain: value.domain.clone(),
         }
     }
 }
@@ -247,19 +247,16 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        Eip712Sign<'a, S>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: OptionsRef<'a>,
-        method: VerificationMethodRef,
-        bytes: &'a [u8],
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
+    ) -> Result<Self::Signature, SignatureError> {
         match method.algorithm() {
-            Ok(algorithm) => Eip712Sign::new(bytes, signer, algorithm),
-            Err(e) => Eip712Sign::err(MessageSignatureError::into(e.into())),
+            Ok(algorithm) => Eip712Signature::sign(bytes, signer, algorithm).await,
+            Err(e) => Err(MessageSignatureError::into(e.into())),
         }
     }
 

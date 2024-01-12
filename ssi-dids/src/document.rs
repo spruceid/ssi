@@ -152,6 +152,15 @@ impl Document {
     pub fn into_representation(self, options: representation::Options) -> Represented {
         Represented::new(self, options)
     }
+
+    /// Consumes the document and returns any verification method in contains.
+    ///
+    /// This will return the first verification method found, although users
+    /// should not expect the DID documents to always list verification methods
+    /// in the same order.
+    pub fn into_any_verification_method(self) -> Option<DIDVerificationMethod> {
+        self.verification_method.into_iter().next()
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

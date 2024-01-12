@@ -31,12 +31,12 @@ pub struct AnySuiteOptions {
 
     #[ld("eip712:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename="eip712Domain")]
+    #[serde(rename = "eip712Domain")]
     pub eip712: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::Eip712Options>,
 
     #[ld("eip712v0.1:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename="eip712Domain")]
+    #[serde(rename = "eip712Domain")]
     pub eip712_v0_1: Option<ssi_vc_ldp::suite::ethereum_eip712_signature_2021::v0_1::Eip712Options>,
 }
 
@@ -81,7 +81,7 @@ impl Referencable for AnySuiteOptions {
     type Reference<'a> = AnySuiteOptionsRef<'a>;
 
     fn as_reference(&self) -> Self::Reference<'_> {
-                AnySuiteOptionsRef {
+        AnySuiteOptionsRef {
             public_key_jwk: self.public_key_jwk.as_deref(),
             public_key_multibase: self.public_key_multibase.as_deref(),
             eip712: self

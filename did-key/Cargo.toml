@@ -13,26 +13,46 @@ documentation = "https://docs.rs/did-key/"
 
 [features]
 default = ["secp256k1", "secp256r1"]
-secp256k1 = ["k256", "ssi-jwk/secp256k1"]
-secp256r1 = ["p256", "ssi-jwk/secp256r1"]
+secp256k1 = [
+	"k256",
+	"ssi-jwk/secp256k1"
+]
+secp256r1 = [
+	"p256",
+	"ssi-jwk/secp256r1"
+]
 secp384r1 = ["ssi-jwk/secp384r1"]
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1" }
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["ripemd-160"] }
-ssi-crypto = { path = "../ssi-crypto", default-features = false, version = "0.1"}
-async-trait = "0.1"
-thiserror = "1.0"
-multibase = "0.8"
+ssi-dids.workspace = true
+ssi-jwk.workspace = true
+ssi-multicodec.workspace = true
+bs58 = { version = "0.4", features = ["check"] }
+multibase.workspace = true
+iref.workspace = true
+static-iref.workspace = true
+thiserror.workspace = true
+serde_json.workspace = true
+simple_asn1 = "^0.5.2"
+# ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["ripemd-160"] }
+# ssi-crypto = { path = "../ssi-crypto", default-features = false, version = "0.1"}
+# async-trait = "0.1"
+# thiserror = "1.0"
+# multibase = "0.8"
 k256 = { version = "0.11", optional = true, features = ["ecdsa"] }
 p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
-serde_json = "1.0"
-simple_asn1 = "^0.5.2"
+# serde_json = "1.0"
+# simple_asn1 = "^0.5.2"
 
 [dev-dependencies]
-ssi-vc = { path = "../ssi-vc" }
-ssi-ldp = { path = "../ssi-ldp" }
-ssi-json-ld = { path = "../ssi-json-ld" }
-serde = { version = "1.0", features = ["derive"] }
+ssi-top.workspace = true
+# ssi-vc = { path = "../ssi-vc" }
+ssi-vc-ldp.workspace = true
+# ssi-json-ld = { path = "../ssi-json-ld" }
+xsd-types.workspace = true
+linked-data.workspace = true
+serde = { workspace = true, features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }
-serde_json = "1.0"
+# serde_json = "1.0"
+rand_chacha.workspace = true
+rand_chacha_old = { package = "rand_chacha", version = "0.2" }

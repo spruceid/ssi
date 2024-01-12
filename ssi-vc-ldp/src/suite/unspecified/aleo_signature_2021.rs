@@ -120,16 +120,13 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
 
     type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: VerificationMethodRef,
-        bytes: &'a [u8],
+        options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        method: <VerificationMethod as ssi_verification_methods::Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
+    ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }
 

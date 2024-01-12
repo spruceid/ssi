@@ -94,152 +94,138 @@ impl DIDTz {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-pub type ResolveMethodRepresentation<'a> =
-    Pin<Box<dyn 'a + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type ResolveMethodRepresentation<'a> =
-    Pin<Box<dyn 'a + Send + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
-
 impl DIDMethodResolver for DIDTz {
-    type ResolveMethodRepresentation<'a> = ResolveMethodRepresentation<'a>;
-
     fn method_name(&self) -> &str {
         "tz"
     }
 
-    fn resolve_method_representation<'a>(
+    async fn resolve_method_representation<'a>(
         &'a self,
         id: &'a str,
         options: ssi_dids::resolution::Options,
-    ) -> Self::ResolveMethodRepresentation<'a> {
-        Box::pin(async move {
-            let did = DIDBuf::new(format!("did:tz:{id}").into_bytes()).unwrap();
-            let (network, address) = id.split_once(':').unwrap_or(("mainnet", id));
+    ) -> Result<Output<Vec<u8>>, Error> {
+        let did = DIDBuf::new(format!("did:tz:{id}").into_bytes()).unwrap();
+        let (network, address) = id.split_once(':').unwrap_or(("mainnet", id));
 
-            if address.len() != 36 {
-                return Err(Error::InvalidMethodSpecificId(id.to_owned()));
-            }
+        if address.len() != 36 {
+            return Err(Error::InvalidMethodSpecificId(id.to_owned()));
+        }
 
-            // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
-            let genesis_block_hash = match network {
-                "mainnet" => "NetXdQprcVkpaWU",
-                "delphinet" => "NetXm8tYqnMWky1",
-                "granadanet" => "NetXz969SFaFn8k",
-                "edonet" => "NetXSgo1ZT2DRUG",
-                "florencenet" => "NetXxkAx4woPLyu",
-                _ => return Err(Error::InvalidMethodSpecificId(id.to_owned())),
-            };
+        // https://github.com/ChainAgnostic/CAIPs/blob/master/CAIPs/caip-26.md
+        let genesis_block_hash = match network {
+            "mainnet" => "NetXdQprcVkpaWU",
+            "delphinet" => "NetXm8tYqnMWky1",
+            "granadanet" => "NetXz969SFaFn8k",
+            "edonet" => "NetXSgo1ZT2DRUG",
+            "florencenet" => "NetXxkAx4woPLyu",
+            _ => return Err(Error::InvalidMethodSpecificId(id.to_owned())),
+        };
 
-            let prefix = Prefix::from_address(address)
-                .map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))?;
+        let prefix = Prefix::from_address(address)
+            .map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))?;
 
-            let vm = TezosVerificationMethod {
-                id: DIDURLBuf::new(format!("{did}#blockchainAccountId").into_bytes()).unwrap(),
-                type_: VerificationMethodType::from_prefix(prefix),
-                controller: did.clone(),
-                blockchain_account_id: Some(format!("tezos:{}:{}", genesis_block_hash, address)),
-                public_key: None,
-            };
+        let vm = TezosVerificationMethod {
+            id: DIDURLBuf::new(format!("{did}#blockchainAccountId").into_bytes()).unwrap(),
+            type_: VerificationMethodType::from_prefix(prefix),
+            controller: did.clone(),
+            blockchain_account_id: Some(format!("tezos:{}:{}", genesis_block_hash, address)),
+            public_key: None,
+        };
 
-            let authentication_vm = options
-                .parameters
-                .additional
-                .get("public_key")
-                .map(|value| {
-                    value
-                        .as_string()
-                        .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))
-                })
-                .transpose()?
-                .map(|public_key| TezosVerificationMethod {
-                    id: vm.id.clone(),
-                    type_: vm.type_,
-                    controller: vm.controller.clone(),
-                    blockchain_account_id: None,
-                    public_key: Some(public_key.to_owned()),
-                });
+        let authentication_vm = options
+            .parameters
+            .additional
+            .get("public_key")
+            .map(|value| {
+                value
+                    .as_string()
+                    .ok_or_else(|| Error::InvalidMethodSpecificId(id.to_owned()))
+            })
+            .transpose()?
+            .map(|public_key| TezosVerificationMethod {
+                id: vm.id.clone(),
+                type_: vm.type_,
+                controller: vm.controller.clone(),
+                blockchain_account_id: None,
+                public_key: Some(public_key.to_owned()),
+            });
 
-            let mut json_ld_context = JsonLdContext::default();
-            json_ld_context.add_verification_method(&vm);
-            if let Some(vm) = &authentication_vm {
-                json_ld_context.add_verification_method(vm);
-            }
+        let mut json_ld_context = JsonLdContext::default();
+        json_ld_context.add_verification_method(&vm);
+        if let Some(vm) = &authentication_vm {
+            json_ld_context.add_verification_method(vm);
+        }
 
-            let mut doc = DIDTz::tier1_derivation(&did, vm, authentication_vm);
+        let mut doc = DIDTz::tier1_derivation(&did, vm, authentication_vm);
 
-            let tzkt_url = match options.parameters.additional.get("tzkt_url") {
-                Some(value) => match value {
-                    Parameter::String(v) => match UriBuf::new(v.as_bytes().to_vec()) {
-                        Ok(url) => url,
-                        Err(_) => return Err(Error::InvalidOptions),
-                    },
-                    _ => return Err(Error::InvalidOptions),
-                },
-                None => match &self.tzkt_url {
-                    Some(u) => u.clone(),
-                    None => {
-                        UriBuf::new(format!("https://api.{network}.tzkt.io").into_bytes()).unwrap()
-                    }
-                },
-            };
-
-            if let (Some(service), Some(vm_url)) =
-                DIDTz::tier2_resolution(prefix, &tzkt_url, &did, address).await?
-            {
-                doc.service.push(service);
-                doc.verification_relationships
-                    .authentication
-                    .push(ValueOrReference::Reference(vm_url.into()));
-            }
-
-            if let Some(updates_metadata) = options.parameters.additional.get("updates") {
-                let conversion: String = match updates_metadata {
-                    Parameter::String(s) => s.clone(),
-                    // Parameter::Map(m) => match serde_json::to_string(m) {
-                    //     Ok(s) => s.clone(),
-                    //     Err(e) => {
-                    //         return (
-                    //             ResolutionMetadata {
-                    //                 error: Some(e.to_string()),
-                    //                 ..Default::default()
-                    //             },
-                    //             Some(doc),
-                    //             None,
-                    //         )
-                    //     }
-                    // },
-                    _ => return Err(Error::InvalidOptions),
-                };
-
-                let updates: Updates = match serde_json::from_str(&conversion) {
-                    Ok(uu) => uu,
+        let tzkt_url = match options.parameters.additional.get("tzkt_url") {
+            Some(value) => match value {
+                Parameter::String(v) => match UriBuf::new(v.as_bytes().to_vec()) {
+                    Ok(url) => url,
                     Err(_) => return Err(Error::InvalidOptions),
-                };
-
-                self.tier3_updates(prefix, &mut doc, updates)
-                    .await
-                    .map_err(|e| Error::Internal(Box::new(e)))?;
-            }
-
-            let content_type = options.accept.unwrap_or(MediaType::JsonLd);
-            let represented = doc.into_representation(representation::Options::from_media_type(
-                content_type,
-                move || representation::json_ld::Options {
-                    context: representation::json_ld::Context::array(
-                        representation::json_ld::DIDContext::V1,
-                        vec![json_ld_context.into()],
-                    ),
                 },
-            ));
+                _ => return Err(Error::InvalidOptions),
+            },
+            None => match &self.tzkt_url {
+                Some(u) => u.clone(),
+                None => UriBuf::new(format!("https://api.{network}.tzkt.io").into_bytes()).unwrap(),
+            },
+        };
 
-            Ok(Output::new(
-                represented.to_bytes(),
-                document::Metadata::default(),
-                resolution::Metadata::from_content_type(Some(content_type.to_string())),
-            ))
-        })
+        if let (Some(service), Some(vm_url)) =
+            DIDTz::tier2_resolution(prefix, &tzkt_url, &did, address).await?
+        {
+            doc.service.push(service);
+            doc.verification_relationships
+                .authentication
+                .push(ValueOrReference::Reference(vm_url.into()));
+        }
+
+        if let Some(updates_metadata) = options.parameters.additional.get("updates") {
+            let conversion: String = match updates_metadata {
+                Parameter::String(s) => s.clone(),
+                // Parameter::Map(m) => match serde_json::to_string(m) {
+                //     Ok(s) => s.clone(),
+                //     Err(e) => {
+                //         return (
+                //             ResolutionMetadata {
+                //                 error: Some(e.to_string()),
+                //                 ..Default::default()
+                //             },
+                //             Some(doc),
+                //             None,
+                //         )
+                //     }
+                // },
+                _ => return Err(Error::InvalidOptions),
+            };
+
+            let updates: Updates = match serde_json::from_str(&conversion) {
+                Ok(uu) => uu,
+                Err(_) => return Err(Error::InvalidOptions),
+            };
+
+            self.tier3_updates(prefix, &mut doc, updates)
+                .await
+                .map_err(|e| Error::Internal(Box::new(e)))?;
+        }
+
+        let content_type = options.accept.unwrap_or(MediaType::JsonLd);
+        let represented = doc.into_representation(representation::Options::from_media_type(
+            content_type,
+            move || representation::json_ld::Options {
+                context: representation::json_ld::Context::array(
+                    representation::json_ld::DIDContext::V1,
+                    vec![json_ld_context.into()],
+                ),
+            },
+        ));
+
+        Ok(Output::new(
+            represented.to_bytes(),
+            document::Metadata::default(),
+            resolution::Metadata::from_content_type(Some(content_type.to_string())),
+        ))
     }
 }
 
@@ -530,116 +516,118 @@ impl DIDTz {
         }
     }
 
-    async fn tier3_updates(
-        &self,
+    fn tier3_updates<'a>(
+        &'a self,
         prefix: Prefix,
-        doc: &mut Document,
+        doc: &'a mut Document,
         updates: Updates,
-    ) -> Result<(), UpdateError> {
-        match updates {
-            Updates::SignedIetfJsonPatch(patches) => {
-                for jws in patches {
-                    let mut doc_json = serde_json::to_value(&*doc).unwrap();
-                    let (patch_metadata, _) =
-                        decode_unverified(&jws).map_err(|e| UpdateError::InvalidJws(e))?;
-                    let curve = VerificationMethodType::from_prefix(prefix)
-                        .curve()
-                        .to_string();
-
-                    let kid = match patch_metadata.key_id {
-                        Some(k) => DIDURLBuf::from_string(k)
-                            .map_err(|e| UpdateError::InvalidPatchKeyId(e.0)),
-                        None => {
-                            // No kid in JWS JSON patch.
-                            Err(UpdateError::MissingPatchKeyId)
-                        }
-                    }?;
-
-                    // TODO need to compare address + network instead of the String
-                    // did:tz:tz1blahblah == did:tz:mainnet:tz1blahblah
-                    let kid_doc = if kid.did() == &doc.id {
-                        doc.clone()
-                    } else {
-                        let deref = self
-                            .dereference(&kid, &resolution::DerefOptions::default())
-                            .await
-                            .map_err(|e| UpdateError::DereferenceFailed(e))?;
-                        match deref.content {
-                            Content::Resource(Resource::Document(d)) => d,
-                            _ => {
-                                // Dereferenced content not a DID document.
-                                return Err(UpdateError::NotADocument);
+    ) -> impl 'a + Future<Output = Result<(), UpdateError>> {
+        Box::pin(async move {
+            match updates {
+                Updates::SignedIetfJsonPatch(patches) => {
+                    for jws in patches {
+                        let mut doc_json = serde_json::to_value(&*doc).unwrap();
+                        let (patch_metadata, _) =
+                            decode_unverified(&jws).map_err(|e| UpdateError::InvalidJws(e))?;
+                        let curve = VerificationMethodType::from_prefix(prefix)
+                            .curve()
+                            .to_string();
+    
+                        let kid = match patch_metadata.key_id {
+                            Some(k) => DIDURLBuf::from_string(k)
+                                .map_err(|e| UpdateError::InvalidPatchKeyId(e.0)),
+                            None => {
+                                // No kid in JWS JSON patch.
+                                Err(UpdateError::MissingPatchKeyId)
                             }
-                        }
-                    };
-
-                    if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
-                        let jwk = match prefix {
-                            Prefix::TZ1 | Prefix::KT1 => {
-                                let pk = decode_public_key(public_key)?;
-
-                                JWK {
-                                    params: Params::OKP(OctetParams {
-                                        curve,
-                                        public_key: Base64urlUInt(pk),
-                                        private_key: None,
-                                    }),
-                                    public_key_use: None,
-                                    key_operations: None,
-                                    algorithm: None,
-                                    key_id: None,
-                                    x509_url: None,
-                                    x509_thumbprint_sha1: None,
-                                    x509_certificate_chain: None,
-                                    x509_thumbprint_sha256: None,
+                        }?;
+    
+                        // TODO need to compare address + network instead of the String
+                        // did:tz:tz1blahblah == did:tz:mainnet:tz1blahblah
+                        let kid_doc = if kid.did() == &doc.id {
+                            doc.clone()
+                        } else {
+                            let deref = self
+                                .dereference(&kid)
+                                .await
+                                .map_err(|e| UpdateError::DereferenceFailed(e))?;
+                            match deref.content {
+                                Content::Resource(Resource::Document(d)) => d,
+                                _ => {
+                                    // Dereferenced content not a DID document.
+                                    return Err(UpdateError::NotADocument);
                                 }
                             }
-                            Prefix::TZ2 => {
-                                let pk = decode_public_key(public_key)?;
-                                secp256k1_parse(&pk).map_err(|e| {
-                                    // Couldn't create JWK from secp256k1 public key: {e}
-                                    UpdateError::InvalidPublicKey(public_key.to_owned(), e)
-                                })?
-                            }
-                            Prefix::TZ3 => {
-                                let pk = decode_public_key(public_key)?;
-                                p256_parse(&pk).map_err(|e| {
-                                    // Couldn't create JWK from P-256 public key: {e}
-                                    UpdateError::InvalidPublicKey(public_key.to_owned(), e)
-                                })?
-                            }
-                            #[allow(unreachable_patterns)]
-                            p => {
-                                // {p} support not enabled.
-                                return Err(UpdateError::PrefixNotEnabled(p));
-                            }
                         };
-                        let (_, patch_) =
-                            decode_verify(&jws, &jwk).map_err(|e| UpdateError::InvalidJws(e))?;
-                        patch(
-                            &mut doc_json,
-                            &serde_json::from_slice(
-                                serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)
-                                    .map_err(|e| UpdateError::InvalidPatch(e))?
-                                    .ietf_json_patch
-                                    .to_string()
-                                    .as_bytes(),
+    
+                        if let Some(public_key) = get_public_key_from_doc(&kid_doc, &kid) {
+                            let jwk = match prefix {
+                                Prefix::TZ1 | Prefix::KT1 => {
+                                    let pk = decode_public_key(public_key)?;
+    
+                                    JWK {
+                                        params: Params::OKP(OctetParams {
+                                            curve,
+                                            public_key: Base64urlUInt(pk),
+                                            private_key: None,
+                                        }),
+                                        public_key_use: None,
+                                        key_operations: None,
+                                        algorithm: None,
+                                        key_id: None,
+                                        x509_url: None,
+                                        x509_thumbprint_sha1: None,
+                                        x509_certificate_chain: None,
+                                        x509_thumbprint_sha256: None,
+                                    }
+                                }
+                                Prefix::TZ2 => {
+                                    let pk = decode_public_key(public_key)?;
+                                    secp256k1_parse(&pk).map_err(|e| {
+                                        // Couldn't create JWK from secp256k1 public key: {e}
+                                        UpdateError::InvalidPublicKey(public_key.to_owned(), e)
+                                    })?
+                                }
+                                Prefix::TZ3 => {
+                                    let pk = decode_public_key(public_key)?;
+                                    p256_parse(&pk).map_err(|e| {
+                                        // Couldn't create JWK from P-256 public key: {e}
+                                        UpdateError::InvalidPublicKey(public_key.to_owned(), e)
+                                    })?
+                                }
+                                #[allow(unreachable_patterns)]
+                                p => {
+                                    // {p} support not enabled.
+                                    return Err(UpdateError::PrefixNotEnabled(p));
+                                }
+                            };
+                            let (_, patch_) =
+                                decode_verify(&jws, &jwk).map_err(|e| UpdateError::InvalidJws(e))?;
+                            patch(
+                                &mut doc_json,
+                                &serde_json::from_slice(
+                                    serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)
+                                        .map_err(|e| UpdateError::InvalidPatch(e))?
+                                        .ietf_json_patch
+                                        .to_string()
+                                        .as_bytes(),
+                                )
+                                .map_err(|e| UpdateError::InvalidPatch(e))?,
                             )
-                            .map_err(|e| UpdateError::InvalidPatch(e))?,
-                        )
-                        .map_err(|e| UpdateError::Patch(e))?;
-
-                        *doc = serde_json::from_value(doc_json)
-                            .map_err(|e| UpdateError::InvalidPatchedDocument(e))?;
-                    } else {
-                        // Need public key for signed patches
-                        return Err(UpdateError::MissingPublicKey);
+                            .map_err(|e| UpdateError::Patch(e))?;
+    
+                            *doc = serde_json::from_value(doc_json)
+                                .map_err(|e| UpdateError::InvalidPatchedDocument(e))?;
+                        } else {
+                            // Need public key for signed patches
+                            return Err(UpdateError::MissingPublicKey);
+                        }
                     }
                 }
             }
-        }
-
-        Ok(())
+    
+            Ok(())
+        })
     }
 }
 

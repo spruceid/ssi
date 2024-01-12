@@ -2,13 +2,13 @@ use super::{Options, OptionsRef};
 use iref::Iri;
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{
-    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, VerificationError,
+    Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, SignatureError, VerificationError,
 };
 use static_iref::iri;
 
 use crate::{
     impl_rdf_input_urdna2015,
-    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws},
+    suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef},
     CryptographicSuite, ProofConfigurationRef,
 };
 
@@ -75,22 +75,20 @@ impl
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        options: OptionsRef<'a>,
-        _method: &Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-        bytes: &'a [u8],
+        options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 as ssi_verification_methods::Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        SignIntoDetachedJws::new(
+    ) -> Result<Self::Signature, SignatureError> {
+        JwsSignature::sign_detached(
             bytes,
             signer,
             options.public_key_jwk.key_id.clone(),
             ssi_jwk::algorithm::EdBlake2b,
         )
+        .await
     }
 
     fn verify(

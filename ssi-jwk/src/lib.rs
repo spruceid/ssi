@@ -287,6 +287,19 @@ impl JWK {
         }
     }
 
+    #[cfg(feature = "ed25519")]
+    #[cfg(not(feature = "ring"))]
+    pub fn generate_ed25519_from(
+        rng: &mut (impl rand_old::CryptoRng + rand_old::RngCore),
+    ) -> Result<JWK, Error> {
+        let keypair = ed25519_dalek::Keypair::generate(rng);
+        Ok(JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
+            private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
+        })))
+    }
+
     #[cfg(feature = "secp256k1")]
     pub fn generate_secp256k1() -> Result<JWK, Error> {
         let mut rng = rand::rngs::OsRng {};

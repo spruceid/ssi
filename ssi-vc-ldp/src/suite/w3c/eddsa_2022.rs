@@ -79,25 +79,22 @@ impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorit
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: &Multikey,
-        bytes: &'a [u8],
-        signer: S,
-    ) -> Self::Sign<'a, S> {
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <Multikey as ssi_verification_methods::Referencable>::Reference<'_>,
+        _bytes: &[u8],
+        _signer: S,
+    ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }
 
     fn verify(
         &self,
         _options: (),
-        signature: MultibaseSignatureRef,
-        method: &Multikey,
-        bytes: &[u8],
+        _signature: MultibaseSignatureRef,
+        _method: &Multikey,
+        _bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
         todo!()
     }

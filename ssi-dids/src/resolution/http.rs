@@ -6,7 +6,7 @@ use crate::{
     DIDResolver, DID,
 };
 
-use super::{BoxedResolveRepresentation, Error, Metadata, Output};
+use super::{Error, Metadata, Output};
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
@@ -49,95 +49,91 @@ pub enum InternalError {
 }
 
 impl DIDResolver for HTTPDIDResolver {
-    type ResolveRepresentation<'a> = BoxedResolveRepresentation<'a>;
-
     /// Resolve a DID over HTTP(S), using the [DID Resolution HTTP(S) Binding](https://w3c-ccg.github.io/did-resolution/#bindings-https).
-    fn resolve_representation<'a>(
+    async fn resolve_representation<'a>(
         &'a self,
         did: &'a DID,
         options: super::Options,
-    ) -> Self::ResolveRepresentation<'a> {
-        Box::pin(async move {
-            let query = serde_urlencoded::to_string(&options.parameters).unwrap();
+    ) -> Result<Output<Vec<u8>>, Error> {
+        let query = serde_urlencoded::to_string(&options.parameters).unwrap();
 
-            let did_urlencoded =
-                percent_encoding::utf8_percent_encode(did, percent_encoding::CONTROLS).to_string();
+        let did_urlencoded =
+            percent_encoding::utf8_percent_encode(did, percent_encoding::CONTROLS).to_string();
 
-            let mut url = self.endpoint.to_string() + &did_urlencoded;
-            if !query.is_empty() {
-                url.push('?');
-                url.push_str(&query)
-            }
+        let mut url = self.endpoint.to_string() + &did_urlencoded;
+        if !query.is_empty() {
+            url.push('?');
+            url.push_str(&query)
+        }
 
-            let url: reqwest::Url = url.parse().unwrap();
+        let url: reqwest::Url = url.parse().unwrap();
 
-            let client = reqwest::Client::builder()
-                .build()
-                .map_err(|_| Error::Internal(Box::new(InternalError::Initialization)))?;
+        let client = reqwest::Client::builder()
+            .build()
+            .map_err(|_| Error::Internal(Box::new(InternalError::Initialization)))?;
 
-            let mut request = client.get(url);
-            if let Some(accept) = options.accept {
-                request = request.header("Accept", accept.to_string());
-            }
+        let mut request = client.get(url);
+        if let Some(accept) = options.accept {
+            request = request.header("Accept", accept.to_string());
+        }
 
-            let response = request
-                .header("User-Agent", USER_AGENT)
-                .send()
-                .await
-                .map_err(|e| Error::Internal(Box::new(InternalError::Reqwest(e))))?;
+        let response = request
+            .header("User-Agent", USER_AGENT)
+            .send()
+            .await
+            .map_err(|e| Error::Internal(Box::new(InternalError::Reqwest(e))))?;
 
-            match response.status() {
-                StatusCode::OK => {
-                    let content_type: Option<String> =
-                        match (response.headers().get(header::CONTENT_TYPE), options.accept) {
-                            (Some(content_type), Some(accept)) => {
-                                if content_type == accept.name() {
-                                    Some(accept.name().to_string())
-                                } else {
-                                    return Err(Error::Internal(Box::new(
-                                        InternalError::ContentTypeMismatch,
-                                    )));
-                                }
-                            }
-                            (Some(content_type), None) => Some(
-                                content_type
-                                    .to_str()
-                                    .map_err(|_| {
-                                        Error::Internal(Box::new(InternalError::InvalidContentType))
-                                    })?
-                                    .to_string(),
-                            ),
-                            (None, Some(_)) => {
+        match response.status() {
+            StatusCode::OK => {
+                let content_type: Option<String> =
+                    match (response.headers().get(header::CONTENT_TYPE), options.accept) {
+                        (Some(content_type), Some(accept)) => {
+                            if content_type == accept.name() {
+                                Some(accept.name().to_string())
+                            } else {
                                 return Err(Error::Internal(Box::new(
-                                    InternalError::MissingContentType,
-                                )))
+                                    InternalError::ContentTypeMismatch,
+                                )));
                             }
-                            (None, None) => None,
-                        };
+                        }
+                        (Some(content_type), None) => Some(
+                            content_type
+                                .to_str()
+                                .map_err(|_| {
+                                    Error::Internal(Box::new(InternalError::InvalidContentType))
+                                })?
+                                .to_string(),
+                        ),
+                        (None, Some(_)) => {
+                            return Err(Error::Internal(Box::new(
+                                InternalError::MissingContentType,
+                            )))
+                        }
+                        (None, None) => None,
+                    };
 
-                    Ok(Output::new(
-                        response
-                            .bytes()
-                            .await
-                            .map_err(|e| Error::Internal(Box::new(InternalError::Reqwest(e))))?
-                            .to_vec(),
-                        document::Metadata::default(),
-                        Metadata::from_content_type(content_type),
-                    ))
-                }
-                StatusCode::NOT_FOUND => Err(Error::NotFound),
-                StatusCode::NOT_IMPLEMENTED => {
-                    Err(Error::MethodNotSupported(did.method_name().to_string()))
-                }
-                StatusCode::VARIANT_ALSO_NEGOTIATES => Err(Error::RepresentationNotSupported(
-                    options
-                        .accept
-                        .map(MediaType::into_name)
-                        .unwrap_or_default()
-                        .to_string(),
-                )),
-                error_code => Err(Error::Internal(Box::new(InternalError::Error(error_code)))),
+                Ok(Output::new(
+                    response
+                        .bytes()
+                        .await
+                        .map_err(|e| Error::Internal(Box::new(InternalError::Reqwest(e))))?
+                        .to_vec(),
+                    document::Metadata::default(),
+                    Metadata::from_content_type(content_type),
+                ))
             }
-        })
+            StatusCode::NOT_FOUND => Err(Error::NotFound),
+            StatusCode::NOT_IMPLEMENTED => {
+                Err(Error::MethodNotSupported(did.method_name().to_string()))
+            }
+            StatusCode::VARIANT_ALSO_NEGOTIATES => Err(Error::RepresentationNotSupported(
+                options
+                    .accept
+                    .map(MediaType::into_name)
+                    .unwrap_or_default()
+                    .to_string(),
+            )),
+            error_code => Err(Error::Internal(Box::new(InternalError::Error(error_code)))),
+        }
     }
 }

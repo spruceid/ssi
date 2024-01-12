@@ -1,5 +1,3 @@
-use std::future;
-
 use ssi_crypto::MessageSigner;
 use ssi_verification_methods::{EcdsaSecp256r1VerificationKey2019, SignatureError};
 use static_iref::iri;
@@ -72,17 +70,16 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        future::Ready<Result<Self::Signature, SignatureError>>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        method: &EcdsaSecp256r1VerificationKey2019,
-        bytes: &'a [u8],
+        _options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        _method: <EcdsaSecp256r1VerificationKey2019 as ssi_verification_methods::Referencable>::Reference<'_>,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        todo!()
+    ) -> Result<Self::Signature, SignatureError> {
+        Ok(MultibaseSignature::new_base58btc(
+            signer.sign(ssi_jwk::algorithm::ES256, (), bytes).await?,
+        ))
     }
 
     fn verify(
@@ -92,6 +89,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
         method: &EcdsaSecp256r1VerificationKey2019,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes)
     }
 }

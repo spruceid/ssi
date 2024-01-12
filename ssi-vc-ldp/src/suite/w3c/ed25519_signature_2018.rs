@@ -1,9 +1,10 @@
 use ssi_crypto::MessageSigner;
+use ssi_verification_methods::SignatureError;
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, verification, CryptographicSuite, ProofConfigurationRef};
 
-use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef, SignIntoDetachedJws};
+use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef};
 
 pub use verification::method::Ed25519VerificationKey2018;
 
@@ -69,17 +70,16 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
-    type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> =
-        SignIntoDetachedJws<'a, S, Self::MessageSignatureAlgorithm>;
-
-    fn sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
         &self,
-        _options: (),
-        _method: &Ed25519VerificationKey2018,
-        bytes: &'a [u8],
+        options: <Self::Options as ssi_verification_methods::Referencable>::Reference<'_>,
+        method: <Ed25519VerificationKey2018 as ssi_verification_methods::Referencable>::Reference<
+            '_,
+        >,
+        bytes: &[u8],
         signer: S,
-    ) -> Self::Sign<'a, S> {
-        SignIntoDetachedJws::new(bytes, signer, None, ssi_jwk::algorithm::EdDSA)
+    ) -> Result<Self::Signature, SignatureError> {
+        JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::EdDSA).await
     }
 
     fn verify(
