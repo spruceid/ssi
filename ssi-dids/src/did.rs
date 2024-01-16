@@ -410,6 +410,7 @@ impl DID {
                 },
                 State::MethodSpecificId => match bytes.next() {
                     Some(b':') => state = State::MethodSpecificIdStartOrSeparator,
+                    Some(b'%') => state = State::MethodSpecificIdPct1,
                     Some(c) if is_id_char(c) => (),
                     c => break Ok((i, c)),
                 },
@@ -426,10 +427,11 @@ mod tests {
 
     #[test]
     fn parse_did_accept() {
-        let vectors: [&[u8]; 3] = [
+        let vectors: [&[u8]; 4] = [
             b"did:method:foo",
             b"did:a:b",
-            b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9"
+            b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9",
+            b"did:web:example.com%3A443:u:bob"
         ];
 
         for input in vectors {

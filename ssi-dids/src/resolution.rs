@@ -41,6 +41,9 @@ pub enum Error {
     #[error("DID representation `{0}` not supported")]
     RepresentationNotSupported(String),
 
+    #[error("invalid DID representation media type")]
+    InvalidRepresentationMediaType,
+
     #[error(transparent)]
     InvalidData(InvalidData),
 
@@ -55,12 +58,17 @@ pub enum Error {
 }
 
 impl Error {
+    pub fn internal<E: 'static + std::error::Error + Send>(error: E) -> Self {
+        Self::Internal(Box::new(error))
+    }
+
     pub fn kind(&self) -> ErrorKind {
         match self {
             Self::MethodNotSupported(_) => ErrorKind::MethodNotSupported,
             Self::NotFound => ErrorKind::NotFound,
             Self::NoRepresentation => ErrorKind::NoRepresentation,
             Self::UnknownRepresentation(_) => ErrorKind::UnknownRepresentation,
+            Self::InvalidRepresentationMediaType => ErrorKind::InvalidRepresentationMediaType,
             Self::RepresentationNotSupported(_) => ErrorKind::RepresentationNotSupported,
             Self::InvalidData(_) => ErrorKind::InvalidData,
             Self::InvalidMethodSpecificId(_) => ErrorKind::InvalidMethodSpecificId,
@@ -82,6 +90,7 @@ pub enum ErrorKind {
     NotFound,
     NoRepresentation,
     UnknownRepresentation,
+    InvalidRepresentationMediaType,
     RepresentationNotSupported,
     InvalidData,
     InvalidMethodSpecificId,

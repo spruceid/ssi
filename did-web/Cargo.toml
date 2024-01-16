@@ -12,23 +12,25 @@ homepage = "https://github.com/spruceid/ssi/tree/main/did-web/"
 documentation = "https://docs.rs/did-web/"
 
 [dependencies]
-ssi-dids = { path = "../ssi-dids", version = "0.1" }
-async-trait = "0.1"
-reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+ssi-dids.workspace = true
+thiserror.workspace = true
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 http = "0.2"
-serde_json = "1.0"
 
 [target.'cfg(target_os = "android")'.dependencies.reqwest]
 version = "0.11"
-features = ["json", "native-tls-vendored"]
+features = ["native-tls-vendored"]
 
 [dev-dependencies]
-ssi-jwk = { path = "../ssi-jwk", default-features = false }
-ssi-ldp = { path = "../ssi-ldp" }
-ssi-vc = { path = "../ssi-vc" }
-ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
+ssi-top.workspace = true
+ssi-vc-ldp.workspace = true
+ssi-jwk.workspace = true
+linked-data.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+iref.workspace = true
+static-iref.workspace = true
+xsd-types.workspace = true
 tokio = { version = "1.0", features = ["macros"] }
-serde = { version = "1.0", features = ["derive"] }
-async-std = { version = "1.9", features = ["attributes"] }
 futures = "0.3"
 hyper = { version = "0.14", features = ["server", "client", "http1", "stream"] }

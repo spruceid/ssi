@@ -128,6 +128,30 @@ impl FromStr for MediaType {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidMediaType {
+    #[error(transparent)]
+    Unknown(Unknown),
+
+    #[error("invalid DID document media type")]
+    NotAString,
+}
+
+impl<'a> TryFrom<&'a [u8]> for MediaType {
+    type Error = InvalidMediaType;
+
+    fn try_from(s: &'a [u8]) -> Result<Self, Self::Error> {
+        match s {
+            b"application/did+json" => Ok(Self::Json),
+            b"application/did+ld+json" => Ok(Self::JsonLd),
+            unknown => match String::from_utf8(unknown.to_vec()) {
+                Ok(s) => Err(InvalidMediaType::Unknown(Unknown(s))),
+                Err(_) => Err(InvalidMediaType::NotAString),
+            },
+        }
+    }
+}
+
 /// Representation configuration.
 pub enum Options {
     Json,
