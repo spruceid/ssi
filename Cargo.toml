@@ -72,7 +72,7 @@ members = [
   "did-tezos",
   "did-jwk",
   "did-key",
-  # "did-web",
+  "did-web",
   # "did-ethr",
   # "did-sol",
   "did-pkh",
