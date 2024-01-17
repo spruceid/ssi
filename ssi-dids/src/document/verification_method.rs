@@ -37,6 +37,24 @@ impl ValueOrReference {
     }
 }
 
+impl From<DIDURLBuf> for ValueOrReference {
+    fn from(value: DIDURLBuf) -> Self {
+        Self::Reference(value.into())
+    }
+}
+
+impl From<DIDURLReferenceBuf> for ValueOrReference {
+    fn from(value: DIDURLReferenceBuf) -> Self {
+        Self::Reference(value)
+    }
+}
+
+impl From<DIDVerificationMethod> for ValueOrReference {
+    fn from(value: DIDVerificationMethod) -> Self {
+        Self::Value(value)
+    }
+}
+
 impl UsesResource for ValueOrReference {
     fn uses_resource(&self, base_id: &DID, id: &DIDURL) -> bool {
         match self {
