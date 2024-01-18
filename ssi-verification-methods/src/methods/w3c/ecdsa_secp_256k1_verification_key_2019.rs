@@ -5,6 +5,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -125,6 +126,9 @@ pub struct EcdsaSecp256k1VerificationKey2019 {
 }
 
 impl EcdsaSecp256k1VerificationKey2019 {
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019");
+
     pub fn sign_bytes(
         &self,
         secret_key: &JWK,

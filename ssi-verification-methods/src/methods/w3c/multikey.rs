@@ -5,6 +5,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use ssi_multicodec::MultiEncodedBuf;
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -71,6 +72,8 @@ pub enum InvalidPublicKey {
 }
 
 impl Multikey {
+    pub const IRI: &'static Iri = iri!("https://w3id.org/security#Multikey");
+
     pub fn generate_key_pair(
         id: IriBuf,
         controller: UriBuf,
@@ -139,11 +142,11 @@ impl VerificationMethod for Multikey {
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -161,7 +164,7 @@ impl TypedVerificationMethod for Multikey {
         MULTIKEY_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         MULTIKEY_TYPE
     }
 }
