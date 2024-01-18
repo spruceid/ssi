@@ -13,29 +13,20 @@ documentation = "https://docs.rs/did-ethr/"
 
 [dependencies]
 ssi-dids.workspace = true
-ssi-caips = { workspace = true, version = "0.1", default-features = false, features = ["eip"] }
+ssi-caips = { workspace = true, features = ["eip"] }
 ssi-jwk.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 thiserror.workspace = true
 hex.workspace = true
 serde_json.workspace = true
-# ssi-crypto = { path = "../ssi-crypto", version = "0.1", default-features = false, features = ["secp256k1"] }
-# ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false, features = ["eip"] }
-# chrono = { version = "0.4", features = ["serde"] }
-# serde = { version = "1.0", features = ["derive"] }
-# serde_json = "1.0"
-# async-trait = "0.1"
-# hex = "0.4"
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
 ssi-top.workspace = true
-ssi-vc = { workspace = true, default-features = false }
-ssi-vc-ldp = { workspace = true, default-features = false }
-ssi-json-ld = { workspace = true, default-features = false }
+ssi-vc.workspace = true
+ssi-vc-ldp = { workspace = true, features = ["ed25519"] }
+ssi-json-ld.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true
 serde = { workspace = true, features = ["derive"] }
-# ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "eip"] }
-# ssi-core = { path = "../ssi-core", default-features = false }
