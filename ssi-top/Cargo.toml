@@ -10,7 +10,7 @@ documentation = "https://docs.rs/ssi-vc/"
 
 [features]
 # Default features.
-default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "tezos", "eip712", "aleo", "solana"]
+default = ["w3c", "dif", "ed25519", "rsa", "secp256k1", "secp256r1", "tezos", "eip712", "aleo", "solana"]
 
 # Enables signature suites specified by the W3C.
 w3c = ["ssi-vc-ldp/w3c"]
