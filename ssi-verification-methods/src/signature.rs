@@ -92,11 +92,11 @@ pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
         signer: S,
     ) -> Result<Self::Signature, SignatureError>;
 
-    fn verify<'o, 's, 'm>(
+    fn verify(
         &self,
-        options: <Self::Options as Referencable>::Reference<'o>,
-        signature: <Self::Signature as Referencable>::Reference<'s>,
-        method: M::Reference<'m>,
+        options: <Self::Options as Referencable>::Reference<'_>,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+        method: M::Reference<'_>,
         bytes: &[u8],
     ) -> Result<bool, VerificationError>;
 }
