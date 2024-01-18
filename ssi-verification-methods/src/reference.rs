@@ -101,7 +101,7 @@ impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
 impl<'a, M: VerificationMethod> ReferenceOrOwnedRef<'a, M> {
     pub fn id(&self) -> &'a Iri {
         match self {
-            Self::Reference(r) => *r,
+            Self::Reference(r) => r,
             Self::Owned(m) => M::ref_id(*m),
         }
     }

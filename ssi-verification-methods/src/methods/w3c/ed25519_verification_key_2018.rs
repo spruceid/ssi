@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -59,6 +60,8 @@ pub enum InvalidPublicKey {
 }
 
 impl Ed25519VerificationKey2018 {
+    pub const IRI: &'static Iri = iri!("https://w3id.org/security#Ed25519VerificationKey2018");
+
     pub fn decode_public_key(&self) -> Result<ed25519_dalek::PublicKey, InvalidPublicKey> {
         let pk_bytes = multibase::Base::Base58Btc.decode(&self.public_key_base58)?;
         let pk = ed25519_dalek::PublicKey::from_bytes(&pk_bytes)?;

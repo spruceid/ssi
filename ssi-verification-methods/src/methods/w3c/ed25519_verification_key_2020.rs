@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -70,6 +71,8 @@ pub enum InvalidPublicKey {
 }
 
 impl Ed25519VerificationKey2020 {
+    pub const IRI: &'static Iri = iri!("https://w3id.org/security#Ed25519VerificationKey2020");
+
     pub fn generate_key_pair(
         id: IriBuf,
         controller: UriBuf,

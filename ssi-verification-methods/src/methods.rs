@@ -41,6 +41,16 @@ macro_rules! verification_method_union {
 			),*
 		}
 
+		impl $kind {
+			pub fn iri(&self) -> &iref::Iri {
+				match self {
+					$(
+						Self::$variant => $variant::IRI
+					),*
+				}
+			}
+		}
+
 		impl $name {
 			pub fn type_(&self) -> $kind {
 				match self {
@@ -177,7 +187,7 @@ macro_rules! verification_method_union {
 				fn try_from(value: $name_ref<'a>) -> Result<Self, Self::Error> {
 					match value {
 						$name_ref::$variant(m) => Ok(m),
-						other => Err($crate::InvalidVerificationMethod::invalid_type_iri(other.id()))
+						other => Err($crate::InvalidVerificationMethod::invalid_type_iri(other.type_().iri()))
 					}
 				}
 			}

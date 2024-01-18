@@ -436,6 +436,14 @@ impl FromStr for CompactJWSString {
     }
 }
 
+impl TryFrom<String> for CompactJWSString {
+    type Error = InvalidCompactJWS<String>;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::from_string(value)
+    }
+}
+
 impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for CompactJWSString {
     fn interpretation(
         &self,

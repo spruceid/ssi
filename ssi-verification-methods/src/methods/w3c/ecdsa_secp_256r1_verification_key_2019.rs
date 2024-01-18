@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
+use static_iref::iri;
 use std::hash::Hash;
 
 use crate::{
@@ -88,6 +89,9 @@ impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
 }
 
 impl EcdsaSecp256r1VerificationKey2019 {
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019");
+
     pub fn decode_public_key(&self) -> Result<p256::PublicKey, InvalidPublicKey> {
         let pk_multi_encoded =
             MultiEncodedBuf::new(multibase::decode(&self.public_key_multibase)?.1)?;
