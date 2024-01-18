@@ -253,6 +253,7 @@ fn resolve_public_key(
     Ok(doc)
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum VerificationMethod {
     EcdsaSecp256k1VerificationKey2019 {
         id: DIDURLBuf,
@@ -561,7 +562,11 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
+        if eip712 {
+            assert_eq!(vc.proof().signature().proof_value.as_deref().unwrap(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
+        } else {
+            assert_eq!(vc.proof().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
+        }
         assert!(vc.verify(&didethr).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
@@ -586,14 +591,19 @@ mod tests {
         assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_invalid());
 
         // Check that proof JWK must match proof verificationMethod
-        let wrong_key = JWK::generate_ed25519().unwrap();
+        let wrong_key = JWK::generate_secp256k1().unwrap();
         let wrong_signer = SingleSecretSigner::new(&didethr, wrong_key.clone());
         let vc_wrong_key = suite
             .sign(
                 cred,
                 AnyInputContext::default(),
                 &wrong_signer,
-                issue_options,
+                ProofConfiguration {
+                    options: AnySuiteOptions::default()
+                        .with_public_key(wrong_key.to_public())
+                        .unwrap(),
+                    ..issue_options
+                },
             )
             .await
             .unwrap();
@@ -632,6 +642,9 @@ mod tests {
         let mut vp_fuzzed = vp.clone();
         if let Some(value) = &mut vp_fuzzed.proof_mut().signature_mut().jws {
             *value = format!("{value}ff").try_into().unwrap()
+        }
+        if let Some(value) = &mut vp_fuzzed.proof_mut().signature_mut().proof_value {
+            value.push_str("ff");
         }
         let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
