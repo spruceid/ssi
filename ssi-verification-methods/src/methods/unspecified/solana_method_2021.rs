@@ -4,6 +4,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -45,6 +46,8 @@ pub struct SolanaMethod2021 {
 }
 
 impl SolanaMethod2021 {
+    pub const IRI: &'static Iri = iri!("https://w3id.org/security#SolanaMethod2021");
+
     pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
         let algorithm = secret_key
             .algorithm
@@ -85,11 +88,11 @@ impl VerificationMethod for SolanaMethod2021 {
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -108,7 +111,7 @@ impl TypedVerificationMethod for SolanaMethod2021 {
         SOLANA_METHOD_2021_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         SOLANA_METHOD_2021_TYPE
     }
 }

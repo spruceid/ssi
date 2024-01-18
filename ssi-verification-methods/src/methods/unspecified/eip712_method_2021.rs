@@ -2,11 +2,14 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_caips::caip10::BlockchainAccountIdVerifyError;
+use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    Referencable, TypedVerificationMethod, VerificationError, VerificationMethod,
+    Referencable, SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 // mod context;
@@ -47,17 +50,45 @@ pub struct Eip712Method2021 {
 }
 
 impl Eip712Method2021 {
+    pub const IRI: &'static Iri = iri!("https://w3id.org/security#Eip712Method2021");
+
+    pub fn sign_bytes(
+        &self,
+        secret_key: &JWK,
+        data: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        use k256::ecdsa::signature::Signer;
+        use ssi_jwk::Params;
+        let ec_params = match &secret_key.params {
+            Params::EC(ec) => ec,
+            _ => return Err(MessageSignatureError::InvalidSecretKey),
+        };
+
+        let secret_key = k256::SecretKey::try_from(ec_params)
+            .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
+        let signing_key = k256::ecdsa::SigningKey::from(secret_key);
+        let sig: k256::ecdsa::recoverable::Signature = signing_key
+            .try_sign(data)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?;
+
+        Ok(sig.as_ref().to_vec())
+    }
+
     pub fn verify_bytes(
         &self,
         data: &[u8],
         signature_bytes: &[u8],
     ) -> Result<bool, VerificationError> {
+        if signature_bytes.len() != 65 {
+            return Err(VerificationError::InvalidSignature);
+        }
+
         // Interpret the signature.
         let signature = k256::ecdsa::Signature::try_from(&signature_bytes[..64])
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         // Recover the signing key.
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(signature_bytes[64] % 27)
+        let rec_id = k256::ecdsa::recoverable::Id::try_from(signature_bytes[64])
             .map_err(|_| VerificationError::InvalidSignature)?;
         let sig = k256::ecdsa::recoverable::Signature::new(&signature, rec_id)
             .map_err(|_| VerificationError::InvalidSignature)?;
@@ -69,8 +100,7 @@ impl Eip712Method2021 {
         let jwk = JWK {
             params: ssi_jwk::Params::EC(
                 ssi_jwk::ECParams::try_from(
-                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_bytes().as_slice())
-                        .unwrap(),
+                    &k256::PublicKey::from_sec1_bytes(recovered_key.to_bytes().as_slice()).unwrap(),
                 )
                 .unwrap(),
             ),
@@ -83,11 +113,12 @@ impl Eip712Method2021 {
             x509_thumbprint_sha1: None,
             x509_thumbprint_sha256: None,
         };
-        self.blockchain_account_id
-            .verify(&jwk)
-            .map_err(|_| VerificationError::InvalidKey)?;
 
-        Ok(true)
+        match self.blockchain_account_id.verify(&jwk) {
+            Ok(()) => Ok(true),
+            Err(BlockchainAccountIdVerifyError::KeyMismatch(_, _)) => Ok(false),
+            Err(_) => Err(VerificationError::InvalidKey),
+        }
     }
 }
 
@@ -110,11 +141,11 @@ impl VerificationMethod for Eip712Method2021 {
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -132,7 +163,7 @@ impl TypedVerificationMethod for Eip712Method2021 {
         EIP712_METHOD_2021_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         EIP712_METHOD_2021_TYPE
     }
 }
@@ -153,5 +184,16 @@ impl TryFrom<GenericVerificationMethod> for Eip712Method2021 {
                 .parse()
                 .map_err(|_| InvalidVerificationMethod::invalid_property("blockchainAccountId"))?,
         })
+    }
+}
+
+impl SigningMethod<JWK, ssi_jwk::algorithm::ESKeccakKR> for Eip712Method2021 {
+    fn sign_bytes_ref(
+        this: &Self,
+        key: &JWK,
+        _algorithm: ssi_jwk::algorithm::ESKeccakKR,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        this.sign_bytes(key, bytes)
     }
 }

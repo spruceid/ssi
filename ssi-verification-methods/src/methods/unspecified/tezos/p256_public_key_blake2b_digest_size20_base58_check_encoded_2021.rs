@@ -4,6 +4,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -46,6 +47,9 @@ pub struct P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
 }
 
 impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
+
     pub fn matches_public_key(&self, public_key: &JWK) -> Result<bool, VerificationError> {
         use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
         match self.blockchain_account_id.verify(public_key) {
@@ -77,11 +81,11 @@ impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded20
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -103,7 +107,7 @@ impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEnco
         P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
 }

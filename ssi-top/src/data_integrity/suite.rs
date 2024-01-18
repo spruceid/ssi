@@ -553,16 +553,16 @@ impl AnySuite {
             },
             Algorithm::ES256KR => {
                 // #[allow(clippy::if_same_then_else)]
-                #[cfg(feature = "eip")]
+                #[cfg(feature = "eip712")]
                 if use_eip712sig(jwk) {
-                    return Ok(Self::EthereumEip712Signature2021);
+                    return Some(Self::EthereumEip712Signature2021);
                 }
-                #[cfg(feature = "eip")]
+                #[cfg(feature = "eip712")]
                 if use_epsig(jwk) {
-                    return Ok(Self::EthereumPersonalSignature2021);
+                    return Some(Self::EthereumPersonalSignature2021);
                 }
                 match verification_method {
-                    #[cfg(feature = "eip")]
+                    #[cfg(feature = "eip712")]
                     Some(vm)
                         if (vm.id().starts_with("did:ethr:")
                             || vm.id().starts_with("did:pkh:eth:"))
@@ -580,6 +580,28 @@ impl AnySuite {
             _ => return None,
         })
     }
+}
+
+#[cfg(feature = "eip712")]
+fn use_eip712sig(key: &JWK) -> bool {
+    // deprecated: allow using unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021
+    if let Some(ref key_ops) = key.key_operations {
+        if key_ops.contains(&"signTypedData".to_string()) {
+            return true;
+        }
+    }
+    false
+}
+
+#[cfg(feature = "eip712")]
+fn use_epsig(key: &JWK) -> bool {
+    // deprecated: allow using unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021
+    if let Some(ref key_ops) = key.key_operations {
+        if key_ops.contains(&"signPersonalMessage".to_string()) {
+            return true;
+        }
+    }
+    false
 }
 
 impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
@@ -641,7 +663,9 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             AnyMethodRef::TezosMethod2021(m) => m.sign_bytes(secret, algorithm.try_into()?, bytes),
             AnyMethodRef::AleoMethod2021(_) => todo!(),
             AnyMethodRef::BlockchainVerificationMethod2021(_) => todo!(),
-            AnyMethodRef::Eip712Method2021(_) => todo!(),
+            AnyMethodRef::Eip712Method2021(m) => {
+                SigningMethod::sign_bytes(m, secret, algorithm.try_into()?, bytes)
+            },
             AnyMethodRef::SolanaMethod2021(_) => todo!(),
         }
     }

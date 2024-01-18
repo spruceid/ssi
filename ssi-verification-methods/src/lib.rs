@@ -130,9 +130,9 @@ pub trait VerificationMethod: Referencable {
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Option<&Iri>; // Should be an URI.
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri;
+    fn ref_id(r: Self::Reference<'_>) -> &Iri;
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri>;
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -253,7 +253,7 @@ pub trait TypedVerificationMethod: VerificationMethod {
     /// Returns the name of the verification method's type.
     fn type_(&self) -> &str;
 
-    fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str;
+    fn ref_type(r: Self::Reference<'_>) -> &str;
 }
 
 // pub trait VerificationMethodRef<'m> {
@@ -275,14 +275,14 @@ pub trait TypedVerificationMethod: VerificationMethod {
 // }
 
 impl<'m, M: VerificationMethod> Cow<'m, M> {
-    fn id<'a>(&'a self) -> &'a Iri {
+    fn id(&self) -> &Iri {
         match self {
             Self::Owned(m) => m.id(),
             Self::Borrowed(b) => M::ref_id(*b),
         }
     }
 
-    fn controller<'a>(&'a self) -> Option<&'a Iri> {
+    fn controller(&self) -> Option<&Iri> {
         match self {
             Self::Owned(m) => m.controller(),
             Self::Borrowed(b) => M::ref_controller(*b),

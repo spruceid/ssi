@@ -2,6 +2,7 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use static_iref::iri;
 
 use crate::{
     covariance_rule, ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
@@ -54,6 +55,10 @@ pub struct AleoMethod2021 {
     pub blockchain_account_id: ssi_caips::caip10::BlockchainAccountId,
 }
 
+impl AleoMethod2021 {
+    pub const IRI: &'static Iri = iri!("https://w3id.org/security#AleoMethod2021");
+}
+
 impl Referencable for AleoMethod2021 {
     type Reference<'a> = &'a Self where Self: 'a;
 
@@ -73,11 +78,11 @@ impl VerificationMethod for AleoMethod2021 {
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -95,7 +100,7 @@ impl TypedVerificationMethod for AleoMethod2021 {
         ALEO_METHOD_2021_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         ALEO_METHOD_2021_TYPE
     }
 }

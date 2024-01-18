@@ -91,7 +91,7 @@ impl From<std::convert::Infallible> for VerificationError {
 macro_rules! proof_purposes {
     ($($(#[$doc:meta])* $id:ident: $variant:ident = $iri:literal),*) => {
         /// Proof purposes.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, linked_data::Serialize, linked_data::Deserialize)]
+        #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, linked_data::Serialize, linked_data::Deserialize)]
         #[derive(serde::Serialize, serde::Deserialize)]
         pub enum ProofPurpose {
             $(
@@ -346,6 +346,7 @@ macro_rules! proof_purposes {
 proof_purposes! {
     /// <https://w3id.org/security#assertionMethod>
     #[serde(rename = "assertionMethod")]
+    #[default]
     assertion_method: Assertion = "https://w3id.org/security#assertionMethod",
 
     /// <https://w3id.org/security#authenticationMethod>
@@ -363,12 +364,6 @@ proof_purposes! {
     /// <https://w3id.org/security#keyAgreementMethod>
     #[serde(rename = "keyAgreementMethod")]
     key_agreement: KeyAgreement = "https://w3id.org/security#keyAgreementMethod"
-}
-
-impl Default for ProofPurpose {
-    fn default() -> Self {
-        ProofPurpose::Assertion
-    }
 }
 
 impl fmt::Display for ProofPurpose {

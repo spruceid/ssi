@@ -3,6 +3,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
+use static_iref::iri;
 use std::hash::Hash;
 
 use crate::{
@@ -119,6 +120,9 @@ impl DigestFunction {
 }
 
 impl EcdsaSecp256k1RecoveryMethod2020 {
+    pub const IRI: &'static Iri =
+        iri!("https://w3id.org/security#EcdsaSecp256k1RecoveryMethod2020");
+
     pub fn sign(
         &self,
         secret_key: &JWK,
