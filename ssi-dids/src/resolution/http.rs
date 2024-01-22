@@ -1,4 +1,4 @@
-use iref::{Iri, IriBuf};
+use iref::{Uri, UriBuf};
 use reqwest::{header, StatusCode};
 
 use crate::{
@@ -15,12 +15,12 @@ pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PK
 #[derive(Debug, Clone)]
 pub struct HTTPDIDResolver {
     /// HTTP(S) URL for DID resolver HTTP(S) endpoint.
-    endpoint: IriBuf, // TODO should be an URL
+    endpoint: UriBuf,
 }
 
 impl HTTPDIDResolver {
     /// Construct a new HTTP DID Resolver with a given [endpoint][HTTPDIDResolver::endpoint] URL.
-    pub fn new(url: &Iri) -> Self {
+    pub fn new(url: &Uri) -> Self {
         Self {
             endpoint: url.to_owned(),
         }
