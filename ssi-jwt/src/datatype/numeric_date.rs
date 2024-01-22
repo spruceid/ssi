@@ -99,7 +99,11 @@ impl TryFrom<DateTime<Utc>> for NumericDate {
         // Have to take seconds and nanoseconds separately in order to get the full allowable
         // range of microsecond-precision values as described above.
         let whole_seconds = dtu.timestamp() as f64;
-        let fractional_seconds = dtu.timestamp_nanos().rem_euclid(1_000_000_000) as f64 * 1.0e-9;
+        let fractional_seconds = match dtu.timestamp_nanos_opt() {
+            Some(nanos) => nanos.rem_euclid(1_000_000_000) as f64 * 1.0e-9,
+            None => dtu.timestamp_micros().rem_euclid(1_000_000) as f64 * 1.0e-6,
+        };
+
         Self::try_from_seconds(whole_seconds + fractional_seconds)
     }
 }

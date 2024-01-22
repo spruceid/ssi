@@ -5,20 +5,9 @@ use ssi_dids::{
         representation::{self, MediaType},
         verification_method::ValueOrReference,
         DIDVerificationMethod, Resource, Service,
-    },
-    resolution::Error,
-    resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter},
-    DIDBuf, DIDResolver, DIDURLBuf, Document, DID, DIDURL,
+    }, resolution::Error, resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter}, DIDBuf, DIDMethod, DIDResolver, DIDURLBuf, Document, DID, DIDURL
 };
 use static_iref::iri;
-// use ssi_dids::{
-//     did_resolve::{
-//         dereference, DIDResolver, DereferencingInputMetadata, DocumentMetadata, Metadata,
-//         ResolutionInputMetadata, ResolutionMetadata, ERROR_INVALID_DID,
-//     },
-//     Context, Contexts, DIDMethod, Document, Service, Source, VerificationMethod,
-//     VerificationMethodMap, DEFAULT_CONTEXT, DIDURL,
-// };
 use json_patch::patch;
 use serde::Deserialize;
 use ssi_jwk::{p256_parse, secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK};
@@ -94,11 +83,11 @@ impl DIDTz {
     }
 }
 
-impl DIDMethodResolver for DIDTz {
-    fn method_name(&self) -> &str {
-        "tz"
-    }
+impl DIDMethod for DIDTz {
+    const DID_METHOD_NAME: &'static str = "tz";
+}
 
+impl DIDMethodResolver for DIDTz {
     async fn resolve_method_representation<'a>(
         &'a self,
         id: &'a str,

@@ -87,6 +87,21 @@ impl<T> OneOrMany<T> {
             }
         }
     }
+
+    pub fn into_single(self) -> Option<T> {
+        match self {
+            Self::One(value) => Some(value),
+            Self::Many(values) => {
+                let mut it = values.into_iter();
+                let value = it.next()?;
+                if it.next().is_none() {
+                    Some(value)
+                } else {
+                    None
+                }
+            }
+        }
+    }
 }
 
 // consuming iterator

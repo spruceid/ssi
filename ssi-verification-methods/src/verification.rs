@@ -349,21 +349,21 @@ proof_purposes! {
     #[default]
     assertion_method: Assertion = "https://w3id.org/security#assertionMethod",
 
-    /// <https://w3id.org/security#authenticationMethod>
-    #[serde(rename = "authenticationMethod")]
-    authentication: Authentication = "https://w3id.org/security#authenticationMethod",
+    /// <https://w3id.org/security#authentication>
+    #[serde(rename = "authentication")]
+    authentication: Authentication = "https://w3id.org/security#authentication",
 
-    /// <https://w3id.org/security#capabilityInvocationMethod>
-    #[serde(rename = "capabilityInvocationMethod")]
-    capability_invocation: CapabilityInvocation = "https://w3id.org/security#capabilityInvocationMethod",
+    /// <https://w3id.org/security#capabilityInvocation>
+    #[serde(rename = "capabilityInvocation")]
+    capability_invocation: CapabilityInvocation = "https://w3id.org/security#capabilityInvocation",
 
-    /// <https://w3id.org/security#capabilityDelegationMethod>
-    #[serde(rename = "capabilityDelegationMethod")]
-    capability_delegation: CapabilityDelegation = "https://w3id.org/security#capabilityDelegationMethod",
+    /// <https://w3id.org/security#capabilityDelegation>
+    #[serde(rename = "capabilityDelegation")]
+    capability_delegation: CapabilityDelegation = "https://w3id.org/security#capabilityDelegation",
 
-    /// <https://w3id.org/security#keyAgreementMethod>
-    #[serde(rename = "keyAgreementMethod")]
-    key_agreement: KeyAgreement = "https://w3id.org/security#keyAgreementMethod"
+    /// <https://w3id.org/security#keyAgreement>
+    #[serde(rename = "keyAgreement")]
+    key_agreement: KeyAgreement = "https://w3id.org/security#keyAgreement"
 }
 
 impl fmt::Display for ProofPurpose {

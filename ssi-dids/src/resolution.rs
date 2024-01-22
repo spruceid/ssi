@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{self, representation, DIDVerificationMethod, InvalidData},
-    Document, PrimaryDIDURL, DID, DIDURL,
+    DIDMethod, Document, PrimaryDIDURL, DID, DIDURL,
 };
 
 // mod composition;
@@ -254,9 +254,11 @@ pub trait DIDResolver {
     }
 }
 
-pub trait DIDMethodResolver {
+pub trait DIDMethodResolver: DIDMethod {
     /// Returns the name of the method handled by this resolver.
-    fn method_name(&self) -> &str;
+    fn method_name(&self) -> &str {
+        Self::DID_METHOD_NAME
+    }
 
     /// Resolves a DID representation using a method specific identifier.
     ///

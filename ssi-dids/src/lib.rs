@@ -9,6 +9,7 @@ use static_iref::iri;
 
 mod did;
 pub mod document;
+pub mod registration;
 pub mod resolution;
 pub mod verifier;
 
@@ -21,3 +22,13 @@ pub use json_ld;
 
 /// URI [required](https://www.w3.org/TR/did-core/#production-0) as the first value of the `@context` property for a DID Document in JSON-LD representation.
 pub const JSON_LD_CONTEXT_IRI: &Iri = iri!("https://www.w3.org/ns/did/v1");
+
+/// DID Method type.
+pub trait DIDMethod {
+    /// Name of the method.
+    const DID_METHOD_NAME: &'static str;
+}
+
+impl<'a, M: DIDMethod> DIDMethod for &'a M {
+    const DID_METHOD_NAME: &'static str = M::DID_METHOD_NAME;
+}

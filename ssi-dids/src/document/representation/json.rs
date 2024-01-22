@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::Document;
 
 /// DID document represented as a JSON document.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Json<D = Document>(D);
 

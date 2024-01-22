@@ -6,7 +6,7 @@ pub use json_ld::syntax::{context, ContextEntry};
 use crate::Document;
 
 /// DID document represented as a JSON document.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonLd<D = Document> {
     #[serde(rename = "@context")]
     context: Context,
@@ -73,7 +73,7 @@ pub struct InvalidContextValue;
 /// ```
 /// "https://www.w3.org/ns/did/v1"
 /// ```
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum DIDContext {
     /// Legacy context.
     #[serde(rename = "https://w3id.org/did/v0.11")]
@@ -89,7 +89,7 @@ pub enum DIDContext {
     V1,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Context {
     /// https://www.w3.org/ns/did/v1
@@ -110,7 +110,7 @@ impl Default for Context {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct ContextArray(DIDContext, Vec<ContextEntry>);
 
 impl Serialize for ContextArray {

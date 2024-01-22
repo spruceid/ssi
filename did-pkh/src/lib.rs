@@ -1,12 +1,10 @@
 use iref::Iri;
 use ssi_dids::document::representation::MediaType;
 use ssi_dids::document::verification_method::ValueOrReference;
-use ssi_dids::{document, resolution, DIDBuf};
+use ssi_dids::{document, resolution, DIDBuf, DIDMethod};
 use ssi_dids::{document::representation, resolution::Output};
 use static_iref::iri;
 use std::collections::BTreeMap;
-use std::future::Future;
-use std::pin::Pin;
 use std::str::FromStr;
 
 use ssi_caips::caip10::BlockchainAccountId;
@@ -473,13 +471,9 @@ async fn resolve_caip10(did: &DID, account_id: &str) -> ResolutionResult {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-pub type ResolveMethodRepresentation<'a> =
-    Pin<Box<dyn 'a + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type ResolveMethodRepresentation<'a> =
-    Pin<Box<dyn 'a + Send + Future<Output = Result<Output<Vec<u8>>, Error>>>>;
+impl DIDMethod for DIDPKH {
+    const DID_METHOD_NAME: &'static str = "pkh";
+}
 
 impl DIDMethodResolver for DIDPKH {
     fn method_name(&self) -> &str {
