@@ -26,7 +26,7 @@ pub use json::Json;
 use crate::Document;
 
 /// DID document in a specific representation.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Represented<D = Document> {
     Json(Json<D>),
