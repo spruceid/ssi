@@ -6,10 +6,7 @@ use ssi_dids::{
         representation::{self, MediaType},
         verification_method::DIDVerificationMethod,
         VerificationRelationships,
-    },
-    json_ld::syntax::ContextEntry,
-    resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
-    DIDBuf, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
+    }, json_ld::syntax::ContextEntry, resolution::{DIDMethodResolver, Error, Metadata, Options, Output}, DIDBuf, DIDMethod, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL
 };
 use ssi_jwk::JWK;
 use ssi_verification_methods::ProofPurposes;
@@ -148,11 +145,11 @@ impl JWKMethod {
     }
 }
 
-impl DIDMethodResolver for JWKMethod {
-    fn method_name(&self) -> &str {
-        "jwk"
-    }
+impl DIDMethod for JWKMethod {
+    const DID_METHOD_NAME: &'static str = "jwk";
+}
 
+impl DIDMethodResolver for JWKMethod {
     async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,

@@ -1,7 +1,6 @@
 use http::header;
 use ssi_dids::{
-    document::representation::MediaType,
-    resolution::{self, DIDMethodResolver, Error, Output},
+    document::representation::MediaType, resolution::{self, DIDMethodResolver, Error, Output}, DIDMethod
 };
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
@@ -74,12 +73,12 @@ fn did_web_url(id: &str) -> Result<String, Error> {
     Ok(url)
 }
 
+impl DIDMethod for DIDWeb {
+    const DID_METHOD_NAME: &'static str = "web";
+}
+
 /// <https://w3c-ccg.github.io/did-method-web/#read-resolve>
 impl DIDMethodResolver for DIDWeb {
-    fn method_name(&self) -> &str {
-        "web"
-    }
-
     async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,

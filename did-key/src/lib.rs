@@ -7,9 +7,7 @@ use ssi_dids::{
         representation::{self, MediaType},
         verification_method::ValueOrReference,
         DIDVerificationMethod,
-    },
-    resolution::{self, DIDMethodResolver, Error},
-    DIDBuf, DIDURLBuf, Document,
+    }, resolution::{self, DIDMethodResolver, Error}, DIDBuf, DIDMethod, DIDURLBuf, Document
 };
 use static_iref::iri;
 
@@ -130,11 +128,11 @@ impl DIDKey {
     }
 }
 
-impl DIDMethodResolver for DIDKey {
-    fn method_name(&self) -> &str {
-        "key"
-    }
+impl DIDMethod for DIDKey {
+    const DID_METHOD_NAME: &'static str = "key";
+}
 
+impl DIDMethodResolver for DIDKey {
     async fn resolve_method_representation<'a>(
         &'a self,
         id: &'a str,

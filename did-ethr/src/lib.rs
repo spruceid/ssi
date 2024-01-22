@@ -6,9 +6,7 @@ use ssi_dids::{
         self,
         representation::{self, MediaType},
         DIDVerificationMethod,
-    },
-    resolution::{self, DIDMethodResolver, Error, Output},
-    DIDBuf, DIDURLBuf, Document, DIDURL,
+    }, resolution::{self, DIDMethodResolver, Error, Output}, DIDBuf, DIDMethod, DIDURLBuf, Document, DIDURL
 };
 use static_iref::iri;
 use std::str::FromStr;
@@ -29,11 +27,11 @@ impl DIDEthr {
     }
 }
 
-impl DIDMethodResolver for DIDEthr {
-    fn method_name(&self) -> &str {
-        "ethr"
-    }
+impl DIDMethod for DIDEthr {
+    const DID_METHOD_NAME: &'static str = "ethr";
+}
 
+impl DIDMethodResolver for DIDEthr {
     async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,
