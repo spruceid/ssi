@@ -27,16 +27,16 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 percent-encoding = { version = "2.1", optional = true }
 iref = { version = "2.2.2", features = ["serde"] }
 static-iref = "2.0.0"
-ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-json-ld = { path = "../ssi-json-ld", version = "0.2" }
+ssi-jwk = { path = "../ssi-jwk", version = "0.1", default-features = false }
 ssi-core = { path = "../ssi-core", version = "0.1"}
 ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  }
 
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dependencies]
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
