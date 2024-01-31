@@ -57,19 +57,19 @@ k256 = { version = "0.13.1", optional = true, features = ["ecdsa"] }
 p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
 keccak-hash = { version = "0.7", optional = true }
 ssi-jwk = { path = "../ssi-jwk", version = "0.1.1" }
-ssi-json-ld = { path = "../ssi-json-ld", version = "0.2" }
 ssi-core = { path = "../ssi-core", version = "0.1" }
 ssi-dids = { path = "../ssi-dids", version = "0.1" }
 ssi-crypto = { path = "../ssi-crypto", version = "0.1" }
+ssi-json-ld = { path = "../ssi-json-ld", version = "0.2" }
 ssi-jws = { path = "../ssi-jws", version = "0.1" }
 ssi-tzkey = { path = "../ssi-tzkey", version = "0.1", optional = true }
 ssi-caips = { path = "../ssi-caips", version = "0.1" }
 ssi-contexts = { version = "0.1.5", path = "../contexts" }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dependencies]
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]

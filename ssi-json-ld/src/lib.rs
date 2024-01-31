@@ -1,11 +1,13 @@
 //! JSON-LD context loaders.
 
 use std::collections::HashMap;
+#[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
 use std::sync::Arc;
 
 pub mod rdf;
 pub mod urdna2015;
 
+#[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
 use async_std::sync::RwLock;
 use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
@@ -342,6 +344,7 @@ pub struct ContextLoader {
     // This map holds the optional, additional context objects.  This is where any app-specific context
     // objects would go.  The Arc<RwLock<_>> is necessary because json_ld::Loader trait unfortunately
     // has a method that uses `&mut self`.
+    #[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
     context_map: Option<Arc<RwLock<ContextMap>>>,
 }
 
@@ -376,6 +379,7 @@ impl ContextLoader {
     pub fn empty() -> Self {
         Self {
             static_loader: None,
+            #[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
             context_map: None,
         }
     }
@@ -388,6 +392,7 @@ impl ContextLoader {
     /// Using the builder pattern, the map of additional contexts can be set.  These context objects
     /// will be checked after StaticLoader (if it's specified).  preparsed_context_map should map
     /// the context URLs to their JSON content.
+    #[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
     pub fn with_context_map_from(
         mut self,
         preparsed_context_map: HashMap<String, String>,
@@ -417,6 +422,7 @@ impl std::default::Default for ContextLoader {
     fn default() -> Self {
         Self {
             static_loader: Some(StaticLoader),
+            #[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
             context_map: None,
         }
     }
@@ -454,6 +460,7 @@ impl Loader<IriBuf, Span> for ContextLoader {
             };
 
             // If we fell through, then try `self.context_map`.
+            #[cfg(not(all(target_arch = "wasm32", target_os = "wasi")))]
             if let Some(context_map) = &mut self.context_map {
                 context_map
                     .read()
@@ -464,6 +471,8 @@ impl Loader<IriBuf, Span> for ContextLoader {
             } else {
                 Err(UnknownContext(url))
             }
+            #[cfg(all(target_arch = "wasm32", target_os = "wasi"))]
+            Err(UnknownContext(url))
         }
         .boxed()
     }

@@ -23,10 +23,10 @@ ssi-caips = { path = "../ssi-caips", version = "0.1", default-features = false  
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}
 
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+[target.'cfg(not(all(target_arch = "wasm32", not(target_os = "wasi"))))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
+[target.'cfg(all(target_arch = "wasm32", not(target_os = "wasi")))'.dependencies]
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
