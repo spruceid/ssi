@@ -51,7 +51,8 @@ exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 # # sha = ["rsa"]
 
 [dependencies]
-ssi-vc.workspace = true
+# ssi-vc.workspace = true
+ssi-claims.workspace = true
 # # ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
 # # ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
 # # ssi-core = { path = "./ssi-core", version = "0.1" }
@@ -70,66 +71,59 @@ ssi-vc.workspace = true
 
 [workspace]
 members = [
-  "did-tezos",
-  "did-jwk",
-  "did-key",
-  "did-web",
-  "did-ethr",
-  # "did-sol",
-  "did-pkh",
-  # "did-onion",
-  "did-ion",
-  # "did-webkey",
+  "crates/*",
+  "crates/dids/core",
+  "crates/dids/methods/*",
+  "crates/claims/core",
+  "crates/claims/crates/*",
+  "crates/claims/crates/vc/core",
+  "crates/claims/crates/vc/proofs/*"
   # "vc-test",
   # "did-test",
-  "ssi-caips",
-  "ssi-multicodec",
-  "ssi-jwk",
-  "ssi-core",
-  "ssi-crypto",
-  "ssi-json-ld",
-  "ssi-dids",
-  "ssi-jws",
-  "ssi-jwt",
   # "ssi-sd-jwt",
-  "ssi-tzkey",
-  "ssi-eip712",
   # "ssi-ssh",
   # "ssi-ucan",
-  "ssi-rdf",
-  "ssi-verification-methods",
-  "ssi-security",
-  "ssi-vc",
-  "ssi-vc-jwt",
-  "ssi-vc-ldp",
-  # "ssi-zcap-ld",
-  "ssi-top"
+  # "ssi-zcap-ld"
 ]
 
 [workspace.dependencies]
-ssi-core = { path = "./ssi-core", version = "0.1" }
-ssi-multicodec = { path = "./ssi-multicodec", version = "0.1" }
-ssi-crypto = { path = "./ssi-crypto", version = "0.1" }
-ssi-verification-methods = { path = "./ssi-verification-methods", version = "0.1" }
-ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
-ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
-ssi-jwt = { path = "./ssi-jwt", version = "0.1" }
-ssi-tzkey = { path = "./ssi-tzkey", version = "0.1" }
-ssi-eip712 = { path = "./ssi-eip712", version = "0.1" }
-ssi-rdf = { path = "./ssi-rdf", version = "0.1" }
-ssi-json-ld = { path = "./ssi-json-ld", version = "0.2.2" }
-ssi-dids = { path = "./ssi-dids", version = "0.1" }
-ssi-security = { path = "./ssi-security", version = "0.1" }
-ssi-caips = { path = "./ssi-caips", version = "0.1" }
-ssi-vc = { path = "./ssi-vc", version = "0.2" }
-ssi-vc-ldp = { path = "./ssi-vc-ldp", version = "0.3" }
-ssi-top = { path = "./ssi-top", version = "0.1" }
+ssi-core = { path = "./crates/core", version = "0.1" }
+ssi-multicodec = { path = "./crates/multicodec", version = "0.1" }
+ssi-crypto = { path = "./crates/crypto", version = "0.1" }
+ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1" }
+ssi-jwk = { path = "./crates/jwk", version = "0.1", default-features = false }
+ssi-jws = { path = "./crates/jws", version = "0.1", default-features = false }
+ssi-jwt = { path = "./crates/jwt", version = "0.1" }
+ssi-tzkey = { path = "./crates/tzkey", version = "0.1" }
+ssi-eip712 = { path = "./crates/eip712", version = "0.1" }
+ssi-rdf = { path = "./crates/rdf", version = "0.1" }
+ssi-contexts = { path = "./crates/contexts", version = "0.1.5" }
+ssi-json-ld = { path = "./crates/json-ld", version = "0.2.2" }
+ssi-security = { path = "./crates/security", version = "0.1" }
+ssi-caips = { path = "./crates/caips", version = "0.1" }
+
+# Verifiable Claims
+ssi-claims-core = { path = "./crates/claims/core", version = "0.1" }
+ssi-vc-data-integrity = { path = "./crates/claims/crates/vc/proofs/data-integrity", version = "0.3" }
+ssi-claims = { path = "./crates/claims", version = "0.1" }
+
+# DID methods
+ssi-dids-core = { path = "./crates/dids/core", version = "0.1" }
+did-ethr = { path = "./crates/dids/methods/ethr", version = "0.2.1" }
+did-ion = { path = "./crates/dids/methods/ion", version = "0.2.0" }
+did-jwk = { path = "./crates/dids/methods/jwk", version = "0.1.1" }
+did-method-key = { path = "./crates/dids/methods/key", version = "0.2.1" }
+did-pkh = { path = "./crates/dids/methods/pkh", version = "0.2.1" }
+did-tz = { path = "./crates/dids/methods/tz", version = "0.2.1" }
+did-web = { path = "./crates/dids/methods/web", version = "0.2.2" }
+
+# other common dependencies
 async-trait = "0.1.68"
 thiserror = "1.0.40"
 chrono = "0.4.24"
 iref = "3.1.2"
 static-iref = "3.0"
-rdf-types = "0.18"
+rdf-types = "0.18.3"
 # xsd-types = "0.7.6"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
@@ -211,6 +205,3 @@ lazy_static = "1.4.0"
 # ]
 # # filter_commits = false
 # tag_pattern = "v[0-9]*"
-
-[patch.crates-io]
-rdf-types = { git = "https://github.com/timothee-haudebourg/rdf-types.git" }

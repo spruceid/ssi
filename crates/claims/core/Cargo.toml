@@ -1,0 +1,26 @@
+[package]
+name = "ssi-claims-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verifiable Claims for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-claims/"
+
+[features]
+default = ["linked-data"]
+
+## Compatibility layer with the [`linked-data`] library.
+##
+## Allows one to serialize verifiable LD claims.
+## 
+## [`linked-data`]: <https://github.com/spruceid/linked-data-rs>
+linked-data = ["dep:linked-data"]
+
+[dependencies]
+ssi-core.workspace = true
+educe.workspace = true
+thiserror.workspace = true
+
+linked-data = { workspace = true, optional = true }

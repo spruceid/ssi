@@ -167,9 +167,9 @@
 // #[cfg(feature = "bbs")]
 // #[deprecated = "Use ssi::crypto::signatures::bbs"]
 // pub use ssi_crypto::signatures::bbs;
-// pub use ssi_dids as did;
+// pub use ssi_dids_core as did;
 // #[deprecated = "Use ssi::did::did_resolve"]
-// pub use ssi_dids::did_resolve;
+// pub use ssi_dids_core::did_resolve;
 // pub use ssi_json_ld as jsonld;
 // #[deprecated = "Use ssi::jsonld::rdf"]
 // pub use ssi_json_ld::rdf;
