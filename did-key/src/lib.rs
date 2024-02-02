@@ -24,6 +24,7 @@ const DID_KEY_BLS12381_G2_PREFIX: [u8; 2] = [0xeb, 0x01];
 const DID_KEY_P256_PREFIX: [u8; 2] = [0x80, 0x24];
 const DID_KEY_P384_PREFIX: [u8; 2] = [0x81, 0x24];
 const DID_KEY_RSA_PREFIX: [u8; 2] = [0x85, 0x24];
+const DID_KEY_JWK_JCS_PUB_PREFIX: [u8; 3] = [0xd1, 0xd6, 0x03]; // see: https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
 
 #[derive(Error, Debug)]
 pub enum DIDKeyError {
@@ -212,6 +213,24 @@ impl DIDResolver for DIDKey {
                     public_key: Base64urlUInt(data[2..].to_vec()),
                     private_key: None,
                 }))
+            }
+        } else if data.len() > 3
+            && data[0] == DID_KEY_JWK_JCS_PUB_PREFIX[0]
+            && data[1] == DID_KEY_JWK_JCS_PUB_PREFIX[1]
+            && data[2] == DID_KEY_JWK_JCS_PUB_PREFIX[2]
+        {
+            // For EBSI compliance - multicodec jwk_jcs-pub
+            // see: https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
+            vm_type = "JsonWebKey2020".to_string();
+            vm_type_iri = "https://w3id.org/security#JsonWebKey2020".to_string();
+            if let Ok(jwk) = serde_json::from_slice(&data[3..]) {
+                jwk
+            } else {
+                return (
+                    ResolutionMetadata::from_error(ERROR_INVALID_DID),
+                    None,
+                    None,
+                );
             }
         } else {
             return (
@@ -448,6 +467,65 @@ mod tests {
 
         let did1 = DIDKey.generate(&Source::Key(&key)).unwrap();
         assert_eq!(did1, did);
+    }
+
+    #[async_std::test]
+    async fn from_did_key_jwk_jcs_pub() {
+        // https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
+        let did = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kbs995rh8qKeDHQgTwf22MTWWYFWQKZPYDz7LLTA4orkBZBHxzasmpiz7wa9BkwwMcjtxm4RUqQNJptsy6NDuXWFNSyc86uaCmiyP1k1uL2xHChFhpU1MQpUmYhSrwrQr8u2";
+        let (res_meta, _doc, _doc_meta) = DIDKey
+            .resolve(did, &ResolutionInputMetadata::default())
+            .await;
+        assert_eq!(res_meta.error, None);
+
+        let vm = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kbs995rh8qKeDHQgTwf22MTWWYFWQKZPYDz7LLTA4orkBZBHxzasmpiz7wa9BkwwMcjtxm4RUqQNJptsy6NDuXWFNSyc86uaCmiyP1k1uL2xHChFhpU1MQpUmYhSrwrQr8u2#z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kbs995rh8qKeDHQgTwf22MTWWYFWQKZPYDz7LLTA4orkBZBHxzasmpiz7wa9BkwwMcjtxm4RUqQNJptsy6NDuXWFNSyc86uaCmiyP1k1uL2xHChFhpU1MQpUmYhSrwrQr8u2";
+        let (res_meta, object, _meta) =
+            dereference(&DIDKey, vm, &DereferencingInputMetadata::default()).await;
+        assert_eq!(res_meta.error, None);
+        let vm = match object {
+            Content::Object(Resource::VerificationMethod(vm)) => vm,
+            _ => unreachable!(),
+        };
+        let key = vm.public_key_jwk.unwrap();
+        eprintln!("key {}", serde_json::to_string_pretty(&key).unwrap());
+
+        let key_expected: JWK = serde_json::from_value(serde_json::json!({
+          "crv": "P-256",
+          "kty": "EC",
+          "x": "m5tdGSoJUS5L4v28v38SP_b9aK1fey7rTFGbGHLRq4U",
+          "y": "PfBi56Jwfv1XKbeBEH-CWbGi-ZnwBcWHCL6XlkZAVCk"
+        }))
+        .unwrap();
+        assert_eq!(key, key_expected);
+
+        // Note: unlike other multi-codecs, this one is just meant to be resolved, not generated.
+        // thus no call to DIDKey.generate() here.
+    }
+
+    #[async_std::test]
+    async fn from_did_key_jwk_jcs_pub_invalid() {
+        // make an invalid jwk with jwk_jcs_pub multicodec, expect an invalid DID error back from resole()
+        let bad_jwk_key: String = String::from("{\"banana\":\"yum\"}");
+        let bad_did: String = String::from("did:key:")
+            + &multibase::encode(
+                multibase::Base::Base58Btc,
+                [
+                    DID_KEY_JWK_JCS_PUB_PREFIX.to_vec(),
+                    bad_jwk_key.as_bytes().to_vec(),
+                ]
+                .concat(),
+            );
+        println!("created did: ({})", bad_did);
+
+        // try resolving it - should error
+        let (res_meta, doc, doc_meta) = DIDKey
+            .resolve(bad_did.as_str(), &ResolutionInputMetadata::default())
+            .await;
+
+        assert_eq!(res_meta.error, Some(String::from(ERROR_INVALID_DID)));
+        assert_eq!(res_meta.content_type, None);
+        assert_eq!(doc, None);
+        assert!(doc_meta.is_none())
     }
 
     #[async_std::test]

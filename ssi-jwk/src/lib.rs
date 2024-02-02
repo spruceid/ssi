@@ -529,6 +529,7 @@ impl JWK {
                 multicodec::Codec::P384Pub => p384_parse(&k),
                 #[cfg(feature = "secp384r1")]
                 multicodec::Codec::P384Priv => p384_parse_private(&k),
+                multicodec::Codec::JWKJCSPub => jwk_jcs_parse(&k),
                 _ => Err(Error::MultibaseKeyPrefix),
             },
             Err(_) => Err(Error::MultibaseKeyPrefix),
@@ -969,6 +970,15 @@ fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
+/// handle the JWK JCS multicodec used by EBSI.  See https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person.
+fn jwk_jcs_parse(data: &[u8]) -> Result<JWK, Error> {
+    let json_result: Result<JWK, serde_json::Error> = serde_json::from_slice(data);
+    match json_result {
+        Ok(result) => Ok(result),
+        Err(_err) => Err(Error::MultibaseKeyPrefix),
+    }
+}
+
 /// Serialize a secp256k1 public key as a 33-byte string with point compression.
 #[cfg(feature = "secp256k1")]
 pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
@@ -1292,6 +1302,8 @@ impl From<Base64urlUInt> for Base64urlUIntString {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::multicodec::Codec::JWKJCSPub;
+    use num_traits::ToPrimitive;
 
     const RSA_JSON: &str = include_str!("../../tests/rsa2048-2020-08-25.json");
     const RSA_DER: &[u8] = include_bytes!("../../tests/rsa2048-2020-08-25.der");
@@ -1386,5 +1398,49 @@ mod tests {
         .unwrap();
         let thumbprint = key.thumbprint().unwrap();
         assert_eq!(thumbprint, "kcfv_I8tB4KY_ljAlRa1ip-y7jzbPdH0sUlCGb-1Jx8");
+    }
+
+    #[test]
+    fn from_multicodec_jwk_jcs_pub() {
+        // receive data indicating the jwk_jcs_pub and valid JWK
+        // expect the JWK to be parsed successfully
+        let multibase_multicodec_str = "z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kbs995rh8qKeDHQgTwf22MTWWYFWQKZPYDz7LLTA4orkBZBHxzasmpiz7wa9BkwwMcjtxm4RUqQNJptsy6NDuXWFNSyc86uaCmiyP1k1uL2xHChFhpU1MQpUmYhSrwrQr8u2";
+
+        let key_expected: JWK = serde_json::from_value(serde_json::json!({
+          "crv": "P-256",
+          "kty": "EC",
+          "x": "m5tdGSoJUS5L4v28v38SP_b9aK1fey7rTFGbGHLRq4U",
+          "y": "PfBi56Jwfv1XKbeBEH-CWbGi-ZnwBcWHCL6XlkZAVCk"
+        }))
+        .unwrap();
+
+        let result = JWK::from_multicodec(multibase_multicodec_str);
+        assert!(result.is_ok());
+        assert_eq!(key_expected, result.ok().unwrap());
+    }
+
+    #[test]
+    fn from_multicodec_jwk_jcs_pub_invalid() {
+        // receive data indicating the jwk_jcs_pub but the remaining bytes don't equate to a valid JWK
+        // expect to get back an error
+
+        let bad_jwk_key: String = String::from("{\"banana\":\"yum\"}");
+        let binding = &multibase::encode(
+            multibase::Base::Base58Btc,
+            [
+                unsigned_varint::encode::usize(
+                    JWKJCSPub.to_usize().unwrap(),
+                    &mut unsigned_varint::encode::usize_buffer(),
+                )
+                .to_vec(),
+                bad_jwk_key.as_bytes().to_vec(),
+            ]
+            .concat(),
+        );
+        let multibase_multicodec_str = binding.as_str();
+        println!("created string: ({})", multibase_multicodec_str);
+
+        let result = JWK::from_multicodec(multibase_multicodec_str);
+        assert!(result.is_err());
     }
 }

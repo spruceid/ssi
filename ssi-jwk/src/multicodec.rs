@@ -11,6 +11,7 @@ pub enum Codec {
     P384Pub = 0x1201,
     P521Pub = 0x1202,
     RSAPub = 0x1205,
+    JWKJCSPub = 0xeb51, // see: https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
     Ed25519Priv = 0x1300,
     Secp256k1Priv = 0x1301,
     RSAPriv = 0x1305,
