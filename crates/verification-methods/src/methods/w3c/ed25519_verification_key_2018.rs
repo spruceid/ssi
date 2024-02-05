@@ -3,16 +3,15 @@ use std::hash::Hash;
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_core::{Referencable, covariance_rule};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    SignatureError, SigningMethod, TypedVerificationMethod, VerificationError,
-    VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SignatureError,
+    SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 /// Ed25519 Verification Key 2018 type name.

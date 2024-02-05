@@ -2,14 +2,14 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_core::{Referencable, covariance_rule};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    SignatureError, TypedVerificationMethod, VerificationError, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SignatureError,
+    TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";

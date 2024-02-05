@@ -10,7 +10,7 @@ use crate::{Referencable, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureErro
 /// `M` is the verification method type.
 /// `B` is the cryptographic signature algorithm to be used with the verification method.
 /// `P` is the signature protocol.
-pub trait Signer<M: Referencable, B, P> {
+pub trait Signer<M: Referencable, B, P = ()> {
     #[allow(async_fn_in_trait)]
     async fn sign<
         'a,

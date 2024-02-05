@@ -6,7 +6,9 @@ use ssi_dids_core::{
         self,
         representation::{self, MediaType},
         DIDVerificationMethod,
-    }, resolution::{self, DIDMethodResolver, Error, Output}, DIDBuf, DIDMethod, DIDURLBuf, Document, DIDURL
+    },
+    resolution::{self, DIDMethodResolver, Error, Output},
+    DIDBuf, DIDMethod, DIDURLBuf, Document, DIDURL,
 };
 use static_iref::iri;
 use std::str::FromStr;
@@ -373,19 +375,19 @@ mod tests {
     use super::*;
     use iref::{IriBuf, UriBuf};
     use serde_json::json;
-    use ssi_dids_core::{did, DIDResolver, DIDVerifier};
-    use ssi_jwk::JWK;
     use ssi_claims::{
-        Verifiable,
         data_integrity::{
-            AnyInputContext, AnySuite, AnySuiteOptions,
-            CryptographicSuiteInput, DataIntegrity, ProofConfiguration,
             verification::{
                 method::{signer::SingleSecretSigner, ProofPurpose},
                 MethodReferenceOrOwned,
-            }
-        }
+            },
+            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
+            ProofConfiguration,
+        },
+        Verifiable,
     };
+    use ssi_dids_core::{did, DIDResolver, DIDVerifier};
+    use ssi_jwk::JWK;
     use static_iref::uri;
 
     #[test]

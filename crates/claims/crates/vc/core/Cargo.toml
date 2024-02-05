@@ -9,3 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
 [dependencies]
+iref.workspace = true
+static-iref.workspace = true
+chrono.workspace = true
+serde = { workspace = true, features = ["derive"] }

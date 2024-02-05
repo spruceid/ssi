@@ -6,7 +6,10 @@ use ssi_dids_core::{
         representation::{self, MediaType},
         verification_method::DIDVerificationMethod,
         VerificationRelationships,
-    }, json_ld::syntax::ContextEntry, resolution::{DIDMethodResolver, Error, Metadata, Options, Output}, DIDBuf, DIDMethod, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL
+    },
+    json_ld::syntax::ContextEntry,
+    resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
+    DIDBuf, DIDMethod, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
 };
 use ssi_jwk::JWK;
 use ssi_verification_methods::ProofPurposes;

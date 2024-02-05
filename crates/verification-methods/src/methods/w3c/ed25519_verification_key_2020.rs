@@ -4,15 +4,15 @@ use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use ssi_core::{Referencable, covariance_rule};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
+    TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 /// Ed25519 Verification Key 2020 type name.

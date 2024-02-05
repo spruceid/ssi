@@ -43,20 +43,14 @@ impl<C: Provable> Verifiable<C> {
         &mut self.proof
     }
 
-    pub async fn verify<V>(
-        &self,
-        verifiers: &V,
-    ) -> Result<ProofValidity, C::Error>
+    pub async fn verify<V>(&self, verifiers: &V) -> Result<ProofValidity, C::Error>
     where
-        C: VerifiableWith<V>
+        C: VerifiableWith<V>,
     {
         self.claims.verify_with(verifiers, &self.proof).await
     }
 
-    pub fn map<D: Provable>(
-        self,
-        f: impl FnOnce(C, C::Proof) -> (D, D::Proof),
-    ) -> Verifiable<D> {
+    pub fn map<D: Provable>(self, f: impl FnOnce(C, C::Proof) -> (D, D::Proof)) -> Verifiable<D> {
         let (claims, proof) = f(self.claims, self.proof);
 
         Verifiable { claims, proof }
@@ -71,10 +65,7 @@ impl<C: Provable> Verifiable<C> {
         Ok(Verifiable { claims, proof })
     }
 
-    pub async fn async_map<D: Provable, F>(
-        self,
-        f: impl FnOnce(C, C::Proof) -> F,
-    ) -> Verifiable<D>
+    pub async fn async_map<D: Provable, F>(self, f: impl FnOnce(C, C::Proof) -> F) -> Verifiable<D>
     where
         F: std::future::Future<Output = (D, D::Proof)>,
     {

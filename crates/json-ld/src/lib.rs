@@ -257,7 +257,7 @@ impl Loader<IriBuf> for StaticLoader {
         V: IriVocabularyMut<Iri = IriBuf>,
         //
         V: Send + Sync,
-        IriBuf: 'a + Send
+        IriBuf: 'a + Send,
     {
         async move {
             iri_match! {
@@ -386,8 +386,7 @@ impl ContextLoader {
             .into_iter()
             .map(
                 |(url, jsonld)| -> Result<(IriBuf, RemoteDocument), FromContextMapError> {
-                    let (doc, _) =
-                        json_syntax::Value::parse_str(&jsonld)?;
+                    let (doc, _) = json_syntax::Value::parse_str(&jsonld)?;
                     let iri = IriBuf::new(url)?;
                     let remote_doc = RemoteDocument::new(
                         Some(iri.clone()),
@@ -425,7 +424,7 @@ impl Loader<IriBuf> for ContextLoader {
         V: IriVocabularyMut<Iri = IriBuf>,
         //
         V: Send + Sync,
-        IriBuf: 'a + Send
+        IriBuf: 'a + Send,
     {
         async move {
             let url = match &mut self.static_loader {

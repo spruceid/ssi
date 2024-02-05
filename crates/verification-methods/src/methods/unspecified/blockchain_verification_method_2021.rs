@@ -2,12 +2,12 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_core::{covariance_rule, Referencable};
 use static_iref::iri;
-use ssi_core::{Referencable, covariance_rule};
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    TypedVerificationMethod, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
+    VerificationMethod,
 };
 
 // pub const BLOCKCHAIN_VERIFICATION_METHOD_2021_IRI: &Iri =

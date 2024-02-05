@@ -1,5 +1,5 @@
 //! DID Methods.
-//! 
+//!
 //! This library provides an interface for DIDs and
 //! implementations for various DID methods.
 

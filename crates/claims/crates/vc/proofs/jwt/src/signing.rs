@@ -1,22 +1,19 @@
 use json_ld::{
-    compaction::CompactMeta, context_processing::Processed, syntax::IntoJsonWithContext,
-    ContextLoader, ExpandedDocument, Indexed, Loader, Process, RemoteDocumentReference,
+    compaction::Compact, context_processing::Processed, syntax::IntoJsonWithContext,
+    ContextLoadError, ExpandedDocument, Indexed, Loader, Process, RemoteContextReference,
 };
 use json_syntax::Print;
 use linked_data::{AsRdfLiteral, LinkedDataResource, LinkedDataSubject};
-use locspan::Meta;
-use pin_project::pin_project;
 use rdf_types::{
     interpretation::{ReverseBlankIdInterpretation, ReverseIriInterpretation},
     Interpretation, ReverseLiteralInterpretation, VocabularyMut,
 };
-use ssi_core::futures::{RefFutureBinder, SelfRefFuture, UnboundedRefFuture};
-use ssi_crypto::{MessageSignatureError, MessageSigner};
-use ssi_vc::{vocab::VERIFIABLE_CREDENTIAL, Verifiable, CREDENTIALS_V1_CONTEXT_IRI};
-use ssi_verification_methods::{
-    covariance_rule, Referencable, SignatureAlgorithm, SignatureError, Signer, VerificationError,
-};
-use std::{future::Future, hash::Hash, marker::PhantomData};
+use ssi_claims_core::Verifiable;
+use ssi_core::{covariance_rule, Referencable};
+use ssi_crypto::MessageSigner;
+use ssi_vc_core::{vocab::VERIFIABLE_CREDENTIAL, CREDENTIALS_V1_CONTEXT_IRI};
+use ssi_verification_methods::{SignatureAlgorithm, SignatureError, Signer, VerificationError};
+use std::hash::Hash;
 
 use crate::{verification, Proof, VcJwt};
 
@@ -26,13 +23,13 @@ pub enum Error<C> {
     Signature(#[from] SignatureError),
 
     #[error("JSON-LD context loading failed")]
-    ContextLoadingFailed(C),
+    ContextLoadingFailed(ContextLoadError<C>),
 
     #[error("JSON-LD context processing failed")]
-    ContextProcessingFailed(json_ld::context_processing::MetaError<(), C>),
+    ContextProcessingFailed(json_ld::context_processing::Error<C>),
 
     #[error("JSON-LD compaction failed")]
-    CompactionFailed(json_ld::compaction::MetaError<(), C>),
+    CompactionFailed(json_ld::compaction::Error<C>),
 }
 
 /// JWT+LD signature options.
@@ -49,7 +46,7 @@ pub struct LdOptions<I> {
     /// in the credential. If the `add_credentials_v1_context` is set to `true`
     /// (by default) then the <https://www.w3.org/2018/credentials/v1> will be
     /// added to the context, even if `None` is passed.
-    pub context: Option<RemoteDocumentReference<I, (), json_ld::syntax::Context>>,
+    pub context: Option<RemoteContextReference<I>>,
 
     /// Specifies if the <https://www.w3.org/2018/credentials/v1> context is
     /// to be added to the compaction context (true by default).
@@ -97,68 +94,70 @@ pub struct VcJwtSignatureRef<'a> {
     pub signature_bytes: &'a [u8],
 }
 
-struct SignWithPayload<'a, S>(PhantomData<&'a S>);
+// struct SignWithPayload<'a, S>(PhantomData<&'a S>);
 
-impl<'a, S: 'a + MessageSigner<()>> UnboundedRefFuture<'a> for SignWithPayload<'a, S> {
-    type Owned = Vec<u8>;
+// impl<'a, S: 'a + MessageSigner<()>> UnboundedRefFuture<'a> for SignWithPayload<'a, S> {
+//     type Owned = Vec<u8>;
 
-    type Bound<'b> = S::Sign<'b> where 'a: 'b;
+//     type Bound<'b> = S::Sign<'b> where 'a: 'b;
 
-    type Output = Result<Vec<u8>, MessageSignatureError>;
-}
+//     type Output = Result<Vec<u8>, MessageSignatureError>;
+// }
 
-struct PayloadBinder<S> {
-    signer: S,
-}
+// struct PayloadBinder<S> {
+//     signer: S,
+// }
 
-impl<'a, S: 'a + MessageSigner<()>> RefFutureBinder<'a, SignWithPayload<'a, S>>
-    for PayloadBinder<S>
-{
-    fn bind<'b>(context: Self, payload: &'b Vec<u8>) -> S::Sign<'b>
-    where
-        'a: 'b,
-    {
-        context.signer.sign((), payload)
-    }
-}
+// impl<'a, S: 'a + MessageSigner<()>> RefFutureBinder<'a, SignWithPayload<'a, S>>
+//     for PayloadBinder<S>
+// {
+//     fn bind<'b>(context: Self, payload: &'b Vec<u8>) -> S::Sign<'b>
+//     where
+//         'a: 'b,
+//     {
+//         context.signer.sign((), payload)
+//     }
+// }
 
-#[pin_project]
-pub struct Sign<'a, S: 'a + MessageSigner<()>> {
-    header: Option<ssi_jws::Header>,
+// #[pin_project]
+// pub struct Sign<'a, S: 'a + MessageSigner<()>> {
+//     header: Option<ssi_jws::Header>,
 
-    #[pin]
-    inner: SelfRefFuture<'a, SignWithPayload<'a, S>>,
-}
+//     #[pin]
+//     inner: SelfRefFuture<'a, SignWithPayload<'a, S>>,
+// }
 
-impl<'a, S: 'a + MessageSigner<()>> Future for Sign<'a, S> {
-    type Output = Result<VcJwtSignature, SignatureError>;
+// impl<'a, S: 'a + MessageSigner<()>> Future for Sign<'a, S> {
+//     type Output = Result<VcJwtSignature, SignatureError>;
 
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        let this = self.project();
-        this.inner.poll(cx).map(|(result, _payload)| match result {
-            Ok(signature_bytes) => Ok(VcJwtSignature {
-                header: this.header.take().unwrap(),
-                signature_bytes,
-            }),
-            Err(e) => Err(e.into()),
-        })
-    }
-}
+//     fn poll(
+//         self: std::pin::Pin<&mut Self>,
+//         cx: &mut std::task::Context<'_>,
+//     ) -> std::task::Poll<Self::Output> {
+//         let this = self.project();
+//         this.inner.poll(cx).map(|(result, _payload)| match result {
+//             Ok(signature_bytes) => Ok(VcJwtSignature {
+//                 header: this.header.take().unwrap(),
+//                 signature_bytes,
+//             }),
+//             Err(e) => Err(e.into()),
+//         })
+//     }
+// }
 
 impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm {
     type Options = ();
 
     type Signature = VcJwtSignature;
 
+    type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
+
     type Protocol = ();
 
-    async fn sign<S: MessageSigner<()>>(
+    async fn sign<S: MessageSigner<ssi_jwk::Algorithm>>(
         &self,
-        options: (),
-        method: verification::AnyJwkMethodRef,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <verification::AnyJwkMethod as Referencable>::Reference<'_>,
         payload: &[u8],
         signer: S,
     ) -> Result<Self::Signature, SignatureError> {
@@ -173,15 +172,17 @@ impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm 
 
         let signing_bytes = header.encode_signing_bytes(payload);
 
-        Sign {
-            header: Some(header),
-            inner: SelfRefFuture::new(signing_bytes, PayloadBinder { signer }),
-        }
+        let signature_bytes = signer.sign(header.algorithm, (), &signing_bytes).await?;
+
+        Ok(VcJwtSignature {
+            header,
+            signature_bytes,
+        })
     }
 
     fn verify(
         &self,
-        options: (),
+        _options: (),
         signature: VcJwtSignatureRef,
         method: verification::AnyJwkMethodRef,
         bytes: &[u8],
@@ -202,39 +203,44 @@ impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm 
     }
 }
 
-impl<C: Sync> VcJwt<C> {
+impl<C> VcJwt<C> {
     /// Sign the given Linked Data credential.
     pub async fn sign_ld<V, I, L>(
         vocabulary: &mut V,
         interpretation: &mut I,
         loader: &mut L,
-        signer: &impl Signer<verification::AnyJwkMethod, ()>,
+        signer: &impl Signer<verification::AnyJwkMethod, ssi_jwk::Algorithm>,
         credential: C,
         signer_info: verification::Issuer,
         options: LdOptions<V::Iri>,
-    ) -> Result<Verifiable<Self>, Error<L::ContextError>>
+    ) -> Result<Verifiable<Self>, Error<L::Error>>
     where
-        V: VocabularyMut + Send + Sync,
-        V::Iri: Clone + Eq + Hash + Send + Sync,
-        V::BlankId: Clone + Eq + Hash + Send + Sync,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash,
+        V::BlankId: Clone + Eq + Hash,
         V::LanguageTag: Clone,
         V::Value: AsRdfLiteral<V>,
         I: Interpretation
             + ReverseIriInterpretation<Iri = V::Iri>
             + ReverseBlankIdInterpretation<BlankId = V::BlankId>
             + ReverseLiteralInterpretation<Literal = V::Literal>,
-        L: Loader<V::Iri, ()> + ContextLoader<V::Iri, ()> + Send + Sync,
-        C: LinkedDataSubject<V, I> + LinkedDataResource<V, I>,
+        L: Loader<V::Iri>,
+        C: LinkedDataSubject<I, V> + LinkedDataResource<I, V>,
+        //
+        V: Send + Sync,
+        V::Iri: Send + Sync,
+        V::BlankId: Send + Sync,
+        L: Send + Sync,
+        L::Error: Send,
+        C: Sync,
     {
         // Produce expanded JSON-LD payload.
-        let mut json_ld_vc = Meta::none(Indexed::none(
+        let mut json_ld_vc = Indexed::none(
             json_ld::ser::serialize_object_with(vocabulary, interpretation, &credential).unwrap(),
-        ));
+        );
         if let Some(node) = json_ld_vc.as_node_mut() {
-            node.type_entry_or_default((), ()).push(Meta(
-                json_ld::Id::iri(vocabulary.insert(VERIFIABLE_CREDENTIAL)),
-                (),
-            ));
+            node.types_mut_or_default()
+                .push(json_ld::Id::iri(vocabulary.insert(VERIFIABLE_CREDENTIAL)));
         }
 
         // Prepare compaction context.
@@ -248,7 +254,7 @@ impl<C: Sync> VcJwt<C> {
             ),
             None => {
                 if options.add_credentials_v1_context {
-                    Some(Meta(json_ld::syntax::Context::Many(Vec::new()), ()))
+                    Some(json_ld::syntax::Context::Many(Vec::new()))
                 } else {
                     None
                 }
@@ -277,8 +283,7 @@ impl<C: Sync> VcJwt<C> {
                 let mut json_ld_vc_doc = ExpandedDocument::new();
                 json_ld_vc_doc.insert(json_ld_vc);
                 json_ld_vc_doc
-                    .compact_full_meta(
-                        &(),
+                    .compact_full(
                         vocabulary,
                         active_context.as_ref(),
                         loader,
@@ -320,7 +325,7 @@ impl<C: Sync> VcJwt<C> {
 }
 
 fn add_credentials_v1_context(context: &mut json_ld::syntax::Context) {
-    fn is_credentials_v1_context<D>(context: &json_ld::syntax::ContextEntry<D>) -> bool {
+    fn is_credentials_v1_context(context: &json_ld::syntax::ContextEntry) -> bool {
         match context {
             json_ld::syntax::ContextEntry::IriRef(iri) => {
                 iri.as_iri_ref() == CREDENTIALS_V1_CONTEXT_IRI
@@ -330,34 +335,25 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::Context) {
     }
 
     match context {
-        json_ld::syntax::Context::One(Meta(c, _)) => {
+        json_ld::syntax::Context::One(c) => {
             if !is_credentials_v1_context(c) {
                 let c = std::mem::replace(c, json_ld::syntax::ContextEntry::Null);
                 *context = json_ld::syntax::Context::Many(vec![
-                    Meta(c, ()),
-                    Meta(
-                        json_ld::syntax::ContextEntry::IriRef(
-                            CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
-                        ),
-                        (),
+                    c,
+                    json_ld::syntax::ContextEntry::IriRef(
+                        CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
                     ),
                 ]);
             }
         }
         json_ld::syntax::Context::Many(list) => {
             if list.is_empty() {
-                *context = json_ld::syntax::Context::One(Meta(
-                    json_ld::syntax::ContextEntry::IriRef(
-                        CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
-                    ),
-                    (),
+                *context = json_ld::syntax::Context::One(json_ld::syntax::ContextEntry::IriRef(
+                    CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
                 ));
-            } else if list.iter().all(|Meta(c, _)| !is_credentials_v1_context(c)) {
-                list.push(Meta(
-                    json_ld::syntax::ContextEntry::IriRef(
-                        CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
-                    ),
-                    (),
+            } else if list.iter().all(|c| !is_credentials_v1_context(c)) {
+                list.push(json_ld::syntax::ContextEntry::IriRef(
+                    CREDENTIALS_V1_CONTEXT_IRI.to_owned().into(),
                 ))
             }
         }
@@ -369,63 +365,53 @@ fn add_credentials_v1_context(context: &mut json_ld::syntax::Context) {
 /// Some parts of the VC properties are standard JWT claims. This function moves
 /// them to the toplevel JWT claims, which is then returned. They will be
 /// moved back inside the `vc` claim upon decoding.
-fn build_vc_claims(mut vc: Meta<json_syntax::Value, ()>) -> json_syntax::Object {
+fn build_vc_claims(mut vc: json_syntax::Value) -> json_syntax::Object {
     let mut claims = json_syntax::Object::new();
     if let Some(vc) = vc.as_object_mut() {
         if let Some(value) = remove_id(vc, "issuer") {
-            claims.insert(Meta("iss".into(), ()), Meta(value.into(), ()));
+            claims.insert("iss".into(), value.into());
         }
 
         let issuance_date = claims.remove("issuance_date").next();
         if let Some(entry) = issuance_date {
-            claims.insert(Meta("iat".into(), ()), entry.value);
+            claims.insert("iat".into(), entry.value);
         }
 
         let expiration_date = claims.remove("expiration_date").next();
         if let Some(entry) = expiration_date {
-            claims.insert(Meta("exp".into(), ()), entry.value);
+            claims.insert("exp".into(), entry.value);
         }
 
         if let Some(value) = remove_id(vc, "credential_subject") {
-            claims.insert(Meta("sub".into(), ()), Meta(value.into(), ()));
+            claims.insert("sub".into(), value.into());
         }
 
         let id = claims.remove("id").next();
         if let Some(entry) = id {
-            claims.insert(Meta("jti".into(), ()), entry.value);
+            claims.insert("jti".into(), entry.value);
         }
     }
-    claims.insert(Meta("vc".into(), ()), vc);
+    claims.insert("vc".into(), vc);
     claims
 }
 
-fn remove_id(object: &mut json_syntax::Object<()>, key: &str) -> Option<String> {
+fn remove_id(object: &mut json_syntax::Object, key: &str) -> Option<String> {
     match object.get_mut(key).next() {
-        Some(Meta(value, ())) => match value {
+        Some(value) => match value {
             json_syntax::Value::String(_) => {
                 let entry: json_syntax::object::Entry = object.remove(key).next().unwrap();
-                Some(
-                    entry
-                        .into_value()
-                        .into_value()
-                        .into_string()
-                        .unwrap()
-                        .into_string(),
-                )
+                Some(entry.into_value().into_string().unwrap().into_string())
             }
             json_syntax::Value::Object(o) => {
                 let id_entry = o.remove("id").next();
                 match id_entry {
-                    Some(entry) => {
-                        let Meta(value, ()) = entry.value;
-                        match value {
-                            json_syntax::Value::String(id) => Some(id.into_string()),
-                            other => {
-                                o.insert(Meta("id".into(), ()), Meta(other, ()));
-                                None
-                            }
+                    Some(entry) => match entry.value {
+                        json_syntax::Value::String(id) => Some(id.into_string()),
+                        other => {
+                            o.insert("id".into(), other);
+                            None
                         }
-                    }
+                    },
                     None => None,
                 }
             }

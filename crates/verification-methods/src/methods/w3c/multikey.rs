@@ -4,13 +4,13 @@ use ed25519_dalek::Signer;
 use iref::{Iri, IriBuf, UriBuf};
 use rand_core_0_5::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_multicodec::MultiEncodedBuf;
 use static_iref::iri;
-use ssi_core::{Referencable, covariance_rule};
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    TypedVerificationMethod, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
+    VerificationMethod,
 };
 
 // /// IRI of the Multikey type.

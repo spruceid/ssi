@@ -2,14 +2,14 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
 use static_iref::iri;
-use ssi_core::{Referencable, covariance_rule};
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    SigningMethod, TypedVerificationMethod, VerificationError, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
+    TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
 pub const ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =

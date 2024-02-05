@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use ssi_claims_core::Provable;
+
 mod decode;
 mod encode;
 mod signing;
@@ -37,6 +39,10 @@ impl<C> Deref for VcJwt<C> {
     fn deref(&self) -> &Self::Target {
         &self.credential
     }
+}
+
+impl<C> Provable for VcJwt<C> {
+    type Proof = Proof;
 }
 
 /// JWS proof.

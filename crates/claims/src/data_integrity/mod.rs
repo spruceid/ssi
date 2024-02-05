@@ -1,4 +1,3 @@
-use std::hash::Hash;
 use linked_data::{
     LinkedData, LinkedDataDeserializeSubject, LinkedDataResource, LinkedDataSubject,
     RdfLiteralType, RdfLiteralValue,
@@ -11,6 +10,7 @@ use rdf_types::{
 };
 use ssi_claims_core::Verifiable;
 pub use ssi_vc_data_integrity::*;
+use std::hash::Hash;
 
 mod any;
 pub use any::*;
@@ -121,14 +121,15 @@ where
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     L: Send + Sync,
-    L::Error: Send
+    L::Error: Send,
 {
     use json_ld::syntax::Parse;
     let document = json_ld::RemoteDocumentReference::Loaded(json_ld::RemoteDocument::new(
         None,
         None,
         json_ld::syntax::Value::parse_str(content)
-            .map_err(|e| DecodeError::Input(JsonLdError::Syntax(e)))?.0,
+            .map_err(|e| DecodeError::Input(JsonLdError::Syntax(e)))?
+            .0,
     ));
 
     from_json_ld_with(
@@ -161,7 +162,7 @@ where
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     L: Send + Sync,
-    L::Error: Send
+    L::Error: Send,
 {
     from_json_ld_with(
         LinkedDataInput::from_generator(generator),
@@ -214,7 +215,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send
+    L::Error: Send,
 {
     DataIntegrity::from_json_ld_with(ld_context, loader, document, |ld| AnyInputContext {
         ld,
@@ -237,10 +238,7 @@ pub async fn deserialize_from_json_ld<'a, T, G: Generator, L>(
     eip712_types: impl 'a + eip712::TypesProvider,
     loader: &mut L,
     document: json_ld::RemoteDocumentReference,
-) -> Result<
-    Verifiable<DataIntegrity<T, AnySuite>>,
-    DecodeError<json_ld::ExpandError<L::Error>>,
->
+) -> Result<Verifiable<DataIntegrity<T, AnySuite>>, DecodeError<json_ld::ExpandError<L::Error>>>
 where
     Proof<AnySuite>: LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
     L: json_ld::Loader,
@@ -250,7 +248,7 @@ where
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     L: Send + Sync,
-    L::Error: Send
+    L::Error: Send,
 {
     DataIntegrity::deserialize_from_json_ld_with(
         LinkedDataInput::from_generator(generator),
@@ -278,10 +276,7 @@ pub async fn deserialize_from_json_ld_with<'a, T, I, V, L>(
     eip712_types: impl 'a + eip712::TypesProvider,
     loader: &mut L,
     document: json_ld::RemoteDocumentReference<V::Iri>,
-) -> Result<
-    Verifiable<DataIntegrity<T, AnySuite>>,
-    DecodeError<json_ld::ExpandError<L::Error>>,
->
+) -> Result<Verifiable<DataIntegrity<T, AnySuite>>, DecodeError<json_ld::ExpandError<L::Error>>>
 where
     I: InterpretationMut<V>
         + IriInterpretationMut<V::Iri>
@@ -307,7 +302,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send
+    L::Error: Send,
 {
     DataIntegrity::deserialize_from_json_ld_with(ld_context, loader, document, |ld| {
         AnyInputContext {

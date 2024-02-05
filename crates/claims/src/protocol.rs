@@ -57,7 +57,8 @@ impl ssi_crypto::SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol 
             Self::EthereumWallet => protocol::EthereumWallet.encode_signature(algorithm, signature),
             Self::TezosWallet => {
                 let algorithm: AnyBlake2b = algorithm.try_into()?;
-                ssi_vc_data_integrity::suite::tezos::TezosWallet.encode_signature(algorithm, signature)
+                ssi_vc_data_integrity::suite::tezos::TezosWallet
+                    .encode_signature(algorithm, signature)
             }
         }
     }

@@ -1,5 +1,4 @@
 use chrono::{DateTime, LocalResult, Utc};
-use grdf::IdentityAccess;
 use iref::IriBuf;
 use json_ld::{JsonLdProcessor, Loader, RemoteDocument, ToRdfError};
 use linked_data::{FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource};
@@ -7,14 +6,15 @@ use rdf_types::{
     IdInterpretationMut, Interpret, IriVocabulary, LanguageTagVocabulary, TermInterpretationMut,
     VocabularyMut,
 };
+use ssi_claims_core::Verifiable;
 use ssi_jws::{CompactJWSBuf, Header};
 use ssi_jwt::{JWTClaims, StringOrURI};
-use ssi_claims_core::Verifiable;
+use ssi_vc_core::datatype::VCDateTime;
 use std::hash::Hash;
 
 use crate::{verification, Proof, VcJwt};
 
-pub enum Error<L, C> {
+pub enum Error<E> {
     InvalidType(Option<String>),
     InvalidContentType(Option<String>),
     MissingCredential,
@@ -24,13 +24,13 @@ pub enum Error<L, C> {
     InvalidIssuer,
     InvalidDateTime,
     InvalidSubject,
-    Processing(ToRdfError<(), L, C>),
+    Processing(ToRdfError<E>),
     FromRdf(FromLinkedDataError),
     Base64(ssi_jws::Base64DecodeError),
     Json(serde_json::Error),
 }
 
-impl<L, C> From<ssi_jws::InvalidHeader> for Error<L, C> {
+impl<E> From<ssi_jws::InvalidHeader> for Error<E> {
     fn from(value: ssi_jws::InvalidHeader) -> Self {
         match value {
             ssi_jws::InvalidHeader::Base64(e) => Self::Base64(e),
@@ -39,63 +39,67 @@ impl<L, C> From<ssi_jws::InvalidHeader> for Error<L, C> {
     }
 }
 
-impl<L, C> From<ssi_jws::Base64DecodeError> for Error<L, C> {
+impl<E> From<ssi_jws::Base64DecodeError> for Error<E> {
     fn from(value: ssi_jws::Base64DecodeError) -> Self {
         Self::Base64(value)
     }
 }
 
-impl<L, C> From<serde_json::Error> for Error<L, C> {
+impl<E> From<serde_json::Error> for Error<E> {
     fn from(value: serde_json::Error) -> Self {
         Self::Json(value)
     }
 }
 
-impl<L, C> From<ToRdfError<(), L, C>> for Error<L, C> {
-    fn from(value: ToRdfError<(), L, C>) -> Self {
+impl<E> From<ToRdfError<E>> for Error<E> {
+    fn from(value: ToRdfError<E>) -> Self {
         Self::Processing(value)
     }
 }
 
-impl<L, C> From<FromLinkedDataError> for Error<L, C> {
+impl<E> From<FromLinkedDataError> for Error<E> {
     fn from(value: FromLinkedDataError) -> Self {
         Self::FromRdf(value)
     }
 }
 
-impl<L, C> From<InvalidId> for Error<L, C> {
+impl<E> From<InvalidId> for Error<E> {
     fn from(value: InvalidId) -> Self {
         Self::InvalidId(value.0)
     }
 }
 
-impl<C: Sync> VcJwt<C> {
+impl<C> VcJwt<C> {
     /// Decode a Linked Data credential encoded as a JSON Web Token.
     pub async fn decode_ld<V, I, L>(
         vocabulary: &mut V,
         interpretation: &mut I,
         loader: &mut L,
         jws: CompactJWSBuf,
-    ) -> Result<ssi_vc::Verifiable<Self>, Error<L::Error, L::ContextError>>
+    ) -> Result<Verifiable<Self>, Error<L::Error>>
     where
         V: VocabularyMut<
-                Type = rdf_types::literal::Type<
-                    <V as IriVocabulary>::Iri,
-                    <V as LanguageTagVocabulary>::LanguageTag,
-                >,
-                Value = String,
-            > + Sync
-            + Send,
-        V::Iri: Clone + Eq + Hash + Sync + Send,
-        V::BlankId: Clone + Eq + Hash + Sync + Send,
+            Type = rdf_types::literal::Type<
+                <V as IriVocabulary>::Iri,
+                <V as LanguageTagVocabulary>::LanguageTag,
+            >,
+            Value = String,
+        >,
+        V::Iri: Clone + Eq + Hash,
+        V::BlankId: Clone + Eq + Hash,
         V::Literal: Clone,
         I: TermInterpretationMut<V::Iri, V::BlankId, V::Literal>,
-        I::Resource: Eq + Hash + Sync + Send + LinkedDataResource<V, I>,
-        C: LinkedDataDeserializeSubject<V, I> + Send,
-        L: Loader<V::Iri, ()> + ContextLoader<V::Iri, ()> + Sync + Send,
-        L::Output: Into<json_syntax::Value>,
+        I::Resource: Eq + Hash + LinkedDataResource<I, V>,
+        C: LinkedDataDeserializeSubject<I, V>,
+        L: Loader<V::Iri>,
+        // required by `json-ld` (for now).
+        V: Sync + Send,
+        V::Iri: Sync + Send,
+        V::BlankId: Sync + Send,
+        I::Resource: Sync + Send,
+        C: Sync + Send,
+        L: Sync + Send,
         L::Error: Send,
-        L::ContextError: Send,
     {
         let header = jws.decode_header()?;
 
@@ -127,18 +131,14 @@ impl<C: Sync> VcJwt<C> {
                         .as_object_mut()
                         .ok_or(Error::CredentialIsNotAnObject)?,
                 )?;
-                let mut generator = rdf_types::generator::Blank::new().with_default_metadata();
-                let document = RemoteDocument::<V::Iri, (), json_syntax::Value>::new(
-                    None,
-                    None,
-                    Meta(credential, ()),
-                );
+                let mut generator = rdf_types::generator::Blank::new();
+                let document = RemoteDocument::<V::Iri>::new(None, None, credential);
                 let mut to_rdf = document
                     .to_rdf_with(vocabulary, &mut generator, loader)
                     .await?;
                 match to_rdf.document().objects().iter().next() {
                     Some(object) => match object.id() {
-                        Some(Meta(id, _)) => {
+                        Some(id) => {
                             let id = interpret_id(interpretation, id.clone())?;
                             let dataset: grdf::HashDataset<
                                 I::Resource,
@@ -153,7 +153,9 @@ impl<C: Sync> VcJwt<C> {
                             let credential = C::deserialize_subject(
                                 vocabulary,
                                 interpretation,
-                                &dataset.default_graph().view(&id, IdentityAccess),
+                                &dataset,
+                                dataset.default_graph(),
+                                &id,
                             )?;
                             let proof = Proof::new(jws.decode_signature()?, verification_method);
                             Ok(Verifiable::new(
@@ -183,10 +185,7 @@ fn interpret_id<T, B, I: IdInterpretationMut<T, B>>(
     }
 }
 
-fn build_issuer<L, C>(
-    header: &Header,
-    claims: &JWTClaims,
-) -> Result<verification::Issuer, Error<L, C>> {
+fn build_issuer<E>(header: &Header, claims: &JWTClaims) -> Result<verification::Issuer, Error<E>> {
     let issuer = match &claims.issuer {
         Some(StringOrURI::URI(issuer_uri)) => Some(IriBuf::new(issuer_uri.to_string()).unwrap()),
         Some(StringOrURI::String(_)) => return Err(Error::InvalidIssuer),
@@ -198,10 +197,10 @@ fn build_issuer<L, C>(
 
 /// Transform the JWT specific headers and claims according to
 /// <https://www.w3.org/TR/vc-data-model/#jwt-decoding>.
-fn add_claims_to_credential<L, C>(
+fn add_claims_to_credential<E>(
     claims: JWTClaims,
     cred: &mut json_syntax::Object,
-) -> Result<(), Error<L, C>> {
+) -> Result<(), Error<E>> {
     if let Some(exp) = claims.expiration_time {
         let exp_date_time: LocalResult<DateTime<Utc>> = exp.into();
         let value = exp_date_time
@@ -209,10 +208,7 @@ fn add_claims_to_credential<L, C>(
             .map(|time| VCDateTime::new(time.into(), true));
 
         if let Some(value) = value {
-            cred.insert(
-                Meta("expirationDate".into(), ()),
-                Meta(String::from(value).into(), ()),
-            );
+            cred.insert("expirationDate".into(), value.to_string().into());
         }
     }
 
@@ -223,20 +219,13 @@ fn add_claims_to_credential<L, C>(
                     .get_unique_mut("issuer")
                     .ok()
                     .flatten()
-                    .map(Meta::value_mut)
                     .and_then(json_syntax::Value::as_object_mut)
                 {
                     Some(issuer) => {
-                        issuer.insert(
-                            Meta("id".into(), ()),
-                            Meta(issuer_uri.to_string().into(), ()),
-                        );
+                        issuer.insert("id".into(), issuer_uri.to_string().into());
                     }
                     None => {
-                        cred.insert(
-                            Meta("issuer".into(), ()),
-                            Meta(issuer_uri.to_string().into(), ()),
-                        );
+                        cred.insert("issuer".into(), issuer_uri.to_string().into());
                     }
                 }
             }
@@ -251,10 +240,7 @@ fn add_claims_to_credential<L, C>(
             .map(|time| VCDateTime::new(time.into(), true));
 
         if let Some(value) = value {
-            cred.insert(
-                Meta("issuanceDate".into(), ()),
-                Meta(String::from(value).into(), ()),
-            );
+            cred.insert("issuanceDate".into(), value.to_string().into());
         }
     } else if let Some(nbf) = claims.not_before {
         let nbf_date_time: LocalResult<DateTime<Utc>> = nbf.into();
@@ -264,10 +250,7 @@ fn add_claims_to_credential<L, C>(
 
         match value {
             Some(value) => {
-                cred.insert(
-                    Meta("issuanceDate".into(), ()),
-                    Meta(String::from(value).into(), ()),
-                );
+                cred.insert("issuanceDate".into(), value.to_string().into());
             }
             None => return Err(Error::InvalidDateTime),
         }
@@ -280,17 +263,13 @@ fn add_claims_to_credential<L, C>(
                     .get_unique_mut("credentialSubject")
                     .ok()
                     .flatten()
-                    .map(Meta::value_mut)
                     .and_then(json_syntax::Value::as_object_mut)
                 {
                     Some(issuer) => {
-                        issuer.insert(Meta("id".into(), ()), Meta(sub_uri.to_string().into(), ()));
+                        issuer.insert("id".into(), sub_uri.to_string().into());
                     }
                     None => {
-                        cred.insert(
-                            Meta("credentialSubject".into(), ()),
-                            Meta(sub_uri.to_string().into(), ()),
-                        );
+                        cred.insert("credentialSubject".into(), sub_uri.to_string().into());
                     }
                 }
             }
@@ -301,7 +280,7 @@ fn add_claims_to_credential<L, C>(
     }
 
     if let Some(id) = claims.jwt_id {
-        cred.insert(Meta("id".into(), ()), Meta(id.into(), ()));
+        cred.insert("id".into(), id.into());
     }
 
     Ok(())

@@ -1,17 +1,20 @@
 use iref::{Iri, Uri, UriBuf};
+use json_patch::patch;
+use serde::Deserialize;
 use ssi_dids_core::{
     document::{
         self,
         representation::{self, MediaType},
         verification_method::ValueOrReference,
         DIDVerificationMethod, Resource, Service,
-    }, resolution::Error, resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter}, DIDBuf, DIDMethod, DIDResolver, DIDURLBuf, Document, DID, DIDURL
+    },
+    resolution::Error,
+    resolution::{self, Content, DIDMethodResolver, DerefError, Output, Parameter},
+    DIDBuf, DIDMethod, DIDResolver, DIDURLBuf, Document, DID, DIDURL,
 };
-use static_iref::iri;
-use json_patch::patch;
-use serde::Deserialize;
 use ssi_jwk::{p256_parse, secp256k1_parse, Base64urlUInt, OctetParams, Params, JWK};
 use ssi_jws::{decode_unverified, decode_verify};
+use static_iref::iri;
 use std::{collections::BTreeMap, future::Future};
 
 mod explorer;

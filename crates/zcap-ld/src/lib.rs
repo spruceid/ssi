@@ -1,5 +1,5 @@
 //! [ZCAP-LD][zcap-ld] implementation for SSI.
-//! 
+//!
 //! [zcap-ld]: <https://w3c-ccg.github.io/zcap-spec/>
 use std::collections::HashMap as Map;
 use std::convert::TryFrom;

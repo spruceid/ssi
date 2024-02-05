@@ -2,17 +2,17 @@ use did_tz::DIDTz;
 use iref::{IriBuf, UriBuf};
 use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
+use ssi_claims::{
+    data_integrity::{
+        verification::method::{signer::SingleSecretSigner, ProofPurpose},
+        AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
+        LinkedDataInput, ProofConfiguration,
+    },
+    Verifiable,
+};
 use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_claims::{
-    Verifiable,
-    data_integrity::{
-        verification::method::{signer::SingleSecretSigner, ProofPurpose},
-        CryptographicSuiteInput, DataIntegrity, LinkedDataInput, ProofConfiguration,
-        AnyInputContext, AnySuite, AnySuiteOptions
-    }
-};
 use static_iref::iri;
 
 const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";

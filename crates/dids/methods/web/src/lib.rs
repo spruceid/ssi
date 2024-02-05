@@ -1,6 +1,8 @@
 use http::header;
 use ssi_dids_core::{
-    document::representation::MediaType, resolution::{self, DIDMethodResolver, Error, Output}, DIDMethod
+    document::representation::MediaType,
+    resolution::{self, DIDMethodResolver, Error, Output},
+    DIDMethod,
 };
 
 pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
@@ -135,10 +137,12 @@ impl DIDMethodResolver for DIDWeb {
 #[cfg(test)]
 mod tests {
     use iref::IriBuf;
+    use ssi_claims::data_integrity::{
+        verification::method::{signer::SingleSecretSigner, ProofPurpose},
+        AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
+    };
     use ssi_dids_core::{did, DIDResolver, DIDVerifier, Document};
     use ssi_jwk::JWK;
-    use ssi_claims::data_integrity::{verification::method::{signer::SingleSecretSigner, ProofPurpose},
-    CryptographicSuiteInput, ProofConfiguration,AnyInputContext, AnySuite};
     use static_iref::iri;
 
     use super::*;

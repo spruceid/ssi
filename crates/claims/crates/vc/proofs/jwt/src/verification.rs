@@ -1,59 +1,44 @@
-use std::{future::Future, pin::Pin, task};
-
 use iref::{Iri, IriBuf};
-use pin_project::pin_project;
+use ssi_claims_core::{ProofValidity, VerifiableWith};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
-use ssi_vc::{ProofValidity, VerifiableWith};
 use ssi_verification_methods::{
-    covariance_rule, ProofPurpose, Referencable, ReferenceOrOwnedRef, VerificationError,
-    VerificationMethod, VerificationMethodRef, Verifier,
+    ProofPurpose, ReferenceOrOwnedRef, VerificationError, VerificationMethod, Verifier,
 };
-// use treeldr_rust_prelude::iref::{Iri, IriBuf};
 
 use crate::{
     signing::{VcJwtSignatureAlgorithm, VcJwtSignatureRef},
     Proof, VcJwt,
 };
 
-impl<C: Sync> VerifiableWith for VcJwt<C> {
-    type Proof = Proof;
-    type Method = AnyJwkMethod;
+impl<C, V> VerifiableWith<V> for VcJwt<C>
+where
+    V: Verifier<AnyJwkMethod>,
+{
+    type Error = VerificationError;
 
-    type VerifyWith<'a, V: 'a + Verifier<Self::Method>> = VerifyWith<'a, V> where Self: 'a;
-
-    fn verify_with<'a, V: Verifier<Self::Method>>(
+    async fn verify_with<'a>(
         &'a self,
         verifier: &'a V,
         proof: &'a Proof,
-    ) -> Self::VerifyWith<'a, V> {
+    ) -> Result<ProofValidity, VerificationError> {
         let signature = VcJwtSignatureRef {
             header: &self.header,
             signature_bytes: &proof.signature,
         };
 
-        VerifyWith(verifier.verify(
-            VcJwtSignatureAlgorithm::default(),
-            (),
-            proof.issuer.id(),
-            proof.issuer.method_reference(),
-            ProofPurpose::Assertion,
-            &self.payload,
-            signature,
-        ))
-    }
-}
-
-#[pin_project]
-pub struct VerifyWith<'a, V: Verifier<AnyJwkMethod>>(
-    #[pin] ssi_verification_methods::Verify<'a, AnyJwkMethod, V, VcJwtSignatureAlgorithm>,
-);
-
-impl<'a, V: Verifier<AnyJwkMethod>> Future for VerifyWith<'a, V> {
-    type Output = Result<ProofValidity, VerificationError>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let this = self.project();
-        this.0.poll(cx).map_ok(Into::into)
+        verifier
+            .verify(
+                VcJwtSignatureAlgorithm::default(),
+                (),
+                proof.issuer.id(),
+                proof.issuer.method_reference(),
+                ProofPurpose::Assertion,
+                &self.payload,
+                signature,
+            )
+            .await
+            .map(Into::into)
     }
 }
 
@@ -90,6 +75,14 @@ impl VerificationMethod for AnyJwkMethod {
     fn controller(&self) -> Option<&Iri> {
         self.controller.as_ref().map(IriBuf::as_iri)
     }
+
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
+        r.id
+    }
+
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
+        r.controller
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -99,16 +92,6 @@ pub struct AnyJwkMethodRef<'a> {
     pub controller: Option<&'a Iri>,
 
     pub public_key_jwk: &'a JWK,
-}
-
-impl<'a> VerificationMethodRef<'a> for AnyJwkMethodRef<'a> {
-    fn id(&self) -> &'a Iri {
-        self.id
-    }
-
-    fn controller(&self) -> Option<&'a Iri> {
-        self.controller
-    }
 }
 
 /// Issuer.

@@ -2,13 +2,13 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use static_iref::iri;
-use ssi_core::{Referencable, covariance_rule};
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    SignatureError, TypedVerificationMethod, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SignatureError,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";

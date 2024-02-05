@@ -3,14 +3,14 @@ use std::{borrow::Cow, hash::Hash};
 use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_core::{Referencable, covariance_rule};
+use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
+    VerificationError, VerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";

@@ -8,8 +8,7 @@ use ssi_vc_data_integrity::{
     CryptographicSuite, ProofConfigurationRef,
 };
 use ssi_verification_methods::{
-    ReferenceOrOwned, SignatureAlgorithm, SignatureError, SigningMethod,
-    VerificationError,
+    ReferenceOrOwned, SignatureAlgorithm, SignatureError, SigningMethod, VerificationError,
 };
 
 use super::{AnySuiteOptions, AnySuiteOptionsRef, Transformed};

@@ -1,7 +1,7 @@
+use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_vc_data_integrity::suite::{CryptographicSuiteOptions, InvalidOptions};
-use ssi_core::{covariance_rule, Referencable};
 
 use super::AnySuite;
 
@@ -37,7 +37,8 @@ pub struct AnySuiteOptions {
     #[ld("eip712v0.1:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "eip712Domain")]
-    pub eip712_v0_1: Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::v0_1::Eip712Options>,
+    pub eip712_v0_1:
+        Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::v0_1::Eip712Options>,
 }
 
 impl AnySuiteOptions {
@@ -46,7 +47,8 @@ impl AnySuiteOptions {
     }
 
     pub fn with_public_key(self, jwk: JWK) -> Result<Self, ssi_jws::Error> {
-        let public_key_multibase = Some(ssi_vc_data_integrity::suite::tezos::encode_jwk_to_multibase(&jwk)?);
+        let public_key_multibase =
+            Some(ssi_vc_data_integrity::suite::tezos::encode_jwk_to_multibase(&jwk)?);
         Ok(Self {
             public_key_jwk: Some(Box::new(jwk)),
             public_key_multibase,
@@ -68,8 +70,12 @@ impl From<Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::E
     }
 }
 
-impl From<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options> for AnySuiteOptions {
-    fn from(value: ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options) -> Self {
+impl From<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options>
+    for AnySuiteOptions
+{
+    fn from(
+        value: ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
+    ) -> Self {
         Self {
             eip712: Some(value.clone()),
             ..Default::default()
@@ -123,10 +129,12 @@ pub struct AnySuiteOptionsRef<'a> {
 
     pub public_key_multibase: Option<&'a Multibase>,
 
-    pub eip712: Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712OptionsRef<'a>>,
+    pub eip712:
+        Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712OptionsRef<'a>>,
 
-    pub eip712_v0_1:
-        Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::v0_1::Eip712OptionsRef<'a>>,
+    pub eip712_v0_1: Option<
+        ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::v0_1::Eip712OptionsRef<'a>,
+    >,
 }
 
 impl<'a> From<AnySuiteOptionsRef<'a>> for () {

@@ -1,7 +1,7 @@
-mod options;
 mod input;
+mod options;
 mod suite;
 
-pub use options::*;
 pub use input::*;
+pub use options::*;
 pub use suite::*;

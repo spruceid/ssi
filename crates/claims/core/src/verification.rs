@@ -1,24 +1,18 @@
 use crate::Verifiable;
 
-/// Verifier.
-pub trait Verifier<M> {
-    /// Verification error.
-    type Error;
-}
-
 /// Credential verifiable with a proof of type `Self::Proof`.
 pub trait Provable {
     type Proof;
 
     fn with_proof(self, proof: Self::Proof) -> Verifiable<Self>
     where
-        Self: Sized
+        Self: Sized,
     {
         Verifiable::new(self, proof)
     }
 }
 
-/// Credential verifiable using a verification method of type `Self::Method`.
+/// Credential verifiable using a verifier of type `V`.
 pub trait VerifiableWith<V>: Provable {
     /// Error that can occur during verification.
     type Error;

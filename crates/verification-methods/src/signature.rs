@@ -1,9 +1,7 @@
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
 
-use crate::{
-    InvalidVerificationMethod, VerificationError, VerificationMethodResolutionError,
-};
+use crate::{InvalidVerificationMethod, VerificationError, VerificationMethodResolutionError};
 
 pub mod signer;
 
