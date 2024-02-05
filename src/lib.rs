@@ -198,7 +198,7 @@
 // pub use ssi_sd_jwt as sd_jwt;
 // pub use ssi_tzkey as tzkey;
 // pub use ssi_ucan as ucan;
-pub use ssi_vc as vc;
+pub use ssi_claims as claims;
 // #[deprecated = "Use ssi::vc::revocation"]
 // pub use ssi_vc::revocation;
 // pub use ssi_zcap_ld as zcap;

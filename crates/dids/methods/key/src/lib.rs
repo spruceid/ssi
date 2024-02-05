@@ -369,7 +369,7 @@ mod tests {
     use rand_chacha::rand_core::SeedableRng as SeedableRngOld;
     use rand_chacha_old::rand_core::SeedableRng;
     use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier, DIDURL};
-    use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
+    use ssi_claims::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
     use ssi_vc_data_integrity::{
         verification::{
             method::{signer::SingleSecretSigner, ProofPurpose},

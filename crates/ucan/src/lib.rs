@@ -13,7 +13,6 @@ use serde_with::{
     base64::{Base64, UrlSafe},
     serde_as, DisplayFromStr,
 };
-use ssi_core::uri::URI;
 use ssi_dids_core::{
     did_resolve::{dereference, Content, DIDResolver},
     Document, Resource, VerificationMethod, VerificationMethodMap,

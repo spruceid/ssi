@@ -1,5 +1,6 @@
 use linked_data::{
-    LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfLiteralValue
+    LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
+    RdfLiteralValue,
 };
 
 use iref::{Iri, IriBuf};
@@ -184,8 +185,9 @@ where
     V::Value: RdfLiteralValue,
 {
     fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-        where
-            S: linked_data::Visitor<I, V> {
+    where
+        S: linked_data::Visitor<I, V>,
+    {
         visitor.default_graph(self)?;
         visitor.end()
     }

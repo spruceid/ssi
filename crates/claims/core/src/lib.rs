@@ -3,11 +3,13 @@ use educe::Educe;
 mod verification;
 pub use verification::*;
 
+/// Claims serialization utils.
+#[cfg(feature = "serde")]
+pub mod serde;
+
+/// Claims data-integrity serialization utils.
 #[cfg(feature = "linked-data")]
 pub mod linked_data;
-
-// pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =
-//     static_iref::iri!("https://www.w3.org/2018/credentials/v1");
 
 /// Verifiable claims.
 #[derive(Educe)]

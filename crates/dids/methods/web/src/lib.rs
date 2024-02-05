@@ -137,11 +137,8 @@ mod tests {
     use iref::IriBuf;
     use ssi_dids_core::{did, DIDResolver, DIDVerifier, Document};
     use ssi_jwk::JWK;
-    use ssi_top::data_integrity::{AnyInputContext, AnySuite};
-    use ssi_vc_data_integrity::{
-        verification::method::{signer::SingleSecretSigner, ProofPurpose},
-        CryptographicSuiteInput, ProofConfiguration,
-    };
+    use ssi_claims::data_integrity::{verification::method::{signer::SingleSecretSigner, ProofPurpose},
+    CryptographicSuiteInput, ProofConfiguration,AnyInputContext, AnySuite};
     use static_iref::iri;
 
     use super::*;

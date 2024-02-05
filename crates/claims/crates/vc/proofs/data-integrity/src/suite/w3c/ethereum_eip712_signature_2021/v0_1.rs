@@ -1,5 +1,4 @@
 use lazy_static::lazy_static;
-use locspan::Meta;
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_verification_methods::SignatureError;
@@ -15,9 +14,9 @@ use super::{Transform, VerificationMethod, VerificationMethodRef};
 
 lazy_static! {
     static ref PROOF_CONTEXT: json_ld::syntax::Context = {
-        json_ld::syntax::Context::One(Meta::none(json_ld::syntax::ContextEntry::IriRef(
+        json_ld::syntax::Context::One(json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld").to_owned(),
-        )))
+        ))
     };
 }
 

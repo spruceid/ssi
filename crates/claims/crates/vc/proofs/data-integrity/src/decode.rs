@@ -218,18 +218,16 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         loader: &mut L,
         document: json_ld::RemoteDocumentReference,
         make_context: impl FnOnce(LinkedDataInput<interpretation::WithGenerator<G>>) -> X,
-    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>>
+    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<L::Error>>>
     where
         Proof<S>: LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
         T: LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
         S: CryptographicSuiteInput<T, X>,
-        L: json_ld::Loader + json_ld::ContextLoader,
-        L::Output: Into<json_ld::syntax::Value>,
+        L: json_ld::Loader,
         // TODO those bounds are required because of `json-ld`, and can't be
         //      avoided until `async fn` in traits are stabilized.
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send,
     {
         Self::deserialize_from_json_ld_with(
             LinkedDataInput::from_generator(generator),
@@ -254,7 +252,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         loader: &mut L,
         document: json_ld::RemoteDocumentReference<V::Iri>,
         make_context: impl FnOnce(LinkedDataInput<I, V>) -> X,
-    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>>
+    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<L::Error>>>
     where
         I: InterpretationMut<V>
             + IriInterpretationMut<V::Iri>
@@ -270,8 +268,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         Proof<S>: LinkedDataDeserializeSubject<I, V>,
         T: LinkedDataDeserializeSubject<I, V>,
         S: CryptographicSuiteInput<T, X>,
-        L: json_ld::Loader<V::Iri> + json_ld::ContextLoader<V::Iri>,
-        L::Output: Into<json_ld::syntax::Value>,
+        L: json_ld::Loader<V::Iri>,
         // TODO those bounds are required because of `json-ld`, and can't be
         //      avoided until `async fn` in traits are stabilized.
         V: Send + Sync,
@@ -279,7 +276,6 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
         V::BlankId: Send + Sync,
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send,
     {
         Self::from_linked_data_with(
             ld_context,
@@ -305,17 +301,15 @@ impl<S: CryptographicSuite> DataIntegrity<json_ld::Document, S> {
         loader: &mut L,
         document: json_ld::RemoteDocumentReference,
         make_context: impl FnOnce(LinkedDataInput<interpretation::WithGenerator<G>>) -> X,
-    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>>
+    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<L::Error>>>
     where
         Proof<S>: LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
         S: CryptographicSuiteInput<json_ld::Document, X>,
-        L: json_ld::Loader + json_ld::ContextLoader,
-        L::Output: Into<json_ld::syntax::Value>,
+        L: json_ld::Loader,
         // TODO those bounds are required because of `json-ld`, and can't be
         //      avoided until `async fn` in traits are stabilized.
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send,
     {
         Self::from_json_ld_with(
             LinkedDataInput::new((), interpretation::WithGenerator::new((), generator)),
@@ -342,7 +336,7 @@ impl<Iri, B, S: CryptographicSuite> DataIntegrity<json_ld::Document<Iri, B>, S> 
         loader: &mut L,
         document: json_ld::RemoteDocumentReference<V::Iri>,
         make_context: impl FnOnce(LinkedDataInput<I, V>) -> X,
-    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>>
+    ) -> Result<Verifiable<Self>, DecodeError<json_ld::ExpandError<L::Error>>>
     where
         I: InterpretationMut<V>
             + IriInterpretationMut<Iri>
@@ -357,8 +351,7 @@ impl<Iri, B, S: CryptographicSuite> DataIntegrity<json_ld::Document<Iri, B>, S> 
         V::LanguageTag: Clone,
         Proof<S>: LinkedDataDeserializeSubject<I, V>,
         S: CryptographicSuiteInput<json_ld::Document<Iri, B>, X>,
-        L: json_ld::Loader<Iri> + json_ld::ContextLoader<Iri>,
-        L::Output: Into<json_ld::syntax::Value>,
+        L: json_ld::Loader<Iri>,
         // TODO those bounds are required because of `json-ld`, and can't be
         //      avoided until `async fn` in traits are stabilized.
         V: Send + Sync,
@@ -366,7 +359,6 @@ impl<Iri, B, S: CryptographicSuite> DataIntegrity<json_ld::Document<Iri, B>, S> 
         B: Send + Sync,
         L: Send + Sync,
         L::Error: Send,
-        L::ContextError: Send,
     {
         Self::from_linked_data_with(ld_context, JsonLdInput::new(loader, document), make_context)
             .await

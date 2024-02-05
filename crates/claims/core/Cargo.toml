@@ -9,7 +9,14 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
 [features]
-default = ["linked-data"]
+default = ["serde", "linked-data"]
+
+## Compatibility layer with the [`serde`] library.
+##
+## Adds claims serialization utilities.
+## 
+## [`serde`]: <https://serde.rs/>
+serde = ["dep:serde"]
 
 ## Compatibility layer with the [`linked-data`] library.
 ##
@@ -23,4 +30,5 @@ ssi-core.workspace = true
 educe.workspace = true
 thiserror.workspace = true
 
+serde = { workspace = true, optional = true }
 linked-data = { workspace = true, optional = true }

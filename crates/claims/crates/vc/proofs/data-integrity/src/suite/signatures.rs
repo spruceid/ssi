@@ -73,7 +73,14 @@ pub struct AnySignatureRef<'a> {
 }
 
 /// Common signature format where the proof value is multibase-encoded.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    serde::Serialize,
+    serde::Deserialize,
+    linked_data::Serialize,
+    linked_data::Deserialize,
+)]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
 pub struct MultibaseSignature {
     /// Multibase encoded signature.

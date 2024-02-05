@@ -104,6 +104,7 @@ ssi-caips = { path = "./crates/caips", version = "0.1" }
 
 # Verifiable Claims
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1" }
+ssi-vc-core = { path = "./crates/claims/crates/vc/core", version = "0.1" }
 ssi-vc-data-integrity = { path = "./crates/claims/crates/vc/proofs/data-integrity", version = "0.3" }
 ssi-claims = { path = "./crates/claims", version = "0.1" }
 
@@ -128,7 +129,7 @@ rdf-types = "0.18.3"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
 locspan = "0.8"
-json-syntax = "0.10"
+json-syntax = "0.11.2"
 nquads-syntax = "0.17"
 multibase = "0.9.1"
 # json-ld = "0.15"

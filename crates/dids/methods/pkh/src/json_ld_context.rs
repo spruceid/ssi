@@ -6,7 +6,7 @@ use ssi_dids_core::{
             term_definition::{Expanded, Id, Type, TypeKeyword},
             TermDefinition,
         },
-        Entry, Nullable,
+        Nullable,
     },
 };
 use static_iref::iri;
@@ -155,12 +155,12 @@ impl JsonLdContext {
             def.bindings.insert(
                 "publicKeyJwk".into(),
                 Nullable::Some(TermDefinition::Expanded(Box::new(Expanded {
-                    id: Some(Entry::new(Nullable::Some(Id::Term(
+                    id: Some(Nullable::Some(Id::Term(
                         iri!("https://w3id.org/security#publicKeyJwk")
                             .to_owned()
                             .into_string(),
-                    )))),
-                    type_: Some(Entry::new(Nullable::Some(Type::Keyword(TypeKeyword::Json)))),
+                    ))),
+                    type_: Some(Nullable::Some(Type::Keyword(TypeKeyword::Json))),
                     ..Default::default()
                 }))),
             );

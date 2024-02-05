@@ -1,16 +1,8 @@
-mod input;
-mod options;
-mod suite;
-
 use std::hash::Hash;
-
-pub use input::*;
 use linked_data::{
     LinkedData, LinkedDataDeserializeSubject, LinkedDataResource, LinkedDataSubject,
     RdfLiteralType, RdfLiteralValue,
 };
-use locspan::Meta;
-pub use options::*;
 use rdf_types::{
     interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
     BlankIdInterpretationMut, ExportedFromVocabulary, Generator, InterpretationMut,
@@ -18,8 +10,10 @@ use rdf_types::{
     ReverseLiteralInterpretation, Vocabulary, VocabularyMut,
 };
 use ssi_claims_core::Verifiable;
-use ssi_vc_data_integrity::{eip712, DataIntegrity, DataIntegrityInput, DecodeError, LinkedDataInput, Proof};
-pub use suite::*;
+pub use ssi_vc_data_integrity::*;
+
+mod any;
+pub use any::*;
 
 pub async fn from_linked_data<G: Generator, U>(
     generator: G,
@@ -74,18 +68,12 @@ where
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum JsonLdError<
-    E = ssi_json_ld::UnknownContext,
-    C = json_ld::ContextLoaderError<
-        ssi_json_ld::UnknownContext,
-        Meta<json_ld::ExtractContextError>,
-    >,
-> {
+pub enum JsonLdError<E = ssi_json_ld::UnknownContext> {
     #[error(transparent)]
-    Syntax(json_ld::syntax::parse::Error<()>),
+    Syntax(json_ld::syntax::parse::Error),
 
     #[error(transparent)]
-    Expansion(json_ld::ExpandError<(), E, C>),
+    Expansion(json_ld::ExpandError<E>),
 }
 
 pub type AnyVerifiableJsonLd = Verifiable<DataIntegrity<json_ld::Document, AnySuite>>;
@@ -127,22 +115,20 @@ pub async fn from_json_ld_str<'a, G: Generator, L>(
     eip712_types: impl 'a + eip712::TypesProvider,
     loader: &mut L,
     content: &str,
-) -> Result<AnyVerifiableJsonLd, DecodeError<JsonLdError<L::Error, L::ContextError>>>
+) -> Result<AnyVerifiableJsonLd, DecodeError<JsonLdError<L::Error>>>
 where
-    L: json_ld::Loader + json_ld::ContextLoader,
-    L::Output: Into<json_ld::syntax::Value>,
+    L: json_ld::Loader,
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     L: Send + Sync,
-    L::Error: Send,
-    L::ContextError: Send,
+    L::Error: Send
 {
     use json_ld::syntax::Parse;
     let document = json_ld::RemoteDocumentReference::Loaded(json_ld::RemoteDocument::new(
         None,
         None,
-        json_ld::syntax::Value::parse_str(content, |_| ())
-            .map_err(|e| DecodeError::Input(JsonLdError::Syntax(e.into_value())))?,
+        json_ld::syntax::Value::parse_str(content)
+            .map_err(|e| DecodeError::Input(JsonLdError::Syntax(e)))?.0,
     ));
 
     from_json_ld_with(
@@ -169,15 +155,13 @@ pub async fn from_json_ld<'a, G: Generator, L>(
     eip712_types: impl 'a + eip712::TypesProvider,
     loader: &mut L,
     document: json_ld::RemoteDocumentReference,
-) -> Result<AnyVerifiableJsonLd, DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>>
+) -> Result<AnyVerifiableJsonLd, DecodeError<json_ld::ExpandError<L::Error>>>
 where
-    L: json_ld::Loader + json_ld::ContextLoader,
-    L::Output: Into<json_ld::syntax::Value>,
+    L: json_ld::Loader,
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     L: Send + Sync,
-    L::Error: Send,
-    L::ContextError: Send,
+    L::Error: Send
 {
     from_json_ld_with(
         LinkedDataInput::from_generator(generator),
@@ -204,7 +188,7 @@ pub async fn from_json_ld_with<'a, I, V, L>(
     document: json_ld::RemoteDocumentReference<V::Iri>,
 ) -> Result<
     Verifiable<DataIntegrity<json_ld::Document<V::Iri, V::BlankId>, AnySuite>>,
-    DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>,
+    DecodeError<json_ld::ExpandError<L::Error>>,
 >
 where
     I: InterpretationMut<V>
@@ -223,16 +207,14 @@ where
     V::Type: RdfLiteralType<V>,
     V::LanguageTag: Clone,
     Proof<AnySuite>: LinkedDataDeserializeSubject<I, V>,
-    L: json_ld::Loader<V::Iri> + json_ld::ContextLoader<V::Iri>,
-    L::Output: Into<json_ld::syntax::Value>,
+    L: json_ld::Loader<V::Iri>,
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     V: Send + Sync,
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
-    L::ContextError: Send,
+    L::Error: Send
 {
     DataIntegrity::from_json_ld_with(ld_context, loader, document, |ld| AnyInputContext {
         ld,
@@ -257,20 +239,18 @@ pub async fn deserialize_from_json_ld<'a, T, G: Generator, L>(
     document: json_ld::RemoteDocumentReference,
 ) -> Result<
     Verifiable<DataIntegrity<T, AnySuite>>,
-    DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>,
+    DecodeError<json_ld::ExpandError<L::Error>>,
 >
 where
     Proof<AnySuite>: LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
-    L: json_ld::Loader + json_ld::ContextLoader,
-    L::Output: Into<json_ld::syntax::Value>,
+    L: json_ld::Loader,
     T: serde::Serialize
         + LinkedData<interpretation::WithGenerator<G>>
         + LinkedDataDeserializeSubject<interpretation::WithGenerator<G>>,
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
     L: Send + Sync,
-    L::Error: Send,
-    L::ContextError: Send,
+    L::Error: Send
 {
     DataIntegrity::deserialize_from_json_ld_with(
         LinkedDataInput::from_generator(generator),
@@ -300,7 +280,7 @@ pub async fn deserialize_from_json_ld_with<'a, T, I, V, L>(
     document: json_ld::RemoteDocumentReference<V::Iri>,
 ) -> Result<
     Verifiable<DataIntegrity<T, AnySuite>>,
-    DecodeError<json_ld::ExpandError<(), L::Error, L::ContextError>>,
+    DecodeError<json_ld::ExpandError<L::Error>>,
 >
 where
     I: InterpretationMut<V>
@@ -319,8 +299,7 @@ where
     V::Type: RdfLiteralType<V>,
     V::LanguageTag: Clone,
     Proof<AnySuite>: LinkedDataDeserializeSubject<I, V>,
-    L: json_ld::Loader<V::Iri> + json_ld::ContextLoader<V::Iri>,
-    L::Output: Into<json_ld::syntax::Value>,
+    L: json_ld::Loader<V::Iri>,
     T: serde::Serialize + LinkedData<I, V> + LinkedDataDeserializeSubject<I, V>,
     // TODO those bounds are required because of `json-ld`, and can't be
     //      avoided until `async fn` in traits are stabilized.
@@ -328,8 +307,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
-    L::ContextError: Send,
+    L::Error: Send
 {
     DataIntegrity::deserialize_from_json_ld_with(ld_context, loader, document, |ld| {
         AnyInputContext {

@@ -375,14 +375,16 @@ mod tests {
     use serde_json::json;
     use ssi_dids_core::{did, DIDResolver, DIDVerifier};
     use ssi_jwk::JWK;
-    use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
-    use ssi_vc::Verifiable;
-    use ssi_vc_data_integrity::{
-        verification::{
-            method::{signer::SingleSecretSigner, ProofPurpose},
-            MethodReferenceOrOwned,
-        },
-        CryptographicSuiteInput, DataIntegrity, ProofConfiguration,
+    use ssi_claims::{
+        Verifiable,
+        data_integrity::{
+            AnyInputContext, AnySuite, AnySuiteOptions,
+            CryptographicSuiteInput, DataIntegrity, ProofConfiguration,
+            verification::{
+                method::{signer::SingleSecretSigner, ProofPurpose},
+                MethodReferenceOrOwned,
+            }
+        }
     };
     use static_iref::uri;
 
@@ -674,7 +676,7 @@ mod tests {
     #[tokio::test]
     async fn credential_verify_eip712vm() {
         let didethr = DIDVerifier::new(DIDEthr);
-        let vc = ssi_top::data_integrity::from_json_ld_str_with_defaults(include_str!(
+        let vc = ssi_claims::data_integrity::from_json_ld_str_with_defaults(include_str!(
             "../tests/vc.jsonld"
         ))
         .await

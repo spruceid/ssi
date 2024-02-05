@@ -1,11 +1,10 @@
 use std::{hash::Hash, marker::PhantomData};
 
-use json_ld::{ContextLoader, Loader, RemoteDocumentReference};
+use json_ld::{Loader, RemoteDocumentReference};
 use linked_data::{
     LinkedDataDeserializeSubject, LinkedDataResource, LinkedDataSubject, RdfLiteralType,
     RdfLiteralValue,
 };
-use locspan::Meta;
 use rdf_types::{
     BlankIdInterpretationMut, Interpretation, InterpretationMut, IriInterpretationMut,
     LiteralInterpretationMut, Vocabulary, VocabularyMut,
@@ -56,8 +55,7 @@ where
     V::Value: RdfLiteralValue,
     V::Type: RdfLiteralType<V>,
     V::LanguageTag: Clone,
-    L: Loader<V::Iri> + ContextLoader<V::Iri>,
-    L::Output: Into<json_ld::syntax::Value>,
+    L: Loader<V::Iri>,
     T: LinkedDataDeserializeSubject<I, V>,
     // Required by `json-ld` for now
     V: Send + Sync,
@@ -65,9 +63,8 @@ where
     V::BlankId: Send + Sync,
     L: Send + Sync,
     L::Error: Send,
-    L::ContextError: Send,
 {
-    type Error = json_ld::ExpandError<(), L::Error, L::ContextError>;
+    type Error = json_ld::ExpandError<L::Error>;
 
     type Data = T;
 
@@ -89,8 +86,8 @@ where
         let (json_ld, proof) =
             extract_json_ld_proof(vocabulary, self.loader, self.document, options).await?;
 
-        match json_ld.into_expanded().into_value().into_main_node() {
-            Some(Meta(node, _)) => {
+        match json_ld.into_expanded().into_main_node() {
+            Some(node) => {
                 let (subject, quads) = linked_data::to_interpreted_subject_quads(
                     vocabulary,
                     interpretation,

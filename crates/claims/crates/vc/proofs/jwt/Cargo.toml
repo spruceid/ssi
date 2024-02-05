@@ -28,6 +28,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-jwt.workspace = true
 ssi-claims-core.workspace = true
+ssi-vc-core.workspace = true
 pin-project.workspace = true
 futures.workspace = true
 serde_with = "2.3.2"

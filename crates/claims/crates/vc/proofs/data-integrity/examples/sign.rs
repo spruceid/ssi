@@ -1,18 +1,16 @@
 //! This example shows how to sign and verify a custom credential type crafted
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
 use chrono::Utc;
-use contextual::WithContext;
 use hashbrown::HashMap;
 use iref::{Iri, IriBuf};
-use json_ld::{syntax::Parse, Compact, Print, Process};
-use locspan::Meta;
+use json_ld::{syntax::Print, Compact, Process};
 use rdf_types::{vocabulary::IriIndex, IndexVocabulary, IriVocabularyMut};
 use ssi_crypto::MessageSignatureError;
 use ssi_vc_data_integrity::{suite::Ed25519Signature2020, CryptographicSuiteInput};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
     ProofPurposes, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureError, Signer,
-    VerificationMethod, VerificationMethodResolutionError, VerificationMethodResolver, Verifier,
+    VerificationMethod, VerificationMethodResolutionError, VerificationMethodResolver,
 };
 use static_iref::{iri, iri_ref, uri};
 
@@ -106,14 +104,10 @@ async fn main() {
         json_ld::ser::serialize_with(&mut vocabulary, &mut interpretation, &verifiable_credential)
             .unwrap();
 
-    use json_ld::syntax::Print;
-    eprintln!("json_ld: {}", json_ld.with(&vocabulary).pretty_print());
-
     // The generated JSON-LD is in expanded form. We want to compact it.
-    // We will use the context definitions defined in the
-    // `ssi-vc-data-integrity/examples/assets` folder.
-    let mut loader: json_ld::FsLoader<IriIndex, ()> =
-        json_ld::FsLoader::new(|_, _, s| json_ld::syntax::Value::parse_str(s, |_| ()));
+    // We will use the context definitions defined in the `examples/assets`
+    // folder.
+    let mut loader = json_ld::FsLoader::<IriIndex>::new();
     loader.mount(
         vocabulary.insert(iri!("https://www.w3.org/")),
         "examples/assets/www.w3.org",
@@ -124,30 +118,17 @@ async fn main() {
     );
 
     // Pick and process the LD context used for compaction.
-    let context = Meta(
-        json_ld::syntax::Context::Many(vec![
-            Meta(
-                json_ld::syntax::ContextEntry::IriRef(
-                    iri_ref!("https://w3id.org/security/v1").to_owned(),
-                ),
-                (),
-            ),
-            Meta(
-                json_ld::syntax::ContextEntry::IriRef(
-                    iri_ref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
-                ),
-                (),
-            ),
-        ]),
-        (),
-    );
+    let context = json_ld::syntax::Context::Many(vec![
+        iri_ref!("https://w3id.org/security/v1").into(),
+        iri_ref!("https://w3id.org/security/suites/ed25519-2020/v1").into(),
+    ]);
     let processed_context = context
         .process(&mut vocabulary, &mut loader, None)
         .await
         .expect("unable to process context");
 
     // Compact the JSON-LD document.
-    let compact = Meta::none(json_ld)
+    let compact = json_ld
         .compact_with(&mut vocabulary, processed_context.as_ref(), &mut loader)
         .await
         .expect("unable to compact document");
@@ -214,7 +195,7 @@ impl Signer<Ed25519VerificationKey2020, ssi_jwk::algorithm::EdDSA, ()> for Keyri
         &'a self,
         algorithm: A,
         options: <A::Options as ssi_core::Referencable>::Reference<'o>,
-        issuer: Option<&'a Iri>,
+        _issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
         bytes: &'a [u8],
     ) -> Result<A::Signature, SignatureError>

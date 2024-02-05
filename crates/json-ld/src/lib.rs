@@ -9,19 +9,12 @@ use iref::{Iri, IriBuf};
 pub use json_ld::{syntax, Options, RemoteDocumentReference};
 use json_ld::{syntax::TryFromJson, Loader, RemoteContext, RemoteContextReference, RemoteDocument};
 use json_syntax::Parse;
-use locspan::Meta;
 use rdf_types::IriVocabularyMut;
 use static_iref::iri;
 use thiserror::Error;
 
 /// Error raised by the `json_to_dataset` function.
-pub type ToRdfError<
-    E = UnknownContext,
-    C = json_ld::loader::ContextLoaderError<
-        UnknownContext,
-        Meta<json_ld::loader::ExtractContextError>,
-    >,
-> = json_ld::ToRdfError<(), E, C>;
+pub type ToRdfError<E = UnknownContext> = json_ld::ToRdfError<E>;
 
 pub const CREDENTIALS_V1_CONTEXT: &Iri = iri!("https://www.w3.org/2018/credentials/v1");
 pub const CREDENTIALS_V2_CONTEXT: &Iri = iri!("https://www.w3.org/ns/credentials/v2");
@@ -81,7 +74,7 @@ fn load_static_context(iri: &Iri, content: &str) -> RemoteDocument {
     RemoteDocument::new(
         Some(iri.to_owned()),
         Some("application/ld+json".parse().unwrap()),
-        json_syntax::Value::parse_str(content, |_| ()).unwrap(),
+        json_syntax::Value::parse_str(content).unwrap().0,
     )
 }
 
@@ -247,22 +240,24 @@ macro_rules! iri_match {
 /// [`ContextLoader`].
 #[derive(thiserror::Error, Debug)]
 #[error("Unknown context: {0}")]
-pub struct UnknownContext(IriBuf);
+pub struct UnknownContext(pub IriBuf);
 
 #[derive(Clone)]
 pub struct StaticLoader;
 
 impl Loader<IriBuf> for StaticLoader {
-    type Output = json_syntax::Value;
     type Error = UnknownContext;
 
-    fn load_with<'a>(
+    fn load_with<'a, V>(
         &'a mut self,
-        _vocabulary: &'a mut (impl Sync + Send + IriVocabularyMut<Iri = IriBuf>),
+        _vocabulary: &'a mut V,
         url: IriBuf,
-    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, (), Self::Output, Self::Error>>
+    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, Self::Error>>
     where
-        IriBuf: 'a,
+        V: IriVocabularyMut<Iri = IriBuf>,
+        //
+        V: Send + Sync,
+        IriBuf: 'a + Send
     {
         async move {
             iri_match! {
@@ -354,7 +349,7 @@ impl std::fmt::Debug for ContextLoader {
 #[derive(Debug, Error)]
 pub enum FromContextMapError {
     #[error(transparent)]
-    ParseError(#[from] json_ld::syntax::parse::Error<()>),
+    ParseError(#[from] json_ld::syntax::parse::Error),
 
     #[error(transparent)]
     InvalidIri(iref::InvalidIri<String>),
@@ -391,8 +386,8 @@ impl ContextLoader {
             .into_iter()
             .map(
                 |(url, jsonld)| -> Result<(IriBuf, RemoteDocument), FromContextMapError> {
-                    let doc =
-                        json_syntax::Value::parse_str(&jsonld, |_| ()).map_err(Meta::into_value)?;
+                    let (doc, _) =
+                        json_syntax::Value::parse_str(&jsonld)?;
                     let iri = IriBuf::new(url)?;
                     let remote_doc = RemoteDocument::new(
                         Some(iri.clone()),
@@ -419,16 +414,18 @@ impl std::default::Default for ContextLoader {
 }
 
 impl Loader<IriBuf> for ContextLoader {
-    type Output = json_syntax::Value;
     type Error = UnknownContext;
 
-    fn load_with<'a>(
+    fn load_with<'a, V>(
         &'a mut self,
-        _vocabulary: &'a mut (impl Sync + Send + IriVocabularyMut<Iri = IriBuf>),
+        _vocabulary: &'a mut V,
         url: IriBuf,
-    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, (), Self::Output, Self::Error>>
+    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, Self::Error>>
     where
-        IriBuf: 'a,
+        V: IriVocabularyMut<Iri = IriBuf>,
+        //
+        V: Send + Sync,
+        IriBuf: 'a + Send
     {
         async move {
             let url = match &mut self.static_loader {
@@ -465,18 +462,10 @@ impl Loader<IriBuf> for ContextLoader {
     }
 }
 
-// /// Remote JSON-LD context document.
-// pub type RemoteContext =
-//     json_ld::RemoteDocument<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
-
-// /// Remote JSON-LD context document reference.
-// pub type RemoteContextReference =
-//     RemoteDocumentReference<IriBuf, Span, json_ld::syntax::context::Value<Span>>;
-
 #[derive(Debug, thiserror::Error)]
 pub enum ContextError {
     #[error("Invalid JSON: {0}")]
-    InvalidJson(#[from] json_syntax::parse::Error<()>),
+    InvalidJson(#[from] json_syntax::parse::Error),
 
     #[error("Invalid JSON-LD context: {0}")]
     InvalidContext(#[from] json_ld::syntax::context::InvalidContext),
@@ -484,8 +473,8 @@ pub enum ContextError {
 
 /// Parse a JSON-LD context.
 pub fn parse_ld_context(content: &str) -> Result<RemoteContextReference, ContextError> {
-    let json = json_syntax::Value::parse_str(content, |_| ()).map_err(Meta::into_value)?;
-    let context = json_ld::syntax::Context::try_from_json(json).map_err(Meta::into_value)?;
+    let (json, _) = json_syntax::Value::parse_str(content)?;
+    let context = json_ld::syntax::Context::try_from_json(json)?;
     Ok(RemoteContextReference::Loaded(RemoteContext::new(
         None, None, context,
     )))

@@ -1,18 +1,16 @@
 use chrono::{DateTime, LocalResult, Utc};
 use grdf::IdentityAccess;
 use iref::IriBuf;
-use json_ld::{ContextLoader, JsonLdProcessor, Loader, RemoteDocument, ToRdfError};
+use json_ld::{JsonLdProcessor, Loader, RemoteDocument, ToRdfError};
 use linked_data::{FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataResource};
-use locspan::Meta;
 use rdf_types::{
     IdInterpretationMut, Interpret, IriVocabulary, LanguageTagVocabulary, TermInterpretationMut,
     VocabularyMut,
 };
 use ssi_jws::{CompactJWSBuf, Header};
 use ssi_jwt::{JWTClaims, StringOrURI};
-use ssi_vc::{datatype::VCDateTime, Verifiable};
+use ssi_claims_core::Verifiable;
 use std::hash::Hash;
-// use treeldr_rust_prelude::{iref::IriBuf, FromRdf, FromRdfError};
 
 use crate::{verification, Proof, VcJwt};
 

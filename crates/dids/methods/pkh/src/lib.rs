@@ -720,19 +720,21 @@ impl DIDPKH {
 mod tests {
     use super::*;
     use iref::{IriBuf, UriBuf};
-    use locspan::Meta;
     use serde_json::{from_str, from_value, json};
     use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
     use ssi_jws::CompactJWSString;
-    use ssi_top::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
-    use ssi_vc::Verifiable;
-    use ssi_vc_data_integrity::{
-        verification::method::{signer::SingleSecretSigner, ProofPurpose},
-        CryptographicSuiteInput, DataIntegrity, Proof, ProofConfiguration,
+    use ssi_claims::{
+        Verifiable,
+        data_integrity::{
+            verification::method::{signer::SingleSecretSigner, ProofPurpose},
+            CryptographicSuiteInput, DataIntegrity, Proof, ProofConfiguration,
+            AnyInputContext,
+            AnySuite,
+            AnySuiteOptions
+        }
     };
     use static_iref::uri;
-    // use ssi_ldp::{Proof, ProofSuite, ProofSuiteType};
 
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
         let jwk: JWK = from_value(jwk_value).unwrap();
@@ -971,9 +973,9 @@ mod tests {
         type_: &str,
         vm_relative_url: &str,
         proof_suite: AnySuite,
-        eip712_domain_opt: Option<ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options>,
+        eip712_domain_opt: Option<ssi_claims::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options>,
         vp_eip712_domain_opt: Option<
-            ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
+            ssi_claims::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
         >,
     ) {
         let didpkh = DIDVerifier::new(DIDPKH);
@@ -1595,7 +1597,7 @@ mod tests {
         // TODO check warnings maybe?
         eprintln!("input: {vc_str}");
 
-        let vc = ssi_top::data_integrity::from_json_ld_str_with_defaults(vc_str)
+        let vc = ssi_claims::data_integrity::from_json_ld_str_with_defaults(vc_str)
             .await
             .unwrap();
 
@@ -1612,13 +1614,13 @@ mod tests {
                 let (mut compact, expanded) = di.into_value().into_parts();
 
                 // Add a fake property in the compact VC form.
-                let obj = compact.document_mut().0.as_object_mut().unwrap();
-                obj.insert(Meta::none("foo".into()), Meta::none("bar".into()));
+                let obj = compact.document_mut().as_object_mut().unwrap();
+                obj.insert("foo".into(), "bar".into());
 
                 // Add the `foo` field to the EIP712 VC schema if necessary.
                 // This is required so hashing can succeed.
                 if let Some(eip712) = &mut proof.untyped_mut().options.eip712 {
-                    if let Some(ssi_vc_data_integrity::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
+                    if let Some(ssi_claims::data_integrity::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
                         let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
                         vc_schema.push(ssi_eip712::MemberVariable::new(
                             "foo".to_owned(),
@@ -1629,7 +1631,7 @@ mod tests {
 
                 // Same as above but for the legacy EIP712 cryptosuite (v0.1).
                 if let Some(eip712) = &mut proof.untyped_mut().options.eip712_v0_1 {
-                    if let Some(ssi_vc_data_integrity::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
+                    if let Some(ssi_claims::data_integrity::eip712::TypesOrURI::Object(types)) = &mut eip712.types {
                         let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
                         vc_schema.push(ssi_eip712::MemberVariable::new(
                             "foo".to_owned(),
@@ -1639,8 +1641,8 @@ mod tests {
                 }
 
                 // Add a fake property in the expanded VC form.
-                let mut node = expanded.into_value().into_main_node().unwrap();
-                node.0.insert(
+                let mut node = expanded.into_main_node().unwrap();
+                node.insert(
                     json_ld::Id::iri(IriBuf::new("https://example.org/foo".to_string()).unwrap()),
                     json_ld::Indexed::none(json_ld::Object::Value(json_ld::Value::Literal(
                         json_ld::object::Literal::String("bar".into()),
@@ -1652,9 +1654,9 @@ mod tests {
                 let bad_di = DataIntegrity::new(
                     json_ld::Document::new(
                         compact,
-                        Meta::none(node.map(json_ld::Indexed::none).into()),
+                        json_ld::Indexed::none(node).into(),
                     ),
-                    ssi_top::data_integrity::AnyInputContext::default(),
+                    ssi_claims::data_integrity::AnyInputContext::default(),
                     proof.suite(),
                     proof.configuration(),
                 )

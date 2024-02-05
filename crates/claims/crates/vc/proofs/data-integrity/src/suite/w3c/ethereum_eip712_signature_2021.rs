@@ -2,7 +2,6 @@
 //!
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 use lazy_static::lazy_static;
-use locspan::Meta;
 use pin_project::pin_project;
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
@@ -28,9 +27,9 @@ pub use v0_1::EthereumEip712Signature2021v0_1;
 
 lazy_static! {
     static ref PROOF_CONTEXT: json_ld::syntax::Context = {
-        json_ld::syntax::Context::One(Meta::none(json_ld::syntax::ContextEntry::IriRef(
+        json_ld::syntax::Context::One(json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://w3id.org/security/suites/eip712sig-2021/v1").to_owned(),
-        )))
+        ))
     };
 }
 

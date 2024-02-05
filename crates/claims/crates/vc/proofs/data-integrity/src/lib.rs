@@ -1,13 +1,12 @@
+//! Data Integrity Proofs format for Verifiable Credentals.
 use educe::Educe;
-use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
-use rdf_types::{Interpretation, VocabularyMut};
-use ssi_claims_core::linked_data::LinkedDataClaims;
 use std::ops::Deref;
 use suite::{HashError, TransformError};
 
 mod decode;
 pub mod eip712;
 mod proof;
+mod serialization;
 pub mod signing;
 pub mod suite;
 pub mod verification;
@@ -110,29 +109,6 @@ impl<T, S: CryptographicSuite> Deref for DataIntegrity<T, S> {
 
     fn deref(&self) -> &Self::Target {
         &self.value
-    }
-}
-
-impl<I: Interpretation, V: VocabularyMut, T, S: CryptographicSuite> LinkedDataClaims<I, V>
-    for DataIntegrity<T, S>
-where
-    V::Value: From<String> + From<xsd_types::Value> + From<linked_data::json_syntax::Value>,
-    T: LinkedDataSubject<I, V>,
-    S::VerificationMethod: LinkedDataPredicateObjects<I, V>,
-    S::Options: LinkedDataSubject<I, V>,
-    S::Signature: LinkedDataSubject<I, V>,
-{
-    fn visit_with_proof<R>(&self, proof: &Self::Proof, visitor: R) -> Result<R::Ok, R::Error>
-    where
-        R: linked_data::Visitor<I, V>,
-    {
-        linked_data::LinkedData::visit(
-            &DataIntegrityWithProof {
-                claims: self,
-                proof,
-            },
-            visitor,
-        )
     }
 }
 
