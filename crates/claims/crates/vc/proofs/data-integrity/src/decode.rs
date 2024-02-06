@@ -1,7 +1,7 @@
 // pub mod rdf;
 use crate::{
     suite::{CryptographicSuiteInput, HashError, TransformError},
-    CryptographicSuite, DataIntegrity, LinkedDataInput, Proof,
+    CryptographicSuite, LinkedDataInput, Proof,
 };
 use iref::Iri;
 use linked_data::{
@@ -187,7 +187,7 @@ impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
 
                         let transformed = proof
                             .suite()
-                            .transform(&data, make_context(ld_context), proof.configuration())
+                            .transform(&data, &mut make_context(ld_context), proof.configuration())
                             .await
                             .map_err(DecodeError::Transform)?;
                         let hashed = proof.suite().hash(transformed, proof.configuration())?;

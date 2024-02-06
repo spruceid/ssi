@@ -294,7 +294,7 @@ where
     fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
-        context: C,
+        context: &'a mut C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
     ) -> Self::Transform<'a>
     where
@@ -343,7 +343,7 @@ pub struct Transform<'a, C: TypesProvider> {
 impl<'a, C: TypesProvider> Transform<'a, C> {
     pub fn new<'c: 'a, T: serde::Serialize>(
         data: &'a T,
-        context: C,
+        context: &'a mut C,
         params: ProofConfigurationRef<'c, VerificationMethod, Options>,
         proof_context: &'static json_ld::syntax::Context,
         proof_type: &'static str,

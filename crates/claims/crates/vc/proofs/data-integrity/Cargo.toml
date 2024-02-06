@@ -69,6 +69,7 @@ ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 # ssi-vc.workspace = true
 ssi-claims-core.workspace = true
+ssi-vc-core.workspace = true
 ssi-security.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
 ssi-eip712 = { workspace = true, optional = true }

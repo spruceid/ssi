@@ -12,13 +12,14 @@ use rdf_types::{
 use ssi_claims_core::{ProofValidity, Verifiable};
 use ssi_core::Referencable;
 use ssi_rdf::urdna2015;
+use ssi_vc_core::verification::Claims;
 use ssi_verification_methods::{
     InvalidVerificationMethod, SignatureAlgorithm, SignatureError, Signer, VerificationError,
     VerificationMethod, Verifier,
 };
 
 use crate::{
-    signing, DataIntegrity, ProofConfiguration, ProofConfigurationCastError, ProofConfigurationRef,
+    sign, signing, Proof, ProofConfiguration, ProofConfigurationCastError, ProofConfigurationRef,
     UntypedProof, UntypedProofRef,
 };
 
@@ -252,7 +253,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
-        context: C,
+        context: &'a mut C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
     ) -> Self::Transform<'a>
     where
@@ -265,7 +266,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         context: C,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Verifiable<DataIntegrity<T, Self>>, signing::Error>
+    ) -> Result<Verifiable<Claims<T, Proof<Self>>>, signing::Error>
     where
         Self::VerificationMethod: 'max,
         S: 'max
@@ -275,7 +276,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
                 Self::SignatureProtocol,
             >,
     {
-        DataIntegrity::sign(input, context, signer, self, params).await
+        sign(input, context, signer, self, params).await
     }
 }
 
@@ -346,7 +347,7 @@ where
     ///
     /// The order in which quads are returned is unspecified.
     pub fn into_quads<T: LinkedData<I, V>>(
-        mut self,
+        &mut self,
         input: &T,
     ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
         linked_data::to_lexical_quads_with(&mut self.vocabulary, &mut self.interpretation, input)
@@ -354,7 +355,7 @@ where
 
     /// Returns the canonical form of the dataset, in the N-Quads format.
     pub fn into_canonical_form<T: LinkedData<I, V>>(
-        self,
+        &mut self,
         input: &T,
     ) -> Result<String, linked_data::IntoQuadsError> {
         let quads = self.into_quads(input)?;
@@ -390,7 +391,7 @@ macro_rules! impl_rdf_input_urdna2015 {
             fn transform<'t, 'c: 't>(
                 &'t self,
                 data: &'t T,
-                context: $crate::LinkedDataInput<I, V>,
+                context: &'t mut $crate::LinkedDataInput<I, V>,
                 _options: $crate::ProofConfigurationRef<'c,
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
                     <$ty as $crate::CryptographicSuite>::Options,

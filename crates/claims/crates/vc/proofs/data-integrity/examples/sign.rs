@@ -2,7 +2,7 @@
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
 use chrono::Utc;
 use hashbrown::HashMap;
-use iref::{Iri, IriBuf};
+use iref::{Iri, IriBuf, Uri, UriBuf};
 use json_ld::{syntax::Print, Compact, Process};
 use rdf_types::{vocabulary::IriIndex, IndexVocabulary, IriVocabularyMut};
 use ssi_crypto::MessageSignatureError;
@@ -19,6 +19,40 @@ use static_iref::{iri, iri_ref, uri};
 pub struct Credential {
     #[ld("sec:credentialSubject")]
     subject: CredentialSubject,
+
+    #[ld("sec:issuer")]
+    issuer: UriBuf,
+
+    #[ld("sec:issuanceDate")]
+    issuance_date: xsd_types::DateTime,
+}
+
+impl ssi_vc_core::CredentialOrPresentation for Credential {
+    fn is_valid(&self) -> bool {
+        ssi_vc_core::Credential::is_valid(self)
+    }
+}
+
+impl ssi_vc_core::Credential for Credential {
+    type Subject = CredentialSubject;
+    type Issuer = Uri;
+    type Status = std::convert::Infallible;
+    type RefreshService = std::convert::Infallible;
+    type TermsOfUse = std::convert::Infallible;
+    type Evidence = std::convert::Infallible;
+    type Schema = std::convert::Infallible;
+
+    fn credential_subjects(&self) -> &[Self::Subject] {
+        std::slice::from_ref(&self.subject)
+    }
+
+    fn issuer(&self) -> &Self::Issuer {
+        &self.issuer
+    }
+
+    fn issuance_date(&self) -> chrono::prelude::DateTime<chrono::prelude::FixedOffset> {
+        self.issuance_date.into()
+    }
 }
 
 #[derive(linked_data::Serialize)]
@@ -36,7 +70,11 @@ async fn main() {
     };
 
     // Credential built from the subject.
-    let credential = Credential { subject };
+    let credential = Credential {
+        subject,
+        issuer: uri!("http://example.com/issuer").to_owned(),
+        issuance_date: chrono::Utc::now().into(),
+    };
 
     // We do not use DIDs in this example. The `Keyring` type will store our
     // keys and controllers.

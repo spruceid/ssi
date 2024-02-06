@@ -1,30 +1,43 @@
-use method::{VerificationError, Verifier};
-use ssi_claims_core::ProofValidity;
-
-use crate::{CryptographicSuite, DataIntegrity, Proof};
-
+use crate::{CryptographicSuite, PreparedProof};
 pub use method::{ReferenceOrOwned as MethodReferenceOrOwned, VerificationMethod};
+use method::{VerificationError, Verifier};
 pub use ssi_verification_methods as method;
 
-impl<T, S: CryptographicSuite> ssi_claims_core::Provable for DataIntegrity<T, S> {
-    type Proof = Proof<S>;
-}
+// impl<T, S: CryptographicSuite> ssi_claims_core::Provable for DataIntegrity<T, S> {
+//     type Proof = Proof<S>;
+// }
 
-impl<T, S: CryptographicSuite, V: Verifier<S::VerificationMethod>>
-    ssi_claims_core::VerifiableWith<V> for DataIntegrity<T, S>
-where
-    S::VerificationMethod: VerificationMethod,
+// impl<T, S: CryptographicSuite, V: Verifier<S::VerificationMethod>>
+//     ssi_claims_core::VerifiableWith<V> for DataIntegrity<T, S>
+// where
+//     S::VerificationMethod: VerificationMethod,
+// {
+//     type Error = VerificationError;
+
+//     async fn verify_with<'a>(
+//         &'a self,
+//         verifier: &'a V,
+//         proof: &'a Self::Proof,
+//     ) -> Result<ProofValidity, VerificationError> {
+//         let suite = proof.suite();
+//         suite
+//             .verify_proof(&self.hash, verifier, proof.untyped().borrowed())
+//             .await
+//     }
+// }
+
+impl<T: CryptographicSuite, V: Verifier<T::VerificationMethod>>
+    ssi_vc_core::verification::VerifyPreparedWith<V> for PreparedProof<T>
 {
     type Error = VerificationError;
 
-    async fn verify_with<'a>(
+    async fn verify_prepared_with<'a>(
         &'a self,
         verifier: &'a V,
-        proof: &'a Self::Proof,
-    ) -> Result<ProofValidity, VerificationError> {
-        let suite = proof.suite();
+    ) -> Result<ssi_claims_core::ProofValidity, Self::Error> {
+        let suite = self.proof().suite();
         suite
-            .verify_proof(&self.hash, verifier, proof.untyped().borrowed())
+            .verify_proof(self.hash(), verifier, self.proof().untyped().borrowed())
             .await
     }
 }

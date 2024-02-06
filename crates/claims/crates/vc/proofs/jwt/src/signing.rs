@@ -94,57 +94,6 @@ pub struct VcJwtSignatureRef<'a> {
     pub signature_bytes: &'a [u8],
 }
 
-// struct SignWithPayload<'a, S>(PhantomData<&'a S>);
-
-// impl<'a, S: 'a + MessageSigner<()>> UnboundedRefFuture<'a> for SignWithPayload<'a, S> {
-//     type Owned = Vec<u8>;
-
-//     type Bound<'b> = S::Sign<'b> where 'a: 'b;
-
-//     type Output = Result<Vec<u8>, MessageSignatureError>;
-// }
-
-// struct PayloadBinder<S> {
-//     signer: S,
-// }
-
-// impl<'a, S: 'a + MessageSigner<()>> RefFutureBinder<'a, SignWithPayload<'a, S>>
-//     for PayloadBinder<S>
-// {
-//     fn bind<'b>(context: Self, payload: &'b Vec<u8>) -> S::Sign<'b>
-//     where
-//         'a: 'b,
-//     {
-//         context.signer.sign((), payload)
-//     }
-// }
-
-// #[pin_project]
-// pub struct Sign<'a, S: 'a + MessageSigner<()>> {
-//     header: Option<ssi_jws::Header>,
-
-//     #[pin]
-//     inner: SelfRefFuture<'a, SignWithPayload<'a, S>>,
-// }
-
-// impl<'a, S: 'a + MessageSigner<()>> Future for Sign<'a, S> {
-//     type Output = Result<VcJwtSignature, SignatureError>;
-
-//     fn poll(
-//         self: std::pin::Pin<&mut Self>,
-//         cx: &mut std::task::Context<'_>,
-//     ) -> std::task::Poll<Self::Output> {
-//         let this = self.project();
-//         this.inner.poll(cx).map(|(result, _payload)| match result {
-//             Ok(signature_bytes) => Ok(VcJwtSignature {
-//                 header: this.header.take().unwrap(),
-//                 signature_bytes,
-//             }),
-//             Err(e) => Err(e.into()),
-//         })
-//     }
-// }
-
 impl SignatureAlgorithm<verification::AnyJwkMethod> for VcJwtSignatureAlgorithm {
     type Options = ();
 

@@ -220,7 +220,7 @@ where
     fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
-        context: C,
+        context: &'a mut C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
     ) -> Self::Transform<'a>
     where

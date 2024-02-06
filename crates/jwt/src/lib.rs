@@ -41,7 +41,7 @@ pub struct JWTClaims {
     pub verifiable_credential: Option<json_syntax::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "vp")]
-    pub verifiable_presentation: Option<serde_json::Value>,
+    pub verifiable_presentation: Option<json_syntax::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

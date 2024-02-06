@@ -122,7 +122,7 @@ where
     fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
-        context: AnyInputContext<I, V, L>,
+        context: &'t mut AnyInputContext<I, V, L>,
         params: ProofConfigurationRef<'c, AnyMethod, AnySuiteOptions>,
     ) -> Transform<'t, L>
     where
@@ -144,7 +144,7 @@ where
 								Ok(params) => {
 									ssi_vc_data_integrity::suite::$name.transform(
 										data,
-										context.ld,
+										&mut context.ld,
 										params
 									).into()
 								}
@@ -161,7 +161,7 @@ where
 							Ok(params) => {
 								ssi_vc_data_integrity::suite::TezosJcsSignature2021.transform(
 									data,
-									(),
+									&mut (),
 									params
 								).into()
 							}
@@ -174,7 +174,7 @@ where
 							Ok(params) => {
 								Transform::EthereumEip712Signature2021(ssi_vc_data_integrity::suite::EthereumEip712Signature2021.transform(
 									data,
-									context.loader,
+									&mut context.loader,
 									params
 								))
 							}
@@ -187,7 +187,7 @@ where
 							Ok(params) => {
 								Transform::EthereumEip712Signature2021(ssi_vc_data_integrity::suite::EthereumEip712Signature2021v0_1.transform(
 									data,
-									context.loader,
+									&mut context.loader,
 									params
 								))
 							}

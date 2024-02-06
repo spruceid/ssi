@@ -65,7 +65,7 @@ impl<C, T: Serialize> CryptographicSuiteInput<T, C> for TezosJcsSignature2021 {
     fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
-        context: C,
+        context: &'a mut C,
         _options: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
     ) -> Self::Transform<'a>
     where

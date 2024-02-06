@@ -9,7 +9,10 @@ use rdf_types::{Interpretation, Vocabulary, VocabularyMut};
 use ssi_security::CRYPTOSUITE;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
-use crate::CryptographicSuite;
+use crate::{
+    suite::{HashError, TransformError},
+    CryptographicSuite, CryptographicSuiteInput,
+};
 
 mod configuration;
 mod untyped;
@@ -29,6 +32,64 @@ impl AnyType {
             iri,
             cryptographic_suite,
         }
+    }
+}
+
+/// Prepared Data-Integrity Proof.
+pub struct PreparedProof<T: CryptographicSuite> {
+    /// Raw proof.
+    proof: Proof<T>,
+
+    /// Hashed credential/presentation value.
+    hash: T::Hashed,
+}
+
+impl<T: CryptographicSuite> PreparedProof<T> {
+    pub fn new(proof: Proof<T>, hash: T::Hashed) -> Self {
+        Self { proof, hash }
+    }
+
+    pub fn proof(&self) -> &Proof<T> {
+        &self.proof
+    }
+
+    pub fn hash(&self) -> &T::Hashed {
+        &self.hash
+    }
+}
+
+impl<S: CryptographicSuite> ssi_vc_core::verification::ProofType for Proof<S> {
+    type Prepared = PreparedProof<S>;
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ProofPreparationError {
+    #[error("input transformation failed: {0}")]
+    Transform(#[from] TransformError),
+
+    #[error("hash failed: {0}")]
+    HashFailed(#[from] HashError),
+}
+
+impl<T, E, S> ssi_vc_core::verification::PrepareWith<T, E> for Proof<S>
+where
+    S: CryptographicSuiteInput<T, E>,
+{
+    type Error = ProofPreparationError;
+
+    /// Creates a new data integrity credential from the given input data.
+    ///
+    /// This will transform and hash the input data using the cryptographic
+    /// suite's transformation and hashing algorithms.
+    async fn prepare_with(
+        self,
+        value: &T,
+        environment: &mut E,
+    ) -> Result<Self::Prepared, Self::Error> {
+        let params = self.untyped.configuration();
+        let transformed = self.type_.transform(&value, environment, params).await?;
+        let hashed = self.type_.hash(transformed, params)?;
+        Ok(PreparedProof::new(self, hashed))
     }
 }
 

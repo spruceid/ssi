@@ -10,6 +10,14 @@ documentation = "https://docs.rs/ssi-claims/"
 
 [dependencies]
 iref.workspace = true
+xsd-types.workspace = true
 static-iref.workspace = true
 chrono.workspace = true
 serde = { workspace = true, features = ["derive"] }
+linked-data.workspace = true
+json-syntax.workspace = true
+json-ld.workspace = true
+ssi-core.workspace = true
+ssi-jwt.workspace = true
+ssi-claims-core.workspace = true
+thiserror.workspace = true

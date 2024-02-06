@@ -152,7 +152,7 @@ where
     fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
-        context: LinkedDataInput<I, V>,
+        context: &'t mut LinkedDataInput<I, V>,
         options: ProofConfigurationRef<'c, VerificationMethod>,
     ) -> Self::Transform<'t>
     where
@@ -165,7 +165,7 @@ where
 fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>(
     suite: &Eip712Signature2021,
     data: &T,
-    context: LinkedDataInput<I, V>,
+    context: &mut LinkedDataInput<I, V>,
     options: ProofConfigurationRef<VerificationMethod>,
 ) -> Result<ssi_eip712::TypedData, TransformError>
 where
