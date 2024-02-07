@@ -40,6 +40,8 @@ use super::{Signature, SignatureRef, TezosWallet};
 pub struct TezosSignature2021;
 
 impl TezosSignature2021 {
+    pub const NAME: &'static str = "TezosSignature2021";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#TezosSignature2021");
 }
 
@@ -60,6 +62,10 @@ impl CryptographicSuite for TezosSignature2021 {
     type MessageSignatureAlgorithm = AnyBlake2b;
 
     type Options = Options;
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

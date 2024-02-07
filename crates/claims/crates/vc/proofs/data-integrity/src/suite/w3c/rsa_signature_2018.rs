@@ -16,6 +16,8 @@ use crate::{
 pub struct RsaSignature2018;
 
 impl RsaSignature2018 {
+    pub const NAME: &'static str = "RsaSignature2018";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#RsaSignature2018");
 }
 
@@ -36,6 +38,10 @@ impl CryptographicSuite for RsaSignature2018 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::RS256;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

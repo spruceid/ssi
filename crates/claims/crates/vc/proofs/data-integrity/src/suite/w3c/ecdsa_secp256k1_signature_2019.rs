@@ -17,6 +17,8 @@ use crate::{
 pub struct EcdsaSecp256k1Signature2019;
 
 impl EcdsaSecp256k1Signature2019 {
+    pub const NAME: &'static str = "EcdsaSecp256k1Signature2019";
+
     pub const IRI: &'static iref::Iri =
         iri!("https://w3id.org/security#EcdsaSecp256k1Signature2019");
 }
@@ -38,6 +40,10 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256K;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

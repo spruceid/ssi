@@ -9,6 +9,8 @@ use static_iref::iri;
 pub struct EthereumPersonalSignature2021v0_1;
 
 impl EthereumPersonalSignature2021v0_1 {
+    pub const NAME: &'static str = "EthereumPersonalSignature2021";
+
     pub const IRI: &'static iref::Iri =
         iri!("https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021");
 }
@@ -31,6 +33,10 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

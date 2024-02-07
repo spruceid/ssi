@@ -41,6 +41,8 @@ use crate::{
 pub struct SolanaSignature2021;
 
 impl SolanaSignature2021 {
+    pub const NAME: &'static str = "SolanaSignature2021";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#SolanaSignature2021");
 }
 
@@ -61,6 +63,10 @@ impl CryptographicSuite for SolanaSignature2021 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

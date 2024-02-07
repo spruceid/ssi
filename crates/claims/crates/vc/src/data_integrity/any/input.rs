@@ -2,11 +2,13 @@ use std::{future::Future, pin::Pin, task};
 
 use super::AnySuiteOptions;
 use pin_project::pin_project;
-use rdf_types::interpretation;
+use rdf_types::{interpretation, IriVocabulary};
+use ssi_json_ld::{AnyJsonLdEnvironment, ContextLoader, JsonLdEnvironment};
+use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
 use ssi_vc_data_integrity::{
     eip712::TypesProvider,
     suite::{HashError, TransformError},
-    CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
+    CryptographicSuiteInput, ProofConfigurationRef,
 };
 
 use super::AnySuite;
@@ -15,9 +17,9 @@ use crate::AnyMethod;
 type JsonObject = serde_json::Map<String, serde_json::Value>;
 
 /// Input context for any cryptographic suite supported by `AnySuite`.
-pub struct AnyInputContext<I, V, L = ()> {
+pub struct AnyInputContext<E, L = ()> {
     /// The Linked-Data context used to interpret RDF terms.
-    pub ld: LinkedDataInput<I, V>,
+    pub ld: E,
 
     /// Remote resources loader.
     ///
@@ -26,8 +28,28 @@ pub struct AnyInputContext<I, V, L = ()> {
     pub loader: L,
 }
 
-impl<'a, I, V> From<LinkedDataInput<I, V>> for AnyInputContext<I, V> {
-    fn from(value: LinkedDataInput<I, V>) -> Self {
+impl<E: AnyLdEnvironment, L> AnyLdEnvironment for AnyInputContext<E, L> {
+    type Vocabulary = E::Vocabulary;
+    type Interpretation = E::Interpretation;
+
+    fn as_ld_environment_mut(&mut self) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation> {
+        self.ld.as_ld_environment_mut()
+    }
+}
+
+impl<E: AnyJsonLdEnvironment, L> AnyJsonLdEnvironment for AnyInputContext<E, L>
+where
+    E::Vocabulary: IriVocabulary
+{
+    type Loader = E::Loader;
+
+    fn as_json_ld_environment_mut(&mut self) -> ssi_json_ld::JsonLdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation, &mut Self::Loader> {
+        self.ld.as_json_ld_environment_mut()
+    }
+}
+
+impl<'a, I, V> From<LdEnvironment<V, I>> for AnyInputContext<LdEnvironment<V, I>> {
+    fn from(value: LdEnvironment<V, I>) -> Self {
         AnyInputContext {
             ld: value,
             loader: (),
@@ -36,16 +58,17 @@ impl<'a, I, V> From<LinkedDataInput<I, V>> for AnyInputContext<I, V> {
 }
 
 impl Default
-    for AnyInputContext<interpretation::WithGenerator<rdf_types::generator::Blank>, (), ()>
+    for AnyInputContext<JsonLdEnvironment<(), interpretation::WithGenerator<rdf_types::generator::Blank>>, ()>
 {
     fn default() -> Self {
         Self {
-            ld: LinkedDataInput {
+            ld: JsonLdEnvironment {
                 vocabulary: (),
                 interpretation: interpretation::WithGenerator::new(
                     (),
                     rdf_types::generator::Blank::new(),
                 ),
+                loader: ContextLoader::default()
             },
             loader: (),
         }
@@ -105,9 +128,10 @@ impl<'a, L: TypesProvider> Future for Transform<'a, L> {
     }
 }
 
-impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, L, T>
-    CryptographicSuiteInput<T, AnyInputContext<I, V, L>> for AnySuite
+impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, L, T>
+    CryptographicSuiteInput<T, AnyInputContext<E, L>> for AnySuite
 where
+    E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
     I: rdf_types::interpretation::InterpretationMut<V>
         + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -116,17 +140,17 @@ where
     T: serde::Serialize + linked_data::LinkedData<I, V>,
     L: ssi_vc_data_integrity::eip712::TypesProvider,
 {
-    type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<I, V, L>: 't;
+    type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<E, L>: 't;
 
     /// Transformation algorithm.
     fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
-        context: &'t mut AnyInputContext<I, V, L>,
+        context: &'t mut AnyInputContext<E, L>,
         params: ProofConfigurationRef<'c, AnyMethod, AnySuiteOptions>,
     ) -> Transform<'t, L>
     where
-        AnyInputContext<I, V, L>: 't,
+        AnyInputContext<E, L>: 't,
     {
         macro_rules! ld_crypto_suites {
             {

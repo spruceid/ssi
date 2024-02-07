@@ -1,3 +1,5 @@
+use core::fmt;
+
 use linked_data::{
     LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
     RdfLiteralValue,
@@ -22,14 +24,14 @@ pub use untyped::*;
 
 /// Any proof type.
 pub struct AnyType {
-    pub iri: IriBuf,
+    pub name: String,
     pub cryptographic_suite: Option<String>,
 }
 
 impl AnyType {
-    pub fn new(iri: IriBuf, cryptographic_suite: Option<String>) -> Self {
+    pub fn new(name: String, cryptographic_suite: Option<String>) -> Self {
         Self {
-            iri,
+            name,
             cryptographic_suite,
         }
     }
@@ -60,6 +62,14 @@ impl<T: CryptographicSuite> PreparedProof<T> {
 
 impl<S: CryptographicSuite> ssi_vc_core::verification::ProofType for Proof<S> {
     type Prepared = PreparedProof<S>;
+}
+
+impl<S: CryptographicSuite> ssi_vc_core::verification::UnprepareProof for PreparedProof<S> {
+    type Unprepared = Proof<S>;
+
+    fn unprepare(self) -> Self::Unprepared {
+        self.proof
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -180,6 +190,18 @@ impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataResource
     }
 }
 
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataResource<I, V>
+    for PreparedProof<T>
+{
+    fn interpretation(
+        &self,
+        vocabulary: &mut V,
+        interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
+        self.proof.interpretation(vocabulary, interpretation)
+    }
+}
+
 impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for Proof<T>
 where
     T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
@@ -202,6 +224,23 @@ where
     }
 }
 
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V>
+    for PreparedProof<T>
+where
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
+    V: VocabularyMut,
+    V::Value: RdfLiteralValue,
+{
+    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<I, V>,
+    {
+        self.proof.visit_subject(serializer)
+    }
+}
+
 impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V>
     for Proof<T>
 where
@@ -217,6 +256,23 @@ where
     {
         visitor.object(self)?;
         visitor.end()
+    }
+}
+
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V>
+    for PreparedProof<T>
+where
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
+    V: VocabularyMut,
+    V::Value: RdfLiteralValue,
+{
+    fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<I, V>,
+    {
+        self.proof.visit_objects(visitor)
     }
 }
 
@@ -237,6 +293,23 @@ where
     }
 }
 
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedDataGraph<I, V>
+    for PreparedProof<T>
+where
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
+    V: VocabularyMut,
+    V::Value: RdfLiteralValue,
+{
+    fn visit_graph<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::GraphVisitor<I, V>,
+    {
+        self.proof.visit_graph(visitor)
+    }
+}
+
 impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedData<I, V> for Proof<T>
 where
     T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
@@ -254,18 +327,45 @@ where
     }
 }
 
+impl<T: CryptographicSuite, V: Vocabulary, I: Interpretation> LinkedData<I, V> for PreparedProof<T>
+where
+    T::VerificationMethod: LinkedDataPredicateObjects<I, V>,
+    T::Options: LinkedDataSubject<I, V>,
+    T::Signature: LinkedDataSubject<I, V>,
+    V: VocabularyMut,
+    V::Value: RdfLiteralValue,
+{
+    fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::Visitor<I, V>,
+    {
+        self.proof.visit(visitor)
+    }
+}
+
 /// Proof type.
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct Type {
     #[serde(rename = "type")]
-    type_: IriBuf,
+    pub type_: String,
 
     #[serde(
         rename = "cryptosuite",
         default,
         skip_serializing_if = "Option::is_none"
     )]
-    cryptosuite: Option<String>,
+    pub cryptosuite: Option<String>,
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.type_.fmt(f)?;
+        if let Some(c) = &self.cryptosuite {
+            write!(f, " ({c})")?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<T: CryptographicSuite> serde::Serialize for Proof<T>
@@ -281,7 +381,7 @@ where
         #[derive(serde::Serialize)]
         struct TypedProof<'a, M, O, S> {
             #[serde(rename = "type")]
-            type_: &'a Iri,
+            type_: &'a str,
 
             #[serde(rename = "cryptosuite", skip_serializing_if = "Option::is_none")]
             cryptosuite: Option<&'a str>,
@@ -291,7 +391,7 @@ where
         }
 
         let typed = TypedProof {
-            type_: self.type_.iri(),
+            type_: self.type_.name(),
             cryptosuite: self.type_.cryptographic_suite(),
             untyped: &self.untyped,
         };

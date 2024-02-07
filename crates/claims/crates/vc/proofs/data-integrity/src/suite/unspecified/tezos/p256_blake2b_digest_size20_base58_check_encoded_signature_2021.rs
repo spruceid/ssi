@@ -16,6 +16,8 @@ use crate::{
 pub struct P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 
 impl P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021 {
+    pub const NAME: &'static str = "P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021";
+
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021");
 }
@@ -38,6 +40,10 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ESBlake2b;
 
     type Options = Options;
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

@@ -24,6 +24,8 @@ pub use v0_1::*;
 pub struct EthereumPersonalSignature2021;
 
 impl EthereumPersonalSignature2021 {
+    pub const NAME: &'static str = "EthereumPersonalSignature2021";
+
     pub const IRI: &'static iref::Iri =
         iri!("https://w3id.org/security#EthereumPersonalSignature2021");
 }
@@ -83,6 +85,10 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

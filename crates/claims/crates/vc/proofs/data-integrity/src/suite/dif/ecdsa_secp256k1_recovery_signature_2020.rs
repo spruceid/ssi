@@ -19,6 +19,8 @@ use crate::{
 pub struct EcdsaSecp256k1RecoverySignature2020;
 
 impl EcdsaSecp256k1RecoverySignature2020 {
+    pub const NAME: &'static str = "EcdsaSecp256k1RecoveryMethod2020";
+
     pub const IRI: &'static Iri = iri!("https://identity.foundation/EcdsaSecp256k1RecoverySignature2020#EcdsaSecp256k1RecoverySignature2020");
 }
 
@@ -40,6 +42,10 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

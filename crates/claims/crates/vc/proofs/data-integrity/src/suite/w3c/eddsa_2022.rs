@@ -23,6 +23,8 @@ pub use verification::method::Multikey;
 pub struct EdDsa2022;
 
 impl EdDsa2022 {
+    pub const NAME: &'static str = "DataIntegrityProof";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#DataIntegrityProof");
 }
 
@@ -43,6 +45,10 @@ impl CryptographicSuite for EdDsa2022 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

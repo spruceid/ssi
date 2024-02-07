@@ -13,6 +13,8 @@ use crate::suite::{sha256_hash, HashError, JwsSignature, JwsSignatureRef};
 pub struct JsonWebSignature2020;
 
 impl JsonWebSignature2020 {
+    pub const NAME: &'static str = "JsonWebSignature2020";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#JsonWebSignature2020");
 }
 
@@ -33,6 +35,10 @@ impl CryptographicSuite for JsonWebSignature2020 {
     type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

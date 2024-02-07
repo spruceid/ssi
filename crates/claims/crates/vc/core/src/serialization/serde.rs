@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use serde::Serialize;
 use ssi_claims_core::serde::SerializeClaims;
 
-use crate::{CryptographicSuite, DataIntegrity, Proof};
+use crate::verification::{Claims, ProofType};
 
-impl<T: Serialize, S: CryptographicSuite> SerializeClaims for DataIntegrity<T, S>
+impl<T: Serialize, P: ProofType> SerializeClaims for Claims<T, P>
 where
-    Proof<S>: Serialize,
+    P::Prepared: Serialize,
 {
     fn serialize_with_proof<U>(&self, proof: &Self::Proof, serializer: U) -> Result<U::Ok, U::Error>
     where
@@ -286,7 +286,15 @@ where
         let len = self.serialize(StructLenSerializer(0, PhantomData::<U>))?;
         let mut strct = serializer.serialize_struct("DataIntegrity", len)?;
         self.serialize(FlattenStructSerializer::<U>(&mut strct))?;
-        strct.serialize_field("proof", proof)?;
+        match proof.split_first() {
+            None => (),
+            Some((p, rest)) if rest.is_empty() => {
+                strct.serialize_field("proof", p)?;
+            }
+            Some(_) => {
+                strct.serialize_field("proof", proof)?;
+            }
+        }
         strct.end()
     }
 }

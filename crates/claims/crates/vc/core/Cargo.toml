@@ -10,6 +10,7 @@ documentation = "https://docs.rs/ssi-claims/"
 
 [dependencies]
 iref.workspace = true
+rdf-types.workspace = true
 xsd-types.workspace = true
 static-iref.workspace = true
 chrono.workspace = true
@@ -20,4 +21,6 @@ json-ld.workspace = true
 ssi-core.workspace = true
 ssi-jwt.workspace = true
 ssi-claims-core.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
 thiserror.workspace = true

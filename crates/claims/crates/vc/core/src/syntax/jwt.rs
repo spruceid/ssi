@@ -1,4 +1,3 @@
-use serde::Serialize;
 use ssi_jwt::JWTClaims;
 
 use super::json::JsonCredential;

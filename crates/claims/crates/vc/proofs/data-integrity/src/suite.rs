@@ -174,6 +174,8 @@ pub trait CryptographicSuite: Sized {
         Protocol = Self::SignatureProtocol,
     >;
 
+    fn name(&self) -> &str;
+
     fn iri(&self) -> &Iri;
 
     fn cryptographic_suite(&self) -> Option<&str>;
@@ -308,63 +310,63 @@ where
     hash_data
 }
 
-pub struct LinkedDataInput<I = (), V = ()> {
-    pub vocabulary: V,
-    pub interpretation: I,
-}
+// pub struct LinkedDataInput<I = (), V = ()> {
+//     pub vocabulary: V,
+//     pub interpretation: I,
+// }
 
-impl Default for LinkedDataInput<interpretation::WithGenerator<rdf_types::generator::Blank>> {
-    fn default() -> Self {
-        Self::from_generator(rdf_types::generator::Blank::new())
-    }
-}
+// impl Default for LinkedDataInput<interpretation::WithGenerator<rdf_types::generator::Blank>> {
+//     fn default() -> Self {
+//         Self::from_generator(rdf_types::generator::Blank::new())
+//     }
+// }
 
-impl<G> LinkedDataInput<interpretation::WithGenerator<G>> {
-    pub fn from_generator(generator: G) -> Self {
-        Self {
-            vocabulary: (),
-            interpretation: interpretation::WithGenerator::new((), generator),
-        }
-    }
-}
+// impl<G> LinkedDataInput<interpretation::WithGenerator<G>> {
+//     pub fn from_generator(generator: G) -> Self {
+//         Self {
+//             vocabulary: (),
+//             interpretation: interpretation::WithGenerator::new((), generator),
+//         }
+//     }
+// }
 
-impl<V: Vocabulary, I: Interpretation> LinkedDataInput<I, V>
-where
-    I: InterpretationMut<V>
-        + ReverseIriInterpretation<Iri = V::Iri>
-        + ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-{
-    pub fn new(vocabulary: V, interpretation: I) -> Self {
-        Self {
-            vocabulary,
-            interpretation,
-        }
-    }
+// impl<V: Vocabulary, I: Interpretation> LinkedDataInput<I, V>
+// where
+//     I: InterpretationMut<V>
+//         + ReverseIriInterpretation<Iri = V::Iri>
+//         + ReverseBlankIdInterpretation<BlankId = V::BlankId>
+//         + ReverseLiteralInterpretation<Literal = V::Literal>,
+//     V::Literal: ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+// {
+//     pub fn new(vocabulary: V, interpretation: I) -> Self {
+//         Self {
+//             vocabulary,
+//             interpretation,
+//         }
+//     }
 
-    /// Returns the list of quads in the dataset.
-    ///
-    /// The order in which quads are returned is unspecified.
-    pub fn into_quads<T: LinkedData<I, V>>(
-        &mut self,
-        input: &T,
-    ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
-        linked_data::to_lexical_quads_with(&mut self.vocabulary, &mut self.interpretation, input)
-    }
+//     /// Returns the list of quads in the dataset.
+//     ///
+//     /// The order in which quads are returned is unspecified.
+//     pub fn into_quads<T: LinkedData<I, V>>(
+//         &mut self,
+//         input: &T,
+//     ) -> Result<Vec<Quad>, linked_data::IntoQuadsError> {
+//         linked_data::to_lexical_quads_with(&mut self.vocabulary, &mut self.interpretation, input)
+//     }
 
-    /// Returns the canonical form of the dataset, in the N-Quads format.
-    pub fn into_canonical_form<T: LinkedData<I, V>>(
-        &mut self,
-        input: &T,
-    ) -> Result<String, linked_data::IntoQuadsError> {
-        let quads = self.into_quads(input)?;
-        Ok(
-            ssi_rdf::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref()))
-                .into_nquads(),
-        )
-    }
-}
+//     /// Returns the canonical form of the dataset, in the N-Quads format.
+//     pub fn into_canonical_form<T: LinkedData<I, V>>(
+//         &mut self,
+//         input: &T,
+//     ) -> Result<String, linked_data::IntoQuadsError> {
+//         let quads = self.into_quads(input)?;
+//         Ok(
+//             ssi_rdf::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref()))
+//                 .into_nquads(),
+//         )
+//     }
+// }
 
 /// `CryptographicSuiteInput` trait implementation for RDF dataset inputs
 /// normalized using URDNA2015.
@@ -375,9 +377,10 @@ where
 #[macro_export]
 macro_rules! impl_rdf_input_urdna2015 {
     ($ty:ident) => {
-        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>
-            $crate::CryptographicSuiteInput<T, $crate::LinkedDataInput<I, V>> for $ty
+        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T>
+            $crate::CryptographicSuiteInput<T, E> for $ty
         where
+            E: $crate::ssi_rdf::AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
             I: rdf_types::interpretation::InterpretationMut<V>
                 + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
                 + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -385,21 +388,18 @@ macro_rules! impl_rdf_input_urdna2015 {
             V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
             T: linked_data::LinkedData<I, V>,
         {
-            type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, $crate::LinkedDataInput<I, V>: 't;
+            type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, E: 't;
 
             /// Transformation algorithm.
             fn transform<'t, 'c: 't>(
                 &'t self,
                 data: &'t T,
-                context: &'t mut $crate::LinkedDataInput<I, V>,
+                context: &'t mut E,
                 _options: $crate::ProofConfigurationRef<'c,
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
                     <$ty as $crate::CryptographicSuite>::Options,
                 >,
-            ) -> Self::Transform<'t>
-            where
-                $crate::LinkedDataInput<I, V>: 't
-            {
+            ) -> Self::Transform<'t> {
                 ::std::future::ready(context.into_canonical_form(data).map_err(Into::into))
             }
         }

@@ -13,6 +13,8 @@ iref.workspace = true
 rdf-types.workspace = true
 grdf.workspace = true
 ssi-crypto.workspace = true
+linked-data.workspace = true
+serde.workspace = true
 combination = "0.1"
 
 [dev-dependencies]

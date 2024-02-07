@@ -52,6 +52,10 @@ where
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("unsupported proof suite: {0}")]
+pub struct UnsupportedProofSuite(pub ssi_vc_data_integrity::Type);
+
 macro_rules! crypto_suites {
     {
         $(
@@ -68,6 +72,26 @@ macro_rules! crypto_suites {
                 $(#[cfg($($t)*)])?
                 $name
             ),*
+        }
+
+        impl TryFrom<ssi_vc_data_integrity::Type> for AnySuite {
+            type Error = UnsupportedProofSuite;
+
+            fn try_from(
+                ty: ssi_vc_data_integrity::Type
+            ) -> Result<Self, Self::Error> {
+                $(
+                    $(#[cfg($($t)*)])?
+                    {
+                        let suite = ssi_vc_data_integrity::suite::$name;
+                        if suite.name() == ty.type_ && suite.cryptographic_suite() == ty.cryptosuite.as_deref() {
+                            return Ok(Self::$name)
+                        }
+                    }
+                )*
+
+                Err(UnsupportedProofSuite(ty))
+            }
         }
 
         impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for AnySuite
@@ -98,7 +122,6 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         if iri == ssi_vc_data_integrity::suite::$name::IRI {
-                            eprintln!("MATCHING: {iri} as `{}`", stringify!($name));
                             return Ok(Self::$name)
                         }
                     )*
@@ -243,6 +266,15 @@ macro_rules! crypto_suites {
             type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
             type Options = AnySuiteOptions;
+
+            fn name(&self) -> &str {
+                match self {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        Self::$name => ssi_vc_data_integrity::suite::$name.name()
+                    ),*
+                }
+            }
 
             fn iri(&self) -> &iref::Iri {
                 match self {

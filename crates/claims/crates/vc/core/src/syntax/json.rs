@@ -1,9 +1,12 @@
 //! JSON syntax for Credentials and Presentations.
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, hash::Hash};
 
 use chrono::{DateTime, FixedOffset};
 use iref::{Uri, UriBuf};
+use linked_data::{LinkedDataResource, LinkedDataSubject};
+use rdf_types::{BlankIdInterpretationMut, Interpretation, InterpretationMut, IriInterpretationMut, LiteralInterpretationMut, VocabularyMut};
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError};
 use static_iref::iri_ref;
 
 use crate::{VERIFIABLE_CREDENTIAL_TYPE, VERIFIABLE_PRESENTATION_TYPE};
@@ -140,6 +143,38 @@ impl crate::Credential for JsonCredential {
 
 	fn credential_schemas(&self) -> &[Self::Schema] {
         &self.credential_schema
+    }
+}
+
+impl<V, I, L, E> ssi_rdf::Expandable<E> for JsonCredential
+where
+    E: AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>,
+    V: VocabularyMut,
+    V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    V::LanguageTag: Clone,
+    V::Value: From<String> + From<xsd_types::Value> + From<json_syntax::Value>,
+    V::Type: From<rdf_types::literal::Type<V::Iri, V::LanguageTag>>,
+    I: InterpretationMut<V>
+        + IriInterpretationMut<V::Iri>
+        + BlankIdInterpretationMut<V::BlankId>
+        + LiteralInterpretationMut<V::Literal>,
+    I::Resource: Clone + Ord,
+    L: json_ld::Loader<V::Iri>,
+    //
+    V: Send + Sync,
+    V::Iri: Send + Sync,
+    V::BlankId: Send + Sync,
+    L: Send + Sync,
+    L::Error: Send
+{
+    type Error = JsonLdError<L::Error>;
+    type Resource = I::Resource;
+
+    async fn expand(self, environment: &mut E) -> Result<ssi_rdf::Expanded<Self, Self::Resource>, Self::Error> {
+        let json = ssi_json_ld::CompactJsonLd(json_syntax::to_value(&self).unwrap());
+        let (dataset, subject) = json.expand(environment).await?.into_rdf_parts();
+        Ok(ssi_rdf::Expanded::new(self, dataset, subject))
     }
 }
 

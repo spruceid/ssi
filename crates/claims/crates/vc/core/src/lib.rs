@@ -7,6 +7,7 @@ pub mod vocab;
 mod data_model;
 pub mod verification;
 pub mod syntax;
+mod serialization;
 
 pub use data_model::*;
 

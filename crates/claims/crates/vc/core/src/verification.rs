@@ -44,7 +44,7 @@ impl<T, P> Deref for Claims<T, P> {
 	}
 }
 
-pub enum PreparationError<I, P> {
+pub enum PreparationError<P, I = std::convert::Infallible> {
 	InvalidProof(I),
 	ProofPreparationFailed(P)
 }
@@ -58,7 +58,7 @@ impl<T, P> Claims<T, P> {
 		}
 	}
 
-	pub async fn new<U, E>(value: U, mut environment: E) -> Result<Verifiable<Self>, PreparationError<<U::Proof as TryInto<P>>::Error, P::Error>>
+	pub async fn new<U, E>(value: U, mut environment: E) -> Result<Verifiable<Self>, PreparationError<P::Error, <U::Proof as TryInto<P>>::Error>>
 	where
 		U: ExtractProofs<Proofless = T>,
 		U::Proof: TryInto<P>,
@@ -78,6 +78,38 @@ impl<T, P> Claims<T, P> {
 			proofs
 		))
 	}
+
+	/// Tamper with the claims without changing the proof.
+	/// 
+	/// The proof may become invalid.
+	pub async fn tamper<U, E>(
+		verifiable_claims: Verifiable<Self>,
+		mut environment: E,
+		f: impl FnOnce(T) -> U
+	) -> Result<Verifiable<Claims<U, P>>, PreparationError<P::Error>>
+	where
+		P: ProofType,
+		P: PrepareWith<U, E>,
+		P::Prepared: UnprepareProof<Unprepared = P>
+	{
+		verifiable_claims.async_try_map(|value, proofs| async {
+			let u = f(value.value);
+
+			let mut new_proofs = Vec::with_capacity(proofs.len());
+			for p in proofs {
+				let unprepared_proof = p.unprepare();
+				new_proofs.push(unprepared_proof.prepare_with(&u, &mut environment).await.map_err(PreparationError::ProofPreparationFailed)?)
+			}
+
+			Ok((Claims::from_proofless(u), new_proofs))
+		}).await
+	}
+}
+
+pub trait UnprepareProof {
+	type Unprepared: ProofType<Prepared = Self>;
+
+	fn unprepare(self) -> Self::Unprepared;
 }
 
 impl<T, P> ssi_claims_core::Provable for Claims<T, P>

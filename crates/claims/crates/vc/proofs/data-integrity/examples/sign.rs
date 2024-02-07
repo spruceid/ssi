@@ -15,15 +15,16 @@ use ssi_verification_methods::{
 use static_iref::{iri, iri_ref, uri};
 
 #[derive(linked_data::Serialize)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
+#[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
+#[ld(type = "cred:VerifiableCredential")]
 pub struct Credential {
-    #[ld("sec:credentialSubject")]
+    #[ld("cred:credentialSubject")]
     subject: CredentialSubject,
 
-    #[ld("sec:issuer")]
-    issuer: UriBuf,
+    #[ld("cred:issuer")]
+    issuer: linked_data::Ref<UriBuf>,
 
-    #[ld("sec:issuanceDate")]
+    #[ld("cred:issuanceDate")]
     issuance_date: xsd_types::DateTime,
 }
 
@@ -47,7 +48,7 @@ impl ssi_vc_core::Credential for Credential {
     }
 
     fn issuer(&self) -> &Self::Issuer {
-        &self.issuer
+        &self.issuer.0
     }
 
     fn issuance_date(&self) -> chrono::prelude::DateTime<chrono::prelude::FixedOffset> {
@@ -72,7 +73,7 @@ async fn main() {
     // Credential built from the subject.
     let credential = Credential {
         subject,
-        issuer: uri!("http://example.com/issuer").to_owned(),
+        issuer: linked_data::Ref(uri!("http://example.com/issuer").to_owned()),
         issuance_date: chrono::Utc::now().into(),
     };
 
@@ -121,7 +122,7 @@ async fn main() {
         rdf_types::interpretation::Indexed::new(),
         rdf_types::generator::Blank::new(),
     );
-    let rdf = ssi_vc_data_integrity::LinkedDataInput::new(&mut vocabulary, &mut interpretation);
+    let rdf = ssi_rdf::LdEnvironment::new(&mut vocabulary, &mut interpretation);
 
     // Sign the credential.
     let verifiable_credential = Ed25519Signature2020
@@ -157,7 +158,7 @@ async fn main() {
 
     // Pick and process the LD context used for compaction.
     let context = json_ld::syntax::Context::Many(vec![
-        iri_ref!("https://w3id.org/security/v1").into(),
+        iri_ref!("https://www.w3.org/2018/credentials/v1").into(),
         iri_ref!("https://w3id.org/security/suites/ed25519-2020/v1").into(),
     ]);
     let processed_context = context

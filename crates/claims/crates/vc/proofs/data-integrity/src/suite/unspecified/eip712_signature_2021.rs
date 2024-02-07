@@ -1,7 +1,7 @@
 //! EIP-712 Signature 2021 implementation.
 use rdf_types::Quad;
 use ssi_crypto::MessageSigner;
-use ssi_rdf::NQuadsStatement;
+use ssi_rdf::{AnyLdEnvironment, NQuadsStatement};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
@@ -12,7 +12,7 @@ use static_iref::iri;
 use crate::{
     eip712::{Eip712Signature, Eip712SignatureRef},
     suite::{HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, LinkedDataInput, ProofConfigurationRef,
+    CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
 /// EIP-712 Signature 2021.
@@ -52,6 +52,8 @@ use crate::{
 pub struct Eip712Signature2021;
 
 impl Eip712Signature2021 {
+    pub const NAME: &'static str = "Eip712Signature2021";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Eip712Signature2021");
 }
 
@@ -113,6 +115,10 @@ impl CryptographicSuite for Eip712Signature2021 {
 
     type Options = ();
 
+    fn name(&self) -> &str {
+        Self::NAME
+    }
+
     fn iri(&self) -> &iref::Iri {
         Self::IRI
     }
@@ -136,9 +142,10 @@ impl CryptographicSuite for Eip712Signature2021 {
     }
 }
 
-impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>
-    CryptographicSuiteInput<T, LinkedDataInput<I, V>> for Eip712Signature2021
+impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T> CryptographicSuiteInput<T, E>
+    for Eip712Signature2021
 where
+    E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
     I: rdf_types::interpretation::InterpretationMut<V>
         + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -146,29 +153,27 @@ where
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
     T: linked_data::LinkedData<I, V>,
 {
-    type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, LinkedDataInput<I, V>: 't;
+    type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, E: 't;
 
     /// Transformation algorithm.
     fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
-        context: &'t mut LinkedDataInput<I, V>,
+        context: &'t mut E,
         options: ProofConfigurationRef<'c, VerificationMethod>,
-    ) -> Self::Transform<'t>
-    where
-        LinkedDataInput<I, V>: 't,
-    {
+    ) -> Self::Transform<'t> {
         std::future::ready(transform(self, data, context, options))
     }
 }
 
-fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, T>(
+fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T>(
     suite: &Eip712Signature2021,
     data: &T,
-    context: &mut LinkedDataInput<I, V>,
+    context: &mut E,
     options: ProofConfigurationRef<VerificationMethod>,
 ) -> Result<ssi_eip712::TypedData, TransformError>
 where
+    E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
     I: rdf_types::interpretation::InterpretationMut<V>
         + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>

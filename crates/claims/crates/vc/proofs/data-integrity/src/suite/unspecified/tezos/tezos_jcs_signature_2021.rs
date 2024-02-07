@@ -55,6 +55,8 @@ lazy_static! {
 pub struct TezosJcsSignature2021;
 
 impl TezosJcsSignature2021 {
+    pub const NAME: &'static str = "TezosJcsSignature2021";
+
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#TezosJcsSignature2021");
 }
 
@@ -101,6 +103,10 @@ impl CryptographicSuite for TezosJcsSignature2021 {
     type MessageSignatureAlgorithm = AnyBlake2b;
 
     type Options = Options;
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

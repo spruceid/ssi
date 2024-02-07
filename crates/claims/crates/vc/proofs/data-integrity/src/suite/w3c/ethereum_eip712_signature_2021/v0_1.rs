@@ -166,6 +166,8 @@ impl<'a> From<OptionsRef<'a>> for super::OptionsRef<'a> {
 pub struct EthereumEip712Signature2021v0_1;
 
 impl EthereumEip712Signature2021v0_1 {
+    pub const NAME: &'static str = "EthereumEip712Signature2021";
+
     pub const IRI: &'static iref::Iri = iri!("https://uport-project.github.io/ethereum-eip712-signature-2021-spec/#ethereum-eip712-signature-2021");
 }
 
@@ -185,6 +187,10 @@ impl CryptographicSuite for EthereumEip712Signature2021v0_1 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = Options;
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

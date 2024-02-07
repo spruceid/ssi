@@ -1,6 +1,6 @@
 //! Data Integrity Proofs format for Verifiable Credentals.
 
-// mod decode;
+mod decode;
 pub mod eip712;
 mod proof;
 // mod serialization;
@@ -8,10 +8,13 @@ pub mod signing;
 pub mod suite;
 pub mod verification;
 
-// pub use decode::*;
+pub use decode::*;
 pub use proof::*;
 pub use signing::sign;
-pub use suite::{CryptographicSuite, CryptographicSuiteInput, LinkedDataInput};
+pub use suite::{CryptographicSuite, CryptographicSuiteInput};
+
+#[doc(hidden)]
+pub use ssi_rdf;
 
 // #[derive(Debug, thiserror::Error)]
 // pub enum Error {

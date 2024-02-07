@@ -26,6 +26,8 @@ pub use verification::method::Ed25519VerificationKey2020;
 pub struct Ed25519Signature2020;
 
 impl Ed25519Signature2020 {
+    pub const NAME: &'static str = "Ed25519Signature2020";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Ed25519Signature2020");
 }
 
@@ -46,6 +48,10 @@ impl CryptographicSuite for Ed25519Signature2020 {
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

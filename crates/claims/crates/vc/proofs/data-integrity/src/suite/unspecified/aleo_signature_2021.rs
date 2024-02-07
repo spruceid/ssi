@@ -46,6 +46,8 @@ use crate::{
 pub struct AleoSignature2021;
 
 impl AleoSignature2021 {
+    pub const NAME: &'static str = "AleoSignature2021";
+
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#AleoSignature2021");
 }
 
@@ -76,6 +78,10 @@ impl CryptographicSuite for AleoSignature2021 {
     type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
     type Options = ();
+
+    fn name(&self) -> &str {
+        Self::NAME
+    }
 
     fn iri(&self) -> &iref::Iri {
         Self::IRI

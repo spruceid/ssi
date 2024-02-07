@@ -1,5 +1,6 @@
 //! Syntaxes for the VC data model.
-mod json;
+pub mod json;
 mod jwt;
 
+pub use json::{JsonCredential, JsonPresentation};
 pub use jwt::*;
