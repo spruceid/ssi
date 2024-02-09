@@ -1,3 +1,5 @@
+pub use ssi_vc_core::*;
+
 mod protocol;
 mod verification_method;
 

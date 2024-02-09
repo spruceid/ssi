@@ -46,6 +46,7 @@ rdf-types.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true
 json-ld.workspace = true
+json-syntax.workspace = true
 locspan.workspace = true
 # ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
 # ssi-vc = { path = "../ssi-vc", default-features = false }

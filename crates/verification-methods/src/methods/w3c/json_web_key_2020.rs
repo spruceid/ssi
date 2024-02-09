@@ -3,7 +3,7 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_jwk::JWK;
+use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::CompactJWSString;
 use static_iref::iri;
 
@@ -69,11 +69,26 @@ impl JsonWebKey2020 {
         Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
-        match self.public_key.algorithm.as_ref() {
-            Some(a) => Ok(ssi_jws::verify_bytes(*a, data, &self.public_key, signature).is_ok()),
-            None => Err(VerificationError::InvalidKey),
-        }
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature: &[u8],
+        algorithm: Option<Algorithm>,
+    ) -> Result<bool, VerificationError> {
+        let algorithm = match (self.public_key.algorithm, algorithm) {
+            (Some(a), Some(b)) => {
+                if a == b {
+                    a
+                } else {
+                    return Ok(false);
+                }
+            }
+            (Some(a), None) => a,
+            (None, Some(b)) => b,
+            (None, None) => return Err(VerificationError::InvalidKey),
+        };
+
+        Ok(ssi_jws::verify_bytes(algorithm, data, &self.public_key, signature).is_ok())
     }
 }
 

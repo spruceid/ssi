@@ -38,6 +38,8 @@ ssi-tzkey.workspace = true
 # ssi-vc.workspace = true
 # ssi-vc-data-integrity.workspace = true
 ssi-claims = { workspace = true, features = ["tezos", "dif", "secp256k1"] }
+ssi-json-ld.workspace = true
+json-syntax.workspace = true
 tokio = { version = "1.0", features = ["macros"] }
 wiremock = "0.5"
 linked-data = { workspace = true, features = ["derive"] }

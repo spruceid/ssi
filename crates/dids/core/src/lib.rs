@@ -15,7 +15,7 @@ pub mod verifier;
 
 pub use did::*;
 pub use document::Document;
-pub use resolution::DIDResolver;
+pub use resolution::{DIDMethodResolver, DIDResolver, StaticDIDResolver};
 pub use verifier::DIDVerifier;
 
 pub use json_ld;

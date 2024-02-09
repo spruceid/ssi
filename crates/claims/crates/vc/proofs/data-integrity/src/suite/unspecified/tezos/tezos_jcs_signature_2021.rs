@@ -61,19 +61,19 @@ impl TezosJcsSignature2021 {
 }
 
 impl<C, T: Serialize> CryptographicSuiteInput<T, C> for TezosJcsSignature2021 {
-    type Transform<'a> = std::future::Ready<Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a, C: 'a;
+    // type Transform<'a> = std::future::Ready<Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a, C: 'a;
 
     /// Transformation algorithm.
-    fn transform<'a, 'c: 'a>(
+    async fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
         context: &'a mut C,
         _options: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Self::Transform<'a>
+    ) -> Result<Self::Transformed, TransformError>
     where
         C: 'a,
     {
-        std::future::ready(transform(data, context))
+        transform(data, context)
     }
 }
 

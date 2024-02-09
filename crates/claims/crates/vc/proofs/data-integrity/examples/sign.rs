@@ -6,6 +6,7 @@ use iref::{Iri, IriBuf, Uri, UriBuf};
 use json_ld::{syntax::Print, Compact, Process};
 use rdf_types::{vocabulary::IriIndex, IndexVocabulary, IriVocabularyMut};
 use ssi_crypto::MessageSignatureError;
+use ssi_rdf::Expandable;
 use ssi_vc_data_integrity::{suite::Ed25519Signature2020, CryptographicSuiteInput};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
@@ -14,7 +15,7 @@ use ssi_verification_methods::{
 };
 use static_iref::{iri, iri_ref, uri};
 
-#[derive(linked_data::Serialize)]
+#[derive(Clone, linked_data::Serialize)]
 #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
 #[ld(type = "cred:VerifiableCredential")]
 pub struct Credential {
@@ -56,7 +57,16 @@ impl ssi_vc_core::Credential for Credential {
     }
 }
 
-#[derive(linked_data::Serialize)]
+impl<E> Expandable<E> for Credential {
+    type Error = std::convert::Infallible;
+    type Expanded = Self;
+
+    async fn expand(&self, _environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+        Ok(self.clone())
+    }
+}
+
+#[derive(Clone, linked_data::Serialize)]
 #[ld(prefix("ex" = "https://example.org/sign#"))]
 pub struct CredentialSubject {
     #[ld("ex:content")]

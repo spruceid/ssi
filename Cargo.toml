@@ -50,25 +50,6 @@ exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 # # keccak = ["eip"]
 # # sha = ["rsa"]
 
-[dependencies]
-# ssi-vc.workspace = true
-ssi-claims.workspace = true
-# # ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
-# # ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
-# # ssi-core = { path = "./ssi-core", version = "0.1" }
-# # ssi-dids = { path = "./ssi-dids", version = "0.1" }
-# # ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
-# # ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
-# # ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
-# # ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
-# # ssi-ldp = { path = "./ssi-ldp", version = "0.2", default-features = false }
-# # ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
-# # ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
-# ssi-vc.workspace = true
-# # ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
-# # ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
-# # ssi-sd-jwt = { path = "./ssi-sd-jwt", version = "0.1" }
-
 [workspace]
 members = [
   "crates/*",
@@ -106,6 +87,7 @@ ssi-caips = { path = "./crates/caips", version = "0.1" }
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1" }
 ssi-vc-core = { path = "./crates/claims/crates/vc/core", version = "0.1" }
 ssi-vc-data-integrity = { path = "./crates/claims/crates/vc/proofs/data-integrity", version = "0.3" }
+ssi-vc = { path = "./crates/claims/crates/vc", version = "0.1" }
 ssi-claims = { path = "./crates/claims", version = "0.1" }
 
 # DID methods
@@ -117,6 +99,7 @@ did-method-key = { path = "./crates/dids/methods/key", version = "0.2.1" }
 did-pkh = { path = "./crates/dids/methods/pkh", version = "0.2.1" }
 did-tz = { path = "./crates/dids/methods/tz", version = "0.2.1" }
 did-web = { path = "./crates/dids/methods/web", version = "0.2.2" }
+ssi-dids = { path = "./crates/dids", version = "0.2" }
 
 # other common dependencies
 async-trait = "0.1.68"
@@ -129,7 +112,7 @@ rdf-types = "0.18.3"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
 locspan = "0.8"
-json-syntax = "0.11.2"
+json-syntax = "0.11.3"
 nquads-syntax = "0.17"
 multibase = "0.9.1"
 # json-ld = "0.15"
@@ -146,11 +129,33 @@ linked-data = { git = "https://github.com/spruceid/linked-data-rs.git" }
 rand_chacha = "0.3.1"
 contextual = "0.1.6"
 lazy_static = "1.4.0"
+mown = "0.2.2"
 
-# [dev-dependencies]
-# async-std = { version = "1.9", features = ["attributes"] }
+[dependencies]
+# ssi-vc.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
+ssi-claims.workspace = true
+ssi-dids.workspace = true
+# # ssi-jwk = { path = "./ssi-jwk", version = "0.1", default-features = false }
+# # ssi-json-ld = { path = "./ssi-json-ld", version = "0.2", default-features = false }
+# # ssi-core = { path = "./ssi-core", version = "0.1" }
+# # ssi-dids = { path = "./ssi-dids", version = "0.1" }
+# # ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
+# # ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
+# # ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
+# # ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
+# # ssi-ldp = { path = "./ssi-ldp", version = "0.2", default-features = false }
+# # ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
+# # ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
+# ssi-vc.workspace = true
+# # ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1" }
+# # ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
 # uuid = { version = "0.8", features = ["v4", "serde"] }
-# serde_json = "1.0"
+serde_json.workspace = true
 # ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["example"] }
 
 # [package.metadata.docs.rs]

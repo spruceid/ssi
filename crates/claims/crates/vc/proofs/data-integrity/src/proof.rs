@@ -1,11 +1,12 @@
 use core::fmt;
+use std::ops::{Deref, DerefMut};
 
+use educe::Educe;
 use linked_data::{
     LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject,
     RdfLiteralValue,
 };
 
-use iref::{Iri, IriBuf};
 use json_ld::rdf::RDF_TYPE;
 use rdf_types::{Interpretation, Vocabulary, VocabularyMut};
 use ssi_security::CRYPTOSUITE;
@@ -60,6 +61,20 @@ impl<T: CryptographicSuite> PreparedProof<T> {
     }
 }
 
+impl<T: CryptographicSuite> Deref for PreparedProof<T> {
+    type Target = Proof<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.proof
+    }
+}
+
+impl<T: CryptographicSuite> DerefMut for PreparedProof<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.proof
+    }
+}
+
 impl<S: CryptographicSuite> ssi_vc_core::verification::ProofType for Proof<S> {
     type Prepared = PreparedProof<S>;
 }
@@ -69,6 +84,53 @@ impl<S: CryptographicSuite> ssi_vc_core::verification::UnprepareProof for Prepar
 
     fn unprepare(self) -> Self::Unprepared {
         self.proof
+    }
+}
+
+impl<T: CryptographicSuite> serde::Serialize for PreparedProof<T>
+where
+    T::VerificationMethod: serde::Serialize,
+    T::Options: serde::Serialize,
+    T::Signature: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.proof.serialize(serializer)
+    }
+}
+
+impl<T: CryptographicSuite> fmt::Debug for PreparedProof<T>
+where
+    T: fmt::Debug,
+    T::VerificationMethod: fmt::Debug,
+    T::Options: fmt::Debug,
+    T::Signature: fmt::Debug,
+    T::Hashed: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("PreparedProof { proof: ")?;
+        self.proof.fmt(f)?;
+        f.write_str(", hash: ")?;
+        self.hash.fmt(f)?;
+        f.write_str(" }")
+    }
+}
+
+impl<T: CryptographicSuite> Clone for PreparedProof<T>
+where
+    T: Clone,
+    T::VerificationMethod: Clone,
+    T::Options: Clone,
+    T::Signature: Clone,
+    T::Hashed: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            proof: self.proof.clone(),
+            hash: self.hash.clone(),
+        }
     }
 }
 

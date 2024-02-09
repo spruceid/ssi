@@ -24,3 +24,4 @@ ssi-claims-core.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 thiserror.workspace = true
+educe.workspace = true

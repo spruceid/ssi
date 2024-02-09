@@ -1,7 +1,7 @@
 //! EIP-712 Signature 2021 implementation.
 use rdf_types::Quad;
 use ssi_crypto::MessageSigner;
-use ssi_rdf::{AnyLdEnvironment, NQuadsStatement};
+use ssi_rdf::{AnyLdEnvironment, Expandable, NQuadsStatement};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019,
@@ -142,7 +142,7 @@ impl CryptographicSuite for Eip712Signature2021 {
     }
 }
 
-impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T> CryptographicSuiteInput<T, E>
+impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T> CryptographicSuiteInput<T, E>
     for Eip712Signature2021
 where
     E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
@@ -151,18 +151,23 @@ where
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
         + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    T: linked_data::LinkedData<I, V>,
+    T: Expandable<E>,
+    T::Expanded: linked_data::LinkedData<I, V>,
 {
-    type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, E: 't;
+    // type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, E: 't;
 
     /// Transformation algorithm.
-    fn transform<'t, 'c: 't>(
+    async fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
         context: &'t mut E,
         options: ProofConfigurationRef<'c, VerificationMethod>,
-    ) -> Self::Transform<'t> {
-        std::future::ready(transform(self, data, context, options))
+    ) -> Result<Self::Transformed, TransformError> {
+        let expanded = data
+            .expand(context)
+            .await
+            .map_err(|_| TransformError::ExpansionFailed)?;
+        transform(self, &expanded, context, options)
     }
 }
 

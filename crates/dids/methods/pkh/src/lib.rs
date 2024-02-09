@@ -722,10 +722,13 @@ mod tests {
     use iref::{IriBuf, UriBuf};
     use serde_json::{from_str, from_value, json};
     use ssi_claims::{
-        data_integrity::{
-            verification::method::{signer::SingleSecretSigner, ProofPurpose},
-            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
-            Proof, ProofConfiguration,
+        vc::{
+            data_integrity::{
+                verification::method::{signer::SingleSecretSigner, ProofPurpose},
+                AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, Proof,
+                ProofConfiguration,
+            },
+            Claims, JsonCredential, JsonPresentation,
         },
         Verifiable,
     };
@@ -932,39 +935,6 @@ mod tests {
         }
     }
 
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiableCredential")]
-    #[serde(rename_all = "camelCase")]
-    struct TestCredential {
-        #[ld("cred:issuer")]
-        issuer: IriBuf,
-
-        #[ld("cred:issuanceDate")]
-        issuance_date: xsd_types::DateTime,
-
-        #[ld("cred:credentialSubject")]
-        credential_subject: CredentialSubject,
-    }
-
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    struct CredentialSubject {
-        #[ld(id)]
-        id: IriBuf,
-    }
-
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiablePresentation")]
-    #[serde(rename_all = "camelCase")]
-    struct TestPresentation {
-        #[ld("cred:holder")]
-        holder: linked_data::Ref<UriBuf>,
-
-        #[ld("cred:verifiableCredential", graph)]
-        verifiable_credential: Verifiable<DataIntegrity<TestCredential, AnySuite>>,
-    }
-
     async fn credential_prove_verify_did_pkh(
         key: JWK,
         wrong_key: JWK,
@@ -972,10 +942,10 @@ mod tests {
         vm_relative_url: &str,
         proof_suite: AnySuite,
         eip712_domain_opt: Option<
-            ssi_claims::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
+            ssi_claims::vc::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
         >,
         vp_eip712_domain_opt: Option<
-            ssi_claims::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
+            ssi_claims::vc::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
         >,
     ) {
         let didpkh = DIDVerifier::new(DIDPKH);
@@ -984,13 +954,15 @@ mod tests {
         let did = DIDPKH.generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
-        let cred = TestCredential {
-            issuer: did.clone().into(),
-            issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: iri!("did:example:foo").to_owned(),
-            },
-        };
+        let cred = JsonCredential::new(
+            None,
+            did.clone().into_uri().into(),
+            "2021-03-18T16:38:25Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:foo"
+            })],
+        );
+
         let issue_options = ProofConfiguration {
             verification_method: IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
@@ -1027,25 +999,12 @@ mod tests {
         assert!(vc.verify(&didpkh).await.unwrap().is_valid());
 
         // Test that issuer property is used for verification.
-        let vc_bad_issuer = vc
-            .clone()
-            .async_try_map(|di, proof| async {
-                let mut cred = di.into_value();
-                cred.issuer = iri!("did:pkh:example:bad").to_owned();
-                // Rebuild the data-integrity credential with the bad issuer.
-                // This will use the cryptosuite to hash the credential.
-                DataIntegrity::new(
-                    cred,
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                )
-                .await
-                // Return it with the original proof.
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_invalid());
 
@@ -1064,15 +1023,12 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vc_fuzzed = vc.clone();
-        fuzz_proof_value(vc_fuzzed.proof_mut());
+        fuzz_proof_value(vc_fuzzed.proof_mut().first_mut().unwrap());
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // Make it into a VP.
-        let presentation = TestPresentation {
-            holder: linked_data::Ref(did.clone().into()),
-            verifiable_credential: vc,
-        };
+        let presentation = JsonPresentation::new(None, vec![vc], vec![did.clone().into()]);
 
         let vp_issue_options = ProofConfiguration {
             verification_method: IriBuf::new(did.to_string() + vm_relative_url)
@@ -1082,13 +1038,16 @@ mod tests {
             proof_purpose: ProofPurpose::Authentication,
             options: AnySuiteOptions {
                 eip712: vp_eip712_domain_opt.clone(),
-                // eip712_v0_1: vp_eip712_domain_opt.map(Into::into),
                 ..Default::default()
             }
             .with_public_key(key.to_public())
             .unwrap(),
         };
 
+        eprintln!(
+            "presentation: {}",
+            serde_json::to_string_pretty(&presentation).unwrap()
+        );
         let vp = proof_suite
             .sign(
                 presentation,
@@ -1104,30 +1063,17 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        fuzz_proof_value(vp_fuzzed.proof_mut());
+        fuzz_proof_value(vp_fuzzed.proof_mut().first_mut().unwrap());
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // Test that holder is verified.
-        let vp_bad_holder = vp
-            .clone()
-            .async_try_map(|di, proof| async {
-                let mut pres = di.into_value();
-                pres.holder = uri!("did:pkh:example:bad").to_owned().into();
-                // Rebuild the data-integrity presentation with the bad holder.
-                // This will use the cryptosuite to hash the presentation.
-                DataIntegrity::new(
-                    pres,
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                )
-                .await
-                // Return it with the original proof.
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vp_bad_holder = Claims::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
+            pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
+            pres
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
@@ -1143,13 +1089,14 @@ mod tests {
         let did = DIDPKH.generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
-        let cred = TestCredential {
-            issuer: did.clone().into(),
-            issuance_date: "2021-03-18T16:38:25Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: iri!("did:example:foo").to_owned(),
-            },
-        };
+        let cred = JsonCredential::new(
+            None,
+            did.clone().into_uri().into(),
+            "2021-03-18T16:38:25Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:foo"
+            })],
+        );
         let issue_options = ProofConfiguration {
             verification_method: IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
@@ -1177,27 +1124,12 @@ mod tests {
         assert!(vc.verify(&didpkh).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer = vc
-            .clone()
-            .async_map(|di, proof| async {
-                // Change the issuer in the Data Integrity credential.
-                let bad_di = di
-                    .map(
-                        AnyInputContext::default(),
-                        &proof_suite,
-                        issue_options.borrowed(),
-                        |mut t| {
-                            t.issuer = iri!("did:pkh:example:bad").to_owned();
-                            t
-                        },
-                    )
-                    .await
-                    .unwrap();
-
-                // Return the changed credential but with the same proof.
-                (bad_di, proof)
-            })
-            .await;
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_valid());
 
         // Check that proof JWK must match proof verificationMethod.
@@ -1215,15 +1147,12 @@ mod tests {
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
-        fuzz_proof_value(vc_fuzzed.proof_mut());
+        fuzz_proof_value(vc_fuzzed.proof_mut().first_mut().unwrap());
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
-        // // Make it into a VP
-        let presentation = TestPresentation {
-            holder: linked_data::Ref(did.clone().into()),
-            verifiable_credential: vc,
-        };
+        // Make it into a VP
+        let presentation = JsonPresentation::new(None, vec![vc], vec![did.clone().into()]);
 
         let vp_issue_options = ProofConfiguration {
             verification_method: IriBuf::new(did.to_string() + vm_relative_url)
@@ -1251,30 +1180,17 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        fuzz_proof_value(vp_fuzzed.proof_mut());
+        fuzz_proof_value(vp_fuzzed.proof_mut().first_mut().unwrap());
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // Test that holder is verified.
-        let vp_bad_holder = vp
-            .clone()
-            .async_try_map(|di, proof| async {
-                let mut pres = di.into_value();
-                pres.holder = uri!("did:pkh:example:bad").to_owned().into();
-                // Rebuild the data-integrity presentation with the bad holder.
-                // This will use the cryptosuite to hash the presentation.
-                DataIntegrity::new(
-                    pres,
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                )
-                .await
-                // Return it with the original proof.
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vp_bad_holder = Claims::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
+            pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
+            pres
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
@@ -1601,7 +1517,7 @@ mod tests {
         // TODO check warnings maybe?
         eprintln!("input: {vc_str}");
 
-        let vc = ssi_claims::data_integrity::from_json_ld_str_with_defaults(vc_str)
+        let vc = ssi_claims::vc::data_integrity::any_credential_from_json_str(vc_str)
             .await
             .unwrap();
 
@@ -1612,19 +1528,19 @@ mod tests {
         // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
 
         // Negative test: tamper with the VC and watch verification fail.
-        let bad_vc = vc
-            .clone()
-            .async_map(|di, mut proof| async move {
-                let (mut compact, expanded) = di.into_value().into_parts();
-
-                // Add a fake property in the compact VC form.
-                let obj = compact.document_mut().as_object_mut().unwrap();
-                obj.insert("foo".into(), "bar".into());
-
+        let bad_vc = Claims::tamper_with_proofs(
+            vc.clone(),
+            AnyInputContext::default(),
+            |mut cred| {
+                cred.additional_properties
+                    .insert("foo".into(), "bar".into());
+                cred
+            },
+            |mut proof| {
                 // Add the `foo` field to the EIP712 VC schema if necessary.
                 // This is required so hashing can succeed.
                 if let Some(eip712) = &mut proof.untyped_mut().options.eip712 {
-                    if let Some(ssi_claims::data_integrity::eip712::TypesOrURI::Object(types)) =
+                    if let Some(ssi_claims::vc::data_integrity::eip712::TypesOrURI::Object(types)) =
                         &mut eip712.types
                     {
                         let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
@@ -1637,7 +1553,7 @@ mod tests {
 
                 // Same as above but for the legacy EIP712 cryptosuite (v0.1).
                 if let Some(eip712) = &mut proof.untyped_mut().options.eip712_v0_1 {
-                    if let Some(ssi_claims::data_integrity::eip712::TypesOrURI::Object(types)) =
+                    if let Some(ssi_claims::vc::data_integrity::eip712::TypesOrURI::Object(types)) =
                         &mut eip712.types
                     {
                         let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
@@ -1648,30 +1564,11 @@ mod tests {
                     }
                 }
 
-                // Add a fake property in the expanded VC form.
-                let mut node = expanded.into_main_node().unwrap();
-                node.insert(
-                    json_ld::Id::iri(IriBuf::new("https://example.org/foo".to_string()).unwrap()),
-                    json_ld::Indexed::none(json_ld::Object::Value(json_ld::Value::Literal(
-                        json_ld::object::Literal::String("bar".into()),
-                        None,
-                    ))),
-                );
-
-                // Rebuild the Data-Integrity VC.
-                let bad_di = DataIntegrity::new(
-                    json_ld::Document::new(compact, json_ld::Indexed::none(node).into()),
-                    ssi_claims::data_integrity::AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                )
-                .await
-                .unwrap();
-
-                // Return the tempered VC with the original proof.
-                (bad_di, proof)
-            })
-            .await;
+                proof
+            },
+        )
+        .await
+        .unwrap();
 
         let verification_result = bad_vc.verify(&didpkh).await.unwrap();
         assert!(verification_result.is_invalid());

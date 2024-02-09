@@ -136,14 +136,16 @@ impl DIDMethodResolver for DIDWeb {
 
 #[cfg(test)]
 mod tests {
-    use iref::IriBuf;
-    use ssi_claims::data_integrity::{
-        verification::method::{signer::SingleSecretSigner, ProofPurpose},
-        AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
+    use ssi_claims::vc::{
+        data_integrity::{
+            verification::method::{signer::SingleSecretSigner, ProofPurpose},
+            AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
+        },
+        Claims, JsonCredential,
     };
     use ssi_dids_core::{did, DIDResolver, DIDVerifier, Document};
     use ssi_jwk::JWK;
-    use static_iref::iri;
+    use static_iref::{iri, uri};
 
     use super::*;
 
@@ -239,27 +241,6 @@ mod tests {
         shutdown().ok();
     }
 
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiableCredential")]
-    #[serde(rename_all = "camelCase")]
-    struct TestCredential {
-        #[ld("cred:issuer")]
-        issuer: IriBuf,
-
-        #[ld("cred:issuanceDate")]
-        issuance_date: xsd_types::DateTime,
-
-        #[ld("cred:credentialSubject")]
-        credential_subject: CredentialSubject,
-    }
-
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    struct CredentialSubject {
-        #[ld(id)]
-        id: IriBuf,
-    }
-
     #[tokio::test]
     async fn credential_prove_verify_did_web() {
         let didweb = DIDVerifier::new(DIDWeb);
@@ -269,13 +250,14 @@ mod tests {
             proxy.replace(Some(url));
         });
 
-        let cred = TestCredential {
-            issuer: did!("did:web:localhost").to_owned().into(),
-            issuance_date: "2021-01-26T16:57:27Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: did!("did:web:localhost").to_owned().into(),
-            },
-        };
+        let cred = JsonCredential::new(
+            None,
+            did!("did:web:localhost").to_owned().into_uri().into(),
+            "2021-01-26T16:57:27Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:web:localhost"
+            })],
+        );
 
         let key: JWK = include_str!("../../../../../tests/ed25519-2020-10-18.json")
             .parse()
@@ -298,27 +280,16 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
+        assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
         assert!(vc.verify(&didweb).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer = vc
-            .clone()
-            .async_try_map(|di, proof| async {
-                di.map(
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                    |mut cred| {
-                        cred.issuer = iri!("did:pkh:example:bad").to_owned();
-                        cred
-                    },
-                )
-                .await
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didweb).await.unwrap().is_invalid());
 

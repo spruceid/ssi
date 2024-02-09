@@ -367,10 +367,12 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
 
 #[cfg(test)]
 mod tests {
-    use iref::IriBuf;
     use rand_chacha::rand_core::SeedableRng as SeedableRngOld;
     use rand_chacha_old::rand_core::SeedableRng;
-    use ssi_claims::data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions};
+    use ssi_claims::vc::{
+        data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions},
+        Claims, JsonCredential,
+    };
     use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier, DIDURL};
     use ssi_vc_data_integrity::{
         verification::{
@@ -379,6 +381,7 @@ mod tests {
         },
         CryptographicSuiteInput, ProofConfiguration,
     };
+    use static_iref::uri;
 
     use super::*;
     // use ssi_dids_core::did_resolve::{dereference, Content, DereferencingInputMetadata};
@@ -498,29 +501,29 @@ mod tests {
         assert_eq!(did1, did);
     }
 
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiableCredential")]
-    #[serde(rename_all = "camelCase")]
-    struct TestCredential {
-        #[ld(id)]
-        id: Option<IriBuf>,
+    // #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    // #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
+    // #[ld(type = "cred:VerifiableCredential")]
+    // #[serde(rename_all = "camelCase")]
+    // struct TestCredential {
+    //     #[ld(id)]
+    //     id: Option<IriBuf>,
 
-        #[ld("cred:issuer")]
-        issuer: IriBuf,
+    //     #[ld("cred:issuer")]
+    //     issuer: IriBuf,
 
-        #[ld("cred:issuanceDate")]
-        issuance_date: xsd_types::DateTime,
+    //     #[ld("cred:issuanceDate")]
+    //     issuance_date: xsd_types::DateTime,
 
-        #[ld("cred:credentialSubject")]
-        credential_subject: CredentialSubject,
-    }
+    //     #[ld("cred:credentialSubject")]
+    //     credential_subject: CredentialSubject,
+    // }
 
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    struct CredentialSubject {
-        #[ld(id)]
-        id: IriBuf,
-    }
+    // #[derive(Clone, serde::Serialize, linked_data::Serialize)]
+    // struct CredentialSubject {
+    //     #[ld(id)]
+    //     id: IriBuf,
+    // }
 
     #[async_std::test]
     async fn credential_prove_verify_did_key() {
@@ -530,14 +533,14 @@ mod tests {
         let key = JWK::generate_ed25519_from(&mut rng).unwrap();
         let did = DIDKey::generate(&key).unwrap();
 
-        let cred = TestCredential {
-            id: Some(iri!("http://example.org/credentials/3731").to_owned()),
-            issuer: did.clone().into(),
-            issuance_date: "2020-08-19T21:41:50Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: iri!("did:example:d23dd687a7dc6787646f2eb98d0").to_owned(),
-            },
-        };
+        let cred = JsonCredential::new(
+            Some(uri!("http://example.org/credentials/3731").to_owned()),
+            did.clone().into_uri().into(),
+            "2020-08-19T21:41:50Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            })],
+        );
 
         let verification_method = DIDKey
             .resolve_into_any_verification_method(&did)
@@ -564,27 +567,16 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
+        assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
-        let vc_bad_issuer = vc
-            .clone()
-            .async_try_map(|di, proof| async {
-                di.map(
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                    |mut cred| {
-                        cred.issuer = iri!("did:pkh:example:bad").to_owned();
-                        cred
-                    },
-                )
-                .await
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_invalid());
     }
@@ -598,14 +590,14 @@ mod tests {
         let key = JWK::generate_secp256k1_from(&mut rng).unwrap();
         let did = DIDKey::generate(&key).unwrap();
 
-        let cred = TestCredential {
-            id: None,
-            issuer: did.clone().into(),
-            issuance_date: "2021-02-18T20:17:46Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: iri!("did:example:d23dd687a7dc6787646f2eb98d0").to_owned(),
-            },
-        };
+        let cred = JsonCredential::new(
+            None,
+            did.clone().into_uri().into(),
+            "2021-02-18T20:17:46Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            })],
+        );
 
         let verification_method = DIDKey
             .resolve_into_any_verification_method(&did)
@@ -632,27 +624,16 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
+        assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
-        let vc_bad_issuer = vc
-            .clone()
-            .async_try_map(|di, proof| async {
-                di.map(
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                    |mut cred| {
-                        cred.issuer = iri!("did:pkh:example:bad").to_owned();
-                        cred
-                    },
-                )
-                .await
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_invalid());
     }
@@ -666,14 +647,14 @@ mod tests {
         let key = JWK::generate_p256_from(&mut rng).unwrap();
         let did = DIDKey::generate(&key).unwrap();
 
-        let cred = TestCredential {
-            id: None,
-            issuer: did.clone().into(),
-            issuance_date: "2021-02-18T20:17:46Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: iri!("did:example:d23dd687a7dc6787646f2eb98d0").to_owned(),
-            },
-        };
+        let cred = JsonCredential::new(
+            None,
+            did.clone().into_uri().into(),
+            "2021-02-18T20:17:46Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:d23dd687a7dc6787646f2eb98d0"
+            })],
+        );
 
         let verification_method = DIDKey
             .resolve_into_any_verification_method(&did)
@@ -703,23 +684,12 @@ mod tests {
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
-        let vc_bad_issuer = vc
-            .clone()
-            .async_try_map(|di, proof| async {
-                di.map(
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                    |mut cred| {
-                        cred.issuer = iri!("did:pkh:example:bad").to_owned();
-                        cred
-                    },
-                )
-                .await
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_invalid());
     }

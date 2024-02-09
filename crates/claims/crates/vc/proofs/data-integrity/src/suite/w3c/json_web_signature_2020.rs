@@ -85,10 +85,11 @@ impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureA
     fn verify(
         &self,
         _options: (),
-        _signature: JwsSignatureRef,
-        _method: &JsonWebKey2020,
-        _bytes: &[u8],
+        signature: JwsSignatureRef,
+        method: &JsonWebKey2020,
+        bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
+        let (signing_bytes, signature_bytes, algorithm) = signature.decode(bytes)?;
+        method.verify_bytes(&signing_bytes, &signature_bytes, Some(algorithm))
     }
 }

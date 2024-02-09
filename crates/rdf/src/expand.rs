@@ -1,17 +1,21 @@
-use std::{hash::Hash, ops::Deref};
+use std::{borrow::Cow, hash::Hash, ops::Deref};
 
 use grdf::BTreeDataset;
 use linked_data::{LinkedData, LinkedDataResource};
-use rdf_types::{BlankIdVocabulary, ExportedFromVocabulary, Interpretation, InterpretationMut, IriVocabulary, LiteralVocabulary, ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseLiteralInterpretation, Vocabulary};
+use rdf_types::{
+    BlankIdVocabulary, ExportedFromVocabulary, Interpretation, InterpretationMut, IriVocabulary,
+    LiteralVocabulary, ReverseBlankIdInterpretation, ReverseIriInterpretation,
+    ReverseLiteralInterpretation, Vocabulary,
+};
 
 /// LD-Expandable value.
 pub trait Expandable<E>: Sized {
     type Error;
 
-    type Resource;
+    type Expanded;
 
     #[allow(async_fn_in_trait)]
-    async fn expand(self, environment: &mut E) -> Result<Expanded<Self, Self::Resource>, Self::Error>;
+    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error>;
 }
 
 pub trait AnyLdEnvironment {
@@ -19,7 +23,9 @@ pub trait AnyLdEnvironment {
 
     type Interpretation: Interpretation;
 
-    fn as_ld_environment_mut(&mut self) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation>;
+    fn as_ld_environment_mut(
+        &mut self,
+    ) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation>;
 
     /// Returns the list of quads in the dataset.
     ///
@@ -34,14 +40,11 @@ pub trait AnyLdEnvironment {
             + ReverseIriInterpretation<Iri = <Self::Vocabulary as IriVocabulary>::Iri>
             + ReverseBlankIdInterpretation<BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId>
             + ReverseLiteralInterpretation<Literal = <Self::Vocabulary as LiteralVocabulary>::Literal>,
-        <Self::Vocabulary as LiteralVocabulary>::Literal: ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
+        <Self::Vocabulary as LiteralVocabulary>::Literal:
+            ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
     {
         let this = self.as_ld_environment_mut();
-        linked_data::to_lexical_quads_with(
-            this.vocabulary,
-            this.interpretation,
-            input
-        )
+        linked_data::to_lexical_quads_with(this.vocabulary, this.interpretation, input)
     }
 
     /// Returns the canonical form of the dataset, in the N-Quads format.
@@ -55,13 +58,11 @@ pub trait AnyLdEnvironment {
             + ReverseIriInterpretation<Iri = <Self::Vocabulary as IriVocabulary>::Iri>
             + ReverseBlankIdInterpretation<BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId>
             + ReverseLiteralInterpretation<Literal = <Self::Vocabulary as LiteralVocabulary>::Literal>,
-        <Self::Vocabulary as LiteralVocabulary>::Literal: ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
+        <Self::Vocabulary as LiteralVocabulary>::Literal:
+            ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
     {
         let quads = self.into_quads(input)?;
-        Ok(
-            crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref()))
-                .into_nquads(),
-        )
+        Ok(crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref())).into_nquads())
     }
 }
 
@@ -74,13 +75,10 @@ pub struct LdEnvironment<V = (), I = ()> {
 }
 
 impl<V, I> LdEnvironment<V, I> {
-    pub fn new(
-        vocabulary: V,
-        interpretation: I,
-    ) -> Self {
+    pub fn new(vocabulary: V, interpretation: I) -> Self {
         Self {
             vocabulary,
-            interpretation
+            interpretation,
         }
     }
 }
@@ -89,10 +87,12 @@ impl<V, I: Interpretation> AnyLdEnvironment for LdEnvironment<V, I> {
     type Vocabulary = V;
     type Interpretation = I;
 
-    fn as_ld_environment_mut(&mut self) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation> {
+    fn as_ld_environment_mut(
+        &mut self,
+    ) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation> {
         LdEnvironment {
             vocabulary: &mut self.vocabulary,
-            interpretation: &mut self.interpretation
+            interpretation: &mut self.interpretation,
         }
     }
 }
@@ -113,7 +113,7 @@ impl<V, I: Interpretation> AnyLdEnvironment for LdEnvironment<V, I> {
 //     I::Resource: Clone + Ord,
 // {
 //     type Error = linked_data::IntoQuadsError;
-    
+
 //     type Resource = I::Resource;
 
 //     async fn expand(
@@ -131,124 +131,124 @@ impl<V, I: Interpretation> AnyLdEnvironment for LdEnvironment<V, I> {
 //     }
 // }
 
-/// LD-Expanded value.
-pub struct Expanded<C, R = rdf_types::Term> {
-    /// Compact value.
-    compact: C,
+// /// LD-Expanded value.
+// pub struct Expanded<C, R = rdf_types::Term> {
+//     /// Compact value.
+//     compact: C,
 
-    /// Expanded value (the RDF dataset).
-    dataset: BTreeDataset<R>,
+//     /// Expanded value (the RDF dataset).
+//     dataset: BTreeDataset<R>,
 
-    /// Resource representing the compact value in the dataset.
-    subject: R,
-}
+//     /// Resource representing the compact value in the dataset.
+//     subject: R,
+// }
 
-impl<C, R> Expanded<C, R> {
-    pub fn new(compact: C, dataset: BTreeDataset<R>, subject: R) -> Self {
-        Self {
-            compact,
-            dataset,
-            subject,
-        }
-    }
+// impl<C, R> Expanded<C, R> {
+//     pub fn new(compact: C, dataset: BTreeDataset<R>, subject: R) -> Self {
+//         Self {
+//             compact,
+//             dataset,
+//             subject,
+//         }
+//     }
 
-    pub fn rdf_dataset(&self) -> &BTreeDataset<R> {
-        &self.dataset
-    }
+//     pub fn rdf_dataset(&self) -> &BTreeDataset<R> {
+//         &self.dataset
+//     }
 
-    pub fn rdf_subject(&self) -> &R {
-        &self.subject
-    }
+//     pub fn rdf_subject(&self) -> &R {
+//         &self.subject
+//     }
 
-    pub fn into_rdf_parts(self) -> (BTreeDataset<R>, R) {
-        (self.dataset, self.subject)
-    }
-}
+//     pub fn into_rdf_parts(self) -> (BTreeDataset<R>, R) {
+//         (self.dataset, self.subject)
+//     }
+// }
 
-impl<C, R> Deref for Expanded<C, R> {
-    type Target = C;
+// impl<C, R> Deref for Expanded<C, R> {
+//     type Target = C;
 
-    fn deref(&self) -> &Self::Target {
-        &self.compact
-    }
-}
+//     fn deref(&self) -> &Self::Target {
+//         &self.compact
+//     }
+// }
 
-impl<C: serde::Serialize, R> serde::Serialize for Expanded<C, R> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: serde::Serializer {
-        self.compact.serialize(serializer)
-    }
-}
+// impl<C: serde::Serialize, R> serde::Serialize for Expanded<C, R> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//         where
+//             S: serde::Serializer {
+//         self.compact.serialize(serializer)
+//     }
+// }
 
-impl<I, V, C> linked_data::LinkedDataResource<I, V> for Expanded<C, I::Resource>
-where
-    I: Interpretation,
-    V: Vocabulary,
-{
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
-        linked_data::ResourceInterpretation::Interpreted(&self.subject)
-    }
-}
+// impl<I, V, C> linked_data::LinkedDataResource<I, V> for Expanded<C, I::Resource>
+// where
+//     I: Interpretation,
+//     V: Vocabulary,
+// {
+//     fn interpretation(
+//         &self,
+//         _vocabulary: &mut V,
+//         _interpretation: &mut I,
+//     ) -> linked_data::ResourceInterpretation<I, V> {
+//         linked_data::ResourceInterpretation::Interpreted(&self.subject)
+//     }
+// }
 
-impl<I, V, C> linked_data::LinkedDataSubject<I, V> for Expanded<C, I::Resource>
-where
-    I: Interpretation,
-    I::Resource: Ord + Hash + LinkedDataResource<I, V>,
-    V: Vocabulary,
-{
-    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<I, V>,
-    {
-        self.dataset
-            .view(None, &self.subject, grdf::IdentityAccess)
-            .visit_subject(serializer)
-    }
-}
+// impl<I, V, C> linked_data::LinkedDataSubject<I, V> for Expanded<C, I::Resource>
+// where
+//     I: Interpretation,
+//     I::Resource: Ord + Hash + LinkedDataResource<I, V>,
+//     V: Vocabulary,
+// {
+//     fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: linked_data::SubjectVisitor<I, V>,
+//     {
+//         self.dataset
+//             .view(None, &self.subject, grdf::IdentityAccess)
+//             .visit_subject(serializer)
+//     }
+// }
 
-impl<I, V, C> linked_data::LinkedDataPredicateObjects<I, V> for Expanded<C, I::Resource>
-where
-    I: Interpretation,
-    I::Resource: Ord + Hash + LinkedDataResource<I, V>,
-    V: Vocabulary,
-{
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-        where
-            S: linked_data::PredicateObjectsVisitor<I, V> {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
+// impl<I, V, C> linked_data::LinkedDataPredicateObjects<I, V> for Expanded<C, I::Resource>
+// where
+//     I: Interpretation,
+//     I::Resource: Ord + Hash + LinkedDataResource<I, V>,
+//     V: Vocabulary,
+// {
+//     fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+//         where
+//             S: linked_data::PredicateObjectsVisitor<I, V> {
+//         visitor.object(self)?;
+//         visitor.end()
+//     }
+// }
 
-impl<I, V, C> linked_data::LinkedDataGraph<I, V> for Expanded<C, I::Resource>
-where
-    I: Interpretation,
-    I::Resource: Ord + Hash + LinkedDataResource<I, V>,
-    V: Vocabulary,
-{
-    fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-        where
-            S: linked_data::GraphVisitor<I, V> {
-        visitor.subject(self)?;
-        visitor.end()
-    }
-}
+// impl<I, V, C> linked_data::LinkedDataGraph<I, V> for Expanded<C, I::Resource>
+// where
+//     I: Interpretation,
+//     I::Resource: Ord + Hash + LinkedDataResource<I, V>,
+//     V: Vocabulary,
+// {
+//     fn visit_graph<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+//         where
+//             S: linked_data::GraphVisitor<I, V> {
+//         visitor.subject(self)?;
+//         visitor.end()
+//     }
+// }
 
-impl<I, V, C> linked_data::LinkedData<I, V> for Expanded<C, I::Resource>
-where
-    I: Interpretation,
-    I::Resource: Ord + Hash + LinkedDataResource<I, V>,
-    V: Vocabulary,
-{
-    fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-        where
-            S: linked_data::Visitor<I, V> {
-        visitor.default_graph(self)?;
-        visitor.end()
-    }
-}
+// impl<I, V, C> linked_data::LinkedData<I, V> for Expanded<C, I::Resource>
+// where
+//     I: Interpretation,
+//     I::Resource: Ord + Hash + LinkedDataResource<I, V>,
+//     V: Vocabulary,
+// {
+//     fn visit<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+//         where
+//             S: linked_data::Visitor<I, V> {
+//         visitor.default_graph(self)?;
+//         visitor.end()
+//     }
+// }

@@ -60,6 +60,7 @@ ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-verification-methods.workspace = true
 ssi-claims-core.workspace = true
+ssi-vc.workspace = true
 ssi-vc-data-integrity.workspace = true
 ssi-dids-core.workspace = true
 ssi-eip712 = { workspace = true, optional = true }

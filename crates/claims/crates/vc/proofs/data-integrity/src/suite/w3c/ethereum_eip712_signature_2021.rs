@@ -230,7 +230,7 @@ impl<'a> VerificationMethodRef<'a> {
                 signature,
                 ecdsa_secp_256k1_recovery_method_2020::DigestFunction::Keccack,
             ),
-            Self::JsonWebKey2020(m) => m.verify_bytes(bytes, signature),
+            Self::JsonWebKey2020(m) => m.verify_bytes(bytes, signature, None),
         }
     }
 }
@@ -295,14 +295,14 @@ where
     for<'a> <Self::VerificationMethod as Referencable>::Reference<'a>: serde::Serialize,
     for<'a> <Self::Options as Referencable>::Reference<'a>: serde::Serialize,
 {
-    type Transform<'a> = Transform<'a, C> where Self: 'a, T: 'a, C: 'a;
+    // type Transform<'a> = Transform<'a, C> where Self: 'a, T: 'a, C: 'a;
 
-    fn transform<'a, 'c: 'a>(
+    async fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
         context: &'a mut C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Self::Transform<'a>
+    ) -> Result<Self::Transformed, TransformError>
     where
         C: 'a,
     {
@@ -313,6 +313,7 @@ where
             &PROOF_CONTEXT,
             "EthereumEip712Signature2021",
         )
+        .await
     }
 }
 

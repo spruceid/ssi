@@ -1,104 +1,34 @@
-use std::collections::HashMap;
-
 use crate::DIDResolver;
 
-use super::DIDMethodResolver;
+use super::{DIDMethodResolver, Error};
 
-// /// Compose multiple DID method resolvers into a DID resolver.
-// #[derive(Default)]
-// pub struct MethodComposition<'a> {
-//     methods: HashMap<String, Box<dyn 'a + DIDMethodResolver>>,
-// }
+macro_rules! define_composition {
+	($($n:tt: $ty:ident),*) => {
+		impl<$($ty : DIDMethodResolver,)*> DIDResolver for ($($ty,)*) {
+			async fn resolve_representation<'a>(
+				&'a self,
+				did: &'a crate::DID,
+				options: super::Options,
+			) -> Result<super::Output<Vec<u8>>, Error> {
+				let method = did.method_name();
 
-// impl<'a> MethodComposition<'a> {
-//     pub fn insert(&mut self, resolver: impl 'a + DIDMethodResolver) {
-//         let method = resolver.method_name().to_string();
-//         self.methods.insert(method, Box::new(resolver));
-//     }
-// }
+				$(
+					if $ty::DID_METHOD_NAME == method {
+						return self.$n.resolve_method_representation(did.method_specific_id(), options).await
+					}
+				)*
 
-// impl<'a> DIDResolver for MethodComposition<'a> {
-//     fn get_method(&self, method_name: &str) -> Option<&dyn DIDMethodResolver> {
-//         self.methods.get(method_name).map(|m| &**m)
-//     }
-// }
+				Err(Error::MethodNotSupported(method.to_owned()))
+			}
+		}
+	};
+}
 
-// #[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-// #[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-// impl<'a> DIDResolver for SeriesResolver<'a> {
-//     /// Resolve a DID using a series of DID resolvers.
-//     ///
-//     /// The first DID resolution result that is not a [`methodNotSupported`][ERROR_METHOD_NOT_SUPPORTED] error is returned as the
-//     /// result.
-//     async fn resolve(
-//         &self,
-//         did: &str,
-//         input_metadata: &ResolutionInputMetadata,
-//     ) -> (
-//         ResolutionMetadata,
-//         Option<Document>,
-//         Option<DocumentMetadata>,
-//     ) {
-//         for resolver in &self.resolvers {
-//             let (res_meta, doc_opt, doc_meta_opt) = resolver.resolve(did, input_metadata).await;
-//             let method_supported = match res_meta.error {
-//                 None => true,
-//                 Some(ref err) => err != ERROR_METHOD_NOT_SUPPORTED,
-//             };
-//             if method_supported {
-//                 return (res_meta, doc_opt, doc_meta_opt);
-//             }
-//         }
-//         (
-//             ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED),
-//             None,
-//             None,
-//         )
-//     }
-
-//     /// Resolve a DID in a representation using a series of DID resolvers.
-//     async fn resolve_representation(
-//         &self,
-//         did: &str,
-//         input_metadata: &ResolutionInputMetadata,
-//     ) -> (ResolutionMetadata, Vec<u8>, Option<DocumentMetadata>) {
-//         for resolver in &self.resolvers {
-//             let (res_meta, doc_data, doc_meta_opt) =
-//                 resolver.resolve_representation(did, input_metadata).await;
-//             let method_supported = match res_meta.error {
-//                 None => true,
-//                 Some(ref err) => err != ERROR_METHOD_NOT_SUPPORTED,
-//             };
-//             if method_supported {
-//                 return (res_meta, doc_data, doc_meta_opt);
-//             }
-//         }
-//         (
-//             ResolutionMetadata::from_error(ERROR_METHOD_NOT_SUPPORTED),
-//             Vec::new(),
-//             None,
-//         )
-//     }
-
-//     /// Dereference a DID URL using a series of DID resolvers (DID URL dereferencers).
-//     async fn dereference(
-//         &self,
-//         primary_did_url: &PrimaryDIDURL,
-//         input_metadata: &DereferencingInputMetadata,
-//     ) -> Option<(DereferencingMetadata, Content, ContentMetadata)> {
-//         for resolver in &self.resolvers {
-//             if let Some((deref_meta, content, content_meta)) =
-//                 resolver.dereference(primary_did_url, input_metadata).await
-//             {
-//                 let method_supported = match deref_meta.error {
-//                     None => true,
-//                     Some(ref err) => err != ERROR_METHOD_NOT_SUPPORTED,
-//                 };
-//                 if method_supported {
-//                     return Some((deref_meta, content, content_meta));
-//                 }
-//             }
-//         }
-//         None
-//     }
-// }
+define_composition!(0: T0);
+define_composition!(0: T0, 1: T1);
+define_composition!(0: T0, 1: T1, 2: T2);
+define_composition!(0: T0, 1: T1, 2: T2, 3: T3);
+define_composition!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4);
+define_composition!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5);
+define_composition!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6);
+define_composition!(0: T0, 1: T1, 2: T2, 3: T3, 4: T4, 5: T5, 6: T6, 7: T7);

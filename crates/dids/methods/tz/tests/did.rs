@@ -2,18 +2,18 @@ use did_tz::DIDTz;
 use iref::{IriBuf, UriBuf};
 use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
-use ssi_claims::{
+use ssi_claims::vc::{
     data_integrity::{
         verification::method::{signer::SingleSecretSigner, ProofPurpose},
-        AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
-        LinkedDataInput, ProofConfiguration,
+        AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration,
     },
-    Verifiable,
+    Claims, JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier};
+use ssi_json_ld::JsonLdEnvironment;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use static_iref::iri;
+use static_iref::{iri, uri};
 
 const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";
 const TZ1_JSON: &str = "{\"kty\":\"OKP\",\"crv\":\"Ed25519\",\"x\":\"GvidwVqGgicuL68BRM89OOtDzK1gjs8IqUXFkjKkm8Iwg18slw==\",\"d\":\"K44dAtJ-MMl-JKuOupfcGRPI5n3ZVH_Gk65c6Rcgn_IV28987PMw_b6paCafNOBOi5u-FZMgGJd3mc5MkfxfwjCrXQM-\"}";
@@ -166,20 +166,6 @@ async fn test_derivation_tz3() {
     )
 }
 
-#[derive(Clone, serde::Serialize, linked_data::Serialize)]
-#[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-#[ld(type = "cred:VerifiableCredential")]
-struct Credential {
-    #[ld("cred:issuer")]
-    issuer: IriBuf,
-
-    #[ld("cred:issuanceDate")]
-    issuance_date: xsd_types::DateTime,
-
-    #[ld("cred:credentialSubject")]
-    credential_subject: IriBuf,
-}
-
 #[tokio::test]
 async fn credential_prove_verify_did_tz1() {
     // use ssi_claims::{Credential, Issuer, LinkedDataProofOptions, URI};
@@ -216,123 +202,77 @@ async fn credential_prove_verify_did_tz1() {
     )));
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
+    let cred = JsonVerifiableCredential::new(
+        None,
+        did.clone().into_uri().into(),
+        "2021-01-27T16:39:07Z".parse().unwrap(),
+        vec![json_syntax::json!({
+            "id": "did:example:foo"
+        })],
+        vec![ssi_claims::vc::data_integrity::Proof::new(
+            ssi_claims::vc::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            "2021-03-02T18:59:44.462Z".parse().unwrap(),
+            iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
+            ProofPurpose::Assertion,
+            ssi_claims::vc::data_integrity::suite::tezos::Options::new(
+                r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
+            ),
+            ssi_claims::vc::data_integrity::suite::JwsSignature::new(
+                "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
+            )
+        )]
+    );
 
-    let cred = Credential {
-        issuer: did.clone().into(),
-        issuance_date: "2021-01-27T16:39:07Z".parse().unwrap(),
-        credential_subject: iri!("did:example:foo").to_owned(),
-    };
-
-    let proof = ssi_claims::data_integrity::Proof::new(
-		ssi_claims::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-		"2021-03-02T18:59:44.462Z".parse().unwrap(),
-		iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
-		ProofPurpose::Assertion,
-        ssi_claims::data_integrity::suite::tezos::Options::new(
-            r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
-        ),
-		ssi_claims::data_integrity::suite::JwsSignature::new(
-			"eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
-		)
-	);
-
-    println!("{}", serde_json::to_string_pretty(&proof).unwrap());
-
-    let ldp_cred = ssi_claims::data_integrity::DataIntegrity::new(
-        cred,
-        LinkedDataInput::default(),
-        proof.suite(),
-        proof.configuration(),
-    )
-    .await
-    .unwrap();
-
-    let vc = ssi_claims::Verifiable::new(ldp_cred, proof);
+    let vc = Claims::new_with(cred, JsonLdEnvironment::default())
+        .await
+        .unwrap();
 
     assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // test that issuer property is used for verification
-    let mut cred_bad_issuer = vc.credential().value().clone();
-    cred_bad_issuer.issuer = iri!("did:example:bad").to_owned();
-
-    let ldp_cred_bad_issuer = ssi_claims::data_integrity::DataIntegrity::new(
-        cred_bad_issuer,
-        LinkedDataInput::default(),
-        vc.proof().suite(),
-        vc.proof().configuration(),
-    )
+    let vc_bad_issuer = Claims::tamper(vc.clone(), JsonLdEnvironment::default(), |mut cred| {
+        cred.issuer = uri!("did:example:bad").to_owned().into();
+        cred
+    })
     .await
     .unwrap();
-
-    let vc_bad_issuer = ssi_claims::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
 
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer = SingleSecretSigner::new(&didtz, JWK::generate_ed25519().unwrap());
-    let vc_wrong_key = ssi_claims::data_integrity::DataIntegrity::<
-        _, // Credential,
-        ssi_claims::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-    >::sign(
-        vc.credential().value().clone(),
-        LinkedDataInput::default(),
+    let vc_wrong_key =
+    ssi_claims::vc::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021.sign(
+        vc.claims().credential().clone(),
+        JsonLdEnvironment::default(),
         &wrong_signer,
-        ssi_claims::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-        vc.proof().clone_configuration(),
+        vc.proof().first().unwrap().clone_configuration()
     )
     .await
     .unwrap();
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
-    // Make it into a VP
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiablePresentation")]
-    struct Presentation {
-        #[ld(id)]
-        id: IriBuf,
+    let presentation = JsonVerifiablePresentation::new(
+        Some(uri!("http://example.org/presentations/3731").to_owned()),
+        vec![vc],
+        vec![did.into()],
+        vec![ssi_claims::vc::data_integrity::Proof::new(
+            ssi_claims::vc::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+            "2021-03-02T19:05:08.271Z".parse().unwrap(),
+            iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
+            ProofPurpose::Authentication,
+            ssi_claims::vc::data_integrity::suite::tezos::Options::new(
+                r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
+            ),
+            ssi_claims::vc::data_integrity::suite::JwsSignature::new(
+                "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
+            )
+        )]
+    );
 
-        #[ld("cred:holder")]
-        holder: linked_data::Ref<UriBuf>,
-
-        #[ld("cred:verifiableCredential", graph)]
-        verifiable_credential: Verifiable<
-            DataIntegrity<
-                Credential,
-                ssi_claims::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-            >,
-        >,
-    }
-
-    let presentation = Presentation {
-        id: iri!("http://example.org/presentations/3731").to_owned(),
-        holder: linked_data::Ref(did.into()),
-        verifiable_credential: vc,
-    };
-
-    let vp_proof = ssi_claims::data_integrity::Proof::new(
-		ssi_claims::data_integrity::suite::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-		"2021-03-02T19:05:08.271Z".parse().unwrap(),
-		iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
-		ProofPurpose::Authentication,
-        ssi_claims::data_integrity::suite::tezos::Options::new(
-            r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
-        ),
-		ssi_claims::data_integrity::suite::JwsSignature::new(
-			"eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
-		)
-	);
-
-    let ldp_vp = ssi_claims::data_integrity::DataIntegrity::new(
-        presentation.clone(),
-        LinkedDataInput::default(),
-        vp_proof.suite(),
-        vp_proof.configuration(),
-    )
-    .await
-    .unwrap();
-
-    let vp = ssi_claims::Verifiable::new(ldp_vp, vp_proof.clone());
+    let vp = Claims::new_with(presentation, JsonLdEnvironment::default())
+        .await
+        .unwrap();
 
     println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
 
@@ -340,22 +280,21 @@ async fn credential_prove_verify_did_tz1() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().signature_mut().jws =
-        CompactJWSString::from_string(format!("x{}", vp1.proof_mut().signature_mut().jws)).unwrap();
+    vp1.proof_mut().first_mut().unwrap().signature_mut().jws =
+        CompactJWSString::from_string(format!(
+            "x{}",
+            vp1.proof_mut().first_mut().unwrap().signature_mut().jws
+        ))
+        .unwrap();
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let mut presentation2 = presentation.clone();
-    presentation2.holder = linked_data::Ref(did!("did:example:bad").to_owned().into());
-    let ldp_vp2 = ssi_claims::data_integrity::DataIntegrity::new(
-        presentation2,
-        LinkedDataInput::default(),
-        vp_proof.suite(),
-        vp_proof.configuration(),
-    )
+    let mut vp2 = Claims::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
+        pres.holders = vec![did!("did:example:bad").to_owned().into()];
+        pres
+    })
     .await
     .unwrap();
-    let vp2 = ssi_claims::Verifiable::new(ldp_vp2, vp_proof);
     assert!(vp2.verify(&didtz).await.unwrap().is_invalid());
 }
 
@@ -370,11 +309,14 @@ async fn credential_prove_verify_did_tz2() {
     key.algorithm = Some(Algorithm::ES256KR);
     let did = DIDTZ.generate(&key).unwrap();
 
-    let cred = Credential {
-        issuer: did.clone().into(),
-        issuance_date: "2021-02-18T20:23:13Z".parse().unwrap(),
-        credential_subject: did!("did:example:foo").to_owned().into(),
-    };
+    let cred = JsonCredential::new(
+        None,
+        did.clone().into_uri().into(),
+        "2021-02-18T20:23:13Z".parse().unwrap(),
+        vec![json_syntax::json!({
+            "id": "did:example:foo"
+        })],
+    );
 
     let didtz = DIDVerifier::new(DIDTZ);
     let signer = SingleSecretSigner::new(&didtz, key.clone());
@@ -396,17 +338,12 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // Test that issuer property is used for verification.
-    let mut cred_bad_issuer = vc.credential().value().clone();
-    cred_bad_issuer.issuer = iri!("did:example:bad").to_owned();
-    let ldp_cred_bad_issuer = ssi_claims::data_integrity::DataIntegrity::new(
-        cred_bad_issuer,
-        AnyInputContext::default(),
-        vc.proof().suite(),
-        vc.proof().configuration(),
-    )
+    let mut vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+        cred.issuer = uri!("did:example:bad").to_owned().into();
+        cred
+    })
     .await
     .unwrap();
-    let vc_bad_issuer = ssi_claims::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     // Check that proof JWK must match proof verificationMethod
@@ -414,35 +351,20 @@ async fn credential_prove_verify_did_tz2() {
         SingleSecretSigner::new(&didtz, JWK::generate_secp256k1_from(&mut rng).unwrap());
     let vc_wrong_key = suite
         .sign(
-            vc.credential().value().clone(),
+            vc.claims().credential().clone(),
             AnyInputContext::default(),
             &wrong_signer,
-            vc.proof().clone_configuration(),
+            vc.proof().first().unwrap().clone_configuration(),
         )
         .await
         .unwrap();
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
-    // Make it into a VP
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiablePresentation")]
-    struct Presentation {
-        #[ld(id)]
-        id: IriBuf,
-
-        #[ld("cred:holder")]
-        holder: linked_data::Ref<UriBuf>,
-
-        #[ld("cred:verifiableCredential", graph)]
-        verifiable_credential: Verifiable<DataIntegrity<Credential, AnySuite>>,
-    }
-
-    let presentation = Presentation {
-        id: iri!("http://example.org/presentations/3731").to_owned(),
-        holder: linked_data::Ref(did.clone().into()),
-        verifiable_credential: vc,
-    };
+    let presentation = JsonPresentation::new(
+        Some(uri!("http://example.org/presentations/3731").to_owned()),
+        vec![vc],
+        vec![did.clone().into()],
+    );
 
     let vp_issue_options = ProofConfiguration::new(
         "2021-02-18T20:23:13Z".parse().unwrap(),
@@ -467,24 +389,28 @@ async fn credential_prove_verify_did_tz2() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().signature_mut().jws = Some(
-        CompactJWSString::from_string(format!("x{}", vp.proof().signature().jws.as_ref().unwrap()))
-            .unwrap(),
+    vp1.proof_mut().first_mut().unwrap().signature_mut().jws = Some(
+        CompactJWSString::from_string(format!(
+            "x{}",
+            vp.proof()
+                .first()
+                .unwrap()
+                .signature()
+                .jws
+                .as_ref()
+                .unwrap()
+        ))
+        .unwrap(),
     );
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let mut presentation2 = vp.credential().value().clone();
-    presentation2.holder = linked_data::Ref(did!("did:example:bad").to_owned().into());
-    let ldp_vp2 = ssi_claims::data_integrity::DataIntegrity::new(
-        presentation2,
-        AnyInputContext::default(),
-        vp.proof().suite(),
-        vp.proof().configuration(),
-    )
+    let vp2 = Claims::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
+        pres.holders = vec![did!("did:example:bad").to_owned().into()];
+        pres
+    })
     .await
     .unwrap();
-    let vp2 = ssi_claims::Verifiable::new(ldp_vp2, vp.proof().clone());
     assert!(vp2.verify(&didtz).await.unwrap().is_invalid());
 }
 
@@ -497,11 +423,14 @@ async fn credential_prove_verify_did_tz3() {
     key.algorithm = Some(Algorithm::ESBlake2b);
     let did = DIDTZ.generate(&key).unwrap();
 
-    let cred = Credential {
-        issuer: did.clone().into(),
-        issuance_date: "2021-03-04T14:18:21Z".parse().unwrap(),
-        credential_subject: did!("did:example:foo").to_owned().into(),
-    };
+    let cred = JsonCredential::new(
+        None,
+        did.clone().into_uri().into(),
+        "2021-03-04T14:18:21Z".parse().unwrap(),
+        vec![json_syntax::json!({
+            "id": "did:example:foo"
+        })],
+    );
 
     let didtz = DIDVerifier::new(DIDTZ);
     let signer = SingleSecretSigner::new(&didtz, key.clone());
@@ -526,52 +455,32 @@ async fn credential_prove_verify_did_tz3() {
     assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // Test that issuer property is used for verification.
-    let mut cred_bad_issuer = vc.credential().value().clone();
-    cred_bad_issuer.issuer = iri!("did:example:bad").to_owned();
-    let ldp_cred_bad_issuer = ssi_claims::data_integrity::DataIntegrity::new(
-        cred_bad_issuer,
-        AnyInputContext::default(),
-        vc.proof().suite(),
-        vc.proof().configuration(),
-    )
+    let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+        cred.issuer = uri!("did:example:bad").to_owned().into();
+        cred
+    })
     .await
     .unwrap();
-    let vc_bad_issuer = ssi_claims::Verifiable::new(ldp_cred_bad_issuer, vc.proof().clone());
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer = SingleSecretSigner::new(&didtz, JWK::generate_p256_from(&mut rng).unwrap());
     let vc_wrong_key = suite
         .sign(
-            vc.credential().value().clone(),
+            vc.claims().credential().clone(),
             AnyInputContext::default(),
             &wrong_signer,
-            vc.proof().clone_configuration(),
+            vc.proof().first().unwrap().clone_configuration(),
         )
         .await
         .unwrap();
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_invalid());
 
-    // Make it into a VP
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiablePresentation")]
-    struct Presentation {
-        #[ld(id)]
-        id: IriBuf,
-
-        #[ld("cred:holder")]
-        holder: linked_data::Ref<UriBuf>,
-
-        #[ld("cred:verifiableCredential", graph)]
-        verifiable_credential: Verifiable<DataIntegrity<Credential, AnySuite>>,
-    }
-
-    let presentation = Presentation {
-        id: iri!("http://example.org/presentations/3731").to_owned(),
-        holder: linked_data::Ref(did.clone().into()),
-        verifiable_credential: vc,
-    };
+    let presentation = JsonPresentation::new(
+        Some(uri!("http://example.org/presentations/3731").to_owned()),
+        vec![vc],
+        vec![did.clone().into()],
+    );
 
     let vp_issue_options = ProofConfiguration::new(
         "2021-03-04T14:18:21Z".parse().unwrap(),
@@ -598,23 +507,27 @@ async fn credential_prove_verify_did_tz3() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().signature_mut().jws = Some(
-        CompactJWSString::from_string(format!("x{}", vp.proof().signature().jws.as_ref().unwrap()))
-            .unwrap(),
+    vp1.proof_mut().first_mut().unwrap().signature_mut().jws = Some(
+        CompactJWSString::from_string(format!(
+            "x{}",
+            vp.proof()
+                .first()
+                .unwrap()
+                .signature()
+                .jws
+                .as_ref()
+                .unwrap()
+        ))
+        .unwrap(),
     );
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let mut presentation2 = vp.credential().value().clone();
-    presentation2.holder = linked_data::Ref(did!("did:example:bad").to_owned().into());
-    let ldp_vp2 = ssi_claims::data_integrity::DataIntegrity::new(
-        presentation2,
-        AnyInputContext::default(),
-        vp.proof().suite(),
-        vp.proof().configuration(),
-    )
+    let vp2 = Claims::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
+        pres.holders = vec![did!("did:example:bad").to_owned().into()];
+        pres
+    })
     .await
     .unwrap();
-    let vp2 = ssi_claims::Verifiable::new(ldp_vp2, vp.proof().clone());
     assert!(vp2.verify(&didtz).await.unwrap().is_invalid());
 }

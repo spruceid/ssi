@@ -171,7 +171,7 @@ pub enum InvalidData {
 }
 
 /// Document metadata.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone, Copy)]
 pub struct Metadata {
     // ...
 }

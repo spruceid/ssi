@@ -6,7 +6,7 @@ use static_iref::{iri, iri_ref};
 
 use crate::{
     eip712::{Eip712Signature, Eip712SignatureRef, TypesProvider},
-    suite::{CryptographicSuiteOptions, HashError},
+    suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ProofConfigurationRef,
 };
 
@@ -221,14 +221,14 @@ where
     for<'a> <Self::VerificationMethod as Referencable>::Reference<'a>: serde::Serialize,
     for<'a> <Self::Options as Referencable>::Reference<'a>: serde::Serialize,
 {
-    type Transform<'a> = Transform<'a, C> where Self: 'a, T: 'a, C: 'a;
+    // type Transform<'a> = Transform<'a, C> where Self: 'a, T: 'a, C: 'a;
 
-    fn transform<'a, 'c: 'a>(
+    async fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
         context: &'a mut C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Self::Transform<'a>
+    ) -> Result<Self::Transformed, TransformError>
     where
         C: 'a,
     {
@@ -239,6 +239,7 @@ where
             &PROOF_CONTEXT,
             "EthereumEip712Signature2021",
         )
+        .await
     }
 }
 

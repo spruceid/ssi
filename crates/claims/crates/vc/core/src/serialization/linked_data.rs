@@ -13,15 +13,14 @@ struct ClaimsWithProofs<'a, T, P> {
     claims: &'a T,
 
     #[ld("sec:proof", graph)]
-    proofs: &'a [P]
+    proofs: &'a [P],
 }
 
-impl<I: Interpretation, V: VocabularyMut, T, P: ProofType> LinkedDataClaims<I, V>
-    for Claims<T, P>
+impl<I: Interpretation, V: VocabularyMut, T, P: ProofType> LinkedDataClaims<I, V> for Claims<T, P>
 where
     V::Value: From<String> + From<xsd_types::Value> + From<linked_data::json_syntax::Value>,
     T: LinkedDataSubject<I, V>,
-    P::Prepared: LinkedDataSubject<I, V> + LinkedDataResource<I, V>
+    P::Prepared: LinkedDataSubject<I, V> + LinkedDataResource<I, V>,
 {
     fn visit_with_proof<R>(&self, proofs: &Self::Proof, visitor: R) -> Result<R::Ok, R::Error>
     where
@@ -42,7 +41,7 @@ impl<I: Interpretation, V: VocabularyMut, T, P: ProofType> LinkedDataSubjectClai
 where
     V::Value: From<String> + From<xsd_types::Value> + From<linked_data::json_syntax::Value>,
     T: LinkedDataSubject<I, V>,
-    P::Prepared: LinkedDataSubject<I, V> + LinkedDataResource<I, V>
+    P::Prepared: LinkedDataSubject<I, V> + LinkedDataResource<I, V>,
 {
     fn visit_subject_with_proof<R>(
         &self,
@@ -67,7 +66,7 @@ impl<I: Interpretation, V: VocabularyMut, T, P: ProofType> LinkedDataGraphClaims
 where
     V::Value: From<String> + From<xsd_types::Value> + From<linked_data::json_syntax::Value>,
     T: LinkedDataSubject<I, V>,
-    P::Prepared: LinkedDataSubject<I, V> + LinkedDataResource<I, V>
+    P::Prepared: LinkedDataSubject<I, V> + LinkedDataResource<I, V>,
 {
     fn visit_graph_with_proof<R>(&self, proofs: &Self::Proof, visitor: R) -> Result<R::Ok, R::Error>
     where

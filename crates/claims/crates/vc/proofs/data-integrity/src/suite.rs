@@ -1,14 +1,9 @@
 //! Cryptographic suites.
-use std::{convert::Infallible, future::Future};
+use std::convert::Infallible;
 
 use iref::Iri;
-use linked_data::{to_quads, LinkedData, LinkedDataPredicateObjects, LinkedDataSubject};
-use rdf_types::{
-    generator,
-    interpretation::{self, ReverseBlankIdInterpretation, ReverseIriInterpretation},
-    ExportedFromVocabulary, Interpretation, InterpretationMut, Quad, ReverseLiteralInterpretation,
-    Vocabulary,
-};
+use linked_data::{to_quads, LinkedDataPredicateObjects, LinkedDataSubject};
+use rdf_types::{generator, interpretation, Quad};
 use ssi_claims_core::{ProofValidity, Verifiable};
 use ssi_core::Referencable;
 use ssi_rdf::urdna2015;
@@ -41,6 +36,9 @@ pub use unspecified::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum TransformError {
+    #[error("Expansion failed")]
+    ExpansionFailed,
+
     #[error("RDF deserialization failed: {0}")]
     LinkedData(#[from] linked_data::IntoQuadsError),
 
@@ -245,19 +243,20 @@ pub trait CryptographicSuite: Sized {
 }
 
 pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
-    type Transform<'a>: 'a + Future<Output = Result<Self::Transformed, TransformError>>
-    where
-        Self: 'a,
-        T: 'a,
-        C: 'a;
+    // type Transform<'a>: 'a + Future<Output = Result<Self::Transformed, TransformError>>
+    // where
+    //     Self: 'a,
+    //     T: 'a,
+    //     C: 'a;
 
     /// Transformation algorithm.
-    fn transform<'a, 'c: 'a>(
+    #[allow(async_fn_in_trait)]
+    async fn transform<'a, 'c: 'a>(
         &'a self,
         data: &'a T,
         context: &'a mut C,
         params: ProofConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Self::Transform<'a>
+    ) -> Result<Self::Transformed, TransformError>
     where
         C: 'a;
 
@@ -377,7 +376,7 @@ where
 #[macro_export]
 macro_rules! impl_rdf_input_urdna2015 {
     ($ty:ident) => {
-        impl<'a, V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T>
+        impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T>
             $crate::CryptographicSuiteInput<T, E> for $ty
         where
             E: $crate::ssi_rdf::AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
@@ -386,21 +385,27 @@ macro_rules! impl_rdf_input_urdna2015 {
                 + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
                 + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
             V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-            T: linked_data::LinkedData<I, V>,
+            T: $crate::ssi_rdf::Expandable<E>,
+            T::Expanded: linked_data::LinkedData<I, V>,
         {
-            type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, E: 't;
+            // type Transform<'t> = ::std::future::Ready<Result<Self::Transformed, $crate::suite::TransformError>> where Self: 't, T: 't, E: 't;
 
             /// Transformation algorithm.
-            fn transform<'t, 'c: 't>(
+            async fn transform<'t, 'c: 't>(
                 &'t self,
                 data: &'t T,
                 context: &'t mut E,
-                _options: $crate::ProofConfigurationRef<'c,
+                _options: $crate::ProofConfigurationRef<
+                    'c,
                     <$ty as $crate::CryptographicSuite>::VerificationMethod,
                     <$ty as $crate::CryptographicSuite>::Options,
                 >,
-            ) -> Self::Transform<'t> {
-                ::std::future::ready(context.into_canonical_form(data).map_err(Into::into))
+            ) -> Result<Self::Transformed, $crate::suite::TransformError> {
+                let expanded = data
+                    .expand(context)
+                    .await
+                    .map_err(|_| $crate::suite::TransformError::ExpansionFailed)?;
+                context.into_canonical_form(&expanded).map_err(Into::into)
             }
         }
     };

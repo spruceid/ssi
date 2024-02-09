@@ -31,3 +31,4 @@ ssi-json-ld.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true
 serde = { workspace = true, features = ["derive"] }
+json-syntax.workspace = true

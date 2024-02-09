@@ -11,24 +11,20 @@ pub enum JwtVcDecodeError {
     UnexpectedCredentialValue(json_syntax::Kind),
 
     #[error("JSON deserialization failed: {0}")]
-    Deserialization(#[from] json_syntax::DeserializeError)
+    Deserialization(#[from] json_syntax::DeserializeError),
 }
 
 pub fn decode_jwt_vc<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError>
 where
-    T: for<'a> serde::Deserialize<'a>
+    T: for<'a> serde::Deserialize<'a>,
 {
     match jwt.verifiable_credential.take() {
         Some(json_syntax::Value::Object(mut vc)) => {
             transform_jwt_specific_headers(jwt, &mut vc);
             Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
         }
-        Some(v) => {
-            Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind()))
-        }
-        None => {
-            Err(JwtVcDecodeError::MissingCredential)
-        }
+        Some(v) => Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind())),
+        None => Err(JwtVcDecodeError::MissingCredential),
     }
 }
 
@@ -41,24 +37,20 @@ pub enum JwtVpDecodeError {
     UnexpectedPresentationValue(json_syntax::Kind),
 
     #[error("JSON deserialization failed: {0}")]
-    Deserialization(#[from] json_syntax::DeserializeError)
+    Deserialization(#[from] json_syntax::DeserializeError),
 }
 
 pub fn decode_jwt_vp<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError>
 where
-    T: for<'a> serde::Deserialize<'a>
+    T: for<'a> serde::Deserialize<'a>,
 {
     match jwt.verifiable_presentation.take() {
         Some(json_syntax::Value::Object(mut vp)) => {
             transform_jwt_specific_headers(jwt, &mut vp);
             Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
         }
-        Some(v) => {
-            Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind()))
-        }
-        None => {
-            Err(JwtVpDecodeError::MissingPresentation)
-        }
+        Some(v) => Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind())),
+        None => Err(JwtVpDecodeError::MissingPresentation),
     }
 }
 

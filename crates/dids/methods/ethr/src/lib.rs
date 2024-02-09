@@ -373,18 +373,18 @@ impl From<VerificationMethod> for DIDVerificationMethod {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iref::{IriBuf, UriBuf};
+    use iref::IriBuf;
     use serde_json::json;
-    use ssi_claims::{
+    use ssi_claims::vc::{
         data_integrity::{
             verification::{
                 method::{signer::SingleSecretSigner, ProofPurpose},
                 MethodReferenceOrOwned,
             },
-            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
+            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput,
             ProofConfiguration,
         },
-        Verifiable,
+        Claims, JsonCredential, JsonPresentation,
     };
     use ssi_dids_core::{did, DIDResolver, DIDVerifier};
     use ssi_jwk::JWK;
@@ -474,42 +474,6 @@ mod tests {
         credential_prove_verify_did_ethr2(true).await;
     }
 
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiableCredential")]
-    #[serde(rename_all = "camelCase")]
-    struct TestCredential {
-        #[ld("cred:issuer")]
-        issuer: IriBuf,
-
-        #[ld("cred:issuanceDate")]
-        issuance_date: xsd_types::DateTime,
-
-        #[ld("cred:credentialSubject")]
-        credential_subject: CredentialSubject,
-    }
-
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    struct CredentialSubject {
-        #[ld(id)]
-        id: IriBuf,
-    }
-
-    #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    #[ld(type = "cred:VerifiablePresentation")]
-    #[serde(rename_all = "camelCase")]
-    struct TestPresentation {
-        #[ld(id)]
-        id: IriBuf,
-
-        #[ld("cred:holder")]
-        holder: Option<linked_data::Ref<UriBuf>>,
-
-        #[ld("cred:verifiableCredential", graph)]
-        verifiable_credential: Verifiable<DataIntegrity<TestCredential, AnySuite>>,
-    }
-
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
         let didethr = DIDVerifier::new(DIDEthr);
         let key: JWK = serde_json::from_value(json!({
@@ -525,13 +489,14 @@ mod tests {
         let did = DIDEthr::generate(&key).unwrap();
         eprintln!("did: {}", did);
 
-        let cred = TestCredential {
-            issuer: did.clone().into(),
-            issuance_date: "2021-02-18T20:23:13Z".parse().unwrap(),
-            credential_subject: CredentialSubject {
-                id: did!("did:example:foo").to_owned().into(),
-            },
-        };
+        let cred = JsonCredential::new(
+            None,
+            did.clone().into_uri().into(),
+            "2021-02-18T20:23:13Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:foo"
+            })],
+        );
 
         let verification_method = if eip712 {
             MethodReferenceOrOwned::Reference(
@@ -565,30 +530,19 @@ mod tests {
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
         if eip712 {
-            assert_eq!(vc.proof().signature().proof_value.as_deref().unwrap(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
+            assert_eq!(vc.proof().first().unwrap().signature().proof_value.as_deref().unwrap(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
         } else {
-            assert_eq!(vc.proof().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
+            assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
         assert!(vc.verify(&didethr).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer = vc
-            .clone()
-            .async_try_map(|di, proof| async {
-                di.map(
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                    |mut cred| {
-                        cred.issuer = iri!("did:pkh:example:bad").to_owned();
-                        cred
-                    },
-                )
-                .await
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_invalid());
 
@@ -612,13 +566,11 @@ mod tests {
         assert!(vc_wrong_key.verify(&didethr).await.unwrap().is_invalid());
 
         // Make it into a VP
-        let presentation = TestPresentation {
-            id: iri!("http://example.org/presentations/3731")
-                .to_owned()
-                .into(),
-            holder: None,
-            verifiable_credential: vc,
-        };
+        let presentation = JsonPresentation::new(
+            Some(uri!("http://example.org/presentations/3731").to_owned()),
+            vec![vc],
+            Vec::new(),
+        );
 
         let vp_issue_options = ProofConfiguration {
             verification_method: IriBuf::new(format!("{did}#controller")).unwrap().into(),
@@ -642,35 +594,34 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        if let Some(value) = &mut vp_fuzzed.proof_mut().signature_mut().jws {
+        if let Some(value) = &mut vp_fuzzed
+            .proof_mut()
+            .first_mut()
+            .unwrap()
+            .signature_mut()
+            .jws
+        {
             *value = format!("{value}ff").try_into().unwrap()
         }
-        if let Some(value) = &mut vp_fuzzed.proof_mut().signature_mut().proof_value {
+        if let Some(value) = &mut vp_fuzzed
+            .proof_mut()
+            .first_mut()
+            .unwrap()
+            .signature_mut()
+            .proof_value
+        {
             value.push_str("ff");
         }
         let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // test that holder is verified
-        let vp_bad_holder = vp
-            .clone()
-            .async_try_map(|di, proof| async {
-                let mut pres = di.into_value();
-                pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
-                // Rebuild the data-integrity presentation with the bad holder.
-                // This will use the cryptosuite to hash the presentation.
-                DataIntegrity::new(
-                    pres,
-                    AnyInputContext::default(),
-                    proof.suite(),
-                    proof.configuration(),
-                )
-                .await
-                // Return it with the original proof.
-                .map(|di| (di, proof))
-            })
-            .await
-            .unwrap();
+        let vp_bad_holder = Claims::tamper(vp, AnyInputContext::default(), |mut pres| {
+            pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
+            pres
+        })
+        .await
+        .unwrap();
         // It should fail.
         assert!(vp_bad_holder.verify(&didethr).await.unwrap().is_invalid());
     }
@@ -678,7 +629,7 @@ mod tests {
     #[tokio::test]
     async fn credential_verify_eip712vm() {
         let didethr = DIDVerifier::new(DIDEthr);
-        let vc = ssi_claims::data_integrity::from_json_ld_str_with_defaults(include_str!(
+        let vc = ssi_claims::vc::data_integrity::any_credential_from_json_str(include_str!(
             "../tests/vc.jsonld"
         ))
         .await

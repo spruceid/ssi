@@ -1,12 +1,8 @@
-use std::{future::Future, pin::Pin, task};
-
 use super::AnySuiteOptions;
-use pin_project::pin_project;
 use rdf_types::{interpretation, IriVocabulary};
 use ssi_json_ld::{AnyJsonLdEnvironment, ContextLoader, JsonLdEnvironment};
-use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
+use ssi_rdf::{AnyLdEnvironment, Expandable, LdEnvironment};
 use ssi_vc_data_integrity::{
-    eip712::TypesProvider,
     suite::{HashError, TransformError},
     CryptographicSuiteInput, ProofConfigurationRef,
 };
@@ -32,18 +28,26 @@ impl<E: AnyLdEnvironment, L> AnyLdEnvironment for AnyInputContext<E, L> {
     type Vocabulary = E::Vocabulary;
     type Interpretation = E::Interpretation;
 
-    fn as_ld_environment_mut(&mut self) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation> {
+    fn as_ld_environment_mut(
+        &mut self,
+    ) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation> {
         self.ld.as_ld_environment_mut()
     }
 }
 
 impl<E: AnyJsonLdEnvironment, L> AnyJsonLdEnvironment for AnyInputContext<E, L>
 where
-    E::Vocabulary: IriVocabulary
+    E::Vocabulary: IriVocabulary,
 {
     type Loader = E::Loader;
 
-    fn as_json_ld_environment_mut(&mut self) -> ssi_json_ld::JsonLdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation, &mut Self::Loader> {
+    fn as_json_ld_environment_mut(
+        &mut self,
+    ) -> ssi_json_ld::JsonLdEnvironment<
+        &mut Self::Vocabulary,
+        &mut Self::Interpretation,
+        &mut Self::Loader,
+    > {
         self.ld.as_json_ld_environment_mut()
     }
 }
@@ -58,7 +62,10 @@ impl<'a, I, V> From<LdEnvironment<V, I>> for AnyInputContext<LdEnvironment<V, I>
 }
 
 impl Default
-    for AnyInputContext<JsonLdEnvironment<(), interpretation::WithGenerator<rdf_types::generator::Blank>>, ()>
+    for AnyInputContext<
+        JsonLdEnvironment<(), interpretation::WithGenerator<rdf_types::generator::Blank>>,
+        (),
+    >
 {
     fn default() -> Self {
         Self {
@@ -68,65 +75,65 @@ impl Default
                     (),
                     rdf_types::generator::Blank::new(),
                 ),
-                loader: ContextLoader::default()
+                loader: ContextLoader::default(),
             },
             loader: (),
         }
     }
 }
 
-#[pin_project(project = TransformProj)]
-pub enum Transform<'a, L: TypesProvider> {
-    Error(Option<TransformError>),
-    String(#[pin] std::future::Ready<Result<String, TransformError>>),
-    JsonObject(#[pin] std::future::Ready<Result<JsonObject, TransformError>>),
-    Eip712(#[pin] std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>),
+// #[pin_project(project = TransformProj)]
+// pub enum Transform<'a, L: TypesProvider> {
+//     Error(Option<TransformError>),
+//     String(#[pin] std::future::Ready<Result<String, TransformError>>),
+//     JsonObject(#[pin] std::future::Ready<Result<JsonObject, TransformError>>),
+//     Eip712(#[pin] std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>),
 
-    #[cfg(feature = "w3c")]
-    EthereumEip712Signature2021(
-        #[pin] ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Transform<'a, L>,
-    ),
-}
+//     #[cfg(feature = "w3c")]
+//     EthereumEip712Signature2021(
+//         #[pin] ssi_vc_data_integrity::suite::ethereum_eip712_signature_2021::Transform<'a, L>,
+//     ),
+// }
 
-impl<'a, L: TypesProvider> From<std::future::Ready<Result<String, TransformError>>>
-    for Transform<'a, L>
-{
-    fn from(value: std::future::Ready<Result<String, TransformError>>) -> Self {
-        Self::String(value)
-    }
-}
+// impl<'a, L: TypesProvider> From<std::future::Ready<Result<String, TransformError>>>
+//     for Transform<'a, L>
+// {
+//     fn from(value: std::future::Ready<Result<String, TransformError>>) -> Self {
+//         Self::String(value)
+//     }
+// }
 
-impl<'a, L: TypesProvider> From<std::future::Ready<Result<JsonObject, TransformError>>>
-    for Transform<'a, L>
-{
-    fn from(value: std::future::Ready<Result<JsonObject, TransformError>>) -> Self {
-        Self::JsonObject(value)
-    }
-}
+// impl<'a, L: TypesProvider> From<std::future::Ready<Result<JsonObject, TransformError>>>
+//     for Transform<'a, L>
+// {
+//     fn from(value: std::future::Ready<Result<JsonObject, TransformError>>) -> Self {
+//         Self::JsonObject(value)
+//     }
+// }
 
-impl<'a, L: TypesProvider> From<std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>>
-    for Transform<'a, L>
-{
-    fn from(value: std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>) -> Self {
-        Self::Eip712(value)
-    }
-}
+// impl<'a, L: TypesProvider> From<std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>>
+//     for Transform<'a, L>
+// {
+//     fn from(value: std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>) -> Self {
+//         Self::Eip712(value)
+//     }
+// }
 
-impl<'a, L: TypesProvider> Future for Transform<'a, L> {
-    type Output = Result<Transformed, TransformError>;
+// impl<'a, L: TypesProvider> Future for Transform<'a, L> {
+//     type Output = Result<Transformed, TransformError>;
 
-    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        match self.project() {
-            TransformProj::Error(e) => task::Poll::Ready(Err(e.take().unwrap())),
-            TransformProj::String(f) => f.poll(cx).map(|r| r.map(Transformed::String)),
-            TransformProj::JsonObject(f) => f.poll(cx).map(|r| r.map(Transformed::JsonObject)),
-            TransformProj::Eip712(f) => f.poll(cx).map(|r| r.map(Transformed::Eip712)),
-            TransformProj::EthereumEip712Signature2021(f) => {
-                f.poll(cx).map(|r| r.map(Transformed::Eip712))
-            }
-        }
-    }
-}
+//     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
+//         match self.project() {
+//             TransformProj::Error(e) => task::Poll::Ready(Err(e.take().unwrap())),
+//             TransformProj::String(f) => f.poll(cx).map(|r| r.map(Transformed::String)),
+//             TransformProj::JsonObject(f) => f.poll(cx).map(|r| r.map(Transformed::JsonObject)),
+//             TransformProj::Eip712(f) => f.poll(cx).map(|r| r.map(Transformed::Eip712)),
+//             TransformProj::EthereumEip712Signature2021(f) => {
+//                 f.poll(cx).map(|r| r.map(Transformed::Eip712))
+//             }
+//         }
+//     }
+// }
 
 impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, L, T>
     CryptographicSuiteInput<T, AnyInputContext<E, L>> for AnySuite
@@ -137,18 +144,19 @@ where
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
         + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
-    T: serde::Serialize + linked_data::LinkedData<I, V>,
+    T: serde::Serialize + Expandable<E>,
+    T::Expanded: linked_data::LinkedData<I, V>,
     L: ssi_vc_data_integrity::eip712::TypesProvider,
 {
-    type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<E, L>: 't;
+    // type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<E, L>: 't;
 
     /// Transformation algorithm.
-    fn transform<'t, 'c: 't>(
+    async fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
         context: &'t mut AnyInputContext<E, L>,
         params: ProofConfigurationRef<'c, AnyMethod, AnySuiteOptions>,
-    ) -> Transform<'t, L>
+    ) -> Result<Self::Transformed, TransformError>
     where
         AnyInputContext<E, L>: 't,
     {
@@ -163,18 +171,17 @@ where
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => {
-                            eprintln!("vm: {params:?}");
 							match params.try_cast_verification_method() {
 								Ok(params) => {
-									ssi_vc_data_integrity::suite::$name.transform(
+									Ok(ssi_vc_data_integrity::suite::$name.transform(
 										data,
 										&mut context.ld,
 										params
-									).into()
+									).await?.into())
 								}
 								Err(e) => {
                                     eprintln!("invalid verification method: {e:?}");
-                                    Transform::Error(Some(e.into()))
+                                    Err(e.into())
                                 }
 							}
                         },
@@ -183,39 +190,39 @@ where
 					Self::TezosJcsSignature2021 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
-								ssi_vc_data_integrity::suite::TezosJcsSignature2021.transform(
+								Ok(ssi_vc_data_integrity::suite::TezosJcsSignature2021.transform(
 									data,
 									&mut (),
 									params
-								).into()
+								).await?.into())
 							}
-							Err(e) => Transform::Error(Some(e.into()))
+							Err(e) => Err(e.into())
 						}
 					}
 					#[cfg(feature = "w3c")]
 					Self::EthereumEip712Signature2021 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
-								Transform::EthereumEip712Signature2021(ssi_vc_data_integrity::suite::EthereumEip712Signature2021.transform(
+								Ok(ssi_vc_data_integrity::suite::EthereumEip712Signature2021.transform(
 									data,
 									&mut context.loader,
 									params
-								))
+								).await?.into())
 							}
-							Err(e) => Transform::Error(Some(e.into()))
+							Err(e) => Err(e.into())
 						}
 					}
                     #[cfg(feature = "w3c")]
 					Self::EthereumEip712Signature2021v0_1 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
-								Transform::EthereumEip712Signature2021(ssi_vc_data_integrity::suite::EthereumEip712Signature2021v0_1.transform(
+								Ok(ssi_vc_data_integrity::suite::EthereumEip712Signature2021v0_1.transform(
 									data,
 									&mut context.loader,
 									params
-								))
+								).await?.into())
 							}
-							Err(e) => Transform::Error(Some(e.into()))
+							Err(e) => Err(e.into())
 						}
 					}
                 }

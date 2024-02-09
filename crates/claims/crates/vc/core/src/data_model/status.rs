@@ -1,17 +1,17 @@
 use iref::Uri;
 
 pub trait CredentialStatus {
-	fn id(&self) -> &Uri;
+    fn id(&self) -> &Uri;
 }
 
 impl CredentialStatus for Uri {
-	fn id(&self) -> &Uri {
-		self
-	}
+    fn id(&self) -> &Uri {
+        self
+    }
 }
 
 impl CredentialStatus for std::convert::Infallible {
-	fn id(&self) -> &Uri {
-		unreachable!()
-	}
+    fn id(&self) -> &Uri {
+        unreachable!()
+    }
 }

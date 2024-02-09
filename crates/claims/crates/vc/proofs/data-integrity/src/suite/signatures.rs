@@ -1,5 +1,6 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
+use ssi_jwk::Algorithm;
 use ssi_jws::{CompactJWSStr, CompactJWSString};
 use ssi_verification_methods::{InvalidSignature, SignatureError, VerificationError};
 
@@ -213,14 +214,17 @@ pub struct JwsSignatureRef<'a> {
 impl<'a> JwsSignatureRef<'a> {
     /// Decodes the signature for the given message.
     ///
-    /// Returns the signing bytes and the signature bytes.
-    pub fn decode(&self, message: &[u8]) -> Result<(Vec<u8>, Vec<u8>), VerificationError> {
+    /// Returns the signing bytes, the signature bytes and the signature algorithm.
+    pub fn decode(
+        &self,
+        message: &[u8],
+    ) -> Result<(Vec<u8>, Vec<u8>, Algorithm), VerificationError> {
         let (header, _, signature_bytes) = self
             .jws
             .decode()
             .map_err(|_| VerificationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(message);
-        Ok((signing_bytes, signature_bytes))
+        Ok((signing_bytes, signature_bytes, header.algorithm))
     }
 }
 

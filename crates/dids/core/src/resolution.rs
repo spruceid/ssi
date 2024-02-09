@@ -8,11 +8,12 @@ use crate::{
     DIDMethod, Document, PrimaryDIDURL, DID, DIDURL,
 };
 
-// mod composition;
+mod composition;
 mod dereference;
+mod static_resolver;
 
-// pub use composition::*;
 pub use dereference::*;
+pub use static_resolver::StaticDIDResolver;
 
 #[cfg(feature = "http")]
 mod http;
@@ -300,6 +301,7 @@ impl<T: DIDMethodResolver> DIDResolverByMethod for T {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Output<T = document::Represented> {
     pub document: T,
     pub document_metadata: document::Metadata,
@@ -307,6 +309,14 @@ pub struct Output<T = document::Represented> {
 }
 
 impl<T> Output<T> {
+    pub fn from_content(content: T, content_type: Option<String>) -> Self {
+        Self::new(
+            content,
+            document::Metadata::default(),
+            Metadata::from_content_type(content_type),
+        )
+    }
+
     pub fn new(document: T, document_metadata: document::Metadata, metadata: Metadata) -> Self {
         Self {
             document,
@@ -403,7 +413,7 @@ impl Parameter {
 }
 
 /// Resolution output metadata.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Metadata {
     content_type: Option<String>,
 }

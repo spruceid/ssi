@@ -2,15 +2,15 @@
 //! canonicalization algorithm.
 use std::{borrow::Borrow, fmt};
 
-pub mod urdna2015;
 mod expand;
+pub mod urdna2015;
 
+pub use expand::*;
 use iref::IriBuf;
 use rdf_types::{
     ExportRefFromVocabulary, Interpretation, IriVocabulary, LanguageTagVocabulary, Quad,
     ReverseTermInterpretation, Vocabulary,
 };
-pub use expand::*;
 
 /// Interpreted RDF dataset with an entry point.
 pub struct DatasetWithEntryPoint<'a, V, I: Interpretation> {

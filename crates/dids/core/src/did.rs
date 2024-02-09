@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{borrow::Borrow, ops::Deref};
+use std::{borrow::Borrow, ops::Deref, str::FromStr};
 
 mod url;
 
@@ -180,6 +180,14 @@ impl DIDBuf {
             DID::new_unchecked(&self.0)
         }
     }
+
+    pub fn into_iri(self) -> IriBuf {
+        unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(self.0)) }
+    }
+
+    pub fn into_uri(self) -> UriBuf {
+        unsafe { UriBuf::new_unchecked(self.0) }
+    }
 }
 
 impl TryFrom<String> for DIDBuf {
@@ -196,15 +204,23 @@ impl TryFrom<String> for DIDBuf {
     }
 }
 
+impl FromStr for DIDBuf {
+    type Err = InvalidDID<String>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.to_owned().try_into()
+    }
+}
+
 impl From<DIDBuf> for UriBuf {
     fn from(value: DIDBuf) -> Self {
-        unsafe { UriBuf::new_unchecked(value.0) }
+        value.into_uri()
     }
 }
 
 impl From<DIDBuf> for IriBuf {
     fn from(value: DIDBuf) -> Self {
-        unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(value.0)) }
+        value.into_iri()
     }
 }
 

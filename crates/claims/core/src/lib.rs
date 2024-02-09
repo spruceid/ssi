@@ -27,11 +27,11 @@ impl<C: Provable> Verifiable<C> {
         Self { claims, proof }
     }
 
-    pub fn credential(&self) -> &C {
+    pub fn claims(&self) -> &C {
         &self.claims
     }
 
-    pub fn credential_mut(&mut self) -> &mut C {
+    pub fn claims_mut(&mut self) -> &mut C {
         &mut self.claims
     }
 
@@ -43,11 +43,11 @@ impl<C: Provable> Verifiable<C> {
         &mut self.proof
     }
 
-    pub async fn verify<V>(&self, verifiers: &V) -> Result<ProofValidity, C::Error>
+    pub async fn verify<V>(&self, verifier: &V) -> Result<ProofValidity, C::Error>
     where
         C: VerifiableWith<V>,
     {
-        self.claims.verify_with(verifiers, &self.proof).await
+        self.claims.verify_with(verifier, &self.proof).await
     }
 
     pub fn map<D: Provable>(self, f: impl FnOnce(C, C::Proof) -> (D, D::Proof)) -> Verifiable<D> {

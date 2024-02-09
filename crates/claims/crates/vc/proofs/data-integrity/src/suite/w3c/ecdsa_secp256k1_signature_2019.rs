@@ -97,7 +97,7 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2
         method: &EcdsaSecp256k1VerificationKey2019,
         bytes: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        let (signing_bytes, signature_bytes) = signature.decode(bytes)?;
+        let (signing_bytes, signature_bytes, _) = signature.decode(bytes)?;
         method.verify_bytes(&signing_bytes, &signature_bytes, DigestFunction::Sha256)
     }
 }

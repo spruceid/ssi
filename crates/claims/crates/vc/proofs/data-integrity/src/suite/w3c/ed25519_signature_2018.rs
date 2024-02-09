@@ -93,7 +93,7 @@ impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2018>
         method: &Ed25519VerificationKey2018,
         message: &[u8],
     ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        let (signing_bytes, signature_bytes) = signature.decode(message)?;
+        let (signing_bytes, signature_bytes, _) = signature.decode(message)?;
         method.verify_bytes(&signing_bytes, &signature_bytes)
     }
 }

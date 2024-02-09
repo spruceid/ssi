@@ -42,6 +42,7 @@ ssi-claims.workspace = true
 ssi-vc-data-integrity.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true
+json-syntax.workspace = true
 serde = { workspace = true, features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }
 rand_chacha.workspace = true

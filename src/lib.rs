@@ -170,9 +170,8 @@
 // pub use ssi_dids_core as did;
 // #[deprecated = "Use ssi::did::did_resolve"]
 // pub use ssi_dids_core::did_resolve;
-// pub use ssi_json_ld as jsonld;
-// #[deprecated = "Use ssi::jsonld::rdf"]
-// pub use ssi_json_ld::rdf;
+pub use ssi_json_ld as json_ld;
+pub use ssi_rdf as rdf;
 // #[deprecated = "Use ssi::jsonld::urdna2015"]
 // pub use ssi_json_ld::urdna2015;
 // pub use ssi_jwk as jwk;
@@ -199,6 +198,7 @@
 // pub use ssi_tzkey as tzkey;
 // pub use ssi_ucan as ucan;
 pub use ssi_claims as claims;
+pub use ssi_dids as dids;
 // #[deprecated = "Use ssi::vc::revocation"]
 // pub use ssi_vc::revocation;
 // pub use ssi_zcap_ld as zcap;
