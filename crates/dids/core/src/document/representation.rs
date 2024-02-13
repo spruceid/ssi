@@ -110,6 +110,12 @@ impl MediaType {
     }
 }
 
+impl From<MediaType> for String {
+    fn from(value: MediaType) -> Self {
+        value.name().to_owned()
+    }
+}
+
 impl fmt::Display for MediaType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.name().fmt(f)

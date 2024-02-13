@@ -75,6 +75,10 @@ impl<T> DerefOutput<T> {
     pub fn cast<U: From<T>>(self) -> DerefOutput<U> {
         self.map(T::into)
     }
+
+    pub fn into_content(self) -> T {
+        self.content
+    }
 }
 
 impl DerefOutput<PrimaryContent> {

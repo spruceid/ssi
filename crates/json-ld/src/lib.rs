@@ -5,12 +5,8 @@ use std::{borrow::Cow, hash::Hash};
 
 pub use context::*;
 use json_ld::{Expand, Loader};
-use linked_data::{LinkedDataResource, LinkedDataSubject};
-use mown::Mown;
 use rdf_types::{
-    generator, interpretation::WithGenerator, BlankIdInterpretationMut, Interpretation,
-    InterpretationMut, IriInterpretationMut, IriVocabulary, LiteralInterpretationMut, Vocabulary,
-    VocabularyMut,
+    generator, interpretation::WithGenerator, Interpretation, IriVocabulary, VocabularyMut,
 };
 use ssi_rdf::{AnyLdEnvironment, Expandable, LdEnvironment};
 
@@ -43,6 +39,16 @@ pub struct JsonLdEnvironment<V = (), I = WithGenerator<generator::Blank>, L = Co
 
     /// Document loader.
     pub loader: L,
+}
+
+impl<V, I, L> JsonLdEnvironment<V, I, L> {
+    pub fn new(vocabulary: V, interpretation: I, loader: L) -> Self {
+        Self {
+            vocabulary,
+            interpretation,
+            loader,
+        }
+    }
 }
 
 impl<V: IriVocabulary, I: Interpretation, L> AnyLdEnvironment for JsonLdEnvironment<V, I, L> {
@@ -139,4 +145,10 @@ where
         // }
         Ok(expanded)
     }
+}
+
+/// Value that has a JSON-LD context.
+pub trait WithJsonLdContext {
+    /// Returns the JSON-LD context attached to `self`.
+    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context>;
 }

@@ -15,7 +15,6 @@ grdf.workspace = true
 ssi-crypto.workspace = true
 linked-data.workspace = true
 serde.workspace = true
-mown.workspace = true
 combination = "0.1"
 
 [dev-dependencies]

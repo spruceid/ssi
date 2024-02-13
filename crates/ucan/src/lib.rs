@@ -1,5 +1,6 @@
 pub mod error;
 pub use error::Error;
+use iref::UriBuf;
 use libipld::{
     codec::{Codec, Decode, Encode},
     error::Error as IpldError,
@@ -13,16 +14,21 @@ use serde_with::{
     base64::{Base64, UrlSafe},
     serde_as, DisplayFromStr,
 };
+use ssi_caips::caip10::{BlockchainAccountId, BlockchainAccountIdParseError};
 use ssi_dids_core::{
-    did_resolve::{dereference, Content, DIDResolver},
-    Document, Resource, VerificationMethod, VerificationMethodMap,
+    document::{DIDVerificationMethod, Resource},
+    resolution::{Content, DerefOutput},
+    DIDBuf, DIDResolver, DIDURLBuf, Document,
 };
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
 use ssi_jwt::NumericDate;
+use ssi_verification_methods::{GenericVerificationMethod, InvalidVerificationMethod};
 use std::{
+    borrow::Cow,
     fmt::Display,
     io::{Read, Seek, Write},
+    str::Utf8Error,
 };
 
 #[derive(Clone, PartialEq, Debug)]
@@ -51,7 +57,7 @@ impl Default for UcanCodec {
 }
 
 impl<F, A> Ucan<F, A> {
-    pub async fn verify_signature(&self, resolver: &dyn DIDResolver) -> Result<(), Error>
+    pub async fn verify_signature(&self, resolver: &impl DIDResolver) -> Result<(), Error>
     where
         F: Serialize + Send,
         A: Serialize + Send,
@@ -61,12 +67,13 @@ impl<F, A> Ucan<F, A> {
             self.payload.issuer.get(..4),
             self.payload.issuer.get(4..8),
             &self.header.jwk,
-            dereference(resolver, &self.payload.issuer, &Default::default())
+            resolver
+                .dereference(&self.payload.issuer)
                 .await
-                .1,
+                .map(DerefOutput::into_content)?,
         ) {
             // did:pkh without fragment
-            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+            (Some("did:"), Some("pkh:"), Some(jwk), Content::Resource(Resource::Document(d))) => {
                 match_key_with_did_pkh(jwk, &d)?;
                 jwk.clone()
             }
@@ -75,26 +82,22 @@ impl<F, A> Ucan<F, A> {
                 Some("did:"),
                 Some("pkh:"),
                 Some(jwk),
-                Content::Object(Resource::VerificationMethod(vm)),
+                Content::Resource(Resource::VerificationMethod(vm)),
             ) => {
                 match_key_with_vm(jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
-            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), _, Content::Resource(Resource::Document(d))) => d
                 .verification_method
                 .iter()
-                .flatten()
                 .next()
-                .and_then(|v| match v {
-                    VerificationMethod::Map(vm) => Some(vm),
-                    _ => None,
-                })
                 .ok_or(Error::VerificationMethodMismatch)?
-                .get_jwk()?,
+                .public_key_jwk()?
+                .ok_or(Error::MissingPublicKey)?,
             // general case, did with fragment
-            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
-                vm.get_jwk()?
+            (Some("did:"), Some(_), _, Content::Resource(Resource::VerificationMethod(vm))) => {
+                vm.public_key_jwk()?.ok_or(Error::MissingPublicKey)?
             }
             _ => return Err(Error::VerificationMethodMismatch),
         };
@@ -184,7 +187,7 @@ impl<F, A> Ucan<F, A> {
         }
     }
 
-    pub fn from_block<S>(block: &Block<S>) -> Result<Self, IpldError>
+    pub fn from_block<S>(block: &Block<S>) -> Result<Self, FromIpldBlockError>
     where
         F: DeserializeOwned,
         A: DeserializeOwned,
@@ -199,41 +202,55 @@ impl<F, A> Ucan<F, A> {
         } else if block.cid().codec() == S::Codecs::from(libipld::raw::RawCodec).into() {
             Ok(Self::decode(std::str::from_utf8(block.data())?)?)
         } else {
-            Err(IpldError::msg("Invalid Codec, expected 'raw' or 'dagJson'"))
+            Err(FromIpldBlockError::InvalidCodec)
         }
     }
 }
 
-fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
-    doc.verification_method
-        .iter()
-        .flatten()
-        .find_map(|vm| match vm {
-            VerificationMethod::Map(vm) if vm.blockchain_account_id.is_some() => {
-                Some(match_key_with_vm(key, vm))
-            }
-            _ => None,
-        })
-        .unwrap_or(Err(Error::VerificationMethodMismatch))
+#[derive(Debug, thiserror::Error)]
+pub enum FromIpldBlockError {
+    #[error(transparent)]
+    Ipld(#[from] libipld::error::Error),
+
+    #[error(transparent)]
+    Decode(#[from] libipld::error::SerdeError),
+
+    #[error(transparent)]
+    Utf8(#[from] Utf8Error),
+
+    #[error(transparent)]
+    Ucan(#[from] Error),
+
+    #[error("Invalid codec: expected `raw` or `dagJson`")]
+    InvalidCodec,
 }
 
-fn match_key_with_vm(key: &JWK, vm: &VerificationMethodMap) -> Result<(), Error> {
-    use std::str::FromStr;
-    Ok(ssi_caips::caip10::BlockchainAccountId::from_str(
-        vm.blockchain_account_id
-            .as_ref()
-            .ok_or(Error::VerificationMethodMismatch)?,
-    )?
-    .verify(key)?)
+fn match_key_with_did_pkh(key: &JWK, doc: &Document) -> Result<(), Error> {
+    for vm in &doc.verification_method {
+        if let Some(id) = vm.blockchain_account_id()? {
+            if id.verify(key).is_ok() {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(Error::VerificationMethodMismatch)
+}
+
+fn match_key_with_vm(key: &JWK, vm: &DIDVerificationMethod) -> Result<(), Error> {
+    Ok(vm
+        .blockchain_account_id()?
+        .ok_or(Error::VerificationMethodMismatch)?
+        .verify(key)?)
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct Payload<F = JsonValue, A = JsonValue> {
     #[serde(rename = "iss")]
-    pub issuer: String,
+    pub issuer: DIDURLBuf,
     #[serde(rename = "aud")]
-    pub audience: String,
+    pub audience: DIDBuf,
     #[serde(rename = "nbf", skip_serializing_if = "Option::is_none")]
     pub not_before: Option<NumericDate>,
     #[serde(rename = "exp")]
@@ -308,12 +325,54 @@ impl<F, A> Payload<F, A> {
     }
 }
 
+/// Extension for the `DIDVerificationMethod` type.
+trait DIDVerificationMethodExt {
+    /// Returns the public key of a DID verification method as a JWK.
+    ///
+    /// The verification method must be known by `ssi` and well-formed, or this
+    /// function will return an `InvalidVerificationMethod` error.
+    fn public_key_jwk(&self) -> Result<Option<JWK>, InvalidVerificationMethod>;
+
+    /// Returns the blockchain account id of a DID verification method.
+    fn blockchain_account_id(
+        &self,
+    ) -> Result<Option<BlockchainAccountId>, BlockchainAccountIdError>;
+}
+
+impl DIDVerificationMethodExt for DIDVerificationMethod {
+    fn public_key_jwk(&self) -> Result<Option<JWK>, InvalidVerificationMethod> {
+        let vm: GenericVerificationMethod = self.clone().into();
+        Ok(ssi_verification_methods::AnyMethod::try_from(vm)?
+            .public_key_jwk()
+            .map(Cow::into_owned))
+    }
+
+    fn blockchain_account_id(
+        &self,
+    ) -> Result<Option<BlockchainAccountId>, BlockchainAccountIdError> {
+        match self.properties.get("blockchainAccountId") {
+            Some(serde_json::Value::String(value)) => Ok(Some(value.parse()?)),
+            Some(_) => Err(BlockchainAccountIdError::InvalidValue),
+            None => Ok(None),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum BlockchainAccountIdError {
+    #[error("Invalid JSON value")]
+    InvalidValue,
+
+    #[error(transparent)]
+    Parse(#[from] BlockchainAccountIdParseError),
+}
+
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 #[serde(untagged)]
 pub enum UcanResource {
     Proof(#[serde_as(as = "DisplayFromStr")] UcanProofRef),
-    URI(URI),
+    URI(UriBuf),
 }
 
 impl Display for UcanResource {
@@ -397,18 +456,18 @@ pub struct Capability<A = JsonValue> {
 }
 
 fn now() -> f64 {
-    (chrono::prelude::Utc::now()
-        .timestamp_nanos_opt()
-        .expect("value can not be represented in a timestamp with nanosecond precision.")
-        as f64)
-        / 1e+9_f64
+    let now = chrono::prelude::Utc::now();
+    match now.timestamp_nanos_opt() {
+        Some(nano) => nano as f64 / 1e+9_f64,
+        None => now.timestamp_micros() as f64 / 1e+6_f64,
+    }
 }
 
 #[serde_as]
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct UcanRevocation {
     #[serde(rename = "iss")]
-    pub issuer: String,
+    pub issuer: DIDURLBuf,
     #[serde_as(as = "DisplayFromStr")]
     pub revoke: Cid,
     #[serde_as(as = "Base64<UrlSafe>")]
@@ -417,7 +476,7 @@ pub struct UcanRevocation {
 
 impl UcanRevocation {
     pub fn sign(
-        issuer: String,
+        issuer: DIDURLBuf,
         revoke: Cid,
         jwk: &JWK,
         algorithm: Algorithm,
@@ -430,7 +489,7 @@ impl UcanRevocation {
     }
     pub async fn verify_signature(
         &self,
-        resolver: &dyn DIDResolver,
+        resolver: &impl DIDResolver,
         algorithm: Algorithm,
         jwk: Option<&JWK>,
     ) -> Result<(), Error> {
@@ -438,12 +497,13 @@ impl UcanRevocation {
             self.issuer.get(..4),
             self.issuer.get(4..8),
             jwk,
-            dereference(resolver, &self.issuer, &Default::default())
+            resolver
+                .dereference(&self.issuer)
                 .await
-                .1,
+                .map(DerefOutput::into_content)?,
         ) {
             // did:pkh without fragment
-            (Some("did:"), Some("pkh:"), Some(jwk), Content::DIDDocument(d)) => {
+            (Some("did:"), Some("pkh:"), Some(jwk), Content::Resource(Resource::Document(d))) => {
                 match_key_with_did_pkh(jwk, &d)?;
                 jwk.clone()
             }
@@ -452,26 +512,22 @@ impl UcanRevocation {
                 Some("did:"),
                 Some("pkh:"),
                 Some(jwk),
-                Content::Object(Resource::VerificationMethod(vm)),
+                Content::Resource(Resource::VerificationMethod(vm)),
             ) => {
                 match_key_with_vm(jwk, &vm)?;
                 jwk.clone()
             }
             // did:key without fragment
-            (Some("did:"), Some("key:"), _, Content::DIDDocument(d)) => d
+            (Some("did:"), Some("key:"), _, Content::Resource(Resource::Document(d))) => d
                 .verification_method
                 .iter()
-                .flatten()
                 .next()
-                .and_then(|v| match v {
-                    VerificationMethod::Map(vm) => Some(vm),
-                    _ => None,
-                })
                 .ok_or(Error::VerificationMethodMismatch)?
-                .get_jwk()?,
+                .public_key_jwk()?
+                .ok_or(Error::MissingPublicKey)?,
             // general case, did with fragment
-            (Some("did:"), Some(_), _, Content::Object(Resource::VerificationMethod(vm))) => {
-                vm.get_jwk()?
+            (Some("did:"), Some(_), _, Content::Resource(Resource::VerificationMethod(vm))) => {
+                vm.public_key_jwk()?.ok_or(Error::MissingPublicKey)?
             }
             _ => return Err(Error::VerificationMethodMismatch),
         };
@@ -519,8 +575,8 @@ mod ipld_encoding {
 
     #[derive(Deserialize, Clone, PartialEq, Debug)]
     pub struct DagJsonPayload<F = JsonValue, A = JsonValue> {
-        pub iss: String,
-        pub aud: String,
+        pub iss: DIDURLBuf,
+        pub aud: DIDBuf,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub nbf: Option<NumericDate>,
         pub exp: NumericDate,
@@ -630,12 +686,11 @@ mod ipld_encoding {
 mod tests {
     use super::*;
     use did_method_key::DIDKey;
-    use ssi_dids_core::DIDMethod;
 
     #[async_std::test]
     async fn valid() {
         let cases: Vec<ValidTestVector> =
-            serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-valid.json")).unwrap();
+            serde_json::from_str(include_str!("../../../tests/ucan-v0.9.0-valid.json")).unwrap();
 
         for case in cases {
             let ucan = match Ucan::decode(&case.token) {
@@ -643,7 +698,7 @@ mod tests {
                 Err(e) => Err(e).unwrap(),
             };
 
-            match ucan.verify_signature(DIDKey.to_resolver()).await {
+            match ucan.verify_signature(&DIDKey).await {
                 Err(e) => Err(e).unwrap(),
                 _ => {}
             };
@@ -656,12 +711,12 @@ mod tests {
     #[async_std::test]
     async fn invalid() {
         let cases: Vec<InvalidTestVector> =
-            serde_json::from_str(include_str!("../../tests/ucan-v0.9.0-invalid.json")).unwrap();
+            serde_json::from_str(include_str!("../../../tests/ucan-v0.9.0-invalid.json")).unwrap();
         for case in cases {
             match Ucan::<JsonValue>::decode(&case.token) {
                 Ok(u) => {
                     if u.payload.validate_time(None).is_ok()
-                        && u.verify_signature(DIDKey.to_resolver()).await.is_ok()
+                        && u.verify_signature(&DIDKey).await.is_ok()
                     {
                         assert!(false, "{}", case.comment);
                     }
@@ -675,7 +730,7 @@ mod tests {
     async fn basic() {
         let case = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCIsInVjdiI6IjAuOS4wIn0.eyJhdHQiOltdLCJhdWQiOiJkaWQ6ZXhhbXBsZToxMjMiLCJleHAiOjkwMDAwMDAwMDEuMCwiaXNzIjoiZGlkOmtleTp6Nk1ram16ZXBUcGc0NFJvejhKbk45QXhUS0QyMjk1Z2p6M3h0NDhQb2k3MjYxR1MiLCJwcmYiOltdfQ.V38liNHsdVO0Zk_davTBsewq-2XCxs_3qIRLuwUNj87aqdlMfa9X5O5IRR5u7apzWm7sUiR0FS3J3Nnu7IWtBQ";
         let u = Ucan::<JsonValue>::decode(case).unwrap();
-        u.verify_signature(DIDKey.to_resolver()).await.unwrap();
+        u.verify_signature(&DIDKey).await.unwrap();
     }
 
     #[derive(Deserialize)]
@@ -692,6 +747,7 @@ mod tests {
 
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
+    #[allow(dead_code)]
     struct InvalidAssertions {
         pub header: Option<JsonValue>,
         pub payload: Option<JsonValue>,
@@ -703,6 +759,7 @@ mod tests {
     struct InvalidTestVector {
         pub comment: String,
         pub token: String,
+        #[allow(dead_code)]
         pub assertions: InvalidAssertions,
     }
 }

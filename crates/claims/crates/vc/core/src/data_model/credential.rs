@@ -1,17 +1,14 @@
-use crate::{verification::ProofType, Claims, CredentialOrPresentation};
+use crate::{verification::ProofType, Claims, Validate};
 use chrono::{DateTime, FixedOffset};
 use iref::Uri;
 use ssi_claims_core::Verifiable;
 
-use super::{
-    CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse,
-    VerifiableCredentialOrPresentation,
-};
+use super::{CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse, VerifiableClaims};
 
 pub const VERIFIABLE_CREDENTIAL_TYPE: &str = "VerifiableCredential";
 
 /// Credential trait.
-pub trait Credential: CredentialOrPresentation {
+pub trait Credential: Validate {
     /// Credential subject type.
     type Subject;
 
@@ -155,13 +152,11 @@ pub trait Credential: CredentialOrPresentation {
     }
 }
 
-pub trait VerifiableCredential: Credential + VerifiableCredentialOrPresentation {}
+pub trait VerifiableCredential: Credential + VerifiableClaims {}
 
-impl<T: Credential + VerifiableCredentialOrPresentation> VerifiableCredential for T {}
+impl<T: Credential + VerifiableClaims> VerifiableCredential for T {}
 
-impl<T: CredentialOrPresentation, P: ProofType> CredentialOrPresentation
-    for Verifiable<Claims<T, P>>
-{
+impl<T: Validate, P: ProofType> Validate for Verifiable<Claims<T, P>> {
     fn is_valid(&self) -> bool {
         T::is_valid(&**self.claims())
     }
@@ -225,7 +220,7 @@ impl<T: Credential, P: ProofType> Credential for Verifiable<Claims<T, P>> {
     }
 }
 
-impl<T: Credential, P: ProofType> VerifiableCredentialOrPresentation for Verifiable<Claims<T, P>> {
+impl<T: Credential, P: ProofType> VerifiableClaims for Verifiable<Claims<T, P>> {
     type Proof = P::Prepared;
 
     fn proofs(&self) -> &[Self::Proof] {

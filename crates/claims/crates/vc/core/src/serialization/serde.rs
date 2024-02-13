@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use serde::Serialize;
 use ssi_claims_core::serde::SerializeClaims;
 

@@ -65,6 +65,10 @@ pub struct TezosMethod2021 {
 impl TezosMethod2021 {
     pub const IRI: &'static Iri = TEZOS_METHOD_2021_IRI;
 
+    pub fn public_key_jwk(&self) -> Option<&JWK> {
+        self.public_key.as_jwk()
+    }
+
     pub fn verify_bytes(
         &self,
         public_key_jwk: Option<&JWK>,

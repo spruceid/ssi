@@ -1,11 +1,14 @@
-use std::hash::Hash;
+use std::{hash::Hash, str::FromStr};
 
 use ed25519_dalek::Signer;
 use iref::{Iri, IriBuf, UriBuf};
 use rand_core_0_5::{CryptoRng, RngCore};
+use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
+use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
+use ssi_security::{Multibase, MultibaseBuf};
 use static_iref::iri;
 
 use crate::{
@@ -47,14 +50,9 @@ pub struct Multikey {
 
     /// Public key encoded according to [MULTICODEC] and formatted according to
     /// [MULTIBASE].
-    ///
-    /// The multicodec encoding of an Ed25519 public key is the
-    /// two-byte prefix 0xed01 followed by the 32-byte public key data. The 34
-    /// byte value is then encoded using base58-btc (z) as the prefix. Any other
-    /// encoding MUST NOT be allowed.
     #[serde(rename = "publicKeyMultibase")]
     #[ld("sec:publicKeyMultibase")]
-    pub public_key_multibase: String,
+    pub public_key: PublicKey,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -75,6 +73,10 @@ pub enum InvalidPublicKey {
 impl Multikey {
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#Multikey");
 
+    pub fn public_key_jwk(&self) -> JWK {
+        self.public_key.to_jwk()
+    }
+
     pub fn generate_key_pair(
         id: IriBuf,
         controller: UriBuf,
@@ -92,29 +94,10 @@ impl Multikey {
         controller: UriBuf,
         public_key: ed25519_dalek::PublicKey,
     ) -> Self {
-        let bytes = public_key.to_bytes();
-        let multi_encoded = MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, &bytes);
-
         Self {
             id,
             controller,
-            public_key_multibase: multibase::encode(
-                multibase::Base::Base58Btc,
-                multi_encoded.as_bytes(),
-            ),
-        }
-    }
-
-    pub fn decode_public_key(&self) -> Result<ed25519_dalek::PublicKey, InvalidPublicKey> {
-        let pk_multi_encoded =
-            MultiEncodedBuf::new(multibase::decode(&self.public_key_multibase)?.1)?;
-
-        let (pk_codec, pk_data) = pk_multi_encoded.parts();
-        if pk_codec == ssi_multicodec::ED25519_PUB {
-            let pk = ed25519_dalek::PublicKey::from_bytes(pk_data)?;
-            Ok(pk)
-        } else {
-            Err(InvalidPublicKey::InvalidKeyType)
+            public_key: PublicKey::encode(public_key),
         }
     }
 
@@ -177,13 +160,143 @@ impl TryFrom<GenericVerificationMethod> for Multikey {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key_multibase: m
+            public_key: m
                 .properties
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
-                .to_owned(),
+                .parse()
+                .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?,
         })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PublicKey {
+    /// Multibase-encoded public key.
+    encoded: MultibaseBuf,
+
+    /// Decoded public key.
+    decoded: ed25519_dalek::PublicKey,
+}
+
+impl PublicKey {
+    pub fn encode(decoded: ed25519_dalek::PublicKey) -> Self {
+        let multi_encoded =
+            MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
+
+        Self {
+            encoded: MultibaseBuf::encode(multibase::Base::Base58Btc, multi_encoded.as_bytes()),
+            decoded,
+        }
+    }
+
+    pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
+        let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
+
+        let (pk_codec, pk_data) = pk_multi_encoded.parts();
+        if pk_codec == ssi_multicodec::ED25519_PUB {
+            let decoded = ed25519_dalek::PublicKey::from_bytes(pk_data)?;
+            Ok(Self { encoded, decoded })
+        } else {
+            Err(InvalidPublicKey::InvalidKeyType)
+        }
+    }
+
+    pub fn encoded(&self) -> &Multibase {
+        &self.encoded
+    }
+
+    pub fn decoded(&self) -> &ed25519_dalek::PublicKey {
+        &self.decoded
+    }
+
+    pub fn to_jwk(&self) -> JWK {
+        self.decoded.clone().into()
+    }
+
+    pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> bool {
+        use ed25519_dalek::Verifier;
+        self.decoded.verify(data, signature).is_ok()
+    }
+}
+
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.encoded.serialize(serializer)
+    }
+}
+
+impl<'a> Deserialize<'a> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        use serde::de::Error;
+        let encoded = MultibaseBuf::deserialize(deserializer)?;
+        Self::decode(encoded).map_err(D::Error::custom)
+    }
+}
+
+impl FromStr for PublicKey {
+    type Err = InvalidPublicKey;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::decode(MultibaseBuf::new(s.to_owned()))
+    }
+}
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.decoded.eq(&other.decoded)
+    }
+}
+
+impl Eq for PublicKey {}
+
+impl Hash for PublicKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.encoded.hash(state)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataResource<I, V> for PublicKey
+where
+    MultibaseBuf: linked_data::LinkedDataResource<I, V>,
+{
+    fn interpretation(
+        &self,
+        vocabulary: &mut V,
+        interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
+        self.encoded.interpretation(vocabulary, interpretation)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataSubject<I, V> for PublicKey
+where
+    MultibaseBuf: linked_data::LinkedDataSubject<I, V>,
+{
+    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<I, V>,
+    {
+        self.encoded.visit_subject(serializer)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataPredicateObjects<I, V> for PublicKey
+where
+    MultibaseBuf: linked_data::LinkedDataPredicateObjects<I, V>,
+{
+    fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<I, V>,
+    {
+        self.encoded.visit_objects(visitor)
     }
 }

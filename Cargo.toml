@@ -53,24 +53,24 @@ exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
 [workspace]
 members = [
   "crates/*",
+  "crates/verification-methods/core",
   "crates/dids/core",
   "crates/dids/methods/*",
   "crates/claims/core",
   "crates/claims/crates/*",
   "crates/claims/crates/vc/core",
-  "crates/claims/crates/vc/proofs/*"
-  # "vc-test",
-  # "did-test",
+  "crates/claims/crates/vc/data-integrity",
+  "crates/claims/crates/vc/data-integrity/core",
+  "crates/claims/crates/vc/data-integrity/suites",
+  "vc-test",
   # "ssi-sd-jwt",
-  # "ssi-ssh",
-  # "ssi-ucan",
-  # "ssi-zcap-ld"
 ]
 
 [workspace.dependencies]
 ssi-core = { path = "./crates/core", version = "0.1" }
 ssi-multicodec = { path = "./crates/multicodec", version = "0.1" }
 ssi-crypto = { path = "./crates/crypto", version = "0.1" }
+ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1" }
 ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1" }
 ssi-jwk = { path = "./crates/jwk", version = "0.1", default-features = false }
 ssi-jws = { path = "./crates/jws", version = "0.1", default-features = false }
@@ -86,7 +86,9 @@ ssi-caips = { path = "./crates/caips", version = "0.1" }
 # Verifiable Claims
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1" }
 ssi-vc-core = { path = "./crates/claims/crates/vc/core", version = "0.1" }
-ssi-vc-data-integrity = { path = "./crates/claims/crates/vc/proofs/data-integrity", version = "0.3" }
+ssi-vc-data-integrity-core = { path = "./crates/claims/crates/vc/data-integrity/core", version = "0.1" }
+ssi-vc-data-integrity-suites = { path = "./crates/claims/crates/vc/data-integrity/suites", version = "0.1" }
+ssi-vc-data-integrity = { path = "./crates/claims/crates/vc/data-integrity", version = "0.1" }
 ssi-vc = { path = "./crates/claims/crates/vc", version = "0.1" }
 ssi-claims = { path = "./crates/claims", version = "0.1" }
 
@@ -102,6 +104,7 @@ did-web = { path = "./crates/dids/methods/web", version = "0.2.2" }
 ssi-dids = { path = "./crates/dids", version = "0.2" }
 
 # other common dependencies
+async-std = "1.9"
 async-trait = "0.1.68"
 thiserror = "1.0.40"
 chrono = "0.4.24"
@@ -120,6 +123,7 @@ json-ld = { git = "https://github.com/timothee-haudebourg/json-ld.git" }
 serde = "1.0"
 serde_json = "1.0"
 serde_jcs = "0.1.0"
+bs58 = "0.4"
 hex = "0.4.3"
 derivative = "2.2.0"
 educe = "0.4.22"
@@ -129,7 +133,6 @@ linked-data = { git = "https://github.com/spruceid/linked-data-rs.git" }
 rand_chacha = "0.3.1"
 contextual = "0.1.6"
 lazy_static = "1.4.0"
-mown = "0.2.2"
 
 [dependencies]
 # ssi-vc.workspace = true
@@ -153,7 +156,7 @@ ssi-dids.workspace = true
 # # ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
 
 [dev-dependencies]
-async-std = { version = "1.9", features = ["attributes"] }
+async-std = { workspace = true, features = ["attributes"] }
 # uuid = { version = "0.8", features = ["v4", "serde"] }
 serde_json.workspace = true
 # ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["example"] }

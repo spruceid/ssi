@@ -315,21 +315,19 @@ impl JWK {
     }
 
     #[cfg(feature = "secp256r1")]
-    pub fn generate_p256() -> Result<JWK, Error> {
+    pub fn generate_p256() -> JWK {
         let mut rng = rand::rngs::OsRng {};
         Self::generate_p256_from(&mut rng)
     }
 
     #[cfg(feature = "secp256r1")]
-    pub fn generate_p256_from(
-        rng: &mut (impl rand::CryptoRng + rand::RngCore),
-    ) -> Result<JWK, Error> {
+    pub fn generate_p256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> JWK {
         let secret_key = p256::SecretKey::random(rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
         let public_key: p256::PublicKey = secret_key.public_key();
-        let mut ec_params = ECParams::try_from(&public_key)?;
+        let mut ec_params = ECParams::from(&public_key);
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
-        Ok(JWK::from(Params::EC(ec_params)))
+        JWK::from(Params::EC(ec_params))
     }
 
     #[cfg(feature = "secp384r1")]
@@ -857,12 +855,19 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
 
 #[cfg(feature = "ed25519")]
 pub fn ed25519_parse(data: &[u8]) -> Result<JWK, Error> {
-    let _: ed25519_dalek::VerifyingKey = data.try_into()?;
-    Ok(JWK::from(Params::OKP(OctetParams {
-        curve: "Ed25519".to_string(),
-        public_key: Base64urlUInt(data.to_owned()),
-        private_key: None,
-    })))
+    let public_key = ed25519_dalek::PublicKey::from_bytes(data)?;
+    Ok(public_key.into())
+}
+
+#[cfg(feature = "ed25519")]
+impl From<ed25519_dalek::PublicKey> for JWK {
+    fn from(value: ed25519_dalek::PublicKey) -> Self {
+        JWK::from(Params::OKP(OctetParams {
+            curve: "Ed25519".to_string(),
+            public_key: Base64urlUInt(value.to_bytes().to_vec()),
+            private_key: None,
+        }))
+    }
 }
 
 #[cfg(feature = "ed25519")]
@@ -912,25 +917,31 @@ pub fn secp256k1_parse_private(data: &[u8]) -> Result<JWK, Error> {
 #[cfg(feature = "secp256r1")]
 pub fn p256_parse(pk_bytes: &[u8]) -> Result<JWK, Error> {
     let pk = p256::PublicKey::from_sec1_bytes(pk_bytes)?;
-    let jwk = JWK {
-        params: Params::EC(ECParams::try_from(&pk)?),
-        public_key_use: None,
-        key_operations: None,
-        algorithm: None,
-        key_id: None,
-        x509_url: None,
-        x509_certificate_chain: None,
-        x509_thumbprint_sha1: None,
-        x509_thumbprint_sha256: None,
-    };
-    Ok(jwk)
+    Ok(pk.into())
+}
+
+#[cfg(feature = "secp256r1")]
+impl From<p256::PublicKey> for JWK {
+    fn from(value: p256::PublicKey) -> Self {
+        JWK {
+            params: Params::EC(ECParams::from(&value)),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        }
+    }
 }
 
 #[cfg(feature = "secp256r1")]
 fn p256_parse_private(data: &[u8]) -> Result<JWK, Error> {
     let k = p256::SecretKey::from_bytes(data.into())?;
     let jwk = JWK {
-        params: Params::EC(ECParams::try_from(&k)?),
+        params: Params::EC(ECParams::from(&k)),
         public_key_use: None,
         key_operations: None,
         algorithm: None,
@@ -991,6 +1002,7 @@ pub fn serialize_secp256k1(params: &ECParams) -> Result<Vec<u8>, Error> {
 pub fn serialize_p256(params: &ECParams) -> Result<Vec<u8>, Error> {
     // TODO: check that curve is P-256
     use p256::elliptic_curve::{sec1::EncodedPoint, FieldBytes};
+
     let x = FieldBytes::<p256::NistP256>::from_slice(
         &params.x_coordinate.as_ref().ok_or(Error::MissingPoint)?.0,
     );
@@ -1206,37 +1218,31 @@ impl TryFrom<&k256::SecretKey> for ECParams {
 }
 
 #[cfg(feature = "secp256r1")]
-impl TryFrom<&p256::PublicKey> for ECParams {
-    type Error = Error;
-    fn try_from(pk: &p256::PublicKey) -> Result<Self, Self::Error> {
+impl From<&p256::PublicKey> for ECParams {
+    fn from(pk: &p256::PublicKey) -> Self {
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         let encoded_point = pk.to_encoded_point(false);
-        let x = encoded_point.x().ok_or(Error::MissingPoint)?;
-        let y = encoded_point.y().ok_or(Error::MissingPoint)?;
-        Ok(ECParams {
+        ECParams {
             curve: Some("P-256".to_string()),
-            x_coordinate: Some(Base64urlUInt(x.to_vec())),
-            y_coordinate: Some(Base64urlUInt(y.to_vec())),
+            x_coordinate: encoded_point.x().map(|x| Base64urlUInt(x.to_vec())),
+            y_coordinate: encoded_point.y().map(|y| Base64urlUInt(y.to_vec())),
             ecc_private_key: None,
-        })
+        }
     }
 }
 
 #[cfg(feature = "secp256r1")]
-impl TryFrom<&p256::SecretKey> for ECParams {
-    type Error = Error;
-    fn try_from(k: &p256::SecretKey) -> Result<Self, Self::Error> {
+impl From<&p256::SecretKey> for ECParams {
+    fn from(k: &p256::SecretKey) -> Self {
         let pk = k.public_key();
         use p256::elliptic_curve::sec1::ToEncodedPoint;
         let encoded_point = pk.to_encoded_point(false);
-        let x = encoded_point.x().ok_or(Error::MissingPoint)?;
-        let y = encoded_point.y().ok_or(Error::MissingPoint)?;
-        Ok(ECParams {
+        Self {
             curve: Some("P-256".to_string()),
-            x_coordinate: Some(Base64urlUInt(x.to_vec())),
-            y_coordinate: Some(Base64urlUInt(y.to_vec())),
+            x_coordinate: encoded_point.x().map(|x| Base64urlUInt(x.to_vec())),
+            y_coordinate: encoded_point.y().map(|y| Base64urlUInt(y.to_vec())),
             ecc_private_key: Some(Base64urlUInt(k.to_bytes().to_vec())),
-        })
+        }
     }
 }
 
@@ -1341,7 +1347,7 @@ mod tests {
     #[test]
     #[cfg(feature = "secp256r1")]
     fn p256_generate() {
-        let _jwk = JWK::generate_p256().unwrap();
+        let _jwk = JWK::generate_p256();
     }
 
     #[test]

@@ -181,6 +181,13 @@ impl DIDBuf {
         }
     }
 
+    pub fn as_did_url(&self) -> &DIDURL {
+        unsafe {
+            // SAFETY: we validated the data in `Self::new`.
+            DIDURL::new_unchecked(&self.0)
+        }
+    }
+
     pub fn into_iri(self) -> IriBuf {
         unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(self.0)) }
     }
@@ -235,6 +242,12 @@ impl Deref for DIDBuf {
 impl Borrow<DID> for DIDBuf {
     fn borrow(&self) -> &DID {
         self.as_did()
+    }
+}
+
+impl Borrow<DIDURL> for DIDBuf {
+    fn borrow(&self) -> &DIDURL {
+        self.as_did_url()
     }
 }
 

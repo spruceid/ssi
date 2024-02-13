@@ -719,18 +719,15 @@ impl DIDPKH {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iref::{IriBuf, UriBuf};
+    use iref::IriBuf;
     use serde_json::{from_str, from_value, json};
-    use ssi_claims::{
-        vc::{
-            data_integrity::{
-                verification::method::{signer::SingleSecretSigner, ProofPurpose},
-                AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, Proof,
-                ProofConfiguration,
-            },
-            Claims, JsonCredential, JsonPresentation,
+    use ssi_claims::vc::{
+        data_integrity::{
+            verification::method::{signer::SingleSecretSigner, ProofPurpose},
+            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, Proof,
+            ProofConfiguration,
         },
-        Verifiable,
+        Claims, JsonCredential, JsonPresentation,
     };
     use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
     use ssi_jwk::Algorithm;
@@ -942,10 +939,10 @@ mod tests {
         vm_relative_url: &str,
         proof_suite: AnySuite,
         eip712_domain_opt: Option<
-            ssi_claims::vc::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
+            ssi_claims::vc::data_integrity::suites::ethereum_eip712_signature_2021::Eip712Options,
         >,
         vp_eip712_domain_opt: Option<
-            ssi_claims::vc::data_integrity::suite::ethereum_eip712_signature_2021::Eip712Options,
+            ssi_claims::vc::data_integrity::suites::ethereum_eip712_signature_2021::Eip712Options,
         >,
     ) {
         let didpkh = DIDVerifier::new(DIDPKH);
@@ -1234,7 +1231,7 @@ mod tests {
         .unwrap();
         let other_key_secp256k1 = JWK::generate_secp256k1().unwrap();
         let mut other_key_ed25519 = JWK::generate_ed25519().unwrap();
-        let mut other_key_p256 = JWK::generate_p256().unwrap();
+        let mut other_key_p256 = JWK::generate_p256();
 
         // eth/Recovery2020
         credential_prove_verify_did_pkh(
@@ -1540,8 +1537,9 @@ mod tests {
                 // Add the `foo` field to the EIP712 VC schema if necessary.
                 // This is required so hashing can succeed.
                 if let Some(eip712) = &mut proof.untyped_mut().options.eip712 {
-                    if let Some(ssi_claims::vc::data_integrity::eip712::TypesOrURI::Object(types)) =
-                        &mut eip712.types
+                    if let Some(
+                        ssi_claims::vc::data_integrity::suites::eip712::TypesOrURI::Object(types),
+                    ) = &mut eip712.types
                     {
                         let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
                         vc_schema.push(ssi_eip712::MemberVariable::new(
@@ -1553,8 +1551,9 @@ mod tests {
 
                 // Same as above but for the legacy EIP712 cryptosuite (v0.1).
                 if let Some(eip712) = &mut proof.untyped_mut().options.eip712_v0_1 {
-                    if let Some(ssi_claims::vc::data_integrity::eip712::TypesOrURI::Object(types)) =
-                        &mut eip712.types
+                    if let Some(
+                        ssi_claims::vc::data_integrity::suites::eip712::TypesOrURI::Object(types),
+                    ) = &mut eip712.types
                     {
                         let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
                         vc_schema.push(ssi_eip712::MemberVariable::new(

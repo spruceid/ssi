@@ -1,9 +1,2 @@
 pub use ssi_vc_core::*;
-
-mod protocol;
-mod verification_method;
-
-pub use protocol::*;
-pub use verification_method::*;
-
-pub mod data_integrity;
+pub use ssi_vc_data_integrity as data_integrity;

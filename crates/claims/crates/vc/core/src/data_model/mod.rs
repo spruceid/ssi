@@ -14,8 +14,8 @@ pub use refresh_service::*;
 pub use status::*;
 pub use terms_of_use::*;
 
-pub trait CredentialOrPresentation {
-    /// Validates the credential or presentation.
+pub trait Validate {
+    /// Validates the claims.
     ///
     /// Validation consists in verifying that the claims themselves are
     /// consistent and valid with regard to the verification environment.
@@ -34,8 +34,8 @@ pub trait CredentialOrPresentation {
     fn is_valid(&self) -> bool;
 }
 
-/// Verifiable Credential or Presentation.
-pub trait VerifiableCredentialOrPresentation {
+/// Verifiable claims.
+pub trait VerifiableClaims {
     type Proof;
 
     /// Proofs.

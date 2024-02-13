@@ -1552,7 +1552,7 @@ mod tests {
     #[test]
     #[cfg(feature = "p256")]
     fn p256_sign_verify() {
-        let key = JWK::generate_p256().unwrap();
+        let key = JWK::generate_p256();
         let data = b"asdf";
         let bad_data = b"no";
         let sig = sign_bytes(Algorithm::ES256, data, &key).unwrap();

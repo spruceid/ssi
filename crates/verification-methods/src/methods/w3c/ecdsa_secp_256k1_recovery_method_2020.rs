@@ -1,11 +1,12 @@
 use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
+use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use static_iref::iri;
-use std::hash::Hash;
+use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
@@ -124,6 +125,10 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256k1RecoveryMethod2020");
 
+    pub fn public_key_jwk(&self) -> Option<Cow<JWK>> {
+        self.public_key.to_jwk()
+    }
+
     pub fn sign(
         &self,
         secret_key: &JWK,
@@ -184,7 +189,7 @@ pub enum PublicKey {
 
     #[serde(rename = "publicKeyHex")]
     #[ld("sec:publicKeyHex")]
-    Hex(String),
+    Hex(Box<PublicKeyHex>),
 
     #[serde(rename = "ethereumAddress")]
     #[ld("sec:ethereumAddress")]
@@ -220,26 +225,19 @@ impl From<InvalidPublicKey> for VerificationError {
 }
 
 impl PublicKey {
+    pub fn to_jwk(&self) -> Option<Cow<JWK>> {
+        match self {
+            Self::Jwk(jwk) => Some(Cow::Borrowed(jwk)),
+            Self::Hex(hex) => Some(Cow::Owned(hex.to_jwk())),
+            Self::EthereumAddress(_) => None,
+            Self::BlockchainAccountId(_) => None,
+        }
+    }
+
     pub fn matches(&self, other: &JWK) -> Result<bool, InvalidPublicKey> {
         match self {
             Self::Jwk(jwk) => Ok(jwk.equals_public(other)),
-            Self::Hex(hex) => {
-                let bytes = hex::decode(hex)?;
-                let pk = k256::PublicKey::from_sec1_bytes(&bytes)?;
-                let jwk = JWK {
-                    params: ssi_jwk::Params::EC(ssi_jwk::ECParams::try_from(&pk).unwrap()),
-                    public_key_use: None,
-                    key_operations: None,
-                    algorithm: None,
-                    key_id: None,
-                    x509_url: None,
-                    x509_certificate_chain: None,
-                    x509_thumbprint_sha1: None,
-                    x509_thumbprint_sha256: None,
-                };
-
-                Ok(jwk.equals_public(other))
-            }
+            Self::Hex(hex) => Ok(hex.to_jwk().equals_public(other)),
             Self::EthereumAddress(a) => {
                 let ssi_jwk::Params::EC(params) = &other.params else {
                     return Err(InvalidPublicKey::InvalidParams);
@@ -267,6 +265,115 @@ impl PublicKey {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct PublicKeyHex {
+    encoded: String,
+    decoded: k256::PublicKey,
+}
+
+impl PublicKeyHex {
+    pub fn decode(encoded: String) -> Result<Self, InvalidPublicKey> {
+        let bytes = hex::decode(&encoded)?;
+        let decoded = k256::PublicKey::from_sec1_bytes(&bytes)?;
+
+        Ok(Self { encoded, decoded })
+    }
+
+    pub fn to_jwk(&self) -> JWK {
+        JWK {
+            params: ssi_jwk::Params::EC(ssi_jwk::ECParams::try_from(&self.decoded).unwrap()),
+            public_key_use: None,
+            key_operations: None,
+            algorithm: None,
+            key_id: None,
+            x509_url: None,
+            x509_certificate_chain: None,
+            x509_thumbprint_sha1: None,
+            x509_thumbprint_sha256: None,
+        }
+    }
+}
+
+impl PartialEq for PublicKeyHex {
+    fn eq(&self, other: &Self) -> bool {
+        self.decoded.eq(&other.decoded)
+    }
+}
+
+impl Eq for PublicKeyHex {}
+
+impl Hash for PublicKeyHex {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.encoded.hash(state)
+    }
+}
+
+impl Serialize for PublicKeyHex {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.encoded.serialize(serializer)
+    }
+}
+
+impl<'a> Deserialize<'a> for PublicKeyHex {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        use serde::de::Error;
+        let encoded = String::deserialize(deserializer)?;
+        Self::decode(encoded).map_err(D::Error::custom)
+    }
+}
+
+impl FromStr for PublicKeyHex {
+    type Err = InvalidPublicKey;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::decode(s.to_owned())
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataResource<I, V> for PublicKeyHex
+where
+    String: linked_data::LinkedDataResource<I, V>,
+{
+    fn interpretation(
+        &self,
+        vocabulary: &mut V,
+        interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
+        self.encoded.interpretation(vocabulary, interpretation)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataSubject<I, V> for PublicKeyHex
+where
+    String: linked_data::LinkedDataSubject<I, V>,
+{
+    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<I, V>,
+    {
+        self.encoded.visit_subject(serializer)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataPredicateObjects<I, V>
+    for PublicKeyHex
+where
+    String: linked_data::LinkedDataPredicateObjects<I, V>,
+{
+    fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<I, V>,
+    {
+        self.encoded.visit_objects(visitor)
+    }
+}
+
 impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
     type Error = InvalidVerificationMethod;
 
@@ -282,11 +389,12 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
                     InvalidVerificationMethod::invalid_property("publicKeyJwk")
                 })?))
             }
-            (None, Some(k), None, None) => PublicKey::Hex(
+            (None, Some(k), None, None) => PublicKey::Hex(Box::new(
                 k.as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyHex"))?
-                    .to_owned(),
-            ),
+                    .parse()
+                    .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyHex"))?,
+            )),
             (None, None, Some(k), None) => PublicKey::EthereumAddress(
                 k.as_str()
                     .ok_or_else(|| InvalidVerificationMethod::invalid_property("ethereumAddress"))?

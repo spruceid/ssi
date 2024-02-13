@@ -26,7 +26,6 @@ grdf.workspace = true
 ssi-contexts.workspace = true
 ssi-crypto.workspace = true
 ssi-rdf.workspace = true
-mown.workspace = true
 
 [dev-dependencies]
 difference = "2.0"

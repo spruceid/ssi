@@ -39,6 +39,8 @@ pub const PROOF_PURPOSE: &Iri = iri!("https://w3id.org/security#proofPurpose");
 
 pub const PROOF_VALUE: &Iri = iri!("https://w3id.org/security#proofValue");
 
+pub const PROOF: &Iri = iri!("https://w3id.org/security#proof");
+
 pub const JWS: &Iri = iri!("https://w3id.org/security#jws");
 
 pub const SIGNATURE_VALUE: &Iri = iri!("https://w3id.org/security#signatureValue");

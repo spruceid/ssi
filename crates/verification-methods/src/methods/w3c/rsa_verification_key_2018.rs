@@ -55,6 +55,10 @@ pub struct RsaVerificationKey2018 {
 impl RsaVerificationKey2018 {
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#RsaVerificationKey2018");
 
+    pub fn public_key_jwk(&self) -> &JWK {
+        &self.public_key
+    }
+
     pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<String, SignatureError> {
         let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::RS256, None);
         let signing_bytes = header.encode_signing_bytes(data);

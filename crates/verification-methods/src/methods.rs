@@ -1,210 +1,133 @@
 mod w3c;
+use std::borrow::Cow;
+
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::JWK;
+use ssi_verification_methods_core::SigningMethod;
 pub use w3c::*;
 
 mod unspecified;
 pub use unspecified::*;
 
-mod generic;
-pub use generic::*;
+ssi_verification_methods_core::verification_method_union! {
+    pub enum AnyMethod, AnyMethodRef, AnyMethodType {
+        /// Deprecated verification method for the `RsaSignature2018` suite.
+        RsaVerificationKey2018,
 
-#[macro_export]
-macro_rules! verification_method_union {
-	{
-		$vis:vis enum $name:ident, $name_ref:ident, $kind:ident {
-			$(
-				$(#[$meta:meta])*
-				$variant:ident
-			),*
-		}
-	} => {
-		#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, linked_data::Serialize, linked_data::Deserialize)]
-		$vis enum $name {
-			$(
-				$(#[$meta])*
-				$variant($variant)
-			),*
-		}
+        /// Deprecated verification method for the `Ed25519Signature2018` suite.
+        Ed25519VerificationKey2018,
 
-		#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
-		$vis enum $name_ref<'a> {
-			$(
-				$(#[$meta])*
-				$variant(&'a $variant)
-			),*
-		}
+        /// Deprecated verification method for the `Ed25519Signature2020` suite.
+        Ed25519VerificationKey2020,
 
-		#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-		$vis enum $kind {
-			$(
-				$(#[$meta])*
-				$variant
-			),*
-		}
+        EcdsaSecp256k1VerificationKey2019,
 
-		impl $kind {
-			pub fn iri(&self) -> &iref::Iri {
-				match self {
-					$(
-						Self::$variant => $variant::IRI
-					),*
-				}
-			}
-		}
+        EcdsaSecp256k1RecoveryMethod2020,
 
-		impl $name {
-			pub fn type_(&self) -> $kind {
-				match self {
-					$(
-						Self::$variant(_) => $kind::$variant
-					),*
-				}
-			}
-		}
+        EcdsaSecp256r1VerificationKey2019,
 
-		impl<'a> $name_ref<'a> {
-			fn id(&self) -> &iref::Iri {
-				use $crate::VerificationMethod;
-				match self {
-					$(
-						Self::$variant(m) => m.id()
-					),*
-				}
-			}
+        /// `JsonWebKey2020`.
+        JsonWebKey2020,
 
-			pub fn type_(&self) -> $kind {
-				match self {
-					$(
-						Self::$variant(_) => $kind::$variant
-					),*
-				}
-			}
-		}
+        /// `Multikey`.
+        Multikey,
 
-		impl $crate::ssi_core::Referencable for $name {
-			type Reference<'a> = $name_ref<'a> where Self: 'a;
+        Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
 
-			fn as_reference(&self) -> $name_ref<'_> {
-				match self {
-					$(
-						Self::$variant(m) => $name_ref::$variant(m)
-					),*
-				}
-			}
+        P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
 
-			fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small> where Self: 'big {
-				match r {
-					$(
-						$name_ref::$variant(m) => $name_ref::$variant(m)
-					),*
-				}
-			}
-		}
+        TezosMethod2021,
 
-		impl $crate::VerificationMethod for $name {
-			fn id(&self) -> &iref::Iri {
-				match self {
-					$(
-						Self::$variant(m) => m.id()
-					),*
-				}
-			}
+        AleoMethod2021,
 
-			fn controller(&self) -> Option<&iref::Iri> {
-				match self {
-					$(
-						Self::$variant(m) => m.controller()
-					),*
-				}
-			}
+        BlockchainVerificationMethod2021,
 
-			fn ref_id<'a>(r: Self::Reference<'a>) -> &'a iref::Iri {
-				match r {
-					$(
-						$name_ref::$variant(m) => $variant::ref_id(m)
-					),*
-				}
-			}
+        Eip712Method2021,
 
-			fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a iref::Iri> {
-				match r {
-					$(
-						$name_ref::$variant(m) => $variant::ref_controller(m)
-					),*
-				}
-			}
-		}
+        SolanaMethod2021
+    }
+}
 
-		impl $crate::TypedVerificationMethod for $name {
-			fn expected_type() -> Option<$crate::ExpectedType> {
-				let mut types = Vec::new();
+impl AnyMethod {
+    /// Returns the public key of the verification method as a JWK.
+    ///
+    /// Some methods don't have any the public key embedded.
+    pub fn public_key_jwk(&self) -> Option<Cow<JWK>> {
+        match self {
+            Self::RsaVerificationKey2018(m) => Some(Cow::Borrowed(m.public_key_jwk())),
+            Self::Ed25519VerificationKey2018(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::Ed25519VerificationKey2020(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::EcdsaSecp256k1VerificationKey2019(m) => Some(m.public_key_jwk()),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.public_key_jwk(),
+            Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::JsonWebKey2020(m) => Some(Cow::Borrowed(m.public_key_jwk())),
+            Self::Multikey(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
+            Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
+            Self::TezosMethod2021(m) => m.public_key_jwk().map(Cow::Borrowed),
+            Self::AleoMethod2021(_) => None,
+            Self::BlockchainVerificationMethod2021(_) => None,
+            Self::Eip712Method2021(_) => None,
+            Self::SolanaMethod2021(m) => Some(Cow::Borrowed(m.public_key_jwk())),
+        }
+    }
+}
 
-				$(
-					match $variant::expected_type() {
-						Some($crate::ExpectedType::One(t)) => types.push(t),
-						Some($crate::ExpectedType::Many(ts)) => types.extend(ts),
-						None => ()
-					}
-				)*
-
-				match types.len() {
-					0 => None,
-					1 => Some($crate::ExpectedType::One(types.pop().unwrap())),
-					_ => Some($crate::ExpectedType::Many(types))
-				}
-			}
-
-			fn type_match(ty: &str) -> bool {
-				$(
-					if <$variant as $crate::TypedVerificationMethod>::type_match(ty) {
-						return true
-					}
-				)*
-
-				false
-			}
-
-			fn type_(&self) -> &str {
-				match self {
-					$(
-						Self::$variant(m) => m.type_()
-					),*
-				}
-			}
-
-			fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str {
-				match r {
-					$(
-						$name_ref::$variant(m) => <$variant as $crate::TypedVerificationMethod>::ref_type(m)
-					),*
-				}
-			}
-		}
-
-		$(
-			impl<'a> TryFrom<$name_ref<'a>> for &'a $variant {
-				type Error = $crate::InvalidVerificationMethod;
-
-				fn try_from(value: $name_ref<'a>) -> Result<Self, Self::Error> {
-					match value {
-						$name_ref::$variant(m) => Ok(m),
-						other => Err($crate::InvalidVerificationMethod::invalid_type_iri(other.type_().iri()))
-					}
-				}
-			}
-		)*
-
-		impl TryFrom<$crate::GenericVerificationMethod> for $name {
-			type Error = $crate::InvalidVerificationMethod;
-
-			fn try_from(value: $crate::GenericVerificationMethod) -> Result<Self, Self::Error> {
-				$(
-					if <$variant as $crate::TypedVerificationMethod>::type_match(&value.type_) {
-						return <$variant as TryFrom<$crate::GenericVerificationMethod>>::try_from(value).map(Self::$variant)
-					}
-				)*
-
-				Err($crate::InvalidVerificationMethod::UnsupportedMethodType)
-			}
-		}
-	};
+impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
+    fn sign_bytes_ref(
+        this: AnyMethodRef,
+        secret: &JWK,
+        algorithm: ssi_jwk::Algorithm,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match this {
+            AnyMethodRef::RsaVerificationKey2018(_) => todo!(),
+            AnyMethodRef::Ed25519VerificationKey2018(m) => {
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            }
+            AnyMethodRef::Ed25519VerificationKey2020(_) => todo!(),
+            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
+                ssi_jwk::Algorithm::ES256K => m.sign_bytes(
+                    secret,
+                    ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
+                    bytes,
+                ),
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
+                ssi_jwk::Algorithm::ES256KR => {
+                    m.sign_bytes(secret, ssi_jwk::algorithm::ES256KR, bytes)
+                }
+                ssi_jwk::Algorithm::ESKeccakKR => {
+                    m.sign_bytes(secret, ssi_jwk::algorithm::ESKeccakKR, bytes)
+                }
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyMethodRef::EcdsaSecp256r1VerificationKey2019(m) => match algorithm {
+                ssi_jwk::Algorithm::ES256 => m.sign_bytes(secret, bytes),
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyMethodRef::JsonWebKey2020(_) => todo!(),
+            AnyMethodRef::Multikey(_) => todo!(),
+            AnyMethodRef::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            }
+            AnyMethodRef::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            }
+            AnyMethodRef::TezosMethod2021(m) => m.sign_bytes(secret, algorithm.try_into()?, bytes),
+            AnyMethodRef::AleoMethod2021(_) => todo!(),
+            AnyMethodRef::BlockchainVerificationMethod2021(_) => todo!(),
+            AnyMethodRef::Eip712Method2021(m) => {
+                SigningMethod::sign_bytes(m, secret, algorithm.try_into()?, bytes)
+            }
+            AnyMethodRef::SolanaMethod2021(_) => todo!(),
+        }
+    }
 }

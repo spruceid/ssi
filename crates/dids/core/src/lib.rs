@@ -13,6 +13,9 @@ pub mod registration;
 pub mod resolution;
 pub mod verifier;
 
+#[cfg(feature = "example")]
+pub mod example;
+
 pub use did::*;
 pub use document::Document;
 pub use resolution::{DIDMethodResolver, DIDResolver, StaticDIDResolver};

@@ -58,6 +58,10 @@ pub struct JsonWebKey2020 {
 impl JsonWebKey2020 {
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#JsonWebKey2020");
 
+    pub fn public_key_jwk(&self) -> &JWK {
+        &self.public_key
+    }
+
     pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
         let algorithm = secret_key
             .algorithm

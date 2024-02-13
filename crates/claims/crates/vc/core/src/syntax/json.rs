@@ -1,112 +1,21 @@
 //! JSON syntax for Credentials and Presentations.
-use std::{collections::BTreeMap, hash::Hash};
+use std::{
+    borrow::{Borrow, Cow},
+    collections::BTreeMap,
+    hash::Hash,
+};
 
 use super::value_or_array;
 use chrono::{DateTime, FixedOffset};
 use iref::{Uri, UriBuf};
-use json_ld::syntax::ContextEntry;
-use linked_data::{LinkedDataResource, LinkedDataSubject};
-use rdf_types::{
-    BlankIdInterpretationMut, InterpretationMut, IriInterpretationMut, LiteralInterpretationMut,
-    VocabularyMut,
-};
+use rdf_types::VocabularyMut;
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError};
-use static_iref::iri_ref;
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
 
 use crate::{
-    verification::ExtractProofs, Credential, CREDENTIALS_V1_CONTEXT_IRI,
-    VERIFIABLE_CREDENTIAL_TYPE, VERIFIABLE_PRESENTATION_TYPE,
+    verification::ExtractProofs, Context, Credential, VERIFIABLE_CREDENTIAL_TYPE,
+    VERIFIABLE_PRESENTATION_TYPE,
 };
-
-/// Verifiable Credential context.
-///
-/// This type represents the value of the `@context` property.
-///
-/// It is an ordered set where the first item is a URI with the value
-/// `https://www.w3.org/2018/credentials/v1`.
-#[derive(Debug, Default, Clone)]
-pub struct Context {
-    /// Contexts, other than `https://www.w3.org/2018/credentials/v1`.
-    additional_contexts: Vec<json_ld::syntax::ContextEntry>,
-}
-
-impl Serialize for Context {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        if self.additional_contexts.is_empty() {
-            CREDENTIALS_V1_CONTEXT_IRI.serialize(serializer)
-        } else {
-            let mut seq = serializer.serialize_seq(Some(1 + self.additional_contexts.len()))?;
-            seq.serialize_element(CREDENTIALS_V1_CONTEXT_IRI)?;
-            for t in &self.additional_contexts {
-                seq.serialize_element(t)?;
-            }
-            seq.end()
-        }
-    }
-}
-
-impl<'de> Deserialize<'de> for Context {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = Context;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "presentation types")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                if CREDENTIALS_V1_CONTEXT_IRI == v {
-                    Ok(Context::default())
-                } else {
-                    Err(E::custom(
-                        "expected `\"https://www.w3.org/2018/credentials/v1\"`",
-                    ))
-                }
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let mut base_type = false;
-                let mut contexts = Vec::new();
-
-                while let Some(t) = seq.next_element()? {
-                    match t {
-                        ContextEntry::IriRef(i) if i == CREDENTIALS_V1_CONTEXT_IRI => {
-                            base_type = true
-                        }
-                        t => contexts.push(t),
-                    }
-                }
-
-                if base_type {
-                    Ok(Context {
-                        additional_contexts: contexts,
-                    })
-                } else {
-                    Err(<A::Error as serde::de::Error>::custom(
-                        "missing required `\"https://www.w3.org/2018/credentials/v1\"` type",
-                    ))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(Visitor)
-    }
-}
 
 /// JSON Credential.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -216,7 +125,13 @@ impl JsonCredential {
     }
 }
 
-impl crate::CredentialOrPresentation for JsonCredential {
+impl WithJsonLdContext for JsonCredential {
+    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
+        Cow::Borrowed(&self.context.0)
+    }
+}
+
+impl crate::Validate for JsonCredential {
     fn is_valid(&self) -> bool {
         crate::Credential::is_valid(self)
     }
@@ -426,7 +341,7 @@ impl<P> JsonVerifiableCredential<P> {
     }
 }
 
-impl<P> crate::CredentialOrPresentation for JsonVerifiableCredential<P> {
+impl<P> crate::Validate for JsonVerifiableCredential<P> {
     fn is_valid(&self) -> bool {
         crate::Credential::is_valid(self)
     }
@@ -486,7 +401,7 @@ impl<P> crate::Credential for JsonVerifiableCredential<P> {
     }
 }
 
-impl<P> crate::VerifiableCredentialOrPresentation for JsonVerifiableCredential<P> {
+impl<P> crate::VerifiableClaims for JsonVerifiableCredential<P> {
     type Proof = P;
 
     fn proofs(&self) -> &[Self::Proof] {
@@ -516,6 +431,10 @@ impl<P> crate::verification::ExtractProofs for JsonVerifiableCredential<P> {
 
         (credential, self.proofs)
     }
+}
+
+pub trait ProcessedProof {
+    type Processed;
 }
 
 #[derive(Debug, Default, Clone)]
@@ -653,7 +572,7 @@ impl<C> JsonPresentation<C> {
     }
 }
 
-impl<C: Credential> crate::CredentialOrPresentation for JsonPresentation<C> {
+impl<C: Credential> crate::Validate for JsonPresentation<C> {
     fn is_valid(&self) -> bool {
         crate::Presentation::is_valid(self)
     }
@@ -776,7 +695,7 @@ impl<C, P> JsonVerifiablePresentation<C, P> {
     }
 }
 
-impl<C: Credential, P> crate::CredentialOrPresentation for JsonVerifiablePresentation<C, P> {
+impl<C: Credential, P> crate::Validate for JsonVerifiablePresentation<C, P> {
     fn is_valid(&self) -> bool {
         crate::Presentation::is_valid(self)
     }
@@ -805,7 +724,7 @@ impl<C: Credential, P> crate::Presentation for JsonVerifiablePresentation<C, P> 
     }
 }
 
-impl<C, P> crate::VerifiableCredentialOrPresentation for JsonVerifiablePresentation<C, P> {
+impl<C, P> crate::VerifiableClaims for JsonVerifiablePresentation<C, P> {
     type Proof = P;
 
     fn proofs(&self) -> &[Self::Proof] {

@@ -1,497 +1,566 @@
 //! [ZCAP-LD][zcap-ld] implementation for SSI.
 //!
 //! [zcap-ld]: <https://w3c-ccg.github.io/zcap-spec/>
-use std::collections::HashMap as Map;
-use std::convert::TryFrom;
-
 pub mod error;
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    hash::Hash,
+    ops::{Deref, DerefMut},
+};
+
 pub use error::Error;
 
-use iref::Iri;
-use ssi_core::{one_or_many::OneOrMany, uri::URI};
-use ssi_dids_core::{did_resolve::DIDResolver, VerificationRelationship as ProofPurpose};
-use ssi_json_ld::{
-    json_to_dataset, parse_ld_context, rdf::DataSet, ContextLoader, SECURITY_V2_CONTEXT,
-};
-use ssi_jwk::JWK;
-use ssi_ldp::{
-    Check, Context, Error as LdpError, LinkedDataDocument, LinkedDataProofOptions,
-    LinkedDataProofs, Proof, ProofPreparation, VerificationResult,
-};
-
-use async_trait::async_trait;
+use iref::{Uri, UriBuf};
+use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ssi_claims::{vc::data_integrity::AnyProof, ProofValidity, Verifiable};
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
 
-const DEFAULT_CONTEXT: Iri = SECURITY_V2_CONTEXT;
+use ssi_claims::vc::{
+    data_integrity::{
+        signing, verification::method::Signer, AnyInputContext, AnySignatureProtocol, AnySuite,
+        AnySuiteOptions, CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfiguration,
+        ProofConfigurationExpansion, ProofConfigurationRefExpansion, ProofPreparationError,
+    },
+    verification::{ExtractProofs, MergeWithProofs},
+    Claims, Context, RequiredContext, Validate, VerifiableClaims,
+};
+use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationError, Verifier};
+use static_iref::iri;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SecurityV2;
+
+impl RequiredContext for SecurityV2 {
+    const CONTEXT_IRI: &'static iref::Iri = iri!("https://w3id.org/security/v2");
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DefaultProps<A> {
+    /// Capability action.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capability_action: Option<A>,
+
+    /// Additional properties.
     #[serde(flatten)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extra_fields: Option<Map<String, Value>>,
+    pub extra_fields: HashMap<String, Value>,
 }
 
 impl<A> DefaultProps<A> {
     pub fn new(capability_action: Option<A>) -> Self {
         Self {
             capability_action,
-            extra_fields: None,
+            extra_fields: HashMap::new(),
         }
     }
 }
 
-// limited initial definition of a ZCAP Delegation, generic over Caveat and additional properties
+/// ZCAP Delegation, generic over Caveat and
+/// additional properties
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Delegation<C, S = DefaultProps<String>> {
+pub struct Delegation<C, P = DefaultProps<String>> {
+    /// JSON-LD context.
     #[serde(rename = "@context")]
-    pub context: Contexts,
-    pub id: URI,
-    pub parent_capability: URI,
+    pub context: Context<SecurityV2>,
+
+    /// Identifier.
+    pub id: UriBuf,
+
+    /// Parent capability.
+    pub parent_capability: UriBuf,
+
+    /// Invoker.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub invoker: Option<URI>,
+    pub invoker: Option<UriBuf>,
+
+    /// Caveat.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub caveat: Option<C>,
+
+    /// Additional properties.
     #[serde(flatten)]
-    pub property_set: S,
-    // This field is populated only when using
-    // embedded proofs such as LD-PROOF
-    //   https://w3c-ccg.github.io/ld-proofs/
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<Proof>,
+    pub additional_properties: P,
 }
 
-impl<C, S> Delegation<C, S> {
-    pub fn new(id: URI, parent_capability: URI, property_set: S) -> Self {
+impl<C, P> Delegation<C, P> {
+    /// Creates a new delegation.
+    pub fn new(id: UriBuf, parent_capability: UriBuf, additional_properties: P) -> Self {
         Self {
-            context: Contexts::default(),
+            context: Context::default(),
             id,
             parent_capability,
             invoker: None,
             caveat: None,
-            proof: None,
-            property_set,
+            additional_properties,
         }
+    }
+
+    pub fn validate_invocation<S>(
+        &self,
+        invocation: &Verifiable<Claims<Invocation<S>, AnyProof>>,
+    ) -> Result<(), InvocationValidationError> {
+        if invocation.proof().is_empty() {
+            Err(InvocationValidationError::MissingProof)
+        } else {
+            for proof in invocation.proof() {
+                let id: &Uri = proof
+                    .extra_properties()
+                    .get("capability")
+                    .and_then(json_syntax::Value::as_str)
+                    .ok_or(InvocationValidationError::MissingTargetId)?
+                    .try_into()
+                    .map_err(|_| InvocationValidationError::IdMismatch)?;
+
+                if id != &self.id {
+                    return Err(InvocationValidationError::IdMismatch);
+                };
+
+                if let Some(invoker) = &self.invoker {
+                    if invoker.as_iri() != proof.configuration().verification_method.id() {
+                        return Err(InvocationValidationError::IncorrectInvoker);
+                    }
+                }
+            }
+
+            Ok(())
+        }
+    }
+
+    /// Sign the delegation.
+    pub async fn sign(
+        self,
+        suite: AnySuite,
+        signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
+        proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
+        capability_chain: &[&str],
+    ) -> Result<Verifiable<Claims<Self, AnyProof>>, signing::Error>
+    where
+        C: Serialize,
+        P: Serialize,
+    {
+        self.sign_with(
+            suite,
+            AnyInputContext::default(),
+            signer,
+            proof_configuration,
+            capability_chain,
+        )
+        .await
+    }
+
+    /// Sign the delegation with a custom cryptographic suite and environment.
+    pub async fn sign_with<S: CryptographicSuite, E>(
+        self,
+        suite: S,
+        environment: E,
+        signer: &impl Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
+        mut proof_configuration: ProofConfiguration<S::VerificationMethod, S::Options>,
+        capability_chain: &[&str],
+    ) -> Result<Verifiable<Claims<Self, Proof<S>>>, signing::Error<E::LoadError>>
+    where
+        S: CryptographicSuiteInput<Self, E>,
+        E: ProofConfigurationExpansion + for<'a> ProofConfigurationRefExpansion<'a, S>,
+    {
+        proof_configuration.extra_properties.insert(
+            "capabilityChain".into(),
+            json_syntax::to_value(capability_chain).unwrap(),
+        );
+
+        if proof_configuration.proof_purpose != ProofPurpose::CapabilityDelegation {
+            // TODO invalid proof purpose.
+        }
+
+        suite
+            .sign(self, environment, signer, proof_configuration)
+            .await
     }
 }
 
-impl<C, P> Delegation<C, P>
+impl<C, P> WithJsonLdContext for Delegation<C, P> {
+    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
+        Cow::Borrowed(self.context.as_ref())
+    }
+}
+
+impl<C, P> Validate for Delegation<C, P> {
+    fn is_valid(&self) -> bool {
+        true
+    }
+}
+
+impl<C, P, E, V, L> ssi_rdf::Expandable<E> for Delegation<C, P>
 where
-    C: Serialize + Send + Sync + Clone,
-    P: Serialize + Send + Sync + Clone,
+    C: Serialize,
+    P: Serialize,
+    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
+    V: VocabularyMut,
+    V::Iri: Clone + Eq + Hash,
+    V::BlankId: Clone + Eq + Hash,
+    L: json_ld::Loader<V::Iri>,
+    //
+    V: Send + Sync,
+    V::Iri: Send + Sync,
+    V::BlankId: Send + Sync,
+    L: Send + Sync,
+    L::Error: Send,
 {
+    type Error = JsonLdError<L::Error>;
+
+    // type Resource = I::Resource;
+    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+
+    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+        let json = json_syntax::to_value(&self).unwrap();
+        ssi_json_ld::CompactJsonLd(json).expand(environment).await
+    }
+}
+
+/// Verifiable ZCAP Delegation, generic over Caveat and
+/// additional properties.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifiableDelegation<C, P = DefaultProps<String>> {
+    /// Delegation.
+    #[serde(flatten)]
+    delegation: Delegation<C, P>,
+
+    /// Data-Integrity Proof.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof: Option<AnyProof>,
+}
+
+impl<C, P> VerifiableDelegation<C, P> {
+    pub fn new(delegation: Delegation<C, P>, proof: Option<AnyProof>) -> Self {
+        Self { delegation, proof }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum DelegationVerificationError {
+    #[error("invalid proof purpose")]
+    InvalidProofPurpose,
+
+    #[error(transparent)]
+    ProofPreparation(#[from] ProofPreparationError),
+
+    #[error(transparent)]
+    Verification(#[from] VerificationError),
+}
+
+impl<C, P> VerifiableDelegation<C, P> {
+    pub async fn into_verifiable_claims(
+        self,
+    ) -> Result<Verifiable<Claims<Delegation<C, P>, AnyProof>>, DelegationVerificationError>
+    where
+        C: Serialize,
+        P: Serialize,
+    {
+        if let Some(proof) = &self.proof {
+            if proof.configuration().proof_purpose != ProofPurpose::CapabilityDelegation {
+                return Err(DelegationVerificationError::InvalidProofPurpose);
+            }
+        }
+
+        Claims::new(self).await.map_err(Into::into)
+    }
+
     pub async fn verify(
         &self,
-        _options: Option<LinkedDataProofOptions>,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-    ) -> VerificationResult {
-        match &self.proof {
-            None => VerificationResult::error("No applicable proof"),
-            Some(proof) => {
-                let mut result = proof.verify(self, resolver, context_loader).await;
-                if proof.proof_purpose != Some(ProofPurpose::CapabilityDelegation) {
-                    result.errors.push("Incorrect Proof Purpose".into());
-                };
-                if result.errors.is_empty() {
-                    result.checks.push(Check::Proof);
-                }
-                result
-            }
-        }
-    }
-
-    pub fn validate_invocation<S>(&self, invocation: &Invocation<S>) -> VerificationResult
+        verifier: &impl Verifier<AnyMethod>,
+    ) -> Result<ProofValidity, DelegationVerificationError>
     where
-        S: Serialize + Send + Sync + Clone,
+        C: Clone + Serialize,
+        P: Clone + Serialize,
     {
-        match &invocation.proof {
-            None => VerificationResult::error("No applicable proof"),
-            Some(proof) => {
-                let mut result = VerificationResult::new();
-                match (
-                    // get cap id from proof extra properties
-                    proof
-                        .property_set
-                        .as_ref()
-                        .and_then(|ps| ps.get("capability").cloned())
-                        .and_then(|v| match v {
-                            Value::String(id) => Some(id),
-                            _ => None,
-                        }),
-                    &self.id,
-                ) {
-                    (Some(ref id), URI::String(ref t_id)) => {
-                        // ensure proof target cap ID and given
-                        if id != t_id {
-                            result
-                                .errors
-                                .push("Target Capability IDs dont match".into())
-                        };
-                    }
-                    _ => result
-                        .errors
-                        .push("Missing proof target capability ID".into()),
-                };
-                match (&self.invoker, &proof.verification_method) {
-                    // Ensure the proof's verification method is authorized as an invoker. TODO: also allow target_capability's capabilityDelegation verification methods.
-                    (Some(URI::String(ref invoker)), Some(ref delegatee)) => {
-                        if invoker != delegatee {
-                            result.errors.push("Incorrect Invoker".into());
-                        }
-                    }
-                    (_, None) => result
-                        .errors
-                        .push("Missing Proof Verification Method".into()),
-                    _ => {}
-                };
-                result
-            }
-        }
+        let vc = self.clone().into_verifiable_claims().await?;
+        vc.verify(verifier).await.map_err(Into::into)
     }
+}
 
-    // https://w3c-ccg.github.io/ld-proofs/
-    pub async fn generate_proof(
-        &self,
-        jwk: &JWK,
-        options: &LinkedDataProofOptions,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-        capability_chain: &[&str],
-    ) -> Result<Proof, Error> {
-        let mut ps = Map::<String, Value>::new();
-        ps.insert(
-            "capabilityChain".into(),
-            serde_json::to_value(capability_chain)?,
-        );
-        Ok(LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await?)
+impl<C, P> Deref for VerifiableDelegation<C, P> {
+    type Target = Delegation<C, P>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.delegation
     }
+}
 
-    /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
-    /// and then pass to [`ProofPreparation::complete`] to complete the proof.
-    pub async fn prepare_proof(
-        &self,
-        public_key: &JWK,
-        options: &LinkedDataProofOptions,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-        capability_chain: &[&str],
-    ) -> Result<ProofPreparation, Error> {
-        let mut ps = Map::<String, Value>::new();
-        ps.insert(
-            "capabilityChain".into(),
-            serde_json::to_value(capability_chain)?,
-        );
-        Ok(LinkedDataProofs::prepare(
-            self,
-            options,
-            resolver,
-            context_loader,
-            public_key,
-            Some(ps),
-        )
-        .await?)
-    }
+impl<C, P> VerifiableClaims for VerifiableDelegation<C, P> {
+    type Proof = AnyProof;
 
-    pub fn set_proof(self, proof: Proof) -> Self {
-        Self {
-            proof: Some(proof),
-            ..self
+    fn proofs(&self) -> &[Self::Proof] {
+        match &self.proof {
+            Some(p) => std::slice::from_ref(p),
+            None => &[],
         }
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<C, S> LinkedDataDocument for Delegation<C, S>
-where
-    C: Serialize + Send + Sync + Clone,
-    S: Serialize + Send + Sync + Clone,
-{
-    fn get_contexts(&self) -> Result<Option<String>, LdpError> {
-        Ok(Some(serde_json::to_string(&self.context)?))
-    }
+impl<C, P> ExtractProofs for VerifiableDelegation<C, P> {
+    type Proofless = Delegation<C, P>;
 
-    async fn to_dataset_for_signing(
-        &self,
-        parent: Option<&(dyn LinkedDataDocument + Sync)>,
-        context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, LdpError> {
-        let mut copy = self.clone();
-        copy.proof = None;
-        let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
-        Ok(json_to_dataset(
-            json,
-            context_loader,
-            parent
-                .map(LinkedDataDocument::get_contexts)
-                .transpose()?
-                .flatten()
-                .as_deref()
-                .map(parse_ld_context)
-                .transpose()?,
-        )
-        .await?)
+    fn extract_proofs(self) -> (Self::Proofless, Vec<Self::Proof>) {
+        (self.delegation, self.proof.into_iter().collect())
     }
+}
 
-    fn to_value(&self) -> Result<Value, LdpError> {
-        Ok(serde_json::to_value(self)?)
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum InvocationValidationError {
+    #[error("No applicable proof")]
+    MissingProof,
 
-    fn get_issuer(&self) -> Option<&str> {
-        // TODO: implement this and use it.
-        None
-    }
+    #[error("Target Capability IDs don't match")]
+    IdMismatch,
 
-    fn get_default_proof_purpose(&self) -> Option<ProofPurpose> {
-        Some(ProofPurpose::CapabilityDelegation)
-    }
+    #[error("Missing proof target capability ID")]
+    MissingTargetId,
+
+    #[error("Incorrect Invoker")]
+    IncorrectInvoker,
 }
 
 // limited initial definition of a ZCAP Invocation, generic over Action
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Invocation<S = DefaultProps<String>> {
+pub struct Invocation<P = DefaultProps<String>> {
+    /// JSON-LD context.
     #[serde(rename = "@context")]
-    pub context: Contexts,
-    pub id: URI,
+    pub context: Context<SecurityV2>,
+
+    /// Identifier.
+    pub id: UriBuf,
+
+    /// Extra properties.
     #[serde(flatten)]
-    pub property_set: S,
-    // This field is populated only when using
-    // embedded proofs such as LD-PROOF
-    //   https://w3c-ccg.github.io/ld-proofs/
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<Proof>,
+    pub property_set: P,
 }
 
-impl<S> Invocation<S> {
-    pub fn new(id: URI, property_set: S) -> Self {
+impl<P> Invocation<P> {
+    pub fn new(id: UriBuf, property_set: P) -> Self {
         Self {
-            context: Contexts::default(),
+            context: Context::default(),
             id,
-            proof: None,
             property_set,
         }
     }
+
+    /// Sign the delegation.
+    pub async fn sign(
+        self,
+        suite: AnySuite,
+        signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
+        mut proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
+        target: &Uri,
+    ) -> Result<VerifiableInvocation<P>, signing::Error>
+    where
+        P: Serialize,
+    {
+        proof_configuration
+            .extra_properties
+            .insert("capability".into(), json_syntax::to_value(target).unwrap());
+
+        Ok(Claims::unprepare(
+            suite
+                .sign(
+                    self,
+                    AnyInputContext::default(),
+                    signer,
+                    proof_configuration,
+                )
+                .await?,
+        ))
+    }
 }
 
-impl<S> Invocation<S>
-where
-    S: Serialize + Send + Sync + Clone,
-{
-    pub async fn verify<C, P>(
-        &self,
-        options: Option<LinkedDataProofOptions>,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-        // TODO make this a list for delegation chains
-        target_capability: &Delegation<C, P>,
-    ) -> VerificationResult
-    where
-        C: Serialize + Send + Sync + Clone,
-        P: Serialize + Send + Sync + Clone,
-    {
-        let mut result = target_capability.validate_invocation(self);
-        let mut r2 = self
-            .verify_signature(options, resolver, context_loader)
-            .await;
-        result.append(&mut r2);
-        result
+impl<P> WithJsonLdContext for Invocation<P> {
+    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
+        Cow::Borrowed(self.context.as_ref())
     }
+}
 
-    pub async fn verify_signature(
-        &self,
-        _options: Option<LinkedDataProofOptions>,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-    ) -> VerificationResult {
-        match &self.proof {
-            None => VerificationResult::error("No applicable proof"),
-            Some(proof) => {
-                let mut result = proof.verify(self, resolver, context_loader).await;
-                if proof.proof_purpose != Some(ProofPurpose::CapabilityInvocation) {
-                    result.errors.push("Incorrect Proof Purpose".into());
-                };
-                if result.errors.is_empty() {
-                    result.checks.push(Check::Proof);
-                };
-                result
+impl<P> MergeWithProofs<AnyProof> for Invocation<P> {
+    type WithProofs = VerifiableInvocation<P>;
+
+    fn merge_with_proofs(self, proofs: Vec<AnyProof>) -> Self::WithProofs {
+        VerifiableInvocation {
+            invocation: self,
+            proof: proofs.into_iter().next(),
+        }
+    }
+}
+
+impl<P, E, V, L> ssi_rdf::Expandable<E> for Invocation<P>
+where
+    P: Serialize,
+    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
+    V: VocabularyMut,
+    V::Iri: Clone + Eq + Hash,
+    V::BlankId: Clone + Eq + Hash,
+    L: json_ld::Loader<V::Iri>,
+    //
+    V: Send + Sync,
+    V::Iri: Send + Sync,
+    V::BlankId: Send + Sync,
+    L: Send + Sync,
+    L::Error: Send,
+{
+    type Error = JsonLdError<L::Error>;
+
+    // type Resource = I::Resource;
+    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+
+    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+        let json = json_syntax::to_value(&self).unwrap();
+        ssi_json_ld::CompactJsonLd(json).expand(environment).await
+    }
+}
+
+impl<P> Validate for Invocation<P> {
+    fn is_valid(&self) -> bool {
+        true
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifiableInvocation<P> {
+    #[serde(flatten)]
+    invocation: Invocation<P>,
+
+    pub proof: Option<AnyProof>,
+}
+
+impl<P> VerifiableInvocation<P> {
+    pub fn new(invocation: Invocation<P>, proof: Option<AnyProof>) -> Self {
+        Self { invocation, proof }
+    }
+}
+
+impl<P> VerifiableInvocation<P> {
+    pub async fn into_verifiable_claims<C, Q>(
+        self,
+        // TODO make this a list for delegation chains
+        target_capability: &Delegation<C, Q>,
+    ) -> Result<Verifiable<Claims<Invocation<P>, AnyProof>>, InvocationVerificationError>
+    where
+        P: Serialize,
+    {
+        if let Some(proof) = &self.proof {
+            if proof.configuration().proof_purpose != ProofPurpose::CapabilityInvocation {
+                return Err(InvocationVerificationError::InvalidProofPurpose);
             }
         }
+
+        let vc = Claims::new(self).await?;
+        target_capability.validate_invocation(&vc)?;
+        Ok(vc)
     }
 
-    // https://w3c-ccg.github.io/ld-proofs/
-    pub async fn generate_proof(
+    pub async fn verify<C, Q>(
         &self,
-        jwk: &JWK,
-        options: &LinkedDataProofOptions,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-        target: &URI,
-    ) -> Result<Proof, Error> {
-        let mut ps = Map::<String, Value>::new();
-        ps.insert("capability".into(), serde_json::to_value(target)?);
-        Ok(LinkedDataProofs::sign(self, options, resolver, context_loader, jwk, Some(ps)).await?)
+        // TODO make this a list for delegation chains
+        target_capability: &Delegation<C, Q>,
+        verifier: &impl Verifier<AnyMethod>,
+    ) -> Result<ProofValidity, InvocationVerificationError>
+    where
+        P: Clone + Serialize,
+    {
+        let vc = self
+            .clone()
+            .into_verifiable_claims(target_capability)
+            .await?;
+        vc.verify(verifier).await.map_err(Into::into)
     }
+}
 
-    /// Prepare to generate a linked data proof. Returns the signing input for the caller to sign
-    /// and then pass to [`ProofPreparation::complete`] to complete the proof.
-    pub async fn prepare_proof(
-        &self,
-        public_key: &JWK,
-        options: &LinkedDataProofOptions,
-        resolver: &dyn DIDResolver,
-        context_loader: &mut ContextLoader,
-        target: &URI,
-    ) -> Result<ProofPreparation, Error> {
-        let mut ps = Map::<String, Value>::new();
-        ps.insert("capability".into(), serde_json::to_value(target)?);
-        Ok(LinkedDataProofs::prepare(
-            self,
-            options,
-            resolver,
-            context_loader,
-            public_key,
-            Some(ps),
-        )
-        .await?)
+impl<P> Deref for VerifiableInvocation<P> {
+    type Target = Invocation<P>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.invocation
     }
+}
 
-    pub fn set_proof(self, proof: Proof) -> Self {
-        Self {
-            proof: Some(proof),
-            ..self
+impl<P> DerefMut for VerifiableInvocation<P> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.invocation
+    }
+}
+
+impl<P> VerifiableClaims for VerifiableInvocation<P> {
+    type Proof = AnyProof;
+
+    fn proofs(&self) -> &[Self::Proof] {
+        match &self.proof {
+            Some(p) => std::slice::from_ref(p),
+            None => &[],
         }
     }
 }
 
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-impl<S> LinkedDataDocument for Invocation<S>
-where
-    S: Serialize + Send + Sync + Clone,
-{
-    fn get_contexts(&self) -> Result<Option<String>, LdpError> {
-        Ok(Some(serde_json::to_string(&self.context)?))
-    }
+impl<P> ExtractProofs for VerifiableInvocation<P> {
+    type Proofless = Invocation<P>;
 
-    async fn to_dataset_for_signing(
-        &self,
-        parent: Option<&(dyn LinkedDataDocument + Sync)>,
-        context_loader: &mut ContextLoader,
-    ) -> Result<DataSet, LdpError> {
-        let mut copy = self.clone();
-        copy.proof = None;
-        let json = ssi_json_ld::syntax::to_value_with(copy, Default::default).unwrap();
-        Ok(json_to_dataset(
-            json,
-            context_loader,
-            parent
-                .map(LinkedDataDocument::get_contexts)
-                .transpose()?
-                .flatten()
-                .as_deref()
-                .map(parse_ld_context)
-                .transpose()?,
-        )
-        .await?)
-    }
-
-    fn to_value(&self) -> Result<Value, LdpError> {
-        Ok(serde_json::to_value(self)?)
-    }
-
-    fn get_issuer(&self) -> Option<&str> {
-        // TODO: implement this and use it.
-        None
-    }
-
-    fn get_default_proof_purpose(&self) -> Option<ProofPurpose> {
-        Some(ProofPurpose::CapabilityInvocation)
+    fn extract_proofs(self) -> (Self::Proofless, Vec<Self::Proof>) {
+        (self.invocation, self.proof.into_iter().collect())
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
-#[serde(untagged)]
-#[serde(try_from = "OneOrMany<Context>")]
-pub enum Contexts {
-    One(Context),
-    Many(Vec<Context>),
-}
+#[derive(Debug, thiserror::Error)]
+pub enum InvocationVerificationError {
+    #[error("validation failed: {0}")]
+    ValidationFailed(#[from] InvocationValidationError),
 
-impl Default for Contexts {
-    fn default() -> Self {
-        Self::One(Context::URI(URI::String(DEFAULT_CONTEXT.to_string())))
-    }
-}
+    #[error("invalid proof purpose")]
+    InvalidProofPurpose,
 
-impl TryFrom<OneOrMany<Context>> for Contexts {
-    type Error = LdpError;
-    fn try_from(context: OneOrMany<Context>) -> Result<Self, Self::Error> {
-        let first_uri = match context.first() {
-            None => return Err(LdpError::MissingContext),
-            Some(Context::URI(URI::String(uri))) => uri,
-            Some(Context::Object(_)) => return Err(LdpError::InvalidContext),
-        };
-        if first_uri != DEFAULT_CONTEXT.into_str() {
-            return Err(LdpError::InvalidContext);
-        }
-        Ok(match context {
-            OneOrMany::One(context) => Contexts::One(context),
-            OneOrMany::Many(contexts) => Contexts::Many(contexts),
-        })
-    }
-}
+    #[error(transparent)]
+    ProofPreparation(#[from] ProofPreparationError),
 
-impl From<Contexts> for OneOrMany<Context> {
-    fn from(contexts: Contexts) -> OneOrMany<Context> {
-        match contexts {
-            Contexts::One(context) => OneOrMany::One(context),
-            Contexts::Many(contexts) => OneOrMany::Many(contexts),
-        }
-    }
+    #[error(transparent)]
+    Verification(#[from] VerificationError),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_dids_core::example::DIDExample;
+    use ssi_dids_core::{example::ExampleDIDResolver, DIDVerifier};
+    use ssi_jwk::JWK;
+    use ssi_vc::verification::UnprepareProof;
+    use ssi_verification_methods::signer::SingleSecretSigner;
+    use static_iref::uri;
 
     #[derive(Deserialize, PartialEq, Debug, Clone, Serialize)]
     enum Actions {
         Read,
         Write,
     }
+
     impl Default for Actions {
         fn default() -> Self {
             Self::Read
         }
     }
+
     #[test]
     fn delegation_from_json() {
-        let zcap_str = include_str!("../../examples/zcap_delegation.jsonld");
+        let zcap_str = include_str!("../../../examples/files/zcap_delegation.jsonld");
         let zcap: Delegation<(), ()> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
-            zcap.context,
-            Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.to_string())))
-        );
-        assert_eq!(
             zcap.id,
-            URI::String("https://whatacar.example/a-fancy-car/proc/7a397d7b".into())
+            uri!("https://whatacar.example/a-fancy-car/proc/7a397d7b")
         );
         assert_eq!(
             zcap.parent_capability,
-            URI::String("https://whatacar.example/a-fancy-car".into())
+            uri!("https://whatacar.example/a-fancy-car")
         );
         assert_eq!(
-            zcap.invoker,
-            Some(URI::String(
-                "https://social.example/alyssa#key-for-car".into()
-            ))
+            zcap.invoker.as_deref(),
+            Some(uri!("https://social.example/alyssa#key-for-car"))
         );
     }
 
@@ -501,118 +570,133 @@ mod tests {
         enum AC {
             Drive,
         }
-        let zcap_str = include_str!("../../examples/zcap_invocation.jsonld");
+        let zcap_str = include_str!("../../../examples/files/zcap_invocation.jsonld");
         let zcap: Invocation<DefaultProps<AC>> = serde_json::from_str(zcap_str).unwrap();
         assert_eq!(
-            zcap.context,
-            Contexts::One(Context::URI(URI::String(DEFAULT_CONTEXT.to_string())))
-        );
-        assert_eq!(
             zcap.id,
-            URI::String("urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4".into())
+            uri!("urn:uuid:ad86cb2c-e9db-434a-beae-71b82120a8a4")
         );
         assert_eq!(zcap.property_set.capability_action, Some(AC::Drive));
     }
 
     #[async_std::test]
     async fn round_trip() {
-        let dk = DIDExample;
-        let mut context_loader = ssi_json_ld::ContextLoader::default();
+        let dk = DIDVerifier::new(ExampleDIDResolver::new());
 
         let alice_did = "did:example:foo";
-        let alice_vm = format!("{}#key2", alice_did);
-        let alice: JWK = JWK {
-            key_id: Some(alice_vm.clone()),
-            ..serde_json::from_str(include_str!("../../tests/ed25519-2020-10-18.json")).unwrap()
-        };
+        let alice_vm = UriBuf::new(format!("{}#key2", alice_did).into_bytes()).unwrap();
+        let alice = SingleSecretSigner::new(
+            &dk,
+            JWK {
+                key_id: Some(alice_vm.clone().into()),
+                ..serde_json::from_str(include_str!("../../../tests/ed25519-2020-10-18.json"))
+                    .unwrap()
+            },
+        );
 
         let bob_did = "did:example:bar";
-        let bob_vm = format!("{}#key1", bob_did);
-        let bob: JWK = JWK {
-            key_id: Some(bob_vm.clone()),
-            ..serde_json::from_str(include_str!("../../tests/ed25519-2021-06-16.json")).unwrap()
-        };
+        let bob_vm = UriBuf::new(format!("{}#key1", bob_did).into_bytes()).unwrap();
+        let bob = SingleSecretSigner::new(
+            &dk,
+            JWK {
+                key_id: Some(bob_vm.clone().into()),
+                ..serde_json::from_str(include_str!("../../../tests/ed25519-2021-06-16.json"))
+                    .unwrap()
+            },
+        );
 
         let del: Delegation<(), DefaultProps<Actions>> = Delegation {
-            invoker: Some(URI::String(bob_vm.clone())),
+            invoker: Some(bob_vm.clone()),
             ..Delegation::new(
-                URI::String("urn:a_urn".into()),
-                URI::String("kepler://alices_orbit".into()),
+                uri!("urn:a_urn").to_owned(),
+                uri!("kepler://alices_orbit").to_owned(),
                 DefaultProps::new(Some(Actions::Read)),
             )
         };
         let inv: Invocation<DefaultProps<Actions>> = Invocation::new(
-            URI::String("urn:a_different_urn".into()),
+            uri!("urn:a_different_urn").to_owned(),
             DefaultProps::new(Some(Actions::Read)),
         );
 
-        let ldpo_alice = LinkedDataProofOptions {
-            verification_method: Some(URI::String(alice_vm.clone())),
-            proof_purpose: Some(ProofPurpose::CapabilityDelegation),
-            ..Default::default()
-        };
-        let ldpo_bob = LinkedDataProofOptions {
-            verification_method: Some(URI::String(bob_vm.clone())),
-            proof_purpose: Some(ProofPurpose::CapabilityInvocation),
-            ..Default::default()
-        };
-        let signed_del = del.clone().set_proof(
-            del.generate_proof(&alice, &ldpo_alice, &dk, &mut context_loader, &[])
-                .await
-                .unwrap(),
+        let ldpo_alice = ProofConfiguration::new(
+            "2024-02-13T16:25:26Z".parse().unwrap(),
+            alice_vm.clone().into_iri().into(),
+            ProofPurpose::CapabilityDelegation,
+            Default::default(),
         );
-        let signed_inv = inv.clone().set_proof(
-            inv.generate_proof(&bob, &ldpo_bob, &dk, &mut context_loader, &del.id)
-                .await
-                .unwrap(),
+        let ldpo_bob = ProofConfiguration::new(
+            "2024-02-13T16:25:26Z".parse().unwrap(),
+            bob_vm.clone().into_iri().into(),
+            ProofPurpose::CapabilityInvocation,
+            Default::default(),
         );
+
+        let signed_del = del
+            .clone()
+            .sign(
+                AnySuite::pick(alice.secret(), Some(&ldpo_alice.verification_method)).unwrap(),
+                &alice,
+                ldpo_alice.clone(),
+                &[],
+            )
+            .await
+            .unwrap();
+
+        let signed_inv = inv
+            .sign(
+                AnySuite::pick(bob.secret(), Some(&ldpo_bob.verification_method)).unwrap(),
+                &bob,
+                ldpo_bob,
+                &signed_del.claims().id,
+            )
+            .await
+            .unwrap();
 
         // happy path
-        let s_d_v = signed_del.verify(None, &dk, &mut context_loader).await;
-        assert!(s_d_v.errors.is_empty());
-        assert!(s_d_v.checks.iter().any(|c| c == &Check::Proof));
+        assert!(signed_del.verify(&dk).await.unwrap().is_valid());
 
-        let s_i_v = signed_inv
-            .verify(None, &dk, &mut context_loader, &signed_del)
-            .await;
-        assert!(s_i_v.errors.is_empty());
-        assert!(s_i_v.checks.iter().any(|c| c == &Check::Proof));
+        assert!(signed_inv
+            .verify(signed_del.claims(), &dk)
+            .await
+            .unwrap()
+            .is_valid());
 
-        let bad_sig_del = Delegation {
-            invoker: Some(URI::String("did:someone_else".into())),
-            ..signed_del.clone()
-        };
-        let bad_sig_inv = Invocation {
-            id: URI::String("urn:different_id".into()),
-            ..signed_inv.clone()
-        };
+        let bad_sig_del = VerifiableDelegation::new(
+            Delegation {
+                invoker: Some(uri!("did:someone_else").to_owned()),
+                ..signed_del.claims().value().clone()
+            },
+            Some(signed_del.proof().first().unwrap().clone().unprepare()),
+        );
+        let mut bad_sig_inv = signed_inv.clone();
+        bad_sig_inv.id = uri!("urn:different_id").to_owned();
 
         // invalid proof for data
-        assert!(!bad_sig_del
-            .verify(None, &dk, &mut context_loader)
+        assert!(bad_sig_del.verify(&dk).await.unwrap().is_invalid());
+        assert!(bad_sig_inv
+            .verify(signed_del.claims(), &dk)
             .await
-            .errors
-            .is_empty());
-        assert!(!bad_sig_inv
-            .verify(None, &dk, &mut context_loader, &signed_del)
-            .await
-            .errors
-            .is_empty());
+            .unwrap()
+            .is_invalid());
 
         // invalid cap attrs, invoker not matching
         let wrong_del = Delegation {
-            invoker: Some(URI::String("did:example:someone_else".into())),
+            invoker: Some(uri!("did:example:someone_else").to_owned()),
             ..del.clone()
         };
-        let proof = wrong_del
-            .generate_proof(&alice, &ldpo_alice, &dk, &mut context_loader, &[])
+        let signed_wrong_del = wrong_del
+            .sign(
+                AnySuite::pick(alice.secret(), Some(&ldpo_alice.verification_method)).unwrap(),
+                &alice,
+                ldpo_alice,
+                &[],
+            )
             .await
             .unwrap();
-        let signed_wrong_del = wrong_del.set_proof(proof);
-        assert!(!signed_inv
-            .verify(None, &dk, &mut context_loader, &signed_wrong_del)
+        assert!(signed_inv
+            .verify(signed_wrong_del.claims(), &dk)
             .await
-            .errors
-            .is_empty());
+            .unwrap()
+            .is_invalid());
     }
 }

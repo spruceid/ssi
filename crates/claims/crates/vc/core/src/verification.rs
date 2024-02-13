@@ -5,18 +5,22 @@ use linked_data::{LinkedData, LinkedDataGraph, LinkedDataPredicateObjects, Linke
 use rdf_types::{Interpretation, Vocabulary};
 use ssi_claims_core::{Verifiable, VerifiableWith};
 
-use crate::{
-    Credential, CredentialOrPresentation, Presentation, VerifiableCredentialOrPresentation,
-};
+use crate::{Credential, Presentation, Validate, VerifiableClaims};
 
 /// Proof extraction trait.
 ///
 /// Implemented by credential and presentation types that can be separated from
 /// their proof value(s).
-pub trait ExtractProofs: Sized + VerifiableCredentialOrPresentation {
+pub trait ExtractProofs: Sized + VerifiableClaims {
     type Proofless;
 
     fn extract_proofs(self) -> (Self::Proofless, Vec<Self::Proof>);
+}
+
+pub trait MergeWithProofs<P> {
+    type WithProofs;
+
+    fn merge_with_proofs(self, proofs: Vec<P>) -> Self::WithProofs;
 }
 
 /// Proof type.
@@ -53,6 +57,12 @@ pub struct Claims<T, P> {
 
     /// Prepared proofs.
     proofs: PhantomData<P>,
+}
+
+impl<T, P> Claims<T, P> {
+    pub fn value(&self) -> &T {
+        &self.value
+    }
 }
 
 impl<T: Credential, P> Claims<T, P> {
@@ -110,12 +120,30 @@ impl<T, P> Claims<T, P> {
         Ok(Verifiable::new(Self::from_proofless(value), proofs))
     }
 
+    /// Merge the claims with their proof(s).
+    ///
+    /// This will effectively unprepare the proof and make them unverifiable
+    /// until [`Self::new`] is called again.
+    pub fn unprepare(this: Verifiable<Self>) -> T::WithProofs
+    where
+        T: MergeWithProofs<P>,
+        P: ProofType,
+        P::Prepared: UnprepareProof<Unprepared = P>,
+    {
+        let (claims, prepared_proofs) = this.into_parts();
+        let proofs = prepared_proofs
+            .into_iter()
+            .map(P::Prepared::unprepare)
+            .collect();
+        T::merge_with_proofs(claims.value, proofs)
+    }
+
     /// Tamper with the claims without changing the proofs.
     ///
     /// The proofs may become invalid.
     pub async fn tamper<U, E>(
         verifiable_claims: Verifiable<Self>,
-        mut environment: E,
+        environment: E,
         f: impl FnOnce(T) -> U,
     ) -> Result<Verifiable<Claims<U, P>>, P::Error>
     where
@@ -171,7 +199,7 @@ where
 
 impl<T, P, V> VerifiableWith<V> for Claims<T, P>
 where
-    T: CredentialOrPresentation,
+    T: Validate,
     P: ProofType,
     P::Prepared: VerifyPreparedWith<V>,
 {

@@ -1,11 +1,13 @@
 use iref::{Iri, IriBuf, UriBuf};
+use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
+use ssi_security::{Multibase, MultibaseBuf};
 use static_iref::iri;
-use std::hash::Hash;
+use std::{hash::Hash, str::FromStr};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
@@ -60,16 +62,10 @@ pub struct EcdsaSecp256r1VerificationKey2019 {
     #[ld("sec:controller")]
     pub controller: UriBuf,
 
-    /// Public key encoded according to [MULTICODEC] and formatted according to
-    /// [MULTIBASE].
-    ///
-    /// The multicodec encoding of an Ed25519 public key is the
-    /// two-byte prefix 0xed01 followed by the 32-byte public key data. The 34
-    /// byte value is then encoded using base58-btc (z) as the prefix. Any other
-    /// encoding MUST NOT be allowed.
+    /// Public key.
     #[serde(rename = "publicKeyMultibase")]
     #[ld("sec:publicKeyMultibase")]
-    pub public_key_multibase: String,
+    pub public_key: PublicKey,
 }
 
 pub enum SecretKeyRef<'a> {
@@ -93,17 +89,8 @@ impl EcdsaSecp256r1VerificationKey2019 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019");
 
-    pub fn decode_public_key(&self) -> Result<p256::PublicKey, InvalidPublicKey> {
-        let pk_multi_encoded =
-            MultiEncodedBuf::new(multibase::decode(&self.public_key_multibase)?.1)?;
-
-        let (pk_codec, pk_data) = pk_multi_encoded.parts();
-        if pk_codec == ssi_multicodec::P256_PUB {
-            let pk = p256::PublicKey::from_sec1_bytes(pk_data)?;
-            Ok(pk)
-        } else {
-            Err(InvalidPublicKey::InvalidKeyType)
-        }
+    pub fn public_key_jwk(&self) -> JWK {
+        self.public_key.to_jwk()
     }
 
     pub fn sign_bytes<'a>(
@@ -140,17 +127,10 @@ impl EcdsaSecp256r1VerificationKey2019 {
         data: &[u8],
         signature_bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        use p256::ecdsa::signature::Verifier;
-
-        let public_key = self
-            .decode_public_key()
-            .map_err(|_| VerificationError::InvalidKey)?;
-        let verifying_key = p256::ecdsa::VerifyingKey::from(public_key);
-
         let signature = p256::ecdsa::Signature::try_from(signature_bytes)
             .map_err(|_| VerificationError::InvalidSignature)?;
 
-        Ok(verifying_key.verify(data, &signature).is_ok())
+        Ok(self.public_key.verify(data, &signature))
     }
 }
 
@@ -214,13 +194,140 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256r1VerificationKey2019 {
         Ok(Self {
             id: m.id,
             controller: m.controller,
-            public_key_multibase: m
+            public_key: m
                 .properties
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
                 .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
-                .to_owned(),
+                .parse()
+                .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?,
         })
+    }
+}
+
+/// Public key of an Ed25519 Verification Key 2020 verification method.
+#[derive(Debug, Clone)]
+pub struct PublicKey {
+    /// Public key encoded according to [MULTICODEC] and formatted according to
+    /// [MULTIBASE].
+    ///
+    /// The multicodec encoding of an P256 public key is the
+    /// two-byte prefix 0x1200 followed by the public key data. The value is
+    /// then encoded using base58-btc (z) as the prefix.
+    encoded: MultibaseBuf,
+
+    /// Decoded public key.
+    decoded: p256::PublicKey,
+}
+
+impl PublicKey {
+    pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
+        let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
+
+        let (pk_codec, pk_data) = pk_multi_encoded.parts();
+        if pk_codec == ssi_multicodec::P256_PUB {
+            let decoded = p256::PublicKey::from_sec1_bytes(pk_data)?;
+            Ok(Self { encoded, decoded })
+        } else {
+            Err(InvalidPublicKey::InvalidKeyType)
+        }
+    }
+
+    pub fn encoded(&self) -> &Multibase {
+        &self.encoded
+    }
+
+    pub fn decoded(&self) -> &p256::PublicKey {
+        &self.decoded
+    }
+
+    pub fn to_jwk(&self) -> JWK {
+        self.decoded.clone().into()
+    }
+
+    pub fn verify(&self, data: &[u8], signature: &p256::ecdsa::Signature) -> bool {
+        use p256::ecdsa::signature::Verifier;
+        let verifying_key = p256::ecdsa::VerifyingKey::from(self.decoded);
+        verifying_key.verify(data, signature).is_ok()
+    }
+}
+
+impl Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.encoded.serialize(serializer)
+    }
+}
+
+impl<'a> Deserialize<'a> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        use serde::de::Error;
+        let encoded = MultibaseBuf::deserialize(deserializer)?;
+        Self::decode(encoded).map_err(D::Error::custom)
+    }
+}
+
+impl FromStr for PublicKey {
+    type Err = InvalidPublicKey;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::decode(MultibaseBuf::new(s.to_owned()))
+    }
+}
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.decoded.eq(&other.decoded)
+    }
+}
+
+impl Eq for PublicKey {}
+
+impl Hash for PublicKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.encoded.hash(state)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataResource<I, V> for PublicKey
+where
+    MultibaseBuf: linked_data::LinkedDataResource<I, V>,
+{
+    fn interpretation(
+        &self,
+        vocabulary: &mut V,
+        interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
+        self.encoded.interpretation(vocabulary, interpretation)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataSubject<I, V> for PublicKey
+where
+    MultibaseBuf: linked_data::LinkedDataSubject<I, V>,
+{
+    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<I, V>,
+    {
+        self.encoded.visit_subject(serializer)
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataPredicateObjects<I, V> for PublicKey
+where
+    MultibaseBuf: linked_data::LinkedDataPredicateObjects<I, V>,
+{
+    fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<I, V>,
+    {
+        self.encoded.visit_objects(visitor)
     }
 }

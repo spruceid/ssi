@@ -1,4 +1,4 @@
-use crate::{CredentialOrPresentation, VerifiableCredentialOrPresentation};
+use crate::{Validate, VerifiableClaims};
 use iref::{Uri, UriBuf};
 
 use super::Credential;
@@ -6,7 +6,7 @@ use super::Credential;
 pub const VERIFIABLE_PRESENTATION_TYPE: &str = "VerifiablePresentation";
 
 /// Presentation trait.
-pub trait Presentation: CredentialOrPresentation {
+pub trait Presentation: Validate {
     /// Verifiable credential type.
     type Credential: Credential;
 
@@ -55,9 +55,9 @@ pub trait Presentation: CredentialOrPresentation {
     }
 }
 
-pub trait VerifiablePresentation: Presentation + VerifiableCredentialOrPresentation {}
+pub trait VerifiablePresentation: Presentation + VerifiableClaims {}
 
-impl<T: Presentation + VerifiableCredentialOrPresentation> VerifiablePresentation for T {}
+impl<T: Presentation + VerifiableClaims> VerifiablePresentation for T {}
 
 pub struct PresentationTypes<'a> {
     base_type: bool,

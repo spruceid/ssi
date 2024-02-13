@@ -644,7 +644,7 @@ mod tests {
         let didkey = DIDVerifier::new(DIDKey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
-        let key = JWK::generate_p256_from(&mut rng).unwrap();
+        let key = JWK::generate_p256_from(&mut rng);
         let did = DIDKey::generate(&key).unwrap();
 
         let cred = JsonCredential::new(

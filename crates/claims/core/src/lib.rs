@@ -85,4 +85,8 @@ impl<C: Provable> Verifiable<C> {
 
         Ok(Verifiable { claims, proof })
     }
+
+    pub fn into_parts(self) -> (C, C::Proof) {
+        (self.claims, self.proof)
+    }
 }

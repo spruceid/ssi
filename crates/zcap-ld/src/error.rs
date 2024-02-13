@@ -4,10 +4,6 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 #[non_exhaustive]
 pub enum Error {
-    #[error(transparent)]
-    LDP(#[from] ssi_ldp::Error),
-    #[error(transparent)]
-    URIParse(#[from] ssi_core::uri::URIParseErr),
     #[error("Missing proof")]
     MissingProof,
     #[error("Invalid issuer")]

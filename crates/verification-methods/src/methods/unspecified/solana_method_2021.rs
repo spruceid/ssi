@@ -49,6 +49,10 @@ pub struct SolanaMethod2021 {
 impl SolanaMethod2021 {
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#SolanaMethod2021");
 
+    pub fn public_key_jwk(&self) -> &JWK {
+        &self.public_key
+    }
+
     pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
         let algorithm = secret_key
             .algorithm
