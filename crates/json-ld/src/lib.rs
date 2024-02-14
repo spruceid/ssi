@@ -125,24 +125,19 @@ where
 
         let expanded = self
             .0
-            .expand_with(environment.vocabulary, environment.loader)
+            .expand_full(
+                environment.vocabulary,
+                Default::default(),
+                None,
+                environment.loader,
+                json_ld::expansion::Options {
+                    policy: json_ld::expansion::Policy::Strict,
+                    ..Default::default()
+                },
+                (),
+            )
             .await?;
 
-        // match expanded.into_main_node() {
-        //     Some(node) => {
-        //         let (subject, quads) = linked_data::to_interpreted_subject_quads(
-        //             environment.vocabulary,
-        //             environment.interpretation,
-        //             None,
-        //             &node,
-        //         )?;
-
-        //         Ok(Expanded::new(self, quads.into_iter().collect(), subject))
-        //     }
-        //     None => {
-        //         todo!()
-        //     }
-        // }
         Ok(expanded)
     }
 }

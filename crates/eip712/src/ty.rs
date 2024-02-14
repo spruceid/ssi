@@ -46,7 +46,7 @@ impl FromStr for TypeRef {
     type Err = TypeParseError;
 
     fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match &string[..] {
+        match string {
             "bytes" => return Ok(TypeRef::Bytes),
             "string" => return Ok(TypeRef::String),
             "address" => return Ok(TypeRef::Address),

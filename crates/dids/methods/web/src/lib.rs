@@ -103,7 +103,7 @@ impl DIDMethodResolver for DIDWeb {
             .build()
             .map_err(|e| Error::internal(InternalError::Client(e)))?;
 
-        let accept = options.accept.clone().unwrap_or(MediaType::Json);
+        let accept = options.accept.unwrap_or(MediaType::Json);
 
         let resp = client
             .get(&url)
@@ -265,13 +265,12 @@ mod tests {
             .unwrap();
         let verification_method = iri!("did:web:localhost#key1").to_owned().into();
         let suite = AnySuite::pick(&key, Some(&verification_method)).unwrap();
-        let issue_options = ProofConfiguration {
-            created: "2021-01-26T16:57:27Z".parse().unwrap(),
+        let issue_options = ProofConfiguration::new(
+            "2021-01-26T16:57:27Z".parse().unwrap(),
             verification_method,
-            proof_purpose: ProofPurpose::Assertion,
-            options: Default::default(),
-            extra_properties: Default::default(),
-        };
+            ProofPurpose::Assertion,
+            Default::default(),
+        );
         let signer = SingleSecretSigner::new(&didweb, key);
         let vc = suite
             .sign(cred, AnyInputContext::default(), &signer, issue_options)

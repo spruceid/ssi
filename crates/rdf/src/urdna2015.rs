@@ -133,10 +133,11 @@ pub struct HashNDegreeQuadsOutput {
 }
 
 fn digest_to_lowerhex(digest: &[u8]) -> String {
-    digest
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>()
+    use fmt::Write;
+    digest.iter().fold(String::new(), |mut s, byte| {
+        let _ = write!(s, "{byte:02x}");
+        s
+    })
 }
 
 /// <https://www.w3.org/TR/rdf-canon/#hash-1d-quads>
@@ -199,7 +200,7 @@ where
             normalization_state
                 .blank_node_to_quads
                 .entry(blank_node_identifier)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(quad);
         }
     }
@@ -225,7 +226,7 @@ where
             normalization_state
                 .hash_to_blank_nodes
                 .entry(hash)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(identifier);
         }
         // 5.4
@@ -311,7 +312,7 @@ pub struct NormalizedQuads<'a, Q> {
 impl<'a, Q: Iterator<Item = QuadRef<'a>>> NormalizedQuads<'a, Q> {
     pub fn into_nquads(self) -> String {
         let result = IntoNQuads::into_nquads(self);
-        // eprintln!("NORMALIZED:\n{result}");
+        eprintln!("NORMALIZED:\n{result}");
         result
     }
 }
@@ -398,7 +399,7 @@ pub fn hash_n_degree_quads(
                     // 3.1.2
                     hash_to_related_blank_nodes
                         .entry(hash)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(component);
                 }
             }

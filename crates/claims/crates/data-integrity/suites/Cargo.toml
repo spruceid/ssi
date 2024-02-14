@@ -68,6 +68,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
+ssi-contexts.workspace = true
 ssi-claims-core.workspace = true
 ssi-vc.workspace = true
 ssi-security.workspace = true

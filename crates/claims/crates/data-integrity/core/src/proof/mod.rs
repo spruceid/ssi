@@ -1,16 +1,19 @@
-use super::PreparedProof;
 use crate::{
     suite::{HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, Type,
+    CryptographicSuite, CryptographicSuiteInput,
 };
 use ssi_json_ld::WithJsonLdContext;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 use std::collections::BTreeMap;
 
 mod configuration;
+mod prepared;
+mod r#type;
 mod untyped;
 
 pub use configuration::*;
+pub use prepared::*;
+pub use r#type::*;
 pub use untyped::*;
 
 pub type Proofs<T> = Vec<Proof<T>>;
@@ -48,6 +51,13 @@ impl<T: CryptographicSuite> Proof<T> {
                 options,
                 signature,
             ),
+        }
+    }
+
+    pub fn with_context(self, context: json_ld::syntax::Context) -> Self {
+        Self {
+            type_: self.type_,
+            untyped: self.untyped.with_context(context),
         }
     }
 
@@ -134,7 +144,7 @@ where
 
         let transformed = self
             .type_
-            .transform(&value, environment, expanded_configuration.borrow())
+            .transform(value, environment, expanded_configuration.borrow())
             .await?;
         let hashed = self.type_.hash(transformed, expanded_configuration)?;
         Ok(PreparedProof::new(self, hashed))

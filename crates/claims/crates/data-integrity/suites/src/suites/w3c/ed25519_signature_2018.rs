@@ -1,7 +1,5 @@
 use ssi_crypto::MessageSigner;
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{Ed25519VerificationKey2018, SignatureError};
 use static_iref::iri;
 

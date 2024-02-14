@@ -1,8 +1,6 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::{protocol::Base58Btc, MessageSignatureError, MessageSigner};
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
     InvalidSignature, SignatureError, SolanaMethod2021, VerificationError,
@@ -157,7 +155,7 @@ pub struct SignatureAlgorithm;
 
 impl SignatureAlgorithm {
     pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
-        let tx = LocalSolanaTransaction::with_message(&message);
+        let tx = LocalSolanaTransaction::with_message(message);
         let bytes = tx.to_bytes();
         let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, &bytes, key)
             .map_err(MessageSignatureError::signature_failed)?;

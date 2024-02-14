@@ -1,7 +1,5 @@
 use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError, MessageSigner};
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
     verification_method_union, AleoMethod2021, AnyMethod, AnyMethodRef,
@@ -112,7 +110,7 @@ pub struct SignatureAlgorithm;
 impl SignatureAlgorithm {
     pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
         let signature =
-            ssi_jwk::aleo::sign(&message, key).map_err(MessageSignatureError::signature_failed)?;
+            ssi_jwk::aleo::sign(message, key).map_err(MessageSignatureError::signature_failed)?;
         Ok(Base58BtcMultibase::encode_signature(&signature))
     }
 }
@@ -143,7 +141,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         method: VerificationMethodRef,
         bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        let (_, signature_bytes) = multibase::decode(&signature.proof_value)
+        let (_, signature_bytes) = multibase::decode(signature.proof_value)
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         let account_id = method.blockchain_account_id();

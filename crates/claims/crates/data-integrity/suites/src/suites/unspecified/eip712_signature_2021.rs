@@ -4,7 +4,6 @@ use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
-    ProofConfigurationRef,
 };
 use ssi_rdf::{AnyLdEnvironment, Expandable, NQuadsStatement};
 use ssi_verification_methods::{
@@ -16,6 +15,13 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 use crate::eip712::{Eip712Signature, Eip712SignatureRef};
+
+lazy_static::lazy_static! {
+    pub static ref EIP712VM_CONTEXT: json_ld::syntax::ContextEntry = {
+        let context_str = ssi_contexts::EIP712VM;
+        serde_json::from_str(context_str).unwrap()
+    };
+}
 
 /// EIP-712 Signature 2021.
 ///
@@ -204,6 +210,10 @@ impl CryptographicSuite for Eip712Signature2021 {
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
     }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(EIP712VM_CONTEXT.clone()))
+    }
 }
 
 impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T> CryptographicSuiteInput<T, E>
@@ -236,7 +246,7 @@ where
 }
 
 fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T>(
-    suite: &Eip712Signature2021,
+    _suite: &Eip712Signature2021,
     data: &T,
     context: &mut E,
     options: ExpandedConfigurationRef<VerificationMethod>,
@@ -250,11 +260,13 @@ where
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
     T: linked_data::LinkedData<I, V>,
 {
-    let document_quads = context.into_quads(data)?;
+    let document_quads = context.quads_of(data)?;
     let document_quads: Vec<_> =
         ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref()))
             .collect();
     let proof_quads = options.quads();
+    let proof_quads: Vec<_> =
+        ssi_rdf::urdna2015::normalize(proof_quads.iter().map(|quad| quad.as_quad_ref())).collect();
     Ok(new_ldp_siging_request(document_quads, proof_quads))
 }
 

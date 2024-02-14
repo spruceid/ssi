@@ -1,7 +1,5 @@
 use ssi_crypto::MessageSigner;
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_verification_key_2019::DigestFunction, EcdsaSecp256k1VerificationKey2019,
     SignatureError,

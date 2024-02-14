@@ -4,6 +4,7 @@ use chrono::Timelike;
 use educe::Educe;
 use grdf::{HashDataset, HashGraph};
 use iref::{Iri, IriBuf};
+use json_syntax::Print;
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::{
     ExportedFromVocabulary, Id, InterpretationMut, IriVocabulary, Literal, Quad,
@@ -27,6 +28,10 @@ pub const XSD_DATETIME_IRI: &Iri = iri!("http://www.w3.org/2001/XMLSchema#dateTi
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProofConfiguration<M, O = ()> {
+    /// Proof context.
+    #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<json_ld::syntax::Context>,
+
     /// Date a creation of the proof.
     pub created: xsd_types::DateTime,
 
@@ -55,6 +60,7 @@ impl<M, O> ProofConfiguration<M, O> {
         options: O,
     ) -> Self {
         Self {
+            context: None,
             created,
             verification_method,
             proof_purpose,
@@ -70,6 +76,7 @@ impl<M, O> ProofConfiguration<M, O> {
         let ns = ms * 1_000_000;
 
         Self {
+            context: None,
             created: datetime.with_nanosecond(ns).unwrap_or(datetime).into(),
             verification_method,
             proof_purpose: ProofPurpose::default(),
@@ -88,6 +95,7 @@ impl<M, O> ProofConfiguration<M, O> {
         O: Referencable,
     {
         ProofConfigurationRef {
+            context: self.context.as_ref(),
             created: &self.created,
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
@@ -106,9 +114,14 @@ impl<M> ProofConfiguration<M> {
 #[derive(serde::Serialize)]
 #[serde(bound = "M::Reference<'a>: serde::Serialize, O::Reference<'a>: serde::Serialize")]
 pub struct ProofConfigurationWithSuiteRef<'a, 'b, M: Referencable, O: 'a + Referencable> {
-    #[serde(rename = "type")]
-    pub type_: &'b Iri,
+    /// Proof context.
+    #[serde(rename = "@context", skip_serializing_if = "Option::is_none")]
+    pub context: Option<&'a json_ld::syntax::Context>,
 
+    #[serde(rename = "type")]
+    pub type_: &'b str,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cryptosuite: Option<&'b str>,
 
     pub created: &'a xsd_types::DateTime,
@@ -134,8 +147,14 @@ pub struct ProofConfigurationWithSuiteRef<'a, 'b, M: Referencable, O: 'a + Refer
     bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize")
 )]
 pub struct ProofConfigurationRef<'a, M: Referencable, O: 'a + Referencable = ()> {
+    /// Proof context.
+    #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<&'a json_ld::syntax::Context>,
+
     pub created: &'a xsd_types::DateTime,
+
     pub verification_method: ReferenceOrOwnedRef<'a, M>,
+
     pub proof_purpose: ProofPurpose,
 
     #[serde(flatten)]
@@ -157,6 +176,7 @@ pub enum ProofConfigurationCastError<M, O> {
 
 impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
     pub fn new(
+        context: Option<&'a json_ld::syntax::Context>,
         created: &'a xsd_types::DateTime,
         verification_method: ReferenceOrOwnedRef<'a, M>,
         proof_purpose: ProofPurpose,
@@ -164,6 +184,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         extra_properties: &'a BTreeMap<String, json_syntax::Value>,
     ) -> Self {
         Self {
+            context,
             created,
             verification_method,
             proof_purpose,
@@ -178,6 +199,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         'a: 'b,
     {
         ProofConfigurationRef {
+            context: self.context,
             created: self.created,
             verification_method: self.verification_method.shorten_lifetime(),
             proof_purpose: self.proof_purpose,
@@ -196,6 +218,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         let (verification_method, options) = f(self.verification_method, self.options)?;
 
         Ok(ProofConfigurationRef::new(
+            self.context,
             self.created,
             verification_method,
             self.proof_purpose,
@@ -209,6 +232,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         f: impl FnOnce(O::Reference<'a>) -> P::Reference<'a>,
     ) -> ProofConfigurationRef<'a, M, P> {
         ProofConfigurationRef::new(
+            self.context,
             self.created,
             self.verification_method,
             self.proof_purpose,
@@ -226,6 +250,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
     ) -> ProofConfigurationRef<'a, N, P> {
         let (verification_method, options) = f(self.verification_method, self.options);
         ProofConfigurationRef::new(
+            self.context,
             self.created,
             verification_method,
             self.proof_purpose,
@@ -262,7 +287,8 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         suite: &'b T,
     ) -> ProofConfigurationWithSuiteRef<'a, 'b, M, O> {
         ProofConfigurationWithSuiteRef {
-            type_: suite.iri(),
+            context: self.context,
+            type_: suite.name(),
             cryptosuite: suite.cryptographic_suite(),
             created: self.created,
             verification_method: self.verification_method,
@@ -274,6 +300,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
 
     pub fn without_options(self) -> ProofConfigurationRef<'a, M> {
         ProofConfigurationRef {
+            context: self.context,
             created: self.created,
             verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
@@ -374,6 +401,12 @@ where
         };
 
         let json_proof_document = json_syntax::to_value(proof_document).unwrap();
+
+        eprintln!(
+            "COMPACT CONFIGURATION: {}",
+            json_proof_document.pretty_print()
+        );
+
         let json_ld_proof_document = ssi_json_ld::CompactJsonLd(json_proof_document)
             .expand(self)
             .await?;
@@ -389,6 +422,11 @@ where
                 )?;
 
                 let mut dataset: HashDataset<Id, IriBuf, Term, Id> = quads.into_iter().collect();
+
+                eprintln!("RDF CONFIGURATION");
+                for quad in &dataset {
+                    eprintln!("{quad} .")
+                }
 
                 let proof_prop = ssi_security::PROOF.to_owned();
                 match dataset

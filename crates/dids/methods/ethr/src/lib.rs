@@ -508,13 +508,12 @@ mod tests {
         };
 
         let suite = AnySuite::pick(&key, Some(&verification_method)).unwrap();
-        let issue_options = ProofConfiguration {
-            created: "2021-02-18T20:23:13Z".parse().unwrap(),
+        let issue_options = ProofConfiguration::new(
+            "2021-02-18T20:23:13Z".parse().unwrap(),
             verification_method,
-            proof_purpose: ProofPurpose::Assertion,
-            options: AnySuiteOptions::default(),
-            extra_properties: Default::default(),
-        };
+            ProofPurpose::Assertion,
+            AnySuiteOptions::default(),
+        );
 
         eprintln!("vm {:?}", issue_options.verification_method);
         let signer = SingleSecretSigner::new(&didethr, key);
@@ -575,13 +574,12 @@ mod tests {
             Vec::new(),
         );
 
-        let vp_issue_options = ProofConfiguration {
-            verification_method: IriBuf::new(format!("{did}#controller")).unwrap().into(),
-            created: "2021-02-18T20:23:13Z".parse().unwrap(),
-            proof_purpose: ProofPurpose::Authentication,
-            options: AnySuiteOptions::default(),
-            extra_properties: Default::default(),
-        };
+        let vp_issue_options = ProofConfiguration::new(
+            "2021-02-18T20:23:13Z".parse().unwrap(),
+            IriBuf::new(format!("{did}#controller")).unwrap().into(),
+            ProofPurpose::Authentication,
+            AnySuiteOptions::default(),
+        );
 
         let vp = suite
             .sign(

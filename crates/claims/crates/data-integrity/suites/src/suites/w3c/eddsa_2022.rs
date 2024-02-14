@@ -4,9 +4,7 @@
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/>
 use ssi_crypto::MessageSigner;
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{Multikey, SignatureError};
 use static_iref::iri;
 

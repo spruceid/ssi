@@ -82,7 +82,7 @@ pub struct PkhVerificationMethod {
 }
 
 pub enum PublicKey {
-    Jwk(JWK),
+    Jwk(Box<JWK>),
     Base58(String),
 }
 
@@ -305,7 +305,7 @@ async fn resolve_solana(did: &DID, account_address: &str, reference: &str) -> Re
     let solvm = PkhVerificationMethod {
         id: solvm_url.clone(),
         type_: PkhVerificationMethodType::SolanaMethod2021,
-        public_key: Some(PublicKey::Jwk(pk_jwk)),
+        public_key: Some(PublicKey::Jwk(Box::new(pk_jwk))),
         controller: did.to_owned(),
         blockchain_account_id,
     };
@@ -381,7 +381,7 @@ async fn resolve_bip122(did: &DID, account_address: &str, reference: &str) -> Re
 
 async fn resolve_aleo(did: &DID, account_address: &str, reference: &str) -> ResolutionResult {
     use bech32::FromBase32;
-    let (hrp, data, _variant) = match bech32::decode(&account_address) {
+    let (hrp, data, _variant) = match bech32::decode(account_address) {
         Err(_e) => {
             return Err(Error::InvalidMethodSpecificId(
                 did.method_specific_id().to_owned(),
@@ -691,7 +691,7 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
 
 impl DIDPKH {
     pub fn generate(&self, key: &JWK, pkh_name: &str) -> Option<DIDBuf> {
-        let addr = match match &pkh_name[..] {
+        let addr = match match pkh_name {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
             #[cfg(feature = "tezos")]
             "tz" => ssi_jwk::blakesig::hash_public_key(key).ok(),
@@ -961,21 +961,20 @@ mod tests {
             })],
         );
 
-        let issue_options = ProofConfiguration {
-            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+        let issue_options = ProofConfiguration::new(
+            cred.issuance_date.clone(),
+            IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
-            created: cred.issuance_date.clone(),
-            proof_purpose: ProofPurpose::Assertion,
-            options: AnySuiteOptions {
+            ProofPurpose::Assertion,
+            AnySuiteOptions {
                 eip712: eip712_domain_opt.clone(),
                 // eip712_v0_1: eip712_domain_opt.clone().map(Into::into),
                 ..Default::default()
             }
             .with_public_key(key.to_public())
             .unwrap(),
-            extra_properties: Default::default(),
-        };
+        );
         eprintln!("vm {:?}", issue_options.verification_method);
         /*
         let proof = vc.generate_proof(&key, &issue_options).await.unwrap();
@@ -1030,20 +1029,19 @@ mod tests {
         // Make it into a VP.
         let presentation = JsonPresentation::new(None, vec![vc], vec![did.clone().into()]);
 
-        let vp_issue_options = ProofConfiguration {
-            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+        let vp_issue_options = ProofConfiguration::new(
+            "2021-03-18T16:38:25Z".parse().unwrap(),
+            IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
-            created: "2021-03-18T16:38:25Z".parse().unwrap(),
-            proof_purpose: ProofPurpose::Authentication,
-            options: AnySuiteOptions {
+            ProofPurpose::Authentication,
+            AnySuiteOptions {
                 eip712: vp_eip712_domain_opt.clone(),
                 ..Default::default()
             }
             .with_public_key(key.to_public())
             .unwrap(),
-            extra_properties: Default::default(),
-        };
+        );
 
         eprintln!(
             "presentation: {}",
@@ -1099,17 +1097,16 @@ mod tests {
                 "id": "did:example:foo"
             })],
         );
-        let issue_options = ProofConfiguration {
-            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+        let issue_options = ProofConfiguration::new(
+            cred.issuance_date.clone(),
+            IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
-            created: cred.issuance_date.clone(),
-            proof_purpose: ProofPurpose::Assertion,
-            options: AnySuiteOptions::default()
+            ProofPurpose::Assertion,
+            AnySuiteOptions::default()
                 .with_public_key(key.to_public())
                 .unwrap(),
-            extra_properties: Default::default(),
-        };
+        );
         eprintln!("vm {:?}", issue_options.verification_method);
         let signer = SingleSecretSigner::new(&didpkh, key.clone());
         eprintln!("key: {key}");
@@ -1158,17 +1155,16 @@ mod tests {
         // Make it into a VP
         let presentation = JsonPresentation::new(None, vec![vc], vec![did.clone().into()]);
 
-        let vp_issue_options = ProofConfiguration {
-            verification_method: IriBuf::new(did.to_string() + vm_relative_url)
+        let vp_issue_options = ProofConfiguration::new(
+            "2021-03-18T16:38:25Z".parse().unwrap(),
+            IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
-            created: "2021-03-18T16:38:25Z".parse().unwrap(),
-            proof_purpose: ProofPurpose::Authentication,
-            options: AnySuiteOptions::default()
+            ProofPurpose::Authentication,
+            AnySuiteOptions::default()
                 .with_public_key(key.to_public())
                 .unwrap(),
-            extra_properties: Default::default(),
-        };
+        );
 
         let vp = proof_suite
             .sign(

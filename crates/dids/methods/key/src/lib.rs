@@ -261,7 +261,7 @@ impl From<VerificationMethod> for DIDVerificationMethod {
 }
 
 pub enum PublicKey {
-    Jwk(JWK),
+    Jwk(Box<JWK>),
     Base58(String),
     Multibase(String),
 }
@@ -308,7 +308,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
         #[cfg(feature = "secp256k1")]
         match ssi_jwk::secp256k1_parse(&data[2..]) {
             Ok(jwk) => Ok((
-                PublicKey::Jwk(jwk),
+                PublicKey::Jwk(Box::new(jwk)),
                 VerificationMethodType::EcdsaSecp256k1VerificationKey2019,
             )),
             Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
@@ -340,7 +340,10 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
         Err(Error::Internal(Box::new(Unsupported::P384)))
     } else if data[0] == DID_KEY_RSA_PREFIX[0] && data[1] == DID_KEY_RSA_PREFIX[1] {
         match ssi_jwk::rsa_x509_pub_parse(&data[2..]) {
-            Ok(jwk) => Ok((PublicKey::Jwk(jwk), VerificationMethodType::JsonWebKey2020)),
+            Ok(jwk) => Ok((
+                PublicKey::Jwk(Box::new(jwk)),
+                VerificationMethodType::JsonWebKey2020,
+            )),
             Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
         }
     } else if data[0] == DID_KEY_BLS12381_G2_PREFIX[0] && data[1] == DID_KEY_BLS12381_G2_PREFIX[1] {
@@ -357,7 +360,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
         // https://datatracker.ietf.org/doc/html/draft-denhartog-pairing-curves-jose-cose-00#section-3.1.3
         // FIXME: This should be a base 58 key according to the spec.
         Ok((
-            PublicKey::Jwk(jwk),
+            PublicKey::Jwk(Box::new(jwk)),
             VerificationMethodType::Bls12381G2Key2020,
         ))
     } else {
@@ -553,13 +556,12 @@ mod tests {
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
 
-        let issue_options = ProofConfiguration {
-            created: "2020-08-19T21:41:50Z".parse().unwrap(),
-            verification_method: verification_method_ref,
-            proof_purpose: ProofPurpose::Assertion,
-            options: AnySuiteOptions::default(),
-            extra_properties: Default::default(),
-        };
+        let issue_options = ProofConfiguration::new(
+            "2020-08-19T21:41:50Z".parse().unwrap(),
+            verification_method_ref,
+            ProofPurpose::Assertion,
+            AnySuiteOptions::default(),
+        );
         let signer = SingleSecretSigner::new(&didkey, key);
         let vc = suite
             .sign(cred, AnyInputContext::default(), &signer, issue_options)
@@ -612,13 +614,12 @@ mod tests {
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
         eprintln!("suite: {suite:?}");
-        let issue_options = ProofConfiguration {
-            created: "2021-02-18T20:17:46Z".parse().unwrap(),
-            verification_method: verification_method_ref,
-            proof_purpose: ProofPurpose::Assertion,
-            options: AnySuiteOptions::default(),
-            extra_properties: Default::default(),
-        };
+        let issue_options = ProofConfiguration::new(
+            "2021-02-18T20:17:46Z".parse().unwrap(),
+            verification_method_ref,
+            ProofPurpose::Assertion,
+            AnySuiteOptions::default(),
+        );
         let signer = SingleSecretSigner::new(&didkey, key);
         let vc = suite
             .sign(cred, AnyInputContext::default(), &signer, issue_options)
@@ -671,13 +672,12 @@ mod tests {
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
         eprintln!("suite: {suite:?}");
-        let issue_options = ProofConfiguration {
-            created: "2021-02-18T20:17:46Z".parse().unwrap(),
-            verification_method: verification_method_ref,
-            proof_purpose: ProofPurpose::Assertion,
-            options: AnySuiteOptions::default(),
-            extra_properties: Default::default(),
-        };
+        let issue_options = ProofConfiguration::new(
+            "2021-02-18T20:17:46Z".parse().unwrap(),
+            verification_method_ref,
+            ProofPurpose::Assertion,
+            AnySuiteOptions::default(),
+        );
         let signer = SingleSecretSigner::new(&didkey, key);
         let vc = suite
             .sign(cred, AnyInputContext::default(), &signer, issue_options)

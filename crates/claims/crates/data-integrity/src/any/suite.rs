@@ -52,8 +52,13 @@ where
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("unsupported proof suite: {0}")]
-pub struct UnsupportedProofSuite(pub ssi_data_integrity_core::Type);
+pub enum UnsupportedProofSuite {
+    #[error("unsupported proof suite: {0}")]
+    Compact(ssi_data_integrity_core::Type),
+
+    #[error("unsupported proof suite: {0}")]
+    Expanded(ssi_data_integrity_core::ExpandedType),
+}
 
 macro_rules! crypto_suites {
     {
@@ -83,13 +88,33 @@ macro_rules! crypto_suites {
                     $(#[cfg($($t)*)])?
                     {
                         let suite = ssi_data_integrity_suites::$name;
-                        if suite.name() == ty.type_ && suite.cryptographic_suite() == ty.cryptosuite.as_deref() {
+                        if suite.name() == ty.name && suite.cryptographic_suite() == ty.cryptosuite.as_deref() {
                             return Ok(Self::$name)
                         }
                     }
                 )*
 
-                Err(UnsupportedProofSuite(ty))
+                Err(UnsupportedProofSuite::Compact(ty))
+            }
+        }
+
+        impl TryFrom<ssi_data_integrity_core::ExpandedType> for AnySuite {
+            type Error = UnsupportedProofSuite;
+
+            fn try_from(
+                ty: ssi_data_integrity_core::ExpandedType
+            ) -> Result<Self, Self::Error> {
+                $(
+                    $(#[cfg($($t)*)])?
+                    {
+                        let suite = ssi_data_integrity_suites::$name;
+                        if *suite.iri() == ty.iri && suite.cryptographic_suite() == ty.cryptosuite.as_deref() {
+                            return Ok(Self::$name)
+                        }
+                    }
+                )*
+
+                Err(UnsupportedProofSuite::Expanded(ty))
             }
         }
 
@@ -314,6 +339,15 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => AnySignatureAlgorithm::$name(ssi_data_integrity_suites::$name.setup_signature_algorithm())
+                    ),*
+                }
+            }
+
+            fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+                match self {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        Self::$name => ssi_data_integrity_suites::$name.required_proof_context()
                     ),*
                 }
             }

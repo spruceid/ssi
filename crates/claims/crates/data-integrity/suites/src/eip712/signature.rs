@@ -27,8 +27,8 @@ impl Eip712Signature {
         }
     }
 
-    pub async fn sign<'a, S: MessageSigner<AnyESKeccakK>>(
-        bytes: &'a [u8],
+    pub async fn sign<S: MessageSigner<AnyESKeccakK>>(
+        bytes: &[u8],
         signer: S,
         algorithm: AnyESKeccakK,
     ) -> Result<Self, SignatureError> {

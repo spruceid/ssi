@@ -104,7 +104,7 @@ impl<'de> Deserialize<'de> for Value {
             where
                 E: serde::de::Error,
             {
-                Ok(Value::Integer(v as i64))
+                Ok(Value::Integer(v))
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>

@@ -61,9 +61,7 @@ impl Base58BtcMultibase {
         multibase::encode(multibase::Base::Base58Btc, signature).into_bytes()
     }
 
-    pub fn decode_signature<'s>(
-        encoded_signature: &'s [u8],
-    ) -> Result<Vec<u8>, InvalidProtocolSignature> {
+    pub fn decode_signature(encoded_signature: &[u8]) -> Result<Vec<u8>, InvalidProtocolSignature> {
         let encoded_signature =
             std::str::from_utf8(encoded_signature).map_err(|_| InvalidProtocolSignature)?;
         let (base, signature) =
@@ -107,9 +105,9 @@ impl Base58Btc {
     }
 
     pub fn decode_signature(encoded_signature: &[u8]) -> Result<Vec<u8>, InvalidProtocolSignature> {
-        Ok(bs58::decode(encoded_signature)
+        bs58::decode(encoded_signature)
             .into_vec()
-            .map_err(|_| InvalidProtocolSignature)?)
+            .map_err(|_| InvalidProtocolSignature)
     }
 }
 

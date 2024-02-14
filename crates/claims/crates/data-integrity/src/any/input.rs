@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<'a, I, V> From<LdEnvironment<V, I>> for AnyInputContext<LdEnvironment<V, I>> {
+impl<I, V> From<LdEnvironment<V, I>> for AnyInputContext<LdEnvironment<V, I>> {
     fn from(value: LdEnvironment<V, I>) -> Self {
         AnyInputContext {
             ld: value,

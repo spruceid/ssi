@@ -70,7 +70,7 @@ impl<S: Sidetree> FromStr for SidetreeDID<S> {
 
         let did_suffix_str = parts
             .next()
-            .ok_or_else(|| InvalidSidetreeDID::MissingSidetreeDIDSuffix)?;
+            .ok_or(InvalidSidetreeDID::MissingSidetreeDIDSuffix)?;
         let did_suffix = DIDSuffix(did_suffix_str.to_string());
         S::validate_did_suffix(&did_suffix)?;
         let create_operation_data_opt = parts.next();

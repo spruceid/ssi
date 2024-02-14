@@ -45,16 +45,16 @@ impl Operation {
     ) -> Result<Self, OperationFromTransactionError> {
         let op_value = transaction
             .as_object_mut()
-            .ok_or_else(|| OperationFromTransactionError::MissingSidetreeOperation)?
+            .ok_or(OperationFromTransactionError::MissingSidetreeOperation)?
             .remove("sidetreeOperation")
-            .ok_or_else(|| OperationFromTransactionError::MissingSidetreeOperation)?;
+            .ok_or(OperationFromTransactionError::MissingSidetreeOperation)?;
         let op: Operation = serde_json::from_value(op_value)
             .map_err(|_| OperationFromTransactionError::InvalidSidetreeOperation)?;
         Ok(op)
     }
 
     pub fn into_transaction(self) -> serde_json::Value {
-        let value = serde_json::to_value(&self).unwrap();
+        let value = serde_json::to_value(self).unwrap();
         serde_json::json!({ "sidetreeOperation": value })
     }
 }
@@ -224,11 +224,11 @@ fn ensure_reveal_commitment<S: Sidetree>(
     let canonicalized_public_key = json_canonicalization_scheme(&pk).unwrap();
     let commitment_value = canonicalized_public_key.as_bytes();
     let computed_reveal_value = S::reveal_value(commitment_value);
-    if &computed_reveal_value != reveal_value {
+    if computed_reveal_value != reveal_value {
         return Err(FollowsError::RevealValueMismatch);
     }
     let computed_commitment = S::commitment_scheme(pk);
-    if &computed_commitment != recovery_commitment {
+    if computed_commitment != recovery_commitment {
         return Err(FollowsError::CommitmentMismatch);
     }
     Ok(())

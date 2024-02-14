@@ -520,7 +520,7 @@ impl DIDTz {
                     for jws in patches {
                         let mut doc_json = serde_json::to_value(&*doc).unwrap();
                         let (patch_metadata, _) =
-                            decode_unverified(&jws).map_err(|e| UpdateError::InvalidJws(e))?;
+                            decode_unverified(&jws).map_err(UpdateError::InvalidJws)?;
                         let curve = VerificationMethodType::from_prefix(prefix)
                             .curve()
                             .to_string();
@@ -542,7 +542,7 @@ impl DIDTz {
                             let deref = self
                                 .dereference(&kid)
                                 .await
-                                .map_err(|e| UpdateError::DereferenceFailed(e))?;
+                                .map_err(UpdateError::DereferenceFailed)?;
                             match deref.content {
                                 Content::Resource(Resource::Document(d)) => d,
                                 _ => {
@@ -593,23 +593,23 @@ impl DIDTz {
                                     return Err(UpdateError::PrefixNotEnabled(p));
                                 }
                             };
-                            let (_, patch_) = decode_verify(&jws, &jwk)
-                                .map_err(|e| UpdateError::InvalidJws(e))?;
+                            let (_, patch_) =
+                                decode_verify(&jws, &jwk).map_err(UpdateError::InvalidJws)?;
                             patch(
                                 &mut doc_json,
                                 &serde_json::from_slice(
                                     serde_json::from_slice::<SignedIetfJsonPatchPayload>(&patch_)
-                                        .map_err(|e| UpdateError::InvalidPatch(e))?
+                                        .map_err(UpdateError::InvalidPatch)?
                                         .ietf_json_patch
                                         .to_string()
                                         .as_bytes(),
                                 )
-                                .map_err(|e| UpdateError::InvalidPatch(e))?,
+                                .map_err(UpdateError::InvalidPatch)?,
                             )
-                            .map_err(|e| UpdateError::Patch(e))?;
+                            .map_err(UpdateError::Patch)?;
 
                             *doc = serde_json::from_value(doc_json)
-                                .map_err(|e| UpdateError::InvalidPatchedDocument(e))?;
+                                .map_err(UpdateError::InvalidPatchedDocument)?;
                         } else {
                             // Need public key for signed patches
                             return Err(UpdateError::MissingPublicKey);

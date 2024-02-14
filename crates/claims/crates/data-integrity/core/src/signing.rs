@@ -3,7 +3,7 @@ use ssi_json_ld::WithJsonLdContext;
 use ssi_verification_methods::{SignatureError, Signer};
 
 use crate::{
-    suite::{CryptographicSuiteInput, HashError, TransformError},
+    suite::{CryptographicSuiteInput, CryptographicSuiteOptions, HashError, TransformError},
     ConfigurationExpansionError, CryptographicSuite, PreparedProof, Proof, ProofConfiguration,
     ProofConfigurationRefExpansion, Proofs,
 };
@@ -37,7 +37,7 @@ pub enum Error<E = ssi_json_ld::UnknownContext> {
 
 pub async fn sign<'max, T, S: CryptographicSuite, X, N>(
     input: T,
-    mut environment: X,
+    environment: X,
     signer: &'max N,
     suite: S,
     params: ProofConfiguration<S::VerificationMethod, S::Options>,
@@ -49,21 +49,9 @@ where
     N: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     X: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
-    let expanded_params = params
-        .borrowed()
-        .expand(input.json_ld_context().as_ref(), &suite, &mut environment)
-        .await?;
-
-    let transformed = suite
-        .transform(&input, &mut environment, expanded_params.borrow())
-        .await?;
-    let hash = suite.hash(transformed, expanded_params)?;
-    let untyped_proof = suite.generate_proof(&hash, signer, params).await?;
-    let proof = untyped_proof.into_typed(suite);
-    Ok(Verifiable::from_parts(
-        input,
-        vec![PreparedProof::new(proof, hash)],
-    ))
+    Ok(sign_single(input, environment, signer, suite, params)
+        .await?
+        .map(|t, p| (t, vec![p])))
 }
 
 pub async fn sign_single<'max, T, S: CryptographicSuite, X, N>(
@@ -71,7 +59,7 @@ pub async fn sign_single<'max, T, S: CryptographicSuite, X, N>(
     mut environment: X,
     signer: &'max N,
     suite: S,
-    params: ProofConfiguration<S::VerificationMethod, S::Options>,
+    mut params: ProofConfiguration<S::VerificationMethod, S::Options>,
 ) -> Result<Verifiable<T, Proof<S>>, Error<X::LoadError>>
 where
     T: WithJsonLdContext,
@@ -80,6 +68,11 @@ where
     N: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     X: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
+    if let Some(context) = suite.required_proof_context() {
+        params.context = Some(context); // TODO: merge instead of replacing.
+        params.options.prepare(&suite);
+    }
+
     let expanded_params = params
         .borrowed()
         .expand(input.json_ld_context().as_ref(), &suite, &mut environment)

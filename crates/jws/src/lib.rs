@@ -1213,7 +1213,6 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
             let digest = k256::elliptic_curve::FieldBytes::<k256::Secp256k1>::from_slice(&hash);
             let recovered_key = VerifyingKey::recover_from_prehash(digest, &sig, rec_id)
                 .map_err(ssi_jwk::Error::from)?;
-            eprintln!("recovered key");
             use ssi_jwk::ECParams;
             let jwk = JWK {
                 params: JWKParams::EC(ECParams::try_from(
@@ -1229,7 +1228,6 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 x509_thumbprint_sha1: None,
                 x509_thumbprint_sha256: None,
             };
-            eprintln!("{}", jwk.to_string());
             Ok(jwk)
         }
         #[cfg(feature = "secp256k1")]
@@ -1253,7 +1251,6 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
                 &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes())
                     .map_err(ssi_jwk::Error::from)?,
             )?));
-            eprintln!("{}", jwk.to_string());
             Ok(jwk)
         }
         _ => {

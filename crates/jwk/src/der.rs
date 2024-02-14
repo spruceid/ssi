@@ -131,7 +131,7 @@ impl ToASN1 for RSAPublicKey {
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Sequence(
             0,
-            vec![
+            [
                 self.modulus.to_asn1_class(class)?,
                 self.public_exponent.to_asn1_class(class)?,
             ]
@@ -249,7 +249,7 @@ impl ToASN1 for OtherPrimeInfo {
     fn to_asn1_class(&self, class: ASN1Class) -> Result<Vec<ASN1Block>, Self::Error> {
         Ok(vec![ASN1Block::Sequence(
             0,
-            vec![
+            [
                 self.prime.to_asn1_class(class)?,
                 self.exponent.to_asn1_class(class)?,
                 self.coefficient.to_asn1_class(class)?,

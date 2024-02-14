@@ -32,7 +32,7 @@ pub enum InvalidInput {
 impl Input {
     pub fn try_into_typed_data<'a, M: Referencable, O: Referencable>(
         mut self,
-        proof_context: &'static json_ld::syntax::Context,
+        // proof_context: &'static json_ld::syntax::Context,
         proof_type: &'static str,
         proof_configuration: ProofConfigurationRef<'a, M, O>,
     ) -> Result<ssi_eip712::TypedData, InvalidInput>
@@ -46,9 +46,8 @@ impl Input {
         #[derive(Serialize)]
         #[serde(bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize"))]
         struct ProofConfigurationWithContext<'a, M: Referencable, O: Referencable> {
-            #[serde(rename = "@context")]
-            proof_context: &'static json_ld::syntax::Context,
-
+            // #[serde(rename = "@context")]
+            // proof_context: &'static json_ld::syntax::Context,
             #[serde(rename = "type")]
             proof_type: &'static str,
 
@@ -57,7 +56,7 @@ impl Input {
         }
 
         let proof = ProofConfigurationWithContext {
-            proof_context,
+            // proof_context,
             proof_type,
             proof_configuration,
         };

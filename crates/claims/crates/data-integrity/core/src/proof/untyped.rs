@@ -1,66 +1,54 @@
-use std::collections::HashMap;
-
-use rdf_types::Id;
 use ssi_core::Referencable;
 use ssi_verification_methods::{
     InvalidVerificationMethod, ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef,
     VerificationError,
 };
+use std::collections::BTreeMap;
 
 use crate::CryptographicSuite;
 
 use super::{Proof, ProofConfiguration, ProofConfigurationRef};
 
 /// Untyped Data Integrity Proof.
-#[derive(
-    Debug,
-    Clone,
-    serde::Serialize,
-    serde::Deserialize,
-    linked_data::Serialize,
-    linked_data::Deserialize,
-)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-#[ld(prefix("dc" = "http://purl.org/dc/terms/"))]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UntypedProof<M, O, S> {
+    #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<json_ld::syntax::Context>,
+
     /// Date and time of creation.
-    #[ld("dc:created")]
     pub created: xsd_types::DateTime,
 
     /// Verification method.
-    #[ld("sec:verificationMethod")]
     pub verification_method: ReferenceOrOwned<M>,
 
     /// Proof purpose.
-    #[ld("sec:proofPurpose")]
     pub proof_purpose: ProofPurpose,
 
     /// Additional proof options required by the cryptographic suite.
-    #[ld(flatten)]
     #[serde(flatten)]
     pub options: O,
 
     /// Proof value.
-    #[ld(flatten)]
     #[serde(flatten)]
     pub signature: S,
 
     /// Extra properties.
-    #[ld(flatten)]
     #[serde(flatten)]
-    pub extra_properties: HashMap<Id, json_syntax::Value>
+    pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 
 impl<M, O, S> UntypedProof<M, O, S> {
     pub fn from_configuration(configuration: ProofConfiguration<M, O>, signature: S) -> Self {
-        Self::new(
-            configuration.created,
-            configuration.verification_method,
-            configuration.proof_purpose,
-            configuration.options,
+        Self {
+            context: configuration.context,
+            created: configuration.created,
+            verification_method: configuration.verification_method,
+            proof_purpose: configuration.proof_purpose,
+            options: configuration.options,
             signature,
-        )
+            extra_properties: configuration.extra_properties,
+        }
     }
 
     pub fn new(
@@ -71,12 +59,20 @@ impl<M, O, S> UntypedProof<M, O, S> {
         signature: S,
     ) -> Self {
         Self {
+            context: None,
             created,
             verification_method,
             proof_purpose,
             options,
             signature,
-            extra_properties: HashMap::new()
+            extra_properties: BTreeMap::new(),
+        }
+    }
+
+    pub fn with_context(self, context: json_ld::syntax::Context) -> Self {
+        Self {
+            context: Some(context),
+            ..self
         }
     }
 
@@ -101,10 +97,12 @@ impl<M, O, S> UntypedProof<M, O, S> {
         O: Referencable,
     {
         ProofConfigurationRef {
+            context: self.context.as_ref(),
             created: &self.created,
             verification_method: self.verification_method.borrowed(),
             proof_purpose: self.proof_purpose,
             options: self.options.as_reference(),
+            extra_properties: &self.extra_properties,
         }
     }
 
@@ -114,10 +112,12 @@ impl<M, O, S> UntypedProof<M, O, S> {
         O: Clone,
     {
         ProofConfiguration {
+            context: self.context.clone(),
             created: self.created,
             verification_method: self.verification_method.clone(),
             proof_purpose: self.proof_purpose,
             options: self.options.clone(),
+            extra_properties: self.extra_properties.clone(),
         }
     }
 

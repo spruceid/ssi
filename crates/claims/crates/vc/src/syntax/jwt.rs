@@ -55,25 +55,25 @@ where
 }
 
 fn transform_jwt_specific_headers(jwt: JWTClaims, target: &mut json_syntax::Object) {
-    if let Some(exp) = jwt.expiration_time {
-        todo!()
-    }
+    // if let Some(exp) = jwt.expiration_time {
+    //     todo!()
+    // }
 
-    if let Some(iss) = jwt.issuance_date {
-        todo!()
-    }
+    // if let Some(iss) = jwt.issuance_date {
+    //     todo!()
+    // }
 
-    if let Some(nbf) = jwt.not_before {
-        todo!()
-    }
+    // if let Some(nbf) = jwt.not_before {
+    //     todo!()
+    // }
 
-    if let Some(sub) = jwt.subject {
-        todo!()
-    }
+    // if let Some(sub) = jwt.subject {
+    //     todo!()
+    // }
 
-    if let Some(jti) = jwt.jwt_id {
-        todo!()
-    }
+    // if let Some(jti) = jwt.jwt_id {
+    //     todo!()
+    // }
 }
 
 impl JsonCredential {

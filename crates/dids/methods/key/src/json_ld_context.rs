@@ -135,10 +135,6 @@ impl JsonLdContext {
             );
         }
 
-        let mut entries = Vec::new();
-
-        entries.push(representation::json_ld::ContextEntry::Definition(def));
-
-        entries
+        vec![representation::json_ld::ContextEntry::Definition(def)]
     }
 }

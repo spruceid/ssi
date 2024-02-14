@@ -1,11 +1,11 @@
 use keccak_hash::keccak;
 
 pub fn bytes_to_lowerhex(bytes: &[u8]) -> String {
-    "0x".to_string()
-        + &bytes
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>()
+    use std::fmt::Write;
+    bytes.iter().fold("0x".to_owned(), |mut s, byte| {
+        let _ = write!(s, "{byte:02x}");
+        s
+    })
 }
 
 /// Compute a hash of a public key as an Ethereum address.

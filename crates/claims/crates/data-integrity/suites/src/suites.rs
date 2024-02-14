@@ -1,9 +1,9 @@
 #[cfg(feature = "w3c")]
 mod w3c;
-use linked_data::{to_quads, LinkedDataPredicateObjects, LinkedDataSubject};
+use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
 use rdf_types::{generator, interpretation, Quad};
 use ssi_core::Referencable;
-use ssi_data_integrity_core::{CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef};
+use ssi_data_integrity_core::{CryptographicSuite, ExpandedConfiguration};
 use ssi_rdf::urdna2015;
 #[cfg(feature = "w3c")]
 pub use w3c::*;
@@ -19,7 +19,7 @@ pub use unspecified::*;
 /// SHA256-based input hashing algorithm used by many cryptographic suites.
 fn sha256_hash<'a, T: CryptographicSuite>(
     data: &[u8],
-    suite: &T,
+    _suite: &T,
     proof_configuration: ExpandedConfiguration<'a, T::VerificationMethod, T::Options>,
 ) -> [u8; 64]
 where
@@ -28,7 +28,6 @@ where
     <T::Options as Referencable>::Reference<'a>:
         LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
 {
-    let generator = rdf_types::generator::Blank::new();
     let proof_config_quads = proof_configuration.quads();
     let proof_config_normalized_quads =
         urdna2015::normalize(proof_config_quads.iter().map(Quad::as_quad_ref)).into_nquads();
@@ -82,7 +81,7 @@ macro_rules! impl_rdf_input_urdna2015 {
                     .expand(context)
                     .await
                     .map_err(|_| $crate::ssi_data_integrity_core::suite::TransformError::ExpansionFailed)?;
-                context.into_canonical_form(&expanded).map_err(Into::into)
+                context.canonical_form_of(&expanded).map_err(Into::into)
             }
         }
     };

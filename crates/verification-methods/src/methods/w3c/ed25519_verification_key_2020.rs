@@ -99,7 +99,7 @@ impl Ed25519VerificationKey2020 {
         data: &[u8],
         signature_bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        let signature = ed25519_dalek::Signature::from_bytes(&signature_bytes)
+        let signature = ed25519_dalek::Signature::from_bytes(signature_bytes)
             .map_err(|_| VerificationError::InvalidSignature)?;
         Ok(self.public_key.verify(data, &signature))
     }
@@ -124,11 +124,11 @@ impl VerificationMethod for Ed25519VerificationKey2020 {
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -146,7 +146,7 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
     }
 }
@@ -251,7 +251,7 @@ impl PublicKey {
     }
 
     pub fn to_jwk(&self) -> JWK {
-        self.decoded.clone().into()
+        self.decoded.into()
     }
 
     pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> bool {

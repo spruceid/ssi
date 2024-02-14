@@ -2,7 +2,7 @@ use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError},
-    CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
+    CryptographicSuite, ExpandedConfiguration,
 };
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_rdf::IntoNQuads;

@@ -170,12 +170,16 @@ pub trait CryptographicSuite: Sized {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
 
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        None
+    }
+
     #[allow(async_fn_in_trait)]
     async fn generate_proof<'a, S>(
         &'a self,
         data: &'a Self::Hashed,
         signer: &'a S,
-        mut params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
+        params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<
         UntypedProof<Self::VerificationMethod, Self::Options, Self::Signature>,
         SignatureError,
@@ -198,7 +202,6 @@ pub trait CryptographicSuite: Sized {
             )
             .await?;
 
-        params.options.prepare(self);
         Ok(params.into_proof(signature))
     }
 

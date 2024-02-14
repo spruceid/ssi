@@ -147,9 +147,7 @@ pub struct AnySuiteOptionsRef<'a> {
 }
 
 impl<'a> From<AnySuiteOptionsRef<'a>> for () {
-    fn from(_value: AnySuiteOptionsRef<'a>) -> Self {
-        ()
-    }
+    fn from(_value: AnySuiteOptionsRef<'a>) -> Self {}
 }
 
 #[cfg(feature = "tezos")]

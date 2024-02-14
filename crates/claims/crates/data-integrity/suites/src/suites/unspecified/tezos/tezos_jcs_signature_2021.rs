@@ -6,7 +6,6 @@ use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
-    ProofConfigurationRef,
 };
 use ssi_jwk::algorithm::AnyBlake2b;
 use ssi_security::{Multibase, MultibaseBuf};

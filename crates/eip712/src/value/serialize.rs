@@ -120,7 +120,7 @@ impl serde::Serializer for ValueSerializer {
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        Ok(Value::Integer(v as i64))
+        Ok(Value::Integer(v))
     }
 
     fn serialize_i128(self, v: i128) -> Result<Self::Ok, Self::Error> {

@@ -1,8 +1,6 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::{protocol::EthereumWallet, MessageSigner};
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
@@ -17,6 +15,13 @@ mod v0_1;
 pub use v0_1::*;
 
 use crate::{impl_rdf_input_urdna2015, AnySignature, AnySignatureRef};
+
+lazy_static::lazy_static! {
+    pub static ref EPSIG_CONTEXT: json_ld::syntax::ContextEntry = {
+        let context_str = ssi_contexts::EPSIG_V0_1;
+        serde_json::from_str(context_str).unwrap()
+    };
+}
 
 /// Ethereum Personal Signature 2021.
 ///
@@ -170,6 +175,10 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
     }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(EPSIG_CONTEXT.clone()))
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -285,7 +294,7 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         signer: S,
     ) -> Result<Self::Signature, SignatureError> {
         let proof_value_bytes = signer
-            .sign(method.algorithm().into(), EthereumWallet, bytes)
+            .sign(method.algorithm(), EthereumWallet, bytes)
             .await?;
         match String::from_utf8(proof_value_bytes) {
             Ok(proof_value) => Ok(Signature::new(proof_value)),

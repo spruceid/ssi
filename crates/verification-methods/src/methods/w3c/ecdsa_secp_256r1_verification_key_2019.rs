@@ -70,7 +70,7 @@ pub struct EcdsaSecp256r1VerificationKey2019 {
 
 pub enum SecretKeyRef<'a> {
     P256(&'a p256::SecretKey),
-    JWK(&'a JWK),
+    Jwk(&'a JWK),
 }
 
 impl<'a> From<&'a p256::SecretKey> for SecretKeyRef<'a> {
@@ -81,7 +81,7 @@ impl<'a> From<&'a p256::SecretKey> for SecretKeyRef<'a> {
 
 impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
     fn from(value: &'a JWK) -> Self {
-        Self::JWK(value)
+        Self::Jwk(value)
     }
 }
 
@@ -109,7 +109,7 @@ impl EcdsaSecp256r1VerificationKey2019 {
                     .as_bytes()
                     .to_vec())
             }
-            SecretKeyRef::JWK(secret_key) => {
+            SecretKeyRef::Jwk(secret_key) => {
                 let algorithm = ssi_jwk::Algorithm::ES256;
                 let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
                 if !algorithm.is_compatible_with(key_algorithm) {
@@ -155,11 +155,11 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
         Some(self.controller.as_iri())
     }
 
-    fn ref_id<'a>(r: Self::Reference<'a>) -> &'a Iri {
+    fn ref_id(r: Self::Reference<'_>) -> &Iri {
         r.id.as_iri()
     }
 
-    fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a Iri> {
+    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
         Some(r.controller.as_iri())
     }
 }
@@ -182,7 +182,7 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
     }
 
-    fn ref_type<'a>(_r: Self::Reference<'a>) -> &'a str {
+    fn ref_type(_r: Self::Reference<'_>) -> &str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
     }
 }
@@ -243,7 +243,7 @@ impl PublicKey {
     }
 
     pub fn to_jwk(&self) -> JWK {
-        self.decoded.clone().into()
+        self.decoded.into()
     }
 
     pub fn verify(&self, data: &[u8], signature: &p256::ecdsa::Signature) -> bool {

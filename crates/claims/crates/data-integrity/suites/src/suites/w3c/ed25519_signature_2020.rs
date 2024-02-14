@@ -7,9 +7,7 @@
 use futures::FutureExt;
 use multibase::Base;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{Ed25519VerificationKey2020, SignatureError, VerificationError};
 use static_iref::iri;
 

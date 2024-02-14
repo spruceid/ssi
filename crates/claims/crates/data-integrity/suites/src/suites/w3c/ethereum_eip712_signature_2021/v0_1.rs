@@ -4,7 +4,6 @@ use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
-    ProofConfigurationRef,
 };
 use ssi_verification_methods::SignatureError;
 use static_iref::{iri, iri_ref};
@@ -14,10 +13,10 @@ use crate::eip712::{Eip712Signature, Eip712SignatureRef, TypesProvider};
 use super::{Transform, VerificationMethod, VerificationMethodRef};
 
 lazy_static! {
-    static ref PROOF_CONTEXT: json_ld::syntax::Context = {
-        json_ld::syntax::Context::One(json_ld::syntax::ContextEntry::IriRef(
+    static ref PROOF_CONTEXT: json_ld::syntax::ContextEntry = {
+        json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld").to_owned(),
-        ))
+        )
     };
 }
 
@@ -214,6 +213,10 @@ impl CryptographicSuite for EthereumEip712Signature2021v0_1 {
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
     }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(PROOF_CONTEXT.clone()))
+    }
 }
 
 impl<T: serde::Serialize, C: TypesProvider> CryptographicSuiteInput<T, C>
@@ -237,7 +240,7 @@ where
             data,
             context,
             params.map_options(OptionsRef::into),
-            &PROOF_CONTEXT,
+            // &PROOF_CONTEXT,
             "EthereumEip712Signature2021",
         )
         .await

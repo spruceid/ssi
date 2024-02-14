@@ -221,7 +221,7 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::JwsSignature::new(
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
             )
-        )]
+        ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())]
     );
 
     let vc = Verifiable::new_with(cred, JsonLdEnvironment::default())

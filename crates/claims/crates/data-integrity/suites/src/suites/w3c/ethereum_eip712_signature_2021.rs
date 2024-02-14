@@ -8,7 +8,6 @@ use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
-    ProofConfigurationRef,
 };
 use ssi_jwk::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_verification_methods::{
@@ -28,10 +27,10 @@ use crate::eip712::{
 };
 
 lazy_static! {
-    static ref PROOF_CONTEXT: json_ld::syntax::Context = {
-        json_ld::syntax::Context::One(json_ld::syntax::ContextEntry::IriRef(
+    static ref PROOF_CONTEXT: json_ld::syntax::ContextEntry = {
+        json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://w3id.org/security/suites/eip712sig-2021/v1").to_owned(),
-        ))
+        )
     };
 }
 
@@ -115,7 +114,7 @@ pub struct Eip712Options {
     pub domain: Option<ssi_eip712::Value>,
 }
 
-impl<'a> Eip712Options {
+impl Eip712Options {
     pub fn as_ref(&self) -> Eip712OptionsRef {
         Eip712OptionsRef {
             types: self.types.as_ref(),
@@ -351,6 +350,10 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
     }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(PROOF_CONTEXT.clone()))
+    }
 }
 
 impl<T: serde::Serialize, C: TypesProvider> CryptographicSuiteInput<T, C>
@@ -374,7 +377,7 @@ where
             data,
             context,
             params,
-            &PROOF_CONTEXT,
+            // &PROOF_CONTEXT,
             "EthereumEip712Signature2021",
         )
         .await
@@ -407,7 +410,7 @@ pub struct Transform<'a, C: TypesProvider> {
     primary_type: Option<String>,
     domain: Option<ssi_eip712::Value>,
     message: Option<Result<ssi_eip712::Struct, TransformError>>,
-    proof_context: &'static json_ld::syntax::Context,
+    // proof_context: &'static json_ld::syntax::Context,
     proof_type: &'static str,
 }
 
@@ -416,7 +419,7 @@ impl<'a, C: TypesProvider> Transform<'a, C> {
         data: &'a T,
         context: &'a mut C,
         params: ExpandedConfigurationRef<'c, VerificationMethod, Options>,
-        proof_context: &'static json_ld::syntax::Context,
+        // proof_context: &'static json_ld::syntax::Context,
         proof_type: &'static str,
     ) -> Self {
         let (types, primary_type, domain) = match &params.options.eip712 {
@@ -438,7 +441,7 @@ impl<'a, C: TypesProvider> Transform<'a, C> {
             primary_type,
             domain,
             message: Some(ssi_eip712::to_struct(data).map_err(|_| TransformError::InvalidData)),
-            proof_context,
+            // proof_context,
             proof_type,
         }
     }
@@ -467,7 +470,11 @@ impl<'a, C: TypesProvider> Future for Transform<'a, C> {
 
                     task::Poll::Ready(
                         input
-                            .try_into_typed_data(this.proof_context, this.proof_type, **this.params)
+                            .try_into_typed_data(
+                                // this.proof_context,
+                                this.proof_type,
+                                **this.params,
+                            )
                             .map_err(|_| TransformError::InvalidData),
                     )
                 }

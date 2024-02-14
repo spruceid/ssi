@@ -1,10 +1,8 @@
 use crate::impl_rdf_input_urdna2015;
 
-use super::{Signature, SignatureAlgorithm, VerificationMethod};
+use super::{Signature, SignatureAlgorithm, VerificationMethod, EPSIG_CONTEXT};
 use ssi_crypto::protocol::EthereumWallet;
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_rdf::IntoNQuads;
 use static_iref::iri;
 
@@ -61,5 +59,9 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
+    }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(EPSIG_CONTEXT.clone()))
     }
 }

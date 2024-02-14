@@ -1,7 +1,4 @@
-use std::{borrow::Cow, hash::Hash, ops::Deref};
-
-use grdf::BTreeDataset;
-use linked_data::{LinkedData, LinkedDataResource};
+use linked_data::LinkedData;
 use rdf_types::{
     BlankIdVocabulary, ExportedFromVocabulary, Interpretation, InterpretationMut, IriVocabulary,
     LiteralVocabulary, ReverseBlankIdInterpretation, ReverseIriInterpretation,
@@ -30,7 +27,7 @@ pub trait AnyLdEnvironment {
     /// Returns the list of quads in the dataset.
     ///
     /// The order in which quads are returned is unspecified.
-    fn into_quads<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
+    fn quads_of<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
         &mut self,
         input: &T,
     ) -> Result<Vec<rdf_types::Quad>, linked_data::IntoQuadsError>
@@ -48,7 +45,7 @@ pub trait AnyLdEnvironment {
     }
 
     /// Returns the canonical form of the dataset, in the N-Quads format.
-    fn into_canonical_form<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
+    fn canonical_form_of<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
         &mut self,
         input: &T,
     ) -> Result<String, linked_data::IntoQuadsError>
@@ -61,7 +58,7 @@ pub trait AnyLdEnvironment {
         <Self::Vocabulary as LiteralVocabulary>::Literal:
             ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
     {
-        let quads = self.into_quads(input)?;
+        let quads = self.quads_of(input)?;
         Ok(crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref())).into_nquads())
     }
 }

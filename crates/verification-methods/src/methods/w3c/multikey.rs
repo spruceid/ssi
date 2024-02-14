@@ -213,7 +213,7 @@ impl PublicKey {
     }
 
     pub fn to_jwk(&self) -> JWK {
-        self.decoded.clone().into()
+        self.decoded.into()
     }
 
     pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> bool {

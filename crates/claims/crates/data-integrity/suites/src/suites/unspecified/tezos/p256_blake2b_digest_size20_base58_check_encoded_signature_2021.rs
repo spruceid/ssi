@@ -1,11 +1,9 @@
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature, JwsSignatureRef};
 
-use super::{Options, OptionsRef};
+use super::{Options, OptionsRef, TZ_CONTEXT};
 use iref::Iri;
 use ssi_crypto::MessageSigner;
-use ssi_data_integrity_core::{
-    suite::HashError, CryptographicSuite, ExpandedConfiguration, ProofConfigurationRef,
-};
+use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{
     P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, SignatureError, VerificationError,
 };
@@ -62,6 +60,10 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
+    }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(TZ_CONTEXT.clone()))
     }
 }
 

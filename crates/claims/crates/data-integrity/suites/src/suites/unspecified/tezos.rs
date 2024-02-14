@@ -26,6 +26,14 @@ const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
 const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
 
+lazy_static::lazy_static! {
+    /// JSON-LD context for Linked Data Proofs based on Tezos addresses
+    pub static ref TZ_CONTEXT: json_ld::syntax::ContextEntry = {
+        let context_str = ssi_contexts::TZ_V2;
+        serde_json::from_str(context_str).unwrap()
+    };
+}
+
 #[derive(
     Debug,
     Clone,

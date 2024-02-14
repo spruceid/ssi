@@ -1,4 +1,4 @@
-//! Data Integrity Proofs format for Verifiable Credentals.
+//! Data Integrity Proofs format for Verifiable Credentials.
 
 mod decode;
 mod proof;

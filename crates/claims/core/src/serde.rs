@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use crate::{Proof, Verifiable};
 
 /// Serializable claims.

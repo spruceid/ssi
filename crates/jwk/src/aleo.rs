@@ -89,8 +89,8 @@ pub enum ParsePrivateKeyError {
     PrivateKeyToAddress(#[source] snarkvm_dpc::AccountError),
     #[error("Address mismatch. Computed: {}, expected: {}", .computed, .expected)]
     AddressMismatch {
-        computed: Address<Components>,
-        expected: Address<Components>,
+        computed: Box<Address<Components>>,
+        expected: Box<Address<Components>>,
     },
 }
 
@@ -215,8 +215,8 @@ fn aleo_jwk_to_private_key(jwk: &JWK) -> Result<PrivateKey<Components>, ParsePri
     .map_err(ParsePrivateKeyError::PrivateKeyToAddress)?;
     if address_computed != address {
         return Err(ParsePrivateKeyError::AddressMismatch {
-            computed: address_computed,
-            expected: address,
+            computed: Box::new(address_computed),
+            expected: Box::new(address),
         });
     }
     Ok(private_key)
