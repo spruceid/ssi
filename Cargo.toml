@@ -58,10 +58,8 @@ members = [
   "crates/dids/methods/*",
   "crates/claims/core",
   "crates/claims/crates/*",
-  "crates/claims/crates/vc/core",
-  "crates/claims/crates/vc/data-integrity",
-  "crates/claims/crates/vc/data-integrity/core",
-  "crates/claims/crates/vc/data-integrity/suites",
+  "crates/claims/crates/data-integrity/core",
+  "crates/claims/crates/data-integrity/suites",
   "vc-test",
   # "ssi-sd-jwt",
 ]
@@ -74,7 +72,6 @@ ssi-verification-methods-core = { path = "./crates/verification-methods/core", v
 ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1" }
 ssi-jwk = { path = "./crates/jwk", version = "0.1", default-features = false }
 ssi-jws = { path = "./crates/jws", version = "0.1", default-features = false }
-ssi-jwt = { path = "./crates/jwt", version = "0.1" }
 ssi-tzkey = { path = "./crates/tzkey", version = "0.1" }
 ssi-eip712 = { path = "./crates/eip712", version = "0.1" }
 ssi-rdf = { path = "./crates/rdf", version = "0.1" }
@@ -85,11 +82,11 @@ ssi-caips = { path = "./crates/caips", version = "0.1" }
 
 # Verifiable Claims
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1" }
-ssi-vc-core = { path = "./crates/claims/crates/vc/core", version = "0.1" }
-ssi-vc-data-integrity-core = { path = "./crates/claims/crates/vc/data-integrity/core", version = "0.1" }
-ssi-vc-data-integrity-suites = { path = "./crates/claims/crates/vc/data-integrity/suites", version = "0.1" }
-ssi-vc-data-integrity = { path = "./crates/claims/crates/vc/data-integrity", version = "0.1" }
+ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.1" }
 ssi-vc = { path = "./crates/claims/crates/vc", version = "0.1" }
+ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1" }
+ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1" }
+ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.1" }
 ssi-claims = { path = "./crates/claims", version = "0.1" }
 
 # DID methods

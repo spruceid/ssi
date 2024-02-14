@@ -2,12 +2,13 @@ use did_tz::DIDTz;
 use iref::{IriBuf, UriBuf};
 use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
-use ssi_claims::vc::{
+use ssi_claims::{
     data_integrity::{
         verification::method::{signer::SingleSecretSigner, ProofPurpose},
         AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration,
     },
-    Claims, JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation,
+    vc::{JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation},
+    Verifiable,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier};
 use ssi_json_ld::JsonLdEnvironment;
@@ -209,28 +210,28 @@ async fn credential_prove_verify_did_tz1() {
         vec![json_syntax::json!({
             "id": "did:example:foo"
         })],
-        vec![ssi_claims::vc::data_integrity::Proof::new(
-            ssi_claims::vc::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+        vec![ssi_claims::data_integrity::Proof::new(
+            ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             "2021-03-02T18:59:44.462Z".parse().unwrap(),
             iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
             ProofPurpose::Assertion,
-            ssi_claims::vc::data_integrity::suites::tezos::Options::new(
+            ssi_claims::data_integrity::suites::tezos::Options::new(
                 r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
             ),
-            ssi_claims::vc::data_integrity::suites::JwsSignature::new(
+            ssi_claims::data_integrity::suites::JwsSignature::new(
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
             )
         )]
     );
 
-    let vc = Claims::new_with(cred, JsonLdEnvironment::default())
+    let vc = Verifiable::new_with(cred, JsonLdEnvironment::default())
         .await
         .unwrap();
 
     assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // test that issuer property is used for verification
-    let vc_bad_issuer = Claims::tamper(vc.clone(), JsonLdEnvironment::default(), |mut cred| {
+    let vc_bad_issuer = Verifiable::tamper(vc.clone(), JsonLdEnvironment::default(), |mut cred| {
         cred.issuer = uri!("did:example:bad").to_owned().into();
         cred
     })
@@ -242,8 +243,8 @@ async fn credential_prove_verify_did_tz1() {
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer = SingleSecretSigner::new(&didtz, JWK::generate_ed25519().unwrap());
     let vc_wrong_key =
-    ssi_claims::vc::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021.sign(
-        vc.claims().credential().clone(),
+    ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021.sign(
+        vc.claims().clone(),
         JsonLdEnvironment::default(),
         &wrong_signer,
         vc.proof().first().unwrap().clone_configuration()
@@ -256,21 +257,21 @@ async fn credential_prove_verify_did_tz1() {
         Some(uri!("http://example.org/presentations/3731").to_owned()),
         vec![vc],
         vec![did.into()],
-        vec![ssi_claims::vc::data_integrity::Proof::new(
-            ssi_claims::vc::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
+        vec![ssi_claims::data_integrity::Proof::new(
+            ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             "2021-03-02T19:05:08.271Z".parse().unwrap(),
             iri!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq#blockchainAccountId").to_owned().into(),
             ProofPurpose::Authentication,
-            ssi_claims::vc::data_integrity::suites::tezos::Options::new(
+            ssi_claims::data_integrity::suites::tezos::Options::new(
                 r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
             ),
-            ssi_claims::vc::data_integrity::suites::JwsSignature::new(
+            ssi_claims::data_integrity::suites::JwsSignature::new(
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
             )
         )]
     );
 
-    let vp = Claims::new_with(presentation, JsonLdEnvironment::default())
+    let vp = Verifiable::new_with(presentation, JsonLdEnvironment::default())
         .await
         .unwrap();
 
@@ -289,7 +290,7 @@ async fn credential_prove_verify_did_tz1() {
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let vp2 = Claims::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
+    let vp2 = Verifiable::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
         pres.holders = vec![did!("did:example:bad").to_owned().into()];
         pres
     })
@@ -338,7 +339,7 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // Test that issuer property is used for verification.
-    let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+    let vc_bad_issuer = Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
         cred.issuer = uri!("did:example:bad").to_owned().into();
         cred
     })
@@ -351,7 +352,7 @@ async fn credential_prove_verify_did_tz2() {
         SingleSecretSigner::new(&didtz, JWK::generate_secp256k1_from(&mut rng).unwrap());
     let vc_wrong_key = suite
         .sign(
-            vc.claims().credential().clone(),
+            vc.claims().clone(),
             AnyInputContext::default(),
             &wrong_signer,
             vc.proof().first().unwrap().clone_configuration(),
@@ -405,7 +406,7 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let vp2 = Claims::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
+    let vp2 = Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
         pres.holders = vec![did!("did:example:bad").to_owned().into()];
         pres
     })
@@ -455,7 +456,7 @@ async fn credential_prove_verify_did_tz3() {
     assert!(vc.verify(&didtz).await.unwrap().is_valid());
 
     // Test that issuer property is used for verification.
-    let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+    let vc_bad_issuer = Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
         cred.issuer = uri!("did:example:bad").to_owned().into();
         cred
     })
@@ -467,7 +468,7 @@ async fn credential_prove_verify_did_tz3() {
     let wrong_signer = SingleSecretSigner::new(&didtz, JWK::generate_p256_from(&mut rng));
     let vc_wrong_key = suite
         .sign(
-            vc.claims().credential().clone(),
+            vc.claims().clone(),
             AnyInputContext::default(),
             &wrong_signer,
             vc.proof().first().unwrap().clone_configuration(),
@@ -523,7 +524,7 @@ async fn credential_prove_verify_did_tz3() {
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let vp2 = Claims::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
+    let vp2 = Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
         pres.holders = vec![did!("did:example:bad").to_owned().into()];
         pres
     })

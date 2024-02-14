@@ -15,17 +15,17 @@ use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use ssi_claims::{vc::data_integrity::AnyProof, ProofValidity, Verifiable};
+use ssi_claims::{data_integrity::AnyProof, ProofValidity, Verifiable};
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
 
-use ssi_claims::vc::{
+use ssi_claims::{
     data_integrity::{
         signing, verification::method::Signer, AnyInputContext, AnySignatureProtocol, AnySuite,
         AnySuiteOptions, CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfiguration,
         ProofConfigurationExpansion, ProofConfigurationRefExpansion, ProofPreparationError,
     },
-    verification::{ExtractProofs, MergeWithProofs},
-    Claims, Context, RequiredContext, Validate, VerifiableClaims,
+    vc::{Context, RequiredContext},
+    ExtractProof, MergeWithProof, Validate, VerifiableClaims,
 };
 use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationError, Verifier};
 use static_iref::iri;
@@ -101,33 +101,28 @@ impl<C, P> Delegation<C, P> {
 
     pub fn validate_invocation<S>(
         &self,
-        invocation: &Verifiable<Claims<Invocation<S>, AnyProof>>,
+        invocation: &Verifiable<Invocation<S>, AnyProof>,
     ) -> Result<(), InvocationValidationError> {
-        if invocation.proof().is_empty() {
-            Err(InvocationValidationError::MissingProof)
-        } else {
-            for proof in invocation.proof() {
-                let id: &Uri = proof
-                    .extra_properties()
-                    .get("capability")
-                    .and_then(json_syntax::Value::as_str)
-                    .ok_or(InvocationValidationError::MissingTargetId)?
-                    .try_into()
-                    .map_err(|_| InvocationValidationError::IdMismatch)?;
+        let id: &Uri = invocation
+            .proof()
+            .extra_properties()
+            .get("capability")
+            .and_then(json_syntax::Value::as_str)
+            .ok_or(InvocationValidationError::MissingTargetId)?
+            .try_into()
+            .map_err(|_| InvocationValidationError::IdMismatch)?;
 
-                if id != &self.id {
-                    return Err(InvocationValidationError::IdMismatch);
-                };
+        if id != &self.id {
+            return Err(InvocationValidationError::IdMismatch);
+        };
 
-                if let Some(invoker) = &self.invoker {
-                    if invoker.as_iri() != proof.configuration().verification_method.id() {
-                        return Err(InvocationValidationError::IncorrectInvoker);
-                    }
-                }
+        if let Some(invoker) = &self.invoker {
+            if invoker.as_iri() != invocation.proof().configuration().verification_method.id() {
+                return Err(InvocationValidationError::IncorrectInvoker);
             }
-
-            Ok(())
         }
+
+        Ok(())
     }
 
     /// Sign the delegation.
@@ -137,7 +132,7 @@ impl<C, P> Delegation<C, P> {
         signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
         proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Claims<Self, AnyProof>>, signing::Error>
+    ) -> Result<Verifiable<Self, AnyProof>, signing::Error>
     where
         C: Serialize,
         P: Serialize,
@@ -160,7 +155,7 @@ impl<C, P> Delegation<C, P> {
         signer: &impl Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
         mut proof_configuration: ProofConfiguration<S::VerificationMethod, S::Options>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Claims<Self, Proof<S>>>, signing::Error<E::LoadError>>
+    ) -> Result<Verifiable<Self, Proof<S>>, signing::Error<E::LoadError>>
     where
         S: CryptographicSuiteInput<Self, E>,
         E: ProofConfigurationExpansion + for<'a> ProofConfigurationRefExpansion<'a, S>,
@@ -175,7 +170,7 @@ impl<C, P> Delegation<C, P> {
         }
 
         suite
-            .sign(self, environment, signer, proof_configuration)
+            .sign_single(self, environment, signer, proof_configuration)
             .await
     }
 }
@@ -229,12 +224,11 @@ pub struct VerifiableDelegation<C, P = DefaultProps<String>> {
     delegation: Delegation<C, P>,
 
     /// Data-Integrity Proof.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof: Option<AnyProof>,
+    pub proof: AnyProof,
 }
 
 impl<C, P> VerifiableDelegation<C, P> {
-    pub fn new(delegation: Delegation<C, P>, proof: Option<AnyProof>) -> Self {
+    pub fn new(delegation: Delegation<C, P>, proof: AnyProof) -> Self {
         Self { delegation, proof }
     }
 }
@@ -254,18 +248,16 @@ pub enum DelegationVerificationError {
 impl<C, P> VerifiableDelegation<C, P> {
     pub async fn into_verifiable_claims(
         self,
-    ) -> Result<Verifiable<Claims<Delegation<C, P>, AnyProof>>, DelegationVerificationError>
+    ) -> Result<Verifiable<Delegation<C, P>, AnyProof>, DelegationVerificationError>
     where
         C: Serialize,
         P: Serialize,
     {
-        if let Some(proof) = &self.proof {
-            if proof.configuration().proof_purpose != ProofPurpose::CapabilityDelegation {
-                return Err(DelegationVerificationError::InvalidProofPurpose);
-            }
+        if self.proof.configuration().proof_purpose != ProofPurpose::CapabilityDelegation {
+            return Err(DelegationVerificationError::InvalidProofPurpose);
         }
 
-        Claims::new(self).await.map_err(Into::into)
+        Verifiable::new(self).await.map_err(Into::into)
     }
 
     pub async fn verify(
@@ -292,27 +284,21 @@ impl<C, P> Deref for VerifiableDelegation<C, P> {
 impl<C, P> VerifiableClaims for VerifiableDelegation<C, P> {
     type Proof = AnyProof;
 
-    fn proofs(&self) -> &[Self::Proof] {
-        match &self.proof {
-            Some(p) => std::slice::from_ref(p),
-            None => &[],
-        }
+    fn proof(&self) -> &Self::Proof {
+        &self.proof
     }
 }
 
-impl<C, P> ExtractProofs for VerifiableDelegation<C, P> {
+impl<C, P> ExtractProof for VerifiableDelegation<C, P> {
     type Proofless = Delegation<C, P>;
 
-    fn extract_proofs(self) -> (Self::Proofless, Vec<Self::Proof>) {
-        (self.delegation, self.proof.into_iter().collect())
+    fn extract_proof(self) -> (Self::Proofless, Self::Proof) {
+        (self.delegation, self.proof)
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum InvocationValidationError {
-    #[error("No applicable proof")]
-    MissingProof,
-
     #[error("Target Capability IDs don't match")]
     IdMismatch,
 
@@ -363,9 +349,9 @@ impl<P> Invocation<P> {
             .extra_properties
             .insert("capability".into(), json_syntax::to_value(target).unwrap());
 
-        Ok(Claims::unprepare(
+        Ok(Verifiable::unprepare(
             suite
-                .sign(
+                .sign_single(
                     self,
                     AnyInputContext::default(),
                     signer,
@@ -382,13 +368,13 @@ impl<P> WithJsonLdContext for Invocation<P> {
     }
 }
 
-impl<P> MergeWithProofs<AnyProof> for Invocation<P> {
+impl<P> MergeWithProof<AnyProof> for Invocation<P> {
     type WithProofs = VerifiableInvocation<P>;
 
-    fn merge_with_proofs(self, proofs: Vec<AnyProof>) -> Self::WithProofs {
+    fn merge_with_proof(self, proof: AnyProof) -> Self::WithProofs {
         VerifiableInvocation {
             invocation: self,
-            proof: proofs.into_iter().next(),
+            proof,
         }
     }
 }
@@ -431,11 +417,11 @@ pub struct VerifiableInvocation<P> {
     #[serde(flatten)]
     invocation: Invocation<P>,
 
-    pub proof: Option<AnyProof>,
+    pub proof: AnyProof,
 }
 
 impl<P> VerifiableInvocation<P> {
-    pub fn new(invocation: Invocation<P>, proof: Option<AnyProof>) -> Self {
+    pub fn new(invocation: Invocation<P>, proof: AnyProof) -> Self {
         Self { invocation, proof }
     }
 }
@@ -445,17 +431,15 @@ impl<P> VerifiableInvocation<P> {
         self,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, Q>,
-    ) -> Result<Verifiable<Claims<Invocation<P>, AnyProof>>, InvocationVerificationError>
+    ) -> Result<Verifiable<Invocation<P>, AnyProof>, InvocationVerificationError>
     where
         P: Serialize,
     {
-        if let Some(proof) = &self.proof {
-            if proof.configuration().proof_purpose != ProofPurpose::CapabilityInvocation {
-                return Err(InvocationVerificationError::InvalidProofPurpose);
-            }
+        if self.proof.configuration().proof_purpose != ProofPurpose::CapabilityInvocation {
+            return Err(InvocationVerificationError::InvalidProofPurpose);
         }
 
-        let vc = Claims::new(self).await?;
+        let vc = Verifiable::new(self).await?;
         target_capability.validate_invocation(&vc)?;
         Ok(vc)
     }
@@ -494,19 +478,16 @@ impl<P> DerefMut for VerifiableInvocation<P> {
 impl<P> VerifiableClaims for VerifiableInvocation<P> {
     type Proof = AnyProof;
 
-    fn proofs(&self) -> &[Self::Proof] {
-        match &self.proof {
-            Some(p) => std::slice::from_ref(p),
-            None => &[],
-        }
+    fn proof(&self) -> &Self::Proof {
+        &self.proof
     }
 }
 
-impl<P> ExtractProofs for VerifiableInvocation<P> {
+impl<P> ExtractProof for VerifiableInvocation<P> {
     type Proofless = Invocation<P>;
 
-    fn extract_proofs(self) -> (Self::Proofless, Vec<Self::Proof>) {
-        (self.invocation, self.proof.into_iter().collect())
+    fn extract_proof(self) -> (Self::Proofless, Self::Proof) {
+        (self.invocation, self.proof)
     }
 }
 
@@ -528,9 +509,9 @@ pub enum InvocationVerificationError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ssi_claims::UnprepareProof;
     use ssi_dids_core::{example::ExampleDIDResolver, DIDVerifier};
     use ssi_jwk::JWK;
-    use ssi_vc::verification::UnprepareProof;
     use ssi_verification_methods::signer::SingleSecretSigner;
     use static_iref::uri;
 
@@ -664,9 +645,9 @@ mod tests {
         let bad_sig_del = VerifiableDelegation::new(
             Delegation {
                 invoker: Some(uri!("did:someone_else").to_owned()),
-                ..signed_del.claims().value().clone()
+                ..signed_del.claims().clone()
             },
-            Some(signed_del.proof().first().unwrap().clone().unprepare()),
+            signed_del.proof().clone().unprepare(),
         );
         let mut bad_sig_inv = signed_inv.clone();
         bad_sig_inv.id = uri!("urn:different_id").to_owned();

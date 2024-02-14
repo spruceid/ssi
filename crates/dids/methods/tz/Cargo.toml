@@ -36,7 +36,7 @@ features = ["json", "native-tls-vendored"]
 [dev-dependencies]
 ssi-tzkey.workspace = true
 # ssi-vc.workspace = true
-# ssi-vc-data-integrity.workspace = true
+# ssi-data-integrity.workspace = true
 ssi-claims = { workspace = true, features = ["tezos", "dif", "secp256k1"] }
 ssi-json-ld.workspace = true
 json-syntax.workspace = true

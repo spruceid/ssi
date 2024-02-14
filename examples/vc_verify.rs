@@ -9,7 +9,7 @@ async fn main() {
     let credential_content = fs::read_to_string("examples/files/vc.jsonld").unwrap();
 
     // All of the above can be done with the following helper function.
-    let vc = ssi::claims::vc::data_integrity::any_credential_from_json_str(&credential_content)
+    let vc = ssi::claims::data_integrity::any_credential_from_json_str(&credential_content)
         .await
         .unwrap();
 

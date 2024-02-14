@@ -136,12 +136,13 @@ impl DIDMethodResolver for DIDWeb {
 
 #[cfg(test)]
 mod tests {
-    use ssi_claims::vc::{
+    use ssi_claims::{
         data_integrity::{
             verification::method::{signer::SingleSecretSigner, ProofPurpose},
             AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
         },
-        Claims, JsonCredential,
+        vc::JsonCredential,
+        Verifiable,
     };
     use ssi_dids_core::{did, DIDResolver, DIDVerifier, Document};
     use ssi_jwk::JWK;
@@ -269,6 +270,7 @@ mod tests {
             verification_method,
             proof_purpose: ProofPurpose::Assertion,
             options: Default::default(),
+            extra_properties: Default::default(),
         };
         let signer = SingleSecretSigner::new(&didweb, key);
         let vc = suite
@@ -284,12 +286,13 @@ mod tests {
         assert!(vc.verify(&didweb).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-            cred
-        })
-        .await
-        .unwrap();
+        let vc_bad_issuer =
+            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+                cred
+            })
+            .await
+            .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didweb).await.unwrap().is_invalid());
 

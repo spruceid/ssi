@@ -23,7 +23,7 @@ features = ["native-tls-vendored"]
 
 [dev-dependencies]
 ssi-claims.workspace = true
-# ssi-vc-data-integrity.workspace = true
+# ssi-data-integrity.workspace = true
 ssi-jwk.workspace = true
 linked-data.workspace = true
 serde = { workspace = true, features = ["derive"] }

@@ -375,7 +375,7 @@ mod tests {
     use super::*;
     use iref::IriBuf;
     use serde_json::json;
-    use ssi_claims::vc::{
+    use ssi_claims::{
         data_integrity::{
             verification::{
                 method::{signer::SingleSecretSigner, ProofPurpose},
@@ -384,7 +384,8 @@ mod tests {
             AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput,
             ProofConfiguration,
         },
-        Claims, JsonCredential, JsonPresentation,
+        vc::{JsonCredential, JsonPresentation},
+        Verifiable,
     };
     use ssi_dids_core::{did, DIDResolver, DIDVerifier};
     use ssi_jwk::JWK;
@@ -512,6 +513,7 @@ mod tests {
             verification_method,
             proof_purpose: ProofPurpose::Assertion,
             options: AnySuiteOptions::default(),
+            extra_properties: Default::default(),
         };
 
         eprintln!("vm {:?}", issue_options.verification_method);
@@ -537,12 +539,13 @@ mod tests {
         assert!(vc.verify(&didethr).await.unwrap().is_valid());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-            cred
-        })
-        .await
-        .unwrap();
+        let vc_bad_issuer =
+            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+                cred
+            })
+            .await
+            .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_invalid());
 
@@ -577,6 +580,7 @@ mod tests {
             created: "2021-02-18T20:23:13Z".parse().unwrap(),
             proof_purpose: ProofPurpose::Authentication,
             options: AnySuiteOptions::default(),
+            extra_properties: Default::default(),
         };
 
         let vp = suite
@@ -616,7 +620,7 @@ mod tests {
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // test that holder is verified
-        let vp_bad_holder = Claims::tamper(vp, AnyInputContext::default(), |mut pres| {
+        let vp_bad_holder = Verifiable::tamper(vp, AnyInputContext::default(), |mut pres| {
             pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
             pres
         })
@@ -629,7 +633,7 @@ mod tests {
     #[tokio::test]
     async fn credential_verify_eip712vm() {
         let didethr = DIDVerifier::new(DIDEthr);
-        let vc = ssi_claims::vc::data_integrity::any_credential_from_json_str(include_str!(
+        let vc = ssi_claims::data_integrity::any_credential_from_json_str(include_str!(
             "../tests/vc.jsonld"
         ))
         .await

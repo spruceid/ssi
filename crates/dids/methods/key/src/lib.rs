@@ -369,18 +369,19 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
 mod tests {
     use rand_chacha::rand_core::SeedableRng as SeedableRngOld;
     use rand_chacha_old::rand_core::SeedableRng;
-    use ssi_claims::vc::{
+    use ssi_claims::{
         data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions},
-        Claims, JsonCredential,
+        vc::JsonCredential,
+        Verifiable,
     };
-    use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier, DIDURL};
-    use ssi_vc_data_integrity::{
+    use ssi_data_integrity::{
         verification::{
             method::{signer::SingleSecretSigner, ProofPurpose},
             MethodReferenceOrOwned,
         },
         CryptographicSuiteInput, ProofConfiguration,
     };
+    use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier, DIDURL};
     use static_iref::uri;
 
     use super::*;
@@ -557,6 +558,7 @@ mod tests {
             verification_method: verification_method_ref,
             proof_purpose: ProofPurpose::Assertion,
             options: AnySuiteOptions::default(),
+            extra_properties: Default::default(),
         };
         let signer = SingleSecretSigner::new(&didkey, key);
         let vc = suite
@@ -571,12 +573,13 @@ mod tests {
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
-        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-            cred
-        })
-        .await
-        .unwrap();
+        let vc_bad_issuer =
+            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+                cred
+            })
+            .await
+            .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_invalid());
     }
@@ -614,6 +617,7 @@ mod tests {
             verification_method: verification_method_ref,
             proof_purpose: ProofPurpose::Assertion,
             options: AnySuiteOptions::default(),
+            extra_properties: Default::default(),
         };
         let signer = SingleSecretSigner::new(&didkey, key);
         let vc = suite
@@ -628,12 +632,13 @@ mod tests {
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
-        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-            cred
-        })
-        .await
-        .unwrap();
+        let vc_bad_issuer =
+            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+                cred
+            })
+            .await
+            .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_invalid());
     }
@@ -671,6 +676,7 @@ mod tests {
             verification_method: verification_method_ref,
             proof_purpose: ProofPurpose::Assertion,
             options: AnySuiteOptions::default(),
+            extra_properties: Default::default(),
         };
         let signer = SingleSecretSigner::new(&didkey, key);
         let vc = suite
@@ -684,12 +690,13 @@ mod tests {
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
-        let vc_bad_issuer = Claims::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-            cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-            cred
-        })
-        .await
-        .unwrap();
+        let vc_bad_issuer =
+            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
+                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
+                cred
+            })
+            .await
+            .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_invalid());
     }

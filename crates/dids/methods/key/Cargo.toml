@@ -39,7 +39,7 @@ p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
 
 [dev-dependencies]
 ssi-claims.workspace = true
-ssi-vc-data-integrity.workspace = true
+ssi-data-integrity.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true
 json-syntax.workspace = true
