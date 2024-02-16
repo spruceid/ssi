@@ -32,6 +32,16 @@ lazy_static::lazy_static! {
         let context_str = ssi_contexts::TZ_V2;
         serde_json::from_str(context_str).unwrap()
     };
+
+    pub static ref TZVM_CONTEXT: json_ld::syntax::ContextEntry = {
+        let context_str = ssi_contexts::TZVM_V1;
+        serde_json::from_str(context_str).unwrap()
+    };
+
+    pub static ref TZJCSVM_CONTEXT: json_ld::syntax::ContextEntry = {
+        let context_str = ssi_contexts::TZJCSVM_V1;
+        serde_json::from_str(context_str).unwrap()
+    };
 }
 
 #[derive(

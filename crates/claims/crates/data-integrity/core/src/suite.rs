@@ -12,9 +12,9 @@ use std::convert::Infallible;
 use crate::{
     sign,
     signing::{self, sign_single},
-    ExpandedConfiguration, ExpandedConfigurationRef, Proof, ProofConfiguration,
-    ProofConfigurationCastError, ProofConfigurationRefExpansion, Proofs, UntypedProof,
-    UntypedProofRef,
+    ExpandedConfiguration, ExpandedConfigurationRef, ExpandedType, Proof, ProofConfiguration,
+    ProofConfigurationCastError, ProofConfigurationRefExpansion, ProofRef, Proofs,
+    UnsupportedProofSuite,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -26,7 +26,7 @@ pub enum TransformError {
     LinkedData(#[from] linked_data::IntoQuadsError),
 
     #[error("JSON serialization failed: {0}")]
-    JsonSerialization(serde_json::Error),
+    JsonSerialization(json_syntax::SerializeError),
 
     #[error("expected JSON object")] // TODO merge it with `InvalidData`.
     ExpectedJsonObject,
@@ -159,6 +159,17 @@ pub trait CryptographicSuite: Sized {
 
     fn iri(&self) -> &Iri;
 
+    fn refine_type(&mut self, type_: &Iri) -> Result<(), UnsupportedProofSuite> {
+        if type_ == self.iri() {
+            Ok(())
+        } else {
+            Err(UnsupportedProofSuite::Expanded(ExpandedType {
+                iri: type_.to_owned(),
+                cryptosuite: self.cryptographic_suite().map(ToOwned::to_owned),
+            }))
+        }
+    }
+
     fn cryptographic_suite(&self) -> Option<&str>;
 
     /// Hashing algorithm.
@@ -176,14 +187,11 @@ pub trait CryptographicSuite: Sized {
 
     #[allow(async_fn_in_trait)]
     async fn generate_proof<'a, S>(
-        &'a self,
+        self,
         data: &'a Self::Hashed,
         signer: &'a S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<
-        UntypedProof<Self::VerificationMethod, Self::Options, Self::Signature>,
-        SignatureError,
-    >
+    ) -> Result<Proof<Self>, SignatureError>
     where
         S: Signer<
             Self::VerificationMethod,
@@ -202,7 +210,7 @@ pub trait CryptographicSuite: Sized {
             )
             .await?;
 
-        Ok(params.into_proof(signature))
+        Ok(params.into_proof(self, signature))
     }
 
     #[allow(async_fn_in_trait)]
@@ -210,7 +218,7 @@ pub trait CryptographicSuite: Sized {
         &self,
         data: &'a Self::Hashed,
         verifier: &'a V,
-        proof: UntypedProofRef<'p, Self::VerificationMethod, Self::Options, Self::Signature>,
+        proof: ProofRef<'a, Self>,
     ) -> Result<ProofValidity, VerificationError> {
         let algorithm = self.setup_signature_algorithm();
         verifier

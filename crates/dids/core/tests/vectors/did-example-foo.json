@@ -27,11 +27,7 @@
       "id": "did:example:foo#key2",
       "type": "Ed25519VerificationKey2018",
       "controller": "did:example:foo",
-      "publicKeyJwk": {
-        "kty": "OKP",
-        "crv": "Ed25519",
-        "x": "G80iskrv_nE69qbGLSpeOHJgmV4MKIzsy5l5iT6pCww"
-      }
+      "publicKeyBase58": "2sXRz2VfrpySNEL6xmXJWQg6iY94qwNp1qrJJFBuPWmH"
     },
     {
       "id": "did:example:foo#key3",

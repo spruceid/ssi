@@ -74,6 +74,7 @@ json-ld.workspace = true
 linked-data.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+json-syntax.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]

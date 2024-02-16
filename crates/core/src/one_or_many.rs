@@ -129,3 +129,11 @@ impl<'a, T> IntoIterator for &'a OneOrMany<T> {
         }
     }
 }
+
+/// One or many reference(s).
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum OneOrManyRef<'a, T> {
+    One(&'a T),
+    Many(&'a [T]),
+}

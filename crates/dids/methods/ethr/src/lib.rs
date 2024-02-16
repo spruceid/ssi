@@ -531,9 +531,9 @@ mod tests {
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
         if eip712 {
-            assert_eq!(vc.proof().first().unwrap().signature().proof_value.as_deref().unwrap(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
+            assert_eq!(vc.proof().first().unwrap().signature.proof_value.as_deref().unwrap(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
         } else {
-            assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
+            assert_eq!(vc.proof().first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
         assert!(vc.verify(&didethr).await.unwrap().is_valid());
 
@@ -596,20 +596,14 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        if let Some(value) = &mut vp_fuzzed
-            .proof_mut()
-            .first_mut()
-            .unwrap()
-            .signature_mut()
-            .jws
-        {
+        if let Some(value) = &mut vp_fuzzed.proof_mut().first_mut().unwrap().signature.jws {
             *value = format!("{value}ff").try_into().unwrap()
         }
         if let Some(value) = &mut vp_fuzzed
             .proof_mut()
             .first_mut()
             .unwrap()
-            .signature_mut()
+            .signature
             .proof_value
         {
             value.push_str("ff");

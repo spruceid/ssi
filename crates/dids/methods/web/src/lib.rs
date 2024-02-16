@@ -281,7 +281,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
+        assert_eq!(vc.proof().first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
         assert!(vc.verify(&didweb).await.unwrap().is_valid());
 
         // test that issuer property is used for verification

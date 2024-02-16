@@ -1,4 +1,5 @@
 use iref::Iri;
+use json_syntax::Print;
 use lazy_static::lazy_static;
 use serde::Serialize;
 use ssi_core::{covariance_rule, Referencable};
@@ -14,7 +15,7 @@ use ssi_verification_methods::{SignatureError, TezosMethod2021, VerificationErro
 use static_iref::iri;
 
 use super::{decode_jwk_from_multibase, TezosWallet};
-pub use super::{Signature, SignatureRef};
+pub use super::{Signature, SignatureRef, TZJCSVM_CONTEXT};
 
 pub const TZ_JCS_PROOF_CONTEXT_STR: &str = include_str!("tzjcsvm-2021-v1.jsonld");
 
@@ -79,16 +80,16 @@ impl<C, T: Serialize> CryptographicSuiteInput<T, C> for TezosJcsSignature2021 {
 fn transform<C, T: Serialize>(
     data: &T,
     _context: C,
-) -> Result<serde_json::Map<String, serde_json::Value>, TransformError> {
-    let json = serde_json::to_value(data).map_err(TransformError::JsonSerialization)?;
+) -> Result<json_syntax::Object, TransformError> {
+    let json = json_syntax::to_value(data).map_err(TransformError::JsonSerialization)?;
     match json {
-        serde_json::Value::Object(obj) => Ok(obj),
+        json_syntax::Value::Object(obj) => Ok(obj),
         _ => Err(TransformError::ExpectedJsonObject),
     }
 }
 
 impl CryptographicSuite for TezosJcsSignature2021 {
-    type Transformed = serde_json::Map<String, serde_json::Value>;
+    type Transformed = json_syntax::Object;
     type Hashed = Vec<u8>;
 
     type VerificationMethod = TezosMethod2021;
@@ -117,7 +118,7 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 
     fn hash(
         &self,
-        mut data: serde_json::Map<String, serde_json::Value>,
+        mut data: json_syntax::Object,
         proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         #[derive(Serialize)]
@@ -133,15 +134,19 @@ impl CryptographicSuite for TezosJcsSignature2021 {
             proof_configuration: ExpandedConfiguration<'a, M, O>,
         }
 
-        let json_proof_configuration = serde_json::to_value(ProofConfigurationWithContext {
+        let json_proof_configuration = json_syntax::to_value(ProofConfigurationWithContext {
             context: &TZ_JCS_PROOF_CONTEXT,
             type_: "TezosJcsSignature2021",
             proof_configuration,
         })
         .unwrap();
 
-        data.insert("proof".to_string(), json_proof_configuration);
-        let msg = serde_jcs::to_string(&data).unwrap();
+        data.insert("proof".into(), json_proof_configuration);
+        data.canonicalize();
+        let msg = json_syntax::Value::Object(data).compact_print().to_string();
+
+        eprintln!("unencoded message: {msg}");
+
         match ssi_tzkey::encode_tezos_signed_message(&msg) {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
@@ -150,6 +155,10 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
+    }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(TZJCSVM_CONTEXT.clone()))
     }
 }
 

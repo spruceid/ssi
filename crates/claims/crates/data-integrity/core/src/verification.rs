@@ -38,7 +38,7 @@ impl<T, S: CryptographicSuite, V: Verifier<S::VerificationMethod>>
     ) -> Result<ssi_claims_core::ProofValidity, Self::Error> {
         let suite = self.proof().suite();
         suite
-            .verify_proof(self.hash(), verifier, self.proof().untyped().borrowed())
+            .verify_proof(self.hash(), verifier, self.proof().borrowed())
             .await
     }
 }

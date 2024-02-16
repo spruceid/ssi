@@ -264,9 +264,7 @@ where
     let document_quads: Vec<_> =
         ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref()))
             .collect();
-    let proof_quads = options.quads();
-    let proof_quads: Vec<_> =
-        ssi_rdf::urdna2015::normalize(proof_quads.iter().map(|quad| quad.as_quad_ref())).collect();
+    let proof_quads = options.quads().collect();
     Ok(new_ldp_siging_request(document_quads, proof_quads))
 }
 

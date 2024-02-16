@@ -1,4 +1,5 @@
 use ssi_claims_core::serde::{SerializeVerifiableClaims, SerializeVerifiableClaimsFromSlice};
+use ssi_core::one_or_many::OneOrManyRef;
 use std::fmt;
 use std::ops::{Deref, DerefMut};
 
@@ -147,12 +148,16 @@ where
             #[serde(flatten)]
             claims: &'a T,
 
-            proof: &'a [P],
+            proof: OneOrManyRef<'a, P>,
         }
 
         WithClaims {
             claims,
-            proof: proofs,
+            proof: if proofs.len() == 1 {
+                OneOrManyRef::One(&proofs[0])
+            } else {
+                OneOrManyRef::Many(proofs)
+            },
         }
         .serialize(serializer)
     }

@@ -571,7 +571,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
+        assert_eq!(vc.proof().first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified
@@ -629,7 +629,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
-        assert_eq!(vc.proof().first().unwrap().signature().jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
+        assert_eq!(vc.proof().first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
         assert!(vc.verify(&didkey).await.unwrap().is_valid());
 
         // test that issuer is verified

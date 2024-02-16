@@ -268,7 +268,7 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::JwsSignature::new(
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
             )
-        )]
+        ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())]
     );
 
     let vp = Verifiable::new_with(presentation, JsonLdEnvironment::default())
@@ -281,12 +281,11 @@ async fn credential_prove_verify_did_tz1() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().first_mut().unwrap().signature_mut().jws =
-        CompactJWSString::from_string(format!(
-            "x{}",
-            vp1.proof_mut().first_mut().unwrap().signature_mut().jws
-        ))
-        .unwrap();
+    vp1.proof_mut().first_mut().unwrap().signature.jws = CompactJWSString::from_string(format!(
+        "x{}",
+        vp1.proof_mut().first_mut().unwrap().signature.jws
+    ))
+    .unwrap();
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
@@ -390,16 +389,10 @@ async fn credential_prove_verify_did_tz2() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().first_mut().unwrap().signature_mut().jws = Some(
+    vp1.proof_mut().first_mut().unwrap().signature.jws = Some(
         CompactJWSString::from_string(format!(
             "x{}",
-            vp.proof()
-                .first()
-                .unwrap()
-                .signature()
-                .jws
-                .as_ref()
-                .unwrap()
+            vp.proof().first().unwrap().signature.jws.as_ref().unwrap()
         ))
         .unwrap(),
     );
@@ -508,16 +501,10 @@ async fn credential_prove_verify_did_tz3() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().first_mut().unwrap().signature_mut().jws = Some(
+    vp1.proof_mut().first_mut().unwrap().signature.jws = Some(
         CompactJWSString::from_string(format!(
             "x{}",
-            vp.proof()
-                .first()
-                .unwrap()
-                .signature()
-                .jws
-                .as_ref()
-                .unwrap()
+            vp.proof().first().unwrap().signature.jws.as_ref().unwrap()
         ))
         .unwrap(),
     );

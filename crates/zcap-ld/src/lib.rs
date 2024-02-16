@@ -105,7 +105,7 @@ impl<C, P> Delegation<C, P> {
     ) -> Result<(), InvocationValidationError> {
         let id: &Uri = invocation
             .proof()
-            .extra_properties()
+            .extra_properties
             .get("capability")
             .and_then(json_syntax::Value::as_str)
             .ok_or(InvocationValidationError::MissingTargetId)?
@@ -677,7 +677,6 @@ mod tests {
         assert!(signed_inv
             .verify(signed_wrong_del.claims(), &dk)
             .await
-            .unwrap()
-            .is_invalid());
+            .is_err());
     }
 }

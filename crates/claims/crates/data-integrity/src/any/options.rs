@@ -31,7 +31,6 @@ pub struct AnySuiteOptions {
 
     #[ld("eip712:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "eip712Domain")]
     pub eip712: Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>,
 
     #[ld("eip712v0.1:eip712-domain")]
@@ -135,7 +134,6 @@ pub struct AnySuiteOptionsRef<'a> {
     pub public_key_multibase: Option<&'a Multibase>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(rename = "eip712Domain")]
     pub eip712:
         Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712OptionsRef<'a>>,
 

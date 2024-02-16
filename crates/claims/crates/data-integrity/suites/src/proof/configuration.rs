@@ -251,19 +251,6 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
             options: (),
         }
     }
-
-    /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads<T: CryptographicSuite>(&self, suite: &T) -> Vec<Quad>
-    where
-        M::Reference<'a>:
-            LinkedDataPredicateObjects<interpretation::WithGenerator<generator::Blank>>,
-        O::Reference<'a>: LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
-    {
-        let generator =
-            rdf_types::generator::Blank::new_with_prefix("proofConfiguration:".to_string());
-        let quads = linked_data::to_quads(generator, &self.with_suite(suite)).unwrap();
-        ssi_rdf::urdna2015::normalize(quads.iter().map(Quad::as_quad_ref)).collect()
-    }
 }
 
 impl<'a, M: Referencable, O: 'a + Referencable> Clone for ProofConfigurationRef<'a, M, O> {

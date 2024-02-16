@@ -1,10 +1,9 @@
 #[cfg(feature = "w3c")]
 mod w3c;
 use linked_data::{LinkedDataPredicateObjects, LinkedDataSubject};
-use rdf_types::{generator, interpretation, Quad};
+use rdf_types::{generator, interpretation};
 use ssi_core::Referencable;
 use ssi_data_integrity_core::{CryptographicSuite, ExpandedConfiguration};
-use ssi_rdf::urdna2015;
 #[cfg(feature = "w3c")]
 pub use w3c::*;
 
@@ -28,11 +27,9 @@ where
     <T::Options as Referencable>::Reference<'a>:
         LinkedDataSubject<interpretation::WithGenerator<generator::Blank>>,
 {
-    let proof_config_quads = proof_configuration.quads();
-    let proof_config_normalized_quads =
-        urdna2015::normalize(proof_config_quads.iter().map(Quad::as_quad_ref)).into_nquads();
+    let proof_config_quads = proof_configuration.nquads();
     let proof_config_hash: [u8; 32] =
-        ssi_crypto::hashes::sha256::sha256(proof_config_normalized_quads.as_bytes());
+        ssi_crypto::hashes::sha256::sha256(proof_config_quads.as_bytes());
 
     let transformed_document_hash = ssi_crypto::hashes::sha256::sha256(data);
 

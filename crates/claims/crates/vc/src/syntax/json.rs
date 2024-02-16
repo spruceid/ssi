@@ -445,16 +445,12 @@ impl Serialize for JsonCredentialTypes {
     where
         S: serde::Serializer,
     {
-        if self.0.is_empty() {
-            VERIFIABLE_CREDENTIAL_TYPE.serialize(serializer)
-        } else {
-            let mut seq = serializer.serialize_seq(Some(1 + self.0.len()))?;
-            seq.serialize_element(VERIFIABLE_CREDENTIAL_TYPE)?;
-            for t in &self.0 {
-                seq.serialize_element(t)?;
-            }
-            seq.end()
+        let mut seq = serializer.serialize_seq(Some(1 + self.0.len()))?;
+        seq.serialize_element(VERIFIABLE_CREDENTIAL_TYPE)?;
+        for t in &self.0 {
+            seq.serialize_element(t)?;
         }
+        seq.end()
     }
 }
 
@@ -470,17 +466,6 @@ impl<'de> Deserialize<'de> for JsonCredentialTypes {
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
                 write!(formatter, "credential types")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                if v == VERIFIABLE_CREDENTIAL_TYPE {
-                    Ok(JsonCredentialTypes::default())
-                } else {
-                    Err(E::custom("expected `\"CredentialType\"`"))
-                }
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>

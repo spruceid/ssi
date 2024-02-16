@@ -14,12 +14,11 @@ use rdf_types::{
 use serde::{Deserialize, Serialize};
 use ssi_core::Referencable;
 use ssi_json_ld::AnyJsonLdEnvironment;
+use ssi_rdf::{urdna2015, IntoNQuads};
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
 
-use crate::CryptographicSuite;
-
-use super::UntypedProof;
+use crate::{CryptographicSuite, Proof};
 
 pub const DC_CREATED_IRI: &Iri = iri!("http://purl.org/dc/terms/created");
 
@@ -85,8 +84,20 @@ impl<M, O> ProofConfiguration<M, O> {
         }
     }
 
-    pub fn into_proof<S>(self, signature: S) -> UntypedProof<M, O, S> {
-        UntypedProof::from_configuration(self, signature)
+    pub fn into_proof<S>(self, suite: S, signature: S::Signature) -> Proof<S>
+    where
+        S: CryptographicSuite<VerificationMethod = M, Options = O>,
+    {
+        Proof {
+            context: self.context,
+            type_: suite,
+            created: self.created,
+            verification_method: self.verification_method,
+            proof_purpose: self.proof_purpose,
+            options: self.options,
+            signature,
+            extra_properties: self.extra_properties,
+        }
     }
 
     pub fn borrowed(&self) -> ProofConfigurationRef<M, O>
@@ -314,7 +325,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         context: &json_ld::syntax::Context,
         suite: &S,
         environment: &mut E,
-    ) -> Result<ExpandedConfiguration<'a, M, O>, ConfigurationExpansionError<E::LoadError>>
+    ) -> Result<LinkedDataConfiguration, ConfigurationExpansionError<E::LoadError>>
     where
         S: CryptographicSuite<VerificationMethod = M, Options = O>,
     {
@@ -344,10 +355,7 @@ pub trait ProofConfigurationRefExpansion<'a, S: CryptographicSuite>:
         context: &json_ld::syntax::Context,
         configuration: ProofConfigurationRef<'a, S::VerificationMethod, S::Options>,
         suite: &S,
-    ) -> Result<
-        ExpandedConfiguration<'a, S::VerificationMethod, S::Options>,
-        ConfigurationExpansionError<Self::LoadError>,
-    >;
+    ) -> Result<LinkedDataConfiguration, ConfigurationExpansionError<Self::LoadError>>;
 }
 
 impl<'a, S: CryptographicSuite, E, V, I, L> ProofConfigurationRefExpansion<'a, S> for E
@@ -379,10 +387,7 @@ where
         context: &json_ld::syntax::Context,
         configuration: ProofConfigurationRef<'a, S::VerificationMethod, S::Options>,
         suite: &S,
-    ) -> Result<
-        ExpandedConfiguration<'a, S::VerificationMethod, S::Options>,
-        ConfigurationExpansionError<L::Error>,
-    > {
+    ) -> Result<LinkedDataConfiguration, ConfigurationExpansionError<L::Error>> {
         use ssi_rdf::Expandable;
 
         #[derive(serde::Serialize)]
@@ -402,10 +407,7 @@ where
 
         let json_proof_document = json_syntax::to_value(proof_document).unwrap();
 
-        eprintln!(
-            "COMPACT CONFIGURATION: {}",
-            json_proof_document.pretty_print()
-        );
+        eprintln!("proof doc: {}", json_proof_document.pretty_print());
 
         let json_ld_proof_document = ssi_json_ld::CompactJsonLd(json_proof_document)
             .expand(self)
@@ -414,6 +416,35 @@ where
         match json_ld_proof_document.into_main_node() {
             Some(node) => {
                 let env = self.as_ld_environment_mut();
+
+                // Get the proof type IRI.
+                let proof_prop = json_ld::Id::iri(
+                    env.vocabulary
+                        .get(ssi_security::PROOF)
+                        .ok_or(ConfigurationExpansionError::MissingProof)?,
+                );
+                let proof_type = match node.get_any(&proof_prop) {
+                    Some(proof) => match proof.as_node() {
+                        Some(proof) => match &proof.graph {
+                            Some(proof_graph) => match proof_graph.first() {
+                                Some(proof) => match proof.as_node() {
+                                    Some(proof) => match proof.types() {
+                                        [json_ld::Id::Valid(Id::Iri(iri))] => {
+                                            Ok(env.vocabulary.iri(iri).unwrap().to_owned())
+                                        }
+                                        _ => Err(ConfigurationExpansionError::InvalidProofType),
+                                    },
+                                    None => Err(ConfigurationExpansionError::InvalidProofValue),
+                                },
+                                None => Err(ConfigurationExpansionError::MissingProof),
+                            },
+                            None => Err(ConfigurationExpansionError::InvalidProofValue),
+                        },
+                        None => Err(ConfigurationExpansionError::InvalidProofValue),
+                    },
+                    None => Err(ConfigurationExpansionError::MissingProof),
+                }?;
+
                 let (subject, quads) = linked_data::to_lexical_subject_quads_with(
                     env.vocabulary,
                     env.interpretation,
@@ -422,11 +453,6 @@ where
                 )?;
 
                 let mut dataset: HashDataset<Id, IriBuf, Term, Id> = quads.into_iter().collect();
-
-                eprintln!("RDF CONFIGURATION");
-                for quad in &dataset {
-                    eprintln!("{quad} .")
-                }
 
                 let proof_prop = ssi_security::PROOF.to_owned();
                 match dataset
@@ -437,8 +463,8 @@ where
                     Some(Term::Id(proof_id)) => {
                         let proof_id = proof_id.clone();
                         match dataset.remove_graph(&proof_id) {
-                            Some(graph) => Ok(ExpandedConfiguration {
-                                configuration,
+                            Some(graph) => Ok(LinkedDataConfiguration {
+                                type_iri: proof_type,
                                 graph,
                             }),
                             None => Err(ConfigurationExpansionError::MissingProofGraph),
@@ -475,11 +501,32 @@ pub enum ConfigurationExpansionError<E> {
     #[error("missing proof configuration value")]
     InvalidProofValue,
 
+    #[error("invalid proof type")]
+    InvalidProofType,
+
     #[error("missing proof configuration graph")]
     MissingProofGraph,
 
     #[error("invalid JSON-LD context")]
     InvalidContext,
+}
+
+/// Linked-Data proof configuration.
+pub struct LinkedDataConfiguration {
+    pub type_iri: IriBuf,
+    pub graph: HashGraph<Id, IriBuf, Term>,
+}
+
+impl LinkedDataConfiguration {
+    pub fn with_configuration<M: Referencable, O: Referencable>(
+        self,
+        configuration: ProofConfigurationRef<'_, M, O>,
+    ) -> ExpandedConfiguration<'_, M, O> {
+        ExpandedConfiguration {
+            configuration,
+            ld: self,
+        }
+    }
 }
 
 /// Expanded proof configuration.
@@ -490,22 +537,30 @@ pub struct ExpandedConfiguration<'a, M: Referencable, O: Referencable = ()> {
     configuration: ProofConfigurationRef<'a, M, O>,
 
     #[serde(skip)]
-    graph: HashGraph<Id, IriBuf, Term>,
+    ld: LinkedDataConfiguration,
 }
 
 impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads(&self) -> Vec<Quad> {
-        self.graph
+    pub fn quads(&self) -> impl '_ + Iterator<Item = Quad> {
+        let quads = self
+            .ld
+            .graph
             .triples()
-            .map(|Triple(s, p, o)| Quad(s.clone(), p.clone(), o.clone(), None))
-            .collect()
+            .map(|Triple(s, p, o)| Quad(s.as_id_ref(), p.as_iri(), o.as_term_ref(), None));
+
+        urdna2015::normalize(quads)
+    }
+
+    /// Returns the quads of the proof configuration, in canonical form.
+    pub fn nquads(&self) -> String {
+        self.quads().into_nquads()
     }
 
     pub fn borrow(&self) -> ExpandedConfigurationRef<M, O> {
         ExpandedConfigurationRef {
             configuration: self.configuration.shorten_lifetime(),
-            graph: &self.graph,
+            ld: &self.ld,
         }
     }
 
@@ -516,7 +571,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     {
         ExpandedConfiguration {
             configuration: self.configuration.shorten_lifetime(),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 
@@ -529,7 +584,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     ) -> Result<ExpandedConfiguration<'a, N, P>, E> {
         Ok(ExpandedConfiguration {
             configuration: self.configuration.try_map_verification_method(f)?,
-            graph: self.graph,
+            ld: self.ld,
         })
     }
 
@@ -539,7 +594,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     ) -> ExpandedConfiguration<'a, M, P> {
         ExpandedConfiguration {
             configuration: self.configuration.map_options(f),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 
@@ -552,7 +607,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     ) -> ExpandedConfiguration<'a, N, P> {
         ExpandedConfiguration {
             configuration: self.configuration.map_verification_method(f),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 
@@ -570,14 +625,14 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     {
         Ok(ExpandedConfiguration {
             configuration: self.configuration.try_cast_verification_method()?,
-            graph: self.graph,
+            ld: self.ld,
         })
     }
 
     pub fn without_options(self) -> ExpandedConfiguration<'a, M> {
         ExpandedConfiguration {
             configuration: self.configuration.without_options(),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 }
@@ -589,7 +644,7 @@ pub struct ExpandedConfigurationRef<'a, M: Referencable, O: Referencable = ()> {
     configuration: ProofConfigurationRef<'a, M, O>,
 
     #[serde(skip)]
-    graph: &'a HashGraph<Id, IriBuf, Term>,
+    ld: &'a LinkedDataConfiguration,
 }
 
 impl<'a, M: Referencable, O: Referencable> Deref for ExpandedConfigurationRef<'a, M, O> {
@@ -608,11 +663,19 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
 
 impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads(&self) -> Vec<Quad> {
-        self.graph
+    pub fn quads(&self) -> impl '_ + Iterator<Item = Quad> {
+        let quads = self
+            .ld
+            .graph
             .triples()
-            .map(|Triple(s, p, o)| Quad(s.clone(), p.clone(), o.clone(), None))
-            .collect()
+            .map(|Triple(s, p, o)| Quad(s.as_id_ref(), p.as_iri(), o.as_term_ref(), None));
+
+        urdna2015::normalize(quads)
+    }
+
+    /// Returns the quads of the proof configuration, in canonical form.
+    pub fn nquads(&self) -> String {
+        self.quads().into_nquads()
     }
 
     /// Apply covariance rules to shorten the `'a` lifetime.
@@ -622,7 +685,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     {
         ExpandedConfigurationRef {
             configuration: self.configuration.shorten_lifetime(),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 
@@ -635,7 +698,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     ) -> Result<ExpandedConfigurationRef<'a, N, P>, E> {
         Ok(ExpandedConfigurationRef {
             configuration: self.configuration.try_map_verification_method(f)?,
-            graph: self.graph,
+            ld: self.ld,
         })
     }
 
@@ -645,7 +708,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     ) -> ExpandedConfigurationRef<'a, M, P> {
         ExpandedConfigurationRef {
             configuration: self.configuration.map_options(f),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 
@@ -658,7 +721,7 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     ) -> ExpandedConfigurationRef<'a, N, P> {
         ExpandedConfigurationRef {
             configuration: self.configuration.map_verification_method(f),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 
@@ -676,14 +739,14 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     {
         Ok(ExpandedConfigurationRef {
             configuration: self.configuration.try_cast_verification_method()?,
-            graph: self.graph,
+            ld: self.ld,
         })
     }
 
     pub fn without_options(self) -> ExpandedConfigurationRef<'a, M> {
         ExpandedConfigurationRef {
             configuration: self.configuration.without_options(),
-            graph: self.graph,
+            ld: self.ld,
         }
     }
 }

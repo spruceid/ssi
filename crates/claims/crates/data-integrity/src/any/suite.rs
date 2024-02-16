@@ -1,8 +1,11 @@
+use iref::Iri;
 use linked_data::{LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject};
 use rdf_types::{interpretation::ReverseIriInterpretation, Interpretation, Vocabulary};
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSigner, SignerAdapter};
-use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
+use ssi_data_integrity_core::{
+    suite::HashError, CryptographicSuite, ExpandedConfiguration, UnsupportedProofSuite,
+};
 use ssi_data_integrity_suites::{AnySignature, AnySignatureRef};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
@@ -49,15 +52,6 @@ where
             )),
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum UnsupportedProofSuite {
-    #[error("unsupported proof suite: {0}")]
-    Compact(ssi_data_integrity_core::Type),
-
-    #[error("unsupported proof suite: {0}")]
-    Expanded(ssi_data_integrity_core::ExpandedType),
 }
 
 macro_rules! crypto_suites {
@@ -316,6 +310,24 @@ macro_rules! crypto_suites {
                         Self::$name => ssi_data_integrity_suites::$name.cryptographic_suite()
                     ),*
                 }
+            }
+
+            fn refine_type(&mut self, type_: &Iri) -> Result<(), UnsupportedProofSuite> {
+                eprintln!("refined suite type: {type_}");
+                let current_cryptosuite = self.cryptographic_suite();
+
+                $(
+                    $(#[cfg($($t)*)])?
+                    {
+                        let suite = ssi_data_integrity_suites::$name;
+                        if suite.iri() == type_ && suite.cryptographic_suite() == current_cryptosuite {
+                            *self = Self::$name;
+                            return Ok(())
+                        }
+                    }
+                )*
+
+                Err(UnsupportedProofSuite::Expanded(ssi_data_integrity_core::ExpandedType { iri: type_.to_owned(), cryptosuite: self.cryptographic_suite().map(ToOwned::to_owned) }))
             }
 
             fn hash(&self, data: Transformed, proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>) -> Result<Self::Hashed, HashError> {

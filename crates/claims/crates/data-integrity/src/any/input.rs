@@ -10,8 +10,6 @@ use ssi_verification_methods::AnyMethod;
 
 use super::AnySuite;
 
-type JsonObject = serde_json::Map<String, serde_json::Value>;
-
 /// Input context for any cryptographic suite supported by `AnySuite`.
 pub struct AnyInputContext<E, L = ()> {
     /// The Linked-Data context used to interpret RDF terms.
@@ -270,7 +268,7 @@ where
 #[derive(Debug, Clone)]
 pub enum Transformed {
     String(String),
-    JsonObject(JsonObject),
+    JsonObject(json_syntax::Object),
     Eip712(ssi_eip712::TypedData),
 }
 
@@ -280,8 +278,8 @@ impl From<String> for Transformed {
     }
 }
 
-impl From<JsonObject> for Transformed {
-    fn from(value: JsonObject) -> Self {
+impl From<json_syntax::Object> for Transformed {
+    fn from(value: json_syntax::Object) -> Self {
         Self::JsonObject(value)
     }
 }
@@ -303,7 +301,7 @@ impl TryFrom<Transformed> for String {
     }
 }
 
-impl TryFrom<Transformed> for JsonObject {
+impl TryFrom<Transformed> for json_syntax::Object {
     type Error = HashError;
 
     fn try_from(value: Transformed) -> Result<Self, Self::Error> {

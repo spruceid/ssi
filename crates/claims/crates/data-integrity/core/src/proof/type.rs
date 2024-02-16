@@ -52,3 +52,12 @@ impl fmt::Display for ExpandedType {
         Ok(())
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum UnsupportedProofSuite {
+    #[error("unsupported proof suite: {0}")]
+    Compact(Type),
+
+    #[error("unsupported proof suite: {0}")]
+    Expanded(ExpandedType),
+}

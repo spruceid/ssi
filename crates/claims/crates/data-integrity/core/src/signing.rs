@@ -70,20 +70,20 @@ where
 {
     if let Some(context) = suite.required_proof_context() {
         params.context = Some(context); // TODO: merge instead of replacing.
-        params.options.prepare(&suite);
     }
+    params.options.prepare(&suite);
 
     let expanded_params = params
         .borrowed()
         .expand(input.json_ld_context().as_ref(), &suite, &mut environment)
-        .await?;
+        .await?
+        .with_configuration(params.borrowed());
 
     let transformed = suite
         .transform(&input, &mut environment, expanded_params.borrow())
         .await?;
     let hash = suite.hash(transformed, expanded_params)?;
-    let untyped_proof = suite.generate_proof(&hash, signer, params).await?;
-    let proof = untyped_proof.into_typed(suite);
+    let proof = suite.generate_proof(&hash, signer, params).await?;
     Ok(Verifiable::from_parts(
         input,
         PreparedProof::new(proof, hash),

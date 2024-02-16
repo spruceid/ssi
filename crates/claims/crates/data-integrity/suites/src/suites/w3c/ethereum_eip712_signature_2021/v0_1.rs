@@ -39,8 +39,7 @@ pub struct Eip712Options {
     // Allow messageSchema for backwards-compatibility since
     // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
     #[ld("eip712:message-schema")]
-    #[serde(alias = "messageSchema")]
-    pub types: Option<crate::eip712::TypesOrURI>,
+    pub message_schema: Option<crate::eip712::TypesOrURI>,
 
     /// Value of the `primaryType` property of the `TypedData` object.
     #[ld("eip712:primary-type")]
@@ -54,7 +53,7 @@ pub struct Eip712Options {
 impl Eip712Options {
     pub fn as_ref(&self) -> Eip712OptionsRef {
         Eip712OptionsRef {
-            types: self.types.as_ref(),
+            message_schema: self.message_schema.as_ref(),
             primary_type: self.primary_type.as_ref(),
             domain: self.domain.as_ref(),
         }
@@ -64,7 +63,7 @@ impl Eip712Options {
 impl From<super::Eip712Options> for Eip712Options {
     fn from(value: super::Eip712Options) -> Self {
         Self {
-            types: value.types.clone(),
+            message_schema: value.types.clone(),
             primary_type: value.primary_type.clone(),
             domain: value.domain.clone(),
         }
@@ -90,8 +89,7 @@ pub struct Eip712OptionsRef<'a> {
     // Allow messageSchema for backwards-compatibility since
     // changed in https://github.com/w3c-ccg/ethereum-eip712-signature-2021-spec/pull/32
     #[ld("eip712:message-schema")]
-    #[serde(alias = "messageSchema")]
-    pub types: Option<&'a crate::eip712::TypesOrURI>,
+    pub message_schema: Option<&'a crate::eip712::TypesOrURI>,
 
     /// Value of the `primaryType` property of the `TypedData` object.
     #[ld("eip712:primary-type")]
@@ -105,7 +103,7 @@ pub struct Eip712OptionsRef<'a> {
 impl<'a> From<Eip712OptionsRef<'a>> for super::Eip712OptionsRef<'a> {
     fn from(value: Eip712OptionsRef<'a>) -> Self {
         Self {
-            types: value.types,
+            types: value.message_schema,
             primary_type: value.primary_type,
             domain: value.domain,
         }

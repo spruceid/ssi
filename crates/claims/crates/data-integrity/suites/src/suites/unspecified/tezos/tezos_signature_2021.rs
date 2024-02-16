@@ -5,14 +5,13 @@ use ssi_data_integrity_core::{
     CryptographicSuite, ExpandedConfiguration,
 };
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
-use ssi_rdf::IntoNQuads;
 use ssi_tzkey::EncodeTezosSignedMessageError;
 use ssi_verification_methods::{SignatureError, TezosMethod2021};
 use static_iref::iri;
 
 use crate::impl_rdf_input_urdna2015;
 
-use super::{Signature, SignatureRef, TezosWallet};
+use super::{Signature, SignatureRef, TezosWallet, TZVM_CONTEXT};
 
 /// Tezos signature suite based on URDNA2015.
 ///
@@ -80,7 +79,7 @@ impl CryptographicSuite for TezosSignature2021 {
         data: String,
         proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
-        let proof_quads = proof_configuration.quads().into_nquads();
+        let proof_quads = proof_configuration.nquads();
         let message = format!("\n{proof_quads}\n{data}");
         match ssi_tzkey::encode_tezos_signed_message(&message) {
             Ok(data) => Ok(data),
@@ -90,6 +89,10 @@ impl CryptographicSuite for TezosSignature2021 {
 
     fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
         SignatureAlgorithm
+    }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        Some(json_ld::syntax::Context::One(TZVM_CONTEXT.clone()))
     }
 }
 

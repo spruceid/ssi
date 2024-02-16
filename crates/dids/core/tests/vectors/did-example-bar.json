@@ -16,11 +16,7 @@
       "id": "did:example:bar#key1",
       "type": "Ed25519VerificationKey2018",
       "controller": "did:example:bar",
-      "publicKeyJwk": {
-          "kty": "OKP",
-          "crv": "Ed25519",
-          "x": "jRSNg5xqr8WZ-kdPZFBebEHYHMHK38NI0lnbC9Tmc0Y"
-      }
+      "publicKeyBase58": "AVifRER7nMC86FoZtW9YZQQn5i2kuwJzPCrDHydZzVuf"
     }
   ],
   "assertionMethod": [

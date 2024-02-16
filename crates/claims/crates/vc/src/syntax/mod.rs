@@ -19,16 +19,16 @@ use crate::{RequiredContext, V1};
 ///
 /// It is an ordered set where the first item is a URI with the value
 /// `https://www.w3.org/2018/credentials/v1`.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize)] // FIXME serializing a single entry as a string breaks Tezos JCS cryptosuite.
 #[serde(transparent)]
 pub struct Context<V = V1>(json_ld::syntax::Context, PhantomData<V>);
 
 impl<V: RequiredContext> Default for Context<V> {
     fn default() -> Self {
         Self(
-            json_ld::syntax::Context::One(json_ld::syntax::ContextEntry::IriRef(
+            json_ld::syntax::Context::Many(vec![json_ld::syntax::ContextEntry::IriRef(
                 V::CONTEXT_IRI.as_iri_ref().to_owned(),
-            )),
+            )]),
             PhantomData,
         )
     }
