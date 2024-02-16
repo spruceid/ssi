@@ -149,58 +149,68 @@
 //! `example-http-issuer` |         | Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
-// // maintain old structure here
-// pub use ssi_caips as caips;
-// #[deprecated = "Use ssi::caips::caip10"]
-// pub use ssi_caips::caip10;
-// #[deprecated = "Use ssi::caips::caip2"]
-// pub use ssi_caips::caip2;
-// pub use ssi_core as core;
-// #[deprecated = "Use ssi::core::one_or_many"]
-// pub use ssi_core::one_or_many;
-// pub use ssi_crypto as crypto;
-// #[deprecated = "Use ssi::crypto::hashes"]
-// pub use ssi_crypto::hashes as hash;
-// #[cfg(feature = "eip")]
-// #[deprecated = "Use ssi::crypto::hashes::keccak"]
-// pub use ssi_crypto::hashes::keccak;
-// #[cfg(feature = "bbs")]
-// #[deprecated = "Use ssi::crypto::signatures::bbs"]
-// pub use ssi_crypto::signatures::bbs;
-// pub use ssi_dids_core as did;
-// #[deprecated = "Use ssi::did::did_resolve"]
-// pub use ssi_dids_core::did_resolve;
-pub use ssi_json_ld as json_ld;
-pub use ssi_rdf as rdf;
-// #[deprecated = "Use ssi::jsonld::urdna2015"]
-// pub use ssi_json_ld::urdna2015;
-// pub use ssi_jwk as jwk;
-// #[cfg(feature = "aleo")]
-// #[deprecated = "Use ssi::jwk::aleo"]
-// pub use ssi_jwk::aleo;
-// #[deprecated = "Use ssi::jwk::blakesig"]
-// pub use ssi_jwk::blakesig;
-// #[deprecated = "Use ssi::jwk::der"]
-// pub use ssi_jwk::der;
-// #[cfg(feature = "ripemd-160")]
-// #[deprecated = "Use ssi::jwk::ripemd160"]
-// pub use ssi_jwk::ripemd160 as ripemd;
-// pub use ssi_jws as jws;
-// pub use ssi_jwt as jwt;
-// pub use ssi_ldp as ldp;
-// #[cfg(feature = "eip")]
-// #[deprecated = "Use ssi::ldp::eip712"]
-// pub use ssi_ldp::eip712;
-// #[deprecated = "Use ssi::ldp::soltx"]
-// pub use ssi_ldp::soltx;
-// pub use ssi_ssh as ssh;
-// pub use ssi_sd_jwt as sd_jwt;
-// pub use ssi_tzkey as tzkey;
-// pub use ssi_ucan as ucan;
-pub use ssi_claims as claims;
-pub use ssi_dids as dids;
-// #[deprecated = "Use ssi::vc::revocation"]
-// pub use ssi_vc::revocation;
-// pub use ssi_zcap_ld as zcap;
+// Re-export core functions and types.
+pub use ssi_core::*;
 
-// pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+/// Cryptography.
+pub use ssi_crypto as crypto;
+
+/// JSON Web Key (JWK).
+/// 
+/// See: <https://www.rfc-editor.org/rfc/rfc7517>
+pub use ssi_jwk as jwk;
+
+/// JSON Web Signature (JWS).
+/// 
+/// See: <https://datatracker.ietf.org/doc/html/rfc7515>
+pub use ssi_jws as jws;
+
+/// RDF utilities.
+pub use ssi_rdf as rdf;
+
+/// JSON-LD utilities.
+pub use ssi_json_ld as json_ld;
+
+/// W3C's Security Vocabulary.
+pub use ssi_security as security;
+
+/// Verifiable Claims.
+/// 
+/// Includes Verifiable Credentials and Data-Integrity Proofs.
+pub use ssi_claims as claims;
+
+/// Verification Methods.
+pub use ssi_verification_methods as verification_methods;
+
+/// Chain Agnostic Improvement Proposals (CAIPs).
+/// 
+/// See: <https://chainagnostic.org/>
+pub use ssi_caips as caips;
+
+/// Decentralized Identifiers (DIDs).
+/// 
+/// See: <https://www.w3.org/TR/did-core/>
+pub use ssi_dids as dids;
+
+/// Ethereum Typed Structured Data Hashing and Signing (EIP-712).
+/// 
+/// See: <https://eips.ethereum.org/EIPS/eip-712>
+pub use ssi_eip712 as eip712;
+
+/// User Controlled Authorization Network (UCAN).
+/// 
+/// See: <https://github.com/ucan-wg/spec>
+pub use ssi_ucan as ucan;
+
+/// Authorization Capabilities for Linked Data (ZCAP-LD).
+/// 
+/// See: <https://w3c-ccg.github.io/zcap-spec/>
+pub use ssi_zcap_ld as zcap_ld;
+
+/// Multicodec.
+/// 
+/// See: <https://github.com/multiformats/multicodec>
+pub use ssi_multicodec as multicodec;
+
+/// Secure Shell utilities.
+pub use ssi_ssh as ssh;

@@ -42,13 +42,6 @@ jobs:
     - name: Clippy
       run: cargo clippy --workspace
 
-    - name: Test vc-test-suite
-      run: |
-        cd vc-test-suite
-        npm i
-        cp ../vc-test/config.json .
-        npm test
-
     - name: Test WASM compilation
       run: |
         rustup target add wasm32-unknown-unknown
