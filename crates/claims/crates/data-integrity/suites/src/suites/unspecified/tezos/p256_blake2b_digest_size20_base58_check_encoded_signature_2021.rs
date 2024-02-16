@@ -1,6 +1,6 @@
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature, JwsSignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
-use super::{Options, OptionsRef, TZ_CONTEXT};
+use super::{Options, TZ_CONTEXT};
 use iref::Iri;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
@@ -32,8 +32,6 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ESBlake2b;
 
     type Options = Options;
@@ -58,101 +56,16 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(TZ_CONTEXT.clone()))
     }
-}
 
-// #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, LinkedData)]
-// #[ld(prefix("sec" = "https://w3id.org/security#"))]
-// pub struct Signature {
-//     /// JSON Web Signature.
-//     #[ld("sec:jwk")]
-//     pub jws: CompactJWSString,
-
-//     /// Signing key.
-//     #[ld("sec:publicKeyJwk")]
-//     pub public_key_jwk: Box<JWK>,
-// }
-
-// impl From<Signature> for AnySignature {
-//     fn from(value: Signature) -> Self {
-//         AnySignature {
-//             jws: Some(value.jws),
-//             public_key_jwk: Some(value.public_key_jwk),
-//             ..Default::default()
-//         }
-//     }
-// }
-
-// impl Referencable for Signature {
-//     type Reference<'a> = SignatureRef<'a> where Self: 'a;
-
-//     fn as_reference(&self) -> Self::Reference<'_> {
-//         SignatureRef {
-//             jws: &self.jws,
-//             public_key_jwk: &self.public_key_jwk,
-//         }
-//     }
-
-//     covariance_rule!();
-// }
-
-// #[derive(Debug, Clone, Copy)]
-// pub struct SignatureRef<'a> {
-//     /// JSON Web Signature.
-//     pub jws: &'a CompactJWSStr,
-
-//     /// Signing key.
-//     pub public_key_jwk: &'a JWK,
-// }
-
-// impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
-//     fn from(value: SignatureRef<'a>) -> Self {
-//         AnySignatureRef {
-//             jws: Some(value.jws),
-//             public_key_jwk: Some(value.public_key_jwk),
-//             ..Default::default()
-//         }
-//     }
-// }
-
-// impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
-//     type Error = InvalidSignature;
-
-//     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-//         Ok(Self {
-//             jws: value.jws.ok_or(InvalidSignature::MissingValue)?,
-//             public_key_jwk: value.public_key_jwk.ok_or(InvalidSignature::MissingPublicKey)?
-//         })
-//     }
-// }
-
-pub struct SignatureAlgorithm;
-
-impl
-    ssi_verification_methods::SignatureAlgorithm<
-        P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-    > for SignatureAlgorithm
-{
-    type Options = Options;
-
-    type Signature = JwsSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ESBlake2b;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 as ssi_core::Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         JwsSignature::sign_detached(
             bytes,
@@ -165,11 +78,11 @@ impl
 
     fn verify(
         &self,
-        options: OptionsRef,
-        signature: JwsSignatureRef,
-        method: &P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+        options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         if method.matches_public_key(options.public_key_jwk)? {
             let (header, _, signature) = signature
                 .jws
@@ -182,9 +95,10 @@ impl
                 options.public_key_jwk,
                 &signature,
             )
-            .is_ok())
+            .is_ok()
+            .into())
         } else {
-            Ok(false)
+            Ok(ssi_claims_core::ProofValidity::Invalid)
         }
     }
 }

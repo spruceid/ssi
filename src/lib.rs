@@ -149,6 +149,8 @@
 //! `example-http-issuer` |         | Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
+pub use xsd_types;
+
 // Re-export core functions and types.
 pub use ssi_core::*;
 
@@ -156,12 +158,12 @@ pub use ssi_core::*;
 pub use ssi_crypto as crypto;
 
 /// JSON Web Key (JWK).
-/// 
+///
 /// See: <https://www.rfc-editor.org/rfc/rfc7517>
 pub use ssi_jwk as jwk;
 
 /// JSON Web Signature (JWS).
-/// 
+///
 /// See: <https://datatracker.ietf.org/doc/html/rfc7515>
 pub use ssi_jws as jws;
 
@@ -175,7 +177,7 @@ pub use ssi_json_ld as json_ld;
 pub use ssi_security as security;
 
 /// Verifiable Claims.
-/// 
+///
 /// Includes Verifiable Credentials and Data-Integrity Proofs.
 pub use ssi_claims as claims;
 
@@ -183,32 +185,32 @@ pub use ssi_claims as claims;
 pub use ssi_verification_methods as verification_methods;
 
 /// Chain Agnostic Improvement Proposals (CAIPs).
-/// 
+///
 /// See: <https://chainagnostic.org/>
 pub use ssi_caips as caips;
 
 /// Decentralized Identifiers (DIDs).
-/// 
+///
 /// See: <https://www.w3.org/TR/did-core/>
 pub use ssi_dids as dids;
 
 /// Ethereum Typed Structured Data Hashing and Signing (EIP-712).
-/// 
+///
 /// See: <https://eips.ethereum.org/EIPS/eip-712>
 pub use ssi_eip712 as eip712;
 
 /// User Controlled Authorization Network (UCAN).
-/// 
+///
 /// See: <https://github.com/ucan-wg/spec>
 pub use ssi_ucan as ucan;
 
 /// Authorization Capabilities for Linked Data (ZCAP-LD).
-/// 
+///
 /// See: <https://w3c-ccg.github.io/zcap-spec/>
 pub use ssi_zcap_ld as zcap_ld;
 
 /// Multicodec.
-/// 
+///
 /// See: <https://github.com/multiformats/multicodec>
 pub use ssi_multicodec as multicodec;
 

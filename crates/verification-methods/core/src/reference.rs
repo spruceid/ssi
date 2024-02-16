@@ -69,6 +69,12 @@ impl<M> From<IriBuf> for ReferenceOrOwned<M> {
     }
 }
 
+impl<'a, M> From<&'a Iri> for ReferenceOrOwned<M> {
+    fn from(value: &'a Iri) -> Self {
+        Self::Reference(value.to_owned())
+    }
+}
+
 impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for ReferenceOrOwned<M> {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
         match self {

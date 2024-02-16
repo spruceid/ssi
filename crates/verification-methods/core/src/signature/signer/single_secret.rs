@@ -1,9 +1,6 @@
 use ssi_crypto::SignatureProtocol;
 
-use crate::{
-    MethodWithSecret, Referencable, SignatureError, Signer, SigningMethod,
-    VerificationMethodResolver,
-};
+use crate::{MethodWithSecret, Referencable, Signer, SigningMethod};
 
 /// Simple signer implementation that always uses the given secret to sign
 /// every message.
@@ -11,16 +8,14 @@ use crate::{
 /// This type is useful for quick testing but should not be used in real
 /// applications since the secret used to sign messages will realistically not
 /// match the verification method used to verify the signature.
-pub struct SingleSecretSigner<R, S> {
-    resolver: R,
+pub struct SingleSecretSigner<S> {
     secret: S,
 }
 
-impl<R, S> SingleSecretSigner<R, S> {
-    /// Creates a new signer with the given verification method resolver and
-    /// secret.
-    pub fn new(resolver: R, secret: S) -> Self {
-        Self { resolver, secret }
+impl<S> SingleSecretSigner<S> {
+    /// Creates a new signer with the given secret.
+    pub fn new(secret: S) -> Self {
+        Self { secret }
     }
 
     pub fn secret(&self) -> &S {
@@ -28,46 +23,14 @@ impl<R, S> SingleSecretSigner<R, S> {
     }
 }
 
-impl<M: Referencable, B: Copy, P: SignatureProtocol<B>, V, S> Signer<M, B, P>
-    for SingleSecretSigner<V, S>
+impl<M: Referencable, A: Copy, P: Copy + SignatureProtocol<A>, S> Signer<M, A, P>
+    for SingleSecretSigner<S>
 where
-    M: SigningMethod<S, B>,
-    V: VerificationMethodResolver<M>,
+    M: SigningMethod<S, A>,
 {
-    async fn sign<
-        'a,
-        'o: 'a,
-        'm: 'a,
-        A: crate::SignatureAlgorithm<M, MessageSignatureAlgorithm = B, Protocol = P>,
-    >(
-        &'a self,
-        algorithm: A,
-        options: <A::Options as Referencable>::Reference<'o>,
-        issuer: Option<&'a iref::Iri>,
-        method: Option<crate::ReferenceOrOwnedRef<'m, M>>,
-        bytes: &'a [u8],
-    ) -> Result<A::Signature, SignatureError>
-    where
-        A: 'a,
-        A::Signature: 'a,
-    {
-        match method {
-            Some(m) => {
-                let method = self
-                    .resolver
-                    .resolve_verification_method(issuer, Some(m))
-                    .await?;
-                let method = method.as_reference();
-                algorithm
-                    .sign(
-                        <A::Options as Referencable>::apply_covariance(options),
-                        method,
-                        bytes,
-                        MethodWithSecret::<M, _>::new(method, &self.secret),
-                    )
-                    .await
-            }
-            None => Err(SignatureError::MissingVerificationMethod),
-        }
+    type MessageSigner<'a> = MethodWithSecret<'a, 'a, M, S> where Self: 'a, M: 'a;
+
+    async fn for_method<'a>(&'a self, method: M::Reference<'a>) -> Option<Self::MessageSigner<'a>> {
+        Some(MethodWithSecret::new(method, &self.secret))
     }
 }

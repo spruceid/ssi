@@ -11,9 +11,7 @@ use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConf
 use ssi_verification_methods::{Ed25519VerificationKey2020, SignatureError, VerificationError};
 use static_iref::iri;
 
-use crate::{
-    impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature, MultibaseSignatureRef,
-};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 
 /// EdDSA Cryptosuite v2020.
 ///
@@ -42,8 +40,6 @@ impl CryptographicSuite for Ed25519Signature2020 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
@@ -69,8 +65,28 @@ impl CryptographicSuite for Ed25519Signature2020 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
+    async fn sign(
+        &self,
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError> {
+        signer
+            .sign(ssi_jwk::algorithm::EdDSA, (), bytes)
+            .map(build_signature)
+            .await
+    }
+
+    fn verify(
+        &self,
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }
 }
 
@@ -78,8 +94,6 @@ pub struct Signature {
     /// Multibase encoded signature.
     pub proof_value: String,
 }
-
-pub struct SignatureAlgorithm;
 
 pub type MessageBuilder =
     fn(Result<Vec<u8>, MessageSignatureError>) -> Result<MultibaseSignature, SignatureError>;
@@ -92,41 +106,5 @@ fn build_signature(
             proof_value: multibase::encode(Base::Base58Btc, bytes),
         }),
         Err(e) => Err(e.into()),
-    }
-}
-
-impl ssi_verification_methods::SignatureAlgorithm<Ed25519VerificationKey2020>
-    for SignatureAlgorithm
-{
-    type Options = ();
-
-    type Signature = MultibaseSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Ed25519VerificationKey2020 as ssi_core::Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
-    ) -> Result<Self::Signature, SignatureError> {
-        signer
-            .sign(ssi_jwk::algorithm::EdDSA, (), bytes)
-            .map(build_signature)
-            .await
-    }
-
-    fn verify(
-        &self,
-        _options: (),
-        signature: MultibaseSignatureRef,
-        method: &Ed25519VerificationKey2020,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
-        let signature_bytes = signature.decode()?;
-        method.verify_bytes(bytes, &signature_bytes)
     }
 }

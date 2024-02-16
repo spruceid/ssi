@@ -2,10 +2,11 @@
 use iref::Iri;
 use ssi_claims_core::{ProofValidity, Verifiable};
 use ssi_core::Referencable;
+use ssi_crypto::MessageSigner;
 use ssi_json_ld::WithJsonLdContext;
 use ssi_verification_methods::{
-    InvalidVerificationMethod, SignatureAlgorithm, SignatureError, Signer, VerificationError,
-    VerificationMethod, Verifier,
+    InvalidVerificationMethod, SignatureError, Signer, VerificationError, VerificationMethod,
+    VerificationMethodResolver,
 };
 use std::convert::Infallible;
 
@@ -108,10 +109,6 @@ impl From<InvalidOptions> for SignatureError {
     }
 }
 
-pub trait FromRdfAndSuite<S> {
-    // ...
-}
-
 pub trait CryptographicSuiteOptions<T>: Referencable {
     /// Prepare the options to be put in the generated proof.
     ///
@@ -131,7 +128,7 @@ pub trait CryptographicSuite: Sized {
     type Transformed;
 
     /// Hashing algorithm result.
-    type Hashed: AsRef<[u8]>;
+    type Hashed;
 
     /// Verification method.
     type VerificationMethod: VerificationMethod;
@@ -139,26 +136,24 @@ pub trait CryptographicSuite: Sized {
     /// Cryptography suite options used to generate the proof.
     type Options: CryptographicSuiteOptions<Self>;
 
-    /// Signature.
-    type Signature: Referencable;
-
     type MessageSignatureAlgorithm: Copy;
 
     type SignatureProtocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
 
-    /// Signature algorithm.
-    type SignatureAlgorithm: SignatureAlgorithm<
-        Self::VerificationMethod,
-        Options = Self::Options,
-        Signature = Self::Signature,
-        MessageSignatureAlgorithm = Self::MessageSignatureAlgorithm,
-        Protocol = Self::SignatureProtocol,
-    >;
+    /// Signature.
+    type Signature: Referencable;
 
+    /// Returns the name of the cryptographic suite.
     fn name(&self) -> &str;
 
+    /// Returns the type IRI of the cryptographic suite.
     fn iri(&self) -> &Iri;
 
+    /// Refines the type of the cryptographic suite.
+    ///
+    /// When the crypto-suite type supports more than one suite with the same
+    /// name, this function may be implemented to disambiguate and select the
+    /// correct suite.
     fn refine_type(&mut self, type_: &Iri) -> Result<(), UnsupportedProofSuite> {
         if type_ == self.iri() {
             Ok(())
@@ -170,6 +165,7 @@ pub trait CryptographicSuite: Sized {
         }
     }
 
+    /// Returns the name of the cryptographic suite variant, if any.
     fn cryptographic_suite(&self) -> Option<&str>;
 
     /// Hashing algorithm.
@@ -179,17 +175,35 @@ pub trait CryptographicSuite: Sized {
         params: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError>;
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm;
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         None
     }
 
+    /// Sign the hash.
     #[allow(async_fn_in_trait)]
-    async fn generate_proof<'a, S>(
+    async fn sign(
+        &self,
+        options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError>;
+
+    /// Verify the given hash.
+    fn verify(
+        &self,
+        options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ProofValidity, VerificationError>;
+
+    #[allow(async_fn_in_trait)]
+    async fn generate_proof<S>(
         self,
-        data: &'a Self::Hashed,
-        signer: &'a S,
+        data: &Self::Hashed,
+        resolver: &impl VerificationMethodResolver<Self::VerificationMethod>,
+        signers: &S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Proof<Self>, SignatureError>
     where
@@ -199,40 +213,48 @@ pub trait CryptographicSuite: Sized {
             Self::SignatureProtocol,
         >,
     {
-        let algorithm = self.setup_signature_algorithm();
-        let signature = signer
-            .sign(
-                algorithm,
+        let signature = {
+            // Resolve the verification method.
+            let verification_method = resolver
+                .resolve_verification_method(None, Some(params.verification_method.borrowed()))
+                .await?;
+
+            // Find a signer for this verification method.
+            let signer = signers
+                .for_method(verification_method.as_reference())
+                .await
+                .ok_or(SignatureError::MissingSigner)?;
+
+            self.sign(
                 params.options.as_reference(),
-                None,
-                Some(params.verification_method.borrowed()),
-                data.as_ref(),
+                verification_method.as_reference(),
+                data,
+                signer,
             )
-            .await?;
+            .await?
+        };
 
         Ok(params.into_proof(self, signature))
     }
 
     #[allow(async_fn_in_trait)]
-    async fn verify_proof<'a, 'p: 'a, V: Verifier<Self::VerificationMethod>>(
+    async fn verify_proof(
         &self,
-        data: &'a Self::Hashed,
-        verifier: &'a V,
-        proof: ProofRef<'a, Self>,
+        data: &Self::Hashed,
+        verifier: &impl VerificationMethodResolver<Self::VerificationMethod>,
+        proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, VerificationError> {
-        let algorithm = self.setup_signature_algorithm();
-        verifier
-            .verify(
-                algorithm,
-                proof.options,
-                None,
-                Some(proof.verification_method),
-                proof.proof_purpose,
-                data.as_ref(),
-                proof.signature,
-            )
-            .await
-            .map(Into::into)
+        // Resolve the verification method.
+        let verification_method = verifier
+            .resolve_verification_method(None, Some(proof.verification_method))
+            .await?;
+
+        self.verify(
+            proof.options,
+            verification_method.as_reference(),
+            data,
+            proof.signature,
+        )
     }
 }
 
@@ -255,16 +277,18 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         C: 'a;
 
     #[allow(async_fn_in_trait)]
-    async fn sign<'max, S>(
+    async fn sign<'max, R, S>(
         self,
         input: T,
         context: C,
+        resolver: &'max R,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Verifiable<T, Proofs<Self>>, signing::Error<C::LoadError>>
     where
         Self::VerificationMethod: 'max,
         T: WithJsonLdContext,
+        R: 'max + VerificationMethodResolver<Self::VerificationMethod>,
         S: 'max
             + Signer<
                 Self::VerificationMethod,
@@ -273,20 +297,22 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
             >,
         C: for<'a> ProofConfigurationRefExpansion<'a, Self>,
     {
-        sign(input, context, signer, self, params).await
+        sign(input, context, resolver, signer, self, params).await
     }
 
     #[allow(async_fn_in_trait)]
-    async fn sign_single<'max, S>(
+    async fn sign_single<'max, R, S>(
         self,
         input: T,
         context: C,
+        resolver: &'max R,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Verifiable<T, Proof<Self>>, signing::Error<C::LoadError>>
     where
         Self::VerificationMethod: 'max,
         T: WithJsonLdContext,
+        R: 'max + VerificationMethodResolver<Self::VerificationMethod>,
         S: 'max
             + Signer<
                 Self::VerificationMethod,
@@ -295,6 +321,6 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
             >,
         C: for<'a> ProofConfigurationRefExpansion<'a, Self>,
     {
-        sign_single(input, context, signer, self, params).await
+        sign_single(input, context, resolver, signer, self, params).await
     }
 }

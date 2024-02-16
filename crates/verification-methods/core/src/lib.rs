@@ -220,14 +220,14 @@ pub trait TypedVerificationMethod: VerificationMethod {
 // }
 
 impl<'m, M: VerificationMethod> Cow<'m, M> {
-    fn id(&self) -> &Iri {
+    pub fn id(&self) -> &Iri {
         match self {
             Self::Owned(m) => m.id(),
             Self::Borrowed(b) => M::ref_id(*b),
         }
     }
 
-    fn controller(&self) -> Option<&Iri> {
+    pub fn controller(&self) -> Option<&Iri> {
         match self {
             Self::Owned(m) => m.controller(),
             Self::Borrowed(b) => M::ref_controller(*b),

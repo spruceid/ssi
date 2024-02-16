@@ -516,11 +516,12 @@ mod tests {
         );
 
         eprintln!("vm {:?}", issue_options.verification_method);
-        let signer = SingleSecretSigner::new(&didethr, key);
+        let signer = SingleSecretSigner::new(key);
         let vc = suite
             .sign(
                 cred.clone(),
                 AnyInputContext::default(),
+                &didethr,
                 &signer,
                 issue_options.clone(),
             )
@@ -550,11 +551,12 @@ mod tests {
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_key = JWK::generate_secp256k1().unwrap();
-        let wrong_signer = SingleSecretSigner::new(&didethr, wrong_key.clone());
+        let wrong_signer = SingleSecretSigner::new(wrong_key.clone());
         let vc_wrong_key = suite
             .sign(
                 cred,
                 AnyInputContext::default(),
+                &didethr,
                 &wrong_signer,
                 ProofConfiguration {
                     options: AnySuiteOptions::default()
@@ -585,6 +587,7 @@ mod tests {
             .sign(
                 presentation,
                 AnyInputContext::default(),
+                &didethr,
                 &signer,
                 vp_issue_options,
             )

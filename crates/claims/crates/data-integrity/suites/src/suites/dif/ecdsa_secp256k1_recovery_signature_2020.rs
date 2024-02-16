@@ -8,7 +8,7 @@ use ssi_verification_methods::{
 };
 use static_iref::iri;
 
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature, JwsSignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
 /// `EcdsaSecp256k1RecoverySignature2020`.
 ///
@@ -34,8 +34,6 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
 
     type Options = ();
@@ -60,51 +58,35 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(iri!("https://w3id.org/security/suites/secp256k1recovery-2020/v2").into())
     }
-}
 
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1RecoveryMethod2020>
-    for SignatureAlgorithm
-{
-    type Options = ();
-
-    type Signature = JwsSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256KR;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
-        _options: <() as Referencable>::Reference<'_>,
-        _method: <EcdsaSecp256k1RecoveryMethod2020 as Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::ES256KR).await
     }
 
     fn verify(
         &self,
-        _options: (),
-        signature: JwsSignatureRef,
-        method: &EcdsaSecp256k1RecoveryMethod2020,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         let (header, _, signature) = signature
             .jws
             .decode()
             .map_err(|_| VerificationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(bytes);
 
-        method.verify_bytes(&signing_bytes, &signature, DigestFunction::Sha256)
+        method
+            .verify_bytes(&signing_bytes, &signature, DigestFunction::Sha256)
+            .map(Into::into)
     }
 }

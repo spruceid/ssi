@@ -241,11 +241,12 @@ async fn credential_prove_verify_did_tz1() {
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     // Check that proof JWK must match proof verificationMethod
-    let wrong_signer = SingleSecretSigner::new(&didtz, JWK::generate_ed25519().unwrap());
+    let wrong_signer = SingleSecretSigner::new(JWK::generate_ed25519().unwrap());
     let vc_wrong_key =
     ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021.sign(
         vc.claims().clone(),
         JsonLdEnvironment::default(),
+        &didtz,
         &wrong_signer,
         vc.proof().first().unwrap().clone_configuration()
     )
@@ -319,7 +320,7 @@ async fn credential_prove_verify_did_tz2() {
     );
 
     let didtz = DIDVerifier::new(DIDTZ);
-    let signer = SingleSecretSigner::new(&didtz, key.clone());
+    let signer = SingleSecretSigner::new(key.clone());
 
     let vc_issue_options = ProofConfiguration::new(
         cred.issuance_date.clone(),
@@ -331,7 +332,13 @@ async fn credential_prove_verify_did_tz2() {
     );
     let suite = AnySuite::pick(&key, Some(&vc_issue_options.verification_method)).unwrap();
     let vc = suite
-        .sign(cred, AnyInputContext::default(), &signer, vc_issue_options)
+        .sign(
+            cred,
+            AnyInputContext::default(),
+            &didtz,
+            &signer,
+            vc_issue_options,
+        )
         .await
         .unwrap();
     println!("{}", serde_json::to_string_pretty(vc.proof()).unwrap());
@@ -347,12 +354,12 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     // Check that proof JWK must match proof verificationMethod
-    let wrong_signer =
-        SingleSecretSigner::new(&didtz, JWK::generate_secp256k1_from(&mut rng).unwrap());
+    let wrong_signer = SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng).unwrap());
     let vc_wrong_key = suite
         .sign(
             vc.claims().clone(),
             AnyInputContext::default(),
+            &didtz,
             &wrong_signer,
             vc.proof().first().unwrap().clone_configuration(),
         )
@@ -379,6 +386,7 @@ async fn credential_prove_verify_did_tz2() {
         .sign(
             presentation,
             AnyInputContext::default(),
+            &didtz,
             &signer,
             vp_issue_options,
         )
@@ -427,7 +435,7 @@ async fn credential_prove_verify_did_tz3() {
     );
 
     let didtz = DIDVerifier::new(DIDTZ);
-    let signer = SingleSecretSigner::new(&didtz, key.clone());
+    let signer = SingleSecretSigner::new(key.clone());
 
     let vc_issue_options = ProofConfiguration::new(
         cred.issuance_date.clone(),
@@ -442,7 +450,13 @@ async fn credential_prove_verify_did_tz3() {
     let suite = AnySuite::pick(&key, Some(&vc_issue_options.verification_method)).unwrap();
     eprintln!("suite {suite:?}");
     let vc = suite
-        .sign(cred, AnyInputContext::default(), &signer, vc_issue_options)
+        .sign(
+            cred,
+            AnyInputContext::default(),
+            &didtz,
+            &signer,
+            vc_issue_options,
+        )
         .await
         .unwrap();
     println!("{}", serde_json::to_string_pretty(vc.proof()).unwrap());
@@ -458,11 +472,12 @@ async fn credential_prove_verify_did_tz3() {
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_invalid());
 
     // Check that proof JWK must match proof verificationMethod
-    let wrong_signer = SingleSecretSigner::new(&didtz, JWK::generate_p256_from(&mut rng));
+    let wrong_signer = SingleSecretSigner::new(JWK::generate_p256_from(&mut rng));
     let vc_wrong_key = suite
         .sign(
             vc.claims().clone(),
             AnyInputContext::default(),
+            &didtz,
             &wrong_signer,
             vc.proof().first().unwrap().clone_configuration(),
         )
@@ -491,6 +506,7 @@ async fn credential_prove_verify_did_tz3() {
         .sign(
             presentation,
             AnyInputContext::default(),
+            &didtz,
             &signer,
             vp_issue_options,
         )

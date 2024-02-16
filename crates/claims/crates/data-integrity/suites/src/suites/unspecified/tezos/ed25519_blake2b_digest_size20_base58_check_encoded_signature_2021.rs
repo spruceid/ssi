@@ -1,6 +1,6 @@
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature, JwsSignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
-use super::{Options, OptionsRef, TZ_CONTEXT};
+use super::{Options, TZ_CONTEXT};
 use iref::Iri;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
@@ -32,8 +32,6 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
 
     type Options = Options;
@@ -58,36 +56,16 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(TZ_CONTEXT.clone()))
     }
-}
 
-pub struct SignatureAlgorithm;
-
-impl
-    ssi_verification_methods::SignatureAlgorithm<
-        Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-    > for SignatureAlgorithm
-{
-    type Options = Options;
-
-    type Signature = JwsSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdBlake2b;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 as ssi_core::Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         JwsSignature::sign_detached(
             bytes,
@@ -100,11 +78,11 @@ impl
 
     fn verify(
         &self,
-        options: OptionsRef,
-        signature: JwsSignatureRef,
-        method: &Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+        options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         if method.matches_public_key(options.public_key_jwk)? {
             let (header, _, signature) = signature
                 .jws
@@ -117,9 +95,10 @@ impl
                 options.public_key_jwk,
                 &signature,
             )
-            .is_ok())
+            .is_ok()
+            .into())
         } else {
-            Ok(false)
+            Ok(ssi_claims_core::ProofValidity::Invalid)
         }
     }
 }

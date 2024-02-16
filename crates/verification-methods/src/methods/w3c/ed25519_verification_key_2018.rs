@@ -68,6 +68,7 @@ impl Ed25519VerificationKey2018 {
         let signature = key_pair.sign(&signing_bytes);
 
         Ok(ssi_jws::CompactJWSString::from_signing_bytes_and_signature(
+            // TODO base64 encode signature?
             signing_bytes,
             signature.to_bytes(),
         )

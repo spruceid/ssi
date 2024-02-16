@@ -3,7 +3,7 @@ use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConf
 use ssi_verification_methods::{JsonWebKey2020, SignatureError};
 use static_iref::iri;
 
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature, JwsSignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
 /// JSON Web Signature 2020.
 ///
@@ -29,8 +29,6 @@ impl CryptographicSuite for JsonWebSignature2020 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
     type Options = ();
@@ -55,40 +53,26 @@ impl CryptographicSuite for JsonWebSignature2020 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<JsonWebKey2020> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = JwsSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <JsonWebKey2020 as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &[u8],
-        _signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }
 
     fn verify(
         &self,
-        _options: (),
-        signature: JwsSignatureRef,
-        method: &JsonWebKey2020,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
         let (signing_bytes, signature_bytes, algorithm) = signature.decode(bytes)?;
-        method.verify_bytes(&signing_bytes, &signature_bytes, Some(algorithm))
+        method
+            .verify_bytes(&signing_bytes, &signature_bytes, Some(algorithm))
+            .map(Into::into)
     }
 }

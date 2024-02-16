@@ -8,9 +8,7 @@ use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConf
 use ssi_verification_methods::{Multikey, SignatureError};
 use static_iref::iri;
 
-use crate::{
-    impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature, MultibaseSignatureRef,
-};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 
 /// EdDSA Cryptosuite v2020.
 ///
@@ -39,8 +37,6 @@ impl CryptographicSuite for EdDsa2022 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
@@ -66,39 +62,23 @@ impl CryptographicSuite for EdDsa2022 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<Multikey> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = MultibaseSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Multikey as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &[u8],
-        _signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }
 
     fn verify(
         &self,
-        _options: (),
-        _signature: MultibaseSignatureRef,
-        _method: &Multikey,
-        _bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
         todo!()
     }
 }

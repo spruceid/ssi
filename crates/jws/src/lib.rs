@@ -272,7 +272,7 @@ impl CompactJWSBuf {
     ///
     /// Detached means the payload will not appear in the JWS.
     pub fn new_detached(header: Header, signature: &[u8]) -> Self {
-        let mut bytes = header.encode();
+        let mut bytes = header.encode().into_bytes();
         bytes.extend([b'.', b'.']);
         bytes.extend(signature.iter().copied());
         unsafe { Self::new_unchecked(bytes) }
@@ -349,16 +349,6 @@ impl CompactJWSString {
         Self(String::from_utf8_unchecked(bytes))
     }
 
-    pub fn from_signing_bytes_and_signature(
-        signing_bytes: Vec<u8>,
-        signature: impl IntoIterator<Item = u8>,
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let mut bytes = signing_bytes;
-        bytes.push(b'.');
-        bytes.extend(signature);
-        Self::new(bytes)
-    }
-
     /// Creates a new detached JWS from a header and base64-encoded signature.
     ///
     /// Detached means the payload will not appear in the JWS.
@@ -366,7 +356,7 @@ impl CompactJWSString {
         header: Header,
         b64_signature: &[u8],
     ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let mut bytes = header.encode();
+        let mut bytes = header.encode().into_bytes();
         bytes.extend(b"..");
         bytes.extend(b64_signature.iter().copied());
         Self::new(bytes)
@@ -378,6 +368,28 @@ impl CompactJWSString {
     pub fn encode_detached(header: Header, signature: &[u8]) -> Self {
         let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
         Self::new_detached(header, b64_signature.as_bytes()).unwrap()
+    }
+
+    /// Encodes the given signature in base64 and returns a compact JWS.
+    pub fn encode_from_signing_bytes_and_signature(
+        signing_bytes: Vec<u8>,
+        signature: &[u8],
+    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+        let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
+        let mut bytes = signing_bytes;
+        bytes.push(b'.');
+        bytes.extend_from_slice(b64_signature.as_bytes());
+        Self::new(bytes)
+    }
+
+    pub fn from_signing_bytes_and_signature(
+        signing_bytes: Vec<u8>,
+        signature: impl IntoIterator<Item = u8>,
+    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
+        let mut bytes = signing_bytes;
+        bytes.push(b'.');
+        bytes.extend(signature);
+        Self::new(bytes)
     }
 
     /// # Safety
@@ -724,12 +736,12 @@ impl Header {
         serde_json::to_string(self).unwrap()
     }
 
-    pub fn encode(&self) -> Vec<u8> {
-        base64::encode_config(self.to_json_string(), base64::URL_SAFE_NO_PAD).into_bytes()
+    pub fn encode(&self) -> String {
+        base64::encode_config(self.to_json_string(), base64::URL_SAFE_NO_PAD)
     }
 
     pub fn encode_signing_bytes(&self, payload: &[u8]) -> Vec<u8> {
-        let mut result = self.encode();
+        let mut result = self.encode().into_bytes();
         result.push(b'.');
 
         if self.base64urlencode_payload.unwrap_or(true) {

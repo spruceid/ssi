@@ -1,13 +1,10 @@
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::{protocol::Base58Btc, MessageSignatureError, MessageSigner};
+use ssi_crypto::{protocol::Base58Btc, MessageSigner};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_jwk::JWK;
-use ssi_verification_methods::{
-    InvalidSignature, SignatureError, SolanaMethod2021, VerificationError,
-};
+use ssi_verification_methods::{SignatureError, SolanaMethod2021, VerificationError};
 use static_iref::iri;
 
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, AnySignature, AnySignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
 
 /// Solana Signature 2021
 ///
@@ -55,8 +52,6 @@ impl CryptographicSuite for SolanaSignature2021 {
 
     type SignatureProtocol = Base58Btc;
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
 
     type Options = ();
@@ -82,10 +77,46 @@ impl CryptographicSuite for SolanaSignature2021 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
+    async fn sign(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError> {
+        todo!()
+    }
+
+    fn verify(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+        let tx = LocalSolanaTransaction::with_message(bytes);
+        let signing_bytes = tx.to_bytes();
+
+        let signature_bytes = Base58Btc::decode_signature(signature.proof_value.as_bytes())
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        Ok(ssi_jws::verify_bytes(
+            ssi_jwk::Algorithm::EdDSA,
+            &signing_bytes,
+            &method.public_key,
+            &signature_bytes,
+        )
+        .is_ok()
+        .into())
     }
 }
+
+// pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
+//     let tx = LocalSolanaTransaction::with_message(message);
+//     let bytes = tx.to_bytes();
+//     let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, &bytes, key)
+//         .map_err(MessageSignatureError::signature_failed)?;
+//     Ok(Base58Btc::encode_signature(&signature))
+// }
 
 #[derive(Debug, Clone)]
 pub struct Signature {
@@ -105,62 +136,10 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
-impl From<Signature> for AnySignature {
-    fn from(value: Signature) -> Self {
-        AnySignature {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl TryFrom<AnySignature> for Signature {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
-        match value.proof_value {
-            Some(v) => Ok(Self { proof_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base58Btc encoded signature.
     pub proof_value: &'a str,
-}
-
-impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: SignatureRef<'a>) -> Self {
-        AnySignatureRef {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        match value.proof_value {
-            Some(v) => Ok(Self { proof_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl SignatureAlgorithm {
-    pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
-        let tx = LocalSolanaTransaction::with_message(message);
-        let bytes = tx.to_bytes();
-        let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, &bytes, key)
-            .map_err(MessageSignatureError::signature_failed)?;
-        Ok(Base58Btc::encode_signature(&signature))
-    }
 }
 
 pub struct LocalSolanaTransaction {
@@ -177,46 +156,5 @@ impl LocalSolanaTransaction {
     pub fn to_bytes(&self) -> Vec<u8> {
         // TODO
         self.bytes.clone()
-    }
-}
-
-impl ssi_verification_methods::SignatureAlgorithm<SolanaMethod2021> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = Signature;
-
-    type Protocol = Base58Btc;
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-        &self,
-        _options: <Self::Options as Referencable>::Reference<'_>,
-        _method: <SolanaMethod2021 as Referencable>::Reference<'_>,
-        _bytes: &[u8],
-        _signer: S,
-    ) -> Result<Self::Signature, SignatureError> {
-        todo!()
-    }
-
-    fn verify(
-        &self,
-        _options: (),
-        signature: SignatureRef,
-        method: &SolanaMethod2021,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
-        let tx = LocalSolanaTransaction::with_message(bytes);
-        let signing_bytes = tx.to_bytes();
-
-        let signature_bytes = Base58Btc::decode_signature(signature.proof_value.as_bytes())
-            .map_err(|_| VerificationError::InvalidSignature)?;
-        Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::EdDSA,
-            &signing_bytes,
-            &method.public_key,
-            &signature_bytes,
-        )
-        .is_ok())
     }
 }

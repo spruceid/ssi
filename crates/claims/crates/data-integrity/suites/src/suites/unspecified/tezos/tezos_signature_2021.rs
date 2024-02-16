@@ -11,7 +11,7 @@ use static_iref::iri;
 
 use crate::impl_rdf_input_urdna2015;
 
-use super::{Signature, SignatureRef, TezosWallet, TZVM_CONTEXT};
+use super::{Signature, TezosWallet, TZVM_CONTEXT};
 
 /// Tezos signature suite based on URDNA2015.
 ///
@@ -56,8 +56,6 @@ impl CryptographicSuite for TezosSignature2021 {
 
     type SignatureProtocol = TezosWallet;
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = AnyBlake2b;
 
     type Options = Options;
@@ -87,32 +85,16 @@ impl CryptographicSuite for TezosSignature2021 {
         }
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(TZVM_CONTEXT.clone()))
     }
-}
 
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
-    type Options = Options;
-
-    type Signature = Signature;
-
-    type Protocol = TezosWallet;
-
-    type MessageSignatureAlgorithm = AnyBlake2b;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         options: <Self::Options as Referencable>::Reference<'_>,
-        method: <TezosMethod2021 as Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         Signature::sign(
             method.public_key.as_jwk().or(options.public_key_jwk),
@@ -124,13 +106,15 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn verify(
         &self,
-        options: OptionsRef,
-        signature: SignatureRef,
-        method: &TezosMethod2021,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
         let (algorithm, signature_bytes) = signature.decode()?;
-        method.verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
+        method
+            .verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)
+            .map(Into::into)
     }
 }
 

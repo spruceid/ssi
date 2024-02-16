@@ -150,12 +150,14 @@ ssi-ucan.workspace = true
 ssi-zcap-ld.workspace = true
 ssi-multicodec.workspace = true
 ssi-ssh.workspace = true
+xsd-types.workspace = true # public reexport
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
-# uuid = { version = "0.8", features = ["v4", "serde"] }
+uuid = { version = "0.8", features = ["v4", "serde"] }
+iref.workspace = true
+static-iref.workspace = true
 serde_json.workspace = true
-# ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["example"] }
 
 # [package.metadata.docs.rs]
 # all-features = true

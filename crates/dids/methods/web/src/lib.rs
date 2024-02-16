@@ -271,9 +271,15 @@ mod tests {
             ProofPurpose::Assertion,
             Default::default(),
         );
-        let signer = SingleSecretSigner::new(&didweb, key);
+        let signer = SingleSecretSigner::new(key);
         let vc = suite
-            .sign(cred, AnyInputContext::default(), &signer, issue_options)
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &didweb,
+                &signer,
+                issue_options,
+            )
             .await
             .unwrap();
 

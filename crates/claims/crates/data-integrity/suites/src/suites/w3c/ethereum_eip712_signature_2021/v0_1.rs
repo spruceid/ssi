@@ -8,9 +8,9 @@ use ssi_data_integrity_core::{
 use ssi_verification_methods::SignatureError;
 use static_iref::{iri, iri_ref};
 
-use crate::eip712::{Eip712Signature, Eip712SignatureRef, TypesProvider};
+use crate::eip712::{Eip712Signature, TypesProvider};
 
-use super::{Transform, VerificationMethod, VerificationMethodRef};
+use super::{Transform, VerificationMethod};
 
 lazy_static! {
     static ref PROOF_CONTEXT: json_ld::syntax::ContextEntry = {
@@ -180,8 +180,6 @@ impl CryptographicSuite for EthereumEip712Signature2021v0_1 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = Options;
@@ -208,12 +206,32 @@ impl CryptographicSuite for EthereumEip712Signature2021v0_1 {
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(PROOF_CONTEXT.clone()))
+    }
+
+    async fn sign(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError> {
+        match method.algorithm() {
+            Ok(algorithm) => Eip712Signature::sign(bytes, signer, algorithm).await,
+            Err(e) => Err(MessageSignatureError::into(e.into())),
+        }
+    }
+
+    fn verify(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }
 }
 
@@ -242,41 +260,5 @@ where
             "EthereumEip712Signature2021",
         )
         .await
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
-    type Options = Options;
-
-    type Signature = Eip712Signature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-        &self,
-        _options: <Self::Options as Referencable>::Reference<'_>,
-        method: <VerificationMethod as Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
-    ) -> Result<Self::Signature, SignatureError> {
-        match method.algorithm() {
-            Ok(algorithm) => Eip712Signature::sign(bytes, signer, algorithm).await,
-            Err(e) => Err(MessageSignatureError::into(e.into())),
-        }
-    }
-
-    fn verify(
-        &self,
-        _options: OptionsRef,
-        signature: Eip712SignatureRef,
-        method: VerificationMethodRef,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        let signature_bytes = signature.decode()?;
-        method.verify_bytes(bytes, &signature_bytes)
     }
 }

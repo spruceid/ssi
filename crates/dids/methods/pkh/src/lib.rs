@@ -981,13 +981,14 @@ mod tests {
         */
         // Sign with proof suite directly because there is not currently a way to do it
         // for Eip712Signature2021 in did-pkh otherwise.
-        let signer = SingleSecretSigner::new(&didpkh, key.clone());
+        let signer = SingleSecretSigner::new(key.clone());
         eprintln!("key: {key}");
         eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
             .sign(
                 cred.clone(),
                 AnyInputContext::default(),
+                &didpkh,
                 &signer,
                 issue_options.clone(),
             )
@@ -1008,11 +1009,12 @@ mod tests {
         assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_invalid());
 
         // Check that proof JWK must match proof verificationMethod
-        let wrong_signer = SingleSecretSigner::new(&didpkh, wrong_key.clone());
+        let wrong_signer = SingleSecretSigner::new(wrong_key.clone());
         let vc_wrong_key = proof_suite
             .sign(
                 cred,
                 AnyInputContext::default(),
+                &didpkh,
                 &wrong_signer,
                 issue_options,
             )
@@ -1051,6 +1053,7 @@ mod tests {
             .sign(
                 presentation,
                 AnyInputContext::default(),
+                &didpkh,
                 &signer,
                 vp_issue_options,
             )
@@ -1108,13 +1111,14 @@ mod tests {
                 .unwrap(),
         );
         eprintln!("vm {:?}", issue_options.verification_method);
-        let signer = SingleSecretSigner::new(&didpkh, key.clone());
+        let signer = SingleSecretSigner::new(key.clone());
         eprintln!("key: {key}");
         eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
             .sign(
                 cred.clone(),
                 AnyInputContext::default(),
+                &didpkh,
                 &signer,
                 issue_options.clone(),
             )
@@ -1134,11 +1138,12 @@ mod tests {
         assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_valid());
 
         // Check that proof JWK must match proof verificationMethod.
-        let wrong_signer = SingleSecretSigner::new(&didpkh, wrong_key.clone());
+        let wrong_signer = SingleSecretSigner::new(wrong_key.clone());
         let vc_wrong_key = proof_suite
             .sign(
                 cred,
                 AnyInputContext::default(),
+                &didpkh,
                 &wrong_signer,
                 issue_options,
             )
@@ -1170,6 +1175,7 @@ mod tests {
             .sign(
                 presentation,
                 AnyInputContext::default(),
+                &didpkh,
                 &signer,
                 vp_issue_options,
             )

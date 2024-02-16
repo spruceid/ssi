@@ -90,8 +90,7 @@ impl<F, A> Ucan<F, A> {
             // did:key without fragment
             (Some("did:"), Some("key:"), _, Content::Resource(Resource::Document(d))) => d
                 .verification_method
-                .iter()
-                .next()
+                .first()
                 .ok_or(Error::VerificationMethodMismatch)?
                 .public_key_jwk()?
                 .ok_or(Error::MissingPublicKey)?,
@@ -520,8 +519,7 @@ impl UcanRevocation {
             // did:key without fragment
             (Some("did:"), Some("key:"), _, Content::Resource(Resource::Document(d))) => d
                 .verification_method
-                .iter()
-                .next()
+                .first()
                 .ok_or(Error::VerificationMethodMismatch)?
                 .public_key_jwk()?
                 .ok_or(Error::MissingPublicKey)?,

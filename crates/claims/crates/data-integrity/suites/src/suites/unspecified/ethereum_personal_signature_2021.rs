@@ -6,7 +6,7 @@ use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, InvalidSignature, InvalidVerificationMethod, SignatureError,
+    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, SignatureError,
     VerificationError,
 };
 use static_iref::iri;
@@ -14,7 +14,7 @@ use static_iref::iri;
 mod v0_1;
 pub use v0_1::*;
 
-use crate::{impl_rdf_input_urdna2015, AnySignature, AnySignatureRef};
+use crate::impl_rdf_input_urdna2015;
 
 lazy_static::lazy_static! {
     pub static ref EPSIG_CONTEXT: json_ld::syntax::ContextEntry = {
@@ -143,8 +143,6 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
 
     type SignatureProtocol = EthereumWallet;
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
     type Options = ();
@@ -172,12 +170,36 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
         Ok(message)
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(EPSIG_CONTEXT.clone()))
+    }
+
+    async fn sign(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        data: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError> {
+        let proof_value_bytes = signer
+            .sign(method.algorithm(), EthereumWallet, data.as_bytes())
+            .await?;
+        match String::from_utf8(proof_value_bytes) {
+            Ok(proof_value) => Ok(Signature::new(proof_value)),
+            Err(_) => Err(SignatureError::InvalidSignature),
+        }
+    }
+
+    fn verify(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        data: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+        let message = EthereumWallet::prepare_message(data.as_bytes());
+        let signature_bytes = signature.decode()?;
+        Ok(method.verify_bytes(&message, &signature_bytes)?.into())
     }
 }
 
@@ -205,25 +227,6 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
-impl From<Signature> for AnySignature {
-    fn from(value: Signature) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl TryFrom<AnySignature> for Signature {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     pub proof_value: &'a str,
@@ -233,85 +236,6 @@ impl<'a> SignatureRef<'a> {
     pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
         EthereumWallet::decode_signature(self.proof_value.as_bytes())
             .map_err(|_| VerificationError::InvalidSignature)
-    }
-}
-
-impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: SignatureRef<'a>) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-// impl SignatureAlgorithm {
-//     /// Sign as an Ethereum wallet.
-//     pub fn wallet_sign(
-//         message: &[u8],
-//         secret_key: &k256::SecretKey,
-//     ) -> Result<String, MessageSignatureError> {
-//         use k256::ecdsa::signature::Signer;
-//         let prefixed_message = ssi_crypto::hashes::keccak::prefix_personal_message(message);
-//         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-//         let sig: k256::ecdsa::recoverable::Signature = signing_key
-//             .try_sign(&prefixed_message)
-//             .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?;
-//         let sig_bytes = &mut sig.as_ref().to_vec();
-
-//         // Recovery ID starts at 27 instead of 0.
-//         sig_bytes[64] += 27;
-//         Ok(ssi_crypto::hashes::keccak::bytes_to_lowerhex(sig_bytes))
-//     }
-// }
-
-impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = Signature;
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
-
-    type Protocol = EthereumWallet;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-        &self,
-        _options: <() as Referencable>::Reference<'_>,
-        method: <VerificationMethod as Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
-    ) -> Result<Self::Signature, SignatureError> {
-        let proof_value_bytes = signer
-            .sign(method.algorithm(), EthereumWallet, bytes)
-            .await?;
-        match String::from_utf8(proof_value_bytes) {
-            Ok(proof_value) => Ok(Signature::new(proof_value)),
-            Err(_) => Err(SignatureError::InvalidSignature),
-        }
-    }
-
-    fn verify(
-        &self,
-        _options: (),
-        signature: SignatureRef,
-        method: VerificationMethodRef,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
-        let message = EthereumWallet::prepare_message(bytes);
-        let signature_bytes = signature.decode()?;
-        method.verify_bytes(&message, &signature_bytes)
     }
 }
 

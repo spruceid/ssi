@@ -1,6 +1,6 @@
 use crate::{CryptographicSuite, PreparedProof};
 pub use method::{ReferenceOrOwned as MethodReferenceOrOwned, VerificationMethod};
-use method::{VerificationError, Verifier};
+use method::{VerificationError, VerificationMethodResolver};
 pub use ssi_verification_methods as method;
 
 // impl<T, S: CryptographicSuite> ssi_claims_core::Provable for DataIntegrity<T, S> {
@@ -26,7 +26,7 @@ pub use ssi_verification_methods as method;
 //     }
 // }
 
-impl<T, S: CryptographicSuite, V: Verifier<S::VerificationMethod>>
+impl<T, S: CryptographicSuite, V: VerificationMethodResolver<S::VerificationMethod>>
     ssi_claims_core::VerifyClaimsWith<T, V> for PreparedProof<S>
 {
     type Error = VerificationError;

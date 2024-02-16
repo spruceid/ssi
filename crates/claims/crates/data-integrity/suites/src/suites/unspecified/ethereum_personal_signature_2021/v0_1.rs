@@ -1,9 +1,11 @@
 use crate::impl_rdf_input_urdna2015;
 
-use super::{Signature, SignatureAlgorithm, VerificationMethod, EPSIG_CONTEXT};
+use super::{Signature, VerificationMethod, EPSIG_CONTEXT};
+use ssi_core::Referencable;
 use ssi_crypto::protocol::EthereumWallet;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_rdf::IntoNQuads;
+use ssi_verification_methods::{SignatureError, VerificationError};
 use static_iref::iri;
 
 pub struct EthereumPersonalSignature2021v0_1;
@@ -27,8 +29,6 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
     type Signature = Signature;
 
     type SignatureProtocol = EthereumWallet;
-
-    type SignatureAlgorithm = SignatureAlgorithm;
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
 
@@ -57,11 +57,35 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
         Ok(message)
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(EPSIG_CONTEXT.clone()))
+    }
+
+    async fn sign(
+        &self,
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        data: &Self::Hashed,
+        signer: impl ssi_crypto::MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        let proof_value_bytes = signer
+            .sign(method.algorithm(), EthereumWallet, data.as_bytes())
+            .await?;
+        match String::from_utf8(proof_value_bytes) {
+            Ok(proof_value) => Ok(Signature::new(proof_value)),
+            Err(_) => Err(SignatureError::InvalidSignature),
+        }
+    }
+
+    fn verify(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        data: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+        let message = EthereumWallet::prepare_message(data.as_bytes());
+        let signature_bytes = signature.decode()?;
+        Ok(method.verify_bytes(&message, &signature_bytes)?.into())
     }
 }

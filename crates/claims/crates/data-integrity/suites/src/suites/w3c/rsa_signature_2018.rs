@@ -1,10 +1,10 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{InvalidSignature, RsaVerificationKey2018, SignatureError};
+use ssi_verification_methods::{RsaVerificationKey2018, SignatureError};
 use static_iref::iri;
 
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, AnySignature, AnySignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
 
 /// RSA Signature Suite 2018.
 ///
@@ -29,8 +29,6 @@ impl CryptographicSuite for RsaSignature2018 {
     type Signature = Signature;
 
     type SignatureProtocol = ();
-
-    type SignatureAlgorithm = SignatureAlgorithm;
 
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::RS256;
 
@@ -57,8 +55,24 @@ impl CryptographicSuite for RsaSignature2018 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> SignatureAlgorithm {
-        SignatureAlgorithm
+    async fn sign(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError> {
+        todo!()
+    }
+
+    fn verify(
+        &self,
+        _options: <Self::Options as Referencable>::Reference<'_>,
+        _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+        todo!()
     }
 }
 
@@ -81,61 +95,8 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
-impl From<Signature> for AnySignature {
-    fn from(value: Signature) -> Self {
-        AnySignature {
-            signature_value: Some(value.signature_value),
-            ..Default::default()
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base64-encoded signature value.
     pub signature_value: &'a str,
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        match value.signature_value {
-            Some(v) => Ok(Self { signature_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
-    }
-}
-
-/// Signature algorithm.
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<RsaVerificationKey2018> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = Signature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::RS256;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-        &self,
-        _options: <Self::Options as Referencable>::Reference<'_>,
-        _method: <RsaVerificationKey2018 as Referencable>::Reference<'_>,
-        _bytes: &[u8],
-        _signer: S,
-    ) -> Result<Self::Signature, SignatureError> {
-        todo!()
-    }
-
-    fn verify(
-        &self,
-        _options: (),
-        _signature: SignatureRef,
-        _method: &RsaVerificationKey2018,
-        _bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
-        todo!()
-    }
 }

@@ -3,7 +3,7 @@
 pub mod aleo_signature_2021;
 pub mod eip712_signature_2021;
 pub mod ethereum_personal_signature_2021;
-mod solana_signature_2021;
+pub mod solana_signature_2021;
 
 #[cfg(feature = "tezos")]
 pub mod tezos;

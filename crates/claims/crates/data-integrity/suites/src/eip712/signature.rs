@@ -4,9 +4,7 @@ use rdf_types::{Interpretation, Vocabulary};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_jwk::algorithm::AnyESKeccakK;
-use ssi_verification_methods::{InvalidSignature, SignatureError, VerificationError};
-
-use crate::{AnySignature, AnySignatureRef};
+use ssi_verification_methods::{SignatureError, VerificationError};
 
 /// Common signature format for EIP-712-based cryptographic suites.
 ///
@@ -49,25 +47,6 @@ impl Referencable for Eip712Signature {
     covariance_rule!();
 }
 
-impl From<Eip712Signature> for AnySignature {
-    fn from(value: Eip712Signature) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl TryFrom<AnySignature> for Eip712Signature {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
-    }
-}
-
 /// Reference to [`Eip712Signature`].
 #[derive(Debug, Clone, Copy)]
 pub struct Eip712SignatureRef<'a> {
@@ -85,25 +64,6 @@ impl<'a> Eip712SignatureRef<'a> {
         } else {
             Err(VerificationError::InvalidSignature)
         }
-    }
-}
-
-impl<'a> From<Eip712SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: Eip712SignatureRef<'a>) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for Eip712SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
     }
 }
 

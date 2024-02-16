@@ -98,8 +98,6 @@ impl CryptographicSuite for TezosJcsSignature2021 {
 
     type SignatureProtocol = TezosWallet;
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = AnyBlake2b;
 
     type Options = Options;
@@ -153,32 +151,16 @@ impl CryptographicSuite for TezosJcsSignature2021 {
         }
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
         Some(json_ld::syntax::Context::One(TZJCSVM_CONTEXT.clone()))
     }
-}
 
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for SignatureAlgorithm {
-    type Options = Options;
-
-    type Signature = Signature;
-
-    type Protocol = TezosWallet;
-
-    type MessageSignatureAlgorithm = AnyBlake2b;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         options: <Self::Options as Referencable>::Reference<'_>,
-        method: <TezosMethod2021 as Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         let public_key_jwk = options
             .public_key_multibase
@@ -195,18 +177,20 @@ impl ssi_verification_methods::SignatureAlgorithm<TezosMethod2021> for Signature
 
     fn verify(
         &self,
-        options: OptionsRef,
-        signature: SignatureRef,
-        method: &TezosMethod2021,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        options: <Self::Options as Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         let public_key_jwk = options
             .public_key_multibase
             .map(|k| decode_jwk_from_multibase(k).map_err(|_| VerificationError::InvalidKey))
             .transpose()?;
 
         let (algorithm, signature_bytes) = signature.decode()?;
-        method.verify_bytes(public_key_jwk.as_ref(), bytes, algorithm, &signature_bytes)
+        method
+            .verify_bytes(public_key_jwk.as_ref(), bytes, algorithm, &signature_bytes)
+            .map(Into::into)
     }
 }
 

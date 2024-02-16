@@ -3,9 +3,7 @@ use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConf
 use ssi_verification_methods::{EcdsaSecp256r1VerificationKey2019, SignatureError};
 use static_iref::iri;
 
-use crate::{
-    impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature, MultibaseSignatureRef,
-};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 
 /// ECDSA Cryptosuite v2019 `EcdsaSecp256r1Signature2019`.
 ///
@@ -31,8 +29,6 @@ impl CryptographicSuite for EcdsaSecp256r1Signature2019 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256;
 
     type Options = ();
@@ -57,30 +53,12 @@ impl CryptographicSuite for EcdsaSecp256r1Signature2019 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2019>
-    for SignatureAlgorithm
-{
-    type Options = ();
-
-    type Signature = MultibaseSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <EcdsaSecp256r1VerificationKey2019 as ssi_core::Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         Ok(MultibaseSignature::new_base58btc(
             signer.sign(ssi_jwk::algorithm::ES256, (), bytes).await?,
@@ -89,12 +67,12 @@ impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256r1VerificationKey2
 
     fn verify(
         &self,
-        _options: (),
-        signature: MultibaseSignatureRef,
-        method: &EcdsaSecp256r1VerificationKey2019,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
         let signature_bytes = signature.decode()?;
-        method.verify_bytes(bytes, &signature_bytes)
+        method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }
 }

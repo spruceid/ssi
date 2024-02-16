@@ -562,9 +562,15 @@ mod tests {
             ProofPurpose::Assertion,
             AnySuiteOptions::default(),
         );
-        let signer = SingleSecretSigner::new(&didkey, key);
+        let signer = SingleSecretSigner::new(key);
         let vc = suite
-            .sign(cred, AnyInputContext::default(), &signer, issue_options)
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &didkey,
+                &signer,
+                issue_options,
+            )
             .await
             .unwrap();
         println!(
@@ -620,9 +626,15 @@ mod tests {
             ProofPurpose::Assertion,
             AnySuiteOptions::default(),
         );
-        let signer = SingleSecretSigner::new(&didkey, key);
+        let signer = SingleSecretSigner::new(key);
         let vc = suite
-            .sign(cred, AnyInputContext::default(), &signer, issue_options)
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &didkey,
+                &signer,
+                issue_options,
+            )
             .await
             .unwrap();
         println!(
@@ -678,9 +690,15 @@ mod tests {
             ProofPurpose::Assertion,
             AnySuiteOptions::default(),
         );
-        let signer = SingleSecretSigner::new(&didkey, key);
+        let signer = SingleSecretSigner::new(key);
         let vc = suite
-            .sign(cred, AnyInputContext::default(), &signer, issue_options)
+            .sign(
+                cred,
+                AnyInputContext::default(),
+                &didkey,
+                &signer,
+                issue_options,
+            )
             .await
             .unwrap();
         println!(

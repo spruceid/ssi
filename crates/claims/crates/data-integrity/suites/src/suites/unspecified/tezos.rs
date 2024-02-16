@@ -16,11 +16,9 @@ use ssi_crypto::{
 use ssi_data_integrity_core::suite::CryptographicSuiteOptions;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods::{InvalidSignature, SignatureError, VerificationError};
+use ssi_verification_methods::{SignatureError, VerificationError};
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
-
-use crate::{AnySignature, AnySignatureRef};
 
 const EDSIG_PREFIX: [u8; 5] = [9, 245, 205, 134, 18];
 const SPSIG_PREFIX: [u8; 5] = [13, 115, 101, 19, 63];
@@ -145,15 +143,6 @@ impl Referencable for Signature {
     covariance_rule!();
 }
 
-impl From<Signature> for AnySignature {
-    fn from(value: Signature) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct SignatureRef<'a> {
     /// Base58-encoded signature.
@@ -164,25 +153,6 @@ impl<'a> SignatureRef<'a> {
     pub fn decode(&self) -> Result<(AnyBlake2b, Vec<u8>), VerificationError> {
         TezosWallet::decode_signature(self.proof_value.as_bytes())
             .map_err(|_| VerificationError::InvalidSignature)
-    }
-}
-
-impl<'a> From<SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: SignatureRef<'a>) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
     }
 }
 

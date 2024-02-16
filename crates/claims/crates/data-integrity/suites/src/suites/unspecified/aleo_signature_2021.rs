@@ -1,6 +1,5 @@
-use ssi_crypto::{protocol::Base58BtcMultibase, MessageSignatureError, MessageSigner};
+use ssi_crypto::{protocol::Base58BtcMultibase, MessageSigner};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_jwk::JWK;
 use ssi_verification_methods::{
     verification_method_union, AleoMethod2021, AnyMethod, AnyMethodRef,
     BlockchainVerificationMethod2021, InvalidVerificationMethod, SignatureError,
@@ -8,9 +7,7 @@ use ssi_verification_methods::{
 };
 use static_iref::iri;
 
-use crate::{
-    impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature, MultibaseSignatureRef,
-};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 
 /// Aleo Signature 2021
 ///
@@ -73,8 +70,6 @@ impl CryptographicSuite for AleoSignature2021 {
 
     type SignatureProtocol = Base58BtcMultibase;
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
     type Options = ();
@@ -100,47 +95,23 @@ impl CryptographicSuite for AleoSignature2021 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl SignatureAlgorithm {
-    pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
-        let signature =
-            ssi_jwk::aleo::sign(message, key).map_err(MessageSignatureError::signature_failed)?;
-        Ok(Base58BtcMultibase::encode_signature(&signature))
-    }
-}
-
-impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for SignatureAlgorithm {
-    type Options = ();
-
-    type Signature = MultibaseSignature;
-
-    type Protocol = Base58BtcMultibase;
-
-    type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &[u8],
-        _signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        _bytes: &Self::Hashed,
+        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
         todo!()
     }
 
     fn verify(
         &self,
-        _options: (),
-        signature: MultibaseSignatureRef,
-        method: VerificationMethodRef,
-        bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         let (_, signature_bytes) = multibase::decode(signature.proof_value)
             .map_err(|_| VerificationError::InvalidSignature)?;
 
@@ -157,12 +128,20 @@ impl ssi_verification_methods::SignatureAlgorithm<VerificationMethod> for Signat
         let result = ssi_jwk::aleo::verify(bytes, &account_id.account_address, &signature_bytes);
 
         match result {
-            Ok(()) => Ok(true),
-            Err(ssi_jwk::aleo::AleoVerifyError::InvalidSignature) => Ok(false),
+            Ok(()) => Ok(ssi_claims_core::ProofValidity::Valid),
+            Err(ssi_jwk::aleo::AleoVerifyError::InvalidSignature) => {
+                Ok(ssi_claims_core::ProofValidity::Invalid)
+            }
             Err(_) => Err(VerificationError::InvalidSignature),
         }
     }
 }
+
+// pub fn wallet_sign(message: &[u8], key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
+//     let signature =
+//         ssi_jwk::aleo::sign(message, key).map_err(MessageSignatureError::signature_failed)?;
+//     Ok(Base58BtcMultibase::encode_signature(&signature))
+// }
 
 impl<'a> VerificationMethodRef<'a> {
     pub fn blockchain_account_id(&self) -> &ssi_caips::caip10::BlockchainAccountId {

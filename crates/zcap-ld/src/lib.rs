@@ -27,7 +27,9 @@ use ssi_claims::{
     vc::{Context, RequiredContext},
     ExtractProof, MergeWithProof, Validate, VerifiableClaims,
 };
-use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationError, Verifier};
+use ssi_verification_methods::{
+    AnyMethod, ProofPurpose, VerificationError, VerificationMethodResolver,
+};
 use static_iref::iri;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -129,6 +131,7 @@ impl<C, P> Delegation<C, P> {
     pub async fn sign(
         self,
         suite: AnySuite,
+        resolver: &impl VerificationMethodResolver<AnyMethod>,
         signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
         proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
         capability_chain: &[&str],
@@ -140,6 +143,7 @@ impl<C, P> Delegation<C, P> {
         self.sign_with(
             suite,
             AnyInputContext::default(),
+            resolver,
             signer,
             proof_configuration,
             capability_chain,
@@ -152,6 +156,7 @@ impl<C, P> Delegation<C, P> {
         self,
         suite: S,
         environment: E,
+        resolver: &impl VerificationMethodResolver<S::VerificationMethod>,
         signer: &impl Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
         mut proof_configuration: ProofConfiguration<S::VerificationMethod, S::Options>,
         capability_chain: &[&str],
@@ -170,7 +175,7 @@ impl<C, P> Delegation<C, P> {
         }
 
         suite
-            .sign_single(self, environment, signer, proof_configuration)
+            .sign_single(self, environment, resolver, signer, proof_configuration)
             .await
     }
 }
@@ -209,7 +214,7 @@ where
     type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
 
     async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
-        let json = json_syntax::to_value(&self).unwrap();
+        let json = json_syntax::to_value(self).unwrap();
         ssi_json_ld::CompactJsonLd(json).expand(environment).await
     }
 }
@@ -262,14 +267,14 @@ impl<C, P> VerifiableDelegation<C, P> {
 
     pub async fn verify(
         &self,
-        verifier: &impl Verifier<AnyMethod>,
+        resolver: &impl VerificationMethodResolver<AnyMethod>,
     ) -> Result<ProofValidity, DelegationVerificationError>
     where
         C: Clone + Serialize,
         P: Clone + Serialize,
     {
         let vc = self.clone().into_verifiable_claims().await?;
-        vc.verify(verifier).await.map_err(Into::into)
+        vc.verify(resolver).await.map_err(Into::into)
     }
 }
 
@@ -338,6 +343,7 @@ impl<P> Invocation<P> {
     pub async fn sign(
         self,
         suite: AnySuite,
+        resolver: &impl VerificationMethodResolver<AnyMethod>,
         signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
         mut proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
         target: &Uri,
@@ -354,6 +360,7 @@ impl<P> Invocation<P> {
                 .sign_single(
                     self,
                     AnyInputContext::default(),
+                    resolver,
                     signer,
                     proof_configuration,
                 )
@@ -400,7 +407,7 @@ where
     type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
 
     async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
-        let json = json_syntax::to_value(&self).unwrap();
+        let json = json_syntax::to_value(self).unwrap();
         ssi_json_ld::CompactJsonLd(json).expand(environment).await
     }
 }
@@ -448,7 +455,7 @@ impl<P> VerifiableInvocation<P> {
         &self,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, Q>,
-        verifier: &impl Verifier<AnyMethod>,
+        verifier: &impl VerificationMethodResolver<AnyMethod>,
     ) -> Result<ProofValidity, InvocationVerificationError>
     where
         P: Clone + Serialize,
@@ -566,25 +573,17 @@ mod tests {
 
         let alice_did = "did:example:foo";
         let alice_vm = UriBuf::new(format!("{}#key2", alice_did).into_bytes()).unwrap();
-        let alice = SingleSecretSigner::new(
-            &dk,
-            JWK {
-                key_id: Some(alice_vm.clone().into()),
-                ..serde_json::from_str(include_str!("../../../tests/ed25519-2020-10-18.json"))
-                    .unwrap()
-            },
-        );
+        let alice = SingleSecretSigner::new(JWK {
+            key_id: Some(alice_vm.clone().into()),
+            ..serde_json::from_str(include_str!("../../../tests/ed25519-2020-10-18.json")).unwrap()
+        });
 
         let bob_did = "did:example:bar";
         let bob_vm = UriBuf::new(format!("{}#key1", bob_did).into_bytes()).unwrap();
-        let bob = SingleSecretSigner::new(
-            &dk,
-            JWK {
-                key_id: Some(bob_vm.clone().into()),
-                ..serde_json::from_str(include_str!("../../../tests/ed25519-2021-06-16.json"))
-                    .unwrap()
-            },
-        );
+        let bob = SingleSecretSigner::new(JWK {
+            key_id: Some(bob_vm.clone().into()),
+            ..serde_json::from_str(include_str!("../../../tests/ed25519-2021-06-16.json")).unwrap()
+        });
 
         let del: Delegation<(), DefaultProps<Actions>> = Delegation {
             invoker: Some(bob_vm.clone()),
@@ -616,6 +615,7 @@ mod tests {
             .clone()
             .sign(
                 AnySuite::pick(alice.secret(), Some(&ldpo_alice.verification_method)).unwrap(),
+                &dk,
                 &alice,
                 ldpo_alice.clone(),
                 &[],
@@ -626,6 +626,7 @@ mod tests {
         let signed_inv = inv
             .sign(
                 AnySuite::pick(bob.secret(), Some(&ldpo_bob.verification_method)).unwrap(),
+                &dk,
                 &bob,
                 ldpo_bob,
                 &signed_del.claims().id,
@@ -668,6 +669,7 @@ mod tests {
         let signed_wrong_del = wrong_del
             .sign(
                 AnySuite::pick(alice.secret(), Some(&ldpo_alice.verification_method)).unwrap(),
+                &dk,
                 &alice,
                 ldpo_alice,
                 &[],

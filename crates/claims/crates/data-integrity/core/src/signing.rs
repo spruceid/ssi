@@ -1,6 +1,6 @@
 use ssi_claims_core::Verifiable;
 use ssi_json_ld::WithJsonLdContext;
-use ssi_verification_methods::{SignatureError, Signer};
+use ssi_verification_methods::{SignatureError, Signer, VerificationMethodResolver};
 
 use crate::{
     suite::{CryptographicSuiteInput, CryptographicSuiteOptions, HashError, TransformError},
@@ -35,9 +35,10 @@ pub enum Error<E = ssi_json_ld::UnknownContext> {
 //     }
 // }
 
-pub async fn sign<'max, T, S: CryptographicSuite, X, N>(
+pub async fn sign<'max, T, S: CryptographicSuite, X, R, N>(
     input: T,
     environment: X,
+    resolver: &'max R,
     signer: &'max N,
     suite: S,
     params: ProofConfiguration<S::VerificationMethod, S::Options>,
@@ -46,17 +47,21 @@ where
     T: WithJsonLdContext,
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
+    R: 'max + VerificationMethodResolver<S::VerificationMethod>,
     N: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     X: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
-    Ok(sign_single(input, environment, signer, suite, params)
-        .await?
-        .map(|t, p| (t, vec![p])))
+    Ok(
+        sign_single(input, environment, resolver, signer, suite, params)
+            .await?
+            .map(|t, p| (t, vec![p])),
+    )
 }
 
-pub async fn sign_single<'max, T, S: CryptographicSuite, X, N>(
+pub async fn sign_single<'max, T, S: CryptographicSuite, X, R, N>(
     input: T,
     mut environment: X,
+    resolver: &'max R,
     signer: &'max N,
     suite: S,
     mut params: ProofConfiguration<S::VerificationMethod, S::Options>,
@@ -65,6 +70,7 @@ where
     T: WithJsonLdContext,
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
+    R: 'max + VerificationMethodResolver<S::VerificationMethod>,
     N: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     X: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
@@ -83,7 +89,9 @@ where
         .transform(&input, &mut environment, expanded_params.borrow())
         .await?;
     let hash = suite.hash(transformed, expanded_params)?;
-    let proof = suite.generate_proof(&hash, signer, params).await?;
+    let proof = suite
+        .generate_proof(&hash, resolver, signer, params)
+        .await?;
     Ok(Verifiable::from_parts(
         input,
         PreparedProof::new(proof, hash),
@@ -112,3 +120,27 @@ where
 //         Ok(Verifiable::new(di, proof.into_typed(suite)))
 //     }
 // }
+
+/// Prepare the signing bytes.
+trait PrepareSigningBytes<Algorithm, Protocol> {
+    /// Signature preparation.
+    type Preparation;
+
+    /// Prepares the signing bytes.
+    fn prepare_signing_bytes(
+        bytes: &[u8],
+        algorithm: Algorithm,
+        protocol: Protocol,
+    ) -> (Self::Preparation, Vec<u8>);
+}
+
+/// Encode the signature.
+trait EncodeSignature<Algorithm, Protocol>: PrepareSigningBytes<Algorithm, Protocol> {
+    /// Encode the signature.
+    fn encode(preparation: Self::Preparation, signature: Vec<u8>) -> Self;
+}
+
+trait DecodeSignature<Algorithm, Protocol>: PrepareSigningBytes<Algorithm, Protocol> {
+    /// Decode the signature.
+    fn decode(self, preparation: Self::Preparation) -> Vec<u8>;
+}

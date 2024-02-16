@@ -6,7 +6,7 @@ use ssi_verification_methods::{
 };
 use static_iref::iri;
 
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature, JwsSignatureRef};
+use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
 /// Ecdsa Secp256k1 Signature 2019.
 ///
@@ -32,8 +32,6 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
 
     type SignatureProtocol = ();
 
-    type SignatureAlgorithm = SignatureAlgorithm;
-
     type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256K;
 
     type Options = ();
@@ -58,43 +56,26 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-        SignatureAlgorithm
-    }
-}
-
-pub struct SignatureAlgorithm;
-
-impl ssi_verification_methods::SignatureAlgorithm<EcdsaSecp256k1VerificationKey2019>
-    for SignatureAlgorithm
-{
-    type Options = ();
-
-    type Signature = JwsSignature;
-
-    type Protocol = ();
-
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::ES256K;
-
-    async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
+    async fn sign(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <EcdsaSecp256k1VerificationKey2019 as ssi_core::Referencable>::Reference<'_>,
-        bytes: &[u8],
-        signer: S,
+        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
-        eprintln!("message: {}", hex::encode(bytes));
         JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::ES256K).await
     }
 
     fn verify(
         &self,
-        _options: (),
-        signature: JwsSignatureRef,
-        method: &EcdsaSecp256k1VerificationKey2019,
-        bytes: &[u8],
-    ) -> Result<bool, ssi_verification_methods::VerificationError> {
+        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
         let (signing_bytes, signature_bytes, _) = signature.decode(bytes)?;
-        method.verify_bytes(&signing_bytes, &signature_bytes, DigestFunction::Sha256)
+        method
+            .verify_bytes(&signing_bytes, &signature_bytes, DigestFunction::Sha256)
+            .map(Into::into)
     }
 }

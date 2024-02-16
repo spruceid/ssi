@@ -1,19 +1,20 @@
 use iref::Iri;
 use linked_data::{LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject};
 use rdf_types::{interpretation::ReverseIriInterpretation, Interpretation, Vocabulary};
+use ssi_claims_core::ProofValidity;
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSigner, SignerAdapter};
 use ssi_data_integrity_core::{
     suite::HashError, CryptographicSuite, ExpandedConfiguration, UnsupportedProofSuite,
 };
-use ssi_data_integrity_suites::{AnySignature, AnySignatureRef};
 use ssi_jwk::JWK;
 use ssi_verification_methods::{
-    AnyMethod, AnyMethodRef, ReferenceOrOwned, SignatureAlgorithm, SignatureError,
-    VerificationError,
+    AnyMethod, AnyMethodRef, ReferenceOrOwned, SignatureError, VerificationError,
 };
 
-use super::{AnySuiteOptions, AnySuiteOptionsRef, Transformed};
+use super::{
+    AnyHash, AnySignature, AnySignatureRef, AnySuiteOptions, AnySuiteOptionsRef, Transformed,
+};
 use crate::AnySignatureProtocol;
 
 impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V> for AnySuite
@@ -167,119 +168,16 @@ macro_rules! crypto_suites {
             }
         }
 
-        pub enum AnySignatureAlgorithm {
-            $(
-                $(#[cfg($($t)*)])?
-                $name(<ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::SignatureAlgorithm)
-            ),*
-        }
-
-        // #[pin_project(project = SignProj)]
-        // pub enum Sign<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> {
-        //     $(
-        //         $(#[cfg($($t)*)])?
-        //         $name(#[pin] SuiteSign<'a, ssi_data_integrity_suites::$name, SignerAdapter<S, ssi_jwk::Algorithm, AnySignatureProtocol>>)
-        //     ),*
-        // }
-
-        // impl<'a, S: 'a + MessageSigner<ssi_jwk::Algorithm, AnySignatureProtocol>> Future for Sign<'a, S> {
-        //     type Output = Result<AnySignature, SignatureError>;
-
-        //     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        //         match self.project() {
-        //             $(
-        //                 $(#[cfg($($t)*)])?
-        //                 SignProj::$name(s) => {
-        //                     s.poll(cx).map_ok(Into::into)
-        //                 }
-        //             ),*
-        //         }
-        //     }
-        // }
-
-        impl SignatureAlgorithm<AnyMethod> for AnySignatureAlgorithm {
-            type Options = AnySuiteOptions;
-
-            type Signature = AnySignature;
-
-            type Protocol = AnySignatureProtocol;
-
-            type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
-
-            // type Sign<'a, S: 'a + MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>> = FailibleFuture<Sign<'a, S>, SignatureError>;
-
-            async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-                &self,
-                options: <Self::Options as Referencable>::Reference<'_>,
-                method: <AnyMethod as Referencable>::Reference<'_>,
-                bytes: &[u8],
-                signer: S
-            ) -> Result<Self::Signature, SignatureError> {
-                match self {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        Self::$name(a) => {
-                            eprintln!(concat!("cs algorithm is ", stringify!($name)));
-                            match method.try_into() {
-                                Ok(method) => {
-                                    match options.try_into() {
-                                        Ok(options) => {
-                                            Ok(a.sign(
-                                                options,
-                                                method,
-                                                bytes,
-                                                SignerAdapter::new(signer)
-                                            ).await?.into())
-                                        }
-                                        Err(e) => {
-                                            Err(e.into())
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    Err(e.into())
-                                }
-                            }
-                        }
-                    ),*
-                }
-            }
-
-            fn verify(
-                &self,
-                options: AnySuiteOptionsRef,
-                signature: AnySignatureRef,
-                method: AnyMethodRef,
-                bytes: &[u8]
-            ) -> Result<bool, VerificationError> {
-                match self {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        Self::$name(a) => {
-                            a.verify(
-                                options.try_into()?,
-                                signature.try_into()?,
-                                method.try_into()?,
-                                bytes
-                            )
-                        }
-                    ),*
-                }
-            }
-        }
-
         // #[async_trait::async_trait]
         impl CryptographicSuite for AnySuite {
             type Transformed = Transformed;
-            type Hashed = Hashed;
+            type Hashed = AnyHash;
 
             type VerificationMethod = AnyMethod;
 
             type Signature = AnySignature;
 
             type SignatureProtocol = AnySignatureProtocol;
-
-            type SignatureAlgorithm = AnySignatureAlgorithm;
 
             type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
 
@@ -346,14 +244,14 @@ macro_rules! crypto_suites {
                 }
             }
 
-            fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-                match self {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        Self::$name => AnySignatureAlgorithm::$name(ssi_data_integrity_suites::$name.setup_signature_algorithm())
-                    ),*
-                }
-            }
+            // fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
+            //     match self {
+            //         $(
+            //             $(#[cfg($($t)*)])?
+            //             Self::$name => AnySignatureAlgorithm::$name(ssi_data_integrity_suites::$name.setup_signature_algorithm())
+            //         ),*
+            //     }
+            // }
 
             fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
                 match self {
@@ -363,59 +261,67 @@ macro_rules! crypto_suites {
                     ),*
                 }
             }
+
+            async fn sign(
+                &self,
+                options: <Self::Options as Referencable>::Reference<'_>,
+                method: <AnyMethod as Referencable>::Reference<'_>,
+                bytes: &Self::Hashed,
+                signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>
+            ) -> Result<Self::Signature, SignatureError> {
+                match self {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        Self::$name => {
+                            eprintln!(concat!("cs algorithm is ", stringify!($name)));
+                            match method.try_into() {
+                                Ok(method) => {
+                                    match options.try_into() {
+                                        Ok(options) => {
+                                            Ok(ssi_data_integrity_suites::$name.sign(
+                                                options,
+                                                method,
+                                                bytes.try_into()?,
+                                                SignerAdapter::new(signer)
+                                            ).await?.into())
+                                        }
+                                        Err(e) => {
+                                            Err(e.into())
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    Err(e.into())
+                                }
+                            }
+                        }
+                    ),*
+                }
+            }
+
+            fn verify(
+                &self,
+                options: AnySuiteOptionsRef,
+                method: AnyMethodRef,
+                bytes: &Self::Hashed,
+                signature: AnySignatureRef
+            ) -> Result<ProofValidity, VerificationError> {
+                match self {
+                    $(
+                        $(#[cfg($($t)*)])?
+                        Self::$name => {
+                            ssi_data_integrity_suites::$name.verify(
+                                options.try_into()?,
+                                method.try_into()?,
+                                bytes.try_into()?,
+                                signature.try_into()?
+                            )
+                        }
+                    ),*
+                }
+            }
         }
     };
-}
-
-#[derive(Debug, Clone)]
-pub enum Hashed {
-    Array32([u8; 32]),
-    Array64([u8; 64]),
-    Array66([u8; 66]),
-    Vec(Vec<u8>),
-    String(String),
-}
-
-impl AsRef<[u8]> for Hashed {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            Self::Array32(a) => a.as_ref(),
-            Self::Array64(a) => a.as_ref(),
-            Self::Array66(a) => a.as_ref(),
-            Self::Vec(v) => v.as_ref(),
-            Self::String(s) => s.as_bytes(),
-        }
-    }
-}
-
-impl From<[u8; 32]> for Hashed {
-    fn from(value: [u8; 32]) -> Self {
-        Self::Array32(value)
-    }
-}
-
-impl From<[u8; 64]> for Hashed {
-    fn from(value: [u8; 64]) -> Self {
-        Self::Array64(value)
-    }
-}
-
-impl From<[u8; 66]> for Hashed {
-    fn from(value: [u8; 66]) -> Self {
-        Self::Array66(value)
-    }
-}
-
-impl From<Vec<u8>> for Hashed {
-    fn from(value: Vec<u8>) -> Self {
-        Self::Vec(value)
-    }
-}
-
-impl From<String> for Hashed {
-    fn from(value: String) -> Self {
-        Self::String(value)
-    }
 }
 
 crypto_suites! {

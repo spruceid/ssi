@@ -5,13 +5,12 @@ use std::borrow::Cow;
 use chrono::Utc;
 use hashbrown::HashMap;
 use iref::{Iri, IriBuf, Uri, UriBuf};
-use ssi_crypto::MessageSignatureError;
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuiteInput};
 use ssi_rdf::Expandable;
 use ssi_verification_methods::{
-    Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, ProofPurpose,
-    ProofPurposes, ReferenceOrOwnedRef, SignatureAlgorithm, SignatureError, Signer,
-    VerificationMethod, VerificationMethodResolutionError, VerificationMethodResolver,
+    Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, MethodWithSecret,
+    ProofPurpose, ProofPurposes, ReferenceOrOwnedRef, Signer, VerificationMethod,
+    VerificationMethodResolutionError, VerificationMethodResolver,
 };
 use static_iref::{iri, uri};
 
@@ -143,7 +142,7 @@ async fn main() {
 
     // Sign the credential.
     let verifiable_credential = Ed25519Signature2020
-        .sign(credential, rdf, &keyring, proof_options.clone())
+        .sign(credential, rdf, &keyring, &keyring, proof_options.clone())
         .await
         .expect("signing failed");
 
@@ -217,53 +216,20 @@ impl Keyring {
 }
 
 impl Signer<Ed25519VerificationKey2020, ssi_jwk::algorithm::EdDSA, ()> for Keyring {
-    async fn sign<'a, 'o: 'a, 'm: 'a, A>(
+    type MessageSigner<'a> = MethodWithSecret<
+        'a,
+        'a,
+        Ed25519VerificationKey2020,
+        ssi_verification_methods::ed25519_dalek::Keypair,
+    >;
+
+    async fn for_method<'a>(
         &'a self,
-        algorithm: A,
-        options: <A::Options as ssi_core::Referencable>::Reference<'o>,
-        _issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
-        bytes: &'a [u8],
-    ) -> Result<A::Signature, SignatureError>
-    where
-        A: 'a,
-        A::Signature: 'a,
-        A: SignatureAlgorithm<
-            Ed25519VerificationKey2020,
-            MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA,
-            Protocol = (),
-        >,
-    {
-        let id = match method {
-            Some(ReferenceOrOwnedRef::Owned(key)) => key.id(),
-            Some(ReferenceOrOwnedRef::Reference(id)) => id,
-            None => return Err(SignatureError::MissingVerificationMethod),
-        };
-
-        match self.keys.get(id) {
-            Some((method, key_pair)) => {
-                algorithm
-                    .sign(options, method, bytes, MessageSigner { method, key_pair })
-                    .await
-            }
-            None => Err(SignatureError::UnknownVerificationMethod),
-        }
-    }
-}
-
-pub struct MessageSigner<'a> {
-    method: &'a Ed25519VerificationKey2020,
-    key_pair: &'a ssi_verification_methods::ed25519_dalek::Keypair,
-}
-
-impl<'a> ssi_crypto::MessageSigner<ssi_jwk::algorithm::EdDSA> for MessageSigner<'a> {
-    async fn sign(
-        self,
-        _algorithm: ssi_jwk::algorithm::EdDSA,
-        _protocol: (),
-        message: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        self.method.sign_bytes(self.key_pair, message)
+        method: <Ed25519VerificationKey2020 as ssi_core::Referencable>::Reference<'a>,
+    ) -> Option<Self::MessageSigner<'a>> {
+        self.keys
+            .get(method.id())
+            .map(|(method, key_pair)| MethodWithSecret::new(method, key_pair))
     }
 }
 

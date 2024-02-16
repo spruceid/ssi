@@ -8,10 +8,6 @@ use static_iref::iri;
 
 use crate::{InvalidVerificationMethod, VerificationMethodResolutionError};
 
-mod verifier;
-
-pub use verifier::*;
-
 #[derive(Debug, thiserror::Error)]
 pub enum VerificationError {
     #[error("verification method resolution failed: {0}")]
@@ -20,6 +16,9 @@ pub enum VerificationError {
     /// Invalid proof.
     #[error("invalid proof")]
     InvalidProof,
+
+    #[error("invalid hash")]
+    InvalidHash,
 
     // /// Unsupported key identifier.
     // #[error("unsupported key id `{0}`")]
