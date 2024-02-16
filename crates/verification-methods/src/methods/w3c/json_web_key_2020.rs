@@ -8,8 +8,8 @@ use ssi_jwk::{Algorithm, JWK};
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
+    VerificationError, VerificationMethod,
 };
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
@@ -62,9 +62,15 @@ impl JsonWebKey2020 {
         &self.public_key
     }
 
-    pub fn sign_bytes(&self, secret_key: &JWK, algorithm: Option<ssi_jwk::Algorithm>, data: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
-        let algorithm = 
-            algorithm.or(secret_key.algorithm).ok_or(MessageSignatureError::InvalidSecretKey)?;
+    pub fn sign_bytes(
+        &self,
+        secret_key: &JWK,
+        algorithm: Option<ssi_jwk::Algorithm>,
+        data: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = algorithm
+            .or(secret_key.algorithm)
+            .ok_or(MessageSignatureError::InvalidSecretKey)?;
         ssi_jws::sign_bytes(algorithm, data, secret_key)
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }

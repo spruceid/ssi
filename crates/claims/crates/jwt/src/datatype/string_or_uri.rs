@@ -10,12 +10,18 @@ pub enum StringOrURI {
     URI(UriBuf),
 }
 
+impl StringOrURI {
+    pub fn into_string(self) -> String {
+        match self {
+            Self::String(s) => s,
+            Self::URI(s) => s.into_string(),
+        }
+    }
+}
+
 impl From<StringOrURI> for String {
     fn from(id: StringOrURI) -> Self {
-        match id {
-            StringOrURI::URI(uri) => uri.into(),
-            StringOrURI::String(s) => s,
-        }
+        id.into_string()
     }
 }
 

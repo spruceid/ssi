@@ -15,7 +15,7 @@ pub(crate) fn encode_aleo_address(jwk: &JWK, network_id: &str) -> Result<String,
     use bech32::ToBase32;
     let address = bech32::encode(
         "aleo",
-        &params.public_key.0.to_base32(),
+        params.public_key.0.to_base32(),
         bech32::Variant::Bech32m,
     )
     .map_err(|_| "Unable to encode Aleo account address")?;
@@ -27,9 +27,9 @@ pub(crate) fn encode_aleo_address(jwk: &JWK, network_id: &str) -> Result<String,
 pub struct Aleo;
 
 impl BlockchainAccountIdType for Aleo {
-	const NAMESPACE: &'static str = "aleo";
+    const NAMESPACE: &'static str = "aleo";
 
-	const REFERENCE: &'static str = "1";
+    const REFERENCE: &'static str = "1";
 }
 
 pub type AleoBlockchainAccountId = super::TypedBlockchainAccountId<Aleo>;

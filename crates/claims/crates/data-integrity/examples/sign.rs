@@ -263,7 +263,7 @@ impl<'a> ssi_crypto::MessageSigner<ssi_jwk::algorithm::EdDSA> for MessageSigner<
         _protocol: (),
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        Ok(self.method.sign_bytes(message, self.key_pair))
+        self.method.sign_bytes(self.key_pair, message)
     }
 }
 

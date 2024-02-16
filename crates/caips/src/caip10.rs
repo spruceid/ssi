@@ -28,8 +28,8 @@ use linked_data::{
     LinkedDataPredicateObjects, LinkedDataSubject,
 };
 use ssi_jwk::{Params, JWK};
-use std::{fmt, marker::PhantomData, ops::Deref};
 use std::str::FromStr;
+use std::{fmt, marker::PhantomData, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -326,7 +326,7 @@ pub enum AleoBlockchainAccountIdError {
     Caip2Namespace(String, String),
 
     #[error("unexpected network `{0}`, `{1}`")]
-    Network(String, String)
+    Network(String, String),
 }
 
 pub trait BlockchainAccountIdType {
@@ -341,11 +341,17 @@ pub struct TypedBlockchainAccountId<T>(BlockchainAccountId, PhantomData<T>);
 impl<T: BlockchainAccountIdType> TypedBlockchainAccountId<T> {
     pub fn new(id: BlockchainAccountId) -> Result<Self, AleoBlockchainAccountIdError> {
         if id.chain_id.namespace != T::NAMESPACE {
-            return Err(AleoBlockchainAccountIdError::Caip2Namespace(T::NAMESPACE.to_owned(), id.chain_id.namespace.clone()))
+            return Err(AleoBlockchainAccountIdError::Caip2Namespace(
+                T::NAMESPACE.to_owned(),
+                id.chain_id.namespace.clone(),
+            ));
         }
 
         if id.chain_id.reference != T::REFERENCE {
-            return Err(AleoBlockchainAccountIdError::Network(T::REFERENCE.to_owned(), id.chain_id.reference.clone()))
+            return Err(AleoBlockchainAccountIdError::Network(
+                T::REFERENCE.to_owned(),
+                id.chain_id.reference.clone(),
+            ));
         }
 
         Ok(Self(id, PhantomData))
@@ -393,6 +399,42 @@ impl<'de, T: BlockchainAccountIdType> Deserialize<'de> for TypedBlockchainAccoun
     {
         let id = BlockchainAccountId::deserialize(deserializer)?;
         Self::new(id).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation, T> linked_data::LinkedDataResource<I, V>
+    for TypedBlockchainAccountId<T>
+{
+    fn interpretation(
+        &self,
+        _vocabulary: &mut V,
+        _interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
+        use linked_data::{rdf_types::Term, CowRdfTerm, RdfLiteral, ResourceInterpretation};
+        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
+            RdfLiteral::Xsd(xsd_types::Value::String(self.to_string())),
+        ))))
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation, T> LinkedDataPredicateObjects<I, V>
+    for TypedBlockchainAccountId<T>
+{
+    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<I, V>,
+    {
+        visitor.object(self)?;
+        visitor.end()
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation, T> LinkedDataSubject<I, V> for TypedBlockchainAccountId<T> {
+    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<I, V>,
+    {
+        visitor.end()
     }
 }
 

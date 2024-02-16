@@ -130,7 +130,7 @@ impl Ed25519VerificationKey2020 {
 
 pub enum SecretKeyRef<'a> {
     Ed25519(&'a ed25519_dalek::Keypair),
-    Jwk(&'a JWK)
+    Jwk(&'a JWK),
 }
 
 impl<'a> From<&'a ed25519_dalek::Keypair> for SecretKeyRef<'a> {
@@ -200,7 +200,7 @@ impl SigningMethod<ed25519_dalek::Keypair, ssi_jwk::algorithm::EdDSA>
         _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        this.sign_bytes( secret, message)
+        this.sign_bytes(secret, message)
     }
 }
 
@@ -211,7 +211,7 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey202
         _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        this.sign_bytes( secret_key, message)
+        this.sign_bytes(secret_key, message)
     }
 }
 

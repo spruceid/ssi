@@ -8,8 +8,8 @@ use ssi_jwk::JWK;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
-    TypedVerificationMethod, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
+    VerificationMethod,
 };
 
 pub const RSA_VERIFICATION_KEY_2018_TYPE: &str = "RsaVerificationKey2018";
@@ -60,7 +60,11 @@ impl RsaVerificationKey2018 {
         &self.public_key
     }
 
-    pub fn sign_bytes(&self, data: &[u8], secret_key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
+    pub fn sign_bytes(
+        &self,
+        data: &[u8],
+        secret_key: &JWK,
+    ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, data, secret_key)
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }

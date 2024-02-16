@@ -63,9 +63,7 @@ impl BlockchainVerificationMethod2021 {
     ) -> Result<bool, VerificationError> {
         match public_key_jwk {
             Some(jwk) => match self.blockchain_account_id.verify(jwk) {
-                Ok(()) => Ok(
-                    ssi_jws::verify_bytes(algorithm, message, jwk, signature).is_ok(),
-                ),
+                Ok(()) => Ok(ssi_jws::verify_bytes(algorithm, message, jwk, signature).is_ok()),
                 Err(_) => Ok(false),
             },
             None => Err(VerificationError::MissingPublicKey),

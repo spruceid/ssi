@@ -1,4 +1,3 @@
-use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::AleoBlockchainAccountId;
@@ -6,6 +5,7 @@ use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use static_iref::iri;
+use std::hash::Hash;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
@@ -66,20 +66,23 @@ impl AleoMethod2021 {
         key: &JWK, // FIXME: check key algorithm?
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        ssi_jwk::aleo::sign(bytes, key)
-            .map_err(|_| MessageSignatureError::InvalidSecretKey)
+        ssi_jwk::aleo::sign(bytes, key).map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
     pub fn verify_bytes(
         &self,
         _key: &JWK, // FIXME: check key algorithm?
         bytes: &[u8],
-        signature: &[u8]
+        signature: &[u8],
     ) -> Result<bool, MessageSignatureError> {
-        match ssi_jwk::aleo::verify(bytes, &self.blockchain_account_id.account_address, signature) {
+        match ssi_jwk::aleo::verify(
+            bytes,
+            &self.blockchain_account_id.account_address,
+            signature,
+        ) {
             Ok(()) => Ok(true),
             Err(ssi_jwk::aleo::AleoVerifyError::InvalidSignature) => Ok(false),
-            Err(_) => Err(MessageSignatureError::InvalidSecretKey)
+            Err(_) => Err(MessageSignatureError::InvalidSecretKey),
         }
     }
 }

@@ -128,7 +128,7 @@ impl Multikey {
 
 pub enum SecretKeyRef<'a> {
     Ed25519(&'a ed25519_dalek::Keypair),
-    Jwk(&'a JWK)
+    Jwk(&'a JWK),
 }
 
 impl<'a> From<&'a ed25519_dalek::Keypair> for SecretKeyRef<'a> {
