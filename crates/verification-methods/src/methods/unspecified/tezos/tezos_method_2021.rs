@@ -170,14 +170,15 @@ impl PublicKey {
         }
     }
 
-    // pub fn sign(&self, data: &[u8]) {
-    // 	// let (header, payload, signature_bytes) =
-    //     //     jws.decode().map_err(|_| VerificationError::InvalidProof)?;
-
-    //     // if !matches!(header.algorithm, Algorithm::EdBlake2b | Algorithm::ESBlake2b | Algorithm::ESBlake2bK) {
-    //     //     return Err(VerificationError::InvalidProof);
-    //     // }
-    // }
+    pub fn sign_bytes(
+        &self,
+        key: &JWK,
+        algorithm: ssi_jwk::algorithm::AnyBlake2b,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(algorithm.into(), bytes, key)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+    }
 }
 
 impl Referencable for TezosMethod2021 {

@@ -6,6 +6,7 @@ use rand_core_0_5::{CryptoRng, RngCore};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
+use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
@@ -101,9 +102,44 @@ impl Multikey {
         }
     }
 
-    pub fn sign(&self, data: &[u8], key_pair: &ed25519_dalek::Keypair) -> String {
-        let signature = key_pair.sign(data);
-        multibase::encode(multibase::Base::Base58Btc, signature)
+    pub fn sign_bytes<'a>(
+        &self,
+        secret_key: impl Into<SecretKeyRef<'a>>,
+        signing_bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match secret_key.into() {
+            SecretKeyRef::Ed25519(key_pair) => {
+                let signature = key_pair.sign(signing_bytes);
+                Ok(signature.to_bytes().to_vec())
+            }
+            SecretKeyRef::Jwk(secret_key) => {
+                let algorithm = ssi_jwk::Algorithm::EdDSA;
+                let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
+                if !algorithm.is_compatible_with(key_algorithm) {
+                    return Err(MessageSignatureError::InvalidSecretKey);
+                }
+
+                ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
+                    .map_err(|_| MessageSignatureError::InvalidSecretKey)
+            }
+        }
+    }
+}
+
+pub enum SecretKeyRef<'a> {
+    Ed25519(&'a ed25519_dalek::Keypair),
+    Jwk(&'a JWK)
+}
+
+impl<'a> From<&'a ed25519_dalek::Keypair> for SecretKeyRef<'a> {
+    fn from(value: &'a ed25519_dalek::Keypair) -> Self {
+        Self::Ed25519(value)
+    }
+}
+
+impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
+    fn from(value: &'a JWK) -> Self {
+        Self::Jwk(value)
     }
 }
 

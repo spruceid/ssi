@@ -25,7 +25,7 @@ tezos = ["ssi-tzkey", "ssi-caips/tezos"]
 
 eip712 = ["ssi-eip712"]
 
-aleo = []
+aleo = ["ssi-caips/aleo"]
 
 solana = []
 

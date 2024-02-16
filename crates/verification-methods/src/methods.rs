@@ -81,11 +81,22 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         match this {
-            AnyMethodRef::RsaVerificationKey2018(_) => todo!(),
+            AnyMethodRef::RsaVerificationKey2018(m) => {
+                m.sign_bytes(bytes, secret)
+            },
             AnyMethodRef::Ed25519VerificationKey2018(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
-            AnyMethodRef::Ed25519VerificationKey2020(_) => todo!(),
+            AnyMethodRef::Ed25519VerificationKey2020(m) => {
+                match algorithm {
+                    ssi_jwk::Algorithm::EdDSA => {
+                        m.sign_bytes(secret, bytes)
+                    }
+                    _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                        algorithm.to_string(),
+                    ))
+                }
+            },
             AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
                 ssi_jwk::Algorithm::ES256K => m.sign_bytes(
                     secret,
@@ -113,8 +124,19 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
                     algorithm.to_string(),
                 )),
             },
-            AnyMethodRef::JsonWebKey2020(_) => todo!(),
-            AnyMethodRef::Multikey(_) => todo!(),
+            AnyMethodRef::JsonWebKey2020(m) => {
+                m.sign_bytes(secret, Some(algorithm), bytes)
+            },
+            AnyMethodRef::Multikey(m) => {
+                match algorithm {
+                    ssi_jwk::Algorithm::EdDSA => {
+                        m.sign_bytes(secret, bytes)
+                    }
+                    _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                        algorithm.to_string(),
+                    ))
+                }
+            },
             AnyMethodRef::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(m) => {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
@@ -122,12 +144,18 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
                 m.sign_bytes(secret, algorithm.try_into()?, bytes)
             }
             AnyMethodRef::TezosMethod2021(m) => m.sign_bytes(secret, algorithm.try_into()?, bytes),
-            AnyMethodRef::AleoMethod2021(_) => todo!(),
-            AnyMethodRef::BlockchainVerificationMethod2021(_) => todo!(),
+            AnyMethodRef::AleoMethod2021(m) => {
+                m.sign_bytes(secret, bytes) // FIXME: check key algorithm?
+            },
+            AnyMethodRef::BlockchainVerificationMethod2021(m) => {
+                m.sign_bytes(secret, algorithm, bytes)
+            },
             AnyMethodRef::Eip712Method2021(m) => {
                 SigningMethod::sign_bytes(m, secret, algorithm.try_into()?, bytes)
             }
-            AnyMethodRef::SolanaMethod2021(_) => todo!(),
+            AnyMethodRef::SolanaMethod2021(m) => {
+                m.sign_bytes(secret, Some(algorithm), bytes) // FIXME: check algorithm?
+            },
         }
     }
 }

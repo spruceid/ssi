@@ -3,11 +3,12 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
+use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SignatureError,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
     TypedVerificationMethod, VerificationMethod,
 };
 
@@ -59,12 +60,9 @@ impl RsaVerificationKey2018 {
         &self.public_key
     }
 
-    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<String, SignatureError> {
-        let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::RS256, None);
-        let signing_bytes = header.encode_signing_bytes(data);
-        let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, &signing_bytes, secret_key)
-            .map_err(|_| SignatureError::InvalidSecretKey)?;
-        Ok(multibase::Base::Base64.encode(signature))
+    pub fn sign_bytes(&self, data: &[u8], secret_key: &JWK) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, data, secret_key)
+            .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 }
 

@@ -3,6 +3,9 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
+use ssi_crypto::MessageSignatureError;
+use ssi_jwk::JWK;
+use ssi_verification_methods_core::VerificationError;
 use static_iref::iri;
 
 use crate::{
@@ -50,6 +53,34 @@ pub struct BlockchainVerificationMethod2021 {
 impl BlockchainVerificationMethod2021 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#BlockchainVerificationMethod2021");
+
+    pub fn verify_bytes(
+        &self,
+        public_key_jwk: Option<&JWK>,
+        message: &[u8],
+        algorithm: ssi_jwk::Algorithm,
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
+        match public_key_jwk {
+            Some(jwk) => match self.blockchain_account_id.verify(jwk) {
+                Ok(()) => Ok(
+                    ssi_jws::verify_bytes(algorithm, message, jwk, signature).is_ok(),
+                ),
+                Err(_) => Ok(false),
+            },
+            None => Err(VerificationError::MissingPublicKey),
+        }
+    }
+
+    pub fn sign_bytes(
+        &self,
+        key: &JWK,
+        algorithm: ssi_jwk::Algorithm,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(algorithm, bytes, key)
+            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+    }
 }
 
 impl Referencable for BlockchainVerificationMethod2021 {

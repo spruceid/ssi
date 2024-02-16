@@ -3,12 +3,12 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
+use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWSString;
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SignatureError,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod,
     TypedVerificationMethod, VerificationError, VerificationMethod,
 };
 
@@ -53,15 +53,17 @@ impl SolanaMethod2021 {
         &self.public_key
     }
 
-    pub fn sign(&self, data: &[u8], secret_key: &JWK) -> Result<CompactJWSString, SignatureError> {
-        let algorithm = secret_key
-            .algorithm
-            .ok_or(SignatureError::InvalidSecretKey)?;
-        let header = ssi_jws::Header::new_unencoded(algorithm, None);
-        let signing_bytes = header.encode_signing_bytes(data);
-        let signature = ssi_jws::sign_bytes(algorithm, &signing_bytes, secret_key)
-            .map_err(|_| SignatureError::InvalidSecretKey)?;
-        Ok(CompactJWSString::from_signing_bytes_and_signature(signing_bytes, signature).unwrap())
+    pub fn sign_bytes( // FIXME: check algorithm?
+        &self,
+        secret_key: &JWK,
+        algorithm: Option<ssi_jwk::Algorithm>,
+        data: &[u8]
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = algorithm.or(secret_key
+            .algorithm)
+            .ok_or(MessageSignatureError::InvalidSecretKey)?;
+        ssi_jws::sign_bytes(algorithm, data, secret_key)
+            .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
     pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
