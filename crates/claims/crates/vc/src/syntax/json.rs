@@ -8,7 +8,6 @@ use rdf_types::VocabularyMut;
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 use ssi_claims_core::{ExtractProof, Validate, VerifiableClaims};
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
-use ssi_jwt::JWTClaims;
 
 use crate::{Context, Credential, VERIFIABLE_CREDENTIAL_TYPE, VERIFIABLE_PRESENTATION_TYPE};
 
@@ -117,14 +116,6 @@ impl JsonCredential {
             refresh_services: Vec::new(),
             additional_properties: BTreeMap::new(),
         }
-    }
-
-    pub fn to_jwt_claims(&self) -> JWTClaims {
-        let mut claims = JWTClaims::default();
-
-        todo!();
-
-        // claims
     }
 }
 

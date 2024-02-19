@@ -1,8 +1,6 @@
 use chrono::{DateTime, Utc};
 use ssi_jwt::JWTClaims;
 
-use super::json::JsonCredential;
-
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcDecodeError {
     #[error("missing credential value")]
@@ -21,7 +19,7 @@ pub enum JwtVcDecodeError {
 /// Decodes a Verifiable Credential form a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vc<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError>
+pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
@@ -103,7 +101,7 @@ pub enum JwtVpDecodeError {
 /// Decodes a Verifiable Presentation from a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vp<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError>
+pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
@@ -134,11 +132,5 @@ fn decode_jwt_vp_specific_headers(jwt: JWTClaims, target: &mut json_syntax::Obje
 
     if let Some(jti) = jwt.jwt_id {
         target.insert("id".into(), jti.into());
-    }
-}
-
-impl JsonCredential {
-    pub fn decode_jwt(jwt: JWTClaims) -> Result<Self, JwtVcDecodeError> {
-        decode_jwt_vc(jwt)
     }
 }

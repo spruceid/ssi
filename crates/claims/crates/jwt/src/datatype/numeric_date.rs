@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use chrono::{prelude::*, Duration, LocalResult};
 use serde::{Deserialize, Serialize, Serializer};
 
@@ -32,6 +34,9 @@ where
 
 #[derive(thiserror::Error, Debug)]
 pub enum NumericDateConversionError {
+    #[error("Invalid float literal")]
+    InvalidFloatLiteral,
+
     #[error("Out of valid microsecond-precision range of NumericDate")]
     OutOfMicrosecondPrecisionRange,
 }
@@ -131,5 +136,16 @@ impl From<NumericDate> for LocalResult<DateTime<Utc>> {
         let (whole_seconds, fractional_nanoseconds) =
             nd.into_whole_seconds_and_fractional_nanoseconds();
         Utc.timestamp_opt(whole_seconds, fractional_nanoseconds)
+    }
+}
+
+impl FromStr for NumericDate {
+    type Err = NumericDateConversionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let f: f64 = s
+            .parse()
+            .map_err(|_| NumericDateConversionError::InvalidFloatLiteral)?;
+        Ok(Self(f))
     }
 }
