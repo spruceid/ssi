@@ -13,7 +13,7 @@ ssi-jwk = { workspace = true, default-features = false, features = ["tezos"]}
 ssi-jws = { workspace = true, version = "0.1", default-features = false, features = ["tezos"] }
 ed25519-dalek = "2.0.0"
 thiserror = "1.0"
-bs58 = { version = "0.4", features = ["check"] }
+bs58 = { workspace = true, features = ["check"] }
 
 [dev-dependencies]
 serde_json = "1.0"

@@ -32,7 +32,7 @@ bbs = { version = "=0.4.1", optional = true }
 pairing-plus = { version = "=0.19.0", optional = true }
 serde = { workspace = true, features = ["derive"] }
 zeroize = { version = "1.5", features = ["zeroize_derive"] }
-bs58 = { version = "0.4", features = ["check"], optional = true }
+bs58 = { workspace = true, features = ["check"], optional = true }
 digest = "0.9"
 iref.workspace = true
 static-iref.workspace = true

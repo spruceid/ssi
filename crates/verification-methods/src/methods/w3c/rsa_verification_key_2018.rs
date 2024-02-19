@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
+use ssi_verification_methods_core::VerificationError;
 use static_iref::iri;
 
 use crate::{
@@ -67,6 +68,16 @@ impl RsaVerificationKey2018 {
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(ssi_jwk::Algorithm::RS256, data, secret_key)
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
+    }
+
+    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+        let result =
+            ssi_jws::verify_bytes(ssi_jwk::Algorithm::RS256, data, &self.public_key, signature);
+        match result {
+            Ok(()) => Ok(true),
+            Err(ssi_jws::Error::InvalidSignature) => Ok(false),
+            Err(_) => Err(VerificationError::InvalidSignature),
+        }
     }
 }
 

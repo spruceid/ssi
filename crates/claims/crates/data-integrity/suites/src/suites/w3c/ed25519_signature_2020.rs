@@ -4,9 +4,7 @@
 //! and Curve25519. It is recommended to use `edssa-2022` instead.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-use futures::FutureExt;
-use multibase::Base;
-use ssi_crypto::{MessageSignatureError, MessageSigner};
+use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{Ed25519VerificationKey2020, SignatureError, VerificationError};
 use static_iref::iri;
@@ -72,10 +70,9 @@ impl CryptographicSuite for Ed25519Signature2020 {
         bytes: &Self::Hashed,
         signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
-        signer
-            .sign(ssi_jwk::algorithm::EdDSA, (), bytes)
-            .map(build_signature)
-            .await
+        Ok(MultibaseSignature::new_base58btc(
+            signer.sign(ssi_jwk::algorithm::EdDSA, (), bytes).await?,
+        ))
     }
 
     fn verify(
@@ -87,24 +84,5 @@ impl CryptographicSuite for Ed25519Signature2020 {
     ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes).map(Into::into)
-    }
-}
-
-pub struct Signature {
-    /// Multibase encoded signature.
-    pub proof_value: String,
-}
-
-pub type MessageBuilder =
-    fn(Result<Vec<u8>, MessageSignatureError>) -> Result<MultibaseSignature, SignatureError>;
-
-fn build_signature(
-    r: Result<Vec<u8>, MessageSignatureError>,
-) -> Result<MultibaseSignature, SignatureError> {
-    match r {
-        Ok(bytes) => Ok(MultibaseSignature {
-            proof_value: multibase::encode(Base::Base58Btc, bytes),
-        }),
-        Err(e) => Err(e.into()),
     }
 }

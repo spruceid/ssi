@@ -56,11 +56,20 @@ impl CryptographicSuite for JsonWebSignature2020 {
     async fn sign(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
-        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
-        todo!()
+        JwsSignature::sign_detached(
+            bytes,
+            signer,
+            method.public_key.key_id.clone(),
+            method
+                .public_key
+                .algorithm
+                .ok_or(SignatureError::MissingAlgorithm)?,
+        )
+        .await
     }
 
     fn verify(
@@ -74,5 +83,10 @@ impl CryptographicSuite for JsonWebSignature2020 {
         method
             .verify_bytes(&signing_bytes, &signature_bytes, Some(algorithm))
             .map(Into::into)
+    }
+
+    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
+        // FIXME: require W3ID_JWS2020_V1_CONTEXT
+        None
     }
 }

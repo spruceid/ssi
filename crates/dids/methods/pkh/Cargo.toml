@@ -29,7 +29,7 @@ chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 async-trait.workspace = true
-bs58 = { version = "0.4", features = ["check"] }
+bs58 = { workspace = true, features = ["check"] }
 bech32 = "0.8"
 
 [dev-dependencies]

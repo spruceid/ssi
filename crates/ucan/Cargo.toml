@@ -14,7 +14,7 @@ iref.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 serde_with = { version = "1.14", features = ["base64"]}
-base64 = "0.12"
+base64.workspace = true
 bs58.workspace = true
 hex.workspace = true
 multibase.workspace = true

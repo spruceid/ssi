@@ -66,19 +66,22 @@ impl CryptographicSuite for EdDsa2022 {
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
-        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
-        todo!()
+        Ok(MultibaseSignature::new_base58btc(
+            signer.sign(ssi_jwk::algorithm::EdDSA, (), bytes).await?,
+        ))
     }
 
     fn verify(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
-        _signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
+        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
     ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
-        todo!()
+        let signature_bytes = signature.decode()?;
+        method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }
 }

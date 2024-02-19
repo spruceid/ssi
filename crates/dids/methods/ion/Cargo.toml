@@ -30,7 +30,7 @@ serde_jcs.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 
-base64 = "0.12"
+base64.workspace = true
 sha2 = "0.10"
 json-patch = "0.2.6"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }

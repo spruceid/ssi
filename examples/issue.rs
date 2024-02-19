@@ -15,7 +15,7 @@ async fn main() {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let resolver = DIDVerifier::new(ssi::dids::example::ExampleDIDResolver::default());
-    let signer = SingleSecretSigner::new(&resolver, key.clone());
+    let signer = SingleSecretSigner::new(key.clone());
 
     let vc: ssi::claims::vc::JsonCredential = serde_json::from_value(json!({
         "@context": ["https://www.w3.org/2018/credentials/v1"],
@@ -40,7 +40,7 @@ async fn main() {
 
             let suite = AnySuite::pick(&key, Some(&params.verification_method)).unwrap();
             let vc = suite
-                .sign(vc, AnyInputContext::default(), &signer, params)
+                .sign(vc, AnyInputContext::default(), &resolver, &signer, params)
                 .await
                 .unwrap();
             let result = vc.verify(&resolver).await.expect("verification failed");
@@ -55,14 +55,19 @@ async fn main() {
         "jwt" => {
             let jwt = vc
                 .to_jwt_claims()
-                .sign(key.algorithm.unwrap(), &verification_method, &signer)
+                .unwrap()
+                .sign(
+                    key.algorithm.unwrap(),
+                    &verification_method,
+                    &resolver,
+                    &signer,
+                )
                 .await
                 .unwrap();
 
-            // ...
-
             let result =
-                ssi::vc::Credential::verify_jwt(&jwt, None, resolver, &mut context_loader).await;
+                ssi::claims::vc::Credential::verify_jwt(&jwt, None, &resolver, &mut context_loader)
+                    .await;
 
             if !result.errors.is_empty() {
                 panic!("verify failed: {:#?}", result);

@@ -99,9 +99,13 @@ impl CryptographicSuite for AleoSignature2021 {
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
+        _hash: &Self::Hashed,
         _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
+        // ssi_jws::sign_bytes(algorithm, data, key)
+        // let signature = ssi_jwk::aleo::sign(hash, key).map_err(MessageSignatureError::signature_failed)?;
+        // signer.sign(method., protocol, message)
+        // Ok(Base58BtcMultibase::encode_signature(&signature))
         todo!()
     }
 

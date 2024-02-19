@@ -1,7 +1,7 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{RsaVerificationKey2018, SignatureError};
+use ssi_verification_methods::{RsaVerificationKey2018, SignatureError, VerificationError};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
@@ -59,20 +59,26 @@ impl CryptographicSuite for RsaSignature2018 {
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
-        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+        bytes: &Self::Hashed,
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
     ) -> Result<Self::Signature, SignatureError> {
-        todo!()
+        let signature = signer.sign(ssi_jwk::algorithm::RS256, (), bytes).await?;
+
+        Ok(Signature {
+            signature_value: base64::encode(signature),
+        })
     }
 
     fn verify(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
-        _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
-        _signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
-        todo!()
+        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
+        bytes: &Self::Hashed,
+        signature: <Self::Signature as Referencable>::Reference<'_>,
+    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+        let signature = base64::decode(signature.signature_value)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        method.verify_bytes(bytes, &signature).map(Into::into)
     }
 }
 

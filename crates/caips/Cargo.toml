@@ -18,7 +18,7 @@ tezos = ["ssi-jwk/tezos"]
 [dependencies]
 thiserror = "1"
 ssi-jwk.workspace = true
-bs58 = { version = "0.4", features = ["check"] }
+bs58 = { workspace = true, features = ["check"] }
 bech32 = { version = "0.8", optional = true }
 serde.workspace = true
 linked-data.workspace = true

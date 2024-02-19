@@ -10,6 +10,7 @@ use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
+use ssi_verification_methods_core::VerificationError;
 use static_iref::iri;
 
 use crate::{
@@ -123,6 +124,16 @@ impl Multikey {
                     .map_err(|_| MessageSignatureError::InvalidSecretKey)
             }
         }
+    }
+
+    pub fn verify_bytes(
+        &self,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<bool, VerificationError> {
+        let signature = ed25519_dalek::Signature::from_bytes(signature)
+            .map_err(|_| VerificationError::InvalidSignature)?;
+        Ok(self.public_key.verify(signing_bytes, &signature))
     }
 }
 

@@ -44,7 +44,7 @@ futures.workspace = true
 self_cell = "1.0.1"
 contextual.workspace = true
 
-# bs58 = { version = "0.4", optional = true }
+# bs58 = { workspace = true, optional = true }
 
 # ed25519-dalek = { version = "1", optional = true }
 # k256 = { version = "0.11", optional = true, features = ["ecdsa", "sha256"] }
