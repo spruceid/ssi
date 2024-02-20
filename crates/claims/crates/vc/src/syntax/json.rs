@@ -197,7 +197,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
+    L::Error: Send + std::fmt::Display,
 {
     type Error = JsonLdError<L::Error>;
     // type Resource = I::Resource;
@@ -468,6 +468,17 @@ impl<'de> Deserialize<'de> for JsonCredentialTypes {
                 write!(formatter, "credential types")
             }
 
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if v == VERIFIABLE_CREDENTIAL_TYPE {
+                    Ok(JsonCredentialTypes::default())
+                } else {
+                    Err(E::custom("expected required `\"CredentialType\"` type"))
+                }
+            }
+
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
             where
                 A: serde::de::SeqAccess<'de>,
@@ -612,7 +623,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
+    L::Error: Send + std::fmt::Display,
 {
     type Error = JsonLdError<L::Error>;
 

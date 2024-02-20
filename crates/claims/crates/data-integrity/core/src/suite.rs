@@ -20,8 +20,8 @@ use crate::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum TransformError {
-    #[error("Expansion failed")]
-    ExpansionFailed,
+    #[error("Expansion failed: {0}")]
+    ExpansionFailed(String),
 
     #[error("RDF deserialization failed: {0}")]
     LinkedData(#[from] linked_data::IntoQuadsError),

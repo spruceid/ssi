@@ -255,7 +255,7 @@ where
         let expanded = data
             .expand(context)
             .await
-            .map_err(|_| TransformError::ExpansionFailed)?;
+            .map_err(|e| TransformError::ExpansionFailed(e.to_string()))?;
         transform(self, &expanded, context, options)
     }
 }

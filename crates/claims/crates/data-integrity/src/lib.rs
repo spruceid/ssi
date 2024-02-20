@@ -49,7 +49,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
+    L::Error: Send + std::fmt::Display,
 {
     ssi_data_integrity_core::from_json_str(json, environment).await
 }

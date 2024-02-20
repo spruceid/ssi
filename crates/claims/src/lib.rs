@@ -24,6 +24,7 @@ pub use ssi_data_integrity as data_integrity;
 
 /// JSON-like verifiable credential or JWS (presumably JWT).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum JsonCredentialOrJws<P = json_syntax::Value> {
     /// JSON-like verifiable credential.
     Credential(vc::JsonVerifiableCredential<P>),

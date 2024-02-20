@@ -3,6 +3,12 @@
 // cargo run --example present ldp jwt < examples/files/vc.jsonld > examples/files/vp.jwt
 // cargo run --example present jwt ldp < examples/files/vc.jwt > examples/files/vp-jwtvc.jsonld
 // cargo run --example present jwt jwt < examples/files/vc.jwt > examples/files/vp-jwtvc.jwt
+//
+// For `nushell` users:
+// cat examples/files/vc.jsonld | cargo run --example present ldp ldp | save examples/files/vp.jsonld
+// cat examples/files/vc.jsonld | cargo run --example present ldp jwt | save examples/files/vp.jwt
+// cat examples/files/vc.jwt | cargo run --example present jwt ldp | save examples/files/vp-jwtvc.jsonld
+// cat examples/files/vc.jwt | cargo run --example present jwt jwt | save examples/files/vp-jwtvc.jwt
 use ssi::{
     claims::{
         data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
@@ -85,7 +91,7 @@ async fn main() {
                 .to_jwt_claims()
                 .unwrap()
                 .sign(
-                    key.algorithm.unwrap(),
+                    key.get_algorithm().unwrap(),
                     &verification_method,
                     &resolver,
                     &signer,

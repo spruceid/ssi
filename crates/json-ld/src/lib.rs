@@ -113,7 +113,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
+    L::Error: Send + std::fmt::Display,
 {
     type Error = JsonLdError<L::Error>;
 

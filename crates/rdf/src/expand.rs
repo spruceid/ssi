@@ -7,7 +7,7 @@ use rdf_types::{
 
 /// LD-Expandable value.
 pub trait Expandable<E>: Sized {
-    type Error;
+    type Error: std::fmt::Display;
 
     type Expanded;
 

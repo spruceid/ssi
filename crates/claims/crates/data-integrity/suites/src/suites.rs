@@ -77,7 +77,7 @@ macro_rules! impl_rdf_input_urdna2015 {
                 let expanded = data
                     .expand(context)
                     .await
-                    .map_err(|_| $crate::ssi_data_integrity_core::suite::TransformError::ExpansionFailed)?;
+                    .map_err(|e| $crate::ssi_data_integrity_core::suite::TransformError::ExpansionFailed(e.to_string()))?;
                 context.canonical_form_of(&expanded).map_err(Into::into)
             }
         }

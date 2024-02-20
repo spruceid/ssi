@@ -424,7 +424,7 @@ where
     V::Iri: Send + Sync,
     V::BlankId: Send + Sync,
     L: Send + Sync,
-    L::Error: Send,
+    L::Error: Send + std::fmt::Display,
 {
     async fn expand_configuration(
         &mut self,

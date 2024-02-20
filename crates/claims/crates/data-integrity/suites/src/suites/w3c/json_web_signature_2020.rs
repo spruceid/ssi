@@ -1,9 +1,18 @@
+use lazy_static::lazy_static;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{JsonWebKey2020, SignatureError};
-use static_iref::iri;
+use static_iref::{iri, iri_ref};
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
+
+lazy_static! {
+    static ref W3ID_JWS2020_V1_CONTEXT: json_ld::syntax::ContextEntry = {
+        json_ld::syntax::ContextEntry::IriRef(
+            iri_ref!("https://w3id.org/security/suites/jws-2020/v1").to_owned(),
+        )
+    };
+}
 
 /// JSON Web Signature 2020.
 ///
@@ -66,7 +75,7 @@ impl CryptographicSuite for JsonWebSignature2020 {
             method.public_key.key_id.clone(),
             method
                 .public_key
-                .algorithm
+                .get_algorithm()
                 .ok_or(SignatureError::MissingAlgorithm)?,
         )
         .await
@@ -86,7 +95,8 @@ impl CryptographicSuite for JsonWebSignature2020 {
     }
 
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
-        // FIXME: require W3ID_JWS2020_V1_CONTEXT
-        None
+        Some(json_ld::syntax::Context::One(
+            W3ID_JWS2020_V1_CONTEXT.clone(),
+        ))
     }
 }

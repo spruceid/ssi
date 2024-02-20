@@ -57,7 +57,7 @@ async fn main() {
                 .to_jwt_claims()
                 .unwrap()
                 .sign(
-                    key.algorithm.unwrap(),
+                    key.get_algorithm().unwrap(),
                     &verification_method,
                     &resolver,
                     &signer,
