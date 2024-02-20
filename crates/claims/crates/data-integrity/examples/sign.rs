@@ -250,7 +250,7 @@ impl VerificationMethodResolver<Ed25519VerificationKey2020> for Keyring {
         _issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
     ) -> Result<
-        ssi_verification_methods::Cow<'a, Ed25519VerificationKey2020>,
+        ssi_verification_methods::VerificationMethodCow<'a, Ed25519VerificationKey2020>,
         VerificationMethodResolutionError,
     > {
         match method {
@@ -262,7 +262,9 @@ impl VerificationMethodResolver<Ed25519VerificationKey2020> for Keyring {
                 todo!()
             }
             Some(ReferenceOrOwnedRef::Reference(id)) => match self.keys.get(id) {
-                Some((key, _)) => Ok(ssi_verification_methods::Cow::Borrowed(key)),
+                Some((key, _)) => Ok(ssi_verification_methods::VerificationMethodCow::Borrowed(
+                    key,
+                )),
                 None => Err(VerificationMethodResolutionError::UnknownKey),
             },
             None => Err(VerificationMethodResolutionError::MissingVerificationMethod),

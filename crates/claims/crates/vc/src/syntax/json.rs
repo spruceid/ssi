@@ -213,7 +213,7 @@ where
 /// JSON Verifiable Credential.
 ///
 /// The `P` parameter is the proof format type.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
     serialize = "P: serde::Serialize",
     deserialize = "P: serde::Deserialize<'de>"
@@ -516,15 +516,6 @@ pub struct JsonPresentation<C = JsonCredential> {
     #[serde(rename = "type")]
     pub types: JsonPresentationTypes,
 
-    /// Verifiable credentials.
-    #[serde(rename = "verifiableCredential")]
-    #[serde(
-        with = "value_or_array",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub verifiable_credentials: Vec<C>,
-
     /// Holders.
     #[serde(rename = "holder")]
     #[serde(
@@ -534,18 +525,40 @@ pub struct JsonPresentation<C = JsonCredential> {
     )]
     pub holders: Vec<UriBuf>,
 
+    /// Verifiable credentials.
+    #[serde(rename = "verifiableCredential")]
+    #[serde(
+        with = "value_or_array",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pub verifiable_credentials: Vec<C>,
+
     #[serde(flatten)]
     pub additional_properties: BTreeMap<String, json_syntax::Value>,
 }
 
+impl Default for JsonPresentation {
+    fn default() -> Self {
+        Self {
+            context: Context::default(),
+            id: None,
+            types: JsonPresentationTypes::default(),
+            verifiable_credentials: Vec::new(),
+            holders: Vec::new(),
+            additional_properties: BTreeMap::new(),
+        }
+    }
+}
+
 impl<C> JsonPresentation<C> {
-    pub fn new(id: Option<UriBuf>, verifiable_credentials: Vec<C>, holders: Vec<UriBuf>) -> Self {
+    pub fn new(id: Option<UriBuf>, holders: Vec<UriBuf>, verifiable_credentials: Vec<C>) -> Self {
         Self {
             context: Context::default(),
             id,
             types: JsonPresentationTypes::default(),
-            verifiable_credentials,
             holders,
+            verifiable_credentials,
             additional_properties: BTreeMap::new(),
         }
     }
@@ -557,9 +570,9 @@ impl<C> WithJsonLdContext for JsonPresentation<C> {
     }
 }
 
-impl<C: Credential> Validate for JsonPresentation<C> {
+impl<C> Validate for JsonPresentation<C> {
     fn is_valid(&self) -> bool {
-        crate::Presentation::is_valid_presentation(self)
+        true
     }
 }
 
@@ -680,9 +693,9 @@ impl<C, P> JsonVerifiablePresentation<C, P> {
     }
 }
 
-impl<C: Credential, P> Validate for JsonVerifiablePresentation<C, P> {
+impl<C, P> Validate for JsonVerifiablePresentation<C, P> {
     fn is_valid(&self) -> bool {
-        crate::Presentation::is_valid_presentation(self)
+        true
     }
 }
 

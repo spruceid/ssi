@@ -572,8 +572,8 @@ mod tests {
         // Make it into a VP
         let presentation = JsonPresentation::new(
             Some(uri!("http://example.org/presentations/3731").to_owned()),
-            vec![vc],
             Vec::new(),
+            vec![vc],
         );
 
         let vp_issue_options = ProofConfiguration::new(

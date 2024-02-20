@@ -9,7 +9,6 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-dids-core/"
 
 [features]
-default = ["http"]
 http = ["reqwest", "percent-encoding"]
 example = []
 

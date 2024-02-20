@@ -34,21 +34,6 @@ pub trait Presentation {
     fn holders(&self) -> &[UriBuf] {
         &[]
     }
-
-    /// Validates the presentation and all its credentials.
-    ///
-    /// Validation consists in verifying that the claims themselves are
-    /// consistent and valid with regard to the verification environment.
-    /// For instance, checking that a credential's expiration date is not in the
-    /// past, or the issue date not in the future.
-    ///
-    /// Validation may fail even if the presentation proof is successfully
-    /// verified.
-    fn is_valid_presentation(&self) -> bool {
-        self.verifiable_credentials()
-            .iter()
-            .all(Credential::is_valid_credential)
-    }
 }
 
 pub trait VerifiablePresentation: Presentation + VerifiableClaims {}

@@ -162,11 +162,6 @@ pub use ssi_crypto as crypto;
 /// See: <https://www.rfc-editor.org/rfc/rfc7517>
 pub use ssi_jwk as jwk;
 
-/// JSON Web Signature (JWS).
-///
-/// See: <https://datatracker.ietf.org/doc/html/rfc7515>
-pub use ssi_jws as jws;
-
 /// RDF utilities.
 pub use ssi_rdf as rdf;
 

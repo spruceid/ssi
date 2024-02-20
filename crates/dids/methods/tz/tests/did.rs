@@ -369,8 +369,8 @@ async fn credential_prove_verify_did_tz2() {
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
-        vec![vc],
         vec![did.clone().into()],
+        vec![vc],
     );
 
     let vp_issue_options = ProofConfiguration::new(
@@ -487,8 +487,8 @@ async fn credential_prove_verify_did_tz3() {
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
-        vec![vc],
         vec![did.clone().into()],
+        vec![vc],
     );
 
     let vp_issue_options = ProofConfiguration::new(

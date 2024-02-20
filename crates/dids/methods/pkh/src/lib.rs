@@ -1029,7 +1029,7 @@ mod tests {
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // Make it into a VP.
-        let presentation = JsonPresentation::new(None, vec![vc], vec![did.clone().into()]);
+        let presentation = JsonPresentation::new(None, vec![did.clone().into()], vec![vc]);
 
         let vp_issue_options = ProofConfiguration::new(
             "2021-03-18T16:38:25Z".parse().unwrap(),
@@ -1158,7 +1158,7 @@ mod tests {
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
 
         // Make it into a VP
-        let presentation = JsonPresentation::new(None, vec![vc], vec![did.clone().into()]);
+        let presentation = JsonPresentation::new(None, vec![did.clone().into()], vec![vc]);
 
         let vp_issue_options = ProofConfiguration::new(
             "2021-03-18T16:38:25Z".parse().unwrap(),

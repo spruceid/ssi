@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::SigningMethod;
+use ssi_verification_methods_core::{JwkVerificationMethod, SigningMethod};
 pub use w3c::*;
 
 mod unspecified;
@@ -142,6 +142,122 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
                 SigningMethod::sign_bytes(m, secret, algorithm.try_into()?, bytes)
             }
             AnyMethodRef::SolanaMethod2021(m) => {
+                m.sign_bytes(secret, Some(algorithm), bytes) // FIXME: check algorithm?
+            }
+        }
+    }
+}
+
+ssi_verification_methods_core::verification_method_union! {
+    pub enum AnyJwkMethod, AnyJwkMethodRef, AnyJwkMethodType {
+        /// Deprecated verification method for the `RsaSignature2018` suite.
+        RsaVerificationKey2018,
+
+        /// Deprecated verification method for the `Ed25519Signature2018` suite.
+        Ed25519VerificationKey2018,
+
+        /// Deprecated verification method for the `Ed25519Signature2020` suite.
+        Ed25519VerificationKey2020,
+
+        EcdsaSecp256k1VerificationKey2019,
+
+        EcdsaSecp256r1VerificationKey2019,
+
+        /// `JsonWebKey2020`.
+        JsonWebKey2020,
+
+        /// `Multikey`.
+        Multikey,
+
+        SolanaMethod2021
+    }
+}
+
+impl AnyJwkMethod {
+    /// Returns the public key of the verification method as a JWK.
+    ///
+    /// Some methods don't have any the public key embedded.
+    pub fn public_key_jwk(&self) -> Cow<JWK> {
+        match self {
+            Self::RsaVerificationKey2018(m) => Cow::Borrowed(m.public_key_jwk()),
+            Self::Ed25519VerificationKey2018(m) => Cow::Owned(m.public_key_jwk()),
+            Self::Ed25519VerificationKey2020(m) => Cow::Owned(m.public_key_jwk()),
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.public_key_jwk(),
+            Self::EcdsaSecp256r1VerificationKey2019(m) => Cow::Owned(m.public_key_jwk()),
+            Self::JsonWebKey2020(m) => Cow::Borrowed(m.public_key_jwk()),
+            Self::Multikey(m) => Cow::Owned(m.public_key_jwk()),
+            Self::SolanaMethod2021(m) => Cow::Borrowed(m.public_key_jwk()),
+        }
+    }
+}
+
+impl<'a> AnyJwkMethodRef<'a> {
+    pub fn public_key_jwk(&self) -> Cow<'a, JWK> {
+        match self {
+            Self::RsaVerificationKey2018(m) => Cow::Borrowed(m.public_key_jwk()),
+            Self::Ed25519VerificationKey2018(m) => Cow::Owned(m.public_key_jwk()),
+            Self::Ed25519VerificationKey2020(m) => Cow::Owned(m.public_key_jwk()),
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.public_key_jwk(),
+            Self::EcdsaSecp256r1VerificationKey2019(m) => Cow::Owned(m.public_key_jwk()),
+            Self::JsonWebKey2020(m) => Cow::Borrowed(m.public_key_jwk()),
+            Self::Multikey(m) => Cow::Owned(m.public_key_jwk()),
+            Self::SolanaMethod2021(m) => Cow::Borrowed(m.public_key_jwk()),
+        }
+    }
+}
+
+impl JwkVerificationMethod for AnyJwkMethod {
+    fn to_jwk(&self) -> Cow<JWK> {
+        self.public_key_jwk()
+    }
+
+    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
+        r.public_key_jwk()
+    }
+}
+
+impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyJwkMethod {
+    fn sign_bytes_ref(
+        this: AnyJwkMethodRef,
+        secret: &JWK,
+        algorithm: ssi_jwk::Algorithm,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        match this {
+            AnyJwkMethodRef::RsaVerificationKey2018(m) => m.sign_bytes(bytes, secret),
+            AnyJwkMethodRef::Ed25519VerificationKey2018(m) => {
+                m.sign_bytes(secret, algorithm.try_into()?, bytes)
+            }
+            AnyJwkMethodRef::Ed25519VerificationKey2020(m) => match algorithm {
+                ssi_jwk::Algorithm::EdDSA => m.sign_bytes(secret, bytes),
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyJwkMethodRef::EcdsaSecp256k1VerificationKey2019(m) => match algorithm {
+                ssi_jwk::Algorithm::ES256K => m.sign_bytes(
+                    secret,
+                    ecdsa_secp_256k1_verification_key_2019::DigestFunction::Sha256,
+                    bytes,
+                ),
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyJwkMethodRef::EcdsaSecp256r1VerificationKey2019(m) => match algorithm {
+                ssi_jwk::Algorithm::ES256 => m.sign_bytes(secret, bytes),
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyJwkMethodRef::JsonWebKey2020(m) => m.sign_bytes(secret, Some(algorithm), bytes),
+            AnyJwkMethodRef::Multikey(m) => match algorithm {
+                ssi_jwk::Algorithm::EdDSA => m.sign_bytes(secret, bytes),
+                _ => Err(MessageSignatureError::UnsupportedAlgorithm(
+                    algorithm.to_string(),
+                )),
+            },
+            AnyJwkMethodRef::SolanaMethod2021(m) => {
                 m.sign_bytes(secret, Some(algorithm), bytes) // FIXME: check algorithm?
             }
         }

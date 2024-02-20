@@ -102,6 +102,13 @@ impl<T> OneOrMany<T> {
             }
         }
     }
+
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            Self::One(t) => vec![t],
+            Self::Many(v) => v,
+        }
+    }
 }
 
 // consuming iterator
@@ -136,4 +143,17 @@ impl<'a, T> IntoIterator for &'a OneOrMany<T> {
 pub enum OneOrManyRef<'a, T> {
     One(&'a T),
     Many(&'a [T]),
+}
+
+impl<'a, T> OneOrManyRef<'a, T> {
+    pub fn from_slice(s: &'a [T]) -> Self {
+        match s {
+            [t] => Self::One(t),
+            _ => Self::Many(s),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Self::Many([]))
+    }
 }

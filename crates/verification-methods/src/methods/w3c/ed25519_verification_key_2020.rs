@@ -1,4 +1,4 @@
-use std::{hash::Hash, str::FromStr};
+use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
@@ -10,6 +10,7 @@ use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
+use ssi_verification_methods_core::JwkVerificationMethod;
 use static_iref::iri;
 
 use crate::{
@@ -188,6 +189,16 @@ impl TypedVerificationMethod for Ed25519VerificationKey2020 {
 
     fn ref_type(_r: Self::Reference<'_>) -> &str {
         ED25519_VERIFICATION_KEY_2020_TYPE
+    }
+}
+
+impl JwkVerificationMethod for Ed25519VerificationKey2020 {
+    fn to_jwk(&self) -> Cow<JWK> {
+        Cow::Owned(self.public_key_jwk())
+    }
+
+    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
+        <Self as JwkVerificationMethod>::to_jwk(r)
     }
 }
 

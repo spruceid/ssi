@@ -6,6 +6,7 @@ pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
 use core::fmt;
 pub use error::Error;
+use iref::IriBuf;
 use linked_data::{
     rdf_types, LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
     LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef,
@@ -13,6 +14,10 @@ use linked_data::{
 use rdf_types::{Interpretation, Vocabulary, RDF_LANG_STRING};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
+use ssi_verification_methods_core::{
+    InvalidVerificationMethod, JwkVerificationMethod, ReferenceOrOwned, VerificationError,
+    VerificationMethodResolver,
+};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::ops::Deref;
@@ -156,6 +161,42 @@ impl CompactJWS {
 
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+
+    pub async fn verify<'a, M: 'a + JwkVerificationMethod>(
+        &self,
+        resolver: &'a impl VerificationMethodResolver<M>,
+    ) -> Result<bool, VerificationError> {
+        let (header, _payload, signature) = self
+            .decode()
+            .map_err(|_| VerificationError::InvalidInputData)?;
+
+        let vm = match header.key_id {
+            Some(id) => match IriBuf::new(id) {
+                Ok(iri) => Some(ReferenceOrOwned::Reference(iri)),
+                Err(e) => {
+                    return Err(VerificationError::InvalidVerificationMethod(
+                        InvalidVerificationMethod::InvalidIri(e.0),
+                    ))
+                }
+            },
+            None => None,
+        };
+
+        let vm = resolver
+            .resolve_verification_method(
+                None, // TODO: get the issuer from the payload? If its a JWT for instance.
+                vm.as_ref().map(ReferenceOrOwned::borrowed),
+            )
+            .await?;
+
+        let jwk = vm.to_jwk();
+
+        match verify_bytes(header.algorithm, self.signing_bytes(), &jwk, &signature) {
+            Ok(()) => Ok(true),
+            Err(Error::InvalidSignature) => Ok(false),
+            Err(_) => Err(VerificationError::InvalidSignature),
+        }
     }
 }
 
@@ -1568,8 +1609,10 @@ mod tests {
         verify_bytes(Algorithm::ES256, data, &key, &sig).unwrap();
         verify_bytes(Algorithm::ES256, bad_data, &key, &sig).unwrap_err();
 
-        let key: JWK =
-            serde_json::from_str(include_str!("../../../tests/secp256r1-2021-03-18.json")).unwrap();
+        let key: JWK = serde_json::from_str(include_str!(
+            "../../../../../tests/secp256r1-2021-03-18.json"
+        ))
+        .unwrap();
         let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
         let jws = encode_sign(Algorithm::ES256, payload, &key).unwrap();
         assert_eq!(jws, "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6ZXhhbXBsZTpmb28iLCJ2cCI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjoiVmVyaWZpYWJsZVByZXNlbnRhdGlvbiJ9fQ.rJzO6MmTNS8Tn-L3baIf9_2Jr9OoK8E06MxJtofz8xMUGSom6eRUmWGZ7oQVjgP3HogOD80miTvuvKTWa54Nvw");
@@ -1586,8 +1629,10 @@ mod tests {
         verify_bytes(Algorithm::ES384, data, &key, &sig).unwrap();
         verify_bytes(Algorithm::ES384, bad_data, &key, &sig).unwrap_err();
 
-        let key: JWK =
-            serde_json::from_str(include_str!("../../../tests/secp384r1-2022-05-10.json")).unwrap();
+        let key: JWK = serde_json::from_str(include_str!(
+            "../../../../../tests/secp384r1-2022-05-10.json"
+        ))
+        .unwrap();
         let payload = "{\"iss\":\"did:example:foo\",\"vp\":{\"@context\":[\"https://www.w3.org/2018/credentials/v1\"],\"type\":\"VerifiablePresentation\"}}";
         let jws = encode_sign(Algorithm::ES384, payload, &key).unwrap();
         dbg!(&jws);

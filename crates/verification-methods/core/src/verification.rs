@@ -10,6 +10,9 @@ use crate::{InvalidVerificationMethod, VerificationMethodResolutionError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum VerificationError {
+    #[error("invalid input data")]
+    InvalidInputData,
+
     #[error("verification method resolution failed: {0}")]
     Resolution(#[from] VerificationMethodResolutionError),
 

@@ -6,8 +6,9 @@ use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
+use ssi_verification_methods_core::JwkVerificationMethod;
 use static_iref::iri;
-use std::{hash::Hash, str::FromStr};
+use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
@@ -184,6 +185,16 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
 
     fn ref_type(_r: Self::Reference<'_>) -> &str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
+    }
+}
+
+impl JwkVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
+    fn to_jwk(&self) -> Cow<JWK> {
+        Cow::Owned(self.public_key_jwk())
+    }
+
+    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
+        <Self as JwkVerificationMethod>::to_jwk(r)
     }
 }
 

@@ -8,9 +8,12 @@
 //! [`JsonWebKey2020`]: crate::JsonWebKey2020
 //! [`ssi-ldp`]: <https://github.com/spruceid/ssi/tree/main/ssi-ldp>
 //! [`ssi-dids`]: <https://github.com/spruceid/ssi/tree/main/ssi-dids>
+use std::borrow::Cow;
+
 use iref::{Iri, IriBuf};
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSignatureError, MessageSigner, SignatureProtocol};
+use ssi_jwk::JWK;
 use static_iref::iri;
 
 mod controller;
@@ -50,12 +53,12 @@ impl From<String> for ExpectedType {
     }
 }
 
-pub enum Cow<'a, T: 'a + Referencable> {
+pub enum VerificationMethodCow<'a, T: 'a + Referencable> {
     Borrowed(T::Reference<'a>),
     Owned(T),
 }
 
-impl<'a, T: 'a + Referencable> Cow<'a, T> {
+impl<'a, T: 'a + Referencable> VerificationMethodCow<'a, T> {
     pub fn as_reference<'b>(&'b self) -> T::Reference<'b>
     where
         'a: 'b,
@@ -63,6 +66,15 @@ impl<'a, T: 'a + Referencable> Cow<'a, T> {
         match self {
             Self::Borrowed(b) => T::apply_covariance(*b),
             Self::Owned(m) => m.as_reference(),
+        }
+    }
+}
+
+impl<'a, T: 'a + JwkVerificationMethod> VerificationMethodCow<'a, T> {
+    pub fn to_jwk(&self) -> Cow<JWK> {
+        match self {
+            Self::Borrowed(r) => T::ref_to_jwk(*r),
+            Self::Owned(m) => m.to_jwk(),
         }
     }
 }
@@ -111,7 +123,7 @@ pub trait VerificationMethodResolver<M: Referencable> {
         &'a self,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<Cow<'a, M>, VerificationMethodResolutionError>;
+    ) -> Result<VerificationMethodCow<'a, M>, VerificationMethodResolutionError>;
 }
 
 impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodResolver<M>
@@ -121,7 +133,7 @@ impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodRe
         &'a self,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<Cow<'a, M>, VerificationMethodResolutionError> {
+    ) -> Result<VerificationMethodCow<'a, M>, VerificationMethodResolutionError> {
         T::resolve_verification_method(self, issuer, method).await
     }
 }
@@ -201,25 +213,7 @@ pub trait TypedVerificationMethod: VerificationMethod {
     fn ref_type(r: Self::Reference<'_>) -> &str;
 }
 
-// pub trait VerificationMethodRef<'m> {
-//     /// Identifier of the verification method.
-//     fn id(&self) -> &'m Iri;
-
-//     /// Returns the IRI of the verification method controller.
-//     fn controller(&self) -> Option<&'m Iri>; // Should be an URI.
-// }
-
-// impl<'m, M: VerificationMethod> VerificationMethodRef<'m> for &'m M {
-//     fn id(&self) -> &'m Iri {
-//         M::id(self)
-//     }
-
-//     fn controller(&self) -> Option<&'m Iri> {
-//         M::controller(self)
-//     }
-// }
-
-impl<'m, M: VerificationMethod> Cow<'m, M> {
+impl<'m, M: VerificationMethod> VerificationMethodCow<'m, M> {
     pub fn id(&self) -> &Iri {
         match self {
             Self::Owned(m) => m.id(),
@@ -247,6 +241,9 @@ impl<'a, T: LinkedDataVerificationMethod> LinkedDataVerificationMethod for &'a T
 
 #[derive(Debug, thiserror::Error)]
 pub enum InvalidVerificationMethod {
+    #[error("invalid verification method IRI `{0}`")]
+    InvalidIri(String),
+
     #[error("invalid verification method type IRI `{0}`")]
     InvalidTypeIri(IriBuf),
 
@@ -282,4 +279,10 @@ impl InvalidVerificationMethod {
     pub fn invalid_property(name: &str) -> Self {
         Self::InvalidProperty(name.to_owned())
     }
+}
+
+pub trait JwkVerificationMethod: VerificationMethod {
+    fn to_jwk(&self) -> Cow<JWK>;
+
+    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK>;
 }

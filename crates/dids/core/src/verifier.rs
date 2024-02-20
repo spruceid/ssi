@@ -75,7 +75,10 @@ where
         &'a self,
         _issuer: Option<&'a iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<ssi_verification_methods::Cow<'a, M>, VerificationMethodResolutionError> {
+    ) -> Result<
+        ssi_verification_methods::VerificationMethodCow<'a, M>,
+        VerificationMethodResolutionError,
+    > {
         match method {
             Some(method) => {
                 if method.id().scheme().as_str() == "did" {
@@ -83,9 +86,11 @@ where
                         Ok(url) => {
                             match self.resolver.dereference(url).await {
                                 Ok(deref) => match deref.content.into_verification_method() {
-                                    Ok(any_method) => Ok(ssi_verification_methods::Cow::Owned(
-                                        M::try_from(any_method.into())?,
-                                    )),
+                                    Ok(any_method) => {
+                                        Ok(ssi_verification_methods::VerificationMethodCow::Owned(
+                                            M::try_from(any_method.into())?,
+                                        ))
+                                    }
                                     Err(_) => {
                                         // The IRI is not referring to a verification method.
                                         Err(VerificationMethodResolutionError::InvalidKeyId(

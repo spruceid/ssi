@@ -2,7 +2,7 @@ use crate::{
     suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput,
 };
-use ssi_core::Referencable;
+use ssi_core::{one_or_many::OneOrManyRef, OneOrMany, Referencable};
 use ssi_json_ld::WithJsonLdContext;
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use std::collections::BTreeMap;
@@ -37,6 +37,36 @@ pub struct Proof<S: CryptographicSuite> {
     /// Purpose of the proof.
     pub proof_purpose: ProofPurpose,
 
+    /// Specifies when the proof expires.
+    pub expires: Option<xsd_types::DateTime>, // FIXME: should be `DateTimeStamp`
+
+    /// Conveys one or more security domains in which the proof is meant to be
+    /// used.
+    ///
+    /// A verifier SHOULD use the value to ensure that the proof was intended to
+    /// be used in the security domain in which the verifier is operating. The
+    /// specification of the domain parameter is useful in challenge-response
+    /// protocols where the verifier is operating from within a security domain
+    /// known to the creator of the proof.
+    ///
+    /// Example domain values include: `domain.example`` (DNS domain),
+    /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
+    /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
+    pub domains: Vec<String>,
+
+    /// Used to mitigate replay attacks.
+    ///
+    /// Used once for a particular domain and window of time. Examples of a
+    /// challenge value include: `1235abcd6789`,
+    /// `79d34551-ae81-44ae-823b-6dadbab9ebd4`, and `ruby`.
+    pub challenge: Option<String>,
+
+    /// Arbitrary string supplied by the proof creator.
+    ///
+    /// One use of this field is to increase privacy by decreasing linkability
+    /// that is the result of deterministically generated signatures.
+    pub nonce: Option<String>,
+
     /// Additional proof options required by the cryptographic suite.
     ///
     /// For instance, tezos cryptosuites requires the public key associated with
@@ -66,6 +96,10 @@ impl<T: CryptographicSuite> Proof<T> {
             created,
             verification_method,
             proof_purpose,
+            expires: None,
+            domains: Vec::new(),
+            challenge: None,
+            nonce: None,
             options,
             signature,
             extra_properties: Default::default(),
@@ -117,6 +151,10 @@ impl<T: CryptographicSuite> Proof<T> {
             created: self.created,
             verification_method: self.verification_method.clone(),
             proof_purpose: self.proof_purpose,
+            expires: self.expires,
+            domains: self.domains.clone(),
+            challenge: self.challenge.clone(),
+            nonce: self.nonce.clone(),
             options: self.options.clone(),
             extra_properties: self.extra_properties.clone(),
         }
@@ -208,6 +246,14 @@ where
             created: xsd_types::DateTime,
             verification_method: &'a ReferenceOrOwned<M>,
             proof_purpose: ProofPurpose,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            expires: Option<&'a xsd_types::DateTime>,
+            #[serde(rename = "domain", skip_serializing_if = "OneOrManyRef::is_empty")]
+            domains: OneOrManyRef<'a, String>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            challenge: Option<&'a str>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            nonce: Option<&'a str>,
             #[serde(flatten)]
             options: &'a O,
             #[serde(flatten)]
@@ -223,6 +269,10 @@ where
             created: self.created,
             verification_method: &self.verification_method,
             proof_purpose: self.proof_purpose,
+            expires: self.expires.as_ref(),
+            domains: OneOrManyRef::from_slice(&self.domains),
+            challenge: self.challenge.as_deref(),
+            nonce: self.nonce.as_deref(),
             options: &self.options,
             signature: &self.signature,
             extra_properties: &self.extra_properties,
@@ -252,6 +302,14 @@ where
             created: xsd_types::DateTime,
             verification_method: ReferenceOrOwned<M>,
             proof_purpose: ProofPurpose,
+            #[serde(default)]
+            expires: Option<xsd_types::DateTime>,
+            #[serde(rename = "domain", default)]
+            domains: OneOrMany<String>,
+            #[serde(default)]
+            challenge: Option<String>,
+            #[serde(default)]
+            nonce: Option<String>,
             #[serde(flatten)]
             options: O,
             #[serde(flatten)]
@@ -271,6 +329,10 @@ where
             created: typed.created,
             verification_method: typed.verification_method,
             proof_purpose: typed.proof_purpose,
+            expires: typed.expires,
+            domains: typed.domains.into_vec(),
+            challenge: typed.challenge,
+            nonce: typed.nonce,
             options: typed.options,
             signature: typed.signature,
             extra_properties: typed.extra_properties,

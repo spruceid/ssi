@@ -1,11 +1,11 @@
-use std::hash::Hash;
+use std::{borrow::Cow, hash::Hash};
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::VerificationError;
+use ssi_verification_methods_core::{JwkVerificationMethod, VerificationError};
 use static_iref::iri;
 
 use crate::{
@@ -127,6 +127,16 @@ impl TypedVerificationMethod for RsaVerificationKey2018 {
 
     fn ref_type(_r: Self::Reference<'_>) -> &str {
         RSA_VERIFICATION_KEY_2018_TYPE
+    }
+}
+
+impl JwkVerificationMethod for RsaVerificationKey2018 {
+    fn to_jwk(&self) -> Cow<JWK> {
+        Cow::Borrowed(self.public_key_jwk())
+    }
+
+    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
+        <Self as JwkVerificationMethod>::to_jwk(r)
     }
 }
 

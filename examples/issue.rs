@@ -7,7 +7,7 @@ use ssi_claims::data_integrity::{
     AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
 };
 use ssi_dids::DIDVerifier;
-use ssi_verification_methods::{signer::SingleSecretSigner, ReferenceOrOwned};
+use ssi_verification_methods::{signer::SingleSecretSigner, AnyJwkMethod};
 use static_iref::iri;
 
 #[async_std::main]
@@ -43,8 +43,8 @@ async fn main() {
                 .sign(vc, AnyInputContext::default(), &resolver, &signer, params)
                 .await
                 .unwrap();
-            let result = vc.verify(&resolver).await.expect("verification failed");
 
+            let result = vc.verify(&resolver).await.expect("verification failed");
             if !result.is_valid() {
                 panic!("verify failed");
             }
@@ -65,12 +65,8 @@ async fn main() {
                 .await
                 .unwrap();
 
-            let result =
-                ssi::claims::vc::Credential::verify_jwt(&jwt, None, &resolver, &mut context_loader)
-                    .await;
-
-            if !result.errors.is_empty() {
-                panic!("verify failed: {:#?}", result);
+            if !jwt.verify::<AnyJwkMethod>(&resolver).await.unwrap() {
+                panic!("verify failed");
             }
 
             print!("{}", jwt);

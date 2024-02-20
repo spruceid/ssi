@@ -40,6 +40,37 @@ pub struct ProofConfiguration<M, O = ()> {
     /// Purpose of the proof.
     pub proof_purpose: ProofPurpose,
 
+    /// Specifies when the proof expires.
+    pub expires: Option<xsd_types::DateTime>, // FIXME: should be `DateTimeStamp`
+
+    /// Conveys one or more security domains in which the proof is meant to be
+    /// used.
+    ///
+    /// A verifier SHOULD use the value to ensure that the proof was intended to
+    /// be used in the security domain in which the verifier is operating. The
+    /// specification of the domain parameter is useful in challenge-response
+    /// protocols where the verifier is operating from within a security domain
+    /// known to the creator of the proof.
+    ///
+    /// Example domain values include: `domain.example`` (DNS domain),
+    /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
+    /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
+    #[serde(rename = "domain")]
+    pub domains: Vec<String>,
+
+    /// Used to mitigate replay attacks.
+    ///
+    /// Used once for a particular domain and window of time. Examples of a
+    /// challenge value include: `1235abcd6789`,
+    /// `79d34551-ae81-44ae-823b-6dadbab9ebd4`, and `ruby`.
+    pub challenge: Option<String>,
+
+    /// Arbitrary string supplied by the proof creator.
+    ///
+    /// One use of this field is to increase privacy by decreasing linkability
+    /// that is the result of deterministically generated signatures.
+    pub nonce: Option<String>,
+
     /// Additional proof options required by the cryptographic suite.
     ///
     /// For instance, tezos cryptosuites requires the public key associated with
@@ -63,6 +94,10 @@ impl<M, O> ProofConfiguration<M, O> {
             created,
             verification_method,
             proof_purpose,
+            expires: None,
+            domains: Vec::new(),
+            challenge: None,
+            nonce: None,
             options,
             extra_properties: BTreeMap::new(),
         }
@@ -79,9 +114,20 @@ impl<M, O> ProofConfiguration<M, O> {
             created: datetime.with_nanosecond(ns).unwrap_or(datetime).into(),
             verification_method,
             proof_purpose: ProofPurpose::default(),
+            expires: None,
+            domains: Vec::new(),
+            challenge: None,
+            nonce: None,
             options,
             extra_properties: BTreeMap::new(),
         }
+    }
+
+    pub fn from_method(verification_method: ReferenceOrOwned<M>) -> Self
+    where
+        O: Default,
+    {
+        Self::from_method_and_options(verification_method, O::default())
     }
 
     pub fn into_proof<S>(self, suite: S, signature: S::Signature) -> Proof<S>
@@ -94,6 +140,10 @@ impl<M, O> ProofConfiguration<M, O> {
             created: self.created,
             verification_method: self.verification_method,
             proof_purpose: self.proof_purpose,
+            expires: self.expires,
+            domains: self.domains,
+            challenge: self.challenge,
+            nonce: self.nonce,
             options: self.options,
             signature,
             extra_properties: self.extra_properties,
@@ -113,12 +163,6 @@ impl<M, O> ProofConfiguration<M, O> {
             options: self.options.as_reference(),
             extra_properties: &self.extra_properties,
         }
-    }
-}
-
-impl<M> ProofConfiguration<M> {
-    pub fn from_method(verification_method: ReferenceOrOwned<M>) -> Self {
-        Self::from_method_and_options(verification_method, ())
     }
 }
 

@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
+use ssi_verification_methods_core::JwkVerificationMethod;
 use static_iref::iri;
 
 use crate::{
@@ -158,6 +159,16 @@ impl TypedVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
 
     fn ref_type(_r: Self::Reference<'_>) -> &str {
         ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE
+    }
+}
+
+impl JwkVerificationMethod for EcdsaSecp256k1VerificationKey2019 {
+    fn to_jwk(&self) -> Cow<JWK> {
+        self.public_key_jwk()
+    }
+
+    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
+        <Self as JwkVerificationMethod>::to_jwk(r)
     }
 }
 

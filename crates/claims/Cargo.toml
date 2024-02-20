@@ -60,6 +60,7 @@ ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-verification-methods.workspace = true
 ssi-claims-core.workspace = true
+ssi-jws.workspace = true
 ssi-jwt.workspace = true
 ssi-vc.workspace = true
 ssi-data-integrity.workspace = true
@@ -67,7 +68,6 @@ ssi-dids-core.workspace = true
 ssi-eip712 = { workspace = true, optional = true }
 ssi-json-ld.workspace = true
 ssi-security.workspace = true
-ssi-jws.workspace = true
 pin-project.workspace = true
 thiserror.workspace = true
 iref.workspace = true
@@ -75,6 +75,7 @@ rdf-types.workspace = true
 linked-data.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+json-syntax.workspace = true
 json-ld.workspace = true
 locspan.workspace = true
 

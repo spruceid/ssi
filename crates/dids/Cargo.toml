@@ -8,6 +8,11 @@ description = "DID methods of the ssi library."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-dids/"
 
+[features]
+default = ["http"]
+example = ["ssi-dids-core/example"]
+http = ["ssi-dids-core/http"]
+
 [dependencies]
 ssi-dids-core.workspace = true
 did-ethr.workspace = true
