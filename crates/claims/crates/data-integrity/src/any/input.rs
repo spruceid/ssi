@@ -1,5 +1,9 @@
 use super::AnySuiteOptions;
-use rdf_types::{interpretation, IriVocabulary};
+use rdf_types::{
+    generator,
+    interpretation::{self, WithGenerator},
+    IriVocabulary,
+};
 use ssi_data_integrity_core::{
     suite::{HashError, TransformError},
     CryptographicSuiteInput, ExpandedConfigurationRef,
@@ -10,8 +14,14 @@ use ssi_verification_methods::AnyMethod;
 
 use super::AnySuite;
 
+/// Input environment for any cryptographic suite supported by `AnySuite` with
+/// a given JSON-LD context loader and sensible defaults for the vocabulary,
+/// interpretation and EIP712 type loader.
+pub type AnyEnvironmentWithLdLoader<L = ContextLoader> =
+    AnyInputContext<JsonLdEnvironment<(), WithGenerator<generator::Blank>, L>>;
+
 /// Input context for any cryptographic suite supported by `AnySuite`.
-pub struct AnyInputContext<E, L = ()> {
+pub struct AnyInputContext<E = JsonLdEnvironment, L = ()> {
     /// The Linked-Data context used to interpret RDF terms.
     pub ld: E,
 
@@ -20,6 +30,21 @@ pub struct AnyInputContext<E, L = ()> {
     /// Used for instance with the `EthereumEip712Signature2021` suite to load
     /// EIP712 type definitions from the URI given in the proof options.
     pub loader: L,
+}
+
+impl<E, L> AnyInputContext<E, L> {
+    pub fn new(ld: E, loader: L) -> Self {
+        Self { ld, loader }
+    }
+}
+
+impl<L> AnyInputContext<JsonLdEnvironment<(), WithGenerator<generator::Blank>, L>> {
+    pub fn from_ld_context_loader(loader: L) -> Self {
+        Self {
+            ld: JsonLdEnvironment::from_loader(loader),
+            loader: (),
+        }
+    }
 }
 
 impl<E: AnyLdEnvironment, L> AnyLdEnvironment for AnyInputContext<E, L> {
@@ -47,6 +72,12 @@ where
         &mut Self::Loader,
     > {
         self.ld.as_json_ld_environment_mut()
+    }
+}
+
+impl<E> AnyInputContext<E> {
+    pub fn from_environment(ld: E) -> Self {
+        Self { ld, loader: () }
     }
 }
 

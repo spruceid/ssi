@@ -1,6 +1,3 @@
-use std::{collections::BTreeMap, hash::Hash, ops::Deref};
-
-use chrono::Timelike;
 use educe::Educe;
 use grdf::{HashDataset, HashGraph};
 use iref::{Iri, IriBuf};
@@ -17,6 +14,7 @@ use ssi_json_ld::AnyJsonLdEnvironment;
 use ssi_rdf::{urdna2015, IntoNQuads};
 use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
+use std::{collections::BTreeMap, hash::Hash, ops::Deref};
 
 use crate::{CryptographicSuite, Proof};
 
@@ -104,14 +102,9 @@ impl<M, O> ProofConfiguration<M, O> {
     }
 
     pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: O) -> Self {
-        // Get current time to millisecond precision if possible
-        let datetime = chrono::Utc::now();
-        let ms = datetime.timestamp_subsec_millis();
-        let ns = ms * 1_000_000;
-
         Self {
             context: None,
-            created: datetime.with_nanosecond(ns).unwrap_or(datetime).into(),
+            created: xsd_types::DateTime::now_ms(),
             verification_method,
             proof_purpose: ProofPurpose::default(),
             expires: None,

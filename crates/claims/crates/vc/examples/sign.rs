@@ -1,9 +1,6 @@
 //! This example shows how to sign and verify a custom credential type crafted
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
-use std::borrow::Cow;
-
 use chrono::Utc;
-use hashbrown::HashMap;
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuiteInput};
 use ssi_rdf::Expandable;
@@ -13,6 +10,7 @@ use ssi_verification_methods::{
     VerificationMethodResolutionError, VerificationMethodResolver,
 };
 use static_iref::{iri, uri};
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Clone, linked_data::Serialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]

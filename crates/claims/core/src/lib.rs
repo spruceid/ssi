@@ -1,4 +1,6 @@
 mod verification;
+use std::ops::Deref;
+
 pub use verification::*;
 
 /// Claims serialization utils.
@@ -169,5 +171,13 @@ impl<T, P: Proof> Verifiable<T, P> {
 
     pub fn into_parts(self) -> (T, P::Prepared) {
         (self.claims, self.proof)
+    }
+}
+
+impl<C, P: Proof> Deref for Verifiable<C, P> {
+    type Target = C;
+
+    fn deref(&self) -> &Self::Target {
+        &self.claims
     }
 }

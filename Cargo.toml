@@ -114,7 +114,7 @@ rdf-types = "0.18.3"
 xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
 grdf = "0.22"
 locspan = "0.8"
-json-syntax = "0.11.7"
+json-syntax = "0.12.2"
 nquads-syntax = "0.17"
 multibase = "0.9.1"
 # json-ld = "0.15"

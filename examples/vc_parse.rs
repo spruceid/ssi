@@ -21,7 +21,7 @@ async fn main() {
     println!("{}", serde_json::to_string_pretty(&vc).unwrap());
 
     // All of the above can be done with the following helper function.
-    let vc = ssi::claims::data_integrity::any_credential_from_json_str(&credential_content)
+    let vc = ssi::claims::vc::any_credential_from_json_str(&credential_content)
         .await
         .unwrap();
 

@@ -628,11 +628,9 @@ mod tests {
     #[tokio::test]
     async fn credential_verify_eip712vm() {
         let didethr = DIDVerifier::new(DIDEthr);
-        let vc = ssi_claims::data_integrity::any_credential_from_json_str(include_str!(
-            "../tests/vc.jsonld"
-        ))
-        .await
-        .unwrap();
+        let vc = ssi_claims::vc::any_credential_from_json_str(include_str!("../tests/vc.jsonld"))
+            .await
+            .unwrap();
         // eprintln!("vc {:?}", vc);
         assert!(vc.verify(&didethr).await.unwrap().is_valid())
     }

@@ -82,13 +82,19 @@ impl<V: IriVocabulary, I: Interpretation, L: Loader<V::Iri>> AnyJsonLdEnvironmen
     }
 }
 
-impl Default for JsonLdEnvironment {
-    fn default() -> Self {
+impl<L> JsonLdEnvironment<(), WithGenerator<generator::Blank>, L> {
+    pub fn from_loader(loader: L) -> Self {
         Self {
             vocabulary: (),
             interpretation: WithGenerator::new((), generator::Blank::new()),
-            loader: ContextLoader::default(),
+            loader,
         }
+    }
+}
+
+impl Default for JsonLdEnvironment {
+    fn default() -> Self {
+        Self::from_loader(ContextLoader::default())
     }
 }
 

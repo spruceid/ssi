@@ -27,7 +27,7 @@ impl<P: Serialize> super::JsonVerifiableCredential<P> {
     }
 }
 
-impl super::JsonCredential {
+impl super::SpecializedJsonCredential {
     /// Encodes this credential into the claims of a JWT following the standard
     /// [JWT-VC encoding].
     ///

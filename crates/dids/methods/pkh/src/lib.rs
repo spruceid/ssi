@@ -1525,7 +1525,7 @@ mod tests {
         // TODO check warnings maybe?
         eprintln!("input: {vc_str}");
 
-        let vc = ssi_claims::data_integrity::any_credential_from_json_str(vc_str)
+        let vc = ssi_claims::vc::any_credential_from_json_str(vc_str)
             .await
             .unwrap();
 

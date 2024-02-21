@@ -2,13 +2,15 @@
 //!
 //! See: <https://www.w3.org/TR/vc-data-model/>
 use iref::Iri;
+mod data_integrity;
 mod data_model;
 pub mod datatype;
-// mod serialization;
+pub mod revocation;
 mod syntax;
 pub mod verification;
 pub mod vocab;
 
+pub use data_integrity::*;
 pub use data_model::*;
 pub use syntax::*;
 
@@ -17,10 +19,6 @@ pub const CREDENTIALS_V1_CONTEXT_IRI: &Iri =
 
 pub const CREDENTIALS_V2_CONTEXT_IRI: &Iri =
     static_iref::iri!("https://www.w3.org/ns/credentials/v2");
-
-pub trait RequiredContext {
-    const CONTEXT_IRI: &'static Iri;
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct V1;

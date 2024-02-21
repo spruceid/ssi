@@ -1,3 +1,4 @@
+use json_syntax::Parse;
 use serde::de::DeserializeOwned;
 use ssi_claims_core::Verifiable;
 use ssi_json_ld::WithJsonLdContext;
@@ -15,11 +16,40 @@ pub enum DecodeError<E = ssi_json_ld::UnknownContext> {
     #[error("missing `proof` property")]
     MissingProof,
 
+    #[error(transparent)]
+    DuplicateEntry(#[from] json_syntax::object::DuplicateEntry),
+
+    #[error("parse error: {0}")]
+    Parse(json_syntax::parse::Error),
+
     #[error("deserialization failed: {0}")]
-    Deserialization(serde_json::Error),
+    Deserialization(json_syntax::DeserializeError),
 
     #[error("proof preparation failed: {0}")]
     ProofPreparation(ProofPreparationError<E>),
+}
+
+/// Decodes a Data-Integrity credential or presentation from its JSON binary
+/// representation.
+pub async fn from_json_slice<T, S: CryptographicSuite, E>(
+    json: &[u8],
+    environment: E,
+) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
+where
+    T: DeserializeOwned + WithJsonLdContext,
+    S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
+    S::VerificationMethod: DeserializeOwned,
+    S::Options: DeserializeOwned,
+    S::Signature: DeserializeOwned,
+    E: for<'a> ProofConfigurationRefExpansion<'a, S>,
+{
+    from_json(
+        json_syntax::Value::parse_slice(json)
+            .map_err(DecodeError::Parse)?
+            .0,
+        environment,
+    )
+    .await
 }
 
 /// Decodes a Data-Integrity credential or presentation from its JSON textual
@@ -36,17 +66,13 @@ where
     S::Signature: DeserializeOwned,
     E: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
-    from_json(
-        json.parse().map_err(DecodeError::Deserialization)?,
-        environment,
-    )
-    .await
+    from_json(json.parse().map_err(DecodeError::Parse)?, environment).await
 }
 
 /// Decodes a Data-Integrity credential or presentation from its JSON
 /// representation.
 pub async fn from_json<T, S: CryptographicSuite, E>(
-    json: serde_json::Value,
+    json: json_syntax::Value,
     mut environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
 where
@@ -59,20 +85,20 @@ where
 {
     use ssi_claims_core::PrepareWith;
     match json {
-        serde_json::Value::Object(mut obj) => match obj.remove("proof") {
-            Some(proof_value) => {
-                let t: T = serde_json::from_value(serde_json::Value::Object(obj))
+        json_syntax::Value::Object(mut obj) => match obj.remove_unique("proof")? {
+            Some(proof_entry) => {
+                let t: T = json_syntax::from_value(json_syntax::Value::Object(obj))
                     .map_err(DecodeError::Deserialization)?;
 
-                let json_proofs = match proof_value {
-                    serde_json::Value::Array(proofs) => proofs,
+                let json_proofs = match proof_entry.value {
+                    json_syntax::Value::Array(proofs) => proofs,
                     proof => vec![proof],
                 };
 
                 let mut proofs = Vec::with_capacity(json_proofs.len());
                 for json_proof in json_proofs {
-                    let unprepared_proof: Proof<S> =
-                        serde_json::from_value(json_proof).map_err(DecodeError::Deserialization)?;
+                    let unprepared_proof: Proof<S> = json_syntax::from_value(json_proof)
+                        .map_err(DecodeError::Deserialization)?;
                     let proof = unprepared_proof
                         .prepare_with(&t, &mut environment)
                         .await
