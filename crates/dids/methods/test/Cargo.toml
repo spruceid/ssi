@@ -9,12 +9,12 @@ publish = false
 
 [dependencies]
 ssi-dids-core.workspace = true
-did-method-key = { workspace = true, default-features = false, features = ["secp256k1", "secp256r1"] }
-did-tz = { workspace = true, default-features = false }
-did-pkh = { workspace = true, default-features = false }
-did-web = { workspace = true, default-features = false }
-# did-webkey = { workspace = true, default-features = false }
-# did-onion = { workspace = true, default-features = false }
+did-method-key = { workspace = true, features = ["secp256k1", "secp256r1"] }
+did-tz.workspace = true
+did-pkh.workspace = true
+did-web.workspace = true
+# did-webkey.workspace = true
+# did-onion.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 base64.workspace = true

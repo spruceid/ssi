@@ -17,16 +17,16 @@ thiserror.workspace = true
 iref.workspace = true
 static-iref.workspace = true
 rdf-types.workspace = true
-ssi-jwk = { workspace = true, default-features = false, features = ["ed25519"] }
+ssi-jwk = { workspace = true, features = ["ed25519"] }
 ssi-core.workspace = true
 ssi-dids-core.workspace = true
 json-ld.workspace = true
 ssi-rdf.workspace = true
-ssi-json-ld = { workspace = true, default-features = false }
-ssi-claims = { workspace = true, default-features = false }
+ssi-json-ld.workspace = true
+ssi-claims.workspace = true
 ssi-verification-methods.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-ssi-data-integrity = { workspace = true, default-features = false, features = ["ed25519"] }
-ssi-dids-core = { workspace = true, version = "0.1", features = ["example"] }
+ssi-data-integrity = { workspace = true, features = ["ed25519"] }
+ssi-dids-core = { workspace = true, features = ["example"] }

@@ -18,13 +18,13 @@ base64.workspace = true
 bs58.workspace = true
 hex.workspace = true
 multibase.workspace = true
-ssi-jwk = { workspace = true, default-features = false }
-ssi-jws = { workspace = true, default-features = false }
-ssi-jwt = { workspace = true, default-features = false }
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-jwt.workspace = true
 ssi-dids-core.workspace = true
 ssi-core.workspace = true
 ssi-verification-methods.workspace = true
-ssi-caips = { workspace = true, default-features = false  }
+ssi-caips.workspace = true
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
@@ -36,4 +36,4 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
 did-method-key.workspace = true
-ssi-jws = { workspace = true, default-features = false, features = ["ed25519"] }
+ssi-jws = { workspace = true, features = ["ed25519"] }
