@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use ssi_core::Referencable;
 use ssi_json_ld::AnyJsonLdEnvironment;
 use ssi_rdf::{urdna2015, IntoNQuads};
-use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
+use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
 use std::{collections::BTreeMap, hash::Hash, ops::Deref};
 

@@ -723,7 +723,6 @@ mod tests {
     use serde_json::{from_str, from_value, json};
     use ssi_claims::{
         data_integrity::{
-            verification::method::{signer::SingleSecretSigner, ProofPurpose},
             AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, Proof,
             ProofConfiguration,
         },
@@ -733,6 +732,7 @@ mod tests {
     use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::Algorithm;
     use ssi_jws::CompactJWSString;
+    use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
     use static_iref::uri;
 
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {

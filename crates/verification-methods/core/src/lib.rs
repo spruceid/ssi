@@ -19,8 +19,8 @@ use static_iref::iri;
 mod controller;
 mod methods;
 mod reference;
-pub mod signature;
-pub mod verification;
+mod signature;
+mod verification;
 
 pub use controller::*;
 pub use methods::*;
@@ -79,6 +79,15 @@ impl<'a, T: 'a + JwkVerificationMethod> VerificationMethodCow<'a, T> {
     }
 }
 
+impl<'a, T: 'a + MaybeJwkVerificationMethod> VerificationMethodCow<'a, T> {
+    pub fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+        match self {
+            Self::Borrowed(r) => T::try_ref_to_jwk(*r),
+            Self::Owned(m) => m.try_to_jwk(),
+        }
+    }
+}
+
 /// Verification method.
 pub trait VerificationMethod: Referencable {
     /// Identifier of the verification method.
@@ -100,6 +109,10 @@ pub enum VerificationMethodResolutionError {
     /// Invalid key identifier.
     #[error("invalid key id `{0}`")]
     InvalidKeyId(String),
+
+    /// Not a verification method.
+    #[error("id `{0}` is not referring to a verification method")]
+    NotAVerificationMethod(String),
 
     /// Unsupported key identifier.
     #[error("unsupported key id `{0}`")]
@@ -281,8 +294,26 @@ impl InvalidVerificationMethod {
     }
 }
 
+/// Verification method that can be turned into a JSON Web Key.
 pub trait JwkVerificationMethod: VerificationMethod {
     fn to_jwk(&self) -> Cow<JWK>;
 
     fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK>;
+}
+
+/// Verification method that *may* be turned into a JSON Web Key.
+pub trait MaybeJwkVerificationMethod: VerificationMethod {
+    fn try_to_jwk(&self) -> Option<Cow<JWK>>;
+
+    fn try_ref_to_jwk(r: Self::Reference<'_>) -> Option<Cow<'_, JWK>>;
+}
+
+impl<M: JwkVerificationMethod> MaybeJwkVerificationMethod for M {
+    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+        Some(M::to_jwk(self))
+    }
+
+    fn try_ref_to_jwk(r: Self::Reference<'_>) -> Option<Cow<'_, JWK>> {
+        Some(M::ref_to_jwk(r))
+    }
 }

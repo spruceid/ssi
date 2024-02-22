@@ -6,7 +6,7 @@ use ssi::{
         vc::revocation::{StatusList2021, StatusList2021Credential, StatusList2021Subject},
     },
     jwk::JWK,
-    verification_methods::signer::SingleSecretSigner,
+    verification_methods::SingleSecretSigner,
 };
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};

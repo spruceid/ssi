@@ -3,7 +3,9 @@ use std::borrow::Cow;
 
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{JwkVerificationMethod, SigningMethod};
+use ssi_verification_methods_core::{
+    JwkVerificationMethod, MaybeJwkVerificationMethod, SigningMethod,
+};
 pub use w3c::*;
 
 mod unspecified;
@@ -70,6 +72,41 @@ impl AnyMethod {
             Self::Eip712Method2021(_) => None,
             Self::SolanaMethod2021(m) => Some(Cow::Borrowed(m.public_key_jwk())),
         }
+    }
+}
+
+impl<'a> AnyMethodRef<'a> {
+    /// Returns the public key of the verification method as a JWK.
+    ///
+    /// Some methods don't have any the public key embedded.
+    pub fn public_key_jwk(&self) -> Option<Cow<'a, JWK>> {
+        match self {
+            Self::RsaVerificationKey2018(m) => Some(Cow::Borrowed(m.public_key_jwk())),
+            Self::Ed25519VerificationKey2018(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::Ed25519VerificationKey2020(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::EcdsaSecp256k1VerificationKey2019(m) => Some(m.public_key_jwk()),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.public_key_jwk(),
+            Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::JsonWebKey2020(m) => Some(Cow::Borrowed(m.public_key_jwk())),
+            Self::Multikey(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
+            Self::P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
+            Self::TezosMethod2021(m) => m.public_key_jwk().map(Cow::Borrowed),
+            Self::AleoMethod2021(_) => None,
+            Self::BlockchainVerificationMethod2021(_) => None,
+            Self::Eip712Method2021(_) => None,
+            Self::SolanaMethod2021(m) => Some(Cow::Borrowed(m.public_key_jwk())),
+        }
+    }
+}
+
+impl MaybeJwkVerificationMethod for AnyMethod {
+    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+        self.public_key_jwk()
+    }
+
+    fn try_ref_to_jwk(r: Self::Reference<'_>) -> Option<Cow<'_, JWK>> {
+        r.public_key_jwk()
     }
 }
 

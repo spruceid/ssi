@@ -33,10 +33,8 @@ bs58 = { workspace = true, features = ["check"] }
 bech32 = "0.8"
 
 [dev-dependencies]
-# ssi-ldp = { path = "../ssi-ldp", default-features = false, features = ["tezos", "eip", "w3c"] }
 ssi-core.workspace = true
-# ssi-vc.workspace = true
-# ssi-data-integrity = { workspace = true, features = ["eip712"] }
+ssi-verification-methods-core.workspace = true
 ssi-json-ld.workspace = true
 ssi-claims = { workspace = true, features = ["dif", "secp256k1"] }
 ssi-tzkey.workspace = true
@@ -48,9 +46,6 @@ linked-data.workspace = true
 json-ld.workspace = true
 json-syntax.workspace = true
 locspan.workspace = true
-# ssi-json-ld = { path = "../ssi-json-ld", default-features = false }
-# ssi-vc = { path = "../ssi-vc", default-features = false }
-# ssi-core = { path = "../ssi-core" }
 tokio = { version = "1.0", features = ["macros", "rt"] }
 hex = "0.4"
 blake2b_simd = "0.5"

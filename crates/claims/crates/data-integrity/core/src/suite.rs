@@ -4,7 +4,7 @@ use ssi_claims_core::{ProofValidity, Verifiable};
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
 use ssi_json_ld::WithJsonLdContext;
-use ssi_verification_methods::{
+use ssi_verification_methods_core::{
     InvalidVerificationMethod, SignatureError, Signer, VerificationError, VerificationMethod,
     VerificationMethodResolver,
 };

@@ -377,16 +377,11 @@ mod tests {
         vc::JsonCredential,
         Verifiable,
     };
-    use ssi_data_integrity::{
-        verification::{
-            method::{signer::SingleSecretSigner, ProofPurpose},
-            MethodReferenceOrOwned,
-        },
-        CryptographicSuiteInput, ProofConfiguration,
-    };
+    use ssi_data_integrity::{CryptographicSuiteInput, ProofConfiguration};
     use ssi_dids_core::{
         did, resolution::Options, DIDResolver, VerificationMethodDIDResolver, DIDURL,
     };
+    use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, SingleSecretSigner};
     use static_iref::uri;
 
     use super::*;
@@ -553,8 +548,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        let verification_method_ref =
-            MethodReferenceOrOwned::Reference(verification_method.id.into());
+        let verification_method_ref = ReferenceOrOwned::Reference(verification_method.id.into());
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
 
@@ -617,8 +611,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        let verification_method_ref =
-            MethodReferenceOrOwned::Reference(verification_method.id.into());
+        let verification_method_ref = ReferenceOrOwned::Reference(verification_method.id.into());
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
         eprintln!("suite: {suite:?}");
@@ -681,8 +674,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        let verification_method_ref =
-            MethodReferenceOrOwned::Reference(verification_method.id.into());
+        let verification_method_ref = ReferenceOrOwned::Reference(verification_method.id.into());
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
         eprintln!("suite: {suite:?}");

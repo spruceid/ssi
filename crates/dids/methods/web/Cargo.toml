@@ -22,6 +22,7 @@ version = "0.11"
 features = ["native-tls-vendored"]
 
 [dev-dependencies]
+ssi-verification-methods-core.workspace = true
 ssi-claims.workspace = true
 # ssi-data-integrity.workspace = true
 ssi-jwk.workspace = true

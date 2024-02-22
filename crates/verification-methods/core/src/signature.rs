@@ -1,8 +1,8 @@
 use crate::{InvalidVerificationMethod, VerificationError, VerificationMethodResolutionError};
 
-pub mod signer;
+mod signer;
 
-pub use signer::Signer;
+pub use signer::*;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignatureError {

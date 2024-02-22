@@ -4,7 +4,7 @@ use crate::{
 };
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany, Referencable};
 use ssi_json_ld::WithJsonLdContext;
-use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
+use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use std::collections::BTreeMap;
 
 mod configuration;

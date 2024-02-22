@@ -9,9 +9,8 @@ use bitvec::slice::BitSlice;
 use core::convert::TryFrom;
 use iref::{IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_data_integrity::verification::method::AnyMethod;
 use ssi_json_ld::ContextLoader;
-use ssi_verification_methods_core::{VerificationError, VerificationMethodResolver};
+use ssi_verification_methods::{AnyMethod, VerificationError, VerificationMethodResolver};
 use thiserror::Error;
 
 mod v2020;

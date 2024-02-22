@@ -6,9 +6,9 @@ use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ProofValidity, Verifiable};
-use ssi_data_integrity::{verification::method::AnyMethod, AnyInputContext, AnyProofs};
+use ssi_data_integrity::{AnyInputContext, AnyProofs};
 use ssi_json_ld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT};
-use ssi_verification_methods_core::VerificationMethodResolver;
+use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 use static_iref::iri;
 use std::collections::BTreeMap;
 

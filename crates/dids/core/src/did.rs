@@ -3,7 +3,7 @@ use std::{borrow::Borrow, ops::Deref, str::FromStr};
 
 mod url;
 
-use iref::{IriBuf, UriBuf};
+use iref::{Iri, IriBuf, Uri, UriBuf};
 use serde::{Deserialize, Serialize};
 pub use url::*;
 
@@ -62,6 +62,20 @@ impl DID {
         std::mem::transmute(data)
     }
 
+    pub fn as_iri(&self) -> &Iri {
+        unsafe {
+            // SAFETY: a DID is an IRI.
+            Iri::new_unchecked(self.as_str())
+        }
+    }
+
+    pub fn as_uri(&self) -> &Uri {
+        unsafe {
+            // SAFETY: a DID is an URI.
+            Uri::new_unchecked(&self.0)
+        }
+    }
+
     /// Returns the DID as a string.
     pub fn as_str(&self) -> &str {
         unsafe {
@@ -112,6 +126,18 @@ impl Deref for DID {
 
     fn deref(&self) -> &Self::Target {
         self.as_str()
+    }
+}
+
+impl Borrow<Uri> for DID {
+    fn borrow(&self) -> &Uri {
+        self.as_uri()
+    }
+}
+
+impl Borrow<Iri> for DID {
+    fn borrow(&self) -> &Iri {
+        self.as_iri()
     }
 }
 
@@ -248,6 +274,18 @@ impl Borrow<DID> for DIDBuf {
 impl Borrow<DIDURL> for DIDBuf {
     fn borrow(&self) -> &DIDURL {
         self.as_did_url()
+    }
+}
+
+impl Borrow<Uri> for DIDBuf {
+    fn borrow(&self) -> &Uri {
+        self.as_uri()
+    }
+}
+
+impl Borrow<Iri> for DIDBuf {
+    fn borrow(&self) -> &Iri {
+        self.as_iri()
     }
 }
 

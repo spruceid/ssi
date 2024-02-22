@@ -1,3 +1,5 @@
+use std::borrow::Borrow;
+
 use crate::{LinkedDataVerificationMethod, VerificationMethod};
 use educe::Educe;
 use iref::{Iri, IriBuf};
@@ -91,6 +93,18 @@ impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference
 pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
     Reference(#[ld(id)] &'a Iri),
     Owned(M::Reference<'a>),
+}
+
+impl<'a, M: 'a + Referencable> From<&'a ReferenceOrOwned<M>> for ReferenceOrOwnedRef<'a, M> {
+    fn from(value: &'a ReferenceOrOwned<M>) -> Self {
+        value.borrowed()
+    }
+}
+
+impl<'a, M: 'a + Referencable, I: Borrow<Iri>> From<&'a I> for ReferenceOrOwnedRef<'a, M> {
+    fn from(value: &'a I) -> Self {
+        Self::Reference(value.borrow())
+    }
 }
 
 impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {

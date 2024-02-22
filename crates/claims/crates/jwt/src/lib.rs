@@ -12,7 +12,8 @@ mod datatype;
 
 pub use datatype::*;
 use ssi_verification_methods::{
-    ReferenceOrOwned, SignatureError, Signer, VerificationMethod, VerificationMethodResolver,
+    MaybeJwkVerificationMethod, ReferenceOrOwnedRef, SignatureError, Signer,
+    VerificationMethodResolver,
 };
 
 /// JSON Web Token claims.
@@ -132,19 +133,26 @@ impl<T> JWTClaims<NoncePublicClaim, T> {
 }
 
 impl<Pu: Serialize, Pr: Serialize> JWTClaims<Pu, Pr> {
-    pub async fn sign<M: VerificationMethod>(
+    /// Sign the claims and return a JWT.
+    pub async fn sign<'m, M: 'm + MaybeJwkVerificationMethod>(
         &self,
-        algorithm: Algorithm,
-        verification_method: &ReferenceOrOwned<M>,
+        verification_method: impl Into<ReferenceOrOwnedRef<'m, M>>,
         resolver: &impl VerificationMethodResolver<M>,
         signers: &impl Signer<M, Algorithm>,
     ) -> Result<CompactJWSString, SignatureError> {
         let verification_method = resolver
             .resolve_verification_method(
                 None, // TODO issuer?
-                Some(verification_method.borrowed()),
+                Some(verification_method.into()),
             )
             .await?;
+
+        let jwk = verification_method
+            .try_to_jwk()
+            .ok_or(SignatureError::MissingAlgorithm)?;
+        let algorithm = jwk
+            .get_algorithm()
+            .ok_or(SignatureError::MissingAlgorithm)?;
 
         let signer = signers
             .for_method(verification_method.as_reference())

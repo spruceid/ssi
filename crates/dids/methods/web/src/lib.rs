@@ -137,15 +137,13 @@ impl DIDMethodResolver for DIDWeb {
 #[cfg(test)]
 mod tests {
     use ssi_claims::{
-        data_integrity::{
-            verification::method::{signer::SingleSecretSigner, ProofPurpose},
-            AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
-        },
+        data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
         vc::JsonCredential,
         Verifiable,
     };
     use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
+    use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
     use static_iref::{iri, uri};
 
     use super::*;

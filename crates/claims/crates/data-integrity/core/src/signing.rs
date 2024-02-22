@@ -1,6 +1,6 @@
 use ssi_claims_core::Verifiable;
 use ssi_json_ld::WithJsonLdContext;
-use ssi_verification_methods::{SignatureError, Signer, VerificationMethodResolver};
+use ssi_verification_methods_core::{SignatureError, Signer, VerificationMethodResolver};
 
 use crate::{
     suite::{CryptographicSuiteInput, CryptographicSuiteOptions, HashError, TransformError},

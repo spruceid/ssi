@@ -8,7 +8,7 @@ use ssi::{
         },
     },
     jwk::JWK,
-    verification_methods::signer::SingleSecretSigner,
+    verification_methods::SingleSecretSigner,
 };
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};

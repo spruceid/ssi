@@ -214,6 +214,7 @@ async-std = { workspace = true, features = ["attributes"] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
 iref.workspace = true
 static-iref.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 ssi-dids = { workspace = true, features = ["example"] }
 

@@ -377,18 +377,14 @@ mod tests {
     use serde_json::json;
     use ssi_claims::{
         data_integrity::{
-            verification::{
-                method::{signer::SingleSecretSigner, ProofPurpose},
-                MethodReferenceOrOwned,
-            },
-            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput,
-            ProofConfiguration,
+            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration,
         },
         vc::{JsonCredential, JsonPresentation},
         Verifiable,
     };
     use ssi_dids_core::{did, DIDResolver};
     use ssi_jwk::JWK;
+    use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, SingleSecretSigner};
     use static_iref::uri;
 
     #[test]
@@ -500,11 +496,9 @@ mod tests {
         );
 
         let verification_method = if eip712 {
-            MethodReferenceOrOwned::Reference(
-                IriBuf::new(format!("{did}#Eip712Method2021")).unwrap(),
-            )
+            ReferenceOrOwned::Reference(IriBuf::new(format!("{did}#Eip712Method2021")).unwrap())
         } else {
-            MethodReferenceOrOwned::Reference(IriBuf::new(format!("{did}#controller")).unwrap())
+            ReferenceOrOwned::Reference(IriBuf::new(format!("{did}#controller")).unwrap())
         };
 
         let suite = AnySuite::pick(&key, Some(&verification_method)).unwrap();

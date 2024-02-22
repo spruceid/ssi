@@ -7,7 +7,7 @@ use ssi_claims::data_integrity::{
     AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
 };
 use ssi_dids::DIDResolver;
-use ssi_verification_methods::{signer::SingleSecretSigner, AnyJwkMethod};
+use ssi_verification_methods::{AnyJwkMethod, SingleSecretSigner};
 use static_iref::iri;
 
 #[async_std::main]
@@ -56,12 +56,7 @@ async fn main() {
             let jwt = vc
                 .to_jwt_claims()
                 .unwrap()
-                .sign(
-                    key.get_algorithm().unwrap(),
-                    &verification_method,
-                    &resolver,
-                    &signer,
-                )
+                .sign(&verification_method, &resolver, &signer)
                 .await
                 .unwrap();
 

@@ -98,7 +98,7 @@ where
                                     ),
                                     Err(_) => {
                                         // The IRI is not referring to a verification method.
-                                        Err(VerificationMethodResolutionError::InvalidKeyId(
+                                        Err(VerificationMethodResolutionError::NotAVerificationMethod(
                                             method.id().to_string(),
                                         ))
                                     }

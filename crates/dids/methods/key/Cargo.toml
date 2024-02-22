@@ -38,6 +38,7 @@ k256 = { version = "0.13.1", optional = true, features = ["ecdsa"] }
 p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
 
 [dev-dependencies]
+ssi-verification-methods-core.workspace = true
 ssi-claims.workspace = true
 ssi-data-integrity.workspace = true
 xsd-types.workspace = true

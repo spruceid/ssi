@@ -126,6 +126,10 @@ pub struct DIDJWK;
 impl DIDJWK {
     /// Generates a JWK DID from the given key.
     ///
+    /// Note: the resulting DID points to the DID document containing the key,
+    /// not the key itself. Use [`Self::generate_url`] to generate a DID URL
+    /// pointing to the key.
+    ///
     /// # Example
     ///
     /// ```
@@ -145,6 +149,13 @@ impl DIDJWK {
         let normalized = serde_jcs::to_string(key).unwrap();
         let method_id = multibase::Base::Base64Url.encode(normalized);
         DIDBuf::new(format!("did:jwk:{method_id}").into_bytes()).unwrap()
+    }
+
+    /// Generates a JWK DID URL referring to the given key.
+    pub fn generate_url(key: &JWK) -> DIDURLBuf {
+        let normalized = serde_jcs::to_string(key).unwrap();
+        let method_id = multibase::Base::Base64Url.encode(normalized);
+        DIDURLBuf::new(format!("did:jwk:{method_id}#0").into_bytes()).unwrap()
     }
 }
 

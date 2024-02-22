@@ -31,8 +31,10 @@
 //! [`serde`][serde]. Don't forget to enable the `derive` feature for `serde`.
 //!
 //! ```
+//! # #[async_std::main]
+//! # async fn main() {
 //! use serde::{Serialize, Deserialize};
-//! use ssi::{JWK, claims::JWTClaims, dids::{DIDResolver, DIDJWK}};
+//! use ssi::prelude::*;
 //!
 //! // Defines the shape of our custom claims.
 //! #[derive(Serialize, Deserialize)]
@@ -42,14 +44,14 @@
 //! }
 //!
 //! // Create JWT claims from our custom ("private") claims.
-//! let claims = JwtClaims::from_private_claims(MyClaims {
+//! let claims = JWTClaims::from_private_claims(MyClaims {
 //!   name: "John Smith".to_owned(),
 //!   email: "john.smith@example.org".to_owned()
 //! });
 //!
-//! // Create a random signing key, and turn its public part into a DID.
+//! // Create a random signing key, and turn its public part into a DID URL.
 //! let key = JWK::generate_p256(); // requires the `p256` feature.
-//! let did = DIDJWK::generate(key.to_public_key());
+//! let did = DIDJWK::generate_url(&key.to_public());
 //!
 //! // Create a verification method resolver, which will be in charge of
 //! // decoding the DID back into a public key.
@@ -61,17 +63,18 @@
 //! let signer = SingleSecretSigner::new(key);
 //!
 //! // Sign the claims.
-//! let jwt = claims.sign(
+//! let jwt = claims.sign::<AnyJwkMethod>(
 //!   &did,
 //!   &vm_resolver,
 //!   &signer
 //! ).await.expect("signature failed");
 //!
 //! // Verify the JWT.
-//! assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_valid())
+//! assert!(jwt.verify::<AnyJwkMethod>(&vm_resolver).await.expect("verification failed"));
 //!
 //! // Print the JWT.
 //! println!("{jwt}")
+//! # }
 //! ```
 //!
 //! # The `Signer` trait
@@ -85,6 +88,9 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg), feature(doc_cfg))]
 
 pub use xsd_types;
+
+/// Collection of common names defined by `ssi`.
+pub mod prelude;
 
 // Re-export core functions and types.
 #[doc(hidden)]

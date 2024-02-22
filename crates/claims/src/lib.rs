@@ -7,15 +7,21 @@ pub use ssi_claims_core::*;
 /// See: <https://datatracker.ietf.org/doc/html/rfc7515>
 pub use ssi_jws as jws;
 
+pub use jws::{CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString};
+
 /// JSON Web tokens (JWT).
 ///
 /// See: <https://datatracker.ietf.org/doc/html/rfc7519>
 pub use ssi_jwt as jwt;
 
+pub use jwt::JWTClaims;
+
 /// W3C Verifiable Credentials (VC).
 ///
 /// See: <https://www.w3.org/TR/vc-data-model>
 pub use ssi_vc as vc;
+
+pub use vc::{Credential, Presentation, VerifiableCredential, VerifiablePresentation};
 
 /// Data-Integrity Proofs.
 ///

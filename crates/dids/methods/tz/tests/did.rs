@@ -4,7 +4,6 @@ use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{
-        verification::method::{signer::SingleSecretSigner, ProofPurpose},
         AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration,
     },
     vc::{JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation},
@@ -14,6 +13,7 @@ use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDID
 use ssi_json_ld::JsonLdEnvironment;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
+use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
 use static_iref::{iri, uri};
 
 const TZ1: &str = "did:tz:tz1YwA1FwpgLtc1G8DKbbZ6e6PTb1dQMRn5x";

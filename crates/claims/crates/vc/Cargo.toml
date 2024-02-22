@@ -31,7 +31,7 @@ base64.workspace = true
 bitvec = "0.20"
 flate2 = "1.0"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
-ssi-verification-methods-core.workspace = true
+ssi-verification-methods.workspace = true
 ssi-dids-core.workspace = true
 ssi-data-integrity.workspace = true
 

@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-data-integrity/"
 
 [dependencies]
-ssi-verification-methods.workspace = true
+ssi-verification-methods-core.workspace = true
 rdf-types.workspace = true
 xsd-types = { workspace = true, features = ["serde"] }
 linked-data = { workspace = true, features = ["derive"] }

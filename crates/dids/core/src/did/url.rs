@@ -9,7 +9,7 @@ mod primary;
 mod reference;
 mod relative;
 
-use iref::{IriBuf, UriBuf};
+use iref::{Iri, IriBuf, Uri, UriBuf};
 pub use primary::*;
 pub use reference::*;
 pub use relative::*;
@@ -57,6 +57,20 @@ impl DIDURL {
         // SAFETY: DID URL is a transparent wrapper over `[u8]`,
         //         but we didn't check if it is actually a DID URL.
         std::mem::transmute(data)
+    }
+
+    pub fn as_iri(&self) -> &Iri {
+        unsafe {
+            // SAFETY: a DID URL is an IRI.
+            Iri::new_unchecked(self.as_str())
+        }
+    }
+
+    pub fn as_uri(&self) -> &Uri {
+        unsafe {
+            // SAFETY: a DID URL is an URI.
+            Uri::new_unchecked(&self.0)
+        }
     }
 
     /// Returns the DID URL as a string.
@@ -205,6 +219,18 @@ impl Deref for DIDURL {
 
     fn deref(&self) -> &Self::Target {
         self.as_str()
+    }
+}
+
+impl Borrow<Uri> for DIDURL {
+    fn borrow(&self) -> &Uri {
+        self.as_uri()
+    }
+}
+
+impl Borrow<Iri> for DIDURL {
+    fn borrow(&self) -> &Iri {
+        self.as_iri()
     }
 }
 
@@ -441,6 +467,18 @@ impl Deref for DIDURLBuf {
 impl Borrow<DIDURL> for DIDURLBuf {
     fn borrow(&self) -> &DIDURL {
         self.as_did_url()
+    }
+}
+
+impl Borrow<Uri> for DIDURLBuf {
+    fn borrow(&self) -> &Uri {
+        self.as_uri()
+    }
+}
+
+impl Borrow<Iri> for DIDURLBuf {
+    fn borrow(&self) -> &Iri {
+        self.as_iri()
     }
 }
 

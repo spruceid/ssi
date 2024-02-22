@@ -15,7 +15,7 @@ use ssi::{
         jws::CompactJWSString,
         vc::JsonVerifiableCredential,
     },
-    verification_methods::{signer::SingleSecretSigner, AnyJwkMethod, ProofPurpose},
+    verification_methods::{AnyJwkMethod, ProofPurpose, SingleSecretSigner},
 };
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
@@ -90,12 +90,7 @@ async fn main() {
             let jwt = vp
                 .to_jwt_claims()
                 .unwrap()
-                .sign(
-                    key.get_algorithm().unwrap(),
-                    &verification_method,
-                    &resolver,
-                    &signer,
-                )
+                .sign(&verification_method, &resolver, &signer)
                 .await
                 .unwrap();
 

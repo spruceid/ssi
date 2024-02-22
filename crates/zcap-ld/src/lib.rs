@@ -15,18 +15,17 @@ use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use ssi_claims::{data_integrity::AnyProof, ProofValidity, Verifiable};
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
-
 use ssi_claims::{
     data_integrity::{
-        signing, verification::method::Signer, AnyInputContext, AnySignatureProtocol, AnySuite,
-        AnySuiteOptions, CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfiguration,
+        signing, AnyInputContext, AnyProof, AnySignatureProtocol, AnySuite, AnySuiteOptions,
+        CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfiguration,
         ProofConfigurationExpansion, ProofConfigurationRefExpansion, ProofPreparationError,
     },
     vc::{Context, RequiredContext},
-    ExtractProof, MergeWithProof, Validate, VerifiableClaims,
+    ExtractProof, MergeWithProof, ProofValidity, Validate, Verifiable, VerifiableClaims,
 };
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
+use ssi_verification_methods::Signer;
 use ssi_verification_methods::{
     AnyMethod, ProofPurpose, VerificationError, VerificationMethodResolver,
 };
@@ -519,7 +518,7 @@ mod tests {
     use ssi_claims::UnprepareProof;
     use ssi_dids_core::{example::ExampleDIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
-    use ssi_verification_methods::signer::SingleSecretSigner;
+    use ssi_verification_methods::SingleSecretSigner;
     use static_iref::uri;
 
     #[derive(Deserialize, PartialEq, Debug, Clone, Serialize)]
