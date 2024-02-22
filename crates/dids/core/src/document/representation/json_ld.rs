@@ -69,10 +69,6 @@ pub struct Options {
 pub struct InvalidContextValue;
 
 /// DID JSON-LD context reference.
-///
-/// ```
-/// "https://www.w3.org/ns/did/v1"
-/// ```
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub enum DIDContext {
     /// Legacy context.
@@ -92,9 +88,7 @@ pub enum DIDContext {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Context {
-    /// https://www.w3.org/ns/did/v1
     DID(DIDContext),
-
     Array(ContextArray),
 }
 

@@ -25,12 +25,16 @@ impl<T> Serialize for JsonPresentationTypes<T> {
     where
         S: serde::Serializer,
     {
-        let mut seq = serializer.serialize_seq(Some(1 + self.0.len()))?;
-        seq.serialize_element(VERIFIABLE_PRESENTATION_TYPE)?;
-        for t in &self.0 {
-            seq.serialize_element(t)?;
+        if self.0.is_empty() {
+            VERIFIABLE_PRESENTATION_TYPE.serialize(serializer)
+        } else {
+            let mut seq = serializer.serialize_seq(Some(1 + self.0.len()))?;
+            seq.serialize_element(VERIFIABLE_PRESENTATION_TYPE)?;
+            for t in &self.0 {
+                seq.serialize_element(t)?;
+            }
+            seq.end()
         }
-        seq.end()
     }
 }
 

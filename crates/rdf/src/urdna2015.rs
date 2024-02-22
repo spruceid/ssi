@@ -542,7 +542,7 @@ mod tests {
         //   cargo test normalization_test_suite -- test022
         let mut passed = 0;
         let mut total = 0;
-        for entry in fs::read_dir("../json-ld-normalization/tests").unwrap() {
+        for entry in fs::read_dir("canonicalization/tests").unwrap() {
             let entry = entry.unwrap();
             let filename = entry.file_name().into_string().unwrap();
             if !filename.starts_with("test") || !filename.ends_with("-urdna2015.nq") {

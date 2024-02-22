@@ -13,3 +13,6 @@
 [submodule "tests/vc-di-ecdsa"]
 	path = tests/vc-di-ecdsa
 	url = https://github.com/w3c/vc-di-ecdsa.git
+[submodule "crates/rdf/canonicalization"]
+	path = crates/rdf/canonicalization
+	url = https://github.com/w3c-ccg/rdf-dataset-canonicalization
