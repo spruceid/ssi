@@ -1,5 +1,5 @@
 use ssi_core::{covariance_rule, Referencable};
-use ssi_data_integrity_core::suite::{CryptographicSuiteOptions, InvalidOptions};
+use ssi_data_integrity_core::suite::CryptographicSuiteOptions;
 use ssi_jwk::JWK;
 use ssi_security::{Multibase, MultibaseBuf};
 
@@ -48,9 +48,15 @@ impl AnySuiteOptions {
     }
 
     pub fn with_public_key(self, jwk: JWK) -> Result<Self, ssi_jws::Error> {
+        #[cfg(feature = "tezos")]
         let public_key_multibase = Some(ssi_data_integrity_suites::tezos::encode_jwk_to_multibase(
             &jwk,
         )?);
+
+        #[cfg(not(feature = "tezos"))]
+        let public_key_multibase = None;
+
+        #[allow(clippy::needless_update)]
         Ok(Self {
             public_key_jwk: Some(Box::new(jwk)),
             public_key_multibase,
@@ -160,13 +166,13 @@ impl<'a> From<AnySuiteOptionsRef<'a>> for () {
 
 #[cfg(feature = "tezos")]
 impl<'a> TryFrom<AnySuiteOptionsRef<'a>> for ssi_data_integrity_suites::tezos::OptionsRef<'a> {
-    type Error = InvalidOptions;
+    type Error = ssi_data_integrity_core::suite::InvalidOptions;
 
     fn try_from(value: AnySuiteOptionsRef<'a>) -> Result<Self, Self::Error> {
         Ok(Self {
             public_key_jwk: value
                 .public_key_jwk
-                .ok_or(InvalidOptions::MissingPublicKey)?,
+                .ok_or(ssi_data_integrity_core::suite::InvalidOptions::MissingPublicKey)?,
         })
     }
 }

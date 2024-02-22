@@ -72,7 +72,7 @@ aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo"]
 ## This includes:
 ##   - `Eip712Signature2021` (requires `ethereum`).
 ##   - `EthereumEip712Signature2021` (requires `w3c`)
-eip712 = ["ssi-eip712", "ssi-jws/eip"]
+eip712 = ["ssi-eip712", "ssi-jws/eip", "serde_json"]
 
 # Enables `SolanaSignature2021`
 solana = ["ssi-verification-methods/solana"]
@@ -131,7 +131,7 @@ p256 = { version = "0.11", optional = true, features = ["ecdsa"] }
 p384 = { version = "0.11", optional = true, features = ["ecdsa"] }
 sha2 = { version = "0.10", optional = true }
 
-# only needed by non LD suites.
+# only needed by non LD suites and EIP-712.
 json-syntax = { workspace = true, features = ["canonicalize"] }
 serde_json = { workspace = true, optional = true }
 serde_jcs = { workspace = true, optional = true }

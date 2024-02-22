@@ -804,7 +804,7 @@ fn base64_encode_json<T: Serialize>(object: &T) -> Result<String, Error> {
 #[allow(unreachable_code, unused_variables)]
 pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8>, Error> {
     let signature = match &key.params {
-        #[cfg(feature = "ring")]
+        #[cfg(all(feature = "rsa", feature = "ring"))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             let key_pair = ring::signature::RsaKeyPair::try_from(rsa_params)?;
@@ -818,7 +818,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             key_pair.sign(padding_alg, &rng, data, &mut sig)?;
             sig
         }
-        #[cfg(feature = "rsa")]
+        #[cfg(all(feature = "rsa", not(feature = "ring")))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             let private_key = rsa::RsaPrivateKey::try_from(rsa_params)?;
@@ -1006,7 +1006,7 @@ pub fn verify_bytes_warnable(
         }
     }
     match &key.params {
-        #[cfg(feature = "ring")]
+        #[cfg(all(feature = "rsa", feature = "ring"))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             use ring::signature::RsaPublicKeyComponents;
@@ -1018,7 +1018,7 @@ pub fn verify_bytes_warnable(
             };
             public_key.verify(parameters, data, signature)?
         }
-        #[cfg(feature = "rsa")]
+        #[cfg(all(feature = "rsa", not(feature = "ring")))]
         JWKParams::RSA(rsa_params) => {
             rsa_params.validate_key_size()?;
             use rsa::PublicKey;

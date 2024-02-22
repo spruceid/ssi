@@ -21,7 +21,14 @@ pub async fn any_credential_from_json_slice(
 
 /// Decodes a Data-Integrity credential or presentation from its JSON binary
 /// representation.
-pub async fn any_credential_from_json_slice_with<V, I, L, E, Y>(
+pub async fn any_credential_from_json_slice_with<
+    V,
+    I,
+    L,
+    E,
+    #[cfg(feature = "eip712")] Y: ssi_data_integrity::suites::eip712::TypesProvider,
+    #[cfg(not(feature = "eip712"))] Y,
+>(
     json: &[u8],
     environment: AnyInputContext<E, Y>,
 ) -> Result<Verifiable<SpecializedJsonCredential, Proofs<AnySuite>>, DecodeError<L::Error>>
@@ -37,7 +44,6 @@ where
         + ReverseLiteralInterpretation<Literal = V::Literal>,
     I::Resource: Clone,
     L: json_ld::Loader<V::Iri>,
-    Y: ssi_data_integrity::suites::eip712::TypesProvider,
     //
     V: Send + Sync,
     V::Iri: Send + Sync,
@@ -58,7 +64,14 @@ pub async fn any_credential_from_json_str(
 
 /// Decodes a Data-Integrity credential or presentation from its JSON textual
 /// representation.
-pub async fn any_credential_from_json_str_with<V, I, L, E, Y>(
+pub async fn any_credential_from_json_str_with<
+    V,
+    I,
+    L,
+    E,
+    #[cfg(feature = "eip712")] Y: ssi_data_integrity::suites::eip712::TypesProvider,
+    #[cfg(not(feature = "eip712"))] Y,
+>(
     json: &str,
     environment: AnyInputContext<E, Y>,
 ) -> Result<Verifiable<JsonCredential, Proofs<AnySuite>>, DecodeError<L::Error>>
@@ -74,7 +87,6 @@ where
         + ReverseLiteralInterpretation<Literal = V::Literal>,
     I::Resource: Clone,
     L: json_ld::Loader<V::Iri>,
-    Y: ssi_data_integrity::suites::eip712::TypesProvider,
     //
     V: Send + Sync,
     V::Iri: Send + Sync,

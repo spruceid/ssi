@@ -3,7 +3,7 @@ use linked_data::{LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSu
 use rdf_types::{interpretation::ReverseIriInterpretation, Interpretation, Vocabulary};
 use ssi_claims_core::ProofValidity;
 use ssi_core::Referencable;
-use ssi_crypto::{MessageSigner, SignerAdapter};
+use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::HashError, CryptographicSuite, ExpandedConfiguration, UnsupportedProofSuite,
 };
@@ -187,8 +187,10 @@ macro_rules! crypto_suites {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
-                        Self::$name => ssi_data_integrity_suites::$name.name()
-                    ),*
+                        Self::$name => ssi_data_integrity_suites::$name.name(),
+                    )*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
 
@@ -196,8 +198,10 @@ macro_rules! crypto_suites {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
-                        Self::$name => ssi_data_integrity_suites::$name.iri()
-                    ),*
+                        Self::$name => ssi_data_integrity_suites::$name.iri(),
+                    )*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
 
@@ -205,13 +209,15 @@ macro_rules! crypto_suites {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
-                        Self::$name => ssi_data_integrity_suites::$name.cryptographic_suite()
-                    ),*
+                        Self::$name => ssi_data_integrity_suites::$name.cryptographic_suite(),
+                    )*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
 
+            #[allow(unused)]
             fn refine_type(&mut self, type_: &Iri) -> Result<(), UnsupportedProofSuite> {
-                eprintln!("refined suite type: {type_}");
                 let current_cryptosuite = self.cryptographic_suite();
 
                 $(
@@ -228,6 +234,7 @@ macro_rules! crypto_suites {
                 Err(UnsupportedProofSuite::Expanded(ssi_data_integrity_core::ExpandedType { iri: type_.to_owned(), cryptosuite: self.cryptographic_suite().map(ToOwned::to_owned) }))
             }
 
+            #[allow(unused)]
             fn hash(&self, data: Transformed, proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>) -> Result<Self::Hashed, HashError> {
                 match self {
                     $(
@@ -241,6 +248,8 @@ macro_rules! crypto_suites {
                             ).map(Into::into)
                         }
                     ),*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
 
@@ -257,11 +266,14 @@ macro_rules! crypto_suites {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?
-                        Self::$name => ssi_data_integrity_suites::$name.required_proof_context()
-                    ),*
+                        Self::$name => ssi_data_integrity_suites::$name.required_proof_context(),
+                    )*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
 
+            #[allow(unused)]
             async fn sign(
                 &self,
                 options: <Self::Options as Referencable>::Reference<'_>,
@@ -282,7 +294,7 @@ macro_rules! crypto_suites {
                                                 options,
                                                 method,
                                                 bytes.try_into()?,
-                                                SignerAdapter::new(signer)
+                                                ssi_crypto::SignerAdapter::new(signer)
                                             ).await?.into())
                                         }
                                         Err(e) => {
@@ -295,10 +307,13 @@ macro_rules! crypto_suites {
                                 }
                             }
                         }
-                    ),*
+                    )*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
 
+            #[allow(unused)]
             fn verify(
                 &self,
                 options: AnySuiteOptionsRef,
@@ -318,6 +333,8 @@ macro_rules! crypto_suites {
                             )
                         }
                     ),*
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
         }
@@ -367,10 +384,10 @@ crypto_suites! {
     #[cfg(feature = "w3c")]
     json_web_signature_2020: JsonWebSignature2020,
 
-    #[cfg(feature = "w3c")]
+    #[cfg(all(feature = "w3c", feature = "eip712"))]
     ethereum_eip712_signature_2021: EthereumEip712Signature2021,
 
-    #[cfg(feature = "w3c")]
+    #[cfg(all(feature = "w3c", feature = "eip712"))]
     ethereum_eip712_signature_2021_v0_1: EthereumEip712Signature2021v0_1,
 
     /// DIF Ecdsa Secp256k1 Recovery Signature 2020.
@@ -388,11 +405,11 @@ crypto_suites! {
     aleo_signature_2021: AleoSignature2021,
 
     /// Unspecified Tezos Ed25519 Blake2b, digest size 20, base 58 check encoded, Signature 2021.
-    #[cfg(feature = "tezos")]
+    #[cfg(all(feature = "tezos", feature = "ed25519"))]
     ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021: Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
 
     /// Unspecified Tezos P256 Blake2b, digest size 20, base 58 check encoded, Signature 2021.
-    #[cfg(feature = "tezos")]
+    #[cfg(all(feature = "tezos", feature = "secp256r1"))]
     p256_blake2b_digest_size20_base58_check_encoded_signature_2021: P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
 
     /// Unspecified Tezos JCS Signature 2021.
@@ -403,53 +420,72 @@ crypto_suites! {
     #[cfg(feature = "tezos")]
     tezos_signature_2021: TezosSignature2021,
 
-    #[cfg(feature = "eip712")]
+    #[cfg(all(feature = "ethereum", feature = "eip712"))]
     eip712_signature_2021: Eip712Signature2021,
 
-    // #[cfg(feature = "ethereum")]
+    #[cfg(feature = "ethereum")]
     ethereum_personal_signature_2021: EthereumPersonalSignature2021,
 
+    #[cfg(feature = "ethereum")]
     ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
 }
 
 impl AnySuite {
+    #[cfg(feature = "eip712")]
     pub fn requires_eip721(&self) -> bool {
-        if cfg!(feature = "w3c") {
-            matches!(self, Self::EthereumEip712Signature2021)
-        } else {
-            false
+        #[cfg(feature = "w3c")]
+        if matches!(self, Self::EthereumEip712Signature2021) {
+            return true;
         }
+
+        false
     }
 
+    #[cfg(feature = "eip712")]
     pub fn requires_eip721_v0_1(&self) -> bool {
-        if cfg!(feature = "w3c") {
-            matches!(self, Self::EthereumEip712Signature2021v0_1)
-        } else {
-            false
+        #[cfg(feature = "w3c")]
+        if matches!(self, Self::EthereumEip712Signature2021v0_1) {
+            return true;
         }
+
+        false
     }
 
     pub fn requires_public_key_jwk(&self) -> bool {
-        if cfg!(feature = "tezos") {
-            matches!(
-                self,
-                Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    | Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                    | Self::TezosSignature2021
-            )
-        } else {
-            false
+        #[cfg(all(feature = "tezos", feature = "ed25519"))]
+        if matches!(
+            self,
+            Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        ) {
+            return true;
         }
+
+        #[cfg(all(feature = "tezos", feature = "secp256r1"))]
+        if matches!(
+            self,
+            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+        ) {
+            return true;
+        }
+
+        #[cfg(feature = "tezos")]
+        if matches!(self, Self::TezosSignature2021) {
+            return true;
+        }
+
+        false
     }
 
     pub fn requires_public_key_multibase(&self) -> bool {
-        if cfg!(feature = "tezos") {
-            matches!(self, Self::TezosJcsSignature2021)
-        } else {
-            false
+        #[cfg(feature = "tezos")]
+        if matches!(self, Self::TezosJcsSignature2021) {
+            return true;
         }
+
+        false
     }
 
+    #[allow(unused)]
     pub fn pick(
         jwk: &JWK,
         verification_method: Option<&ReferenceOrOwned<AnyMethod>>,
@@ -457,7 +493,7 @@ impl AnySuite {
         use ssi_jwk::Algorithm;
         let algorithm = jwk.get_algorithm()?;
         Some(match algorithm {
-            #[cfg(feature = "rsa")]
+            #[cfg(all(feature = "w3c", feature = "rsa"))]
             Algorithm::RS256 => Self::RsaSignature2018,
             #[cfg(feature = "w3c")]
             Algorithm::PS256 => Self::JsonWebSignature2020,
@@ -483,13 +519,12 @@ impl AnySuite {
                         Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
                     }
                 }
-                #[cfg(feature = "ed25519")]
+                #[cfg(all(feature = "w3c", feature = "ed25519"))]
                 _ => Self::Ed25519Signature2018,
-                #[cfg(not(feature = "ed25519"))]
+                #[cfg(not(all(feature = "w3c", feature = "ed25519")))]
                 _ => {
-                    return Err(Error::JWS(ssi_jws::Error::MissingFeatures(
-                        "ed25519 or tezos or solana",
-                    )))
+                    // missing `ed25519` or `tezos` or `solana`.
+                    return None;
                 }
             },
             Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
@@ -500,16 +535,22 @@ impl AnySuite {
                     if vm.id().ends_with("#TezosMethod2021") {
                         Self::TezosSignature2021
                     } else {
-                        Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                        #[cfg(feature = "secp256r1")]
+                        {
+                            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                        }
+                        #[cfg(not(feature = "secp256r1"))]
+                        {
+                            return None;
+                        }
                     }
                 }
                 #[cfg(feature = "secp256r1")]
                 _ => Self::EcdsaSecp256r1Signature2019,
                 #[cfg(not(feature = "secp256r1"))]
                 _ => {
-                    return Err(Error::JWS(ssi_jws::Error::MissingFeatures(
-                        "secp256r1 or tezos",
-                    )))
+                    // missing `secp256r1` or `tezos` features.
+                    return None;
                 }
             },
             Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
@@ -528,24 +569,23 @@ impl AnySuite {
 
                     return None;
                 }
-                #[cfg(feature = "secp256k1")]
+                #[cfg(all(feature = "w3c", feature = "secp256k1"))]
                 _ => Self::EcdsaSecp256k1Signature2019,
-
                 #[allow(unreachable_patterns)]
                 _ => return None,
             },
             Algorithm::ES256KR => {
                 // #[allow(clippy::if_same_then_else)]
-                #[cfg(feature = "eip712")]
+                #[cfg(all(feature = "w3c", feature = "eip712"))]
                 if use_eip712sig(jwk) {
                     return Some(Self::EthereumEip712Signature2021);
                 }
-                #[cfg(feature = "eip712")]
+                #[cfg(feature = "ethereum")]
                 if use_epsig(jwk) {
                     return Some(Self::EthereumPersonalSignature2021);
                 }
                 match verification_method {
-                    #[cfg(feature = "eip712")]
+                    #[cfg(all(feature = "ethereum", feature = "eip712"))]
                     Some(vm)
                         if (vm.id().starts_with("did:ethr:")
                             || vm.id().starts_with("did:pkh:eth:"))
@@ -576,7 +616,7 @@ fn use_eip712sig(key: &JWK) -> bool {
     false
 }
 
-#[cfg(feature = "eip712")]
+#[cfg(feature = "ethereum")]
 fn use_epsig(key: &JWK) -> bool {
     // deprecated: allow using unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021
     if let Some(ref key_ops) = key.key_operations {

@@ -9,8 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
 [features]
-# Default features.
-default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "tezos", "ethereum", "eip712", "aleo", "solana"]
+# default = ["w3c", "ed25519", "rsa", "secp256k1", "secp256r1", "tezos", "ethereum", "eip712", "aleo", "solana"]
 
 ## Signature suites specified by the W3C.
 ##

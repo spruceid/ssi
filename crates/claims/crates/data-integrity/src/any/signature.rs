@@ -1,7 +1,5 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_data_integrity_suites::{
-    eip712::{self, Eip712Metadata},
-    ethereum_personal_signature_2021, rsa_signature_2018, solana_signature_2021, tezos,
     JwsSignature, JwsSignatureRef, MultibaseSignature, MultibaseSignatureRef,
 };
 use ssi_jws::{CompactJWSStr, CompactJWSString};
@@ -31,9 +29,10 @@ pub struct AnySignature {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jws: Option<CompactJWSString>,
 
+    #[cfg(feature = "eip712")]
     #[ld("https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub eip712: Option<Eip712Metadata>,
+    pub eip712: Option<ssi_data_integrity_suites::eip712::Eip712Metadata>,
 }
 
 impl Referencable for AnySignature {
@@ -44,6 +43,7 @@ impl Referencable for AnySignature {
             proof_value: self.proof_value.as_deref(),
             signature_value: self.signature_value.as_deref(),
             jws: self.jws.as_deref(),
+            #[cfg(feature = "eip712")]
             eip712: self.eip712.as_ref(),
         }
     }
@@ -59,7 +59,8 @@ pub struct AnySignatureRef<'a> {
 
     pub jws: Option<&'a CompactJWSStr>,
 
-    pub eip712: Option<&'a Eip712Metadata>,
+    #[cfg(feature = "eip712")]
+    pub eip712: Option<&'a ssi_data_integrity_suites::eip712::Eip712Metadata>,
 }
 
 impl From<MultibaseSignature> for AnySignature {
@@ -102,8 +103,9 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
     }
 }
 
-impl From<ethereum_personal_signature_2021::Signature> for AnySignature {
-    fn from(value: ethereum_personal_signature_2021::Signature) -> Self {
+#[cfg(feature = "ethereum")]
+impl From<ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature> for AnySignature {
+    fn from(value: ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature) -> Self {
         Self {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -111,7 +113,10 @@ impl From<ethereum_personal_signature_2021::Signature> for AnySignature {
     }
 }
 
-impl TryFrom<AnySignature> for ethereum_personal_signature_2021::Signature {
+#[cfg(feature = "ethereum")]
+impl TryFrom<AnySignature>
+    for ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature
+{
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
@@ -121,8 +126,13 @@ impl TryFrom<AnySignature> for ethereum_personal_signature_2021::Signature {
     }
 }
 
-impl<'a> From<ethereum_personal_signature_2021::SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: ethereum_personal_signature_2021::SignatureRef<'a>) -> Self {
+#[cfg(feature = "ethereum")]
+impl<'a> From<ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>>
+    for AnySignatureRef<'a>
+{
+    fn from(
+        value: ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>,
+    ) -> Self {
         Self {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -130,7 +140,10 @@ impl<'a> From<ethereum_personal_signature_2021::SignatureRef<'a>> for AnySignatu
     }
 }
 
-impl<'a> TryFrom<AnySignatureRef<'a>> for ethereum_personal_signature_2021::SignatureRef<'a> {
+#[cfg(feature = "ethereum")]
+impl<'a> TryFrom<AnySignatureRef<'a>>
+    for ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>
+{
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
@@ -140,8 +153,9 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for ethereum_personal_signature_2021::Sign
     }
 }
 
-impl From<solana_signature_2021::Signature> for AnySignature {
-    fn from(value: solana_signature_2021::Signature) -> Self {
+#[cfg(feature = "solana")]
+impl From<ssi_data_integrity_suites::solana_signature_2021::Signature> for AnySignature {
+    fn from(value: ssi_data_integrity_suites::solana_signature_2021::Signature) -> Self {
         AnySignature {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -149,7 +163,8 @@ impl From<solana_signature_2021::Signature> for AnySignature {
     }
 }
 
-impl TryFrom<AnySignature> for solana_signature_2021::Signature {
+#[cfg(feature = "solana")]
+impl TryFrom<AnySignature> for ssi_data_integrity_suites::solana_signature_2021::Signature {
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
@@ -160,8 +175,11 @@ impl TryFrom<AnySignature> for solana_signature_2021::Signature {
     }
 }
 
-impl<'a> From<solana_signature_2021::SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: solana_signature_2021::SignatureRef<'a>) -> Self {
+#[cfg(feature = "solana")]
+impl<'a> From<ssi_data_integrity_suites::solana_signature_2021::SignatureRef<'a>>
+    for AnySignatureRef<'a>
+{
+    fn from(value: ssi_data_integrity_suites::solana_signature_2021::SignatureRef<'a>) -> Self {
         AnySignatureRef {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -169,7 +187,10 @@ impl<'a> From<solana_signature_2021::SignatureRef<'a>> for AnySignatureRef<'a> {
     }
 }
 
-impl<'a> TryFrom<AnySignatureRef<'a>> for solana_signature_2021::SignatureRef<'a> {
+#[cfg(feature = "solana")]
+impl<'a> TryFrom<AnySignatureRef<'a>>
+    for ssi_data_integrity_suites::solana_signature_2021::SignatureRef<'a>
+{
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
@@ -180,8 +201,9 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for solana_signature_2021::SignatureRef<'a
     }
 }
 
-impl From<tezos::Signature> for AnySignature {
-    fn from(value: tezos::Signature) -> Self {
+#[cfg(feature = "tezos")]
+impl From<ssi_data_integrity_suites::tezos::Signature> for AnySignature {
+    fn from(value: ssi_data_integrity_suites::tezos::Signature) -> Self {
         Self {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -189,8 +211,9 @@ impl From<tezos::Signature> for AnySignature {
     }
 }
 
-impl<'a> From<tezos::SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: tezos::SignatureRef<'a>) -> Self {
+#[cfg(feature = "tezos")]
+impl<'a> From<ssi_data_integrity_suites::tezos::SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: ssi_data_integrity_suites::tezos::SignatureRef<'a>) -> Self {
         Self {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -198,7 +221,8 @@ impl<'a> From<tezos::SignatureRef<'a>> for AnySignatureRef<'a> {
     }
 }
 
-impl<'a> TryFrom<AnySignatureRef<'a>> for tezos::SignatureRef<'a> {
+#[cfg(feature = "tezos")]
+impl<'a> TryFrom<AnySignatureRef<'a>> for ssi_data_integrity_suites::tezos::SignatureRef<'a> {
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
@@ -208,8 +232,9 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for tezos::SignatureRef<'a> {
     }
 }
 
-impl From<rsa_signature_2018::Signature> for AnySignature {
-    fn from(value: rsa_signature_2018::Signature) -> Self {
+#[cfg(all(feature = "w3c", feature = "rsa"))]
+impl From<ssi_data_integrity_suites::rsa_signature_2018::Signature> for AnySignature {
+    fn from(value: ssi_data_integrity_suites::rsa_signature_2018::Signature) -> Self {
         AnySignature {
             signature_value: Some(value.signature_value),
             ..Default::default()
@@ -217,7 +242,10 @@ impl From<rsa_signature_2018::Signature> for AnySignature {
     }
 }
 
-impl<'a> TryFrom<AnySignatureRef<'a>> for rsa_signature_2018::SignatureRef<'a> {
+#[cfg(all(feature = "w3c", feature = "rsa"))]
+impl<'a> TryFrom<AnySignatureRef<'a>>
+    for ssi_data_integrity_suites::rsa_signature_2018::SignatureRef<'a>
+{
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
@@ -228,8 +256,9 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for rsa_signature_2018::SignatureRef<'a> {
     }
 }
 
-impl From<eip712::Eip712Signature> for AnySignature {
-    fn from(value: eip712::Eip712Signature) -> Self {
+#[cfg(feature = "eip712")]
+impl From<ssi_data_integrity_suites::eip712::Eip712Signature> for AnySignature {
+    fn from(value: ssi_data_integrity_suites::eip712::Eip712Signature) -> Self {
         Self {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -237,7 +266,8 @@ impl From<eip712::Eip712Signature> for AnySignature {
     }
 }
 
-impl TryFrom<AnySignature> for eip712::Eip712Signature {
+#[cfg(feature = "eip712")]
+impl TryFrom<AnySignature> for ssi_data_integrity_suites::eip712::Eip712Signature {
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
@@ -247,8 +277,9 @@ impl TryFrom<AnySignature> for eip712::Eip712Signature {
     }
 }
 
-impl<'a> From<eip712::Eip712SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: eip712::Eip712SignatureRef<'a>) -> Self {
+#[cfg(feature = "eip712")]
+impl<'a> From<ssi_data_integrity_suites::eip712::Eip712SignatureRef<'a>> for AnySignatureRef<'a> {
+    fn from(value: ssi_data_integrity_suites::eip712::Eip712SignatureRef<'a>) -> Self {
         Self {
             proof_value: Some(value.proof_value),
             ..Default::default()
@@ -256,7 +287,10 @@ impl<'a> From<eip712::Eip712SignatureRef<'a>> for AnySignatureRef<'a> {
     }
 }
 
-impl<'a> TryFrom<AnySignatureRef<'a>> for eip712::Eip712SignatureRef<'a> {
+#[cfg(feature = "eip712")]
+impl<'a> TryFrom<AnySignatureRef<'a>>
+    for ssi_data_integrity_suites::eip712::Eip712SignatureRef<'a>
+{
     type Error = InvalidSignature;
 
     fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {

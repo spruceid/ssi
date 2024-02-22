@@ -12,11 +12,24 @@ mod dif;
 #[cfg(feature = "dif")]
 pub use dif::*;
 
+#[cfg(any(
+    feature = "aleo",
+    feature = "ethereum",
+    feature = "tezos",
+    feature = "solana"
+))]
 mod unspecified;
+
+#[cfg(any(
+    feature = "aleo",
+    feature = "ethereum",
+    feature = "tezos",
+    feature = "solana"
+))]
 pub use unspecified::*;
 
 /// SHA256-based input hashing algorithm used by many cryptographic suites.
-fn sha256_hash<'a, T: CryptographicSuite>(
+pub fn sha256_hash<'a, T: CryptographicSuite>(
     data: &[u8],
     _suite: &T,
     proof_configuration: ExpandedConfiguration<'a, T::VerificationMethod, T::Options>,

@@ -94,7 +94,7 @@ contextual = "0.1.6"
 lazy_static = "1.4.0"
 
 [features]
-# # default = ["w3c", "ripemd-160", "eip", "tezos"]
+default = ["w3c", "rsa", "ed25519", "secp256k1", "ripemd-160", "eip712"]
 
 ## Signature suites specified by the W3C.
 ## 
@@ -172,7 +172,7 @@ solana = ["ssi-claims/solana"]
 ## This includes:
 ##   - `EthereumPersonalSignature2021`
 ##   - `Eip712Signature2021` (requires `eip712`)
-ethereum = ["ssi-claims/ethereum"]
+ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip"]
 
 ## Enable ripemd hashes.
 ripemd-160 = ["ssi-jwk/ripemd-160"]

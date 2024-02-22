@@ -8,6 +8,9 @@ description = "Verifiable Credentials Data Model v1.1 for the `ssi` library."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
+[features]
+eip712 = ["ssi-data-integrity/eip712"]
+
 [dependencies]
 iref.workspace = true
 rdf-types.workspace = true

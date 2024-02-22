@@ -264,6 +264,7 @@ impl<C, P> VerifiableDelegation<C, P> {
         Verifiable::new(self).await.map_err(Into::into)
     }
 
+    #[allow(unused, unreachable_code)]
     pub async fn verify(
         &self,
         resolver: &impl VerificationMethodResolver<AnyMethod>,
@@ -450,6 +451,7 @@ impl<P> VerifiableInvocation<P> {
         Ok(vc)
     }
 
+    #[allow(unused, unreachable_code)]
     pub async fn verify<C, Q>(
         &self,
         // TODO make this a list for delegation chains

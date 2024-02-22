@@ -9,9 +9,6 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 
 [features]
-# Default features.
-default = ["w3c", "dif", "ed25519", "rsa", "secp256k1", "secp256r1", "tezos", "eip712", "aleo", "solana"]
-
 # Enables signature suites specified by the W3C.
 w3c = ["ssi-data-integrity/w3c"]
 
@@ -46,7 +43,7 @@ tezos = ["ssi-jws/tezos", "ssi-data-integrity/tezos"]
 aleo = ["ssi-jwk/aleo", "ssi-jws/aleo", "ssi-data-integrity/aleo", "ssi-verification-methods/aleo"]
 
 # Enables `Eip712Signature2021`
-eip712 = ["ssi-eip712", "ssi-data-integrity/eip712"]
+eip712 = ["ssi-eip712", "ssi-data-integrity/eip712", "ssi-vc/eip712"]
 
 # Enables `SolanaSignature2021`
 solana = ["ssi-data-integrity/solana", "ssi-verification-methods/solana"]

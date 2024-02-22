@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use ssi_crypto::{protocol, MessageSignatureError};
-use ssi_jwk::algorithm::AnyBlake2b;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AnySignatureProtocol {
@@ -9,6 +8,7 @@ pub enum AnySignatureProtocol {
     Base58Btc,
     Base58BtcMultibase,
     EthereumWallet,
+    #[cfg(feature = "tezos")]
     TezosWallet,
 }
 
@@ -36,10 +36,13 @@ impl ssi_crypto::SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol 
                     bytes,
                 )
             }
-            Self::TezosWallet => ssi_crypto::SignatureProtocol::<AnyBlake2b>::prepare_message(
-                &ssi_data_integrity_suites::tezos::TezosWallet,
-                bytes,
-            ),
+            #[cfg(feature = "tezos")]
+            Self::TezosWallet => {
+                ssi_crypto::SignatureProtocol::<ssi_jwk::algorithm::AnyBlake2b>::prepare_message(
+                    &ssi_data_integrity_suites::tezos::TezosWallet,
+                    bytes,
+                )
+            }
         }
     }
 
@@ -55,8 +58,9 @@ impl ssi_crypto::SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol 
                 protocol::Base58BtcMultibase.encode_signature(algorithm, signature)
             }
             Self::EthereumWallet => protocol::EthereumWallet.encode_signature(algorithm, signature),
+            #[cfg(feature = "tezos")]
             Self::TezosWallet => {
-                let algorithm: AnyBlake2b = algorithm.try_into()?;
+                let algorithm: ssi_jwk::algorithm::AnyBlake2b = algorithm.try_into()?;
                 ssi_data_integrity_suites::tezos::TezosWallet.encode_signature(algorithm, signature)
             }
         }
@@ -89,10 +93,13 @@ impl ssi_crypto::SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol 
                     encoded_signature,
                 )
             }
-            Self::TezosWallet => ssi_crypto::SignatureProtocol::<AnyBlake2b>::decode_signature(
-                &ssi_data_integrity_suites::tezos::TezosWallet,
-                encoded_signature,
-            ),
+            #[cfg(feature = "tezos")]
+            Self::TezosWallet => {
+                ssi_crypto::SignatureProtocol::<ssi_jwk::algorithm::AnyBlake2b>::decode_signature(
+                    &ssi_data_integrity_suites::tezos::TezosWallet,
+                    encoded_signature,
+                )
+            }
         }
     }
 }
@@ -121,6 +128,7 @@ impl From<protocol::EthereumWallet> for AnySignatureProtocol {
     }
 }
 
+#[cfg(feature = "tezos")]
 impl From<ssi_data_integrity_suites::tezos::TezosWallet> for AnySignatureProtocol {
     fn from(_value: ssi_data_integrity_suites::tezos::TezosWallet) -> Self {
         Self::TezosWallet

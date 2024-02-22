@@ -111,8 +111,14 @@ impl Default
     }
 }
 
-impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, L, T>
-    CryptographicSuiteInput<T, AnyInputContext<E, L>> for AnySuite
+impl<
+        V: rdf_types::Vocabulary,
+        I: rdf_types::Interpretation,
+        E,
+        #[cfg(feature = "eip712")] L: ssi_data_integrity_suites::eip712::TypesProvider,
+        #[cfg(not(feature = "eip712"))] L,
+        T,
+    > CryptographicSuiteInput<T, AnyInputContext<E, L>> for AnySuite
 where
     E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
     I: rdf_types::interpretation::InterpretationMut<V>
@@ -122,11 +128,11 @@ where
     V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
     T: serde::Serialize + Expandable<E>,
     T::Expanded: linked_data::LinkedData<I, V>,
-    L: ssi_data_integrity_suites::eip712::TypesProvider,
 {
     // type Transform<'t> = Transform<'t, L> where T: 't, AnyInputContext<E, L>: 't;
 
     /// Transformation algorithm.
+    #[allow(unused)]
     async fn transform<'t, 'c: 't>(
         &'t self,
         data: &'t T,
@@ -175,7 +181,7 @@ where
 							Err(e) => Err(e.into())
 						}
 					}
-					#[cfg(feature = "w3c")]
+					#[cfg(all(feature = "w3c", feature = "eip712"))]
 					Self::EthereumEip712Signature2021 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
@@ -188,7 +194,7 @@ where
 							Err(e) => Err(e.into())
 						}
 					}
-                    #[cfg(feature = "w3c")]
+                    #[cfg(all(feature = "w3c", feature = "eip712"))]
 					Self::EthereumEip712Signature2021v0_1 => {
 						match params.try_cast_verification_method() {
 							Ok(params) => {
@@ -200,7 +206,9 @@ where
 							}
 							Err(e) => Err(e.into())
 						}
-					}
+					},
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
                 }
             }
         }
@@ -232,7 +240,7 @@ where
             p256_blake2b_digest_size20_base58_check_encoded_signature_2021: P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             #[cfg(feature = "tezos")]
             tezos_signature_2021: TezosSignature2021,
-            #[cfg(feature = "eip712")]
+            #[cfg(all(feature = "ethereum", feature = "eip712"))]
             eip712_signature_2021: Eip712Signature2021,
             #[cfg(feature = "ethereum")]
             ethereum_personal_signature_2021: EthereumPersonalSignature2021,
