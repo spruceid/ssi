@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use ssi_verification_methods::GenericVerificationMethod;
+use ssi_verification_methods_core::GenericVerificationMethod;
 
 use crate::{DIDBuf, DIDURLBuf, DIDURLReference, DIDURLReferenceBuf, DID, DIDURL};
 

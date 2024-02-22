@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     document::{self, representation, DIDVerificationMethod, InvalidData},
-    DIDMethod, Document, PrimaryDIDURL, DID, DIDURL,
+    DIDMethod, Document, PrimaryDIDURL, VerificationMethodDIDResolver, DID, DIDURL,
 };
 
 mod composition;
@@ -252,6 +252,20 @@ pub trait DIDResolver {
             }
             None => Ok(primary_deref_output.cast()),
         }
+    }
+
+    fn with_options(self, options: Options) -> VerificationMethodDIDResolver<Self>
+    where
+        Self: Sized,
+    {
+        VerificationMethodDIDResolver::new_with_options(self, options)
+    }
+
+    fn with_default_options(self) -> VerificationMethodDIDResolver<Self>
+    where
+        Self: Sized,
+    {
+        VerificationMethodDIDResolver::new(self)
     }
 }
 

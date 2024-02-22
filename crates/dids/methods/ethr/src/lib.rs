@@ -387,7 +387,7 @@ mod tests {
         vc::{JsonCredential, JsonPresentation},
         Verifiable,
     };
-    use ssi_dids_core::{did, DIDResolver, DIDVerifier};
+    use ssi_dids_core::{did, DIDResolver};
     use ssi_jwk::JWK;
     use static_iref::uri;
 
@@ -476,7 +476,7 @@ mod tests {
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
-        let didethr = DIDVerifier::new(DIDEthr);
+        let didethr = DIDEthr.with_default_options();
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
             "kty": "EC",
@@ -627,7 +627,7 @@ mod tests {
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
-        let didethr = DIDVerifier::new(DIDEthr);
+        let didethr = DIDEthr.with_default_options();
         let vc = ssi_claims::vc::any_credential_from_json_str(include_str!("../tests/vc.jsonld"))
             .await
             .unwrap();

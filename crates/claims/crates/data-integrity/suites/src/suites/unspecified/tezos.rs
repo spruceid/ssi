@@ -1,13 +1,18 @@
 //! Tezos crypto suites.
-
+#[cfg(feature = "ed25519")]
 pub mod ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021;
+
+#[cfg(feature = "secp256r1")]
 pub mod p256_blake2b_digest_size20_base58_check_encoded_signature_2021;
 pub mod tezos_jcs_signature_2021;
 pub mod tezos_signature_2021;
 
 use std::borrow::Cow;
 
+#[cfg(feature = "ed25519")]
 pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+
+#[cfg(feature = "secp256r1")]
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::{

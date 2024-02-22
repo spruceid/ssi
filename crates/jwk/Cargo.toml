@@ -10,33 +10,32 @@ documentation = "https://docs.rs/ssi-jwk/"
 
 [features]
 default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
-## enable secp256k1 keys
+
+## Enable secp256k1 keys.
 secp256k1 = ["k256", "rand", "ssi-crypto/secp256k1"]
-## enable secp256r1 (p256) keys
+
+## Enable secp256r1 (p256) keys.
 secp256r1 = ["p256", "rand"]
-## enable secp384r1 (p384) keys
+
+## Enable secp384r1 (p384) keys.
 secp384r1 = ["p384", "rand"]
-## enable ed25519 (EdDSA) keys
+
+## Enable ed25519 (EdDSA) keys.
 ed25519 = ["ed25519-dalek", "rand", "getrandom"]
-## enable RSA keys
+
+## Enable RSA keys.
 rsa = ["dep:rsa"]
 
-## enable aleo ecosystem keys
-aleo = [
-  "rand",
-  "blake2",
-  "snarkvm-dpc",
-  "snarkvm-algorithms",
-  "snarkvm-curves",
-  "snarkvm-utilities",
-  "snarkvm-parameters",
-  "bs58",
-]
-## enable ripemd-160 hashing for keys, e.g. for bitcoin
+## Enable aleo ecosystem keys.
+aleo = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters", "bs58"]
+
+## enable ripemd-160 hashing for keys, e.g. for bitcoin.
 ripemd-160 = ["ssi-crypto/ripemd-160", "secp256k1"]
-## enable ethereum style key hashing
-eip = ["ssi-crypto/keccak", "secp256k1"]
-## enable tezos style key hashing
+
+## enable ethereum style key hashing.
+eip = ["ssi-crypto/keccak", "k256/keccak256", "secp256k1"]
+
+## enable tezos style key hashing.
 tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
 
 ring = ["dep:ring"]

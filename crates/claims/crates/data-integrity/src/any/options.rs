@@ -29,10 +29,12 @@ pub struct AnySuiteOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_multibase: Option<MultibaseBuf>,
 
+    #[cfg(all(feature = "w3c", feature = "eip712"))]
     #[ld("eip712:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>,
 
+    #[cfg(all(feature = "w3c", feature = "eip712"))]
     #[ld("eip712v0.1:eip712-domain")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "eip712Domain")]
@@ -57,6 +59,7 @@ impl AnySuiteOptions {
     }
 }
 
+#[cfg(all(feature = "w3c", feature = "eip712"))]
 impl From<Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>>
     for AnySuiteOptions
 {
@@ -70,6 +73,7 @@ impl From<Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip7
     }
 }
 
+#[cfg(all(feature = "w3c", feature = "eip712"))]
 impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>
     for AnySuiteOptions
 {
@@ -90,10 +94,12 @@ impl Referencable for AnySuiteOptions {
         AnySuiteOptionsRef {
             public_key_jwk: self.public_key_jwk.as_deref(),
             public_key_multibase: self.public_key_multibase.as_deref(),
+            #[cfg(all(feature = "w3c", feature = "eip712"))]
             eip712: self
                 .eip712
                 .as_ref()
                 .map(ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options::as_ref),
+            #[cfg(all(feature = "w3c", feature = "eip712"))]
             eip712_v0_1: self.eip712_v0_1.as_ref().map(
                 ssi_data_integrity_suites::ethereum_eip712_signature_2021::v0_1::Eip712Options::as_ref,
             ),
@@ -113,10 +119,12 @@ impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
             self.public_key_multibase = None
         }
 
+        #[cfg(all(feature = "w3c", feature = "eip712"))]
         if !suite.requires_eip721() {
             self.eip712 = None
         }
 
+        #[cfg(all(feature = "w3c", feature = "eip712"))]
         if !suite.requires_eip721_v0_1() {
             self.eip712_v0_1 = None
         }
@@ -133,10 +141,12 @@ pub struct AnySuiteOptionsRef<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_multibase: Option<&'a Multibase>,
 
+    #[cfg(all(feature = "w3c", feature = "eip712"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712:
         Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712OptionsRef<'a>>,
 
+    #[cfg(all(feature = "w3c", feature = "eip712"))]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(rename = "eip712Domain")]
     pub eip712_v0_1: Option<

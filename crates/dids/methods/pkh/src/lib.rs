@@ -730,7 +730,7 @@ mod tests {
         vc::{JsonCredential, JsonPresentation},
         Verifiable,
     };
-    use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, DIDVerifier};
+    use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::Algorithm;
     use ssi_jws::CompactJWSString;
     use static_iref::uri;
@@ -946,7 +946,7 @@ mod tests {
             ssi_claims::data_integrity::suites::ethereum_eip712_signature_2021::Eip712Options,
         >,
     ) {
-        let didpkh = DIDVerifier::new(DIDPKH);
+        let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
 
         // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
         let did = DIDPKH.generate(&key, type_).unwrap();
@@ -1088,7 +1088,7 @@ mod tests {
         vm_relative_url: &str,
         proof_suite: AnySuite,
     ) {
-        let didpkh = DIDVerifier::new(DIDPKH);
+        let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
         let did = DIDPKH.generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
@@ -1529,7 +1529,7 @@ mod tests {
             .await
             .unwrap();
 
-        let didpkh = DIDVerifier::new(DIDPKH);
+        let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
         let verification_result = vc.verify(&didpkh).await.unwrap();
         assert!(verification_result.is_valid());
 

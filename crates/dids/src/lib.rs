@@ -17,7 +17,7 @@ pub use did_web as web;
 
 pub use ethr::DIDEthr;
 pub use ion::DIDION;
-pub use jwk::JWKMethod;
+pub use jwk::DIDJWK;
 pub use key::DIDKey;
 pub use pkh::DIDPKH;
 pub use tz::DIDTz;
@@ -52,7 +52,7 @@ impl DIDResolver for AnyDidMethod {
                     .await
             }
             "jwk" => {
-                JWKMethod
+                DIDJWK
                     .resolve_method_representation(did.method_specific_id(), options)
                     .await
             }

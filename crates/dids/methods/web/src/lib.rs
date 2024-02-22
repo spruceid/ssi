@@ -144,7 +144,7 @@ mod tests {
         vc::JsonCredential,
         Verifiable,
     };
-    use ssi_dids_core::{did, DIDResolver, DIDVerifier, Document};
+    use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
     use static_iref::{iri, uri};
 
@@ -244,7 +244,7 @@ mod tests {
 
     #[tokio::test]
     async fn credential_prove_verify_did_web() {
-        let didweb = DIDVerifier::new(DIDWeb);
+        let didweb = VerificationMethodDIDResolver::new(DIDWeb);
 
         let (url, shutdown) = web_server().unwrap();
         PROXY.with(|proxy| {

@@ -5,10 +5,10 @@ use ssi::{
         data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
         vc::revocation::{StatusList2021, StatusList2021Credential, StatusList2021Subject},
     },
-    dids::DIDVerifier,
     jwk::JWK,
     verification_methods::signer::SingleSecretSigner,
 };
+use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
 #[async_std::main]
@@ -18,7 +18,7 @@ async fn main() {
     let signer = SingleSecretSigner::new(key.clone());
 
     // DID resolver.
-    let resolver = DIDVerifier::new(ssi::dids::example::ExampleDIDResolver::default());
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
 
     let mut rl = StatusList2021::new(131072).unwrap();
     rl.set_status(1, true).unwrap();

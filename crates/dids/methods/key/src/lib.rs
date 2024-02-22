@@ -384,7 +384,9 @@ mod tests {
         },
         CryptographicSuiteInput, ProofConfiguration,
     };
-    use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier, DIDURL};
+    use ssi_dids_core::{
+        did, resolution::Options, DIDResolver, VerificationMethodDIDResolver, DIDURL,
+    };
     use static_iref::uri;
 
     use super::*;
@@ -531,7 +533,7 @@ mod tests {
 
     #[async_std::test]
     async fn credential_prove_verify_did_key() {
-        let didkey = DIDVerifier::new(DIDKey);
+        let didkey = VerificationMethodDIDResolver::new(DIDKey);
 
         let mut rng = rand_chacha_old::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_ed25519_from(&mut rng).unwrap();
@@ -595,7 +597,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_key_secp256k1() {
-        let didkey = DIDVerifier::new(DIDKey);
+        let didkey = VerificationMethodDIDResolver::new(DIDKey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_secp256k1_from(&mut rng).unwrap();
@@ -659,7 +661,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_key_p256() {
-        let didkey = DIDVerifier::new(DIDKey);
+        let didkey = VerificationMethodDIDResolver::new(DIDKey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_p256_from(&mut rng);

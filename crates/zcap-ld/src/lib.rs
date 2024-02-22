@@ -517,7 +517,7 @@ pub enum InvocationVerificationError {
 mod tests {
     use super::*;
     use ssi_claims::UnprepareProof;
-    use ssi_dids_core::{example::ExampleDIDResolver, DIDVerifier};
+    use ssi_dids_core::{example::ExampleDIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
     use ssi_verification_methods::signer::SingleSecretSigner;
     use static_iref::uri;
@@ -569,7 +569,7 @@ mod tests {
 
     #[async_std::test]
     async fn round_trip() {
-        let dk = DIDVerifier::new(ExampleDIDResolver::new());
+        let dk = VerificationMethodDIDResolver::new(ExampleDIDResolver::new());
 
         let alice_did = "did:example:foo";
         let alice_vm = UriBuf::new(format!("{}#key2", alice_did).into_bytes()).unwrap();

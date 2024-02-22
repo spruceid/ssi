@@ -10,15 +10,20 @@ documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
 default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "eip712", "aleo", "solana"]
-# enable RSA keys
+
+## enable RSA keys
 rsa = []
-# enable ed25519 keys
-ed25519 = ["ed25519-dalek", "rand_core_0_5"]
-# enable secp256k1 keys
+
+## enable ed25519 keys
+ed25519 = ["ed25519-dalek", "rand_core_0_5", "ssi-jwk/ed25519"]
+
+## enable secp256k1 keys
 secp256k1 = ["k256", "sha2", "ssi-jwk/secp256k1"]
-# enable secp256r1 (p256) keys
+
+## enable secp256r1 (p256) keys
 secp256r1 = ["p256"]
-# enable secp384r1 (p384) keys
+
+## enable secp384r1 (p384) keys
 secp384r1 = ["p384"]
 
 tezos = ["ssi-tzkey", "ssi-caips/tezos"]

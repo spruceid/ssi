@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use ssi_jwt::JWTClaims;
 
+use crate::VCPublicClaims;
+
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcDecodeError {
     #[error("missing credential value")]
@@ -19,11 +21,11 @@ pub enum JwtVcDecodeError {
 /// Decodes a Verifiable Credential form a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError>
+pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims<VCPublicClaims>) -> Result<T, JwtVcDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt.verifiable_credential.take() {
+    match jwt.public.verifiable_credential.take() {
         Some(json_syntax::Value::Object(mut vc)) => {
             decode_jwt_vc_specific_headers(jwt, &mut vc)?;
             Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
@@ -34,7 +36,7 @@ where
 }
 
 fn decode_jwt_vc_specific_headers(
-    jwt: JWTClaims,
+    jwt: JWTClaims<VCPublicClaims>,
     target: &mut json_syntax::Object,
 ) -> Result<(), JwtVcDecodeError> {
     if let Some(exp) = jwt.expiration_time {
@@ -101,11 +103,11 @@ pub enum JwtVpDecodeError {
 /// Decodes a Verifiable Presentation from a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError>
+pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims<VCPublicClaims>) -> Result<T, JwtVpDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt.verifiable_presentation.take() {
+    match jwt.public.verifiable_presentation.take() {
         Some(json_syntax::Value::Object(mut vp)) => {
             decode_jwt_vp_specific_headers(jwt, &mut vp);
             Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
@@ -115,7 +117,10 @@ where
     }
 }
 
-fn decode_jwt_vp_specific_headers(jwt: JWTClaims, target: &mut json_syntax::Object) {
+fn decode_jwt_vp_specific_headers(
+    jwt: JWTClaims<VCPublicClaims>,
+    target: &mut json_syntax::Object,
+) {
     if let Some(iss) = jwt.issuer {
         target.insert("holder".into(), iss.into_string().into());
     }

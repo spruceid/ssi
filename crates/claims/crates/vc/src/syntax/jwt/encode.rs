@@ -2,6 +2,8 @@ use chrono::FixedOffset;
 use serde::Serialize;
 use ssi_jwt::JWTClaims;
 
+use crate::VCPublicClaims;
+
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcEncodeError {
     #[error(transparent)]
@@ -29,11 +31,13 @@ pub enum JwtVcEncodeError {
     InvalidUri(#[from] iref::InvalidUri<String>),
 }
 
-pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, JwtVcEncodeError> {
+pub fn encode_jwt_vc_claims<T: Serialize>(
+    credential: &T,
+) -> Result<JWTClaims<VCPublicClaims>, JwtVcEncodeError> {
     let mut credential = json_syntax::to_value(credential)?
         .into_object()
         .ok_or(JwtVcEncodeError::ExpectedJsonObject)?;
-    let mut claims = JWTClaims::default();
+    let mut claims: JWTClaims<VCPublicClaims> = Default::default();
 
     if let Some(date_value) =
         take_object_property(&mut credential, "credentialSubject", "expirationDate")
@@ -86,7 +90,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, J
         }
     }
 
-    claims.verifiable_credential = Some(json_syntax::Value::Object(credential));
+    claims.public.verifiable_credential = Some(json_syntax::Value::Object(credential));
 
     Ok(claims)
 }
@@ -115,11 +119,13 @@ pub enum JwtVpEncodeError {
     InvalidUri(#[from] iref::InvalidUri<String>),
 }
 
-pub fn encode_jwt_vp_claims<T: Serialize>(presentation: &T) -> Result<JWTClaims, JwtVpEncodeError> {
+pub fn encode_jwt_vp_claims<T: Serialize>(
+    presentation: &T,
+) -> Result<JWTClaims<VCPublicClaims>, JwtVpEncodeError> {
     let mut vp = json_syntax::to_value(presentation)?
         .into_object()
         .ok_or(JwtVpEncodeError::ExpectedJsonObject)?;
-    let mut claims = JWTClaims::default();
+    let mut claims: JWTClaims<VCPublicClaims> = Default::default();
 
     if let Some(holder_entry) = vp.remove("holder").next() {
         match holder_entry.value.into_string() {
@@ -148,7 +154,7 @@ pub fn encode_jwt_vp_claims<T: Serialize>(presentation: &T) -> Result<JWTClaims,
         }
     }
 
-    claims.verifiable_presentation = Some(json_syntax::Value::Object(vp));
+    claims.public.verifiable_presentation = Some(json_syntax::Value::Object(vp));
 
     Ok(claims)
 }

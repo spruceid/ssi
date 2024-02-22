@@ -6,7 +6,7 @@ use serde_json::json;
 use ssi_claims::data_integrity::{
     AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
 };
-use ssi_dids::DIDVerifier;
+use ssi_dids::DIDResolver;
 use ssi_verification_methods::{signer::SingleSecretSigner, AnyJwkMethod};
 use static_iref::iri;
 
@@ -14,7 +14,7 @@ use static_iref::iri;
 async fn main() {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
-    let resolver = DIDVerifier::new(ssi::dids::example::ExampleDIDResolver::default());
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
     let signer = SingleSecretSigner::new(key.clone());
 
     let vc: ssi::claims::vc::SpecializedJsonCredential = serde_json::from_value(json!({

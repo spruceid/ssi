@@ -10,7 +10,7 @@ use ssi_claims::{
     vc::{JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation},
     Verifiable,
 };
-use ssi_dids_core::{did, resolution::Options, DIDResolver, DIDVerifier};
+use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
 use ssi_json_ld::JsonLdEnvironment;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
@@ -198,7 +198,7 @@ async fn credential_prove_verify_did_tz1() {
 		.mount(&mock_server)
 		.await;
 
-    let didtz = DIDVerifier::new(DIDTz::new(Some(
+    let didtz = VerificationMethodDIDResolver::new(DIDTz::new(Some(
         UriBuf::new(mock_server.uri().into_bytes()).unwrap(),
     )));
 
@@ -319,7 +319,7 @@ async fn credential_prove_verify_did_tz2() {
         })],
     );
 
-    let didtz = DIDVerifier::new(DIDTZ);
+    let didtz = VerificationMethodDIDResolver::new(DIDTZ);
     let signer = SingleSecretSigner::new(key.clone());
 
     let vc_issue_options = ProofConfiguration::new(
@@ -434,7 +434,7 @@ async fn credential_prove_verify_did_tz3() {
         })],
     );
 
-    let didtz = DIDVerifier::new(DIDTZ);
+    let didtz = VerificationMethodDIDResolver::new(DIDTZ);
     let signer = SingleSecretSigner::new(key.clone());
 
     let vc_issue_options = ProofConfiguration::new(

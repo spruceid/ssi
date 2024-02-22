@@ -28,6 +28,7 @@ pub mod ecdsa_secp256k1_signature_2019;
 #[cfg(feature = "secp256k1")]
 pub use ecdsa_secp256k1_signature_2019::EcdsaSecp256k1Signature2019;
 
+#[cfg(feature = "eip712")]
 pub mod ethereum_eip712_signature_2021;
 pub use ethereum_eip712_signature_2021::{
     EthereumEip712Signature2021, EthereumEip712Signature2021v0_1,

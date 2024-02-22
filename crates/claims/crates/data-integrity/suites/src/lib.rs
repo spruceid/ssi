@@ -1,5 +1,6 @@
 //! Data Integrity Cryptographic Suites.
 
+#[cfg(feature = "eip712")]
 pub mod eip712;
 mod signatures;
 mod suites;

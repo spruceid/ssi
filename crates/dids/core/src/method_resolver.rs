@@ -1,15 +1,15 @@
 use crate::{document::Document, resolution, DIDResolver, DID, DIDURL};
-use ssi_verification_methods::{
+use ssi_verification_methods_core::{
     ControllerError, GenericVerificationMethod, InvalidVerificationMethod, ProofPurposes,
     ReferenceOrOwnedRef, VerificationMethodResolutionError,
 };
 
-pub struct DIDVerifier<T> {
+pub struct VerificationMethodDIDResolver<T> {
     resolver: T,
     options: resolution::Options,
 }
 
-impl<T> DIDVerifier<T> {
+impl<T> VerificationMethodDIDResolver<T> {
     pub fn new(resolver: T) -> Self {
         Self {
             resolver,
@@ -30,7 +30,7 @@ impl<T> DIDVerifier<T> {
     }
 }
 
-impl ssi_verification_methods::Controller for Document {
+impl ssi_verification_methods_core::Controller for Document {
     fn allows_verification_method(&self, id: &iref::Iri, proof_purposes: ProofPurposes) -> bool {
         DIDURL::new(id.as_bytes()).is_ok_and(|url| {
             self.verification_relationships
@@ -39,7 +39,9 @@ impl ssi_verification_methods::Controller for Document {
     }
 }
 
-impl<T: DIDResolver> ssi_verification_methods::ControllerProvider for DIDVerifier<T> {
+impl<T: DIDResolver> ssi_verification_methods_core::ControllerProvider
+    for VerificationMethodDIDResolver<T>
+{
     type Controller<'a> = Document where Self: 'a;
 
     async fn get_controller<'a>(
@@ -51,22 +53,25 @@ impl<T: DIDResolver> ssi_verification_methods::ControllerProvider for DIDVerifie
                 Ok(did) => match self.resolver.resolve_with(did, self.options.clone()).await {
                     Ok(output) => Ok(Some(output.document.into_document())),
                     Err(resolution::Error::NotFound) => Ok(None),
-                    Err(e) => Err(ssi_verification_methods::ControllerError::InternalError(
-                        e.to_string(),
-                    )),
+                    Err(e) => Err(
+                        ssi_verification_methods_core::ControllerError::InternalError(
+                            e.to_string(),
+                        ),
+                    ),
                 },
-                Err(_) => Err(ssi_verification_methods::ControllerError::Invalid),
+                Err(_) => Err(ssi_verification_methods_core::ControllerError::Invalid),
             }
         } else {
-            Err(ssi_verification_methods::ControllerError::Invalid)
+            Err(ssi_verification_methods_core::ControllerError::Invalid)
         }
     }
 }
 
 // #[async_trait]
-impl<T: DIDResolver, M> ssi_verification_methods::VerificationMethodResolver<M> for DIDVerifier<T>
+impl<T: DIDResolver, M> ssi_verification_methods_core::VerificationMethodResolver<M>
+    for VerificationMethodDIDResolver<T>
 where
-    M: ssi_verification_methods::VerificationMethod,
+    M: ssi_verification_methods_core::VerificationMethod,
     M: TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
     // type ResolveVerificationMethod<'a> = ResolveVerificationMethod<'a, M, T> where Self: 'a, M: 'a;
@@ -76,7 +81,7 @@ where
         _issuer: Option<&'a iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
     ) -> Result<
-        ssi_verification_methods::VerificationMethodCow<'a, M>,
+        ssi_verification_methods_core::VerificationMethodCow<'a, M>,
         VerificationMethodResolutionError,
     > {
         match method {
@@ -86,11 +91,11 @@ where
                         Ok(url) => {
                             match self.resolver.dereference(url).await {
                                 Ok(deref) => match deref.content.into_verification_method() {
-                                    Ok(any_method) => {
-                                        Ok(ssi_verification_methods::VerificationMethodCow::Owned(
+                                    Ok(any_method) => Ok(
+                                        ssi_verification_methods_core::VerificationMethodCow::Owned(
                                             M::try_from(any_method.into())?,
-                                        ))
-                                    }
+                                        ),
+                                    ),
                                     Err(_) => {
                                         // The IRI is not referring to a verification method.
                                         Err(VerificationMethodResolutionError::InvalidKeyId(

@@ -9,17 +9,17 @@ use static_iref::iri;
 
 mod did;
 pub mod document;
+pub mod method_resolver;
 pub mod registration;
 pub mod resolution;
-pub mod verifier;
 
 #[cfg(feature = "example")]
 pub mod example;
 
 pub use did::*;
 pub use document::Document;
+pub use method_resolver::VerificationMethodDIDResolver;
 pub use resolution::{DIDMethodResolver, DIDResolver, StaticDIDResolver};
-pub use verifier::DIDVerifier;
 
 pub use json_ld;
 

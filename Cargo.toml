@@ -9,47 +9,6 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
 keywords = ["ssi", "did", "vc", "vp", "jsonld"]
 
-exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
-
-# [features]
-# # default = ["w3c", "ripemd-160", "eip", "tezos"]
-
-# # w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
-# # ## enable secp256k1 signatures
-# # secp256k1 = ["ssi-ldp/secp256k1"]
-# # ## enable secp256r1 (p256) signatures
-# # secp256r1 = ["ssi-ldp/secp256r1"]
-# # ## enable secp384r1 (p384) signatures
-# # secp384r1 = ["ssi-ldp/secp384r1"]
-# # ## enable ed25519 (EdDSA) signatures
-# # ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
-# # ## enable RSA signatures
-# # rsa = ["ssi-ldp/rsa"]
-# # ## enable ripemd hashes
-# # ripemd-160 = ["ssi-jwk/ripemd-160"]
-# # ## enable bbs
-# # bbs = ["ssi-crypto/bbs"]
-
-# # ## enable aleo ecosystem signatures
-# # aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
-# # ## enable ethereum style signatures
-# # eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
-# # ## enable tezos style signatures
-# # tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
-# # ## enable LDPs from the Solana Ecosystem
-# # solana = ["ssi-ldp/solana"]
-
-# # ## Use the Ring crate for crypto operations
-# # ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
-
-# # http-did = ["ssi-dids/http"]
-# # example-http-issuer = ["ssi-ldp/example-http-issuer"]
-
-# # # Backward compatibility features
-# # ed25519-dalek = ["ed25519"]
-# # keccak = ["eip"]
-# # sha = ["rsa"]
-
 [workspace]
 members = [
   "crates/*",
@@ -134,6 +93,102 @@ rand_chacha = "0.3.1"
 contextual = "0.1.6"
 lazy_static = "1.4.0"
 
+[features]
+# # default = ["w3c", "ripemd-160", "eip", "tezos"]
+
+## Signature suites specified by the W3C.
+## 
+## This will enable the following Data-Integrity suites:
+##   - `JsonWebSignature2020`
+##   - `RsaSignature2018` (requires `rsa`)
+##   - `Ed25519Signature2018` (requires `ed25519`)
+##   - `Ed25519Signature2020` (requires `ed25519`)
+##   - `EdDsa2022` (requires `ed25519`)
+##   - `EcdsaSecp256k1Signature2019` (requires `secp256k1`)
+##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+##   - `EthereumEip712Signature2021` (requires `eip712`)
+w3c = ["ssi-claims/w3c"]
+
+## Signature suites specified by the Decentralized Identify Foundation (DIF).
+##
+## This includes:
+##   - `EcdsaSecp256k1RecoverySignature2020` (requires `secp256k1`)
+dif = ["ssi-claims/dif"]
+
+## Signature suites based on ED25519 (EdDSA).
+##
+## This includes:
+##   - `Ed25519Signature2018` (requires `w3c`)
+##   - `Ed25519Signature2020` (requires `w3c`)
+##   - `EdDsa2022` (requires `w3c`)
+ed25519 = ["ssi-claims/ed25519"]
+
+## Signature suites based on secp256k1.
+##
+## This includes:
+##   - `EcdsaSecp256k1Signature2019` (requires `w3c`)
+##   - `EcdsaSecp256k1RecoverySignature2020` (requires `dif`)
+secp256k1 = ["ssi-claims/secp256k1"]
+
+## Signature suites based on secp256r1.
+##
+## This includes:
+##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+secp256r1 = ["ssi-claims/secp256r1"]
+
+## Enable secp384r1 keys.
+secp384r1 = ["ssi-jwk/secp384r1"]
+
+## Signature suites based on RSA.
+##
+## This includes:
+##   - `RsaSignature2018` (requires `w3c`)
+rsa = ["ssi-claims/rsa"]
+
+## Tezos signatures suites.
+##
+## This includes:
+##   - `TezosJcsSignature2021`
+##   - `TezosSignature2021`
+##   - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `ed25519`)
+##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
+tezos = ["ssi-claims/tezos", "ssi-caips/tezos"]
+
+## Enables `AleoSignature2021`.
+aleo = ["ssi-claims/aleo", "ssi-caips/aleo"]
+
+## Signature suites based on Ethereum EIP-712.
+## 
+## This includes:
+##   - `Eip712Signature2021` (requires `ethereum`).
+##   - `EthereumEip712Signature2021` (requires `w3c`)
+eip712 = ["ssi-claims/eip712"]
+
+# Enables `SolanaSignature2021`
+solana = ["ssi-claims/solana"]
+
+## Ethereum signature suites.
+##
+## This includes:
+##   - `EthereumPersonalSignature2021`
+##   - `Eip712Signature2021` (requires `eip712`)
+ethereum = ["ssi-claims/ethereum"]
+
+## Enable ripemd hashes.
+ripemd-160 = ["ssi-jwk/ripemd-160"]
+
+## Enable bbs.
+bbs = ["ssi-crypto/bbs"]
+
+## Use the Ring crate for crypto operations
+ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
+
+## Enable DID resolution tests using [hyper](https://crates.io/crates/hyper) and [tokio](https://crates.io/crates/tokio).
+http-did = ["ssi-dids/http"]
+
+# ## Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
+# example-http-issuer = ["ssi-ldp/example-http-issuer"]
+
 [dependencies]
 ssi-core.workspace = true
 ssi-crypto.workspace = true
@@ -152,6 +207,7 @@ ssi-zcap-ld.workspace = true
 ssi-multicodec.workspace = true
 ssi-ssh.workspace = true
 xsd-types.workspace = true # public reexport
+document-features = "0.2"
 
 [dev-dependencies]
 async-std = { workspace = true, features = ["attributes"] }
@@ -161,56 +217,13 @@ static-iref.workspace = true
 serde_json.workspace = true
 ssi-dids = { workspace = true, features = ["example"] }
 
-# [package.metadata.docs.rs]
-# all-features = true
-# rustdoc-args = ["--cfg", "docsrs"]
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
-# # $cargo release
-# [workspace.metadata.release]
-# sign-tag = true
-# tag-prefix = "{{crate_name}}/"
-# tag-message = "Release {{crate_name}} version {{version}}."
-# pre-release-commit-message = "Release"
-
-# # $git-cliff --config Cargo.toml > CHANGELOG.md
-# [workspace.metadata.git-cliff.changelog]
-# header = """
-# # Changelog
-# All notable changes to this project will be documented in this file.
-
-# The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-# and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-# """
-# body = """
-# {% if version %}\
-#     ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-# {% else %}\
-#     ## [Unreleased]
-# {% endif %}\
-# {% for group, commits in commits | group_by(attribute="group") %}
-#     ### {{ group | upper_first }}\
-#     {% for commit in commits %}
-#         - [{{ commit.id | truncate(length=7, end="") }}] {{ commit.message }}\
-#     {% endfor %}
-# {% endfor %}\n
-# """
-# trim = true
-# [workspace.metadata.git-cliff.git]
-# commit_preprocessors = [
-#   { pattern = "\\n.*", replace = ""},
-# ]
-# conventional_commits = false
-# filter_unconventional = false
-# commit_parsers = [
-#   { message = "^[aA]dd( |ed)", group = "Added"},
-#   { message = "^[fF]ix", group = "Fixed"},
-#   { message = "^[cC]hange", group = "Changed"},
-#   { message = "^[mM]ove", group = "Changed"},
-#   { message = "^[rR]estructure", group = "Changed"},
-#   { message = "^[rR]efactor", group = "Changed"},
-#   { message = "^[rR]emove", group = "Removed"},
-#   { message = ".*", group = "Other"},
-# ]
-# # filter_commits = false
-# tag_pattern = "v[0-9]*"
+# $cargo release
+[workspace.metadata.release]
+sign-tag = true
+tag-prefix = "{{crate_name}}/"
+tag-message = "Release {{crate_name}} version {{version}}."
+pre-release-commit-message = "Release"

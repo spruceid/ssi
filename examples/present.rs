@@ -15,9 +15,9 @@ use ssi::{
         jws::CompactJWSString,
         vc::JsonVerifiableCredential,
     },
-    dids::DIDVerifier,
     verification_methods::{signer::SingleSecretSigner, AnyJwkMethod, ProofPurpose},
 };
+use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
 #[async_std::main]
@@ -28,7 +28,7 @@ async fn main() {
 
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
-    let resolver = DIDVerifier::new(ssi::dids::example::ExampleDIDResolver::default());
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
     let signer = SingleSecretSigner::new(key.clone());
 
     let mut reader = std::io::BufReader::new(std::io::stdin());

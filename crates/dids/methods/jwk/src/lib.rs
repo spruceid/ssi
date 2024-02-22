@@ -121,15 +121,15 @@ impl<'a> TryFrom<&'a DIDVerificationMethod> for JsonWebKey2020Ref<'a> {
 }
 
 /// JSON Web Token (`jwt`) DID method.
-pub struct JWKMethod;
+pub struct DIDJWK;
 
-impl JWKMethod {
+impl DIDJWK {
     /// Generates a JWK DID from the given key.
     ///
     /// # Example
     ///
     /// ```
-    /// use did_jwk::JWKMethod;
+    /// use did_jwk::DIDJWK;
     ///
     /// let jwk: ssi_jwk::JWK = serde_json::from_value(serde_json::json!({
     ///   "crv": "P-256",
@@ -138,7 +138,7 @@ impl JWKMethod {
     ///   "y": "_KcyLj9vWMptnmKtm46GqDz8wf74I5LKgrl2GzH3nSE"
     /// })).unwrap();
     ///
-    /// let did = JWKMethod::generate(&jwk);
+    /// let did = DIDJWK::generate(&jwk);
     /// assert_eq!(did, "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9");
     /// ```
     pub fn generate(key: &JWK) -> DIDBuf {
@@ -148,11 +148,11 @@ impl JWKMethod {
     }
 }
 
-impl DIDMethod for JWKMethod {
+impl DIDMethod for DIDJWK {
     const DID_METHOD_NAME: &'static str = "jwk";
 }
 
-impl DIDMethodResolver for JWKMethod {
+impl DIDMethodResolver for DIDJWK {
     async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,
@@ -224,7 +224,7 @@ mod tests {
     #[cfg(feature = "secp256r1")]
     async fn from_p256() {
         let did_url = DIDURL::new(b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9#0").unwrap();
-        let resolved = JWKMethod.dereference(did_url).await.unwrap();
+        let resolved = DIDJWK.dereference(did_url).await.unwrap();
 
         let vm: JsonWebKey2020Ref = resolved
             .content
@@ -259,10 +259,10 @@ mod tests {
         .unwrap();
 
         let expected = "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9";
-        let did = JWKMethod::generate(&jwk);
+        let did = DIDJWK::generate(&jwk);
         assert_eq!(did, expected);
 
-        let resolved = JWKMethod
+        let resolved = DIDJWK
             .resolve_with(&did, resolution::Options::default())
             .await
             .unwrap();
@@ -281,7 +281,7 @@ mod tests {
     #[async_std::test]
     async fn from_x25519() {
         let did_url = DIDURL::new(b"did:jwk:eyJrdHkiOiJPS1AiLCJjcnYiOiJYMjU1MTkiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9#0").unwrap();
-        let resolved = JWKMethod.dereference(did_url).await.unwrap();
+        let resolved = DIDJWK.dereference(did_url).await.unwrap();
 
         let vm: JsonWebKey2020Ref = resolved
             .content
@@ -314,10 +314,10 @@ mod tests {
 
         let jwk: ssi_jwk::JWK = serde_json::from_value(json).unwrap();
         let expected = "did:jwk:eyJjcnYiOiJYMjU1MTkiLCJrdHkiOiJPS1AiLCJ1c2UiOiJlbmMiLCJ4IjoiM3A3YmZYdDl3YlRUVzJIQzdPUTFOei1EUThoYmVHZE5yZngtRkctSUswOCJ9";
-        let did = JWKMethod::generate(&jwk);
+        let did = DIDJWK::generate(&jwk);
         assert_eq!(did, expected);
 
-        let resolved = JWKMethod
+        let resolved = DIDJWK
             .resolve_with(&did, resolution::Options::default())
             .await
             .unwrap();
@@ -343,7 +343,7 @@ mod tests {
         )
         .unwrap();
 
-        let resolved = JWKMethod
+        let resolved = DIDJWK
             .resolve(&did, resolution::Options::default())
             .await
             .unwrap();

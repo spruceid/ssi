@@ -7,10 +7,10 @@ use ssi::{
             RevocationList2020, RevocationList2020Credential, RevocationList2020Subject,
         },
     },
-    dids::DIDVerifier,
     jwk::JWK,
     verification_methods::signer::SingleSecretSigner,
 };
+use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
 #[async_std::main]
@@ -20,7 +20,7 @@ async fn main() {
     let signer = SingleSecretSigner::new(key.clone());
 
     // DID resolver.
-    let resolver = DIDVerifier::new(ssi::dids::example::ExampleDIDResolver::default());
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
 
     let mut rl = RevocationList2020::default();
     rl.set_status(1, true).unwrap();

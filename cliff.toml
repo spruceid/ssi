@@ -1,0 +1,42 @@
+[changelog]
+header = """
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+"""
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | upper_first }}\
+    {% for commit in commits %}
+        - [{{ commit.id | truncate(length=7, end="") }}] {{ commit.message }}\
+    {% endfor %}
+{% endfor %}\n
+"""
+trim = true
+
+[git]
+commit_preprocessors = [
+  { pattern = "\\n.*", replace = ""},
+]
+conventional_commits = false
+filter_unconventional = false
+commit_parsers = [
+  { message = "^[aA]dd( |ed)", group = "Added"},
+  { message = "^[fF]ix", group = "Fixed"},
+  { message = "^[cC]hange", group = "Changed"},
+  { message = "^[mM]ove", group = "Changed"},
+  { message = "^[rR]estructure", group = "Changed"},
+  { message = "^[rR]efactor", group = "Changed"},
+  { message = "^[rR]emove", group = "Removed"},
+  { message = ".*", group = "Other"},
+]
+# filter_commits = false
+tag_pattern = "v[0-9]*"

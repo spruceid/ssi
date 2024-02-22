@@ -8,7 +8,7 @@ use std::{borrow::Cow, collections::HashMap};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_jwk::JWK;
-use ssi_verification_methods::ProofPurpose;
+use ssi_verification_methods_core::ProofPurpose;
 
 use crate::{
     document::{self, DIDVerificationMethod, Service},

@@ -22,7 +22,7 @@ dif = ["ssi-data-integrity/dif"]
 # - `Ed25519Signature2018`
 # - `Ed25519Signature2020`
 # - `EdDsa2022`
-ed25519 = ["ssi-data-integrity/ed25519", "ssi-verification-methods/ed25519"]
+ed25519 = ["ssi-jws/ed25519", "ssi-data-integrity/ed25519", "ssi-verification-methods/ed25519"]
 
 # Enables signature suites based on secp256k1:
 # - `EcdsaSecp256k1Signature2019`
@@ -40,10 +40,10 @@ rsa = ["ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
 # - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
 # - `TezosJcsSignature2021`
 # - `TezosSignature2021`
-tezos = ["ssi-data-integrity/tezos"]
+tezos = ["ssi-jws/tezos", "ssi-data-integrity/tezos"]
 
 # Enables `AleoSignature2021`
-aleo = ["ssi-jwk/aleo", "ssi-data-integrity/aleo", "ssi-verification-methods/aleo"]
+aleo = ["ssi-jwk/aleo", "ssi-jws/aleo", "ssi-data-integrity/aleo", "ssi-verification-methods/aleo"]
 
 # Enables `Eip712Signature2021`
 eip712 = ["ssi-eip712", "ssi-data-integrity/eip712"]

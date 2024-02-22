@@ -111,59 +111,6 @@ impl Default
     }
 }
 
-// #[pin_project(project = TransformProj)]
-// pub enum Transform<'a, L: TypesProvider> {
-//     Error(Option<TransformError>),
-//     String(#[pin] std::future::Ready<Result<String, TransformError>>),
-//     JsonObject(#[pin] std::future::Ready<Result<JsonObject, TransformError>>),
-//     Eip712(#[pin] std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>),
-
-//     #[cfg(feature = "w3c")]
-//     EthereumEip712Signature2021(
-//         #[pin] ssi_data_integrity::suite::ethereum_eip712_signature_2021::Transform<'a, L>,
-//     ),
-// }
-
-// impl<'a, L: TypesProvider> From<std::future::Ready<Result<String, TransformError>>>
-//     for Transform<'a, L>
-// {
-//     fn from(value: std::future::Ready<Result<String, TransformError>>) -> Self {
-//         Self::String(value)
-//     }
-// }
-
-// impl<'a, L: TypesProvider> From<std::future::Ready<Result<JsonObject, TransformError>>>
-//     for Transform<'a, L>
-// {
-//     fn from(value: std::future::Ready<Result<JsonObject, TransformError>>) -> Self {
-//         Self::JsonObject(value)
-//     }
-// }
-
-// impl<'a, L: TypesProvider> From<std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>>
-//     for Transform<'a, L>
-// {
-//     fn from(value: std::future::Ready<Result<ssi_eip712::TypedData, TransformError>>) -> Self {
-//         Self::Eip712(value)
-//     }
-// }
-
-// impl<'a, L: TypesProvider> Future for Transform<'a, L> {
-//     type Output = Result<Transformed, TransformError>;
-
-//     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-//         match self.project() {
-//             TransformProj::Error(e) => task::Poll::Ready(Err(e.take().unwrap())),
-//             TransformProj::String(f) => f.poll(cx).map(|r| r.map(Transformed::String)),
-//             TransformProj::JsonObject(f) => f.poll(cx).map(|r| r.map(Transformed::JsonObject)),
-//             TransformProj::Eip712(f) => f.poll(cx).map(|r| r.map(Transformed::Eip712)),
-//             TransformProj::EthereumEip712Signature2021(f) => {
-//                 f.poll(cx).map(|r| r.map(Transformed::Eip712))
-//             }
-//         }
-//     }
-// }
-
 impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, L, T>
     CryptographicSuiteInput<T, AnyInputContext<E, L>> for AnySuite
 where
@@ -279,19 +226,18 @@ where
             solana_signature_2021: SolanaSignature2021,
             #[cfg(feature = "aleo")]
             aleo_signature_2021: AleoSignature2021,
-            #[cfg(feature = "tezos")]
+            #[cfg(all(feature = "tezos", feature = "ed25519"))]
             ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021: Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-            #[cfg(feature = "tezos")]
+            #[cfg(all(feature = "tezos", feature = "secp256r1"))]
             p256_blake2b_digest_size20_base58_check_encoded_signature_2021: P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
-            // #[cfg(feature = "tezos")]
-            // tezos_jcs_signature_2021: TezosJcsSignature2021,
             #[cfg(feature = "tezos")]
             tezos_signature_2021: TezosSignature2021,
             #[cfg(feature = "eip712")]
             eip712_signature_2021: Eip712Signature2021,
+            #[cfg(feature = "ethereum")]
             ethereum_personal_signature_2021: EthereumPersonalSignature2021,
+            #[cfg(feature = "ethereum")]
             ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
-            // ethereum_eip712_signature_2021: EthereumEip712Signature2021
         }
     }
 }
