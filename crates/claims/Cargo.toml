@@ -23,14 +23,14 @@ ed25519 = ["ssi-jws/ed25519", "ssi-data-integrity/ed25519", "ssi-verification-me
 
 # Enables signature suites based on secp256k1:
 # - `EcdsaSecp256k1Signature2019`
-secp256k1 = ["ssi-data-integrity/secp256k1", "ssi-verification-methods/secp256k1"]
+secp256k1 = ["ssi-jws/secp256k1", "ssi-data-integrity/secp256k1", "ssi-verification-methods/secp256k1"]
 
 # Enables signature suites based on secp256r1:
 # - `EcdsaSecp256r1Signature2019`
-secp256r1 = ["ssi-data-integrity/secp256r1", "ssi-verification-methods/secp256r1"]
+secp256r1 = ["ssi-jws/secp256r1", "ssi-data-integrity/secp256r1", "ssi-verification-methods/secp256r1"]
 
 # Enables `RsaSignature2018`
-rsa = ["ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
+rsa = ["ssi-jws/rsa", "ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
 
 # Enables all the tezos signatures suites:
 # - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
@@ -49,7 +49,7 @@ eip712 = ["ssi-eip712", "ssi-data-integrity/eip712", "ssi-vc/eip712"]
 solana = ["ssi-data-integrity/solana", "ssi-verification-methods/solana"]
 
 # Enables `EthereumPersonalSignature2021`
-ethereum = ["ssi-data-integrity/ethereum"]
+ethereum = ["ssi-jws/eip", "ssi-data-integrity/ethereum"]
 
 [dependencies]
 ssi-core.workspace = true

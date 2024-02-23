@@ -165,7 +165,7 @@ impl DIDURL {
 
     /// Convert to a fragment-less DID URL and return the removed fragment.
     ///
-    /// The DID URL can be reconstructed using [PrimaryDIDURL::with_fragment].
+    /// The DID URL can be reconstructed using [PrimaryDIDURLBuf::with_fragment].
     pub fn without_fragment(&self) -> (&PrimaryDIDURL, Option<&Fragment>) {
         let fragment_start = self.fragment_delimiter_offset();
         let fragment_end = self.0.len();
@@ -410,23 +410,12 @@ impl DIDURLBuf {
         unsafe { DIDURL::new_unchecked(&self.0) }
     }
 
-    /// Convert to a fragment-less DID URL and return the removed fragment.
-    ///
-    /// The DID URL can be reconstructed using [PrimaryDIDURL::with_fragment].
-    pub fn remove_fragment(self) -> (PrimaryDIDURLBuf, Option<String>) {
-        // (
-        //     PrimaryDIDURL {
-        //         did: self.did,
-        //         path: if !self.path_abempty.is_empty() {
-        //             Some(self.path_abempty)
-        //         } else {
-        //             None
-        //         },
-        //         query: self.query,
-        //     },
-        //     self.fragment,
-        // )
-        todo!()
+    pub fn into_iri(self) -> IriBuf {
+        unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(self.0)) }
+    }
+
+    pub fn into_uri(self) -> UriBuf {
+        unsafe { UriBuf::new_unchecked(self.0) }
     }
 }
 

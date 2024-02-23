@@ -41,7 +41,9 @@ pub enum TypedDataHashError {
 }
 
 impl Value {
-    /// https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct
+    /// Hash the value.
+    ///
+    /// See: <https://eips.ethereum.org/EIPS/eip-712#definition-of-hashstruct>
     #[allow(clippy::ptr_arg)]
     pub fn hash(
         &self,
@@ -56,7 +58,7 @@ impl Value {
 }
 
 impl TypeDefinition {
-    /// Hash the result of [`encodeType`]
+    /// Encodes and hash this type.
     #[allow(clippy::ptr_arg)]
     pub fn hash(
         &self,

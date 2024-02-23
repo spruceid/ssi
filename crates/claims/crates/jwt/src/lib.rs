@@ -95,8 +95,9 @@ pub struct JWTClaims<PublicClaims = NoncePublicClaim, PrivateClaims = AnyClaims>
 
     /// Public claims defined in the [IANA "JSON Web Token Claims" registry][1].
     ///
-    /// See: <https://datatracker.ietf.org/doc/html/rfc7519#section-4.2>
     /// [1]: <https://www.iana.org/assignments/jwt/jwt.xhtml>
+    ///
+    /// See: <https://datatracker.ietf.org/doc/html/rfc7519#section-4.2>
     #[serde(flatten)]
     pub public: PublicClaims,
 

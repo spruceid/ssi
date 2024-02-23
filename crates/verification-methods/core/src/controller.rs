@@ -70,6 +70,8 @@ pub trait ControllerProvider {
     ///
     /// Contrarily to the [`allows_verification_method`] function, this function
     /// returns an error if one of the input proof purposes is not allowed.
+    ///
+    /// [`allows_verification_method`]: ControllerProvider::allows_verification_method
     #[allow(async_fn_in_trait)]
     async fn ensure_allows_verification_method<'a>(
         &'a self,

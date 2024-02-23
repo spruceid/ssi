@@ -1,13 +1,3 @@
-//! This library provides the implementation of common Data Integrity
-//! verification methods such as [`Multikey`] or [`JsonWebKey2020`].
-//! It is separated from the Data Integrity library ([`ssi-ldp`]) to allow
-//! verification methods providers (such as [`ssi-dids`]) to reason about
-//! verification methods without Data Integrity.
-//!
-//! [`Multikey`]: crate::Multikey
-//! [`JsonWebKey2020`]: crate::JsonWebKey2020
-//! [`ssi-ldp`]: <https://github.com/spruceid/ssi/tree/main/ssi-ldp>
-//! [`ssi-dids`]: <https://github.com/spruceid/ssi/tree/main/ssi-dids>
 use std::borrow::Cow;
 
 use iref::{Iri, IriBuf};

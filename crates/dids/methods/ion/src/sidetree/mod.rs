@@ -788,9 +788,6 @@ pub struct PublicKeyJwk {
 /// Error resulting from [converting JWK to PublicKeyJwk][PublicKeyJwk::try_from]
 #[derive(thiserror::Error, Debug)]
 pub enum PublicKeyJwkFromJWKError {
-    /// Unable to convert JWK to [Value]
-    #[error("Unable to convert JWK to Value")]
-    ToValue(#[from] serde_json::Error),
     /// Public Key JWK must not contain private key parameters (e.g. "d")
     #[error("Public Key JWK must not contain private key parameters")]
     PrivateKeyParameters,
@@ -799,7 +796,7 @@ pub enum PublicKeyJwkFromJWKError {
 /// Error resulting from attempting to convert [PublicKeyJwk] to JWK
 #[derive(thiserror::Error, Debug)]
 pub enum JWKFromPublicKeyJwkError {
-    /// Unable to convert [Value] to JWK
+    /// Unable to convert [`serde_json::Value`] to JWK
     #[error("Unable to convert Value to JWK")]
     FromValue(#[from] serde_json::Error),
 }
@@ -807,7 +804,7 @@ pub enum JWKFromPublicKeyJwkError {
 impl TryFrom<JWK> for PublicKeyJwk {
     type Error = PublicKeyJwkFromJWKError;
     fn try_from(jwk: JWK) -> Result<Self, Self::Error> {
-        let jwk_value = serde_json::to_value(jwk).map_err(PublicKeyJwkFromJWKError::ToValue)?;
+        let jwk_value = serde_json::to_value(jwk).unwrap();
         if jwk_value.get("d").is_some() {
             return Err(PublicKeyJwkFromJWKError::PrivateKeyParameters);
         };

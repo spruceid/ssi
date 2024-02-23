@@ -24,7 +24,7 @@ pub use v2021::*;
 /// See: <https://w3c-ccg.github.io/vc-status-rl-2020/#revocation-bitstring-length>
 pub const MIN_BITSTRING_LENGTH: usize = 131072;
 
-/// Maximum size of a revocation list credential loaded using [`load_credential`].
+/// Maximum size of a revocation list credential.
 pub const MAX_RESPONSE_LENGTH: usize = 2097152; // 2MB
 
 const EMPTY_RLIST: &str = "H4sIAAAAAAAA_-3AMQEAAADCoPVPbQwfKAAAAAAAAAAAAAAAAAAAAOBthtJUqwBAAAA";

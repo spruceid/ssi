@@ -74,8 +74,7 @@ pub struct Document {
 }
 
 impl Document {
-    /// Construct a new DID document with the given id (DID) and [default
-    /// `@context`][DEFAULT_CONTEXT].
+    /// Construct a new DID document with the given id (DID).
     pub fn new(id: DIDBuf) -> Document {
         Document {
             id,
@@ -182,15 +181,13 @@ pub struct VerificationRelationships {
     /// [`authentication`](https://www.w3.org/TR/did-core/#dfn-authentication) property of a DID
     /// document, expressing [verification
     /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
-    /// [authentication](https://www.w3.org/TR/did-core/#authentication) purposes (e.g. generating [verifiable
-    /// presentations][crate::vc::Presentation]).
+    /// [authentication](https://www.w3.org/TR/did-core/#authentication) purposes (e.g. generating verifiable presentations).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub authentication: Vec<verification_method::ValueOrReference>,
 
     /// [`assertionMethod`](https://www.w3.org/TR/did-core/#dfn-assertionmethod) property of a DID document, expressing [verification
     /// methods](https://www.w3.org/TR/did-core/#verification-methods) for
-    /// [assertion](https://www.w3.org/TR/did-core/#assertion) purposes (e.g. issuing [verifiable
-    /// credentials](crate::vc::Credential)).
+    /// [assertion](https://www.w3.org/TR/did-core/#assertion) purposes (e.g. issuing verifiable credentials).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assertion_method: Vec<verification_method::ValueOrReference>,
 

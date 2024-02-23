@@ -13,15 +13,7 @@ pub trait Validate {
     /// For instance, checking that a credential's expiration date is not in the
     /// past, or the issue date not in the future.
     ///
-    /// Validation may fail even if the credential or presentation's proof is
-    /// successfully verified.
-    ///
-    /// You do not need to call this method yourself when verifying a
-    /// credential or presentation. It is automatically called by
-    /// [`VerifiableWith::verify_with`].
-    ///
-    /// If you need to implement this function, you can simply reuse
-    /// [`Credential::is_valid`] or [`Presentation::is_valid`].
+    /// Validation may fail even if the claims's proof is successfully verified.
     fn is_valid(&self) -> bool;
 }
 

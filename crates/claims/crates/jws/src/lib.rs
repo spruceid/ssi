@@ -195,7 +195,10 @@ impl CompactJWS {
         match verify_bytes(header.algorithm, self.signing_bytes(), &jwk, &signature) {
             Ok(()) => Ok(true),
             Err(Error::InvalidSignature) => Ok(false),
-            Err(_) => Err(VerificationError::InvalidSignature),
+            Err(e) => {
+                eprintln!("error: {e:?}");
+                Err(VerificationError::InvalidSignature)
+            }
         }
     }
 }
@@ -1076,7 +1079,7 @@ pub fn verify_bytes_warnable(
         }
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
-            #[cfg(feature = "p256")]
+            #[cfg(feature = "secp256r1")]
             Algorithm::ES256 => {
                 use p256::ecdsa::signature::Verifier;
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
@@ -1178,7 +1181,7 @@ pub fn verify_bytes_warnable(
                     false => Err(k256::ecdsa::Error::new())?,
                 }
             }
-            #[cfg(feature = "p256")]
+            #[cfg(feature = "secp256r1")]
             Algorithm::ESBlake2b => {
                 use p256::ecdsa::{
                     signature::{

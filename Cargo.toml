@@ -189,6 +189,9 @@ http-did = ["ssi-dids/http"]
 # ## Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
 # example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
+## Enable example DIDs.
+example = ["ssi-dids/example"]
+
 [dependencies]
 ssi-core.workspace = true
 ssi-crypto.workspace = true
@@ -216,6 +219,7 @@ iref.workspace = true
 static-iref.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+json-syntax.workspace = true
 ssi-dids = { workspace = true, features = ["example"] }
 
 [package.metadata.docs.rs]

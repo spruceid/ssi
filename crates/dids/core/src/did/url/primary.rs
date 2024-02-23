@@ -62,7 +62,7 @@ impl PrimaryDIDURLBuf {
 
     /// Append a [fragment](https://www.w3.org/TR/did-core/#fragment) to construct a DID URL.
     ///
-    /// The opposite of [DIDURL::remove_fragment].
+    /// The opposite of [DIDURL::without_fragment].
     pub fn with_fragment(self, fragment: &Fragment) -> DIDURLBuf {
         let mut result = self.0;
         result.push(b'#');

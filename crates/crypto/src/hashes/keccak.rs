@@ -22,10 +22,10 @@ pub fn hash_public_key(k: &k256::PublicKey) -> String {
     bytes_to_lowerhex(hash_last20)
 }
 
-/// Compute a hash of a public key as an Ethereum address, with EIP-55 checksum.
+/// Compute a hash of a public key as an Ethereum address, with [EIP-55]
+/// checksum.
 ///
-/// Same as [`hash_public_key_lowercase`], but with [EIP-55] mixed-case checksum encoding (using [`eip55_checksum_addr`]).
-/// [EIP-55]: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
+/// [EIP-55]: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md>
 #[cfg(feature = "secp256k1")]
 pub fn hash_public_key_eip55(k: &k256::PublicKey) -> Result<String, Eip155Error> {
     let hash_lowercase = hash_public_key(k);
@@ -44,7 +44,8 @@ pub enum Eip155Error {
 /// encoding.
 /// Input string must begin with "0x" and be in lowercase.
 /// Output string begins with "0x".
-/// [EIP-55]: https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md
+///
+/// [EIP-55]: <https://github.com/ethereum/EIPs/blob/master/EIPS/eip-55.md>
 pub fn eip55_checksum_addr(addr: &str) -> Result<String, Eip155Error> {
     let addr = addr.strip_prefix("0x").ok_or(Eip155Error::HexString)?;
     if addr.contains(|c: char| c.is_ascii_uppercase()) {

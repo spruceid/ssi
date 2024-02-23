@@ -40,6 +40,7 @@ pub struct Proof<S: CryptographicSuite> {
     /// Specifies when the proof expires.
     pub expires: Option<xsd_types::DateTime>, // FIXME: should be `DateTimeStamp`
 
+    #[allow(rustdoc::bare_urls)]
     /// Conveys one or more security domains in which the proof is meant to be
     /// used.
     ///

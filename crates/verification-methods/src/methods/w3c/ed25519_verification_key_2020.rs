@@ -54,6 +54,9 @@ pub struct Ed25519VerificationKey2020 {
     /// two-byte prefix 0xed01 followed by the 32-byte public key data. The 34
     /// byte value is then encoded using base58-btc (z) as the prefix. Any other
     /// encoding MUST NOT be allowed.
+    ///
+    /// [MULTICODEC]: <https://github.com/multiformats/multicodec>
+    /// [MULTIBASE]: <https://github.com/multiformats/multibase>
     #[serde(rename = "publicKeyMultibase")]
     #[ld("sec:publicKeyMultibase")]
     pub public_key: PublicKey,

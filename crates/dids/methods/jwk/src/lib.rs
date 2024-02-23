@@ -39,7 +39,7 @@ impl DIDJsonWebKey2020 {
     }
 }
 
-/// Error raised when the conversion to a [`JsonWebKey2020`] failed.
+/// Error raised when the conversion to a [`DIDJsonWebKey2020`] failed.
 #[derive(Debug, thiserror::Error)]
 pub enum InvalidJsonWebKey2020 {
     #[error("invalid type")]

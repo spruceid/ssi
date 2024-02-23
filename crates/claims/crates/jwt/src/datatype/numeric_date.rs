@@ -3,7 +3,7 @@ use std::str::FromStr;
 use chrono::{prelude::*, Duration, LocalResult};
 use serde::{Deserialize, Serialize, Serializer};
 
-/// Represents NumericDate (see https://datatracker.ietf.org/doc/html/rfc7519#section-2)
+/// Represents NumericDate (see <https://datatracker.ietf.org/doc/html/rfc7519#section-2>)
 /// where the range is restricted to those in which microseconds can be exactly represented,
 /// which is approximately between the years 1685 and 2255, which was considered to be sufficient
 /// for the purposes of this crate.  Note that leap seconds are ignored by this type, just as

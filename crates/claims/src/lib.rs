@@ -21,7 +21,11 @@ pub use jwt::JWTClaims;
 /// See: <https://www.w3.org/TR/vc-data-model>
 pub use ssi_vc as vc;
 
-pub use vc::{Credential, Presentation, VerifiableCredential, VerifiablePresentation};
+pub use vc::{
+    Credential, JsonCredential, JsonPresentation, JsonVerifiableCredential,
+    JsonVerifiablePresentation, Presentation, SpecializedJsonCredential, VerifiableCredential,
+    VerifiablePresentation,
+};
 
 /// Data-Integrity Proofs.
 ///

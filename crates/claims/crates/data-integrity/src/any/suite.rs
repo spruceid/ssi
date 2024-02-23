@@ -490,6 +490,13 @@ impl AnySuite {
         jwk: &JWK,
         verification_method: Option<&ReferenceOrOwned<AnyMethod>>,
     ) -> Option<Self> {
+        if let Some(vm) = verification_method {
+            #[cfg(feature = "w3c")]
+            if vm.id().starts_with("did:jwk:") {
+                return Some(Self::JsonWebSignature2020);
+            }
+        }
+
         use ssi_jwk::Algorithm;
         let algorithm = jwk.get_algorithm()?;
         Some(match algorithm {

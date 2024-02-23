@@ -52,6 +52,9 @@ pub struct Multikey {
 
     /// Public key encoded according to [MULTICODEC] and formatted according to
     /// [MULTIBASE].
+    ///
+    /// [MULTICODEC]: <https://github.com/multiformats/multicodec>
+    /// [MULTIBASE]: <https://github.com/multiformats/multibase>
     #[serde(rename = "publicKeyMultibase")]
     #[ld("sec:publicKeyMultibase")]
     pub public_key: PublicKey,
