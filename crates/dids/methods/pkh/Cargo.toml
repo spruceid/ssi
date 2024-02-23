@@ -15,8 +15,9 @@ documentation = "https://docs.rs/did-pkh/"
 default = ["ripemd-160", "eip", "tezos"]
 ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-caips/ripemd-160"]
 eip = ["ssi-jwk/eip", "ssi-caips/eip"]
-aleo = ["ssi-jwk/aleo", "ssi-caips/aleo"]
 tezos = ["ssi-jwk/tezos", "ssi-caips/tezos"]
+aleo = ["ssi-jwk/aleo", "ssi-caips/aleo"]
+solana = []
 
 [dependencies]
 ssi-crypto.workspace = true
@@ -36,7 +37,7 @@ bech32 = "0.8"
 ssi-core.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-json-ld.workspace = true
-ssi-claims = { workspace = true, features = ["dif", "secp256k1"] }
+ssi-claims = { workspace = true, features = ["w3c", "dif", "ethereum", "eip712", "secp256k1", "secp256r1"] }
 ssi-tzkey.workspace = true
 ssi-eip712.workspace = true
 ssi-jws.workspace = true

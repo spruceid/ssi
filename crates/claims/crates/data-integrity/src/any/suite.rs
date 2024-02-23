@@ -545,9 +545,9 @@ impl AnySuite {
                         }
                     }
                 }
-                #[cfg(feature = "secp256r1")]
+                #[cfg(all(feature = "w3c", feature = "secp256r1"))]
                 _ => Self::EcdsaSecp256r1Signature2019,
-                #[cfg(not(feature = "secp256r1"))]
+                #[allow(unreachable_patterns)]
                 _ => {
                     // missing `secp256r1` or `tezos` features.
                     return None;

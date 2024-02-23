@@ -333,7 +333,10 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
     } else if data[0] == DID_KEY_P384_PREFIX[0] && data[1] == DID_KEY_P384_PREFIX[1] {
         #[cfg(feature = "secp384r1")]
         match ssi_jwk::p384_parse(&data[2..]) {
-            Ok(jwk) => Ok((PublicKey::Jwk(jwk), VerificationMethodType::JsonWebKey2020)),
+            Ok(jwk) => Ok((
+                PublicKey::Jwk(Box::new(jwk)),
+                VerificationMethodType::JsonWebKey2020,
+            )),
             Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
         }
         #[cfg(not(feature = "secp384r1"))]
@@ -501,30 +504,6 @@ mod tests {
         let did1 = DIDKey::generate(&key).unwrap();
         assert_eq!(did1, did);
     }
-
-    // #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    // #[ld(prefix("cred" = "https://www.w3.org/2018/credentials#"))]
-    // #[ld(type = "cred:VerifiableCredential")]
-    // #[serde(rename_all = "camelCase")]
-    // struct TestCredential {
-    //     #[ld(id)]
-    //     id: Option<IriBuf>,
-
-    //     #[ld("cred:issuer")]
-    //     issuer: IriBuf,
-
-    //     #[ld("cred:issuanceDate")]
-    //     issuance_date: xsd_types::DateTime,
-
-    //     #[ld("cred:credentialSubject")]
-    //     credential_subject: CredentialSubject,
-    // }
-
-    // #[derive(Clone, serde::Serialize, linked_data::Serialize)]
-    // struct CredentialSubject {
-    //     #[ld(id)]
-    //     id: IriBuf,
-    // }
 
     #[async_std::test]
     async fn credential_prove_verify_did_key() {

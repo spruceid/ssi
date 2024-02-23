@@ -620,6 +620,7 @@ fn generate_caip10_bip122(
     })
 }
 
+#[cfg(feature = "solana")]
 fn generate_caip10_solana(
     key: &JWK,
     ref_opt: Option<String>,
@@ -641,6 +642,7 @@ fn generate_caip10_solana(
     })
 }
 
+#[cfg(feature = "aleo")]
 fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<BlockchainAccountId, String> {
     let reference = ref_opt.unwrap_or_else(|| "1".to_string());
     let chain_id = ChainId {
@@ -663,6 +665,7 @@ fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<Blockchain
     })
 }
 
+#[allow(unused, unreachable_code)]
 fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
     // Require name to be a either CAIP-2 namespace or a
     // full CAIP-2 string - namespace and reference (e.g. internal
@@ -675,14 +678,16 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
         [namespace, reference] => (namespace.to_string(), Some(reference.to_string())),
         _ => return Err("Unable to parse chain id or namespace".to_string()),
     };
-    let account_id = match &namespace[..] {
+    let account_id: BlockchainAccountId = match &namespace[..] {
         #[cfg(feature = "tezos")]
         "tezos" => generate_caip10_tezos(key, reference_opt)?,
         #[cfg(feature = "eip")]
         "eip155" => generate_caip10_eip155(key, reference_opt)?,
         #[cfg(feature = "ripemd-160")]
         "bip122" => generate_caip10_bip122(key, reference_opt)?,
+        #[cfg(feature = "solana")]
         "solana" => generate_caip10_solana(key, reference_opt)?,
+        #[cfg(feature = "aleo")]
         "aleo" => generate_caip10_aleo(key, reference_opt)?,
         _ => return Err("Namespace not supported".to_string()),
     };
@@ -719,24 +724,12 @@ impl DIDPKH {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use iref::IriBuf;
-    use serde_json::{from_str, from_value, json};
-    use ssi_claims::{
-        data_integrity::{
-            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, Proof,
-            ProofConfiguration,
-        },
-        vc::{JsonCredential, JsonPresentation},
-        Verifiable,
-    };
+    use ssi_claims::{data_integrity::AnyInputContext, Verifiable};
     use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, VerificationMethodDIDResolver};
-    use ssi_jwk::Algorithm;
-    use ssi_jws::CompactJWSString;
-    use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
-    use static_iref::uri;
 
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
-        let jwk: JWK = from_value(jwk_value).unwrap();
+        let jwk: JWK = serde_json::from_value(jwk_value).unwrap();
         let did = DIDPKH.generate(&jwk, type_).unwrap();
         assert_eq!(did, did_expected);
     }
@@ -744,6 +737,8 @@ mod tests {
     #[test]
     #[cfg(all(feature = "eip", feature = "tezos"))]
     fn generate_did_pkh() {
+        use serde_json::json;
+
         let secp256k1_pk = json!({
             "kty": "EC",
             "crv": "secp256k1",
@@ -918,7 +913,10 @@ mod tests {
         test_resolve_error(did!("did:pkh:eth:bar"), ErrorKind::InvalidMethodSpecificId).await;
     }
 
-    fn fuzz_proof_value(proof: &mut Proof<AnySuite>) {
+    #[cfg(all(feature = "eip", feature = "tezos"))]
+    fn fuzz_proof_value(
+        proof: &mut ssi_claims::data_integrity::Proof<ssi_claims::data_integrity::AnySuite>,
+    ) {
         let signature = &mut proof.signature;
         if let Some(value) = &mut signature.proof_value {
             value.insert(0, 'x');
@@ -929,16 +927,17 @@ mod tests {
         }
 
         if let Some(value) = &mut signature.jws {
-            *value = CompactJWSString::from_string(format!("{value}ff")).unwrap();
+            *value = ssi_jws::CompactJWSString::from_string(format!("{value}ff")).unwrap();
         }
     }
 
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     async fn credential_prove_verify_did_pkh(
         key: JWK,
         wrong_key: JWK,
         type_: &str,
         vm_relative_url: &str,
-        proof_suite: AnySuite,
+        proof_suite: ssi_claims::data_integrity::AnySuite,
         eip712_domain_opt: Option<
             ssi_claims::data_integrity::suites::ethereum_eip712_signature_2021::Eip712Options,
         >,
@@ -946,6 +945,14 @@ mod tests {
             ssi_claims::data_integrity::suites::ethereum_eip712_signature_2021::Eip712Options,
         >,
     ) {
+        use iref::IriBuf;
+        use ssi_claims::{
+            data_integrity::{AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration},
+            vc::{JsonCredential, JsonPresentation},
+        };
+        use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
+        use static_iref::uri;
+
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
 
         // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
@@ -1081,13 +1088,22 @@ mod tests {
         assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
     }
 
+    #[cfg(all(feature = "eip", feature = "tezos"))]
     async fn credential_prepare_complete_verify_did_pkh_tz(
         key: JWK,
         wrong_key: JWK,
         type_: &str,
         vm_relative_url: &str,
-        proof_suite: AnySuite,
+        proof_suite: ssi_claims::data_integrity::AnySuite,
     ) {
+        use iref::IriBuf;
+        use ssi_claims::{
+            data_integrity::{AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration},
+            vc::{JsonCredential, JsonPresentation},
+        };
+        use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
+        use static_iref::uri;
+
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
         let did = DIDPKH.generate(&key, type_).unwrap();
 
@@ -1215,7 +1231,11 @@ mod tests {
     #[tokio::test]
     #[cfg(all(feature = "eip", feature = "tezos"))]
     async fn resolve_vc_issue_verify() {
-        let key_secp256k1: JWK = from_str(include_str!(
+        use serde_json::json;
+        use ssi_claims::data_integrity::AnySuite;
+        use ssi_jwk::Algorithm;
+
+        let key_secp256k1: JWK = serde_json::from_str(include_str!(
             "../../../../../tests/secp256k1-2021-02-17.json"
         ))
         .unwrap();
@@ -1235,8 +1255,9 @@ mod tests {
         };
 
         let mut key_ed25519: JWK =
-            from_str(include_str!("../../../../../tests/ed25519-2020-10-18.json")).unwrap();
-        let mut key_p256: JWK = from_str(include_str!(
+            serde_json::from_str(include_str!("../../../../../tests/ed25519-2020-10-18.json"))
+                .unwrap();
+        let mut key_p256: JWK = serde_json::from_str(include_str!(
             "../../../../../tests/secp256r1-2021-03-18.json"
         ))
         .unwrap();

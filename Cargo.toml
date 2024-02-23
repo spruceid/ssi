@@ -23,43 +23,43 @@ members = [
 ]
 
 [workspace.dependencies]
-ssi-core = { path = "./crates/core", version = "0.1" }
-ssi-multicodec = { path = "./crates/multicodec", version = "0.1" }
-ssi-crypto = { path = "./crates/crypto", version = "0.1" }
-ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1" }
-ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1" }
+ssi-core = { path = "./crates/core", version = "0.1", default-features = false }
+ssi-multicodec = { path = "./crates/multicodec", version = "0.1", default-features = false }
+ssi-crypto = { path = "./crates/crypto", version = "0.1", default-features = false }
+ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1", default-features = false }
+ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1", default-features = false }
 ssi-jwk = { path = "./crates/jwk", version = "0.1", default-features = false }
-ssi-tzkey = { path = "./crates/tzkey", version = "0.1" }
-ssi-eip712 = { path = "./crates/eip712", version = "0.1" }
-ssi-rdf = { path = "./crates/rdf", version = "0.1" }
-ssi-contexts = { path = "./crates/contexts", version = "0.1.5" }
-ssi-json-ld = { path = "./crates/json-ld", version = "0.2.2" }
-ssi-security = { path = "./crates/security", version = "0.1" }
-ssi-caips = { path = "./crates/caips", version = "0.1" }
-ssi-ucan = { path = "./crates/ucan", version = "0.1" }
-ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.1" }
-ssi-ssh = { path = "./crates/ssh", version = "0.1" }
+ssi-tzkey = { path = "./crates/tzkey", version = "0.1", default-features = false }
+ssi-eip712 = { path = "./crates/eip712", version = "0.1", default-features = false }
+ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
+ssi-contexts = { path = "./crates/contexts", version = "0.1.5", default-features = false }
+ssi-json-ld = { path = "./crates/json-ld", version = "0.2.2", default-features = false }
+ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
+ssi-caips = { path = "./crates/caips", version = "0.1", default-features = false }
+ssi-ucan = { path = "./crates/ucan", version = "0.1", default-features = false }
+ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.1", default-features = false }
+ssi-ssh = { path = "./crates/ssh", version = "0.1", default-features = false }
 
 # Verifiable Claims
-ssi-claims-core = { path = "./crates/claims/core", version = "0.1" }
+ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-features = false }
 ssi-jws = { path = "./crates/claims/crates/jws", version = "0.1", default-features = false }
-ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.1" }
-ssi-vc = { path = "./crates/claims/crates/vc", version = "0.1" }
-ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1" }
-ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1" }
-ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.1" }
-ssi-claims = { path = "./crates/claims", version = "0.1" }
+ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.1", default-features = false }
+ssi-vc = { path = "./crates/claims/crates/vc", version = "0.1", default-features = false }
+ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1", default-features = false }
+ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1", default-features = false }
+ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.1", default-features = false }
+ssi-claims = { path = "./crates/claims", version = "0.1", default-features = false }
 
 # DID methods
-ssi-dids-core = { path = "./crates/dids/core", version = "0.1" }
-did-ethr = { path = "./crates/dids/methods/ethr", version = "0.2.1" }
-did-ion = { path = "./crates/dids/methods/ion", version = "0.2.0" }
-did-jwk = { path = "./crates/dids/methods/jwk", version = "0.1.1" }
-did-method-key = { path = "./crates/dids/methods/key", version = "0.2.1" }
-did-pkh = { path = "./crates/dids/methods/pkh", version = "0.2.1" }
-did-tz = { path = "./crates/dids/methods/tz", version = "0.2.1" }
-did-web = { path = "./crates/dids/methods/web", version = "0.2.2" }
-ssi-dids = { path = "./crates/dids", version = "0.2" }
+ssi-dids-core = { path = "./crates/dids/core", version = "0.1", default-features = false }
+did-ethr = { path = "./crates/dids/methods/ethr", version = "0.2.1", default-features = false }
+did-ion = { path = "./crates/dids/methods/ion", version = "0.2.0", default-features = false }
+did-jwk = { path = "./crates/dids/methods/jwk", version = "0.1.1", default-features = false }
+did-method-key = { path = "./crates/dids/methods/key", version = "0.2.1", default-features = false }
+did-pkh = { path = "./crates/dids/methods/pkh", version = "0.2.1", default-features = false }
+did-tz = { path = "./crates/dids/methods/tz", version = "0.2.1", default-features = false }
+did-web = { path = "./crates/dids/methods/web", version = "0.2.2", default-features = false }
+ssi-dids = { path = "./crates/dids", version = "0.2", default-features = false }
 
 # other common dependencies
 async-std = "1.9"
@@ -94,7 +94,7 @@ contextual = "0.1.6"
 lazy_static = "1.4.0"
 
 [features]
-default = ["w3c", "rsa", "ed25519", "secp256k1", "ripemd-160", "eip712"]
+default = ["w3c", "rsa", "ed25519", "secp256k1", "secp256r1", "ripemd-160", "eip712"]
 
 ## Signature suites specified by the W3C.
 ## 
@@ -128,16 +128,16 @@ ed25519 = ["ssi-claims/ed25519"]
 ## This includes:
 ##   - `EcdsaSecp256k1Signature2019` (requires `w3c`)
 ##   - `EcdsaSecp256k1RecoverySignature2020` (requires `dif`)
-secp256k1 = ["ssi-claims/secp256k1"]
+secp256k1 = ["ssi-claims/secp256k1", "ssi-dids/secp256k1"]
 
 ## Signature suites based on secp256r1.
 ##
 ## This includes:
 ##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
-secp256r1 = ["ssi-claims/secp256r1"]
+secp256r1 = ["ssi-claims/secp256r1", "ssi-dids/secp256r1"]
 
 ## Enable secp384r1 keys.
-secp384r1 = ["ssi-jwk/secp384r1"]
+secp384r1 = ["ssi-jwk/secp384r1", "ssi-verification-methods/secp384r1", "ssi-dids/secp384r1"]
 
 ## Signature suites based on RSA.
 ##
@@ -152,10 +152,10 @@ rsa = ["ssi-claims/rsa"]
 ##   - `TezosSignature2021`
 ##   - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `ed25519`)
 ##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
-tezos = ["ssi-claims/tezos", "ssi-caips/tezos"]
+tezos = ["ssi-claims/tezos", "ssi-caips/tezos", "ssi-dids/tezos"]
 
 ## Enables `AleoSignature2021`.
-aleo = ["ssi-claims/aleo", "ssi-caips/aleo"]
+aleo = ["ssi-claims/aleo", "ssi-caips/aleo", "ssi-dids/aleo"]
 
 ## Signature suites based on Ethereum EIP-712.
 ## 
@@ -165,17 +165,17 @@ aleo = ["ssi-claims/aleo", "ssi-caips/aleo"]
 eip712 = ["ssi-claims/eip712"]
 
 # Enables `SolanaSignature2021`
-solana = ["ssi-claims/solana"]
+solana = ["ssi-claims/solana", "ssi-dids/solana"]
 
 ## Ethereum signature suites.
 ##
 ## This includes:
 ##   - `EthereumPersonalSignature2021`
 ##   - `Eip712Signature2021` (requires `eip712`)
-ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip"]
+ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip", "ssi-dids/eip"]
 
 ## Enable ripemd hashes.
-ripemd-160 = ["ssi-jwk/ripemd-160"]
+ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-dids/ripemd-160"]
 
 ## Enable bbs.
 bbs = ["ssi-crypto/bbs"]

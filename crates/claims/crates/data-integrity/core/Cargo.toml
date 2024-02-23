@@ -19,7 +19,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
-ssi-claims-core.workspace = true
+ssi-claims-core = { workspace = true, features = ["serde"] }
 ssi-security.workspace = true
 chrono.workspace = true
 iref.workspace = true

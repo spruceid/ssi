@@ -25,7 +25,7 @@ secp384r1 = ["ssi-jwk/secp384r1"]
 
 [dependencies]
 ssi-dids-core.workspace = true
-ssi-jwk.workspace = true
+ssi-jwk = { workspace = true, features = ["ed25519"] }
 ssi-multicodec.workspace = true
 bs58 = { workspace = true, features = ["check"] }
 multibase.workspace = true

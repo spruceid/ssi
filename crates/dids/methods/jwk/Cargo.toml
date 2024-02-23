@@ -11,12 +11,6 @@ repository = "https://github.com/spruceid/ssi/"
 homepage = "https://github.com/spruceid/ssi/tree/main/did-jwk/"
 documentation = "https://docs.rs/did-jwk/"
 
-[features]
-default = ["secp256k1", "secp256r1"]
-secp256k1 = ["ssi-jwk/secp256k1"]
-secp256r1 = ["ssi-jwk/secp256r1"]
-ed25519 = ["ssi-jwk/ed25519"]
-
 [dependencies]
 ssi-crypto.workspace = true
 ssi-dids-core.workspace = true
@@ -31,4 +25,5 @@ static-iref.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+ssi-jwk = { workspace = true, features = ["ed25519", "secp256k1", "secp256r1"] }
 async-std = { version = "1.9", features = ["attributes"] }

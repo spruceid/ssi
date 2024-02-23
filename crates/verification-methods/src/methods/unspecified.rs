@@ -1,10 +1,16 @@
+#[cfg(feature = "tezos")]
 mod tezos;
+
+#[cfg(feature = "tezos")]
 pub use tezos::*;
 
 mod blockchain_verification_method_2021;
 pub use blockchain_verification_method_2021::BlockchainVerificationMethod2021;
 
+#[cfg(feature = "eip712")]
 mod eip712_method_2021;
+
+#[cfg(feature = "eip712")]
 pub use eip712_method_2021::Eip712Method2021;
 
 #[cfg(feature = "aleo")]

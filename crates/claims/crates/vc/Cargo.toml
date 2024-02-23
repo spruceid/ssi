@@ -50,3 +50,7 @@ xsd-types.workspace = true
 chrono.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+
+[[example]]
+name = "sign"
+required-features = ["ssi-data-integrity/w3c", "ssi-data-integrity/ed25519"]

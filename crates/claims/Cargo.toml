@@ -49,7 +49,7 @@ eip712 = ["ssi-eip712", "ssi-data-integrity/eip712", "ssi-vc/eip712"]
 solana = ["ssi-data-integrity/solana", "ssi-verification-methods/solana"]
 
 # Enables `EthereumPersonalSignature2021`
-ethereum = []
+ethereum = ["ssi-data-integrity/ethereum"]
 
 [dependencies]
 ssi-core.workspace = true

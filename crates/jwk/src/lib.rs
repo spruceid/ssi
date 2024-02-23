@@ -284,7 +284,6 @@ impl JWK {
     }
 
     #[cfg(feature = "ed25519")]
-    #[cfg(not(feature = "ring"))]
     pub fn generate_ed25519_from(
         rng: &mut (impl rand_old::CryptoRng + rand_old::RngCore),
     ) -> Result<JWK, Error> {

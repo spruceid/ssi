@@ -58,6 +58,7 @@ macro_rules! verification_method_union {
 			pub fn iri(&self) -> &iref::Iri {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant => $variant::IRI
 					),*
 				}
@@ -68,6 +69,7 @@ macro_rules! verification_method_union {
 			pub fn type_(&self) -> $kind {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(_) => $kind::$variant
 					),*
 				}
@@ -79,6 +81,7 @@ macro_rules! verification_method_union {
 				use $crate::VerificationMethod;
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(m) => m.id()
 					),*
 				}
@@ -87,6 +90,7 @@ macro_rules! verification_method_union {
 			pub fn type_(&self) -> $kind {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(_) => $kind::$variant
 					),*
 				}
@@ -99,6 +103,7 @@ macro_rules! verification_method_union {
 			fn as_reference(&self) -> $name_ref<'_> {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(m) => $name_ref::$variant(m)
 					),*
 				}
@@ -107,6 +112,7 @@ macro_rules! verification_method_union {
 			fn apply_covariance<'big: 'small, 'small>(r: Self::Reference<'big>) -> Self::Reference<'small> where Self: 'big {
 				match r {
 					$(
+						$(#[$meta])*
 						$name_ref::$variant(m) => $name_ref::$variant(m)
 					),*
 				}
@@ -117,6 +123,7 @@ macro_rules! verification_method_union {
 			fn id(&self) -> &iref::Iri {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(m) => m.id()
 					),*
 				}
@@ -125,6 +132,7 @@ macro_rules! verification_method_union {
 			fn controller(&self) -> Option<&iref::Iri> {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(m) => m.controller()
 					),*
 				}
@@ -133,6 +141,7 @@ macro_rules! verification_method_union {
 			fn ref_id<'a>(r: Self::Reference<'a>) -> &'a iref::Iri {
 				match r {
 					$(
+						$(#[$meta])*
 						$name_ref::$variant(m) => $variant::ref_id(m)
 					),*
 				}
@@ -141,6 +150,7 @@ macro_rules! verification_method_union {
 			fn ref_controller<'a>(r: Self::Reference<'a>) -> Option<&'a iref::Iri> {
 				match r {
 					$(
+						$(#[$meta])*
 						$name_ref::$variant(m) => $variant::ref_controller(m)
 					),*
 				}
@@ -152,6 +162,7 @@ macro_rules! verification_method_union {
 				let mut types = Vec::new();
 
 				$(
+					$(#[$meta])*
 					match $variant::expected_type() {
 						Some($crate::ExpectedType::One(t)) => types.push(t),
 						Some($crate::ExpectedType::Many(ts)) => types.extend(ts),
@@ -168,6 +179,7 @@ macro_rules! verification_method_union {
 
 			fn type_match(ty: &str) -> bool {
 				$(
+					$(#[$meta])*
 					if <$variant as $crate::TypedVerificationMethod>::type_match(ty) {
 						return true
 					}
@@ -179,6 +191,7 @@ macro_rules! verification_method_union {
 			fn type_(&self) -> &str {
 				match self {
 					$(
+						$(#[$meta])*
 						Self::$variant(m) => m.type_()
 					),*
 				}
@@ -187,6 +200,7 @@ macro_rules! verification_method_union {
 			fn ref_type<'a>(r: Self::Reference<'a>) -> &'a str {
 				match r {
 					$(
+						$(#[$meta])*
 						$name_ref::$variant(m) => <$variant as $crate::TypedVerificationMethod>::ref_type(m)
 					),*
 				}
@@ -194,6 +208,7 @@ macro_rules! verification_method_union {
 		}
 
 		$(
+			$(#[$meta])*
 			impl<'a> TryFrom<$name_ref<'a>> for &'a $variant {
 				type Error = $crate::InvalidVerificationMethod;
 
@@ -211,6 +226,7 @@ macro_rules! verification_method_union {
 
 			fn try_from(value: $crate::GenericVerificationMethod) -> Result<Self, Self::Error> {
 				$(
+					$(#[$meta])*
 					if <$variant as $crate::TypedVerificationMethod>::type_match(&value.type_) {
 						return <$variant as TryFrom<$crate::GenericVerificationMethod>>::try_from(value).map(Self::$variant)
 					}
