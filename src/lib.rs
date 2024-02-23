@@ -1,8 +1,9 @@
 //! The SSI library provides a simple and modular API to sign and verify claims
 //! exchanged between applications using
-//! [Decentralized Identifiers (DIDs)][dids].
+//! [Decentralized Identifiers (DIDs)][dids]. SSI is embedded in the
+//! cross-platform [`didkit`][didkit] library as a core dependency.
 //!
-//! It supports the two main families of verifiable claims:
+//! This library supports the two main families of verifiable claims:
 //! - [JSON Web Tokens (JWT)][jwt] where claims are encoded into JSON and
 //!   secured using [JSON Web Signatures][jws]; and
 //! - [W3C's Verifiable Credentials (VCs)][vc-data-model], a
@@ -16,6 +17,7 @@
 //!     [*cryptographic suites*][cryptosuite].
 //!
 //! [dids]: <https://www.w3.org/TR/did-core/>
+//! [didkit]: <https://github.com/spruceid/didkit>
 //! [vc-data-model]: <https://www.w3.org/TR/vc-data-model/>
 //! [jwt]: <https://www.rfc-editor.org/rfc/rfc7519>
 //! [jws]: <https://www.rfc-editor.org/rfc/rfc7515>
@@ -25,7 +27,7 @@
 //!
 //! # Basic Usage
 //!
-//! `ssi` provides various functions to parse, verify, create and sign various
+//! SSI provides various functions to parse, verify, create and sign various
 //! kind of claims. This section shows how to use these functions in combination
 //! with JSON Web Signatures (or Tokens) and Verifiable Credentials.
 //!
@@ -33,7 +35,7 @@
 //!
 //! The simplest type of claim to load and verify is probably JSON Web
 //! Signatures (JWSs), often use to encode JSON Web Tokens (JWTs). To represent
-//! such claims `ssi` provides the `CompactJWSString` type representing a JWS
+//! such claims SSI provides the `CompactJWSString` type representing a JWS
 //! in compact textual form. One can load a JWS using [`from_string`] and verify
 //! it using [`verify`].
 //!
@@ -67,11 +69,11 @@
 //!
 //! Verifiable Credential are much more complex as they require interpreting
 //! the input claims and proofs, such as Data-Integrity proofs as Linked-Data
-//! using JSON-LD. This operation is highly configurable. `ssi` provide
+//! using JSON-LD. This operation is highly configurable. SSI provide
 //! functions exposing various levels of implementation details that you can
 //! tweak as needed. The simplest of them is [`any_credential_from_json_str`]
 //! that will simply load a VC from a string, assuming it is signed using
-//! any Data-Integrity proof supported by `ssi`.
+//! any Data-Integrity proof supported by SSI.
 //!
 //! [`any_credential_from_json_str`]: crate::claims::vc::any_credential_from_json_str
 //!
@@ -98,7 +100,7 @@
 //!
 //! In the previous section we have seen how to load and verify arbitrary
 //! claims. This section shows how to create and sign custom claims.
-//! With `ssi`, any Rust type can serve as claims as long as it complies to
+//! With SSI, any Rust type can serve as claims as long as it complies to
 //! certain conditions such as implementing serialization/deserialization
 //! functions using [`serde`](https://crates.io/crates/serde).
 //! Don't forget to enable the `derive` feature for `serde`.
@@ -235,7 +237,7 @@
 
 pub use xsd_types;
 
-/// Collection of common names defined by `ssi`.
+/// Collection of common names defined by SSI.
 pub mod prelude;
 
 // Re-export core functions and types.
