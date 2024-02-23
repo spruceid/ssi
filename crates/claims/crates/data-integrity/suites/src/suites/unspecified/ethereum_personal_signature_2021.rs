@@ -174,7 +174,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
         Some(json_ld::syntax::Context::One(EPSIG_CONTEXT.clone()))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
@@ -190,7 +190,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
         }
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,

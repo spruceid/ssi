@@ -181,7 +181,7 @@ pub trait CryptographicSuite: Sized {
 
     /// Sign the hash.
     #[allow(async_fn_in_trait)]
-    async fn sign(
+    async fn sign_hash(
         &self,
         options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
@@ -190,7 +190,7 @@ pub trait CryptographicSuite: Sized {
     ) -> Result<Self::Signature, SignatureError>;
 
     /// Verify the given hash.
-    fn verify(
+    fn verify_hash(
         &self,
         options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
@@ -225,7 +225,7 @@ pub trait CryptographicSuite: Sized {
                 .await
                 .ok_or(SignatureError::MissingSigner)?;
 
-            self.sign(
+            self.sign_hash(
                 params.options.as_reference(),
                 verification_method.as_reference(),
                 data,
@@ -249,7 +249,7 @@ pub trait CryptographicSuite: Sized {
             .resolve_verification_method(None, Some(proof.verification_method))
             .await?;
 
-        self.verify(
+        self.verify_hash(
             proof.options,
             verification_method.as_reference(),
             data,

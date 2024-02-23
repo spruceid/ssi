@@ -253,15 +253,6 @@ macro_rules! crypto_suites {
                 }
             }
 
-            // fn setup_signature_algorithm(&self) -> Self::SignatureAlgorithm {
-            //     match self {
-            //         $(
-            //             $(#[cfg($($t)*)])?
-            //             Self::$name => AnySignatureAlgorithm::$name(ssi_data_integrity_suites::$name.setup_signature_algorithm())
-            //         ),*
-            //     }
-            // }
-
             fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
                 match self {
                     $(
@@ -274,7 +265,7 @@ macro_rules! crypto_suites {
             }
 
             #[allow(unused)]
-            async fn sign(
+            async fn sign_hash(
                 &self,
                 options: <Self::Options as Referencable>::Reference<'_>,
                 method: <AnyMethod as Referencable>::Reference<'_>,
@@ -290,7 +281,7 @@ macro_rules! crypto_suites {
                                 Ok(method) => {
                                     match options.try_into() {
                                         Ok(options) => {
-                                            Ok(ssi_data_integrity_suites::$name.sign(
+                                            Ok(ssi_data_integrity_suites::$name.sign_hash(
                                                 options,
                                                 method,
                                                 bytes.try_into()?,
@@ -314,7 +305,7 @@ macro_rules! crypto_suites {
             }
 
             #[allow(unused)]
-            fn verify(
+            fn verify_hash(
                 &self,
                 options: AnySuiteOptionsRef,
                 method: AnyMethodRef,
@@ -325,7 +316,7 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => {
-                            ssi_data_integrity_suites::$name.verify(
+                            ssi_data_integrity_suites::$name.verify_hash(
                                 options.try_into()?,
                                 method.try_into()?,
                                 bytes.try_into()?,

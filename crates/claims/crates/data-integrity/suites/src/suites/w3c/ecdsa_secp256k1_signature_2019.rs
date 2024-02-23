@@ -56,7 +56,7 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
@@ -66,7 +66,7 @@ impl CryptographicSuite for EcdsaSecp256k1Signature2019 {
         JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::ES256K).await
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,

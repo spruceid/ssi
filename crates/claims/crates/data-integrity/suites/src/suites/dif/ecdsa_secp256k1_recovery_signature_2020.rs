@@ -62,7 +62,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         Some(iri!("https://w3id.org/security/suites/secp256k1recovery-2020/v2").into())
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
@@ -72,7 +72,7 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         JwsSignature::sign_detached(bytes, signer, None, ssi_jwk::algorithm::ES256KR).await
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,

@@ -89,7 +89,7 @@ impl CryptographicSuite for TezosSignature2021 {
         Some(json_ld::syntax::Context::One(TZVM_CONTEXT.clone()))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
@@ -104,7 +104,7 @@ impl CryptographicSuite for TezosSignature2021 {
         .await
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,

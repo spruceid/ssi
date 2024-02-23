@@ -60,7 +60,7 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
         Some(json_ld::syntax::Context::One(TZ_CONTEXT.clone()))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
@@ -76,7 +76,7 @@ impl CryptographicSuite for Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignatur
         .await
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,

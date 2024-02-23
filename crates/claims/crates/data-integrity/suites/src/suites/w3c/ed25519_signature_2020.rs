@@ -63,7 +63,7 @@ impl CryptographicSuite for Ed25519Signature2020 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
@@ -75,7 +75,7 @@ impl CryptographicSuite for Ed25519Signature2020 {
         ))
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,

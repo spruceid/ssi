@@ -209,7 +209,7 @@ impl CryptographicSuite for Eip712Signature2021 {
         Some(json_ld::syntax::Context::One(EIP712VM_CONTEXT.clone()))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
@@ -219,7 +219,7 @@ impl CryptographicSuite for Eip712Signature2021 {
         Eip712Signature::sign(bytes, signer, method.algorithm()).await
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
