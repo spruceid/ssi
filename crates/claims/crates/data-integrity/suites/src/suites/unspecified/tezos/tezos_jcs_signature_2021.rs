@@ -143,8 +143,6 @@ impl CryptographicSuite for TezosJcsSignature2021 {
         data.canonicalize();
         let msg = json_syntax::Value::Object(data).compact_print().to_string();
 
-        eprintln!("unencoded message: {msg}");
-
         match ssi_tzkey::encode_tezos_signed_message(&msg) {
             Ok(data) => Ok(data),
             Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),

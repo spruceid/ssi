@@ -285,13 +285,14 @@ impl JWK {
 
     #[cfg(feature = "ed25519")]
     pub fn generate_ed25519_from(
-        rng: &mut (impl rand_old::CryptoRng + rand_old::RngCore),
+        rng: &mut (impl rand::CryptoRng + rand::RngCore),
     ) -> Result<JWK, Error> {
-        let keypair = ed25519_dalek::Keypair::generate(rng);
+        let secret = ed25519_dalek::SigningKey::generate(rng);
+        let public = secret.verifying_key();
         Ok(JWK::from(Params::OKP(OctetParams {
             curve: "Ed25519".to_string(),
-            public_key: Base64urlUInt(keypair.public.as_ref().to_vec()),
-            private_key: Some(Base64urlUInt(keypair.secret.as_ref().to_vec())),
+            public_key: Base64urlUInt(public.as_ref().to_vec()),
+            private_key: Some(Base64urlUInt(secret.to_bytes().to_vec())),
         })))
     }
 
@@ -306,7 +307,7 @@ impl JWK {
         rng: &mut (impl rand::CryptoRng + rand::RngCore),
     ) -> Result<JWK, Error> {
         let secret_key = k256::SecretKey::random(rng);
-        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key = secret_key.public_key();
         let mut ec_params = ECParams::try_from(&public_key)?;
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -322,7 +323,7 @@ impl JWK {
     #[cfg(feature = "secp256r1")]
     pub fn generate_p256_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> JWK {
         let secret_key = p256::SecretKey::random(rng);
-        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_be_bytes().to_vec());
+        let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key: p256::PublicKey = secret_key.public_key();
         let mut ec_params = ECParams::from(&public_key);
         ec_params.ecc_private_key = Some(Base64urlUInt(sk_bytes.to_vec()));
@@ -854,13 +855,13 @@ impl TryFrom<&OctetParams> for ring::signature::Ed25519KeyPair {
 
 #[cfg(feature = "ed25519")]
 pub fn ed25519_parse(data: &[u8]) -> Result<JWK, Error> {
-    let public_key = ed25519_dalek::PublicKey::from_bytes(data)?;
+    let public_key = ed25519_dalek::VerifyingKey::try_from(data)?;
     Ok(public_key.into())
 }
 
 #[cfg(feature = "ed25519")]
-impl From<ed25519_dalek::PublicKey> for JWK {
-    fn from(value: ed25519_dalek::PublicKey) -> Self {
+impl From<ed25519_dalek::VerifyingKey> for JWK {
+    fn from(value: ed25519_dalek::VerifyingKey) -> Self {
         JWK::from(Params::OKP(OctetParams {
             curve: "Ed25519".to_string(),
             public_key: Base64urlUInt(value.to_bytes().to_vec()),

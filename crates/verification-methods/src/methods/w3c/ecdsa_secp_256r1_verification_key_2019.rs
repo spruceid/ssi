@@ -99,16 +99,14 @@ impl EcdsaSecp256r1VerificationKey2019 {
         secret_key: impl Into<SecretKeyRef<'a>>,
         signing_bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        use p256::ecdsa::signature::{Signature, Signer};
+        use p256::ecdsa::signature::Signer;
 
         match secret_key.into() {
             SecretKeyRef::P256(secret_key) => {
                 let signing_key = p256::ecdsa::SigningKey::from(secret_key);
-                Ok(signing_key
-                    .try_sign(signing_bytes)
-                    .unwrap()
-                    .as_bytes()
-                    .to_vec())
+                let signature: p256::ecdsa::Signature =
+                    signing_key.try_sign(signing_bytes).unwrap();
+                Ok(signature.to_bytes().to_vec())
             }
             SecretKeyRef::Jwk(secret_key) => {
                 let algorithm = ssi_jwk::Algorithm::ES256;

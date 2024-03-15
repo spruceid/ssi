@@ -1,11 +1,10 @@
-use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
-
-use chrono::{DateTime, FixedOffset};
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::Validate;
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
+use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
+use xsd_types::DateTime;
 
 use super::super::value_or_array;
 use crate::{Context, RequiredContextSet, V1};
@@ -180,12 +179,12 @@ impl<S, C, T> crate::Credential for SpecializedJsonCredential<S, C, T> {
         &self.issuer
     }
 
-    fn issuance_date(&self) -> DateTime<FixedOffset> {
-        self.issuance_date.into()
+    fn issuance_date(&self) -> DateTime {
+        self.issuance_date
     }
 
-    fn expiration_date(&self) -> Option<DateTime<FixedOffset>> {
-        self.expiration_date.map(Into::into)
+    fn expiration_date(&self) -> Option<DateTime> {
+        self.expiration_date
     }
 
     fn credential_status(&self) -> &[Self::Status] {

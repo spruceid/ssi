@@ -37,7 +37,7 @@ bech32 = "0.8"
 ssi-core.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-json-ld.workspace = true
-ssi-claims = { workspace = true, features = ["w3c", "dif", "ethereum", "eip712", "secp256k1", "secp256r1"] }
+ssi-claims = { workspace = true, features = ["w3c", "dif", "ethereum", "eip712", "secp256k1", "secp256r1", "tezos", "ed25519"] }
 ssi-tzkey.workspace = true
 ssi-eip712.workspace = true
 ssi-jws.workspace = true
@@ -48,5 +48,5 @@ json-ld.workspace = true
 json-syntax.workspace = true
 locspan.workspace = true
 tokio = { version = "1.0", features = ["macros", "rt"] }
-hex = "0.4"
+hex.workspace = true
 blake2b_simd = "0.5"

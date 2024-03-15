@@ -34,8 +34,8 @@ static-iref.workspace = true
 thiserror.workspace = true
 serde_json.workspace = true
 simple_asn1 = "^0.5.2"
-k256 = { version = "0.13.1", optional = true, features = ["ecdsa"] }
-p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
+k256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 
 [dev-dependencies]
 ssi-verification-methods-core.workspace = true
@@ -47,4 +47,3 @@ json-syntax.workspace = true
 serde = { workspace = true, features = ["derive"] }
 async-std = { version = "1.9", features = ["attributes"] }
 rand_chacha.workspace = true
-rand_chacha_old = { package = "rand_chacha", version = "0.2" }

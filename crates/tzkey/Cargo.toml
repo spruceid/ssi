@@ -11,10 +11,10 @@ documentation = "https://docs.rs/ssi-tzkey/"
 [dependencies]
 ssi-jwk = { workspace = true, features = ["tezos"]}
 ssi-jws = { workspace = true, features = ["tezos"] }
-ed25519-dalek = "2.0.0"
-thiserror = "1.0"
+ed25519-dalek.workspace = true
+thiserror.workspace = true
 bs58 = { workspace = true, features = ["check"] }
 
 [dev-dependencies]
-serde_json = "1.0"
-hex = "0.4"
+serde_json.workspace = true
+hex.workspace = true

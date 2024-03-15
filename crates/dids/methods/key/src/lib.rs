@@ -373,8 +373,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
 
 #[cfg(test)]
 mod tests {
-    use rand_chacha::rand_core::SeedableRng as SeedableRngOld;
-    use rand_chacha_old::rand_core::SeedableRng;
+    use rand_chacha::rand_core::SeedableRng;
     use ssi_claims::{
         data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions},
         vc::JsonCredential,
@@ -509,7 +508,7 @@ mod tests {
     async fn credential_prove_verify_did_key() {
         let didkey = VerificationMethodDIDResolver::new(DIDKey);
 
-        let mut rng = rand_chacha_old::ChaCha8Rng::seed_from_u64(2);
+        let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_ed25519_from(&mut rng).unwrap();
         let did = DIDKey::generate(&key).unwrap();
 

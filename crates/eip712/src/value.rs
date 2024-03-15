@@ -3,7 +3,6 @@ use indexmap::{Equivalent, IndexMap};
 use linked_data::{LinkedData, LinkedDataGraph};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
-use ssi_crypto::hashes::keccak::bytes_to_lowerhex;
 use std::hash::Hash;
 
 use crate::StructName;
@@ -184,7 +183,7 @@ impl From<Value> for serde_json::Value {
             Value::Bool(false) => serde_json::Value::Bool(false),
             Value::Integer(int) => serde_json::Value::Number(serde_json::Number::from(int)),
             Value::Bytes(bytes) => {
-                serde_json::Value::String("0x".to_string() + &bytes_to_lowerhex(&bytes))
+                serde_json::Value::String("0x".to_string() + &hex::encode(bytes))
             }
             Value::String(string) => serde_json::Value::String(string),
             Value::Array(array) => {

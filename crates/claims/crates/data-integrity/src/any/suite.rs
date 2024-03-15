@@ -276,7 +276,6 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => {
-                            eprintln!(concat!("cs algorithm is ", stringify!($name)));
                             match method.try_into() {
                                 Ok(method) => {
                                     match options.try_into() {
@@ -490,39 +489,42 @@ impl AnySuite {
 
         use ssi_jwk::Algorithm;
         let algorithm = jwk.get_algorithm()?;
-        Some(match algorithm {
+        match algorithm {
             #[cfg(all(feature = "w3c", feature = "rsa"))]
-            Algorithm::RS256 => Self::RsaSignature2018,
+            Algorithm::RS256 => Some(Self::RsaSignature2018),
             #[cfg(feature = "w3c")]
-            Algorithm::PS256 => Self::JsonWebSignature2020,
+            Algorithm::PS256 => Some(Self::JsonWebSignature2020),
             #[cfg(feature = "w3c")]
-            Algorithm::ES384 => Self::JsonWebSignature2020,
+            Algorithm::ES384 => Some(Self::JsonWebSignature2020),
             #[cfg(feature = "aleo")]
-            Algorithm::AleoTestnet1Signature => Self::AleoSignature2021,
+            Algorithm::AleoTestnet1Signature => Some(Self::AleoSignature2021),
             Algorithm::EdDSA | Algorithm::EdBlake2b => match verification_method {
                 #[cfg(feature = "solana")]
                 Some(vm)
                     if (vm.id().starts_with("did:sol:") || vm.id().starts_with("did:pkh:sol:"))
                         && vm.id().ends_with("#SolanaMethod2021") =>
                 {
-                    Self::SolanaSignature2021
+                    Some(Self::SolanaSignature2021)
                 }
                 #[cfg(feature = "tezos")]
                 Some(vm)
                     if vm.id().starts_with("did:tz:") || vm.id().starts_with("did:pkh:tz:") =>
                 {
                     if vm.id().ends_with("#TezosMethod2021") {
-                        Self::TezosSignature2021
-                    } else {
-                        Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021
+                        return Some(Self::TezosSignature2021);
                     }
+
+                    #[cfg(feature = "ed25519")]
+                    return Some(Self::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
+
+                    None
                 }
                 #[cfg(all(feature = "w3c", feature = "ed25519"))]
-                _ => Self::Ed25519Signature2018,
+                _ => Some(Self::Ed25519Signature2018),
                 #[cfg(not(all(feature = "w3c", feature = "ed25519")))]
                 _ => {
                     // missing `ed25519` or `tezos` or `solana`.
-                    return None;
+                    None
                 }
             },
             Algorithm::ES256 | Algorithm::ESBlake2b => match verification_method {
@@ -531,24 +533,20 @@ impl AnySuite {
                     if vm.id().starts_with("did:tz:") || vm.id().starts_with("did:pkh:tz:") =>
                 {
                     if vm.id().ends_with("#TezosMethod2021") {
-                        Self::TezosSignature2021
-                    } else {
-                        #[cfg(feature = "secp256r1")]
-                        {
-                            Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021
-                        }
-                        #[cfg(not(feature = "secp256r1"))]
-                        {
-                            return None;
-                        }
+                        return Some(Self::TezosSignature2021);
                     }
+
+                    #[cfg(feature = "secp256r1")]
+                    return Some(Self::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021);
+
+                    None
                 }
                 #[cfg(all(feature = "w3c", feature = "secp256r1"))]
-                _ => Self::EcdsaSecp256r1Signature2019,
+                _ => Some(Self::EcdsaSecp256r1Signature2019),
                 #[allow(unreachable_patterns)]
                 _ => {
                     // missing `secp256r1` or `tezos` features.
-                    return None;
+                    None
                 }
             },
             Algorithm::ES256K | Algorithm::ESBlake2bK => match verification_method {
@@ -565,12 +563,12 @@ impl AnySuite {
                     #[cfg(feature = "dif")]
                     return Some(Self::EcdsaSecp256k1RecoverySignature2020);
 
-                    return None;
+                    None
                 }
                 #[cfg(all(feature = "w3c", feature = "secp256k1"))]
-                _ => Self::EcdsaSecp256k1Signature2019,
+                _ => Some(Self::EcdsaSecp256k1Signature2019),
                 #[allow(unreachable_patterns)]
-                _ => return None,
+                _ => None,
             },
             Algorithm::ES256KR => {
                 // #[allow(clippy::if_same_then_else)]
@@ -582,6 +580,7 @@ impl AnySuite {
                 if use_epsig(jwk) {
                     return Some(Self::EthereumPersonalSignature2021);
                 }
+
                 match verification_method {
                     #[cfg(all(feature = "ethereum", feature = "eip712"))]
                     Some(vm)
@@ -589,17 +588,17 @@ impl AnySuite {
                             || vm.id().starts_with("did:pkh:eth:"))
                             && vm.id().ends_with("#Eip712Method2021") =>
                     {
-                        Self::Eip712Signature2021
+                        Some(Self::Eip712Signature2021)
                     }
-                    #[cfg(all(feature = "dif", feature = "secp256k1"))]
-                    _ => Self::EcdsaSecp256k1RecoverySignature2020,
 
+                    #[cfg(all(feature = "dif", feature = "secp256k1"))]
+                    _ => Some(Self::EcdsaSecp256k1RecoverySignature2020),
                     #[allow(unreachable_patterns)]
-                    _ => return None,
+                    _ => None,
                 }
             }
-            _ => return None,
-        })
+            _ => None,
+        }
     }
 }
 

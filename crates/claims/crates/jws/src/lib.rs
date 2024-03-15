@@ -195,10 +195,7 @@ impl CompactJWS {
         match verify_bytes(header.algorithm, self.signing_bytes(), &jwk, &signature) {
             Ok(()) => Ok(true),
             Err(Error::InvalidSignature) => Ok(false),
-            Err(e) => {
-                eprintln!("error: {e:?}");
-                Err(VerificationError::InvalidSignature)
-            }
+            Err(_) => Err(VerificationError::InvalidSignature),
         }
     }
 }

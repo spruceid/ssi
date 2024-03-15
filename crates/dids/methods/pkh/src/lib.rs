@@ -695,7 +695,7 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
 }
 
 impl DIDPKH {
-    pub fn generate(&self, key: &JWK, pkh_name: &str) -> Option<DIDBuf> {
+    pub fn generate(key: &JWK, pkh_name: &str) -> Option<DIDBuf> {
         let addr = match match pkh_name {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
             #[cfg(feature = "tezos")]
@@ -730,7 +730,7 @@ mod tests {
     #[cfg(all(feature = "eip", feature = "tezos"))]
     fn test_generate(jwk_value: serde_json::Value, type_: &str, did_expected: &str) {
         let jwk: JWK = serde_json::from_value(jwk_value).unwrap();
-        let did = DIDPKH.generate(&jwk, type_).unwrap();
+        let did = DIDPKH::generate(&jwk, type_).unwrap();
         assert_eq!(did, did_expected);
     }
 
@@ -956,7 +956,7 @@ mod tests {
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
 
         // use ssi_vc::{Credential, Issuer, LinkedDataProofOptions, URI};
-        let did = DIDPKH.generate(&key, type_).unwrap();
+        let did = DIDPKH::generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
         let cred = JsonCredential::new(
@@ -1105,7 +1105,7 @@ mod tests {
         use static_iref::uri;
 
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
-        let did = DIDPKH.generate(&key, type_).unwrap();
+        let did = DIDPKH::generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
         let cred = JsonCredential::new(
@@ -1542,8 +1542,9 @@ mod tests {
         other_key_p256.algorithm = Some(Algorithm::ES256);
     }
 
-    async fn test_verify_vc(vc_str: &str, _num_warnings: usize) {
+    async fn test_verify_vc(name: &str, vc_str: &str, _num_warnings: usize) {
         // TODO check warnings maybe?
+        eprintln!("test verify vc `{name}`");
         eprintln!("input: {vc_str}");
 
         let vc = ssi_claims::vc::any_credential_from_json_str(vc_str)
@@ -1610,13 +1611,48 @@ mod tests {
     #[tokio::test]
     async fn verify_vc() {
         // TODO: update these to use CAIP-10 did:pkh issuers
-        // test_verify_vc(include_str!("../tests/vc-tz1.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-tz1-jcs.jsonld"), 1).await;
-        test_verify_vc(include_str!("../tests/vc-eth-eip712sig.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-eth-eip712vm.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-eth-epsig.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-celo-epsig.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-poly-epsig.jsonld"), 0).await;
-        test_verify_vc(include_str!("../tests/vc-poly-eip712sig.jsonld"), 0).await;
+        test_verify_vc("vc-tz1", include_str!("../tests/vc-tz1.jsonld"), 0).await;
+        test_verify_vc(
+            "vc-tz1-jcs.jsonld",
+            include_str!("../tests/vc-tz1-jcs.jsonld"),
+            1,
+        )
+        .await;
+        test_verify_vc(
+            "vc-eth-eip712sig.jsonld",
+            include_str!("../tests/vc-eth-eip712sig.jsonld"),
+            0,
+        )
+        .await;
+        test_verify_vc(
+            "vc-eth-eip712vm",
+            include_str!("../tests/vc-eth-eip712vm.jsonld"),
+            0,
+        )
+        .await;
+        test_verify_vc(
+            "vc-eth-epsig",
+            include_str!("../tests/vc-eth-epsig.jsonld"),
+            0,
+        )
+        .await;
+        test_verify_vc(
+            "vc-celo-epsig",
+            include_str!("../tests/vc-celo-epsig.jsonld"),
+            0,
+        )
+        .await;
+        test_verify_vc(
+            "vc-poly-epsig",
+            include_str!("../tests/vc-poly-epsig.jsonld"),
+            0,
+        )
+        .await;
+        test_verify_vc(
+            "vc-poly-eip712sig",
+            include_str!("../tests/vc-poly-eip712sig.jsonld"),
+            0,
+        )
+        .await;
     }
 }

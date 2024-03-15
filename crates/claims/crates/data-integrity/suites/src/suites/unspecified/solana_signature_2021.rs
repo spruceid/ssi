@@ -77,7 +77,7 @@ impl CryptographicSuite for SolanaSignature2021 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
@@ -87,7 +87,7 @@ impl CryptographicSuite for SolanaSignature2021 {
         todo!()
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,

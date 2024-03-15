@@ -61,6 +61,16 @@ did-tz = { path = "./crates/dids/methods/tz", version = "0.2.1", default-feature
 did-web = { path = "./crates/dids/methods/web", version = "0.2.2", default-features = false }
 ssi-dids = { path = "./crates/dids", version = "0.2", default-features = false }
 
+# crypto
+k256 = "0.13.1"
+p256 = "0.13.2"
+p384 = "0.13.0"
+ed25519-dalek = "2.0"
+blake2 = "0.10"
+sha2 = "0.10.0"
+sha3 = "0.10.8"
+rsa = "0.6"
+
 # other common dependencies
 async-std = "1.9"
 async-trait = "0.1.68"
@@ -69,8 +79,7 @@ chrono = "0.4.24"
 iref = "3.1.2"
 static-iref = "3.0"
 rdf-types = "0.18.3"
-# xsd-types = "0.7.6"
-xsd-types = { git = "https://github.com/timothee-haudebourg/xsd-types.git" }
+xsd-types = "0.9.2"
 grdf = "0.22"
 locspan = "0.8"
 json-syntax = "0.12.2"

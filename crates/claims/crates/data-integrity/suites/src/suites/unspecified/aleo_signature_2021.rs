@@ -13,6 +13,8 @@ use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 ///
 /// Linked data signature suite using [Aleo](crate::aleo).
 ///
+/// Only verification is supported.
+///
 /// # Transformation algorithm
 ///
 /// This suite accepts linked data documents transformed into a canonical
@@ -95,7 +97,7 @@ impl CryptographicSuite for AleoSignature2021 {
         Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
     }
 
-    async fn sign(
+    async fn sign_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
@@ -106,10 +108,10 @@ impl CryptographicSuite for AleoSignature2021 {
         // let signature = ssi_jwk::aleo::sign(hash, key).map_err(MessageSignatureError::signature_failed)?;
         // signer.sign(method., protocol, message)
         // Ok(Base58BtcMultibase::encode_signature(&signature))
-        todo!()
+        unimplemented!("AleoSignature2021 signing is not supported")
     }
 
-    fn verify(
+    fn verify_hash(
         &self,
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,

@@ -1,9 +1,8 @@
-use std::ops::{Deref, DerefMut};
-
-use chrono::{DateTime, FixedOffset};
 use iref::{Uri, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ExtractProof, Validate, VerifiableClaims};
+use std::ops::{Deref, DerefMut};
+use xsd_types::DateTime;
 
 use super::{value_or_array, Evidence, Issuer, RefreshService, Schema, Status, TermsOfUse};
 use crate::SpecializedJsonCredential;
@@ -95,12 +94,12 @@ impl<P> crate::Credential for JsonVerifiableCredential<P> {
         &self.credential.issuer
     }
 
-    fn issuance_date(&self) -> DateTime<FixedOffset> {
-        self.credential.issuance_date.into()
+    fn issuance_date(&self) -> DateTime {
+        self.credential.issuance_date
     }
 
-    fn expiration_date(&self) -> Option<DateTime<FixedOffset>> {
-        self.credential.expiration_date.map(Into::into)
+    fn expiration_date(&self) -> Option<DateTime> {
+        self.credential.expiration_date
     }
 
     fn credential_status(&self) -> &[Self::Status] {

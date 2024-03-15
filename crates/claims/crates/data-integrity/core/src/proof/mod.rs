@@ -206,15 +206,11 @@ where
         self.type_.refine_type(&ld_configuration.type_iri)?;
 
         let expanded_configuration = ld_configuration.with_configuration(self.configuration());
-
-        eprintln!("transformation");
         let transformed = self
             .type_
             .transform(value, environment, expanded_configuration.borrow())
             .await?;
-        eprintln!("transformed");
         let hashed = self.type_.hash(transformed, expanded_configuration)?;
-        eprintln!("hashed");
         Ok(PreparedProof::new(self, hashed))
     }
 }

@@ -1,4 +1,3 @@
-use chrono::FixedOffset;
 use serde::Serialize;
 use ssi_jwt::JWTClaims;
 
@@ -47,8 +46,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
                 let date_value: xsd_types::DateTime = date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                let date_value: chrono::DateTime<FixedOffset> = date_value.into();
-                claims.expiration_time = Some(date_value.try_into()?)
+                claims.expiration_time = Some(date_value.earliest().try_into()?)
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -67,8 +65,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                let issuance_date_value: chrono::DateTime<FixedOffset> = issuance_date_value.into();
-                claims.not_before = Some(issuance_date_value.try_into()?)
+                claims.not_before = Some(issuance_date_value.latest().try_into()?)
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -140,8 +137,7 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVpEncodeError::InvalidDateValue)?;
-                let issuance_date_value: chrono::DateTime<FixedOffset> = issuance_date_value.into();
-                claims.not_before = Some(issuance_date_value.try_into()?)
+                claims.not_before = Some(issuance_date_value.latest().try_into()?)
             }
             None => return Err(JwtVpEncodeError::InvalidDateValue),
         }

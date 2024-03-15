@@ -58,7 +58,7 @@ impl Eip712Method2021 {
         secret_key: &JWK,
         data: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        use k256::ecdsa::signature::Signer;
+        use sha3::Digest;
         use ssi_jwk::Params;
         let ec_params = match &secret_key.params {
             Params::EC(ec) => ec,
@@ -68,11 +68,18 @@ impl Eip712Method2021 {
         let secret_key = k256::SecretKey::try_from(ec_params)
             .map_err(|_| MessageSignatureError::InvalidSecretKey)?;
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
-        let sig: k256::ecdsa::recoverable::Signature = signing_key
-            .try_sign(data)
+        let (sig, rec_id) = signing_key
+            .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data))
             .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?;
 
-        Ok(sig.as_ref().to_vec())
+        // let sig: k256::ecdsa::recoverable::Signature = signing_key
+        //     .try_sign(data)
+        //     .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?;
+
+        let mut result = sig.to_bytes().to_vec();
+        result.push(rec_id.to_byte());
+
+        Ok(result)
     }
 
     pub fn verify_bytes(
@@ -80,6 +87,7 @@ impl Eip712Method2021 {
         data: &[u8],
         signature_bytes: &[u8],
     ) -> Result<bool, VerificationError> {
+        use sha3::Digest;
         if signature_bytes.len() != 65 {
             return Err(VerificationError::InvalidSignature);
         }
@@ -89,19 +97,22 @@ impl Eip712Method2021 {
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         // Recover the signing key.
-        let rec_id = k256::ecdsa::recoverable::Id::try_from(signature_bytes[64])
+        let rec_id = k256::ecdsa::RecoveryId::try_from(signature_bytes[64])
             .map_err(|_| VerificationError::InvalidSignature)?;
-        let sig = k256::ecdsa::recoverable::Signature::new(&signature, rec_id)
-            .map_err(|_| VerificationError::InvalidSignature)?;
-        let recovered_key = sig
-            .recover_verifying_key(data)
+
+        let recovered_key: k256::ecdsa::VerifyingKey =
+            k256::ecdsa::VerifyingKey::recover_from_digest(
+                sha3::Keccak256::new_with_prefix(data),
+                &signature,
+                rec_id,
+            )
             .map_err(|_| VerificationError::InvalidSignature)?;
 
         // Check the signing key.
         let jwk = JWK {
             params: ssi_jwk::Params::EC(
                 ssi_jwk::ECParams::try_from(
-                    &k256::PublicKey::from_sec1_bytes(recovered_key.to_bytes().as_slice()).unwrap(),
+                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes()).unwrap(),
                 )
                 .unwrap(),
             ),

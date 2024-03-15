@@ -1,7 +1,7 @@
 //! This example shows how to sign and verify a custom credential type crafted
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
-use chrono::Utc;
 use iref::{Iri, IriBuf, Uri, UriBuf};
+use rand_chacha::rand_core::SeedableRng;
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuiteInput};
 use ssi_rdf::Expandable;
 use ssi_verification_methods::{
@@ -11,6 +11,7 @@ use ssi_verification_methods::{
 };
 use static_iref::{iri, uri};
 use std::{borrow::Cow, collections::HashMap};
+use xsd_types::DateTime;
 
 #[derive(Clone, linked_data::Serialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,7 +28,7 @@ pub struct Credential {
     issuer: linked_data::Ref<UriBuf>,
 
     #[ld("cred:issuanceDate")]
-    issuance_date: xsd_types::DateTime,
+    issuance_date: DateTime,
 }
 
 impl ssi_json_ld::WithJsonLdContext for Credential {
@@ -59,8 +60,8 @@ impl ssi_vc::Credential for Credential {
         &self.issuer.0
     }
 
-    fn issuance_date(&self) -> chrono::prelude::DateTime<chrono::prelude::FixedOffset> {
-        self.issuance_date.into()
+    fn issuance_date(&self) -> DateTime {
+        self.issuance_date
     }
 }
 
@@ -101,15 +102,15 @@ async fn main() {
     let mut keyring = Keyring::default();
 
     // Create a new key `https://example.com/controller#key`.
-    let mut csprng = rand::rngs::OsRng;
-    let key_pair = ssi_verification_methods::ed25519_dalek::Keypair::generate(&mut csprng);
+    let mut csprng = rand_chacha::ChaCha8Rng::from_entropy();
+    let secret_key = ssi_verification_methods::ed25519_dalek::SigningKey::generate(&mut csprng);
     keyring.insert_key_pair(
         Ed25519VerificationKey2020::from_public_key(
             iri!("https://example.com/controller#key").to_owned(),
             uri!("https://example.com/controller").to_owned(),
-            key_pair.public,
+            secret_key.verifying_key(),
         ),
-        key_pair,
+        secret_key,
     );
 
     // Create the key controller and declare our key with its purposes.
@@ -126,7 +127,7 @@ async fn main() {
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
     let proof_options = ssi_data_integrity::ProofConfiguration::new(
-        Utc::now().fixed_offset().into(),
+        DateTime::now(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::Assertion,
         (),
@@ -193,7 +194,7 @@ pub struct Keyring {
         IriBuf,
         (
             Ed25519VerificationKey2020,
-            ssi_verification_methods::ed25519_dalek::Keypair,
+            ssi_verification_methods::ed25519_dalek::SigningKey,
         ),
     >,
 }
@@ -206,7 +207,7 @@ impl Keyring {
     pub fn insert_key_pair(
         &mut self,
         verification_key: Ed25519VerificationKey2020,
-        key_pair: ssi_verification_methods::ed25519_dalek::Keypair,
+        key_pair: ssi_verification_methods::ed25519_dalek::SigningKey,
     ) {
         self.keys
             .insert(verification_key.id.clone(), (verification_key, key_pair));
@@ -218,7 +219,7 @@ impl Signer<Ed25519VerificationKey2020, ssi_jwk::algorithm::EdDSA, ()> for Keyri
         'a,
         'a,
         Ed25519VerificationKey2020,
-        ssi_verification_methods::ed25519_dalek::Keypair,
+        ssi_verification_methods::ed25519_dalek::SigningKey,
     >;
 
     async fn for_method<'a>(

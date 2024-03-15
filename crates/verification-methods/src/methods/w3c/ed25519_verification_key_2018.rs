@@ -62,11 +62,11 @@ impl Ed25519VerificationKey2018 {
     pub fn sign(
         &self,
         data: &[u8],
-        key_pair: &ed25519_dalek::Keypair,
+        secret_key: &ed25519_dalek::SigningKey,
     ) -> Result<CompactJWSString, SignatureError> {
         let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdDSA, None);
         let signing_bytes = header.encode_signing_bytes(data);
-        let signature = key_pair.sign(&signing_bytes);
+        let signature = secret_key.sign(&signing_bytes);
 
         Ok(ssi_jws::CompactJWSString::from_signing_bytes_and_signature(
             // TODO base64 encode signature?
@@ -81,7 +81,7 @@ impl Ed25519VerificationKey2018 {
         data: &[u8],
         signature_bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        let signature = ed25519_dalek::Signature::from_bytes(signature_bytes)
+        let signature = ed25519_dalek::Signature::try_from(signature_bytes)
             .map_err(|_| VerificationError::InvalidSignature)?;
         Ok(self.public_key.verify(data, &signature))
     }
@@ -181,13 +181,13 @@ pub struct PublicKey {
     encoded: String,
 
     /// Decoded public key.
-    decoded: ed25519_dalek::PublicKey,
+    decoded: ed25519_dalek::VerifyingKey,
 }
 
 impl PublicKey {
     pub fn decode(encoded: String) -> Result<Self, InvalidPublicKey> {
         let pk_bytes = multibase::Base::Base58Btc.decode(&encoded)?;
-        let decoded = ed25519_dalek::PublicKey::from_bytes(&pk_bytes)?;
+        let decoded = ed25519_dalek::VerifyingKey::try_from(pk_bytes.as_slice())?;
         Ok(Self { encoded, decoded })
     }
 
@@ -195,7 +195,7 @@ impl PublicKey {
         &self.encoded
     }
 
-    pub fn decoded(&self) -> &ed25519_dalek::PublicKey {
+    pub fn decoded(&self) -> &ed25519_dalek::VerifyingKey {
         &self.decoded
     }
 

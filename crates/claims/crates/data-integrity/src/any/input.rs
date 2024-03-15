@@ -162,7 +162,6 @@ where
 									).await?.into())
 								}
 								Err(e) => {
-                                    eprintln!("invalid verification method: {e:?}");
                                     Err(e.into())
                                 }
 							}

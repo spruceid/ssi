@@ -33,7 +33,7 @@ aleo = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves"
 ripemd-160 = ["ssi-crypto/ripemd-160", "secp256k1"]
 
 ## enable ethereum style key hashing.
-eip = ["ssi-crypto/keccak", "k256/keccak256", "secp256k1"]
+eip = ["ssi-crypto/keccak", "k256", "secp256k1"]
 
 ## enable tezos style key hashing.
 tezos = ["blake2b_simd", "secp256k1", "secp256r1", "bs58"]
@@ -50,21 +50,16 @@ serde_jcs.workspace = true
 base64.workspace = true
 thiserror = "1.0"
 ssi-crypto.workspace = true
-k256 = { version = "0.13.1", optional = true, features = ["ecdsa"] }
-p256 = { version = "0.13.2", optional = true, features = ["ecdsa"] }
-p384 = { version = "0.13.0", optional = true, features = ["ecdsa"] }
+k256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p384 = { workspace = true, optional = true, features = ["ecdsa"] }
 ring = { version = "0.16", optional = true }
-rsa = { version = "0.6", optional = true }
+rsa = { workspace = true, optional = true }
 rand = { version = "0.8", optional = true }
-ed25519-dalek = { version = "2.0.0", optional = true, features = ["rand_core"] }
+ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
 lazy_static = "1.4"
 bs58 = { workspace = true, features = ["check"], optional = true }
-blake2 = { version = "0.9", optional = true }
-snarkvm-dpc = { version = "0.7.9", optional = true }
-snarkvm-algorithms = { version = "0.7.9", optional = true }
-snarkvm-curves = { version = "0.7.9", optional = true }
-snarkvm-utilities = { version = "0.7.9", optional = true }
-snarkvm-parameters = { version = "0.7.9", optional = true }
+
 blake2b_simd = { version = "0.5", optional = true }
 multibase = "0.9.1"
 num-traits = "0.2"
@@ -73,13 +68,23 @@ ssi-multicodec.workspace = true
 linked-data.workspace = true
 json-syntax = { workspace = true, features = ["serde", "canonicalize"] }
 
+# Required only for aleo
+# All of these dependencies are out of date becaus `snarkvm` since dropped
+# support for the `Schnorr` scheme, required by aleo.
+blake2 = { version = "0.9", optional = true }
+snarkvm-dpc = { version = "0.7.9", optional = true }
+snarkvm-algorithms = { version = "0.7.9", optional = true }
+snarkvm-curves = { version = "0.7.9", optional = true }
+snarkvm-utilities = { version = "0.7.9", optional = true }
+snarkvm-parameters = { version = "0.7.9", optional = true }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"], optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 getrandom = { version = "0.2", optional = true }
 
 [dev-dependencies]
-hex = "0.4"
+hex.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

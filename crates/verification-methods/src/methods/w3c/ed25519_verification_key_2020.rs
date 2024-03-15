@@ -2,7 +2,7 @@ use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
-use rand_core_0_5::{CryptoRng, RngCore};
+use rand_core::{CryptoRng, RngCore};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_core::{covariance_rule, Referencable};
@@ -73,18 +73,18 @@ impl Ed25519VerificationKey2020 {
         id: IriBuf,
         controller: UriBuf,
         csprng: &mut (impl RngCore + CryptoRng),
-    ) -> (Self, ed25519_dalek::SecretKey) {
-        let key = ed25519_dalek::Keypair::generate(csprng);
+    ) -> (Self, ed25519_dalek::SigningKey) {
+        let key = ed25519_dalek::SigningKey::generate(csprng);
         (
-            Self::from_public_key(id, controller, key.public),
-            key.secret,
+            Self::from_public_key(id, controller, key.verifying_key()),
+            key,
         )
     }
 
     pub fn from_public_key(
         id: IriBuf,
         controller: UriBuf,
-        public_key: ed25519_dalek::PublicKey,
+        public_key: ed25519_dalek::VerifyingKey,
     ) -> Self {
         Self {
             id,
@@ -126,19 +126,19 @@ impl Ed25519VerificationKey2020 {
         data: &[u8],
         signature_bytes: &[u8],
     ) -> Result<bool, VerificationError> {
-        let signature = ed25519_dalek::Signature::from_bytes(signature_bytes)
+        let signature = ed25519_dalek::Signature::try_from(signature_bytes)
             .map_err(|_| VerificationError::InvalidSignature)?;
         Ok(self.public_key.verify(data, &signature))
     }
 }
 
 pub enum SecretKeyRef<'a> {
-    Ed25519(&'a ed25519_dalek::Keypair),
+    Ed25519(&'a ed25519_dalek::SigningKey),
     Jwk(&'a JWK),
 }
 
-impl<'a> From<&'a ed25519_dalek::Keypair> for SecretKeyRef<'a> {
-    fn from(value: &'a ed25519_dalek::Keypair) -> Self {
+impl<'a> From<&'a ed25519_dalek::SigningKey> for SecretKeyRef<'a> {
+    fn from(value: &'a ed25519_dalek::SigningKey) -> Self {
         Self::Ed25519(value)
     }
 }
@@ -205,12 +205,12 @@ impl JwkVerificationMethod for Ed25519VerificationKey2020 {
     }
 }
 
-impl SigningMethod<ed25519_dalek::Keypair, ssi_jwk::algorithm::EdDSA>
+impl SigningMethod<ed25519_dalek::SigningKey, ssi_jwk::algorithm::EdDSA>
     for Ed25519VerificationKey2020
 {
     fn sign_bytes_ref(
         this: &Self,
-        secret: &ed25519_dalek::Keypair,
+        secret: &ed25519_dalek::SigningKey,
         _algorithm: ssi_jwk::algorithm::EdDSA,
         message: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
@@ -260,11 +260,11 @@ pub struct PublicKey {
     encoded: MultibaseBuf,
 
     /// Decoded public key.
-    decoded: ed25519_dalek::PublicKey,
+    decoded: ed25519_dalek::VerifyingKey,
 }
 
 impl PublicKey {
-    pub fn encode(decoded: ed25519_dalek::PublicKey) -> Self {
+    pub fn encode(decoded: ed25519_dalek::VerifyingKey) -> Self {
         let multi_encoded =
             MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
 
@@ -279,7 +279,7 @@ impl PublicKey {
 
         let (pk_codec, pk_data) = pk_multi_encoded.parts();
         if pk_codec == ssi_multicodec::ED25519_PUB {
-            let decoded = ed25519_dalek::PublicKey::from_bytes(pk_data)?;
+            let decoded = ed25519_dalek::VerifyingKey::try_from(pk_data)?;
             Ok(Self { encoded, decoded })
         } else {
             Err(InvalidPublicKey::InvalidKeyType)
@@ -290,7 +290,7 @@ impl PublicKey {
         &self.encoded
     }
 
-    pub fn decoded(&self) -> &ed25519_dalek::PublicKey {
+    pub fn decoded(&self) -> &ed25519_dalek::VerifyingKey {
         &self.decoded
     }
 

@@ -1,6 +1,6 @@
-use chrono::{DateTime, FixedOffset};
 use iref::Uri;
 use ssi_claims_core::{Proof, Verifiable, VerifiableClaims};
+use xsd_types::DateTime;
 
 use super::{CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse};
 
@@ -73,10 +73,10 @@ pub trait Credential {
     fn issuer(&self) -> &Self::Issuer;
 
     /// Issuance date.
-    fn issuance_date(&self) -> DateTime<FixedOffset>;
+    fn issuance_date(&self) -> DateTime;
 
     /// Expiration date.
-    fn expiration_date(&self) -> Option<DateTime<FixedOffset>> {
+    fn expiration_date(&self) -> Option<DateTime> {
         None
     }
 
@@ -131,13 +131,13 @@ pub trait Credential {
     fn is_valid_credential(&self) -> bool {
         let now = chrono::Utc::now();
 
-        if self.issuance_date() > now {
+        if self.issuance_date().earliest() > now {
             // Credential is issued in the future!
             return false;
         }
 
         if let Some(t) = self.expiration_date() {
-            if t < now {
+            if now >= t.latest() {
                 // Credential has expired.
                 return false;
             }
@@ -176,11 +176,11 @@ impl<T: Credential, P: Proof> Credential for Verifiable<T, P> {
         T::issuer(self.claims())
     }
 
-    fn issuance_date(&self) -> DateTime<FixedOffset> {
+    fn issuance_date(&self) -> DateTime {
         T::issuance_date(self.claims())
     }
 
-    fn expiration_date(&self) -> Option<DateTime<FixedOffset>> {
+    fn expiration_date(&self) -> Option<DateTime> {
         T::expiration_date(self.claims())
     }
 

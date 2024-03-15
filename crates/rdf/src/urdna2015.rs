@@ -311,9 +311,7 @@ pub struct NormalizedQuads<'a, Q> {
 
 impl<'a, Q: Iterator<Item = QuadRef<'a>>> NormalizedQuads<'a, Q> {
     pub fn into_nquads(self) -> String {
-        let result = IntoNQuads::into_nquads(self);
-        eprintln!("NORMALIZED:\n{result}");
-        result
+        IntoNQuads::into_nquads(self)
     }
 }
 

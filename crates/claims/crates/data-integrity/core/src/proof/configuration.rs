@@ -1,7 +1,6 @@
 use educe::Educe;
 use grdf::{HashDataset, HashGraph};
 use iref::{Iri, IriBuf};
-use json_syntax::Print;
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::{
     ExportedFromVocabulary, Id, InterpretationMut, IriVocabulary, Literal, Quad,
@@ -444,9 +443,6 @@ where
         };
 
         let json_proof_document = json_syntax::to_value(proof_document).unwrap();
-
-        eprintln!("proof doc: {}", json_proof_document.pretty_print());
-
         let json_ld_proof_document = ssi_json_ld::CompactJsonLd(json_proof_document)
             .expand(self)
             .await?;

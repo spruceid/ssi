@@ -44,6 +44,7 @@ ssi-jwk.workspace = true
 async-std = { version = "1.9", features = ["attributes"] }
 static-iref.workspace = true
 rand = "0.7"
+rand_chacha.workspace = true
 hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
 xsd-types.workspace = true

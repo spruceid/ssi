@@ -66,11 +66,6 @@ impl Input {
 
         let message = ssi_eip712::Value::Struct(self.message);
 
-        eprintln!(
-            "message: {}",
-            serde_json::to_string_pretty(&message).unwrap()
-        );
-
         let types = match self.types {
             Some(types) => types,
             None => ssi_eip712::Types::generate(
@@ -86,11 +81,6 @@ impl Input {
             domain,
             message,
         };
-
-        eprintln!(
-            "EIP712 typed data: {}",
-            serde_json::to_string_pretty(&result).unwrap()
-        );
 
         Ok(result)
     }

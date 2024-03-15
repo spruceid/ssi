@@ -75,6 +75,7 @@ pub enum Error {
     #[error(transparent)]
     ParseInt(#[from] ParseIntError),
     /// Error eip155 encoding a JWK
+    #[cfg(feature = "eip")]
     #[error(transparent)]
     Eip155(#[from] ssi_crypto::hashes::keccak::Eip155Error),
     /// Error parsing a char
