@@ -39,7 +39,7 @@ p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 
 [dev-dependencies]
 ssi-verification-methods-core.workspace = true
-ssi-claims.workspace = true
+ssi-claims = { workspace = true, features = ["w3c", "ed25519", "secp256r1", "secp256k1"] }
 ssi-data-integrity.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true

@@ -23,7 +23,7 @@ features = ["native-tls-vendored"]
 
 [dev-dependencies]
 ssi-verification-methods-core.workspace = true
-ssi-claims.workspace = true
+ssi-claims = { workspace = true, features = ["w3c", "ed25519"] }
 # ssi-data-integrity.workspace = true
 ssi-jwk.workspace = true
 linked-data.workspace = true

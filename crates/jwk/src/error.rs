@@ -1,6 +1,7 @@
 //! Error types for `ssi-jwk` crate
 #[cfg(feature = "aleo")]
 use crate::aleo::AleoGeneratePrivateKeyError;
+use crate::JWK;
 use base64::DecodeError as Base64Error;
 #[cfg(feature = "ring")]
 use ring::error::{KeyRejected as KeyRejectedError, Unspecified as RingUnspecified};
@@ -30,8 +31,8 @@ pub enum Error {
     #[error("Key type not supported")]
     UnsupportedKeyType,
     /// Key type not implemented
-    #[error("Key type not implemented")]
-    KeyTypeNotImplemented,
+    #[error("Key type not implemented for {0}")]
+    KeyTypeNotImplemented(JWK),
     /// Curve not implemented
     #[error("Curve not implemented: '{0}'")]
     CurveNotImplemented(String),
@@ -98,23 +99,35 @@ pub enum Error {
     #[error("Unable to decompress elliptic curve")]
     ECDecompress,
     /// Errors from p256, k256 and ed25519-dalek
-    #[cfg(feature = "k256")]
+    #[cfg(feature = "secp256k1")]
     #[error(transparent)]
     CryptoErr(#[from] k256::ecdsa::Error),
-    #[cfg(all(feature = "p256", not(feature = "k256")))]
+    #[cfg(all(feature = "secp256r1", not(feature = "secp256k1")))]
     #[error(transparent)]
     CryptoErr(#[from] p256::ecdsa::Error),
-    #[cfg(all(feature = "ed25519", not(feature = "k256"), not(feature = "p256")))]
+    #[cfg(all(
+        feature = "secp384r1",
+        not(any(feature = "secp256r1", feature = "secp256k1"))
+    ))]
+    #[error(transparent)]
+    CryptoErr(#[from] p384::ecdsa::Error),
+    #[cfg(all(
+        feature = "ed25519",
+        not(any(feature = "secp384r1", feature = "secp256r1", feature = "secp256k1"))
+    ))]
     #[error(transparent)]
     CryptoErr(#[from] ed25519_dalek::ed25519::Error),
     /// Error from `elliptic-curve` crate
-    #[cfg(feature = "k256")]
+    #[cfg(feature = "secp256k1")]
     #[error(transparent)]
     EC(#[from] k256::elliptic_curve::Error),
-    #[cfg(all(feature = "p256", not(feature = "k256")))]
+    #[cfg(all(feature = "secp256r1", not(feature = "secp256k1")))]
     #[error(transparent)]
     EC(#[from] p256::elliptic_curve::Error),
-    #[cfg(all(feature = "p384", not(any(feature = "p256", feature = "k256"))))]
+    #[cfg(all(
+        feature = "secp384r1",
+        not(any(feature = "secp256r1", feature = "secp256k1"))
+    ))]
     #[error(transparent)]
     EC(#[from] p384::elliptic_curve::Error),
     /// Unexpected length for publicKeyMultibase

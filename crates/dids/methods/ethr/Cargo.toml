@@ -24,7 +24,7 @@ serde_json.workspace = true
 [dev-dependencies]
 tokio = { version = "1.0", features = ["macros"] }
 ssi-verification-methods-core.workspace = true
-ssi-claims.workspace = true
+ssi-claims = { workspace = true, features = ["ethereum", "eip712", "dif", "secp256k1"] }
 ssi-json-ld.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true

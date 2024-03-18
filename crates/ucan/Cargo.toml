@@ -36,4 +36,5 @@ chrono = { version = "0.4", features = ["serde", "wasmbind"] }
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
 did-method-key.workspace = true
+ssi-verification-methods = { workspace = true, features = ["ed25519"] }
 ssi-jws = { workspace = true, features = ["ed25519"] }

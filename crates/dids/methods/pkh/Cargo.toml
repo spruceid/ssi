@@ -40,6 +40,7 @@ ssi-json-ld.workspace = true
 ssi-claims = { workspace = true, features = ["w3c", "dif", "ethereum", "eip712", "secp256k1", "secp256r1", "tezos", "ed25519"] }
 ssi-tzkey.workspace = true
 ssi-eip712.workspace = true
+ssi-caips = { workspace = true, features = ["eip"] }
 ssi-jws.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true

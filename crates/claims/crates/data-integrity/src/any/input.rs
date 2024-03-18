@@ -241,9 +241,9 @@ where
             tezos_signature_2021: TezosSignature2021,
             #[cfg(all(feature = "ethereum", feature = "eip712"))]
             eip712_signature_2021: Eip712Signature2021,
-            #[cfg(feature = "ethereum")]
+            #[cfg(all(feature = "ethereum", feature = "secp256k1"))]
             ethereum_personal_signature_2021: EthereumPersonalSignature2021,
-            #[cfg(feature = "ethereum")]
+            #[cfg(all(feature = "ethereum", feature = "secp256k1"))]
             ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
         }
     }

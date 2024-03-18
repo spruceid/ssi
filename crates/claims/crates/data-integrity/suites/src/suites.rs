@@ -10,6 +10,7 @@ pub use w3c::*;
 #[cfg(feature = "dif")]
 mod dif;
 #[cfg(feature = "dif")]
+#[allow(unused_imports)]
 pub use dif::*;
 
 #[cfg(any(
@@ -26,6 +27,7 @@ mod unspecified;
     feature = "tezos",
     feature = "solana"
 ))]
+#[allow(unused_imports)]
 pub use unspecified::*;
 
 /// SHA256-based input hashing algorithm used by many cryptographic suites.

@@ -28,7 +28,7 @@ ssi_verification_methods_core::verification_method_union! {
         #[cfg(feature = "secp256k1")]
         EcdsaSecp256k1VerificationKey2019,
 
-        #[cfg(feature = "secp256r1")]
+        #[cfg(feature = "secp256k1")]
         EcdsaSecp256k1RecoveryMethod2020,
 
         #[cfg(feature = "secp256r1")]
@@ -55,7 +55,7 @@ ssi_verification_methods_core::verification_method_union! {
 
         BlockchainVerificationMethod2021,
 
-        #[cfg(feature = "eip712")]
+        #[cfg(all(feature = "eip712", feature = "secp256k1"))]
         Eip712Method2021,
 
         #[cfg(feature = "solana")]
@@ -77,7 +77,7 @@ impl AnyMethod {
             Self::Ed25519VerificationKey2020(m) => Some(Cow::Owned(m.public_key_jwk())),
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019(m) => Some(m.public_key_jwk()),
-            #[cfg(feature = "secp256r1")]
+            #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.public_key_jwk(),
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
@@ -93,7 +93,7 @@ impl AnyMethod {
             #[cfg(feature = "aleo")]
             Self::AleoMethod2021(_) => None,
             Self::BlockchainVerificationMethod2021(_) => None,
-            #[cfg(feature = "eip712")]
+            #[cfg(all(feature = "eip712", feature = "secp256k1"))]
             Self::Eip712Method2021(_) => None,
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => Some(Cow::Borrowed(m.public_key_jwk())),
@@ -115,7 +115,7 @@ impl<'a> AnyMethodRef<'a> {
             Self::Ed25519VerificationKey2020(m) => Some(Cow::Owned(m.public_key_jwk())),
             #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019(m) => Some(m.public_key_jwk()),
-            #[cfg(feature = "secp256r1")]
+            #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.public_key_jwk(),
             #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
@@ -131,7 +131,7 @@ impl<'a> AnyMethodRef<'a> {
             #[cfg(feature = "aleo")]
             Self::AleoMethod2021(_) => None,
             Self::BlockchainVerificationMethod2021(_) => None,
-            #[cfg(feature = "eip712")]
+            #[cfg(all(feature = "eip712", feature = "secp256k1"))]
             Self::Eip712Method2021(_) => None,
             #[cfg(feature = "solana")]
             Self::SolanaMethod2021(m) => Some(Cow::Borrowed(m.public_key_jwk())),
@@ -181,7 +181,7 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
                     algorithm.to_string(),
                 )),
             },
-            #[cfg(feature = "secp256r1")]
+            #[cfg(feature = "secp256k1")]
             AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => match algorithm {
                 ssi_jwk::Algorithm::ES256KR => {
                     m.sign_bytes(secret, ssi_jwk::algorithm::ES256KR, bytes)
@@ -225,7 +225,7 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for AnyMethod {
             AnyMethodRef::BlockchainVerificationMethod2021(m) => {
                 m.sign_bytes(secret, algorithm, bytes)
             }
-            #[cfg(feature = "eip712")]
+            #[cfg(all(feature = "eip712", feature = "secp256k1"))]
             AnyMethodRef::Eip712Method2021(m) => {
                 SigningMethod::sign_bytes(m, secret, algorithm.try_into()?, bytes)
             }

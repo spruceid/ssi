@@ -505,7 +505,7 @@ mod tests {
     }
 
     #[async_std::test]
-    async fn credential_prove_verify_did_key() {
+    async fn credential_prove_verify_did_key_ed25519() {
         let didkey = VerificationMethodDIDResolver::new(DIDKey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);

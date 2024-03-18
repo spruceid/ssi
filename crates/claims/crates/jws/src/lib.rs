@@ -873,7 +873,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         }
         #[allow(unused)]
         JWKParams::EC(ec) => match algorithm {
-            #[cfg(feature = "p384")]
+            #[cfg(feature = "secp384r1")]
             Algorithm::ES384 => {
                 use p384::ecdsa::{signature::Signer, Signature};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
@@ -883,7 +883,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                     signing_key.try_sign(data).map_err(ssi_jwk::Error::from)?;
                 sig.to_bytes().to_vec()
             }
-            #[cfg(feature = "p256")]
+            #[cfg(feature = "secp256r1")]
             Algorithm::ES256 => {
                 use p256::ecdsa::{signature::Signer, Signature};
                 let curve = ec.curve.as_ref().ok_or(ssi_jwk::Error::MissingCurve)?;
@@ -939,7 +939,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 res.push(rec_id.to_byte());
                 res
             }
-            #[cfg(feature = "p256")]
+            #[cfg(feature = "secp256r1")]
             Algorithm::ESBlake2b => {
                 use p256::ecdsa::{
                     signature::{
@@ -975,7 +975,11 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 return Err(Error::UnsupportedAlgorithm);
             }
         },
-        _ => return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented)),
+        _ => {
+            return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented(
+                key.to_public(),
+            )))
+        }
     };
     clear_on_drop::clear_stack(1);
     Ok(signature)
@@ -1233,7 +1237,11 @@ pub fn verify_bytes_warnable(
                 return Err(Error::UnsupportedAlgorithm);
             }
         },
-        _ => return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented)),
+        _ => {
+            return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented(
+                key.to_public(),
+            )))
+        }
     }
     Ok(warnings)
 }
@@ -1515,6 +1523,7 @@ pub fn decode_unverified(jws: &str) -> Result<(Header, Vec<u8>), Error> {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     #[test]
@@ -1600,7 +1609,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "p256")]
+    #[cfg(feature = "secp256r1")]
     fn p256_sign_verify() {
         let key = JWK::generate_p256();
         let data = b"asdf";
@@ -1620,7 +1629,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "p384")]
+    #[cfg(feature = "secp384r1")]
     fn p384_sign_verify() {
         let key = JWK::generate_p384().unwrap();
         let data = b"asdf";

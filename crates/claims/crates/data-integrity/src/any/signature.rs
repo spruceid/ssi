@@ -103,7 +103,7 @@ impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
     }
 }
 
-#[cfg(feature = "ethereum")]
+#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
 impl From<ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature> for AnySignature {
     fn from(value: ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature) -> Self {
         Self {
@@ -113,7 +113,7 @@ impl From<ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature
     }
 }
 
-#[cfg(feature = "ethereum")]
+#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
 impl TryFrom<AnySignature>
     for ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature
 {
@@ -126,7 +126,7 @@ impl TryFrom<AnySignature>
     }
 }
 
-#[cfg(feature = "ethereum")]
+#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
 impl<'a> From<ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>>
     for AnySignatureRef<'a>
 {
@@ -140,7 +140,7 @@ impl<'a> From<ssi_data_integrity_suites::ethereum_personal_signature_2021::Signa
     }
 }
 
-#[cfg(feature = "ethereum")]
+#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
 impl<'a> TryFrom<AnySignatureRef<'a>>
     for ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>
 {

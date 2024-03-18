@@ -82,7 +82,7 @@ solana = ["ssi-verification-methods/solana"]
 ## This includes:
 ##   - `EthereumPersonalSignature2021`
 ##   - `Eip712Signature2021` (requires `eip712`)
-ethereum = []
+ethereum = ["serde_json"]
 
 [dependencies]
 ssi-data-integrity-core.workspace = true

@@ -413,10 +413,10 @@ crypto_suites! {
     #[cfg(all(feature = "ethereum", feature = "eip712"))]
     eip712_signature_2021: Eip712Signature2021,
 
-    #[cfg(feature = "ethereum")]
+    #[cfg(all(feature = "ethereum", feature = "secp256k1"))]
     ethereum_personal_signature_2021: EthereumPersonalSignature2021,
 
-    #[cfg(feature = "ethereum")]
+    #[cfg(all(feature = "ethereum", feature = "secp256k1"))]
     ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
 }
 
@@ -480,6 +480,11 @@ impl AnySuite {
         jwk: &JWK,
         verification_method: Option<&ReferenceOrOwned<AnyMethod>>,
     ) -> Option<Self> {
+        eprintln!("pick for {jwk}");
+        if let Some(vm) = verification_method {
+            eprintln!("vm: {}", vm.id());
+        }
+
         if let Some(vm) = verification_method {
             #[cfg(feature = "w3c")]
             if vm.id().starts_with("did:jwk:") {
@@ -560,7 +565,7 @@ impl AnySuite {
                         return Some(Self::TezosSignature2021);
                     }
 
-                    #[cfg(feature = "dif")]
+                    #[cfg(all(feature = "dif", feature = "secp256k1"))]
                     return Some(Self::EcdsaSecp256k1RecoverySignature2020);
 
                     None
@@ -576,7 +581,7 @@ impl AnySuite {
                 if use_eip712sig(jwk) {
                     return Some(Self::EthereumEip712Signature2021);
                 }
-                #[cfg(feature = "ethereum")]
+                #[cfg(all(feature = "ethereum", feature = "secp256k1"))]
                 if use_epsig(jwk) {
                     return Some(Self::EthereumPersonalSignature2021);
                 }
@@ -602,7 +607,7 @@ impl AnySuite {
     }
 }
 
-#[cfg(feature = "eip712")]
+#[cfg(all(feature = "w3c", feature = "eip712"))]
 fn use_eip712sig(key: &JWK) -> bool {
     // deprecated: allow using unregistered "signTypedData" key operation value to indicate using EthereumEip712Signature2021
     if let Some(ref key_ops) = key.key_operations {
@@ -613,7 +618,7 @@ fn use_eip712sig(key: &JWK) -> bool {
     false
 }
 
-#[cfg(feature = "ethereum")]
+#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
 fn use_epsig(key: &JWK) -> bool {
     // deprecated: allow using unregistered "signPersonalMessage" key operation value to indicate using EthereumPersonalSignature2021
     if let Some(ref key_ops) = key.key_operations {

@@ -28,5 +28,5 @@ ssi-verification-methods.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-ssi-data-integrity = { workspace = true, features = ["ed25519"] }
+ssi-data-integrity = { workspace = true, features = ["w3c", "ed25519"] }
 ssi-dids-core = { workspace = true, features = ["example"] }
