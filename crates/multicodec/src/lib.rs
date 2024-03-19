@@ -2,6 +2,7 @@ use std::ops::Deref;
 
 pub use unsigned_varint::decode::Error;
 
+#[rustfmt::skip]
 mod table;
 
 pub use table::*;
