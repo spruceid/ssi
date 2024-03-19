@@ -976,9 +976,9 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             }
         },
         _ => {
-            return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented(
+            return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented(Box::new(
                 key.to_public(),
-            )))
+            ))))
         }
     };
     clear_on_drop::clear_stack(1);
@@ -1238,9 +1238,9 @@ pub fn verify_bytes_warnable(
             }
         },
         _ => {
-            return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented(
+            return Err(Error::JWK(ssi_jwk::Error::KeyTypeNotImplemented(Box::new(
                 key.to_public(),
-            )))
+            ))))
         }
     }
     Ok(warnings)

@@ -32,7 +32,7 @@ pub enum Error {
     UnsupportedKeyType,
     /// Key type not implemented
     #[error("Key type not implemented for {0}")]
-    KeyTypeNotImplemented(JWK),
+    KeyTypeNotImplemented(Box<JWK>),
     /// Curve not implemented
     #[error("Curve not implemented: '{0}'")]
     CurveNotImplemented(String),

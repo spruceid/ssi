@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
-description = "Verification methods implementation for ssi"
+description = "Core traits and types for verification methods in ssi"
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
-description = "Verifiable Claims for the `ssi` library."
+description = "Core types and traits for Verifiable Claims in the `ssi` library."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-claims/"
 

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Spruce Systems, Inc."]
 license = "Apache-2.0"
-description = "Verifiable Credential Data Integrity 1.0 implementation for the `ssi` library."
+description = "Verifiable Credential Data Integrity 1.0 core implementation for the `ssi` library."
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-data-integrity/"
 

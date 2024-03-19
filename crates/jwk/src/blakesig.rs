@@ -41,7 +41,7 @@ pub fn hash_public_key(jwk: &JWK) -> Result<String, Error> {
                 _ => return Err(Error::CurveNotImplemented(curve.to_string())),
             }
         }
-        _ => return Err(Error::KeyTypeNotImplemented(jwk.to_public())),
+        _ => return Err(Error::KeyTypeNotImplemented(Box::new(jwk.to_public()))),
     };
     let mut hasher = blake2b_simd::Params::new();
     hasher.hash_length(20);

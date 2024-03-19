@@ -535,7 +535,7 @@ impl ToASN1 for JWK {
             Params::RSA(params) => params.to_asn1_class(class),
             // Symmetric(params) => params.to_asn1_class(class),
             Params::OKP(params) => params.to_asn1_class(class),
-            _ => Err(Error::KeyTypeNotImplemented(self.to_public())),
+            _ => Err(Error::KeyTypeNotImplemented(Box::new(self.to_public()))),
         }
     }
 }
