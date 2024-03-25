@@ -12,13 +12,13 @@ documentation = "https://docs.rs/ssi-jwk/"
 default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ripemd-160"]
 
 ## Enable secp256k1 keys.
-secp256k1 = ["k256", "rand", "ssi-crypto/secp256k1"]
+secp256k1 = ["k256", "rand", "getrandom", "ssi-crypto/secp256k1"]
 
 ## Enable secp256r1 (p256) keys.
-secp256r1 = ["p256", "rand"]
+secp256r1 = ["p256", "rand", "getrandom"]
 
 ## Enable secp384r1 (p384) keys.
-secp384r1 = ["p384", "rand"]
+secp384r1 = ["p384", "rand", "getrandom"]
 
 ## Enable ed25519 (EdDSA) keys.
 ed25519 = ["ed25519-dalek", "rand", "getrandom"]
@@ -27,6 +27,8 @@ ed25519 = ["ed25519-dalek", "rand", "getrandom"]
 rsa = ["dep:rsa"]
 
 ## Enable aleo ecosystem keys.
+## 
+## Not compatible with WASM targets.
 aleo = ["rand", "blake2", "snarkvm-dpc",  "snarkvm-algorithms", "snarkvm-curves", "snarkvm-utilities", "snarkvm-parameters", "bs58"]
 
 ## enable ripemd-160 hashing for keys, e.g. for bitcoin.
@@ -80,8 +82,6 @@ snarkvm-parameters = { version = "0.7.9", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"], optional = true }
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-getrandom = { version = "0.2", optional = true }
 
 [dev-dependencies]
 hex.workspace = true

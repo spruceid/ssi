@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_std::sync::RwLock;
-use futures::future::{BoxFuture, FutureExt};
 use iref::{Iri, IriBuf};
+use json_ld::future::{BoxFuture, FutureExt};
 pub use json_ld::{syntax, Options, RemoteDocumentReference};
 use json_ld::{syntax::TryFromJson, Loader, RemoteContext, RemoteContextReference, RemoteDocument};
 use json_syntax::Parse;

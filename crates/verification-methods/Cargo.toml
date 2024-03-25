@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-verification-methods/"
 
 [features]
-default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "eip712", "aleo", "solana"]
+default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "eip712", "solana"]
 
 ## enable RSA keys
 rsa = []
@@ -30,6 +30,9 @@ tezos = ["ssi-tzkey", "ssi-caips/tezos"]
 
 eip712 = ["ssi-eip712", "sha3"]
 
+## Enable aleo keys.
+##
+## Not compatible with WASM targets.
 aleo = ["ssi-caips/aleo"]
 
 solana = []

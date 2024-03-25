@@ -374,7 +374,7 @@ impl fmt::Display for ProofPurpose {
     }
 }
 
-pub struct UnknownProofPurpose(IriBuf);
+pub struct UnknownProofPurpose(pub IriBuf);
 
 impl TryFrom<IriBuf> for ProofPurpose {
     type Error = UnknownProofPurpose;

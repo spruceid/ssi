@@ -12,6 +12,10 @@ documentation = "https://docs.rs/ssi-caips/"
 default = ["eip", "ripemd-160", "ssi-jwk/secp256k1"]
 eip = ["ssi-jwk/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160"]
+
+## Enable aleo accounts.
+## 
+## Not compatible with WASM targets.
 aleo = ["ssi-jwk/aleo", "bech32"]
 tezos = ["ssi-jwk/tezos"]
 

@@ -26,12 +26,15 @@ ssi-dids-core.workspace = true
 ssi-jwk.workspace = true
 iref.workspace = true
 static-iref.workspace = true
-chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 async-trait.workspace = true
 bs58 = { workspace = true, features = ["check"] }
 bech32 = "0.8"
+chrono = { workspace = true, features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { workspace = true, features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 ssi-core.workspace = true

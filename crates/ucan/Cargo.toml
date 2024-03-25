@@ -26,12 +26,10 @@ ssi-core.workspace = true
 ssi-verification-methods.workspace = true
 ssi-caips.workspace = true
 libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { workspace = true, features = ["serde"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+chrono = { workspace = true, features = ["serde", "wasmbind"] }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
