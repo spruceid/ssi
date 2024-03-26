@@ -2,8 +2,10 @@ use std::hash::Hash;
 
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::{
-    InterpretationMut, ReverseBlankIdInterpretation, ReverseIriInterpretation,
-    ReverseLiteralInterpretation, VocabularyMut,
+    interpretation::{
+        ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseLiteralInterpretation,
+    },
+    InterpretationMut, VocabularyMut,
 };
 use ssi_claims_core::Verifiable;
 use ssi_data_integrity::{AnyInputContext, AnySuite, DecodeError, Proofs};
@@ -37,7 +39,6 @@ where
     V: VocabularyMut,
     V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
     V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
-    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
     I: InterpretationMut<V>
         + ReverseIriInterpretation<Iri = V::Iri>
         + ReverseBlankIdInterpretation<BlankId = V::BlankId>
@@ -80,7 +81,6 @@ where
     V: VocabularyMut,
     V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
     V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
-    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
     I: InterpretationMut<V>
         + ReverseIriInterpretation<Iri = V::Iri>
         + ReverseBlankIdInterpretation<BlankId = V::BlankId>

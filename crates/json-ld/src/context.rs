@@ -7,7 +7,7 @@ use json_ld::future::{BoxFuture, FutureExt};
 pub use json_ld::{syntax, Options, RemoteDocumentReference};
 use json_ld::{syntax::TryFromJson, Loader, RemoteContext, RemoteContextReference, RemoteDocument};
 use json_syntax::Parse;
-use rdf_types::IriVocabularyMut;
+use rdf_types::vocabulary::IriVocabularyMut;
 use static_iref::iri;
 use thiserror::Error;
 

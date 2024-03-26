@@ -1,10 +1,10 @@
 use core::fmt;
 use linked_data::{
-    grdf,
     rdf_types::{
-        literal, Interpretation, IriVocabulary, IriVocabularyMut, LanguageTagVocabulary,
-        LiteralVocabulary, ReverseIriInterpretation, ReverseLiteralInterpretation, Vocabulary,
-        RDF_LANG_STRING,
+        dataset::PatternMatchingDataset,
+        interpretation::{ReverseIriInterpretation, ReverseLiteralInterpretation},
+        vocabulary::{IriVocabularyMut, LiteralVocabulary},
+        Interpretation, LiteralType, LiteralTypeRef, Vocabulary, RDF_LANG_STRING,
     },
     Context, FromLinkedDataError, LinkedDataDeserializeSubject, LinkedDataPredicateObjects,
     LinkedDataSubject, RdfLiteral,
@@ -60,7 +60,7 @@ where
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Any(
                 self.0.to_owned(),
-                literal::Type::Any(vocabulary.insert(MULTIBASE)),
+                LiteralType::Any(vocabulary.insert(MULTIBASE)),
             ),
         ))))
     }
@@ -148,7 +148,7 @@ where
         ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Owned(Term::Literal(
             RdfLiteral::Any(
                 self.0.to_owned(),
-                literal::Type::Any(vocabulary.insert(MULTIBASE)),
+                LiteralType::Any(vocabulary.insert(MULTIBASE)),
             ),
         ))))
     }
@@ -178,36 +178,28 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for MultibaseBuf 
 
 impl<V: Vocabulary, I> LinkedDataDeserializeSubject<I, V> for MultibaseBuf
 where
-    V: LiteralVocabulary<
-        Type = literal::Type<<V as IriVocabulary>::Iri, <V as LanguageTagVocabulary>::LanguageTag>,
-    >,
-    V::Value: AsRef<str>,
+    V: LiteralVocabulary,
     I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
 {
     fn deserialize_subject_in<D>(
         vocabulary: &V,
         interpretation: &I,
         _dataset: &D,
-        _graph: &D::Graph,
+        _graph: Option<&I::Resource>,
         resource: &<I as Interpretation>::Resource,
         context: Context<I>,
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
-        D: grdf::Dataset<
-            Subject = <I as Interpretation>::Resource,
-            Predicate = <I as Interpretation>::Resource,
-            Object = <I as Interpretation>::Resource,
-            GraphLabel = <I as Interpretation>::Resource,
-        >,
+        D: PatternMatchingDataset<Resource = I::Resource>,
     {
         let mut literal_ty = None;
         for l in interpretation.literals_of(resource) {
             let l = vocabulary.literal(l).unwrap();
-            match l.type_() {
-                literal::Type::Any(ty_iri) => {
+            match l.type_ {
+                LiteralTypeRef::Any(ty_iri) => {
                     let ty_iri = vocabulary.iri(ty_iri).unwrap();
                     if ty_iri == MULTIBASE {
-                        return match l.value().as_ref().parse() {
+                        return match l.value.parse() {
                             Ok(value) => Ok(value),
                             Err(_) => Err(FromLinkedDataError::InvalidLiteral(
                                 context.into_iris(vocabulary, interpretation),
@@ -217,7 +209,7 @@ where
 
                     literal_ty = Some(ty_iri)
                 }
-                literal::Type::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
+                LiteralTypeRef::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
             }
         }
 

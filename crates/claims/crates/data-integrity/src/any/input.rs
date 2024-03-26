@@ -2,7 +2,7 @@ use super::AnySuiteOptions;
 use rdf_types::{
     generator,
     interpretation::{self, WithGenerator},
-    IriVocabulary,
+    vocabulary::IriVocabulary,
 };
 use ssi_data_integrity_core::{
     suite::{HashError, TransformError},
@@ -124,8 +124,7 @@ where
     I: rdf_types::interpretation::InterpretationMut<V>
         + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+        + rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>,
     T: serde::Serialize + Expandable<E>,
     T::Expanded: linked_data::LinkedData<I, V>,
 {

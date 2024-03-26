@@ -1,5 +1,5 @@
 //! EIP-712 Signature 2021 implementation.
-use rdf_types::Quad;
+use rdf_types::{LexicalQuad, Quad};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{HashError, TransformError},
@@ -201,6 +201,10 @@ impl CryptographicSuite for Eip712Signature2021 {
         data: ssi_eip712::TypedData,
         _proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
+        eprintln!(
+            "typed data: {}",
+            serde_json::to_string_pretty(&data).unwrap()
+        );
         data.encode()
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
     }
@@ -238,8 +242,7 @@ where
     I: rdf_types::interpretation::InterpretationMut<V>
         + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+        + rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>,
     T: Expandable<E>,
     T::Expanded: linked_data::LinkedData<I, V>,
 {
@@ -271,13 +274,12 @@ where
     I: rdf_types::interpretation::InterpretationMut<V>
         + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
         + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
-    V::Literal: rdf_types::ExportedFromVocabulary<V, Output = rdf_types::Literal>,
+        + rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>,
     T: linked_data::LinkedData<I, V>,
 {
     let document_quads = context.quads_of(data)?;
     let document_quads: Vec<_> =
-        ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_quad_ref()))
+        ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_lexical_quad_ref()))
             .collect();
     let proof_quads = options.quads().collect();
     Ok(new_ldp_siging_request(document_quads, proof_quads))
@@ -303,8 +305,8 @@ where
 /// }
 /// ```
 pub fn new_ldp_siging_request(
-    mut document: Vec<Quad>,
-    mut proof_configuration: Vec<Quad>,
+    mut document: Vec<LexicalQuad>,
+    mut proof_configuration: Vec<LexicalQuad>,
 ) -> ssi_eip712::TypedData {
     use ssi_eip712::{TypeRef, Value};
 
@@ -333,7 +335,7 @@ pub fn new_ldp_siging_request(
         .collect(),
     };
 
-    fn encode_statement(Quad(s, p, o, g): Quad) -> Value {
+    fn encode_statement(Quad(s, p, o, g): LexicalQuad) -> Value {
         use rdf_types::RdfDisplay;
 
         let mut terms = vec![

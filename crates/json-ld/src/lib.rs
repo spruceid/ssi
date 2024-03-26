@@ -6,7 +6,8 @@ use std::{borrow::Cow, hash::Hash};
 pub use context::*;
 use json_ld::{Expand, Loader};
 use rdf_types::{
-    generator, interpretation::WithGenerator, Interpretation, IriVocabulary, VocabularyMut,
+    generator, interpretation::WithGenerator, vocabulary::IriVocabulary, Interpretation,
+    VocabularyMut,
 };
 use ssi_rdf::{AnyLdEnvironment, Expandable, LdEnvironment};
 

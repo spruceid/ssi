@@ -7,8 +7,10 @@ use std::fmt;
 pub struct MissingChosenIssuer;
 
 use rdf_types::BlankId;
+use rdf_types::BlankIdBuf;
 use rdf_types::Id;
-use rdf_types::{BlankIdBuf, Quad, QuadRef};
+use rdf_types::LexicalQuad;
+use rdf_types::LexicalQuadRef;
 
 use ssi_crypto::hashes::sha256::sha256;
 
@@ -53,7 +55,7 @@ pub trait BlankNodeComponentsMut {
     fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf>;
 }
 
-impl<'a> BlankNodeComponents<'a> for QuadRef<'a> {
+impl<'a> BlankNodeComponents<'a> for LexicalQuadRef<'a> {
     fn blank_node_components(&self) -> Vec<&'a BlankId> {
         self.blank_node_components_with_position()
             .into_iter()
@@ -76,7 +78,7 @@ impl<'a> BlankNodeComponents<'a> for QuadRef<'a> {
     }
 }
 
-impl BlankNodeComponentsMut for Quad {
+impl BlankNodeComponentsMut for LexicalQuad {
     fn blank_node_components_mut(&mut self) -> Vec<&mut BlankIdBuf> {
         let mut labels: Vec<&mut BlankIdBuf> = Vec::new();
         if let rdf_types::Subject::Blank(label) = &mut self.0 {
@@ -95,7 +97,7 @@ impl BlankNodeComponentsMut for Quad {
 /// <https://www.w3.org/TR/rdf-canon/#normalization-state>
 #[derive(Debug, Clone)]
 pub struct NormalizationState<'a> {
-    pub blank_node_to_quads: Map<&'a BlankId, Vec<QuadRef<'a>>>,
+    pub blank_node_to_quads: Map<&'a BlankId, Vec<LexicalQuadRef<'a>>>,
     pub hash_to_blank_nodes: Map<String, Vec<&'a BlankId>>,
     pub canonical_issuer: IdentifierIssuer,
 }
@@ -156,7 +158,7 @@ pub fn hash_first_degree_quads(
         // 3
         for quad in quads {
             // 3.1
-            let mut quad: Quad = quad.into_owned();
+            let mut quad: LexicalQuad = quad.into_owned();
             // 3.1.1
             for label in quad.blank_node_components_mut() {
                 // 3.1.1.1
@@ -179,7 +181,7 @@ pub fn hash_first_degree_quads(
 }
 
 /// <https://www.w3.org/TR/rdf-canon/>
-pub fn normalize<'a, Q: IntoIterator<Item = QuadRef<'a>>>(
+pub fn normalize<'a, Q: IntoIterator<Item = LexicalQuadRef<'a>>>(
     quads: Q,
 ) -> NormalizedQuads<'a, Q::IntoIter>
 where
@@ -309,14 +311,14 @@ pub struct NormalizedQuads<'a, Q> {
     normalization_state: NormalizationState<'a>,
 }
 
-impl<'a, Q: Iterator<Item = QuadRef<'a>>> NormalizedQuads<'a, Q> {
+impl<'a, Q: Iterator<Item = LexicalQuadRef<'a>>> NormalizedQuads<'a, Q> {
     pub fn into_nquads(self) -> String {
         IntoNQuads::into_nquads(self)
     }
 }
 
-impl<'a, Q: Iterator<Item = QuadRef<'a>>> Iterator for NormalizedQuads<'a, Q> {
-    type Item = Quad;
+impl<'a, Q: Iterator<Item = LexicalQuadRef<'a>>> Iterator for NormalizedQuads<'a, Q> {
+    type Item = LexicalQuad;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.quads.next().map(|quad| {
@@ -492,7 +494,7 @@ pub fn hash_n_degree_quads(
 pub fn hash_related_blank_node(
     normalization_state: &mut NormalizationState,
     related: &BlankId,
-    quad: QuadRef,
+    quad: LexicalQuadRef,
     issuer: &mut IdentifierIssuer,
     position: BlankIdPosition,
 ) -> String {
@@ -558,15 +560,19 @@ mod tests {
             let in_file_name = num.to_string() + "-in.nq";
             path.set_file_name(PathBuf::from(in_file_name));
             let in_str = fs::read_to_string(&path).unwrap();
-            let dataset = nquads_syntax::Document::parse_str(&in_str, |span| span).unwrap();
+            let dataset = nquads_syntax::Document::parse_str(&in_str).unwrap();
             let stripped_dataset: Vec<_> = dataset
                 .into_value()
                 .into_iter()
                 .map(Meta::into_value)
-                .map(Quad::strip_all_but_predicate)
+                .map(nquads_syntax::strip_quad)
                 .collect();
-            let normalized =
-                normalize(stripped_dataset.iter().map(Quad::as_quad_ref)).into_nquads();
+            let normalized = normalize(
+                stripped_dataset
+                    .iter()
+                    .map(LexicalQuad::as_lexical_quad_ref),
+            )
+            .into_nquads();
             if &normalized == &expected_str {
                 passed += 1;
             } else {

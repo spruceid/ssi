@@ -22,7 +22,6 @@ linked-data.workspace = true
 futures = "0.3"
 lazy_static = "1.4"
 combination = "0.1"
-grdf.workspace = true
 ssi-contexts.workspace = true
 ssi-crypto.workspace = true
 ssi-rdf.workspace = true

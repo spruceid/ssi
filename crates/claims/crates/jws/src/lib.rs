@@ -11,7 +11,9 @@ use linked_data::{
     rdf_types, LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
     LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef,
 };
-use rdf_types::{Interpretation, Vocabulary, RDF_LANG_STRING};
+use rdf_types::dataset::PatternMatchingDataset;
+use rdf_types::interpretation::{ReverseIriInterpretation, ReverseLiteralInterpretation};
+use rdf_types::{Interpretation, LiteralTypeRef, Vocabulary, RDF_LANG_STRING};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
 use ssi_verification_methods_core::{
@@ -521,44 +523,30 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for CompactJWSStr
 
 impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for CompactJWSString
 where
-    V: linked_data::rdf_types::Vocabulary<
-        Type = linked_data::rdf_types::literal::Type<
-            <V as linked_data::rdf_types::IriVocabulary>::Iri,
-            <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag,
-        >,
-    >,
-    V::Value: AsRef<str>,
-    I: linked_data::rdf_types::ReverseIriInterpretation<Iri = V::Iri>
-        + linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+    V: Vocabulary,
+    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
 {
     fn deserialize_subject_in<D>(
         vocabulary: &V,
         interpretation: &I,
         _dataset: &D,
-        _graph: &D::Graph,
+        _graph: Option<&I::Resource>,
         resource: &I::Resource,
         context: linked_data::Context<I>,
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
-        D: linked_data::grdf::Dataset<
-            Subject = I::Resource,
-            Predicate = I::Resource,
-            Object = I::Resource,
-            GraphLabel = I::Resource,
-        >,
+        D: PatternMatchingDataset<Resource = I::Resource>,
     {
-        use linked_data::rdf_types::literal;
-
         let mut literal_ty = None;
         for l in interpretation.literals_of(resource) {
             let literal = vocabulary.literal(l).unwrap();
 
-            match literal.type_() {
-                literal::Type::Any(ty) => {
+            match literal.type_ {
+                LiteralTypeRef::Any(ty) => {
                     let ty_iri = vocabulary.iri(ty).unwrap();
 
                     if ty_iri == linked_data::xsd_types::XSD_STRING {
-                        return literal.value().as_ref().parse().map_err(|_| {
+                        return literal.value.parse().map_err(|_| {
                             linked_data::FromLinkedDataError::InvalidLiteral(
                                 context.into_iris(vocabulary, interpretation),
                             )
@@ -567,7 +555,7 @@ where
 
                     literal_ty = Some(ty_iri)
                 }
-                literal::Type::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
+                LiteralTypeRef::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
             }
         }
 
@@ -597,32 +585,20 @@ impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for Comp
 impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V>
     for CompactJWSString
 where
-    V: linked_data::rdf_types::Vocabulary<
-        Type = linked_data::rdf_types::literal::Type<
-            <V as linked_data::rdf_types::IriVocabulary>::Iri,
-            <V as linked_data::rdf_types::LanguageTagVocabulary>::LanguageTag,
-        >,
-    >,
-    V::Value: AsRef<str>,
-    I: linked_data::rdf_types::ReverseIriInterpretation<Iri = V::Iri>
-        + linked_data::rdf_types::ReverseLiteralInterpretation<Literal = V::Literal>,
+    V: Vocabulary,
+    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
 {
     fn deserialize_objects_in<'a, D>(
         vocabulary: &V,
         interpretation: &I,
         dataset: &D,
-        graph: &D::Graph,
+        graph: Option<&I::Resource>,
         objects: impl IntoIterator<Item = &'a I::Resource>,
         context: linked_data::Context<I>,
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         I::Resource: 'a,
-        D: linked_data::grdf::Dataset<
-            Subject = I::Resource,
-            Predicate = I::Resource,
-            Object = I::Resource,
-            GraphLabel = I::Resource,
-        >,
+        D: PatternMatchingDataset<Resource = I::Resource>,
     {
         let mut objects = objects.into_iter();
         match objects.next() {

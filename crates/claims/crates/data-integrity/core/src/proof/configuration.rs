@@ -1,11 +1,11 @@
 use educe::Educe;
-use grdf::{HashDataset, HashGraph};
 use iref::{Iri, IriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::{
-    ExportedFromVocabulary, Id, InterpretationMut, IriVocabulary, Literal, Quad,
-    ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseLiteralInterpretation, Term,
-    Triple, VocabularyMut,
+    dataset::{BTreeGraph, IndexedBTreeDataset, PatternMatchingDataset},
+    interpretation::ReverseTermInterpretation,
+    vocabulary::IriVocabulary,
+    Id, InterpretationMut, LexicalQuad, Quad, Term, Triple, VocabularyMut,
 };
 use serde::{Deserialize, Serialize};
 use ssi_core::Referencable;
@@ -405,11 +405,8 @@ where
     V: VocabularyMut,
     V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
     V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
-    V::Literal: ExportedFromVocabulary<V, Output = Literal>,
     I: InterpretationMut<V>
-        + ReverseIriInterpretation<Iri = V::Iri>
-        + ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + ReverseLiteralInterpretation<Literal = V::Literal>,
+        + ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
     I::Resource: Clone,
     L: json_ld::Loader<V::Iri>,
     //
@@ -486,17 +483,18 @@ where
                     &node,
                 )?;
 
-                let mut dataset: HashDataset<Id, IriBuf, Term, Id> = quads.into_iter().collect();
+                let subject = Term::Id(subject);
 
-                let proof_prop = ssi_security::PROOF.to_owned();
-                match dataset
-                    .default_graph()
-                    .objects(&subject, &proof_prop)
-                    .next()
-                {
+                let mut dataset: IndexedBTreeDataset = quads
+                    .into_iter()
+                    .map(|q| Quad(Term::Id(q.0), Term::iri(q.1), q.2, q.3.map(Term::Id)))
+                    .collect();
+
+                let proof_prop = Term::iri(ssi_security::PROOF.to_owned());
+                match dataset.quad_objects(None, &subject, &proof_prop).next() {
                     Some(Term::Id(proof_id)) => {
-                        let proof_id = proof_id.clone();
-                        match dataset.remove_graph(&proof_id) {
+                        let proof_id = Term::Id(proof_id.clone());
+                        match dataset.remove_graph(Some(&proof_id)) {
                             Some(graph) => Ok(LinkedDataConfiguration {
                                 type_iri: proof_type,
                                 graph,
@@ -548,7 +546,7 @@ pub enum ConfigurationExpansionError<E> {
 /// Linked-Data proof configuration.
 pub struct LinkedDataConfiguration {
     pub type_iri: IriBuf,
-    pub graph: HashGraph<Id, IriBuf, Term>,
+    pub graph: BTreeGraph,
 }
 
 impl LinkedDataConfiguration {
@@ -576,12 +574,15 @@ pub struct ExpandedConfiguration<'a, M: Referencable, O: Referencable = ()> {
 
 impl<'a, M: Referencable, O: Referencable> ExpandedConfiguration<'a, M, O> {
     /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads(&self) -> impl '_ + Iterator<Item = Quad> {
-        let quads = self
-            .ld
-            .graph
-            .triples()
-            .map(|Triple(s, p, o)| Quad(s.as_id_ref(), p.as_iri(), o.as_term_ref(), None));
+    pub fn quads(&self) -> impl '_ + Iterator<Item = LexicalQuad> {
+        let quads = self.ld.graph.iter().map(|Triple(s, p, o)| {
+            Quad(
+                s.as_lexical_term_ref().into_id().unwrap(),
+                p.as_lexical_term_ref().into_iri().unwrap(),
+                o.as_lexical_term_ref(),
+                None,
+            )
+        });
 
         urdna2015::normalize(quads)
     }
@@ -697,12 +698,15 @@ impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
 
 impl<'a, M: Referencable, O: Referencable> ExpandedConfigurationRef<'a, M, O> {
     /// Returns the quads of the proof configuration, in canonical form.
-    pub fn quads(&self) -> impl '_ + Iterator<Item = Quad> {
-        let quads = self
-            .ld
-            .graph
-            .triples()
-            .map(|Triple(s, p, o)| Quad(s.as_id_ref(), p.as_iri(), o.as_term_ref(), None));
+    pub fn quads(&self) -> impl '_ + Iterator<Item = LexicalQuad> {
+        let quads = self.ld.graph.iter().map(|Triple(s, p, o)| {
+            Quad(
+                s.as_lexical_term_ref().into_id().unwrap(),
+                p.as_lexical_term_ref().into_iri().unwrap(),
+                o.as_lexical_term_ref(),
+                None,
+            )
+        });
 
         urdna2015::normalize(quads)
     }

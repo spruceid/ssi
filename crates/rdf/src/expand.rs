@@ -1,8 +1,8 @@
 use linked_data::LinkedData;
 use rdf_types::{
-    BlankIdVocabulary, ExportedFromVocabulary, Interpretation, InterpretationMut, IriVocabulary,
-    LiteralVocabulary, ReverseBlankIdInterpretation, ReverseIriInterpretation,
-    ReverseLiteralInterpretation, Vocabulary,
+    interpretation::ReverseTermInterpretation,
+    vocabulary::{BlankIdVocabulary, IriVocabulary, LiteralVocabulary},
+    Interpretation, InterpretationMut, Vocabulary,
 };
 
 /// LD-Expandable value.
@@ -30,15 +30,15 @@ pub trait AnyLdEnvironment {
     fn quads_of<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
         &mut self,
         input: &T,
-    ) -> Result<Vec<rdf_types::Quad>, linked_data::IntoQuadsError>
+    ) -> Result<Vec<rdf_types::LexicalQuad>, linked_data::IntoQuadsError>
     where
         Self::Vocabulary: Vocabulary,
         Self::Interpretation: InterpretationMut<Self::Vocabulary>
-            + ReverseIriInterpretation<Iri = <Self::Vocabulary as IriVocabulary>::Iri>
-            + ReverseBlankIdInterpretation<BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId>
-            + ReverseLiteralInterpretation<Literal = <Self::Vocabulary as LiteralVocabulary>::Literal>,
-        <Self::Vocabulary as LiteralVocabulary>::Literal:
-            ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
+            + ReverseTermInterpretation<
+                Iri = <Self::Vocabulary as IriVocabulary>::Iri,
+                BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId,
+                Literal = <Self::Vocabulary as LiteralVocabulary>::Literal,
+            >,
     {
         let this = self.as_ld_environment_mut();
         linked_data::to_lexical_quads_with(this.vocabulary, this.interpretation, input)
@@ -52,14 +52,17 @@ pub trait AnyLdEnvironment {
     where
         Self::Vocabulary: Vocabulary,
         Self::Interpretation: InterpretationMut<Self::Vocabulary>
-            + ReverseIriInterpretation<Iri = <Self::Vocabulary as IriVocabulary>::Iri>
-            + ReverseBlankIdInterpretation<BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId>
-            + ReverseLiteralInterpretation<Literal = <Self::Vocabulary as LiteralVocabulary>::Literal>,
-        <Self::Vocabulary as LiteralVocabulary>::Literal:
-            ExportedFromVocabulary<Self::Vocabulary, Output = rdf_types::Literal>,
+            + ReverseTermInterpretation<
+                Iri = <Self::Vocabulary as IriVocabulary>::Iri,
+                BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId,
+                Literal = <Self::Vocabulary as LiteralVocabulary>::Literal,
+            >,
     {
         let quads = self.quads_of(input)?;
-        Ok(crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_quad_ref())).into_nquads())
+        Ok(
+            crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_lexical_quad_ref()))
+                .into_nquads(),
+        )
     }
 }
 

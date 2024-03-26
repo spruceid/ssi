@@ -1,6 +1,9 @@
 use iref::Iri;
 use linked_data::{LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject};
-use rdf_types::{interpretation::ReverseIriInterpretation, Interpretation, Vocabulary};
+use rdf_types::{
+    dataset::PatternMatchingDataset, interpretation::ReverseIriInterpretation, Interpretation,
+    Vocabulary,
+};
 use ssi_claims_core::ProofValidity;
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
@@ -25,18 +28,13 @@ where
         vocabulary: &V,
         interpretation: &I,
         dataset: &D,
-        graph: &D::Graph,
+        graph: Option<&I::Resource>,
         objects: impl IntoIterator<Item = &'a I::Resource>,
         context: linked_data::Context<I>,
     ) -> Result<Self, linked_data::FromLinkedDataError>
     where
         I::Resource: 'a,
-        D: linked_data::grdf::Dataset<
-            Subject = I::Resource,
-            Predicate = I::Resource,
-            Object = I::Resource,
-            GraphLabel = I::Resource,
-        >,
+        D: PatternMatchingDataset<Resource = I::Resource>,
     {
         let mut objects = objects.into_iter();
         match objects.next() {
@@ -121,17 +119,12 @@ macro_rules! crypto_suites {
                 vocabulary: &V,
                 interpretation: &I,
                 _dataset: &D,
-                _graph: &D::Graph,
+                _graph: Option<&I::Resource>,
                 resource: &I::Resource,
                 context: linked_data::Context<I>
             ) -> Result<Self, linked_data::FromLinkedDataError>
             where
-                D: linked_data::grdf::Dataset<
-                    Subject = I::Resource,
-                    Predicate = I::Resource,
-                    Object = I::Resource,
-                    GraphLabel = I::Resource,
-                >
+                D: PatternMatchingDataset<Resource = I::Resource>
             {
                 let mut known_iri = None;
 
