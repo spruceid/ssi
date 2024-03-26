@@ -57,7 +57,7 @@ p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p384 = { workspace = true, optional = true, features = ["ecdsa"] }
 ring = { version = "0.16", optional = true }
 rsa = { workspace = true, optional = true }
-rand = { version = "0.8", optional = true }
+rand = { workspace = true, optional = true }
 ed25519-dalek = { workspace = true, optional = true, features = ["rand_core"] }
 lazy_static = "1.4"
 bs58 = { workspace = true, features = ["check"], optional = true }

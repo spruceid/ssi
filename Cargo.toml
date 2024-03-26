@@ -45,6 +45,7 @@ ssi-ssh = { path = "./crates/ssh", version = "0.2", default-features = false }
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-features = false }
 ssi-jws = { path = "./crates/claims/crates/jws", version = "0.2", default-features = false }
 ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.2", default-features = false }
+ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.2", default-features = false }
 ssi-vc = { path = "./crates/claims/crates/vc", version = "0.3", default-features = false }
 ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1", default-features = false }
 ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1", default-features = false }
@@ -98,6 +99,7 @@ educe = "0.4.22"
 pin-project = "1.1.3"
 futures = "0.3.28"
 linked-data = "0.1.2"
+rand = "0.8"
 rand_chacha = "0.3.1"
 contextual = "0.1.6"
 lazy_static = "1.4.0"

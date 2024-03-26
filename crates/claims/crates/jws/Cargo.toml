@@ -51,7 +51,7 @@ ed25519-dalek = { workspace = true, optional = true }
 sha2 = { workspace = true, optional = true }
 sha3 = { workspace = true, optional = true }
 rsa = { workspace = true, optional = true }
-rand = { version = "0.8", optional = true }
+rand = { workspace = true, optional = true }
 ring = { version = "0.16", optional = true }
 iref.workspace = true
 ssi-crypto.workspace = true

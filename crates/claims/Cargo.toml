@@ -59,6 +59,7 @@ ssi-verification-methods.workspace = true
 ssi-claims-core.workspace = true
 ssi-jws.workspace = true
 ssi-jwt.workspace = true
+ssi-sd-jwt.workspace = true
 ssi-vc.workspace = true
 ssi-data-integrity.workspace = true
 ssi-dids-core.workspace = true

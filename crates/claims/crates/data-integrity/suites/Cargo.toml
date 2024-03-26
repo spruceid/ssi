@@ -137,7 +137,6 @@ serde_jcs = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
-# treeldr-rust-macros.workspace = true
 static-iref.workspace = true
 rand = "0.7"
 hashbrown = "0.13.0"

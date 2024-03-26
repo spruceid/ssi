@@ -107,14 +107,3 @@ serde.workspace = true
 serde_json.workspace = true
 json-syntax.workspace = true
 thiserror.workspace = true
-
-# [dev-dependencies]
-# async-std = { version = "1.9", features = ["attributes"] }
-# # treeldr-rust-macros.workspace = true
-# static-iref.workspace = true
-# rand = "0.7"
-# hashbrown = "0.13.0"
-# iref = { workspace = true, features = ["hashbrown"] }
-# xsd-types.workspace = true
-# chrono.workspace = true
-# serde = { workspace = true, features = ["derive"] }

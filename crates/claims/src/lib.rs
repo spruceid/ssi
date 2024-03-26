@@ -16,6 +16,11 @@ pub use ssi_jwt as jwt;
 
 pub use jwt::JWTClaims;
 
+/// Selective Disclosure for JWTs (SD-JWT).
+///
+/// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-selective-disclosure-jwt-08.html>
+pub use ssi_sd_jwt as sd_jwt;
+
 /// W3C Verifiable Credentials (VC).
 ///
 /// See: <https://www.w3.org/TR/vc-data-model>
