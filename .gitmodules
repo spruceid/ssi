@@ -1,15 +1,3 @@
-[submodule "json-ld-api"]
-	path = json-ld-api
-	url = https://github.com/w3c/json-ld-api
-[submodule "json-ld-normalization"]
-	path = json-ld-normalization
+[submodule "crates/rdf/canonicalization"]
+	path = crates/rdf/canonicalization
 	url = https://github.com/w3c-ccg/rdf-dataset-canonicalization
-[submodule "vc-test-suite"]
-	path = vc-test-suite
-	url = https://github.com/w3c/vc-test-suite
-[submodule "tests/vc-di-eddsa"]
-	path = tests/vc-di-eddsa
-	url = https://github.com/w3c/vc-di-eddsa.git
-[submodule "tests/vc-di-ecdsa"]
-	path = tests/vc-di-ecdsa
-	url = https://github.com/w3c/vc-di-ecdsa.git

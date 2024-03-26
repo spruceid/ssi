@@ -1,0 +1,24 @@
+[package]
+name = "ssi-sd-jwt"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of SD-JWT for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-sd-jwt/"
+
+[dependencies]
+base64.workspace = true
+rand.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+sha2.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-jwt.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+hex-literal = "0.4.1"
+ssi-jws = { workspace = true, features = ["secp256r1"] }

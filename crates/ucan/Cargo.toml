@@ -1,0 +1,38 @@
+[package]
+name = "ssi-ucan"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of UCANs for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-ucan/"
+
+[dependencies]
+thiserror.workspace = true
+iref.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_with = { version = "1.14", features = ["base64"]}
+base64.workspace = true
+bs58.workspace = true
+hex.workspace = true
+multibase.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-jwt.workspace = true
+ssi-dids-core.workspace = true
+ssi-core.workspace = true
+ssi-verification-methods.workspace = true
+ssi-caips.workspace = true
+libipld = { version = "0.14", default-features = false, features = ["dag-cbor", "dag-json", "derive", "serde-codec"]}
+chrono = { workspace = true, features = ["serde"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+chrono = { workspace = true, features = ["serde", "wasmbind"] }
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
+did-method-key.workspace = true
+ssi-verification-methods = { workspace = true, features = ["ed25519"] }
+ssi-jws = { workspace = true, features = ["ed25519"] }

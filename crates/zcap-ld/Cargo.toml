@@ -1,0 +1,32 @@
+[package]
+name = "ssi-zcap-ld"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of ZCAP-LD for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-zcap-ld/"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+json-syntax.workspace = true
+async-trait = "0.1"
+thiserror.workspace = true
+iref.workspace = true
+static-iref.workspace = true
+rdf-types.workspace = true
+ssi-jwk = { workspace = true, features = ["ed25519"] }
+ssi-core.workspace = true
+ssi-dids-core.workspace = true
+json-ld.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
+ssi-claims.workspace = true
+ssi-verification-methods.workspace = true
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
+ssi-data-integrity = { workspace = true, features = ["w3c", "ed25519"] }
+ssi-dids-core = { workspace = true, features = ["example"] }

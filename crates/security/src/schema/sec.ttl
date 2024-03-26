@@ -1,0 +1,13 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix sec: <https://w3id.org/security#> .
+@prefix tldr: <https://treeldr.org/> .
+
+sec:multibase a rdfs:Datatype ;
+	owl:onDatatype xsd:string ;
+	owl:withRestrictions () ;
+	a tldr:Layout ;
+	tldr:name "Multibase" ;
+	tldr:derivedFrom tldr:String ;
+	tldr:withRestrictions () .

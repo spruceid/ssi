@@ -1,0 +1,34 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    {
+      "Ed25519VerificationKey2018": "https://w3id.org/security#Ed25519VerificationKey2018",
+      "publicKeyBase58": "https://w3id.org/security#publicKeyBase58",
+      "publicKeyJwk": {
+        "@id": "https://w3id.org/security#publicKeyJwk",
+        "@type": "@json"
+      }
+    }
+  ],
+  "id": "did:example:bar",
+  "verificationMethod": [
+    {
+      "id": "did:example:bar#key1",
+      "type": "Ed25519VerificationKey2018",
+      "controller": "did:example:bar",
+      "publicKeyBase58": "AVifRER7nMC86FoZtW9YZQQn5i2kuwJzPCrDHydZzVuf"
+    }
+  ],
+  "assertionMethod": [
+    "did:example:bar#key1"
+  ],
+  "authentication": [
+    "did:example:bar#key1"
+  ],
+  "capabilityDelegation": [
+    "did:example:bar#key1"
+  ],
+  "capabilityInvocation": [
+    "did:example:bar#key1"
+  ]
+}

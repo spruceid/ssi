@@ -1,0 +1,21 @@
+[package]
+name = "ssi-did-test"
+version = "0.1.0"
+authors = ["Spruce Systems, Inc."]
+edition = "2021"
+license = "Apache-2.0"
+description = "did-test-suite test vector generator"
+publish = false
+
+[dependencies]
+ssi-dids-core.workspace = true
+did-method-key = { workspace = true, features = ["secp256k1", "secp256r1"] }
+did-tz.workspace = true
+did-pkh.workspace = true
+did-web.workspace = true
+# did-webkey.workspace = true
+# did-onion.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+base64.workspace = true
+async-std = { version = "1.9", features = ["attributes"] }

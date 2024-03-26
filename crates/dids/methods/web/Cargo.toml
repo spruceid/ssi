@@ -1,0 +1,38 @@
+[package]
+name = "did-web"
+version = "0.3.0"
+authors = ["Spruce Systems, Inc."]
+edition = "2021"
+license = "Apache-2.0"
+keywords = ["ssi", "did"]
+categories = ["web-programming::http-client"]
+description = "did:web DID method, using the ssi crate"
+repository = "https://github.com/spruceid/ssi/"
+homepage = "https://github.com/spruceid/ssi/tree/main/did-web/"
+documentation = "https://docs.rs/did-web/"
+
+[dependencies]
+ssi-dids-core.workspace = true
+thiserror.workspace = true
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
+http = "0.2"
+
+[target.'cfg(target_os = "android")'.dependencies.reqwest]
+version = "0.11"
+features = ["native-tls-vendored"]
+
+[dev-dependencies]
+ssi-verification-methods-core.workspace = true
+ssi-claims = { workspace = true, features = ["w3c", "ed25519"] }
+# ssi-data-integrity.workspace = true
+ssi-jwk.workspace = true
+linked-data.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+json-syntax.workspace = true
+iref.workspace = true
+static-iref.workspace = true
+xsd-types.workspace = true
+tokio = { version = "1.0", features = ["macros"] }
+futures = "0.3"
+hyper = { version = "0.14", features = ["server", "client", "http1", "stream"] }

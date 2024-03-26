@@ -1,0 +1,19 @@
+[package]
+name = "ssi-security"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Security Vocabulary implementation for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-vc/"
+
+[dependencies]
+iref.workspace = true
+static-iref.workspace = true
+# treeldr-rust-macros.workspace = true
+# treeldr-rust-prelude.workspace = true
+serde.workspace = true
+linked-data.workspace = true
+xsd-types.workspace = true
+multibase.workspace = true

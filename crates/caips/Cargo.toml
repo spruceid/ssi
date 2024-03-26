@@ -1,0 +1,37 @@
+[package]
+name = "ssi-caips"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of CAIPS for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-caips/"
+
+[features]
+default = ["eip", "ripemd-160", "ssi-jwk/secp256k1"]
+eip = ["ssi-jwk/eip"]
+ripemd-160 = ["ssi-jwk/ripemd-160"]
+
+## Enable aleo accounts.
+## 
+## Not compatible with WASM targets.
+aleo = ["ssi-jwk/aleo", "bech32"]
+tezos = ["ssi-jwk/tezos"]
+
+[dependencies]
+thiserror = "1"
+ssi-jwk.workspace = true
+bs58 = { workspace = true, features = ["check"] }
+bech32 = { version = "0.8", optional = true }
+serde.workspace = true
+linked-data.workspace = true
+xsd-types.workspace = true
+
+[dev-dependencies]
+serde_json = "1.0"
+async-std = { version = "1.9", features = ["attributes"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

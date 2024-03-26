@@ -1,0 +1,24 @@
+[package]
+name = "ssi-eip712"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Ethereum's typed structured data hashing and signing (EIP-712)"
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-eip712/"
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_jcs = "0.1"
+thiserror.workspace = true
+keccak-hash = "0.7"
+hex.workspace = true
+rdf-types.workspace = true
+indexmap = { version = "2.0.0", features = ["serde"] }
+json-syntax = { workspace = true, features = ["serde"] }
+linked-data.workspace = true
+
+[dev-dependencies]
+lazy_static = "1.4"
