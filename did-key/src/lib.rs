@@ -24,7 +24,7 @@ const DID_KEY_BLS12381_G2_PREFIX: [u8; 2] = [0xeb, 0x01];
 const DID_KEY_P256_PREFIX: [u8; 2] = [0x80, 0x24];
 const DID_KEY_P384_PREFIX: [u8; 2] = [0x81, 0x24];
 const DID_KEY_RSA_PREFIX: [u8; 2] = [0x85, 0x24];
-const DID_KEY_JWK_JCS_PUB_PREFIX: [u8; 3] = [0xd1, 0xd6, 0x03]; // see: https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
+const DID_KEY_JWK_JCS_PUB_PREFIX: [u8; 3] = [0xd1, 0xd6, 0x03]; // see: https://hub.ebsi.eu/vc-framework/did/natural-person
 
 #[derive(Error, Debug)]
 pub enum DIDKeyError {
@@ -220,7 +220,7 @@ impl DIDResolver for DIDKey {
             && data[2] == DID_KEY_JWK_JCS_PUB_PREFIX[2]
         {
             // For EBSI compliance - multicodec jwk_jcs-pub
-            // see: https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
+            // see: https://hub.ebsi.eu/vc-framework/did/natural-person
             vm_type = "JsonWebKey2020".to_string();
             vm_type_iri = "https://w3id.org/security#JsonWebKey2020".to_string();
             if let Ok(jwk) = serde_json::from_slice(&data[3..]) {
@@ -471,7 +471,7 @@ mod tests {
 
     #[async_std::test]
     async fn from_did_key_jwk_jcs_pub() {
-        // https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
+        // https://hub.ebsi.eu/vc-framework/did/natural-person
 
         let did = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kbs995rh8qKeDHQgTwf22MTWWYFWQKZPYDz7LLTA4orkBZBHxzasmpiz7wa9BkwwMcjtxm4RUqQNJptsy6NDuXWFNSyc86uaCmiyP1k1uL2xHChFhpU1MQpUmYhSrwrQr8u2";
         let (res_meta, _doc, _doc_meta) = DIDKey

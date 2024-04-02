@@ -970,7 +970,7 @@ fn p384_parse_private(data: &[u8]) -> Result<JWK, Error> {
     Ok(jwk)
 }
 
-/// handle the JWK JCS multicodec used by EBSI.  See https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person.
+/// handle the JWK JCS multicodec used by EBSI.  See https://hub.ebsi.eu/vc-framework/did/natural-person.
 fn jwk_jcs_parse(data: &[u8]) -> Result<JWK, Error> {
     let json_result: Result<JWK, serde_json::Error> = serde_json::from_slice(data);
     match json_result {
