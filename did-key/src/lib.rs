@@ -472,6 +472,7 @@ mod tests {
     #[async_std::test]
     async fn from_did_key_jwk_jcs_pub() {
         // https://hub.ebsi.eu/vc-framework/did/did-methods/natural-person
+
         let did = "did:key:z2dmzD81cgPx8Vki7JbuuMmFYrWPgYoytykUZ3eyqht1j9Kbs995rh8qKeDHQgTwf22MTWWYFWQKZPYDz7LLTA4orkBZBHxzasmpiz7wa9BkwwMcjtxm4RUqQNJptsy6NDuXWFNSyc86uaCmiyP1k1uL2xHChFhpU1MQpUmYhSrwrQr8u2";
         let (res_meta, _doc, _doc_meta) = DIDKey
             .resolve(did, &ResolutionInputMetadata::default())
