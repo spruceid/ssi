@@ -20,11 +20,15 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: true
+
+    - name: Retrieve MSRV
+      id: msrv
+      run: echo "MSRV=$(cat Cargo.toml | grep -Po '(?<=rust-version = ")([\d\.]+)')" >> $GITHUB_OUTPUT
     
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
-        toolchain: "1.75.0"
+        toolchain: ${{ steps.msrv.outputs.MSRV }}
         components: rustfmt, clippy
 
     - uses: Swatinem/rust-cache@v2

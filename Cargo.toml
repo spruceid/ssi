@@ -19,8 +19,7 @@ members = [
   "crates/claims/core",
   "crates/claims/crates/*",
   "crates/claims/crates/data-integrity/core",
-  "crates/claims/crates/data-integrity/suites",
-  # "ssi-sd-jwt",
+  "crates/claims/crates/data-integrity/suites"
 ]
 
 [workspace.dependencies]
