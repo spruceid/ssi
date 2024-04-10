@@ -1,7 +1,5 @@
 use serde::Serialize;
-use ssi_jwt::JWTClaims;
-
-use crate::VCPublicClaims;
+use ssi_jwt::{JWTClaims, RegisteredClaim};
 
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcEncodeError {
@@ -32,11 +30,11 @@ pub enum JwtVcEncodeError {
 
 pub fn encode_jwt_vc_claims<T: Serialize>(
     credential: &T,
-) -> Result<JWTClaims<VCPublicClaims>, JwtVcEncodeError> {
+) -> Result<JWTClaims, JwtVcEncodeError> {
     let mut credential = json_syntax::to_value(credential)?
         .into_object()
         .ok_or(JwtVcEncodeError::ExpectedJsonObject)?;
-    let mut claims: JWTClaims<VCPublicClaims> = Default::default();
+    let mut claims: JWTClaims = Default::default();
 
     if let Some(date_value) =
         take_object_property(&mut credential, "credentialSubject", "expirationDate")
@@ -87,7 +85,9 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
         }
     }
 
-    claims.public.verifiable_credential = Some(json_syntax::Value::Object(credential));
+    claims.registered_claims.insert(RegisteredClaim::VerifiableCredential(
+        json_syntax::Value::Object(credential)
+    ));
 
     Ok(claims)
 }
@@ -118,11 +118,11 @@ pub enum JwtVpEncodeError {
 
 pub fn encode_jwt_vp_claims<T: Serialize>(
     presentation: &T,
-) -> Result<JWTClaims<VCPublicClaims>, JwtVpEncodeError> {
+) -> Result<JWTClaims, JwtVpEncodeError> {
     let mut vp = json_syntax::to_value(presentation)?
         .into_object()
         .ok_or(JwtVpEncodeError::ExpectedJsonObject)?;
-    let mut claims: JWTClaims<VCPublicClaims> = Default::default();
+    let mut claims: JWTClaims = Default::default();
 
     if let Some(holder_entry) = vp.remove("holder").next() {
         match holder_entry.value.into_string() {
@@ -150,7 +150,9 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
         }
     }
 
-    claims.public.verifiable_presentation = Some(json_syntax::Value::Object(vp));
+    claims.registered_claims.insert(RegisteredClaim::VerifiablePresentation(
+        json_syntax::Value::Object(vp)
+    ));
 
     Ok(claims)
 }

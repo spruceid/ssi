@@ -1,15 +1,18 @@
 use std::collections::HashMap;
 
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use ssi_core::one_or_many::OneOrMany;
 use ssi_crypto::MessageSigner;
 use ssi_jwk::{Algorithm, JWK};
 use ssi_jws::{CompactJWSString, Error, Header};
 
+mod claims;
 mod datatype;
+mod de;
 
+pub use claims::*;
 pub use datatype::*;
 use ssi_verification_methods::{
     MaybeJwkVerificationMethod, ReferenceOrOwnedRef, SignatureError, Signer,
@@ -17,9 +20,9 @@ use ssi_verification_methods::{
 };
 
 /// JSON Web Token claims.
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[derive(Debug, Serialize, Clone, Default)]
 #[non_exhaustive]
-pub struct JWTClaims<PublicClaims = NoncePublicClaim, PrivateClaims = AnyClaims> {
+pub struct JWTClaims<PrivateClaims = AnyClaims> {
     /// Issuer (`iss`) claim.
     ///
     /// Principal that issued the JWT. The processing of this claim is generally
@@ -93,32 +96,17 @@ pub struct JWTClaims<PublicClaims = NoncePublicClaim, PrivateClaims = AnyClaims>
     #[serde(skip_serializing_if = "Option::is_none")]
     pub jwt_id: Option<String>,
 
-    /// Public claims defined in the [IANA "JSON Web Token Claims" registry][1].
-    ///
-    /// [1]: <https://www.iana.org/assignments/jwt/jwt.xhtml>
-    ///
-    /// See: <https://datatracker.ietf.org/doc/html/rfc7519#section-4.2>
+    /// Other registered claims.
     #[serde(flatten)]
-    pub public: PublicClaims,
+    pub registered_claims: RegisteredClaims,
 
-    /// Application specific claims.
+    /// Private, non-registered claims.
     #[serde(flatten)]
-    pub private: PrivateClaims,
+    pub private_claims: PrivateClaims
 }
 
-/// Any set of claims.
-pub type AnyClaims = HashMap<String, serde_json::Value>;
-
-#[derive(Debug, Serialize, Deserialize, Clone, Default)]
-pub struct NoncePublicClaim {
-    /// Value used to associate a Client session with an ID Token (MAY also be
-    /// used for nonce values in other applications of JWTs).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub nonce: Option<String>,
-}
-
-impl<T> JWTClaims<NoncePublicClaim, T> {
-    pub fn from_private_claims(claims: T) -> Self {
+impl<P> JWTClaims<P> {
+    pub fn from_private_claims(claims: P) -> Self {
         Self {
             issuer: None,
             subject: None,
@@ -127,13 +115,29 @@ impl<T> JWTClaims<NoncePublicClaim, T> {
             not_before: None,
             issuance_date: None,
             jwt_id: None,
-            public: NoncePublicClaim::default(),
-            private: claims,
+            registered_claims: RegisteredClaims::default(),
+            private_claims: claims
         }
     }
 }
 
-impl<Pu: Serialize, Pr: Serialize> JWTClaims<Pu, Pr> {
+impl JWTClaims<()> {
+    pub fn with_private_claims<P>(self, claims: P) -> JWTClaims<P> {
+        JWTClaims {
+            issuer: self.issuer,
+            subject: self.subject,
+            audience: self.audience,
+            expiration_time: self.expiration_time,
+            not_before: self.not_before,
+            issuance_date: self.issuance_date,
+            jwt_id: self.jwt_id,
+            registered_claims: self.registered_claims,
+            private_claims: claims
+        }
+    }
+}
+
+impl<P: Serialize> JWTClaims<P> {
     /// Sign the claims and return a JWT.
     pub async fn sign<'m, M: 'm + MaybeJwkVerificationMethod>(
         &self,
@@ -141,42 +145,59 @@ impl<Pu: Serialize, Pr: Serialize> JWTClaims<Pu, Pr> {
         resolver: &impl VerificationMethodResolver<M>,
         signers: &impl Signer<M, Algorithm>,
     ) -> Result<CompactJWSString, SignatureError> {
-        let verification_method = resolver
-            .resolve_verification_method(
-                None, // TODO issuer?
-                Some(verification_method.into()),
-            )
-            .await?;
-
-        let jwk = verification_method
-            .try_to_jwk()
-            .ok_or(SignatureError::MissingAlgorithm)?;
-        let algorithm = jwk
-            .get_algorithm()
-            .ok_or(SignatureError::MissingAlgorithm)?;
-
-        let signer = signers
-            .for_method(verification_method.as_reference())
-            .await
-            .ok_or(SignatureError::MissingSigner)?;
-
-        let payload = serde_json::to_string(self).unwrap();
-
-        let header = Header {
-            algorithm,
-            key_id: Some(verification_method.id().to_owned().into()),
-            type_: Some("JWT".to_string()),
-            ..Default::default()
-        };
-
-        let signing_bytes = header.encode_signing_bytes(payload.as_bytes());
-        let signature = signer.sign(algorithm, (), &signing_bytes).await?;
-
-        Ok(
-            CompactJWSString::encode_from_signing_bytes_and_signature(signing_bytes, &signature)
-                .unwrap(),
-        )
+        sign_claims(self, verification_method, resolver, signers).await
     }
+}
+
+/// Any set of claims.
+pub type AnyClaims = HashMap<String, serde_json::Value>;
+
+pub trait ClaimSet {
+    fn get<'a>(&self, claim: ClaimKind<&str>) -> Option<&Claim>;
+}
+
+/// Sign the claims and return a JWT.
+pub async fn sign_claims<'m, M: 'm + MaybeJwkVerificationMethod>(
+    claims: &impl Serialize,
+    verification_method: impl Into<ReferenceOrOwnedRef<'m, M>>,
+    resolver: &impl VerificationMethodResolver<M>,
+    signers: &impl Signer<M, Algorithm>,
+) -> Result<CompactJWSString, SignatureError> {
+    let verification_method = resolver
+        .resolve_verification_method(
+            None, // TODO issuer?
+            Some(verification_method.into()),
+        )
+        .await?;
+
+    let jwk = verification_method
+        .try_to_jwk()
+        .ok_or(SignatureError::MissingAlgorithm)?;
+    let algorithm = jwk
+        .get_algorithm()
+        .ok_or(SignatureError::MissingAlgorithm)?;
+
+    let signer = signers
+        .for_method(verification_method.as_reference())
+        .await
+        .ok_or(SignatureError::MissingSigner)?;
+
+    let payload = serde_json::to_string(claims).unwrap();
+
+    let header = Header {
+        algorithm,
+        key_id: Some(verification_method.id().to_owned().into()),
+        type_: Some("JWT".to_string()),
+        ..Default::default()
+    };
+
+    let signing_bytes = header.encode_signing_bytes(payload.as_bytes());
+    let signature = signer.sign(algorithm, (), &signing_bytes).await?;
+
+    Ok(
+        CompactJWSString::encode_from_signing_bytes_and_signature(signing_bytes, &signature)
+            .unwrap(),
+    )
 }
 
 // RFC 7519 - JSON Web Token (JWT)

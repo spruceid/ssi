@@ -1,7 +1,5 @@
 use chrono::{DateTime, Utc};
-use ssi_jwt::JWTClaims;
-
-use crate::VCPublicClaims;
+use ssi_jwt::{JWTClaims, RegisteredClaim, RegisteredClaimKind};
 
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcDecodeError {
@@ -21,22 +19,25 @@ pub enum JwtVcDecodeError {
 /// Decodes a Verifiable Credential form a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims<VCPublicClaims>) -> Result<T, JwtVcDecodeError>
+pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt.public.verifiable_credential.take() {
-        Some(json_syntax::Value::Object(mut vc)) => {
-            decode_jwt_vc_specific_headers(jwt, &mut vc)?;
-            Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
+    match jwt.registered_claims.remove(RegisteredClaimKind::VerifiableCredential) {
+        Some(RegisteredClaim::VerifiableCredential(vc)) => match vc {
+            json_syntax::Value::Object(mut vc) => {
+                decode_jwt_vc_specific_headers(jwt, &mut vc)?;
+                Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
+            }
+            v => Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind())),
         }
-        Some(v) => Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind())),
+        Some(_) => panic!(), // unsound claim set.
         None => Err(JwtVcDecodeError::MissingCredential),
     }
 }
 
 fn decode_jwt_vc_specific_headers(
-    jwt: JWTClaims<VCPublicClaims>,
+    jwt: JWTClaims,
     target: &mut json_syntax::Object,
 ) -> Result<(), JwtVcDecodeError> {
     if let Some(exp) = jwt.expiration_time {
@@ -103,22 +104,25 @@ pub enum JwtVpDecodeError {
 /// Decodes a Verifiable Presentation from a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims<VCPublicClaims>) -> Result<T, JwtVpDecodeError>
+pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt.public.verifiable_presentation.take() {
-        Some(json_syntax::Value::Object(mut vp)) => {
-            decode_jwt_vp_specific_headers(jwt, &mut vp);
-            Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
+    match jwt.registered_claims.remove(RegisteredClaimKind::VerifiableCredential) {
+        Some(RegisteredClaim::VerifiablePresentation(vp)) => match vp {
+            json_syntax::Value::Object(mut vp) => {
+                decode_jwt_vp_specific_headers(jwt, &mut vp);
+                Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
+            }
+            v => Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind())),
         }
-        Some(v) => Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind())),
+        Some(_) => panic!(), // unsound claim set.
         None => Err(JwtVpDecodeError::MissingPresentation),
     }
 }
 
 fn decode_jwt_vp_specific_headers(
-    jwt: JWTClaims<VCPublicClaims>,
+    jwt: JWTClaims,
     target: &mut json_syntax::Object,
 ) {
     if let Some(iss) = jwt.issuer {

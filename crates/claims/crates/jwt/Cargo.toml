@@ -21,6 +21,8 @@ ssi-jws.workspace = true
 ssi-verification-methods.workspace = true
 iref.workspace = true
 serde_with = "2.3.2"
+hashbrown = "0.14.3"
+slab = "0.4.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
