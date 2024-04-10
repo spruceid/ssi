@@ -409,12 +409,7 @@ where
         + ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
     I::Resource: Clone,
     L: json_ld::Loader<V::Iri>,
-    //
-    V: Send + Sync,
-    V::Iri: Send + Sync,
-    V::BlankId: Send + Sync,
-    L: Send + Sync,
-    L::Error: Send + std::fmt::Display,
+    L::Error: std::fmt::Display,
 {
     async fn expand_configuration(
         &mut self,

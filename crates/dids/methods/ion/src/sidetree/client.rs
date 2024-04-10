@@ -61,7 +61,7 @@ impl<S: Sidetree> DIDMethod for SidetreeClient<S> {
     const DID_METHOD_NAME: &'static str = S::METHOD;
 }
 
-impl<S: Sidetree + Send + Sync> DIDMethodResolver for SidetreeClient<S> {
+impl<S: Sidetree> DIDMethodResolver for SidetreeClient<S> {
     async fn resolve_method_representation<'a>(
         &'a self,
         method_specific_id: &'a str,

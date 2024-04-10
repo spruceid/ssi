@@ -125,12 +125,7 @@ where
     V::BlankId: Clone + Eq + Hash,
     L: json_ld::Loader<V::Iri>,
     C: Serialize,
-    //
-    V: Send + Sync,
-    V::Iri: Send + Sync,
-    V::BlankId: Send + Sync,
-    L: Send + Sync,
-    L::Error: Send + std::fmt::Display,
+    L::Error: std::fmt::Display,
 {
     type Error = JsonLdError<L::Error>;
 

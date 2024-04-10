@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use async_std::sync::RwLock;
 use iref::{Iri, IriBuf};
-use json_ld::future::{BoxFuture, FutureExt};
 pub use json_ld::{syntax, Options, RemoteDocumentReference};
 use json_ld::{syntax::TryFromJson, Loader, RemoteContext, RemoteContextReference, RemoteDocument};
 use json_syntax::Parse;
@@ -246,78 +245,72 @@ pub struct StaticLoader;
 impl Loader<IriBuf> for StaticLoader {
     type Error = UnknownContext;
 
-    fn load_with<'a, V>(
-        &'a mut self,
-        _vocabulary: &'a mut V,
+    async fn load_with<V>(
+        &mut self,
+        _vocabulary: &mut V,
         url: IriBuf,
-    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, Self::Error>>
+    ) -> json_ld::LoadingResult<IriBuf, Self::Error>
     where
         V: IriVocabularyMut<Iri = IriBuf>,
-        //
-        V: Send + Sync,
-        IriBuf: 'a + Send,
     {
-        async move {
-            iri_match! {
-                match url {
-                    CREDENTIALS_V1_CONTEXT => Ok(CREDENTIALS_V1_CONTEXT_DOCUMENT.clone()),
-                    CREDENTIALS_V2_CONTEXT => Ok(CREDENTIALS_V2_CONTEXT_DOCUMENT.clone()),
-                    CREDENTIALS_EXAMPLES_V1_CONTEXT => {
-                        Ok(CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT.clone())
-                    },
-                    CREDENTIALS_EXAMPLES_V2_CONTEXT => {
-                        Ok(CREDENTIALS_EXAMPLES_V2_CONTEXT_DOCUMENT.clone())
-                    },
-                    ODRL_CONTEXT => Ok(ODRL_CONTEXT_DOCUMENT.clone()),
-                    SECURITY_V1_CONTEXT => Ok(SECURITY_V1_CONTEXT_DOCUMENT.clone()),
-                    SECURITY_V2_CONTEXT => Ok(SECURITY_V2_CONTEXT_DOCUMENT.clone()),
-                    SCHEMA_ORG_CONTEXT => Ok(SCHEMA_ORG_CONTEXT_DOCUMENT.clone()),
-                    DID_V1_CONTEXT | DID_V1_CONTEXT_NO_WWW | W3ID_DID_V1_CONTEXT => {
-                        Ok(DID_V1_CONTEXT_DOCUMENT.clone())
-                    },
-                    DID_RESOLUTION_V1_CONTEXT => Ok(DID_RESOLUTION_V1_CONTEXT_DOCUMENT.clone()),
-                    #[allow(deprecated)]
-                    DIF_ESRS2020_CONTEXT => Ok(DIF_ESRS2020_CONTEXT_DOCUMENT.clone()),
-                    W3ID_ESRS2020_V2_CONTEXT => Ok(W3ID_ESRS2020_V2_CONTEXT_DOCUMENT.clone()),
-                    #[allow(deprecated)]
-                    ESRS2020_EXTRA_CONTEXT => Ok(ESRS2020_EXTRA_CONTEXT_DOCUMENT.clone()),
-                    LDS_JWS2020_V1_CONTEXT => Ok(LDS_JWS2020_V1_CONTEXT_DOCUMENT.clone()),
-                    W3ID_JWS2020_V1_CONTEXT => Ok(W3ID_JWS2020_V1_CONTEXT_DOCUMENT.clone()),
-                    W3ID_ED2020_V1_CONTEXT => Ok(W3ID_ED2020_V1_CONTEXT_DOCUMENT.clone()),
-                    W3ID_MULTIKEY_V1_CONTEXT => Ok(W3ID_MULTIKEY_V1_CONTEXT_DOCUMENT.clone()),
-                    W3ID_DATA_INTEGRITY_V1_CONTEXT => Ok(W3ID_DATA_INTEGRITY_V1_CONTEXT_DOCUMENT.clone()),
-                    BLOCKCHAIN2021_V1_CONTEXT => Ok(BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT.clone()),
-                    CITIZENSHIP_V1_CONTEXT => Ok(CITIZENSHIP_V1_CONTEXT_DOCUMENT.clone()),
-                    VACCINATION_V1_CONTEXT => Ok(VACCINATION_V1_CONTEXT_DOCUMENT.clone()),
-                    TRACEABILITY_CONTEXT => Ok(TRACEABILITY_CONTEXT_DOCUMENT.clone()),
-                    REVOCATION_LIST_2020_V1_CONTEXT => {
-                        Ok(REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT.clone())
-                    },
-                    STATUS_LIST_2021_V1_CONTEXT => Ok(STATUS_LIST_2021_V1_CONTEXT_DOCUMENT.clone()),
-                    EIP712SIG_V0_1_CONTEXT => Ok(EIP712SIG_V0_1_CONTEXT_DOCUMENT.clone()),
-                    BBS_V1_CONTEXT => Ok(BBS_V1_CONTEXT_DOCUMENT.clone()),
-                    EIP712SIG_V1_CONTEXT => Ok(EIP712SIG_V1_CONTEXT_DOCUMENT.clone()),
-                    PRESENTATION_SUBMISSION_V1_CONTEXT => {
-                        Ok(PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT.clone())
-                    },
-                    VDL_V1_CONTEXT => Ok(VDL_V1_CONTEXT_DOCUMENT.clone()),
-                    WALLET_V1_CONTEXT => Ok(WALLET_V1_CONTEXT_DOCUMENT.clone()),
-                    ZCAP_V1_CONTEXT => Ok(ZCAP_V1_CONTEXT_DOCUMENT.clone()),
-                    CACAO_ZCAP_V1_CONTEXT => Ok(CACAO_ZCAP_V1_CONTEXT_DOCUMENT.clone()),
-                    JFF_VC_EDU_PLUGFEST_2022_CONTEXT => {
-                        Ok(JFF_VC_EDU_PLUGFEST_2022_CONTEXT_DOCUMENT.clone())
-                    },
-                    DID_CONFIGURATION_V0_0_CONTEXT => {
-                        Ok(DID_CONFIGURATION_V0_0_CONTEXT_DOCUMENT.clone())
-                    },
-                    JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
-                        Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
-                    },
-                    _ as iri => Err(UnknownContext(iri))
-                }
+        iri_match! {
+            match url {
+                CREDENTIALS_V1_CONTEXT => Ok(CREDENTIALS_V1_CONTEXT_DOCUMENT.clone()),
+                CREDENTIALS_V2_CONTEXT => Ok(CREDENTIALS_V2_CONTEXT_DOCUMENT.clone()),
+                CREDENTIALS_EXAMPLES_V1_CONTEXT => {
+                    Ok(CREDENTIALS_EXAMPLES_V1_CONTEXT_DOCUMENT.clone())
+                },
+                CREDENTIALS_EXAMPLES_V2_CONTEXT => {
+                    Ok(CREDENTIALS_EXAMPLES_V2_CONTEXT_DOCUMENT.clone())
+                },
+                ODRL_CONTEXT => Ok(ODRL_CONTEXT_DOCUMENT.clone()),
+                SECURITY_V1_CONTEXT => Ok(SECURITY_V1_CONTEXT_DOCUMENT.clone()),
+                SECURITY_V2_CONTEXT => Ok(SECURITY_V2_CONTEXT_DOCUMENT.clone()),
+                SCHEMA_ORG_CONTEXT => Ok(SCHEMA_ORG_CONTEXT_DOCUMENT.clone()),
+                DID_V1_CONTEXT | DID_V1_CONTEXT_NO_WWW | W3ID_DID_V1_CONTEXT => {
+                    Ok(DID_V1_CONTEXT_DOCUMENT.clone())
+                },
+                DID_RESOLUTION_V1_CONTEXT => Ok(DID_RESOLUTION_V1_CONTEXT_DOCUMENT.clone()),
+                #[allow(deprecated)]
+                DIF_ESRS2020_CONTEXT => Ok(DIF_ESRS2020_CONTEXT_DOCUMENT.clone()),
+                W3ID_ESRS2020_V2_CONTEXT => Ok(W3ID_ESRS2020_V2_CONTEXT_DOCUMENT.clone()),
+                #[allow(deprecated)]
+                ESRS2020_EXTRA_CONTEXT => Ok(ESRS2020_EXTRA_CONTEXT_DOCUMENT.clone()),
+                LDS_JWS2020_V1_CONTEXT => Ok(LDS_JWS2020_V1_CONTEXT_DOCUMENT.clone()),
+                W3ID_JWS2020_V1_CONTEXT => Ok(W3ID_JWS2020_V1_CONTEXT_DOCUMENT.clone()),
+                W3ID_ED2020_V1_CONTEXT => Ok(W3ID_ED2020_V1_CONTEXT_DOCUMENT.clone()),
+                W3ID_MULTIKEY_V1_CONTEXT => Ok(W3ID_MULTIKEY_V1_CONTEXT_DOCUMENT.clone()),
+                W3ID_DATA_INTEGRITY_V1_CONTEXT => Ok(W3ID_DATA_INTEGRITY_V1_CONTEXT_DOCUMENT.clone()),
+                BLOCKCHAIN2021_V1_CONTEXT => Ok(BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT.clone()),
+                CITIZENSHIP_V1_CONTEXT => Ok(CITIZENSHIP_V1_CONTEXT_DOCUMENT.clone()),
+                VACCINATION_V1_CONTEXT => Ok(VACCINATION_V1_CONTEXT_DOCUMENT.clone()),
+                TRACEABILITY_CONTEXT => Ok(TRACEABILITY_CONTEXT_DOCUMENT.clone()),
+                REVOCATION_LIST_2020_V1_CONTEXT => {
+                    Ok(REVOCATION_LIST_2020_V1_CONTEXT_DOCUMENT.clone())
+                },
+                STATUS_LIST_2021_V1_CONTEXT => Ok(STATUS_LIST_2021_V1_CONTEXT_DOCUMENT.clone()),
+                EIP712SIG_V0_1_CONTEXT => Ok(EIP712SIG_V0_1_CONTEXT_DOCUMENT.clone()),
+                BBS_V1_CONTEXT => Ok(BBS_V1_CONTEXT_DOCUMENT.clone()),
+                EIP712SIG_V1_CONTEXT => Ok(EIP712SIG_V1_CONTEXT_DOCUMENT.clone()),
+                PRESENTATION_SUBMISSION_V1_CONTEXT => {
+                    Ok(PRESENTATION_SUBMISSION_V1_CONTEXT_DOCUMENT.clone())
+                },
+                VDL_V1_CONTEXT => Ok(VDL_V1_CONTEXT_DOCUMENT.clone()),
+                WALLET_V1_CONTEXT => Ok(WALLET_V1_CONTEXT_DOCUMENT.clone()),
+                ZCAP_V1_CONTEXT => Ok(ZCAP_V1_CONTEXT_DOCUMENT.clone()),
+                CACAO_ZCAP_V1_CONTEXT => Ok(CACAO_ZCAP_V1_CONTEXT_DOCUMENT.clone()),
+                JFF_VC_EDU_PLUGFEST_2022_CONTEXT => {
+                    Ok(JFF_VC_EDU_PLUGFEST_2022_CONTEXT_DOCUMENT.clone())
+                },
+                DID_CONFIGURATION_V0_0_CONTEXT => {
+                    Ok(DID_CONFIGURATION_V0_0_CONTEXT_DOCUMENT.clone())
+                },
+                JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
+                    Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
+                },
+                _ as iri => Err(UnknownContext(iri))
             }
         }
-        .boxed()
     }
 }
 
@@ -413,49 +406,43 @@ impl std::default::Default for ContextLoader {
 impl Loader<IriBuf> for ContextLoader {
     type Error = UnknownContext;
 
-    fn load_with<'a, V>(
-        &'a mut self,
-        _vocabulary: &'a mut V,
+    async fn load_with<V>(
+        &mut self,
+        _vocabulary: &mut V,
         url: IriBuf,
-    ) -> BoxFuture<'a, json_ld::LoadingResult<IriBuf, Self::Error>>
+    ) -> json_ld::LoadingResult<IriBuf, Self::Error>
     where
         V: IriVocabularyMut<Iri = IriBuf>,
-        //
-        V: Send + Sync,
-        IriBuf: 'a + Send,
     {
-        async move {
-            let url = match &mut self.static_loader {
-                Some(static_loader) => {
-                    match static_loader.load(url).await {
-                        Ok(x) => {
-                            // The url was present in `StaticLoader`.
-                            return Ok(x);
-                        }
-                        Err(UnknownContext(url)) => {
-                            // This is ok, the url just wasn't found in
-                            // `StaticLoader`. Fall through to
-                            // `self.context_map`.
-                            url
-                        }
+        let url = match &mut self.static_loader {
+            Some(static_loader) => {
+                match static_loader.load(url).await {
+                    Ok(x) => {
+                        // The url was present in `StaticLoader`.
+                        return Ok(x);
+                    }
+                    Err(UnknownContext(url)) => {
+                        // This is ok, the url just wasn't found in
+                        // `StaticLoader`. Fall through to
+                        // `self.context_map`.
+                        url
                     }
                 }
-                None => url,
-            };
-
-            // If we fell through, then try `self.context_map`.
-            if let Some(context_map) = &mut self.context_map {
-                context_map
-                    .read()
-                    .await
-                    .get(&url)
-                    .cloned()
-                    .ok_or(UnknownContext(url))
-            } else {
-                Err(UnknownContext(url))
             }
+            None => url,
+        };
+
+        // If we fell through, then try `self.context_map`.
+        if let Some(context_map) = &mut self.context_map {
+            context_map
+                .read()
+                .await
+                .get(&url)
+                .cloned()
+                .ok_or(UnknownContext(url))
+        } else {
+            Err(UnknownContext(url))
         }
-        .boxed()
     }
 }
 

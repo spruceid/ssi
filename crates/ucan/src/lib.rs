@@ -59,8 +59,8 @@ impl Default for UcanCodec {
 impl<F, A> Ucan<F, A> {
     pub async fn verify_signature(&self, resolver: &impl DIDResolver) -> Result<(), Error>
     where
-        F: Serialize + Send,
-        A: Serialize + Send,
+        F: Serialize,
+        A: Serialize,
     {
         // extract or deduce signing key
         let key: JWK = match (
