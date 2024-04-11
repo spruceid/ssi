@@ -1,12 +1,14 @@
 //! JWT encoding of a Status Lists.
+use std::collections::HashMap;
+
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_jwt::{NumericDate, StringOrURI};
 
-use crate::{StatusList, StatusSize};
+use crate::token_status_list::{StatusList, StatusSize};
 
 /// Status List JWT.
-/// 
+///
 /// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#name-status-list-token>
 #[derive(Serialize, Deserialize)]
 pub struct StatusListJwt {
@@ -57,31 +59,39 @@ pub struct StatusListJwt {
     pub time_to_live: Option<u64>,
 
     /// Status list.
-    #[serde(serialize_with = "serialize_status_list", deserialize_with = "deserialize_status_list")]
+    #[serde(
+        serialize_with = "serialize_status_list",
+        deserialize_with = "deserialize_status_list"
+    )]
     pub status_list: StatusList,
 
-    /// Other claims not directly related to status lists.
-    #[serde(flatten)]
-    pub other_claims: ssi_jwt::Claims
+    /// Other claims.
+    pub other_claims: HashMap<String, serde_json::Value>,
 }
 
-fn serialize_status_list<S: serde::Serializer>(list: &StatusList, serializer: S) -> Result<S::Ok, S::Error> {
+fn serialize_status_list<S: serde::Serializer>(
+    list: &StatusList,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
     let lst = base64::encode_config(list.as_bytes(), base64::URL_SAFE);
     JsonStatusList {
         bits: list.status_size(),
-        lst
-    }.serialize(serializer)
+        lst,
+    }
+    .serialize(serializer)
 }
 
-fn deserialize_status_list<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<StatusList, D::Error> {
+fn deserialize_status_list<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<StatusList, D::Error> {
     let json = JsonStatusList::deserialize(deserializer)?;
-    let bytes = base64::decode_config(&json.lst, base64::URL_SAFE)
-        .map_err( serde::de::Error::custom)?;
+    let bytes =
+        base64::decode_config(&json.lst, base64::URL_SAFE).map_err(serde::de::Error::custom)?;
     Ok(StatusList::from_parts(json.bits, bytes))
 }
 
 /// JSON Status List.
-/// 
+///
 /// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#name-status-list>
 #[derive(Serialize, Deserialize)]
 pub struct JsonStatusList {
@@ -89,13 +99,13 @@ pub struct JsonStatusList {
     bits: StatusSize,
 
     /// Status values for all the Referenced Tokens it conveys statuses for.
-    lst: String
+    lst: String,
 }
 
 /// Status claim value.
 #[derive(Serialize, Deserialize)]
 pub struct Status {
-    pub status_list: StatusListReference
+    pub status_list: StatusListReference,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -106,5 +116,5 @@ pub struct StatusListReference {
 
     /// Identifies the Status List or Status List Token containing the status
     /// information for the Referenced Token.
-    pub uri: UriBuf
+    pub uri: UriBuf,
 }

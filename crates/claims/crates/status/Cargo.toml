@@ -1,0 +1,32 @@
+[package]
+name = "ssi-status"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Status Lists implementations for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-token-status-list/"
+
+[dependencies]
+ssi-claims-core.workspace = true
+ssi-jwt.workspace = true
+ssi-vc.workspace = true
+ssi-verification-methods.workspace = true
+ssi-data-integrity.workspace = true
+ssi-json-ld.workspace = true
+json-ld.workspace = true
+serde = { workspace = true, features = ["derive"] }
+thiserror.workspace = true
+iref.workspace = true
+base64.workspace = true
+serde_json.workspace = true
+json-syntax.workspace = true
+rdf-types.workspace = true
+xsd-types.workspace = true
+reqwest = "0.12.3"
+parking_lot = "0.12.1"
+flate2 = "1.0.28"
+
+[dev-dependencies]
+clap = { version = "4.5.4", features = ["derive"] }

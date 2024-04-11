@@ -1,22 +1,20 @@
-//! This library implements status list data structures, as defined by
-//! [IETF Token Status List][1] specification, as a way to represent the status
+//! IETF Token Status List.
+//!
+//! A Token Status List provides a way to represent the status
 //! of tokens secured by JSON Object Signing and Encryption (JOSE) or CBOR
 //! Object Signing and Encryption (COSE). Such tokens can include JSON Web
 //! Tokens (JWTs), CBOR Web Tokens (CWTs) and ISO mdoc.
 //!
 //! Token status lists are themselves encoded as JWTs or CWTs.
-//! 
-//! [1]: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html>
+//!
+//! See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html>
+use std::borrow::Cow;
+
+use iref::Uri;
 use serde::Serialize;
 
-pub mod json;
 pub mod cbor;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error(transparent)]
-    InvalidStatusSize(InvalidStatusSize)
-}
+pub mod json;
 
 /// Type of a JWT representing a status list.
 ///
@@ -28,8 +26,7 @@ pub const JWT_TYPE: &str = "statuslist+jwt";
 pub struct InvalidStatusSize(u8);
 
 /// Number of bits per Referenced Token in a Status List.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[derive(Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(transparent)]
 pub struct StatusSize(u8);
 
@@ -45,7 +42,7 @@ impl StatusSize {
             1 => 0b1,
             2 => 0b11,
             4 => 0b1111,
-            _ => 0b11111111
+            _ => 0b11111111,
         }
     }
 
@@ -72,7 +69,7 @@ impl TryFrom<u8> for StatusSize {
 impl<'de> serde::Deserialize<'de> for StatusSize {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         struct Visitor;
 
@@ -85,7 +82,7 @@ impl<'de> serde::Deserialize<'de> for StatusSize {
 
             fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
             where
-                E: serde::de::Error
+                E: serde::de::Error,
             {
                 v.try_into().map_err(serde::de::Error::custom)
             }
@@ -95,51 +92,41 @@ impl<'de> serde::Deserialize<'de> for StatusSize {
     }
 }
 
-pub struct JsonEncoded<T>(pub T);
-
 /// Status List.
-/// 
+///
 /// A Status List is a byte array that contains the statuses of many
 /// Referenced Tokens represented by one or multiple bits.
-/// 
+///
 /// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#section-4>
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct StatusList {
     status_size: StatusSize,
-    bytes: Vec<u8>
+    bytes: Vec<u8>,
 }
 
 impl StatusList {
     /// Creates a new status list with the given status size.
-    pub fn new(
-        status_size: StatusSize
-    ) -> Self {
+    pub fn new(status_size: StatusSize) -> Self {
         Self {
             status_size,
-            bytes: Vec::new()
+            bytes: Vec::new(),
         }
     }
 
     /// Creates a new status list with the given status size and capacity
     /// (in number of statuses).
-    pub fn with_capacity(
-        status_size: StatusSize,
-        capacity: usize
-    ) -> Self {
+    pub fn with_capacity(status_size: StatusSize, capacity: usize) -> Self {
         Self {
             status_size,
-            bytes: Vec::with_capacity(capacity / status_size.status_per_byte())
+            bytes: Vec::with_capacity(capacity / status_size.status_per_byte()),
         }
     }
 
     /// Creates a new status list from a status size and byte array.
-    pub fn from_parts(
-        status_size: StatusSize,
-        data: Vec<u8>
-    ) -> Self {
+    pub fn from_parts(status_size: StatusSize, data: Vec<u8>) -> Self {
         Self {
             status_size,
-            bytes: data
+            bytes: data,
         }
     }
 
@@ -166,4 +153,20 @@ impl StatusList {
     pub fn into_parts(self) -> (StatusSize, Vec<u8>) {
         (self.status_size, self.bytes)
     }
+}
+
+pub trait StatusListToken {
+    fn status_list(&self) -> &StatusList;
+
+    fn status_list_mut(&mut self) -> &mut StatusList;
+}
+
+pub trait ReferencedToken {
+    fn status_list_url(&self) -> ReferencedTokenStatusList;
+}
+
+pub struct ReferencedTokenStatusList<'a> {
+    pub status_list: Cow<'a, Uri>,
+
+    pub index: usize,
 }
