@@ -21,6 +21,10 @@ pub struct Credential {
     #[serde(rename = "@context")]
     context: ssi_vc::Context,
 
+    #[ld(ignore)]
+    #[serde(rename = "type")]
+    type_: ssi_vc::json::JsonCredentialTypes,
+
     #[ld("cred:credentialSubject")]
     credential_subject: CredentialSubject,
 
@@ -31,9 +35,15 @@ pub struct Credential {
     issuance_date: DateTime,
 }
 
-impl ssi_json_ld::WithJsonLdContext for Credential {
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
-        Cow::Borrowed(self.context.as_ref())
+impl ssi_json_ld::JsonLdObject for Credential {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        Some(Cow::Borrowed(self.context.as_ref()))
+    }
+}
+
+impl ssi_json_ld::JsonLdNodeObject for Credential {
+    fn json_ld_type(&self) -> ssi_json_ld::JsonLdTypes {
+        self.type_.to_json_ld_types()
     }
 }
 
@@ -92,6 +102,7 @@ async fn main() {
     // Credential built from the subject.
     let credential = Credential {
         context: Default::default(),
+        type_: Default::default(),
         credential_subject,
         issuer: linked_data::Ref(uri!("http://example.com/issuer").to_owned()),
         issuance_date: chrono::Utc::now().into(),

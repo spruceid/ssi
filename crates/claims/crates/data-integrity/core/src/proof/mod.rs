@@ -3,7 +3,7 @@ use crate::{
     CryptographicSuite, CryptographicSuiteInput,
 };
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany, Referencable};
-use ssi_json_ld::WithJsonLdContext;
+use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use std::collections::BTreeMap;
 
@@ -183,7 +183,7 @@ pub enum ProofPreparationError<E = ssi_json_ld::UnknownContext> {
 
 impl<T, E, S> ssi_claims_core::PrepareWith<T, E> for Proof<S>
 where
-    T: WithJsonLdContext,
+    T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E>,
     E: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
@@ -200,7 +200,12 @@ where
     ) -> Result<Self::Prepared, Self::Error> {
         let configuration = self.configuration();
         let ld_configuration = configuration
-            .expand(value.json_ld_context().as_ref(), &self.type_, environment)
+            .expand(
+                value.json_ld_context().as_deref(),
+                value.json_ld_type(),
+                &self.type_,
+                environment,
+            )
             .await?;
 
         self.type_.refine_type(&ld_configuration.type_iri)?;

@@ -9,7 +9,7 @@ use rdf_types::{
 };
 use serde::{Deserialize, Serialize};
 use ssi_core::Referencable;
-use ssi_json_ld::AnyJsonLdEnvironment;
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdTypes};
 use ssi_rdf::{urdna2015, IntoNQuads};
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
@@ -359,7 +359,8 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
 
     pub async fn expand<S, E: ProofConfigurationRefExpansion<'a, S>>(
         &self,
-        context: &json_ld::syntax::Context,
+        context: Option<&json_ld::syntax::Context>,
+        types: JsonLdTypes<'_>,
         suite: &S,
         environment: &mut E,
     ) -> Result<LinkedDataConfiguration, ConfigurationExpansionError<E::LoadError>>
@@ -367,7 +368,7 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
         S: CryptographicSuite<VerificationMethod = M, Options = O>,
     {
         environment
-            .expand_configuration(context, *self, suite)
+            .expand_configuration(context, types, *self, suite)
             .await
     }
 }
@@ -389,7 +390,8 @@ pub trait ProofConfigurationRefExpansion<'a, S: CryptographicSuite>:
     #[allow(async_fn_in_trait)]
     async fn expand_configuration(
         &mut self,
-        context: &json_ld::syntax::Context,
+        context: Option<&json_ld::syntax::Context>,
+        types: JsonLdTypes<'_>,
         configuration: ProofConfigurationRef<'a, S::VerificationMethod, S::Options>,
         suite: &S,
     ) -> Result<LinkedDataConfiguration, ConfigurationExpansionError<Self::LoadError>>;
@@ -413,7 +415,8 @@ where
 {
     async fn expand_configuration(
         &mut self,
-        context: &json_ld::syntax::Context,
+        context: Option<&json_ld::syntax::Context>,
+        types: JsonLdTypes<'_>,
         configuration: ProofConfigurationRef<'a, S::VerificationMethod, S::Options>,
         suite: &S,
     ) -> Result<LinkedDataConfiguration, ConfigurationExpansionError<L::Error>> {
@@ -422,8 +425,11 @@ where
         #[derive(serde::Serialize)]
         #[serde(bound = "M::Reference<'a>: serde::Serialize, O::Reference<'a>: serde::Serialize")]
         struct CompactProofConfigurationDocument<'c, 'a, 'b, M: Referencable, O: Referencable> {
-            #[serde(rename = "@context")]
-            context: &'c json_ld::syntax::Context,
+            #[serde(rename = "@context", skip_serializing_if = "Option::is_none")]
+            context: Option<&'c json_ld::syntax::Context>,
+
+            #[serde(rename = "@type", skip_serializing_if = "JsonLdTypes::is_empty")]
+            types: JsonLdTypes<'c>,
 
             proof: ProofConfigurationWithSuiteRef<'a, 'b, M, O>,
         }
@@ -431,6 +437,7 @@ where
         // Expand the proof.
         let proof_document = CompactProofConfigurationDocument {
             context,
+            types,
             proof: configuration.with_suite(suite),
         };
 

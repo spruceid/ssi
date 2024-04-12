@@ -2,7 +2,7 @@ use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::Validate;
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use xsd_types::DateTime;
 
@@ -142,9 +142,15 @@ impl<S, C: RequiredContextSet, T: RequiredCredentialTypeSet> SpecializedJsonCred
     }
 }
 
-impl<S, C, T> WithJsonLdContext for SpecializedJsonCredential<S, C, T> {
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
-        Cow::Borrowed(self.context.as_ref())
+impl<S, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        Some(Cow::Borrowed(self.context.as_ref()))
+    }
+}
+
+impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
+    fn json_ld_type(&self) -> JsonLdTypes {
+        self.types.to_json_ld_types()
     }
 }
 

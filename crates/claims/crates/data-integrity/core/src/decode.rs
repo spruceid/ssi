@@ -1,7 +1,7 @@
 use json_syntax::Parse;
 use serde::de::DeserializeOwned;
 use ssi_claims_core::Verifiable;
-use ssi_json_ld::WithJsonLdContext;
+use ssi_json_ld::JsonLdNodeObject;
 
 use crate::{
     proof, CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfigurationRefExpansion,
@@ -36,7 +36,7 @@ pub async fn from_json_slice<T, S: CryptographicSuite, E>(
     environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
 where
-    T: DeserializeOwned + WithJsonLdContext,
+    T: DeserializeOwned + JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
     S::VerificationMethod: DeserializeOwned,
     S::Options: DeserializeOwned,
@@ -59,7 +59,7 @@ pub async fn from_json_str<T, S: CryptographicSuite, E>(
     environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
 where
-    T: DeserializeOwned + WithJsonLdContext,
+    T: DeserializeOwned + JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
     S::VerificationMethod: DeserializeOwned,
     S::Options: DeserializeOwned,
@@ -76,7 +76,7 @@ pub async fn from_json<T, S: CryptographicSuite, E>(
     mut environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
 where
-    T: DeserializeOwned + WithJsonLdContext,
+    T: DeserializeOwned + JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
     S::VerificationMethod: DeserializeOwned,
     S::Options: DeserializeOwned,

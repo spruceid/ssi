@@ -25,6 +25,7 @@ combination = "0.1"
 ssi-contexts.workspace = true
 ssi-crypto.workspace = true
 ssi-rdf.workspace = true
+serde.workspace = true
 
 [dev-dependencies]
 difference = "2.0"

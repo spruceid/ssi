@@ -3,7 +3,7 @@ use iref::Iri;
 use ssi_claims_core::{ProofValidity, Verifiable};
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
-use ssi_json_ld::WithJsonLdContext;
+use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{
     InvalidVerificationMethod, SignatureError, Signer, VerificationError, VerificationMethod,
     VerificationMethodResolver,
@@ -287,7 +287,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     ) -> Result<Verifiable<T, Proofs<Self>>, signing::Error<C::LoadError>>
     where
         Self::VerificationMethod: 'max,
-        T: WithJsonLdContext,
+        T: JsonLdNodeObject,
         R: 'max + VerificationMethodResolver<Self::VerificationMethod>,
         S: 'max
             + Signer<
@@ -311,7 +311,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     ) -> Result<Verifiable<T, Proof<Self>>, signing::Error<C::LoadError>>
     where
         Self::VerificationMethod: 'max,
-        T: WithJsonLdContext,
+        T: JsonLdNodeObject,
         R: 'max + VerificationMethodResolver<Self::VerificationMethod>,
         S: 'max
             + Signer<

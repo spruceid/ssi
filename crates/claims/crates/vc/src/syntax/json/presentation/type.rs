@@ -1,5 +1,6 @@
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
-use std::marker::PhantomData;
+use ssi_json_ld::JsonLdTypes;
+use std::{borrow::Cow, marker::PhantomData};
 
 use crate::VERIFIABLE_PRESENTATION_TYPE;
 
@@ -17,6 +18,10 @@ pub struct JsonPresentationTypes<T = ()>(Vec<String>, PhantomData<T>);
 impl<T> JsonPresentationTypes<T> {
     pub fn additional_types(&self) -> &[String] {
         &self.0
+    }
+
+    pub fn to_json_ld_types(&self) -> JsonLdTypes {
+        JsonLdTypes::new(&[VERIFIABLE_PRESENTATION_TYPE], Cow::Borrowed(&self.0))
     }
 }
 

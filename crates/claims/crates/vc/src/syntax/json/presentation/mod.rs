@@ -5,7 +5,7 @@ use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::Validate;
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
 
 use super::{super::value_or_array, SpecializedJsonCredential};
 
@@ -82,9 +82,15 @@ impl<C> JsonPresentation<C> {
     }
 }
 
-impl<C> WithJsonLdContext for JsonPresentation<C> {
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
-        Cow::Borrowed(self.context.as_ref())
+impl<C> JsonLdObject for JsonPresentation<C> {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        Some(Cow::Borrowed(self.context.as_ref()))
+    }
+}
+
+impl<C> JsonLdNodeObject for JsonPresentation<C> {
+    fn json_ld_type(&self) -> JsonLdTypes {
+        self.types.to_json_ld_types()
     }
 }
 

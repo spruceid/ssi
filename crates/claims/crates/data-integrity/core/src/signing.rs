@@ -1,5 +1,5 @@
 use ssi_claims_core::Verifiable;
-use ssi_json_ld::WithJsonLdContext;
+use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{SignatureError, Signer, VerificationMethodResolver};
 
 use crate::{
@@ -44,7 +44,7 @@ pub async fn sign<'max, T, S: CryptographicSuite, X, R, N>(
     params: ProofConfiguration<S::VerificationMethod, S::Options>,
 ) -> Result<Verifiable<T, Proofs<S>>, Error<X::LoadError>>
 where
-    T: WithJsonLdContext,
+    T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
     R: 'max + VerificationMethodResolver<S::VerificationMethod>,
@@ -67,7 +67,7 @@ pub async fn sign_single<'max, T, S: CryptographicSuite, X, R, N>(
     mut params: ProofConfiguration<S::VerificationMethod, S::Options>,
 ) -> Result<Verifiable<T, Proof<S>>, Error<X::LoadError>>
 where
-    T: WithJsonLdContext,
+    T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
     R: 'max + VerificationMethodResolver<S::VerificationMethod>,
@@ -81,7 +81,12 @@ where
 
     let expanded_params = params
         .borrowed()
-        .expand(input.json_ld_context().as_ref(), &suite, &mut environment)
+        .expand(
+            input.json_ld_context().as_deref(),
+            input.json_ld_type(),
+            &suite,
+            &mut environment,
+        )
         .await?
         .with_configuration(params.borrowed());
 

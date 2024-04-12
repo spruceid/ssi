@@ -144,8 +144,85 @@ where
     }
 }
 
-/// Value that has a JSON-LD context.
-pub trait WithJsonLdContext {
+/// Any type representing a JSON-LD object.
+pub trait JsonLdObject {
     /// Returns the JSON-LD context attached to `self`.
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context>;
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        None
+    }
+}
+
+pub trait JsonLdNodeObject: JsonLdObject {
+    fn json_ld_type(&self) -> JsonLdTypes {
+        JsonLdTypes::default()
+    }
+}
+
+pub struct JsonLdTypes<'a> {
+    static_: &'static [&'static str],
+    non_static: Cow<'a, [String]>,
+}
+
+impl<'a> Default for JsonLdTypes<'a> {
+    fn default() -> Self {
+        Self::new(&[], Cow::Owned(vec![]))
+    }
+}
+
+impl<'a> JsonLdTypes<'a> {
+    pub fn new(static_: &'static [&'static str], non_static: Cow<'a, [String]>) -> Self {
+        Self {
+            static_,
+            non_static,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.static_.len() + self.non_static.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.static_.is_empty() && self.non_static.is_empty()
+    }
+}
+
+impl<'a> From<&'static &'static str> for JsonLdTypes<'a> {
+    fn from(value: &'static &'static str) -> Self {
+        Self::new(std::slice::from_ref(value), Cow::Owned(vec![]))
+    }
+}
+
+impl<'a> From<&'a [String]> for JsonLdTypes<'a> {
+    fn from(value: &'a [String]) -> Self {
+        Self::new(&[], Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<Vec<String>> for JsonLdTypes<'a> {
+    fn from(value: Vec<String>) -> Self {
+        Self::new(&[], Cow::Owned(value))
+    }
+}
+
+impl<'a> From<Cow<'a, [String]>> for JsonLdTypes<'a> {
+    fn from(value: Cow<'a, [String]>) -> Self {
+        Self::new(&[], value)
+    }
+}
+
+impl<'a> serde::Serialize for JsonLdTypes<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeSeq;
+        let mut seq = serializer.serialize_seq(Some(self.static_.len() + self.non_static.len()))?;
+        for ty in self.static_ {
+            seq.serialize_element(ty)?;
+        }
+        for ty in self.non_static.as_ref() {
+            seq.serialize_element(ty)?;
+        }
+        seq.end()
+    }
 }

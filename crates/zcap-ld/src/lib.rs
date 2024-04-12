@@ -24,7 +24,7 @@ use ssi_claims::{
     vc::{Context, RequiredContext},
     ExtractProof, MergeWithProof, ProofValidity, Validate, Verifiable, VerifiableClaims,
 };
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, WithJsonLdContext};
+use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject};
 use ssi_verification_methods::Signer;
 use ssi_verification_methods::{
     AnyMethod, ProofPurpose, VerificationError, VerificationMethodResolver,
@@ -179,11 +179,13 @@ impl<C, P> Delegation<C, P> {
     }
 }
 
-impl<C, P> WithJsonLdContext for Delegation<C, P> {
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
-        Cow::Borrowed(self.context.as_ref())
+impl<C, P> JsonLdObject for Delegation<C, P> {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
+
+impl<C, P> JsonLdNodeObject for Delegation<C, P> {}
 
 impl<C, P> Validate for Delegation<C, P> {
     fn is_valid(&self) -> bool {
@@ -364,11 +366,13 @@ impl<P> Invocation<P> {
     }
 }
 
-impl<P> WithJsonLdContext for Invocation<P> {
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
-        Cow::Borrowed(self.context.as_ref())
+impl<P> JsonLdObject for Invocation<P> {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
+
+impl<P> JsonLdNodeObject for Invocation<P> {}
 
 impl<P> MergeWithProof<AnyProof> for Invocation<P> {
     type WithProofs = VerifiableInvocation<P>;

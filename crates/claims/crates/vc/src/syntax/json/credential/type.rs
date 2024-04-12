@@ -1,5 +1,6 @@
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
-use std::marker::PhantomData;
+use ssi_json_ld::JsonLdTypes;
+use std::{borrow::Cow, marker::PhantomData};
 
 use crate::VERIFIABLE_CREDENTIAL_TYPE;
 
@@ -43,6 +44,10 @@ impl<T: RequiredCredentialTypeSet> Default for JsonCredentialTypes<T> {
 impl<T> JsonCredentialTypes<T> {
     pub fn additional_types(&self) -> &[String] {
         &self.0
+    }
+
+    pub fn to_json_ld_types(&self) -> JsonLdTypes {
+        JsonLdTypes::new(&[VERIFIABLE_CREDENTIAL_TYPE], Cow::Borrowed(&self.0))
     }
 }
 
