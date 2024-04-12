@@ -73,6 +73,7 @@ sha3 = "0.10.8"
 rsa = "0.6"
 
 # other common dependencies
+log = "0.4.21"
 async-std = "1.9"
 async-trait = "0.1.68"
 thiserror = "1.0.40"

@@ -16,6 +16,7 @@ use std::{
 
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use iref::UriBuf;
+use multibase::Base;
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{Proof, Validate, Verifiable, VerifyClaimsWith};
@@ -39,15 +40,21 @@ pub struct BitstringStatusListCredential {
     #[serde(rename = "@context")]
     pub context: Context<V2>,
 
+    /// Credential identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<UriBuf>,
+
     /// Credential type.
     #[serde(rename = "type")]
     pub types: JsonCredentialTypes<BitstringStatusListCredentialType>,
 
     /// Valid from.
-    pub valid_from: xsd_types::DateTimeStamp,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valid_from: Option<xsd_types::DateTimeStamp>,
 
     /// Valid until.
-    pub valid_until: xsd_types::DateTimeStamp,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valid_until: Option<xsd_types::DateTimeStamp>,
 
     /// Status list.
     pub credential_subject: BitstringStatusList,
@@ -55,6 +62,24 @@ pub struct BitstringStatusListCredential {
     /// Other properties.
     #[serde(flatten)]
     pub other_properties: HashMap<String, serde_json::Value>,
+}
+
+impl BitstringStatusListCredential {
+    pub fn new(id: Option<UriBuf>, credential_subject: BitstringStatusList) -> Self {
+        Self {
+            context: Context::default(),
+            id,
+            types: JsonCredentialTypes::default(),
+            valid_from: None,
+            valid_until: None,
+            credential_subject,
+            other_properties: HashMap::default()
+        }
+    }
+
+    pub fn decode_status_list(&self) -> Result<StatusList, DecodeError> {
+        self.credential_subject.decode()
+    }
 }
 
 impl WithJsonLdContext for BitstringStatusListCredential {
@@ -82,12 +107,6 @@ where
     }
 }
 
-impl BitstringStatusListCredential {
-    fn decode_status_list(&self) -> Result<StatusList, DecodeError> {
-        todo!()
-    }
-}
-
 impl Validate for BitstringStatusListCredential {
     fn is_valid(&self) -> bool {
         todo!()
@@ -96,8 +115,8 @@ impl Validate for BitstringStatusListCredential {
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
-    #[error("invalid base64: {0}")]
-    Base64(#[from] base64::DecodeError),
+    #[error("invalid multibase: {0}")]
+    Multibase(#[from] multibase::Error),
 
     #[error("GZIP error: {0}")]
     Gzip(io::Error),
@@ -197,29 +216,65 @@ impl RequiredCredentialType for BitstringStatusListCredentialType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BitstringStatusList {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<UriBuf>,
+
     /// `BitstringStatusList` type.
     #[serde(rename = "type")]
-    type_: BitstringStatusListType,
+    pub type_: BitstringStatusListType,
 
     /// Status purpose.
-    status_purpose: StatusPurpose,
+    pub status_purpose: StatusPurpose,
+
+    #[serde(default, skip_serializing_if = "StatusSize::is_default")]
+    pub status_size: StatusSize,
 
     /// Encoded status list.
-    encoded_list: EncodedList,
+    pub encoded_list: EncodedList,
 
     /// Time to live.
     #[serde(default, skip_serializing_if = "TimeToLive::is_default")]
-    ttl: TimeToLive,
-
-    #[serde(default, skip_serializing_if = "StatusSize::is_default")]
-    status_size: StatusSize,
+    pub ttl: TimeToLive,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    status_message: Vec<StatusMessage>,
+    pub status_message: Vec<StatusMessage>,
 
     /// URL to material related to the status.
-    status_reference: Option<UriBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_reference: Option<UriBuf>,
+}
+
+impl BitstringStatusList {
+    pub fn new(
+        id: Option<UriBuf>,
+        status_purpose: StatusPurpose,
+        status_size: StatusSize,
+        encoded_list: EncodedList,
+        ttl: TimeToLive,
+        status_message: Vec<StatusMessage>
+    ) -> Self {
+        Self {
+            id,
+            type_: BitstringStatusListType,
+            status_purpose,
+            status_size,
+            encoded_list,
+            ttl,
+            status_message,
+            status_reference: None
+        }
+    }
+    
+    pub fn decode(&self) -> Result<StatusList, DecodeError> {
+        let bytes = self.encoded_list.decode(None)?;
+        Ok(StatusList::from_bytes(
+            self.status_size,
+            self.ttl,
+            bytes
+        ))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -314,16 +369,36 @@ impl Offset {
 pub struct EncodedList(String);
 
 impl EncodedList {
-    pub fn encode(bytes: Vec<u8>) -> Self {
+    /// Minimum bitstring size (16KB).
+    pub const MINIMUM_SIZE: usize = 16 * 1024;
+    
+    /// Default maximum bitstring size allowed by the `decode` function.
+    ///
+    /// 16MB.
+    pub const DEFAULT_LIMIT: u64 = 16 * 1024 * 1024;
+
+    pub fn encode(bytes: &[u8]) -> Self {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(&bytes).unwrap();
+
+        // Add padding to satisfy the minimum bitstring size constraint.
+        const PADDING_BUFFER_LEN: usize = 1024;
+        let padding = [0; PADDING_BUFFER_LEN];
+        let mut it = (bytes.len()..Self::MINIMUM_SIZE).step_by(PADDING_BUFFER_LEN).peekable();
+        while let Some(start) = it.next() {
+            let end = it.peek().copied().unwrap_or(Self::MINIMUM_SIZE);
+            let len = end - start;
+            encoder.write_all(&padding[..len]).unwrap();
+        }
+
         let compressed = encoder.finish().unwrap();
-        Self(base64::encode_config(compressed, base64::URL_SAFE_NO_PAD))
+        Self(multibase::encode(Base::Base64Url, compressed))
     }
 
-    pub fn decode(&self) -> Result<Vec<u8>, DecodeError> {
-        let compressed = base64::decode_config(&self.0, base64::URL_SAFE_NO_PAD)?;
-        let mut decoder = GzDecoder::new(compressed.as_slice());
+    pub fn decode(&self, limit: Option<u64>) -> Result<Vec<u8>, DecodeError> {
+        let limit = limit.unwrap_or(Self::DEFAULT_LIMIT);
+        let (_base, compressed) = multibase::decode(&self.0)?;
+        let mut decoder = GzDecoder::new(compressed.as_slice()).take(limit);
         let mut bytes = Vec::new();
         decoder.read_to_end(&mut bytes).map_err(DecodeError::Gzip)?;
         Ok(bytes)
@@ -526,6 +601,16 @@ impl StatusList {
         }
     }
 
+    pub fn from_bytes(status_size: StatusSize, ttl: TimeToLive, bytes: Vec<u8>) -> Self {
+        let len = bytes.len() * 8usize / status_size.0 as usize;
+        Self {
+            status_size,
+            bytes,
+            len,
+            ttl,
+        }
+    }
+
     pub fn get(&self, index: usize) -> Option<u8> {
         let offset = self.status_size.offset_of(index);
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
@@ -569,6 +654,45 @@ impl StatusList {
 
         self.len += 1;
         index
+    }
+
+    pub fn iter(&self) -> StatusListIter {
+        StatusListIter {
+            status_list: self,
+            index: 0
+        }
+    }
+
+    pub fn to_credential_subject(
+        &self,
+        id: Option<UriBuf>,
+        status_purpose: StatusPurpose,
+        status_message: Vec<StatusMessage>
+    ) -> BitstringStatusList {
+        BitstringStatusList::new(
+            id,
+            status_purpose,
+            self.status_size,
+            EncodedList::encode(&self.bytes),
+            self.ttl,
+            status_message
+        )
+    }
+}
+
+pub struct StatusListIter<'a> {
+    status_list: &'a StatusList,
+    index: usize
+}
+
+impl<'a> Iterator for StatusListIter<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.status_list.get(self.index).map(|status| {
+            self.index += 1;
+            status
+        })
     }
 }
 
