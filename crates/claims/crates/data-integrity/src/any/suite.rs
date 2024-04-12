@@ -473,11 +473,6 @@ impl AnySuite {
         jwk: &JWK,
         verification_method: Option<&ReferenceOrOwned<AnyMethod>>,
     ) -> Option<Self> {
-        eprintln!("pick for {jwk}");
-        if let Some(vm) = verification_method {
-            eprintln!("vm: {}", vm.id());
-        }
-
         if let Some(vm) = verification_method {
             #[cfg(feature = "w3c")]
             if vm.id().starts_with("did:jwk:") {

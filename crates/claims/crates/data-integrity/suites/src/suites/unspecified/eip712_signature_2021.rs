@@ -201,10 +201,6 @@ impl CryptographicSuite for Eip712Signature2021 {
         data: ssi_eip712::TypedData,
         _proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
-        eprintln!(
-            "typed data: {}",
-            serde_json::to_string_pretty(&data).unwrap()
-        );
         data.encode()
             .map_err(|e| HashError::InvalidMessage(Box::new(e)))
     }
