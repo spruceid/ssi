@@ -102,7 +102,7 @@ pub struct JWTClaims<PrivateClaims = AnyClaims> {
 
     /// Private, non-registered claims.
     #[serde(flatten)]
-    pub private_claims: PrivateClaims
+    pub private_claims: PrivateClaims,
 }
 
 impl<P> JWTClaims<P> {
@@ -116,7 +116,7 @@ impl<P> JWTClaims<P> {
             issuance_date: None,
             jwt_id: None,
             registered_claims: RegisteredClaims::default(),
-            private_claims: claims
+            private_claims: claims,
         }
     }
 }
@@ -132,7 +132,7 @@ impl JWTClaims<()> {
             issuance_date: self.issuance_date,
             jwt_id: self.jwt_id,
             registered_claims: self.registered_claims,
-            private_claims: claims
+            private_claims: claims,
         }
     }
 }
@@ -151,10 +151,6 @@ impl<P: Serialize> JWTClaims<P> {
 
 /// Any set of claims.
 pub type AnyClaims = HashMap<String, serde_json::Value>;
-
-pub trait ClaimSet {
-    fn get<'a>(&self, claim: ClaimKind<&str>) -> Option<&Claim>;
-}
 
 /// Sign the claims and return a JWT.
 pub async fn sign_claims<'m, M: 'm + MaybeJwkVerificationMethod>(

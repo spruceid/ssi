@@ -5,143 +5,150 @@ use serde::de::Visitor;
 use crate::{ClaimKind, JWTClaims, RegisteredClaim, RegisteredClaimKind};
 
 struct ClaimsDeserializer<D> {
-	inner: D,
-	result: JWTClaims<()>
+    inner: D,
+    result: JWTClaims<()>,
 }
 
 impl<'de, D: serde::de::MapAccess<'de>> ClaimsDeserializer<D> {
-	fn deserialize_registered_claim(&mut self, kind: RegisteredClaimKind) -> Result<(), D::Error> {
-		match kind.deserialize_value(&mut self.inner)? {
-			RegisteredClaim::Issuer(value) => {
-				self.result.issuer = Some(value);
-			}
-			RegisteredClaim::Subject(value) => {
-				self.result.subject = Some(value)
-			}
-			RegisteredClaim::Audience(value) => {
-				self.result.audience = Some(value)
-			}
-			RegisteredClaim::ExpirationTime(value) => {
-				self.result.expiration_time = Some(value)
-			}
-			RegisteredClaim::NotBefore(value) => {
-				self.result.not_before = Some(value)
-			}
-			RegisteredClaim::IssuedAt(value) => {
-				self.result.issuance_date = Some(value)
-			}
-			RegisteredClaim::JwtId(value) => {
-				self.result.jwt_id = Some(value)
-			}
-			other => {
-				self.result.registered_claims.insert(other);
-			}
-		}
+    fn deserialize_registered_claim(&mut self, kind: RegisteredClaimKind) -> Result<(), D::Error> {
+        match kind.deserialize_value(&mut self.inner)? {
+            RegisteredClaim::Issuer(value) => {
+                self.result.issuer = Some(value);
+            }
+            RegisteredClaim::Subject(value) => self.result.subject = Some(value),
+            RegisteredClaim::Audience(value) => self.result.audience = Some(value),
+            RegisteredClaim::ExpirationTime(value) => self.result.expiration_time = Some(value),
+            RegisteredClaim::NotBefore(value) => self.result.not_before = Some(value),
+            RegisteredClaim::IssuedAt(value) => self.result.issuance_date = Some(value),
+            RegisteredClaim::JwtId(value) => self.result.jwt_id = Some(value),
+            other => {
+                self.result.registered_claims.insert(other);
+            }
+        }
 
-		Ok(())
-	}
+        Ok(())
+    }
 
-	fn into_registered_claims(mut self) -> Result<JWTClaims<()>, D::Error> {
-		while let Some(claim) = self.inner.next_key()? {
-			match claim {
-				ClaimKind::Registered(r) => {
-					self.deserialize_registered_claim(r)?
-				}
-				ClaimKind::Unregistered(key) => {
-					return Err(serde::de::Error::custom(format!("unexpected claim `{}`", key)))
-				}
-			}
-		}
+    fn into_registered_claims(mut self) -> Result<JWTClaims<()>, D::Error> {
+        while let Some(claim) = self.inner.next_key()? {
+            match claim {
+                ClaimKind::Registered(r) => self.deserialize_registered_claim(r)?,
+                ClaimKind::Unregistered(key) => {
+                    return Err(serde::de::Error::custom(format!(
+                        "unexpected claim `{}`",
+                        key
+                    )))
+                }
+            }
+        }
 
-		Ok(self.result)
-	}
+        Ok(self.result)
+    }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::de::MapAccess<'de> for &'a mut ClaimsDeserializer<D> {
-	type Error = D::Error;
+impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::de::MapAccess<'de>
+    for &'a mut ClaimsDeserializer<D>
+{
+    type Error = D::Error;
 
-	fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
-		where
-			K: serde::de::DeserializeSeed<'de> {
-		loop {
-			match self.inner.next_key()? {
-				Some(ClaimKind::Registered(r)) => {
-					self.deserialize_registered_claim(r)?
-				}
-				Some(ClaimKind::Unregistered(key)) => {
-					break Ok(Some(seed.deserialize(serde::de::value::StringDeserializer::new(key))?))
-				}
-				None => {
-					break Ok(None)
-				}
-			}
-		}
-	}
-
-	fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
-		where
-			V: serde::de::DeserializeSeed<'de>
-	{
-		self.inner.next_value_seed(seed)
-	}
-}
-
-impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut ClaimsDeserializer<D> {
-	type Error = D::Error;
-
-	fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-	where
-		V: serde::de::Visitor<'de>
-	{
-		visitor.visit_map(self)
-	}
-
-	fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		visitor.visit_map(self)
-	}
+        K: serde::de::DeserializeSeed<'de>,
+    {
+        loop {
+            match self.inner.next_key()? {
+                Some(ClaimKind::Registered(r)) => self.deserialize_registered_claim(r)?,
+                Some(ClaimKind::Unregistered(key)) => {
+                    break Ok(Some(
+                        seed.deserialize(serde::de::value::StringDeserializer::new(key))?,
+                    ))
+                }
+                None => break Ok(None),
+            }
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::DeserializeSeed<'de>,
+    {
+        self.inner.next_value_seed(seed)
+    }
+}
+
+impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de>
+    for &'a mut ClaimsDeserializer<D>
+{
+    type Error = D::Error;
+
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
 
     /// Hint that the `Deserialize` type is expecting a `bool` value.
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an `i8` value.
     fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an `i16` value.
     fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an `i32` value.
     fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an `i64` value.
     fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an `i128` value.
     ///
@@ -157,34 +164,46 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// Hint that the `Deserialize` type is expecting a `u8` value.
     fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a `u16` value.
     fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a `u32` value.
     fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a `u64` value.
     fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an `u128` value.
     ///
@@ -200,26 +219,35 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// Hint that the `Deserialize` type is expecting a `f32` value.
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a `f64` value.
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a `char` value.
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a string value and does
     /// not benefit from taking ownership of buffered data owned by the
@@ -230,10 +258,13 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// instead.
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a string value and would
     /// benefit from taking ownership of buffered data owned by the
@@ -244,10 +275,13 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// instead.
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a byte array and does not
     /// benefit from taking ownership of buffered data owned by the
@@ -258,10 +292,13 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// instead.
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a byte array and would
     /// benefit from taking ownership of buffered data owned by the
@@ -272,10 +309,13 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// instead.
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting an optional value.
     ///
@@ -284,18 +324,21 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// `Some(value)`.
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a unit value.
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		visitor.visit_unit()
-	}
+        V: Visitor<'de>,
+    {
+        visitor.visit_unit()
+    }
 
     /// Hint that the `Deserialize` type is expecting a unit struct with a
     /// particular name.
@@ -305,10 +348,13 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a newtype struct with a
     /// particular name.
@@ -318,27 +364,36 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a sequence of values.
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a sequence of values and
     /// knows how many values there are without looking at the serialized data.
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a tuple struct with a
     /// particular name and number of fields.
@@ -349,10 +404,13 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting a struct with a particular
     /// name and fields.
@@ -363,10 +421,10 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		visitor.visit_map(self)
-	}
+        V: Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
 
     /// Hint that the `Deserialize` type is expecting an enum value with a
     /// particular name and possible variants.
@@ -377,19 +435,25 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type is expecting the name of a struct
     /// field or the discriminant of an enum variant.
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 
     /// Hint that the `Deserialize` type needs to deserialize a value whose type
     /// doesn't matter because it is ignored.
@@ -397,19 +461,20 @@ impl<'a, 'de, D: serde::de::MapAccess<'de>> serde::Deserializer<'de> for &'a mut
     /// Deserializers for non-self-describing formats may not support this mode.
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
-        V: Visitor<'de>
-	{
-		Err(serde::de::Error::invalid_type(serde::de::Unexpected::Map, &visitor))
-	}
+        V: Visitor<'de>,
+    {
+        Err(serde::de::Error::invalid_type(
+            serde::de::Unexpected::Map,
+            &visitor,
+        ))
+    }
 }
 
 impl<'de, P: serde::Deserialize<'de>> serde::Deserialize<'de> for JWTClaims<P> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
-        
-
         // P::deserialize(PrivateClaimsDeserializer);
 
         struct Visitor<P>(PhantomData<P>);
@@ -423,15 +488,15 @@ impl<'de, P: serde::Deserialize<'de>> serde::Deserialize<'de> for JWTClaims<P> {
 
             fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
             where
-                A: serde::de::MapAccess<'de>
+                A: serde::de::MapAccess<'de>,
             {
-				let mut claims_deserializer = ClaimsDeserializer {
-					inner: map,
-					result: JWTClaims::default()
-				};
+                let mut claims_deserializer = ClaimsDeserializer {
+                    inner: map,
+                    result: JWTClaims::default(),
+                };
 
-				let private_claims = P::deserialize(&mut claims_deserializer)?;
-				let registered_claims = claims_deserializer.into_registered_claims()?;
+                let private_claims = P::deserialize(&mut claims_deserializer)?;
+                let registered_claims = claims_deserializer.into_registered_claims()?;
 
                 Ok(registered_claims.with_private_claims(private_claims))
             }

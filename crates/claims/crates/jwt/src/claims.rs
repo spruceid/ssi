@@ -9,14 +9,14 @@ use crate::{NumericDate, StringOrURI};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ClaimKind<U = String> {
     Registered(RegisteredClaimKind),
-    Unregistered(U)
+    Unregistered(U),
 }
 
 impl ClaimKind {
     pub fn as_ref(&self) -> ClaimKind<&str> {
         match self {
             Self::Registered(r) => ClaimKind::Registered(*r),
-            Self::Unregistered(u) => ClaimKind::Unregistered(u)
+            Self::Unregistered(u) => ClaimKind::Unregistered(u),
         }
     }
 }
@@ -24,12 +24,12 @@ impl ClaimKind {
 impl<'de> serde::Deserialize<'de> for ClaimKind {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         let name = String::deserialize(deserializer)?;
-        match RegisteredClaimKind::from_str(&name) {
+        match RegisteredClaimKind::new(&name) {
             Some(r) => Ok(Self::Registered(r)),
-            None => Ok(Self::Unregistered(name))
+            None => Ok(Self::Unregistered(name)),
         }
     }
 }
@@ -38,7 +38,7 @@ impl<'a> ClaimKind<&'a str> {
     pub fn into_owned(self) -> ClaimKind {
         match self {
             Self::Registered(r) => ClaimKind::Registered(r),
-            Self::Unregistered(u) => ClaimKind::Unregistered(u.to_owned())
+            Self::Unregistered(u) => ClaimKind::Unregistered(u.to_owned()),
         }
     }
 }
@@ -51,14 +51,14 @@ impl hashbrown::Equivalent<ClaimKind<String>> for ClaimKind<&str> {
 
 pub enum Claim {
     Registered(RegisteredClaim),
-    Unregistered(String, serde_json::Value)
+    Unregistered(String, serde_json::Value),
 }
 
 impl Claim {
     pub fn kind(&self) -> ClaimKind<&str> {
         match self {
             Self::Registered(r) => ClaimKind::Registered(r.kind()),
-            Self::Unregistered(k, _) => ClaimKind::Unregistered(k)
+            Self::Unregistered(k, _) => ClaimKind::Unregistered(k),
         }
     }
 }
@@ -79,7 +79,7 @@ macro_rules! registered_claims {
         }
 
         impl RegisteredClaimKind {
-            pub fn from_str(s: &str) -> Option<Self> {
+            pub fn new(s: &str) -> Option<Self> {
                 match s {
                     $(
                         $name => Some(Self::$variant),
@@ -113,13 +113,13 @@ macro_rules! registered_claims {
 				D: serde::Deserializer<'de>
 			{
 				let name = String::deserialize(deserializer)?;
-				match Self::from_str(&name) {
+				match Self::new(&name) {
 					Some(r) => Ok(r),
 					None => Err(serde::de::Error::custom(format!("unknown registered claim `{}`", name)))
 				}
 			}
 		}
-        
+
         /// Claims defined in the [IANA "JSON Web Token Claims" registry][1].
         ///
         /// [1]: <https://www.iana.org/assignments/jwt/jwt.xhtml>
@@ -220,9 +220,9 @@ registered_claims! {
 
     "nonce": Nonce(String),
 
-	"vc": VerifiableCredential(json_syntax::Value),
+    "vc": VerifiableCredential(json_syntax::Value),
 
-	"vp": VerifiablePresentation(json_syntax::Value)
+    "vp": VerifiablePresentation(json_syntax::Value)
 }
 
 /// Set of registered claims, defined in the
@@ -234,7 +234,7 @@ registered_claims! {
 #[derive(Default, Clone)]
 pub struct RegisteredClaims {
     by_kind: HashMap<RegisteredClaimKind, usize>,
-    entries: Slab<RegisteredClaim>
+    entries: Slab<RegisteredClaim>,
 }
 
 impl RegisteredClaims {
@@ -242,24 +242,22 @@ impl RegisteredClaims {
         Self::default()
     }
 
-    pub fn get<'a>(&self, kind: RegisteredClaimKind) -> Option<&RegisteredClaim> {
+    pub fn get(&self, kind: RegisteredClaimKind) -> Option<&RegisteredClaim> {
         let i = *self.by_kind.get(&kind)?;
         Some(&self.entries[i])
     }
 
-	pub fn iter(&self) -> RegisteredClaimsIter {
-		RegisteredClaimsIter {
-			map: self.by_kind.values().copied(),
-			entries: &self.entries
-		}
-	}
+    pub fn iter(&self) -> RegisteredClaimsIter {
+        RegisteredClaimsIter {
+            map: self.by_kind.values().copied(),
+            entries: &self.entries,
+        }
+    }
 
     pub fn insert(&mut self, claim: RegisteredClaim) -> Option<RegisteredClaim> {
         let kind = claim.kind();
         match self.by_kind.get(&kind).copied() {
-            Some(i) => {
-                Some(std::mem::replace(&mut self.entries[i], claim))
-            }
+            Some(i) => Some(std::mem::replace(&mut self.entries[i], claim)),
             None => {
                 let entry = self.entries.vacant_entry();
                 self.by_kind.insert(kind, entry.key());
@@ -269,30 +267,30 @@ impl RegisteredClaims {
         }
     }
 
-	pub fn remove(&mut self, kind: RegisteredClaimKind) -> Option<RegisteredClaim> {
-		let i = self.by_kind.remove(&kind)?;
-		Some(self.entries.remove(i))
-	}
+    pub fn remove(&mut self, kind: RegisteredClaimKind) -> Option<RegisteredClaim> {
+        let i = self.by_kind.remove(&kind)?;
+        Some(self.entries.remove(i))
+    }
 }
 
 impl<'a> IntoIterator for &'a RegisteredClaims {
-	type IntoIter = RegisteredClaimsIter<'a>;
-	type Item = &'a RegisteredClaim;
+    type IntoIter = RegisteredClaimsIter<'a>;
+    type Item = &'a RegisteredClaim;
 
-	fn into_iter(self) -> Self::IntoIter {
-		self.iter()
-	}
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
 impl fmt::Debug for RegisteredClaims {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		self.entries.fmt(f)
-	}
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.entries.fmt(f)
+    }
 }
 
 pub struct RegisteredClaimsIter<'a> {
-	map: std::iter::Copied<hashbrown::hash_map::Values<'a, RegisteredClaimKind, usize>>,
-	entries: &'a Slab<RegisteredClaim>
+    map: std::iter::Copied<hashbrown::hash_map::Values<'a, RegisteredClaimKind, usize>>,
+    entries: &'a Slab<RegisteredClaim>,
 }
 
 impl<'a> Iterator for RegisteredClaimsIter<'a> {
@@ -306,15 +304,15 @@ impl<'a> Iterator for RegisteredClaimsIter<'a> {
 impl serde::Serialize for RegisteredClaims {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer
+        S: serde::Serializer,
     {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(Some(self.entries.len()))?;
-        
-        for claim in self { 
+
+        for claim in self {
             claim.serialize(&mut map)?;
         }
-        
+
         map.end()
     }
 }
@@ -322,7 +320,7 @@ impl serde::Serialize for RegisteredClaims {
 impl<'de> serde::Deserialize<'de> for RegisteredClaims {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         struct Visitor;
 
@@ -335,7 +333,7 @@ impl<'de> serde::Deserialize<'de> for RegisteredClaims {
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
-                A: serde::de::MapAccess<'de>
+                A: serde::de::MapAccess<'de>,
             {
                 let mut result = RegisteredClaims::new();
                 while let Some(kind) = map.next_key::<RegisteredClaimKind>()? {
@@ -354,7 +352,7 @@ impl<'de> serde::Deserialize<'de> for RegisteredClaims {
 #[derive(Default)]
 pub struct Claims {
     by_kind: HashMap<ClaimKind, usize>,
-    entries: Vec<Claim>
+    entries: Vec<Claim>,
 }
 
 impl Claims {
@@ -371,9 +369,7 @@ impl Claims {
     pub fn insert(&mut self, claim: Claim) -> Option<Claim> {
         let kind = claim.kind();
         match self.by_kind.get(&kind).copied() {
-            Some(i) => {
-                Some(std::mem::replace(&mut self.entries[i], claim))
-            }
+            Some(i) => Some(std::mem::replace(&mut self.entries[i], claim)),
             None => {
                 let i = self.entries.len();
                 self.by_kind.insert(kind.into_owned(), i);
@@ -397,11 +393,11 @@ impl<'a> Iterator for ClaimsIter<'a> {
 impl serde::Serialize for Claims {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer
+        S: serde::Serializer,
     {
         use serde::ser::SerializeMap;
         let mut map = serializer.serialize_map(Some(self.entries.len()))?;
-        
+
         for claim in &self.entries {
             match claim {
                 Claim::Registered(r) => {
@@ -412,7 +408,7 @@ impl serde::Serialize for Claims {
                 }
             }
         }
-        
+
         map.end()
     }
 }
@@ -420,7 +416,7 @@ impl serde::Serialize for Claims {
 impl<'de> serde::Deserialize<'de> for Claims {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>
+        D: serde::Deserializer<'de>,
     {
         struct Visitor;
 
@@ -433,7 +429,7 @@ impl<'de> serde::Deserialize<'de> for Claims {
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
             where
-                A: serde::de::MapAccess<'de>
+                A: serde::de::MapAccess<'de>,
             {
                 let mut result = Claims::new();
                 while let Some(key) = map.next_key()? {

@@ -23,14 +23,17 @@ pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt.registered_claims.remove(RegisteredClaimKind::VerifiableCredential) {
+    match jwt
+        .registered_claims
+        .remove(RegisteredClaimKind::VerifiableCredential)
+    {
         Some(RegisteredClaim::VerifiableCredential(vc)) => match vc {
             json_syntax::Value::Object(mut vc) => {
                 decode_jwt_vc_specific_headers(jwt, &mut vc)?;
                 Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
             }
             v => Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind())),
-        }
+        },
         Some(_) => panic!(), // unsound claim set.
         None => Err(JwtVcDecodeError::MissingCredential),
     }
@@ -108,23 +111,23 @@ pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt.registered_claims.remove(RegisteredClaimKind::VerifiableCredential) {
+    match jwt
+        .registered_claims
+        .remove(RegisteredClaimKind::VerifiableCredential)
+    {
         Some(RegisteredClaim::VerifiablePresentation(vp)) => match vp {
             json_syntax::Value::Object(mut vp) => {
                 decode_jwt_vp_specific_headers(jwt, &mut vp);
                 Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
             }
             v => Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind())),
-        }
+        },
         Some(_) => panic!(), // unsound claim set.
         None => Err(JwtVpDecodeError::MissingPresentation),
     }
 }
 
-fn decode_jwt_vp_specific_headers(
-    jwt: JWTClaims,
-    target: &mut json_syntax::Object,
-) {
+fn decode_jwt_vp_specific_headers(jwt: JWTClaims, target: &mut json_syntax::Object) {
     if let Some(iss) = jwt.issuer {
         target.insert("holder".into(), iss.into_string().into());
     }

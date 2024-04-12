@@ -28,9 +28,7 @@ pub enum JwtVcEncodeError {
     InvalidUri(#[from] iref::InvalidUri<String>),
 }
 
-pub fn encode_jwt_vc_claims<T: Serialize>(
-    credential: &T,
-) -> Result<JWTClaims, JwtVcEncodeError> {
+pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, JwtVcEncodeError> {
     let mut credential = json_syntax::to_value(credential)?
         .into_object()
         .ok_or(JwtVcEncodeError::ExpectedJsonObject)?;
@@ -85,9 +83,11 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
         }
     }
 
-    claims.registered_claims.insert(RegisteredClaim::VerifiableCredential(
-        json_syntax::Value::Object(credential)
-    ));
+    claims
+        .registered_claims
+        .insert(RegisteredClaim::VerifiableCredential(
+            json_syntax::Value::Object(credential),
+        ));
 
     Ok(claims)
 }
@@ -116,9 +116,7 @@ pub enum JwtVpEncodeError {
     InvalidUri(#[from] iref::InvalidUri<String>),
 }
 
-pub fn encode_jwt_vp_claims<T: Serialize>(
-    presentation: &T,
-) -> Result<JWTClaims, JwtVpEncodeError> {
+pub fn encode_jwt_vp_claims<T: Serialize>(presentation: &T) -> Result<JWTClaims, JwtVpEncodeError> {
     let mut vp = json_syntax::to_value(presentation)?
         .into_object()
         .ok_or(JwtVpEncodeError::ExpectedJsonObject)?;
@@ -150,9 +148,11 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
         }
     }
 
-    claims.registered_claims.insert(RegisteredClaim::VerifiablePresentation(
-        json_syntax::Value::Object(vp)
-    ));
+    claims
+        .registered_claims
+        .insert(RegisteredClaim::VerifiablePresentation(
+            json_syntax::Value::Object(vp),
+        ));
 
     Ok(claims)
 }
