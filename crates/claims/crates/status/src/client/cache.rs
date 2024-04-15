@@ -9,7 +9,7 @@ use parking_lot::RwLock;
 
 use crate::{EncodedStatusMap, StatusMap};
 
-use super::{MaybeCached, ProviderError, StatusMapProvider};
+use super::{MaybeCached, ProviderError, StatusMapProvider, TypedStatusMapProvider};
 
 pub struct Cached<I: ToOwned, T: EncodedStatusMap, R> {
     remote_provider: R,
@@ -27,7 +27,7 @@ impl<I: ToOwned, T: EncodedStatusMap, R> Cached<I, T, R> {
     }
 }
 
-impl<I: ToOwned + Eq + Hash, T: EncodedStatusMap, R: StatusMapProvider<I, T>> Cached<I, T, R>
+impl<I: ToOwned + Eq + Hash, T: EncodedStatusMap, R: TypedStatusMapProvider<I, T>> Cached<I, T, R>
 where
     I::Owned: Eq + Hash,
 {
@@ -40,7 +40,7 @@ where
         }
 
         let entry = CacheEntry {
-            status_map: Arc::new(self.remote_provider.get(id).await?.into_owned()),
+            status_map: Arc::new(self.remote_provider.get_typed(id).await?.into_owned()),
             retrieval_date: Instant::now(),
         };
 
@@ -50,12 +50,19 @@ where
     }
 }
 
-impl<I: ToOwned + Eq + Hash, T: EncodedStatusMap, R: StatusMapProvider<I, T>>
-    StatusMapProvider<I, T> for Cached<I, T, R>
+impl<I: ToOwned + Eq + Hash, T: EncodedStatusMap, R: TypedStatusMapProvider<I, T>>
+    StatusMapProvider<I> for Cached<I, T, R>
 where
     I::Owned: Eq + Hash,
 {
-    async fn get(&self, id: &I) -> Result<MaybeCached<T::Decoded>, ProviderError> {
+}
+
+impl<I: ToOwned + Eq + Hash, T: EncodedStatusMap, R: TypedStatusMapProvider<I, T>>
+    TypedStatusMapProvider<I, T> for Cached<I, T, R>
+where
+    I::Owned: Eq + Hash,
+{
+    async fn get_typed(&self, id: &I) -> Result<MaybeCached<T::Decoded>, ProviderError> {
         Ok(MaybeCached::Cached(self.get_entry(id).await?.status_map))
     }
 }

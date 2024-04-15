@@ -7,17 +7,40 @@ pub use cache::Cached;
 mod http;
 pub use http::HttpClient;
 
+#[derive(Debug, thiserror::Error)]
 pub enum ProviderError {
+    #[error("not found")]
     NotFound,
+
+    #[error("internal error: {0}")]
     Internal(String),
+
+    #[error("invalid media type")]
     InvalidMediaType,
+
+    #[error("{0}")]
     Encoded(String),
+
+    #[error("decoding failed: {0}")]
     Decoding(String),
 }
 
-pub trait StatusMapProvider<I: ?Sized, T: EncodedStatusMap> {
+pub trait TypedStatusMapProvider<I: ?Sized, T: EncodedStatusMap> {
     #[allow(async_fn_in_trait)]
-    async fn get(&self, id: &I) -> Result<MaybeCached<T::Decoded>, ProviderError>;
+    async fn get_typed(&self, id: &I) -> Result<MaybeCached<T::Decoded>, ProviderError>;
+}
+
+pub trait StatusMapProvider<I: ?Sized> {
+    #[allow(async_fn_in_trait)]
+    async fn get<T: EncodedStatusMap>(
+        &self,
+        id: &I,
+    ) -> Result<MaybeCached<T::Decoded>, ProviderError>
+    where
+        Self: TypedStatusMapProvider<I, T>,
+    {
+        self.get_typed(id).await
+    }
 }
 
 pub enum MaybeCached<T> {

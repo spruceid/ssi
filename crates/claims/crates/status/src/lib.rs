@@ -1,8 +1,9 @@
 use std::time::Duration;
 
-pub mod bitstream_status_list;
+mod r#impl;
+use iref::Uri;
+pub use r#impl::*;
 pub mod client;
-pub mod token_status_list;
 
 pub type BoxedError = Box<dyn Send + std::error::Error>;
 
@@ -36,23 +37,37 @@ pub trait StatusMap: Clone {
 
     fn get_by_key(&self, key: Self::Key) -> Option<Self::Status>;
 
-    fn get<E: StatusMapEntry<Key = Self::Key>>(&self, entry: &E) -> Option<Self::Status> {
+    fn get_entry<E: StatusMapEntry<Key = Self::Key>>(&self, entry: &E) -> Option<Self::Status> {
         self.get_by_key(entry.key())
     }
 }
 
 pub trait StatusMapEntrySet {
-    type Entry: StatusMapEntry;
+    type Entry<'a>: StatusMapEntry
+    where
+        Self: 'a;
 
-    fn get_entry(&self, purpose: StatusPurpose<&str>) -> Option<&Self::Entry>;
+    fn get_entry(&self, purpose: StatusPurpose<&str>) -> Option<Self::Entry<'_>>;
 }
 
 pub trait StatusMapEntry {
     type Key;
 
-    fn purpose(&self) -> Option<StatusPurpose<&str>>;
+    fn status_list_url(&self) -> &Uri;
 
     fn key(&self) -> Self::Key;
+}
+
+impl<'a, E: StatusMapEntry> StatusMapEntry for &'a E {
+    type Key = E::Key;
+
+    fn status_list_url(&self) -> &Uri {
+        E::status_list_url(*self)
+    }
+
+    fn key(&self) -> Self::Key {
+        E::key(*self)
+    }
 }
 
 pub enum StatusPurpose<T = String> {

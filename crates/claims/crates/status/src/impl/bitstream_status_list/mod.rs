@@ -15,19 +15,22 @@ use std::{
 };
 
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use iref::UriBuf;
+use iref::{Uri, UriBuf};
 use multibase::Base;
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{Proof, Validate, Verifiable, VerifyClaimsWith};
 use ssi_data_integrity::{ssi_rdf::Expandable, AnyInputContext, AnyProofs};
-use ssi_json_ld::{AnyJsonLdEnvironment, CompactJsonLd, JsonLdError, WithJsonLdContext};
+use ssi_json_ld::{
+    AnyJsonLdEnvironment, CompactJsonLd, JsonLdError, JsonLdNodeObject, JsonLdObject,
+};
 use ssi_vc::{
     json::{JsonCredentialTypes, RequiredCredentialType},
     Context, V2,
 };
+use ssi_verification_methods::ssi_core::OneOrMany;
 
-use crate::{EncodedStatusMap, FromBytes, StatusMap, StatusMapEntry};
+use crate::{EncodedStatusMap, FromBytes, StatusMap, StatusMapEntry, StatusMapEntrySet};
 
 pub const BITSTRING_STATUS_LIST_TYPE: &str = "BitstringStatusList";
 pub const BITSTRING_STATUS_LIST_CREDENTIAL_TYPE: &str = "BitstringStatusListCredential";
@@ -73,7 +76,7 @@ impl BitstringStatusListCredential {
             valid_from: None,
             valid_until: None,
             credential_subject,
-            other_properties: HashMap::default()
+            other_properties: HashMap::default(),
         }
     }
 
@@ -82,9 +85,15 @@ impl BitstringStatusListCredential {
     }
 }
 
-impl WithJsonLdContext for BitstringStatusListCredential {
-    fn json_ld_context(&self) -> Cow<json_ld::syntax::Context> {
-        Cow::Borrowed(self.context.as_ref())
+impl JsonLdObject for BitstringStatusListCredential {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        Some(Cow::Borrowed(self.context.as_ref()))
+    }
+}
+
+impl JsonLdNodeObject for BitstringStatusListCredential {
+    fn json_ld_type(&self) -> ssi_json_ld::JsonLdTypes {
+        self.types.to_json_ld_types()
     }
 }
 
@@ -109,7 +118,7 @@ where
 
 impl Validate for BitstringStatusListCredential {
     fn is_valid(&self) -> bool {
-        todo!()
+        true
     }
 }
 
@@ -253,7 +262,7 @@ impl BitstringStatusList {
         status_size: StatusSize,
         encoded_list: EncodedList,
         ttl: TimeToLive,
-        status_message: Vec<StatusMessage>
+        status_message: Vec<StatusMessage>,
     ) -> Self {
         Self {
             id,
@@ -263,17 +272,13 @@ impl BitstringStatusList {
             encoded_list,
             ttl,
             status_message,
-            status_reference: None
+            status_reference: None,
         }
     }
-    
+
     pub fn decode(&self) -> Result<StatusList, DecodeError> {
         let bytes = self.encoded_list.decode(None)?;
-        Ok(StatusList::from_bytes(
-            self.status_size,
-            self.ttl,
-            bytes
-        ))
+        Ok(StatusList::from_bytes(self.status_size, self.ttl, bytes))
     }
 }
 
@@ -371,7 +376,7 @@ pub struct EncodedList(String);
 impl EncodedList {
     /// Minimum bitstring size (16KB).
     pub const MINIMUM_SIZE: usize = 16 * 1024;
-    
+
     /// Default maximum bitstring size allowed by the `decode` function.
     ///
     /// 16MB.
@@ -379,12 +384,14 @@ impl EncodedList {
 
     pub fn encode(bytes: &[u8]) -> Self {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
-        encoder.write_all(&bytes).unwrap();
+        encoder.write_all(bytes).unwrap();
 
         // Add padding to satisfy the minimum bitstring size constraint.
         const PADDING_BUFFER_LEN: usize = 1024;
         let padding = [0; PADDING_BUFFER_LEN];
-        let mut it = (bytes.len()..Self::MINIMUM_SIZE).step_by(PADDING_BUFFER_LEN).peekable();
+        let mut it = (bytes.len()..Self::MINIMUM_SIZE)
+            .step_by(PADDING_BUFFER_LEN)
+            .peekable();
         while let Some(start) = it.next() {
             let end = it.peek().copied().unwrap_or(Self::MINIMUM_SIZE);
             let len = end - start;
@@ -496,12 +503,41 @@ pub struct BitstringStatusListEntry {
 impl StatusMapEntry for BitstringStatusListEntry {
     type Key = usize;
 
-    fn purpose(&self) -> Option<crate::StatusPurpose<&str>> {
-        Some((&self.status_purpose).into())
+    fn status_list_url(&self) -> &Uri {
+        &self.status_list_credential
     }
 
     fn key(&self) -> Self::Key {
         self.status_list_index
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BitstringStatusListEntrySetCredential {
+    /// JSON-LD context.
+    #[serde(rename = "@context")]
+    pub context: Context<V2>,
+
+    /// Credential identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<UriBuf>,
+
+    /// Credential type.
+    #[serde(rename = "type")]
+    pub types: JsonCredentialTypes,
+
+    pub credential_status: OneOrMany<BitstringStatusListEntry>,
+
+    #[serde(flatten)]
+    pub other_properties: HashMap<String, serde_json::Value>,
+}
+
+impl StatusMapEntrySet for BitstringStatusListEntrySetCredential {
+    type Entry<'a> = &'a BitstringStatusListEntry where Self: 'a;
+
+    fn get_entry(&self, purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
+        (&self.credential_status).into_iter().find(|&entry| entry.status_purpose == purpose)
     }
 }
 
@@ -530,6 +566,17 @@ impl<'a> From<&'a StatusPurpose> for crate::StatusPurpose<&'a str> {
             StatusPurpose::Suspension => Self::Suspension,
             StatusPurpose::Message => Self::Other("message"),
         }
+    }
+}
+
+impl<'a> PartialEq<crate::StatusPurpose<&'a str>> for StatusPurpose {
+    fn eq(&self, other: &crate::StatusPurpose<&'a str>) -> bool {
+        matches!(
+            (self, other),
+            (Self::Revocation, crate::StatusPurpose::Revocation) |
+            (Self::Suspension, crate::StatusPurpose::Suspension) |
+            (Self::Message, crate::StatusPurpose::Other("message"))
+        )
     }
 }
 
@@ -659,7 +706,7 @@ impl StatusList {
     pub fn iter(&self) -> StatusListIter {
         StatusListIter {
             status_list: self,
-            index: 0
+            index: 0,
         }
     }
 
@@ -667,7 +714,7 @@ impl StatusList {
         &self,
         id: Option<UriBuf>,
         status_purpose: StatusPurpose,
-        status_message: Vec<StatusMessage>
+        status_message: Vec<StatusMessage>,
     ) -> BitstringStatusList {
         BitstringStatusList::new(
             id,
@@ -675,14 +722,14 @@ impl StatusList {
             self.status_size,
             EncodedList::encode(&self.bytes),
             self.ttl,
-            status_message
+            status_message,
         )
     }
 }
 
 pub struct StatusListIter<'a> {
     status_list: &'a StatusList,
-    index: usize
+    index: usize,
 }
 
 impl<'a> Iterator for StatusListIter<'a> {

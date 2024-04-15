@@ -2,7 +2,7 @@ use iref::Uri;
 
 use crate::{EncodedStatusMap, FromBytes};
 
-use super::{MaybeCached, ProviderError, StatusMapProvider};
+use super::{MaybeCached, ProviderError, StatusMapProvider, TypedStatusMapProvider};
 
 pub struct HttpClient<V> {
     client: reqwest::Client,
@@ -18,8 +18,10 @@ impl<V> HttpClient<V> {
     }
 }
 
-impl<T: EncodedStatusMap + FromBytes<V>, V> StatusMapProvider<Uri, T> for HttpClient<V> {
-    async fn get(&self, url: &Uri) -> Result<MaybeCached<T::Decoded>, ProviderError> {
+impl<V> StatusMapProvider<Uri> for HttpClient<V> {}
+
+impl<T: EncodedStatusMap + FromBytes<V>, V> TypedStatusMapProvider<Uri, T> for HttpClient<V> {
+    async fn get_typed(&self, url: &Uri) -> Result<MaybeCached<T::Decoded>, ProviderError> {
         match self.client.get(url.as_str()).send().await {
             Ok(response) => {
                 let media_type = match response.headers().get(reqwest::header::CONTENT_TYPE) {

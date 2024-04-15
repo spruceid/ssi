@@ -1,32 +1,36 @@
 //! Command line interface and example showing how to read and create status lists.
-//! 
+//!
 //! # Usage
-//! 
+//!
 //! Read a status list from a JWT, JWT-VC claims or Credential:
 //! ```console
-//! cargo run --example status_list -- examples/status-list.jwt
-//! cargo run --example status_list -- examples/status-list-jwt-payload.json
-//! cargo run --example status_list -- examples/status-list-credential.json
-//! cargo run --example status_list -- examples/status-list-credential-di.json
+//! $ cargo run --example status_list -- examples/files/status-list.jwt
+//! $ cargo run --example status_list -- examples/files/status-list-jwt-payload.json
+//! $ cargo run --example status_list -- examples/files/status-list-credential.json
+//! $ cargo run --example status_list -- examples/files/status-list-credential-di.json
 //! ```
-//! 
+//!
 //! Create a new status list:
 //! ```console
-//! cargo run --example status_list -- create "http://example.org/#statusList" 0 0 1 0
+//! $ cargo run --example status_list -- create "http://example.org/#statusList" 0 0 1 0
 //! ```
-use core::fmt;
-use std::{fs, io::{self, Read}, num::ParseIntError, path::{Path, PathBuf}, process::ExitCode, str::FromStr};
 use clap::{Parser, Subcommand};
+use core::fmt;
 use iref::UriBuf;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use ssi_data_integrity::{AnyInputContext, AnySuite, ProofConfiguration};
-use ssi_dids::{DIDMethodResolver, DIDResolver, VerificationMethodDIDResolver, DIDJWK};
+use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
-use ssi_jws::CompactJWS;
-use ssi_jwt::JWTClaims;
-use ssi_status::{bitstream_status_list::{self, BitstringStatusListCredential}, EncodedStatusMap};
-use ssi_vc::VCPublicClaims;
-use ssi_verification_methods::{ReferenceOrOwned, SingleSecretSigner, VerificationMethod};
+use ssi_status::{any::AnyStatusMap, bitstream_status_list, EncodedStatusMap};
+use ssi_verification_methods::{ReferenceOrOwned, SingleSecretSigner};
+use std::{
+    fs,
+    io::{self, stdout, Read, Write},
+    num::ParseIntError,
+    path::{Path, PathBuf},
+    process::ExitCode,
+    str::FromStr,
+};
 
 /// Command line interface to read and create status lists.
 #[derive(Parser)]
@@ -41,7 +45,7 @@ enum Command {
     /// Read a status list.
     Read {
         /// Path to a file representing the status list.
-        /// 
+        ///
         /// If unspecified, the status list is read from the standard input.
         filename: Option<PathBuf>,
     },
@@ -56,7 +60,7 @@ enum Command {
 
         /// Secret key to sign the status list.
         #[clap(short, long)]
-        key: Option<PathBuf>
+        key: Option<PathBuf>,
     },
 }
 
@@ -64,14 +68,17 @@ impl Command {
     async fn run(self) -> Result<(), Error> {
         match self {
             Self::Read { filename } => {
-                let input = filename.map(Input::File).unwrap_or_default();
-                let content = match input.read() {
+                let input = filename.map(Source::File).unwrap_or_default();
+                let bytes = match input.read() {
                     Ok(content) => content,
-                    Err(e) => return Err(Error::ReadFile(input, e))
+                    Err(e) => return Err(Error::ReadFile(input, e)),
                 };
 
-                let report = match InputValue::decode(input, &content)? {
-                    InputValue::BitstringStatusListCredential(cred) => {
+                let (status_list, _) =
+                    AnyStatusMap::decode(&bytes, None).map_err(|e| Error::Decode(input, e))?;
+
+                let report = match status_list {
+                    AnyStatusMap::BitstringStatusList(cred) => {
                         let status_list = cred.decode()?;
                         Report {
                             format: StatusListFormat::BitstringStatusListCredential,
@@ -80,7 +87,7 @@ impl Command {
                             } else {
                                 None
                             },
-                            list: status_list.iter().collect()
+                            list: status_list.iter().collect(),
                         }
                     }
                 };
@@ -89,49 +96,64 @@ impl Command {
                 Ok(())
             }
             Self::Create { id, list, key } => {
-                let status_list = bitstream_status_list::StatusList::from_bytes(
-                    bitstream_status_list::StatusSize::default(),
-                    bitstream_status_list::TimeToLive::default(),
-                    list.into_iter().map(|v| v.0).collect()
-                );
-
-                let credential = bitstream_status_list::BitstringStatusListCredential::new(
-                    Some(id),
-                    status_list.to_credential_subject(
-                        None,
-                        bitstream_status_list::StatusPurpose::Revocation,
-                        Vec::new()
-                    )
-                );
-
-                match key {
-                    Some(path) => {
-                        use ssi_data_integrity::CryptographicSuiteInput;
-                        let jwk = read_jwk(&path)?;
-                        let did = DIDJWK::generate(&jwk.to_public());
-                        let resolver = VerificationMethodDIDResolver::new(DIDJWK);
-                        let signer = SingleSecretSigner::new(jwk.clone());
-                        let verification_method = ReferenceOrOwned::Reference(did.into());
-                        let suite = AnySuite::pick(&jwk, Some(&verification_method)).unwrap();
-                        let params = ProofConfiguration::from_method(verification_method);
-                        let vc = suite.sign(
-                            credential,
-                            AnyInputContext::default(),
-                            &resolver,
-                            &signer,
-                            params
-                        ).await.unwrap();
-
-                        println!("{}", serde_json::to_string_pretty(&vc).unwrap());
-                    }
-                    None => {
-                        println!("{}", serde_json::to_string_pretty(&credential).unwrap());
-                    }
-                }
-
+                let data = create_status_list(id.clone(), list, key).await?;
+                stdout().write_all(&data).unwrap();
                 Ok(())
             }
         }
+    }
+}
+
+async fn create_status_list(
+    id: UriBuf,
+    list: Vec<StatusValue>,
+    key: Option<PathBuf>,
+) -> Result<Vec<u8>, Error> {
+    let mut status_list = bitstream_status_list::StatusList::new(
+        bitstream_status_list::StatusSize::default(),
+        bitstream_status_list::TimeToLive::default(),
+        // list.into_iter().map(|v| v.0).collect(),
+    );
+
+    for v in list {
+        status_list.push(v.0);
+    }
+
+    let credential = bitstream_status_list::BitstringStatusListCredential::new(
+        Some(id),
+        status_list.to_credential_subject(
+            None,
+            bitstream_status_list::StatusPurpose::Revocation,
+            Vec::new(),
+        ),
+    );
+
+    match key {
+        Some(path) => {
+            use ssi_data_integrity::CryptographicSuiteInput;
+            let jwk = read_jwk(&path)?;
+            let did = DIDJWK::generate_url(&jwk.to_public());
+            let resolver = VerificationMethodDIDResolver::new(DIDJWK);
+            let signer = SingleSecretSigner::new(jwk.clone());
+            let verification_method = ReferenceOrOwned::Reference(did.into());
+            let suite = AnySuite::pick(&jwk, Some(&verification_method)).unwrap();
+            let params = ProofConfiguration::from_method(verification_method);
+            let vc = suite
+                .sign(
+                    credential,
+                    AnyInputContext::default(),
+                    &resolver,
+                    &signer,
+                    params,
+                )
+                .await
+                .unwrap();
+
+            Ok(serde_json::to_string_pretty(&vc).unwrap().into_bytes())
+        }
+        None => Ok(serde_json::to_string_pretty(&credential)
+            .unwrap()
+            .into_bytes()),
     }
 }
 
@@ -144,90 +166,32 @@ fn read_jwk(path: &Path) -> Result<JWK, KeyError> {
 pub struct Report {
     format: StatusListFormat,
     security: Option<SecurityType>,
-    list: Vec<u8>
+    list: Vec<u8>,
 }
 
 #[derive(Serialize)]
 pub enum StatusListFormat {
-    BitstringStatusListCredential
+    BitstringStatusListCredential,
 }
 
 #[derive(Serialize)]
 pub enum SecurityType {
-    DataIntegrity
-}
-
-pub enum InputValue {
-    BitstringStatusListCredential(BitstringStatusListCredential)
-}
-
-impl InputValue {
-    fn decode_jwt_vc_claims(input: Input, claims: JWTClaims<VCPublicClaims>) -> Result<Self, Error> {
-        match ssi_vc::decode_jwt_vc_claims(claims) {
-            Ok(cred) => match cred {
-                Credential::BitstringStatusListCredential(cred) => Ok(InputValue::BitstringStatusListCredential(cred)),
-            }
-            Err(_) => {
-                Err(Error::UnrecognizedInput(input))
-            }
-        }
-    }
-    
-    fn decode(input: Input, bytes: &[u8]) -> Result<Self, Error> {
-        match serde_json::from_slice(bytes) {
-            Ok(json) => match json {
-                JsonInputValue::BitstringStatusListCredential(cred) => Ok(Self::BitstringStatusListCredential(cred)),
-                JsonInputValue::JwtVc(jwt_vc) => {
-                    Self::decode_jwt_vc_claims(input, jwt_vc)
-                }
-            },
-            Err(_) => match CompactJWS::new(bytes) {
-                Ok(jws) => {
-                    let (_, payload, _) = jws.decode()?;
-                    match serde_json::from_slice(&payload) {
-                        Ok(jwt_vc) => Self::decode_jwt_vc_claims(input, jwt_vc),
-                        Err(_) => {
-                            Err(Error::UnrecognizedInput(input))
-                        }
-                    }
-                }
-                Err(_) => {
-                    Err(Error::UnrecognizedInput(input))
-                }
-            }
-        }
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum Credential {
-    BitstringStatusListCredential(BitstringStatusListCredential)
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum JsonInputValue {
-    BitstringStatusListCredential(BitstringStatusListCredential),
-    JwtVc(ssi_jwt::JWTClaims<ssi_vc::VCPublicClaims>),
+    DataIntegrity,
 }
 
 #[derive(Debug, thiserror::Error)]
 enum Error {
     #[error("could not read from {0}: {1}")]
-    ReadFile(Input, io::Error),
+    ReadFile(Source, io::Error),
 
-    #[error("unrecognized input value from {0}")]
-    UnrecognizedInput(Input),
+    #[error("unable to decode {0}: {1}")]
+    Decode(Source, ssi_status::any::Error),
 
     #[error("unable to decode `BitstringStatusList`: {0}")]
     BitstringStatusListDecode(#[from] ssi_status::bitstream_status_list::DecodeError),
 
-    #[error("invalid JWS: {0}")]
-    Jws(#[from] ssi_jws::DecodeError),
-
     #[error("unable to read key: {0}")]
-    Key(#[from] KeyError)
+    Key(#[from] KeyError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -236,17 +200,17 @@ enum KeyError {
     IO(#[from] io::Error),
 
     #[error(transparent)]
-    Json(#[from] serde_json::Error)
+    Json(#[from] serde_json::Error),
 }
 
 #[derive(Debug, Default)]
-enum Input {
+enum Source {
     #[default]
     Stdin,
-    File(PathBuf)
+    File(PathBuf),
 }
 
-impl Input {
+impl Source {
     fn read(&self) -> Result<Vec<u8>, io::Error> {
         let mut buffer = Vec::new();
         match self {
@@ -262,11 +226,11 @@ impl Input {
     }
 }
 
-impl fmt::Display for Input {
+impl fmt::Display for Source {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Stdin => write!(f, "standard input"),
-            Self::File(path) => write!(f, "file `{}`", path.display())
+            Self::File(path) => write!(f, "file `{}`", path.display()),
         }
     }
 }
