@@ -71,10 +71,6 @@ impl<C: Credential, P> crate::Presentation for JsonVerifiablePresentation<C, P> 
 
 impl<C, P> VerifiableClaims for JsonVerifiablePresentation<C, P> {
     type Proof = Vec<P>;
-
-    fn proof(&self) -> &Vec<P> {
-        &self.proofs
-    }
 }
 
 impl<C, P> ExtractProof for JsonVerifiablePresentation<C, P> {

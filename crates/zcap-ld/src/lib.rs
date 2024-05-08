@@ -18,8 +18,8 @@ use serde_json::Value;
 use ssi_claims::{
     data_integrity::{
         signing, AnyInputContext, AnyProof, AnySignatureProtocol, AnySuite, AnySuiteOptions,
-        CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfiguration,
-        ProofConfigurationExpansion, ProofConfigurationRefExpansion, ProofPreparationError,
+        CryptographicSuiteInput, Proof, ProofConfiguration, ProofConfigurationExpansion,
+        ProofConfigurationRefExpansion, ProofPreparationError,
     },
     vc::{Context, RequiredContext},
     ExtractProof, MergeWithProof, ProofValidity, Validate, Verifiable, VerifiableClaims,
@@ -130,7 +130,7 @@ impl<C, P> Delegation<C, P> {
     pub async fn sign(
         self,
         suite: AnySuite,
-        resolver: &impl VerificationMethodResolver<AnyMethod>,
+        resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
         proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
         capability_chain: &[&str],
@@ -151,11 +151,11 @@ impl<C, P> Delegation<C, P> {
     }
 
     /// Sign the delegation with a custom cryptographic suite and environment.
-    pub async fn sign_with<S: CryptographicSuite, E>(
+    pub async fn sign_with<S, E>(
         self,
         suite: S,
         environment: E,
-        resolver: &impl VerificationMethodResolver<S::VerificationMethod>,
+        resolver: &impl VerificationMethodResolver<Method = S::VerificationMethod>,
         signer: &impl Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
         mut proof_configuration: ProofConfiguration<S::VerificationMethod, S::Options>,
         capability_chain: &[&str],
@@ -264,7 +264,7 @@ impl<C, P> VerifiableDelegation<C, P> {
     #[allow(unused, unreachable_code)]
     pub async fn verify(
         &self,
-        resolver: &impl VerificationMethodResolver<AnyMethod>,
+        resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
     ) -> Result<ProofValidity, DelegationVerificationError>
     where
         C: Clone + Serialize,
@@ -285,10 +285,6 @@ impl<C, P> Deref for VerifiableDelegation<C, P> {
 
 impl<C, P> VerifiableClaims for VerifiableDelegation<C, P> {
     type Proof = AnyProof;
-
-    fn proof(&self) -> &Self::Proof {
-        &self.proof
-    }
 }
 
 impl<C, P> ExtractProof for VerifiableDelegation<C, P> {
@@ -340,7 +336,7 @@ impl<P> Invocation<P> {
     pub async fn sign(
         self,
         suite: AnySuite,
-        resolver: &impl VerificationMethodResolver<AnyMethod>,
+        resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
         mut proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
         target: &Uri,
@@ -450,7 +446,7 @@ impl<P> VerifiableInvocation<P> {
         &self,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, Q>,
-        verifier: &impl VerificationMethodResolver<AnyMethod>,
+        verifier: &impl VerificationMethodResolver<Method = AnyMethod>,
     ) -> Result<ProofValidity, InvocationVerificationError>
     where
         P: Clone + Serialize,
@@ -479,10 +475,6 @@ impl<P> DerefMut for VerifiableInvocation<P> {
 
 impl<P> VerifiableClaims for VerifiableInvocation<P> {
     type Proof = AnyProof;
-
-    fn proof(&self) -> &Self::Proof {
-        &self.proof
-    }
 }
 
 impl<P> ExtractProof for VerifiableInvocation<P> {

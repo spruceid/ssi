@@ -72,33 +72,3 @@ impl From<InvalidSignature> for VerificationError {
         }
     }
 }
-
-// pub trait SignatureAlgorithm<M: ?Sized + Referencable> {
-//     type Options: Referencable;
-
-//     type Signature: Referencable;
-
-//     /// Cryptographic signature algorithm to be used with the verification
-//     /// method by a remote message signer.
-//     type MessageSignatureAlgorithm: Copy;
-
-//     /// Signature protocol.
-//     type Protocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
-
-//     #[allow(async_fn_in_trait)]
-//     async fn sign<S: MessageSigner<Self::MessageSignatureAlgorithm, Self::Protocol>>(
-//         &self,
-//         options: <Self::Options as Referencable>::Reference<'_>,
-//         method: M::Reference<'_>,
-//         bytes: &[u8],
-//         signer: S,
-//     ) -> Result<Self::Signature, SignatureError>;
-
-//     fn verify(
-//         &self,
-//         options: <Self::Options as Referencable>::Reference<'_>,
-//         signature: <Self::Signature as Referencable>::Reference<'_>,
-//         method: M::Reference<'_>,
-//         bytes: &[u8],
-//     ) -> Result<bool, VerificationError>;
-// }

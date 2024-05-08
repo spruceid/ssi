@@ -1,7 +1,7 @@
 use crate::{CryptographicSuite, PreparedProof};
 use ssi_verification_methods_core::{VerificationError, VerificationMethodResolver};
 
-impl<T, S: CryptographicSuite, V: VerificationMethodResolver<S::VerificationMethod>>
+impl<T, S: CryptographicSuite, V: VerificationMethodResolver<Method = S::VerificationMethod>>
     ssi_claims_core::VerifyClaimsWith<T, V> for PreparedProof<S>
 {
     type Error = VerificationError;

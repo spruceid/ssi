@@ -2,6 +2,7 @@ use iref::Iri;
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
+use ssi_jws::JWS;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, EcdsaSecp256k1RecoveryMethod2020,
     SignatureError, VerificationError,
@@ -79,7 +80,9 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
     ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
-        let (header, _, signature) = signature
+        let JWS {
+            header, signature, ..
+        } = signature
             .jws
             .decode()
             .map_err(|_| VerificationError::InvalidSignature)?;

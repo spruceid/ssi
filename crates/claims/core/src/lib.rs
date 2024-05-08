@@ -17,7 +17,10 @@ pub struct Verifiable<Claims, P: Proof> {
     /// Claims.
     claims: Claims,
 
-    /// Credential proof.
+    /// Prepared proof.
+    ///
+    /// This is not just the proof, but also any information derived from the
+    /// claims and/or proof required for the verification.
     proof: P::Prepared,
 }
 
@@ -114,6 +117,7 @@ impl<T, P: Proof> Verifiable<T, P> {
         &mut self.proof
     }
 
+    /// Validates the claims and verify them against the proof.
     pub async fn verify<V, E>(&self, verifier: &V) -> Result<ProofValidity, E>
     where
         T: Validate,

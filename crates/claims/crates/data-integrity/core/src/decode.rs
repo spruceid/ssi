@@ -4,8 +4,8 @@ use ssi_claims_core::Verifiable;
 use ssi_json_ld::JsonLdNodeObject;
 
 use crate::{
-    proof, CryptographicSuite, CryptographicSuiteInput, Proof, ProofConfigurationRefExpansion,
-    ProofPreparationError, Proofs,
+    proof, CryptographicSuiteInput, Proof, ProofConfigurationRefExpansion, ProofPreparationError,
+    Proofs,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -31,7 +31,7 @@ pub enum DecodeError<E = ssi_json_ld::UnknownContext> {
 
 /// Decodes a Data-Integrity credential or presentation from its JSON binary
 /// representation.
-pub async fn from_json_slice<T, S: CryptographicSuite, E>(
+pub async fn from_json_slice<T, S, E>(
     json: &[u8],
     environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
@@ -54,7 +54,7 @@ where
 
 /// Decodes a Data-Integrity credential or presentation from its JSON textual
 /// representation.
-pub async fn from_json_str<T, S: CryptographicSuite, E>(
+pub async fn from_json_str<T, S, E>(
     json: &str,
     environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
@@ -71,7 +71,7 @@ where
 
 /// Decodes a Data-Integrity credential or presentation from its JSON
 /// representation.
-pub async fn from_json<T, S: CryptographicSuite, E>(
+pub async fn from_json<T, S, E>(
     json: json_syntax::Value,
     mut environment: E,
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>

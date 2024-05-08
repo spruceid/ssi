@@ -202,7 +202,7 @@ pub trait CryptographicSuite: Sized {
     async fn generate_proof<S>(
         self,
         data: &Self::Hashed,
-        resolver: &impl VerificationMethodResolver<Self::VerificationMethod>,
+        resolver: &impl VerificationMethodResolver<Method = Self::VerificationMethod>,
         signers: &S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Proof<Self>, SignatureError>
@@ -241,7 +241,7 @@ pub trait CryptographicSuite: Sized {
     async fn verify_proof(
         &self,
         data: &Self::Hashed,
-        verifier: &impl VerificationMethodResolver<Self::VerificationMethod>,
+        verifier: &impl VerificationMethodResolver<Method = Self::VerificationMethod>,
         proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, VerificationError> {
         // Resolve the verification method.
@@ -288,7 +288,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     where
         Self::VerificationMethod: 'max,
         T: JsonLdNodeObject,
-        R: 'max + VerificationMethodResolver<Self::VerificationMethod>,
+        R: 'max + VerificationMethodResolver<Method = Self::VerificationMethod>,
         S: 'max
             + Signer<
                 Self::VerificationMethod,
@@ -312,7 +312,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
     where
         Self::VerificationMethod: 'max,
         T: JsonLdNodeObject,
-        R: 'max + VerificationMethodResolver<Self::VerificationMethod>,
+        R: 'max + VerificationMethodResolver<Method = Self::VerificationMethod>,
         S: 'max
             + Signer<
                 Self::VerificationMethod,

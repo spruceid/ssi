@@ -21,11 +21,6 @@ pub use verification::*;
 #[doc(hidden)]
 pub use ssi_core;
 
-/// Export some JSON-LD traits.
-///
-/// This module should be a crate reexport in the future.
-pub mod json_ld;
-
 /// IRI of the RDF property associated to the `controller` term found in a
 /// verification method.
 pub const CONTROLLER_IRI: &Iri = iri!("https://w3id.org/security#controller");
@@ -119,24 +114,27 @@ pub enum VerificationMethodResolutionError {
     InternalError(String),
 }
 
-pub trait VerificationMethodResolver<M: Referencable> {
+pub trait VerificationMethodResolver {
+    /// Verification method type.
+    type Method: Referencable;
+
     /// Resolve the verification method reference.
     #[allow(async_fn_in_trait)]
     async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<VerificationMethodCow<'a, M>, VerificationMethodResolutionError>;
+        method: Option<ReferenceOrOwnedRef<'m, Self::Method>>,
+    ) -> Result<VerificationMethodCow<'a, Self::Method>, VerificationMethodResolutionError>;
 }
 
-impl<'t, M: Referencable, T: VerificationMethodResolver<M>> VerificationMethodResolver<M>
-    for &'t T
-{
+impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
+    type Method = T::Method;
+
     async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<VerificationMethodCow<'a, M>, VerificationMethodResolutionError> {
+        method: Option<ReferenceOrOwnedRef<'m, T::Method>>,
+    ) -> Result<VerificationMethodCow<'a, T::Method>, VerificationMethodResolutionError> {
         T::resolve_verification_method(self, issuer, method).await
     }
 }

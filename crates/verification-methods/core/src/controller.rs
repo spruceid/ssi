@@ -5,8 +5,8 @@ use crate::{ProofPurpose, ProofPurposes, VerificationError};
 /// Verification method controller.
 ///
 /// A verification method controller stores the proof purposes for its
-/// controlled verification methods. All verification methods have a controller.
-/// The [`VerificationMethod::controller`](crate::VerificationMethod) returns
+/// controlled verification methods.
+/// The [`VerificationMethod::controller`] method returns
 /// an identifier for its controller, which can then be retrieved using a
 /// [`ControllerProvider`].
 ///

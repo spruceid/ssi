@@ -254,14 +254,14 @@ pub trait DIDResolver {
         }
     }
 
-    fn with_options(self, options: Options) -> VerificationMethodDIDResolver<Self>
+    fn with_options<M>(self, options: Options) -> VerificationMethodDIDResolver<Self, M>
     where
         Self: Sized,
     {
         VerificationMethodDIDResolver::new_with_options(self, options)
     }
 
-    fn with_default_options(self) -> VerificationMethodDIDResolver<Self>
+    fn with_default_options<M>(self) -> VerificationMethodDIDResolver<Self, M>
     where
         Self: Sized,
     {

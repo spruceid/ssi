@@ -4,205 +4,105 @@
 
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
-use core::fmt;
 pub use error::Error;
-use iref::IriBuf;
-use linked_data::{
-    rdf_types, LinkedDataDeserializePredicateObjects, LinkedDataDeserializeSubject,
-    LinkedDataPredicateObjects, LinkedDataResource, LinkedDataSubject, RdfTermRef,
-};
-use rdf_types::dataset::PatternMatchingDataset;
-use rdf_types::interpretation::{ReverseIriInterpretation, ReverseLiteralInterpretation};
-use rdf_types::{Interpretation, LiteralTypeRef, Vocabulary, RDF_LANG_STRING};
 use serde::{Deserialize, Serialize};
 use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
-use ssi_verification_methods_core::{
-    InvalidVerificationMethod, JwkVerificationMethod, ReferenceOrOwned, VerificationError,
-    VerificationMethodResolver,
-};
-use std::borrow::Cow;
-use std::collections::BTreeMap;
-use std::ops::Deref;
-use std::str::FromStr;
+use std::{borrow::Cow, collections::BTreeMap};
 
 pub type VerificationWarnings = Vec<String>;
 
 // RFC 7515 - JSON Web Signature (JWS)
 // RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
 
-/// JWS in compact serialized form.
-#[repr(transparent)]
-pub struct CompactJWS([u8]);
+mod compact;
+pub use compact::*;
 
-impl CompactJWS {
-    pub fn new(data: &[u8]) -> Result<&Self, InvalidCompactJWS<&[u8]>> {
-        if Self::check(data) {
-            Ok(unsafe { Self::new_unchecked(data) })
-        } else {
-            Err(InvalidCompactJWS(data))
+mod verification;
+pub use verification::*;
+
+#[cfg(feature = "linked-data")]
+mod linked_data;
+
+/// Decoded JWS.
+#[derive(Clone, PartialEq, Eq)]
+pub struct JWS<T = Vec<u8>> {
+    /// JOSE Header.
+    pub header: Header,
+
+    /// Payload.
+    pub payload: T,
+
+    /// Signature.
+    pub signature: Vec<u8>,
+}
+
+impl<T> JWS<T> {
+    pub fn new(header: Header, payload: T, signature: Vec<u8>) -> Self {
+        Self {
+            header,
+            payload,
+            signature,
         }
     }
 
-    /// Creates a new compact JWS without checking the data.
-    ///
-    /// # Safety
-    ///
-    /// The input `data` must represent a valid compact JWS.
-    pub unsafe fn new_unchecked(data: &[u8]) -> &Self {
-        std::mem::transmute(data)
-    }
-
-    pub fn check(data: &[u8]) -> bool {
-        enum State {
-            Header,
-            Payload,
-            Signature,
-        }
-
-        let mut state = State::Header;
-
-        for &b in data {
-            match state {
-                State::Header => match b {
-                    b'.' => state = State::Payload,
-                    b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
-                    _ => return false,
-                },
-                State::Payload => {
-                    if b == b'.' {
-                        state = State::Signature
-                    }
-                }
-                State::Signature => (),
-            }
-        }
-
-        matches!(state, State::Signature)
-    }
-
-    pub fn check_signing_bytes(data: &[u8]) -> bool {
-        for &b in data {
-            match b {
-                b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'/' => (),
-                b'.' => return true,
-                _ => return false,
-            }
-        }
-
-        false
-    }
-
-    fn header_end(&self) -> usize {
-        self.0.iter().position(|b| *b == b'.').unwrap()
-    }
-
-    fn signature_start(&self) -> usize {
-        self.0.len() - self.0.iter().rev().position(|b| *b == b'.').unwrap()
-    }
-
-    fn payload_start(&self) -> usize {
-        self.header_end() + 1
-    }
-
-    fn payload_end(&self) -> usize {
-        self.signature_start() - 1
-    }
-
-    /// Returns the Base64 encoded header.
-    pub fn header(&self) -> &[u8] {
-        &self.0[..self.header_end()]
-    }
-
-    pub fn decode_header(&self) -> Result<Header, InvalidHeader> {
-        Header::decode(self.header())
-    }
-
-    /// Returns the Base64 encoded payload.
-    pub fn payload(&self) -> &[u8] {
-        &self.0[self.payload_start()..self.payload_end()]
-    }
-
-    /// Decode the payload bytes.
-    ///
-    /// The header is necessary to know how the payload is encoded.
-    pub fn decode_payload(&self, header: &Header) -> Result<Cow<[u8]>, Base64DecodeError> {
-        if header.base64urlencode_payload.unwrap_or(true) {
-            Ok(Cow::Owned(base64::decode_config(
-                self.payload(),
-                base64::URL_SAFE_NO_PAD,
-            )?))
-        } else {
-            Ok(Cow::Borrowed(self.payload()))
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> JWS<U> {
+        JWS {
+            header: self.header,
+            payload: f(self.payload),
+            signature: self.signature,
         }
     }
 
-    /// Returns the Base64 encoded signature.
-    pub fn signature(&self) -> &str {
-        unsafe { std::str::from_utf8_unchecked(&self.0[self.signature_start()..]) }
+    pub fn try_map<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<JWS<U>, E> {
+        Ok(JWS {
+            header: self.header,
+            payload: f(self.payload)?,
+            signature: self.signature,
+        })
     }
+}
 
-    pub fn decode_signature(&self) -> Result<Vec<u8>, Base64DecodeError> {
-        base64::decode_config(self.signature(), base64::URL_SAFE_NO_PAD)
+impl<'a, T: ?Sized + ToOwned> JWS<Cow<'a, T>> {
+    pub fn into_owned(self) -> JWS<T::Owned> {
+        JWS::new(self.header, self.payload.into_owned(), self.signature)
     }
+}
 
-    /// Decodes the entire JWS.
-    pub fn decode(&self) -> Result<JWSParts, DecodeError> {
-        let header = self.decode_header().map_err(DecodeError::Header)?;
-        let payload = self.decode_payload(&header).map_err(DecodeError::Payload)?;
-        let signature = self.decode_signature().map_err(DecodeError::Signature)?;
-        Ok((header, payload, signature))
-    }
+/// Decoded JWS.
+///
+/// JWS with its signing bytes.
+#[derive(Clone, PartialEq, Eq)]
+pub struct DecodedJWS<T = Vec<u8>> {
+    pub signing_bytes: Vec<u8>,
+    pub decoded: JWS<T>,
+}
 
-    /// Returns the signing bytes.
-    ///
-    /// It is the concatenation of the Base64 encoded headers, a period '.' and
-    /// the Base64 encoded payload.
-    pub fn signing_bytes(&self) -> &[u8] {
-        &self.0[..self.payload_end()]
-    }
-
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.0
-    }
-
-    pub async fn verify<'a, M: 'a + JwkVerificationMethod>(
-        &self,
-        resolver: &'a impl VerificationMethodResolver<M>,
-    ) -> Result<bool, VerificationError> {
-        let (header, _payload, signature) = self
-            .decode()
-            .map_err(|_| VerificationError::InvalidInputData)?;
-
-        let vm = match header.key_id {
-            Some(id) => match IriBuf::new(id) {
-                Ok(iri) => Some(ReferenceOrOwned::Reference(iri)),
-                Err(e) => {
-                    return Err(VerificationError::InvalidVerificationMethod(
-                        InvalidVerificationMethod::InvalidIri(e.0),
-                    ))
-                }
-            },
-            None => None,
-        };
-
-        let vm = resolver
-            .resolve_verification_method(
-                None, // TODO: get the issuer from the payload? If its a JWT for instance.
-                vm.as_ref().map(ReferenceOrOwned::borrowed),
-            )
-            .await?;
-
-        let jwk = vm.to_jwk();
-
-        match verify_bytes(header.algorithm, self.signing_bytes(), &jwk, &signature) {
-            Ok(()) => Ok(true),
-            Err(Error::InvalidSignature) => Ok(false),
-            Err(_) => Err(VerificationError::InvalidSignature),
+impl<T> DecodedJWS<T> {
+    pub fn new(signing_bytes: Vec<u8>, decoded: JWS<T>) -> Self {
+        Self {
+            signing_bytes,
+            decoded,
         }
     }
 }
 
-pub type JWSParts<'a> = (Header, Cow<'a, [u8]>, Vec<u8>);
+impl<'a, T: ?Sized + ToOwned> DecodedJWS<Cow<'a, T>> {
+    pub fn into_owned(self) -> DecodedJWS<T::Owned> {
+        DecodedJWS::new(self.signing_bytes, self.decoded.into_owned())
+    }
+}
+
+/// JWS decoded signing bytes.
+pub struct DecodedSigningBytes<T = Vec<u8>> {
+    /// Encoded bytes.
+    pub bytes: Vec<u8>,
+
+    /// Decoded JOSE Header.
+    pub header: Header,
+
+    /// Decoded payload.
+    pub payload: T,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
@@ -216,441 +116,7 @@ pub enum DecodeError {
     Signature(Base64DecodeError),
 }
 
-#[derive(Debug, thiserror::Error)]
-#[error("invalid compact JWS")]
-pub struct InvalidCompactJWS<B = String>(pub B);
-
-/// JWS in UTF-8 compact serialized form.
-///
-/// Contrarily to [`CompactJWS`], this type guarantees that the payload is
-/// a valid UTF-8 string, meaning the whole compact JWS is an UTF-8 string.
-/// This does not necessarily mean the payload is base64 encoded.
-#[repr(transparent)]
-pub struct CompactJWSStr(CompactJWS);
-
-impl CompactJWSStr {
-    pub fn new(data: &str) -> Result<&Self, InvalidCompactJWS<&str>> {
-        let inner = CompactJWS::new(data.as_bytes()).map_err(|_| InvalidCompactJWS(data))?;
-        Ok(unsafe { std::mem::transmute(inner) })
-    }
-
-    /// Creates a new compact JWS without checking the data.
-    ///
-    /// # Safety
-    ///
-    /// The input `data` must represent a valid compact JWS where the payload
-    /// is an UTF-8 string.
-    pub unsafe fn new_unchecked(data: &[u8]) -> &Self {
-        std::mem::transmute(data)
-    }
-
-    pub fn as_str(&self) -> &str {
-        unsafe {
-            // Safety: we already checked that the bytes are a valid UTF-8
-            // string.
-            std::str::from_utf8_unchecked(self.0.as_bytes())
-        }
-    }
-}
-
-impl Deref for CompactJWSStr {
-    type Target = CompactJWS;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Display for CompactJWSStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
-    }
-}
-
-impl fmt::Debug for CompactJWSStr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
-    }
-}
-
-impl serde::Serialize for CompactJWSStr {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.as_str().serialize(serializer)
-    }
-}
-
-/// JWS in compact serialized form.
-pub struct CompactJWSBuf(Vec<u8>);
-
-impl CompactJWSBuf {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        if CompactJWS::check(&bytes) {
-            Ok(Self(bytes))
-        } else {
-            Err(InvalidCompactJWS(bytes))
-        }
-    }
-
-    /// # Safety
-    ///
-    /// The input `bytes` must represent a valid compact JWS.
-    pub unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
-        Self(bytes)
-    }
-
-    pub fn from_signing_bytes_and_signature(
-        signing_bytes: Vec<u8>,
-        signature: &[u8],
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let mut bytes = signing_bytes;
-        bytes.push(b'.');
-        bytes.extend(signature.iter().copied());
-        Self::new(bytes)
-    }
-
-    /// Creates a new detached JWS.
-    ///
-    /// Detached means the payload will not appear in the JWS.
-    pub fn new_detached(header: Header, signature: &[u8]) -> Self {
-        let mut bytes = header.encode().into_bytes();
-        bytes.extend([b'.', b'.']);
-        bytes.extend(signature.iter().copied());
-        unsafe { Self::new_unchecked(bytes) }
-    }
-
-    /// # Safety
-    ///
-    /// The input `signing_bytes` and `signature` must form a valid compact JWS
-    /// once concatenated with a `.`.
-    pub unsafe fn from_signing_bytes_and_signature_unchecked(
-        signing_bytes: Vec<u8>,
-        signature: Vec<u8>,
-    ) -> Self {
-        let mut bytes = signing_bytes;
-        bytes.push(b'.');
-        bytes.extend(signature);
-        Self::new_unchecked(bytes)
-    }
-
-    pub fn as_compact_jws(&self) -> &CompactJWS {
-        unsafe { CompactJWS::new_unchecked(&self.0) }
-    }
-
-    pub fn into_signing_bytes(mut self) -> Vec<u8> {
-        self.0.truncate(self.payload_end()); // remove the signature.
-        self.0
-    }
-}
-
-impl Deref for CompactJWSBuf {
-    type Target = CompactJWS;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_compact_jws()
-    }
-}
-
-/// JWS in compact serialized form, with a base64 payload.
-///
-/// Contrarily to [`CompactJWS`], this type guarantees that the payload is
-/// a valid UTF-8 string, meaning the whole compact JWS is an UTF-8 string.
-/// This does not necessarily mean the payload is base64 encoded.
-#[derive(Clone, serde::Serialize)]
-#[serde(transparent)]
-pub struct CompactJWSString(String);
-
-impl CompactJWSString {
-    pub fn new(bytes: Vec<u8>) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        match String::from_utf8(bytes) {
-            Ok(string) => {
-                if CompactJWS::check(string.as_bytes()) {
-                    Ok(Self(string))
-                } else {
-                    Err(InvalidCompactJWS(string.into_bytes()))
-                }
-            }
-            Err(e) => Err(InvalidCompactJWS(e.into_bytes())),
-        }
-    }
-
-    pub fn from_string(string: String) -> Result<Self, InvalidCompactJWS<String>> {
-        if CompactJWS::check(string.as_bytes()) {
-            Ok(Self(string))
-        } else {
-            Err(InvalidCompactJWS(string))
-        }
-    }
-
-    /// # Safety
-    ///
-    /// The input `bytes` must represent a valid compact JWS where the payload
-    /// is UTF-8 encoded.
-    pub unsafe fn new_unchecked(bytes: Vec<u8>) -> Self {
-        Self(String::from_utf8_unchecked(bytes))
-    }
-
-    /// Creates a new detached JWS from a header and base64-encoded signature.
-    ///
-    /// Detached means the payload will not appear in the JWS.
-    pub fn new_detached(
-        header: Header,
-        b64_signature: &[u8],
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let mut bytes = header.encode().into_bytes();
-        bytes.extend(b"..");
-        bytes.extend(b64_signature.iter().copied());
-        Self::new(bytes)
-    }
-
-    /// Creates a new detached JWS from a header and unencoded signature.
-    ///
-    /// Detached means the payload will not appear in the JWS.
-    pub fn encode_detached(header: Header, signature: &[u8]) -> Self {
-        let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
-        Self::new_detached(header, b64_signature.as_bytes()).unwrap()
-    }
-
-    /// Encodes the given signature in base64 and returns a compact JWS.
-    pub fn encode_from_signing_bytes_and_signature(
-        signing_bytes: Vec<u8>,
-        signature: &[u8],
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let b64_signature = base64::encode_config(signature, base64::URL_SAFE_NO_PAD);
-        let mut bytes = signing_bytes;
-        bytes.push(b'.');
-        bytes.extend_from_slice(b64_signature.as_bytes());
-        Self::new(bytes)
-    }
-
-    pub fn from_signing_bytes_and_signature(
-        signing_bytes: Vec<u8>,
-        signature: impl IntoIterator<Item = u8>,
-    ) -> Result<Self, InvalidCompactJWS<Vec<u8>>> {
-        let mut bytes = signing_bytes;
-        bytes.push(b'.');
-        bytes.extend(signature);
-        Self::new(bytes)
-    }
-
-    /// # Safety
-    ///
-    /// The input `signing_bytes` and `signature` must form a valid compact JWS
-    /// once concatenated with a `.`.
-    pub unsafe fn from_signing_bytes_and_signature_unchecked(
-        signing_bytes: Vec<u8>,
-        signature: Vec<u8>,
-    ) -> Self {
-        let mut bytes = signing_bytes;
-        bytes.push(b'.');
-        bytes.extend(signature);
-        Self::new_unchecked(bytes)
-    }
-
-    pub fn as_compact_jws_str(&self) -> &CompactJWSStr {
-        unsafe { CompactJWSStr::new_unchecked(self.0.as_bytes()) }
-    }
-
-    pub fn into_signing_bytes(mut self) -> String {
-        self.0.truncate(self.payload_end()); // remove the signature.
-        self.0
-    }
-
-    pub fn into_string(self) -> String {
-        self.0
-    }
-}
-
-impl Deref for CompactJWSString {
-    type Target = CompactJWSStr;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_compact_jws_str()
-    }
-}
-
-impl fmt::Display for CompactJWSString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
-    }
-}
-
-impl fmt::Debug for CompactJWSString {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
-    }
-}
-
-impl FromStr for CompactJWSString {
-    type Err = InvalidCompactJWS;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::from_string(s.to_owned())
-    }
-}
-
-impl TryFrom<String> for CompactJWSString {
-    type Error = InvalidCompactJWS<String>;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::from_string(value)
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataResource<I, V> for CompactJWSString {
-    fn interpretation(
-        &self,
-        _vocabulary: &mut V,
-        _interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
-        use linked_data::{xsd_types::ValueRef, CowRdfTerm, RdfLiteralRef, ResourceInterpretation};
-        ResourceInterpretation::Uninterpreted(Some(CowRdfTerm::Borrowed(RdfTermRef::Literal(
-            RdfLiteralRef::Xsd(ValueRef::String(&self.0)),
-        ))))
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataSubject<I, V> for CompactJWSString {
-    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<I, V>,
-    {
-        serializer.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializeSubject<I, V> for CompactJWSString
-where
-    V: Vocabulary,
-    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
-{
-    fn deserialize_subject_in<D>(
-        vocabulary: &V,
-        interpretation: &I,
-        _dataset: &D,
-        _graph: Option<&I::Resource>,
-        resource: &I::Resource,
-        context: linked_data::Context<I>,
-    ) -> Result<Self, linked_data::FromLinkedDataError>
-    where
-        D: PatternMatchingDataset<Resource = I::Resource>,
-    {
-        let mut literal_ty = None;
-        for l in interpretation.literals_of(resource) {
-            let literal = vocabulary.literal(l).unwrap();
-
-            match literal.type_ {
-                LiteralTypeRef::Any(ty) => {
-                    let ty_iri = vocabulary.iri(ty).unwrap();
-
-                    if ty_iri == linked_data::xsd_types::XSD_STRING {
-                        return literal.value.parse().map_err(|_| {
-                            linked_data::FromLinkedDataError::InvalidLiteral(
-                                context.into_iris(vocabulary, interpretation),
-                            )
-                        });
-                    }
-
-                    literal_ty = Some(ty_iri)
-                }
-                LiteralTypeRef::LangString(_) => literal_ty = Some(RDF_LANG_STRING),
-            }
-        }
-
-        match literal_ty {
-            Some(ty) => Err(linked_data::FromLinkedDataError::LiteralTypeMismatch {
-                context: context.into_iris(vocabulary, interpretation),
-                expected: Some(linked_data::xsd_types::XSD_STRING.to_owned()),
-                found: ty.to_owned(),
-            }),
-            None => Err(linked_data::FromLinkedDataError::ExpectedLiteral(
-                context.into_iris(vocabulary, interpretation),
-            )),
-        }
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataPredicateObjects<I, V> for CompactJWSString {
-    fn visit_objects<S>(&self, mut visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<I, V>,
-    {
-        visitor.object(self)?;
-        visitor.end()
-    }
-}
-
-impl<V: Vocabulary, I: Interpretation> LinkedDataDeserializePredicateObjects<I, V>
-    for CompactJWSString
-where
-    V: Vocabulary,
-    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
-{
-    fn deserialize_objects_in<'a, D>(
-        vocabulary: &V,
-        interpretation: &I,
-        dataset: &D,
-        graph: Option<&I::Resource>,
-        objects: impl IntoIterator<Item = &'a I::Resource>,
-        context: linked_data::Context<I>,
-    ) -> Result<Self, linked_data::FromLinkedDataError>
-    where
-        I::Resource: 'a,
-        D: PatternMatchingDataset<Resource = I::Resource>,
-    {
-        let mut objects = objects.into_iter();
-        match objects.next() {
-            Some(object) => {
-                if objects.next().is_none() {
-                    Self::deserialize_subject(vocabulary, interpretation, dataset, graph, object)
-                } else {
-                    Err(linked_data::FromLinkedDataError::TooManyValues(
-                        context.into_iris(vocabulary, interpretation),
-                    ))
-                }
-            }
-            None => Err(linked_data::FromLinkedDataError::MissingRequiredValue(
-                context.into_iris(vocabulary, interpretation),
-            )),
-        }
-    }
-}
-
-impl<'de> serde::Deserialize<'de> for CompactJWSString {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct Visitor;
-
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = CompactJWSString;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("compact JWS")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                self.visit_string(v.to_owned())
-            }
-
-            fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                CompactJWSString::from_string(v).map_err(|e| E::custom(e))
-            }
-        }
-
-        deserializer.deserialize_string(Visitor)
-    }
-}
-
+/// JOSE Header.
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 pub struct Header {
     #[serde(rename = "alg")]
@@ -1388,14 +854,6 @@ pub fn split_detached_jws(jws: &str) -> Result<(&str, &str), Error> {
     Ok((header_b64, signature_b64))
 }
 
-#[derive(Clone, PartialEq, Eq)]
-pub struct DecodedJWS {
-    pub header: Header,
-    pub signing_input: Vec<u8>,
-    pub payload: Vec<u8>,
-    pub signature: Vec<u8>,
-}
-
 /// Decode JWS parts (JOSE header, payload, and signature) into useful values.
 /// The payload argument is bytes since it may be unencoded if the b64:false header parameter is used; otherwise it must be a base64url-encoded string. Header and signature are always expected to be base64url-encoded.
 /// "crit" (critical) header parameters are checked and disallowed if unrecognized/unsupported.
@@ -1420,38 +878,32 @@ pub fn decode_jws_parts(
         }
     }
     let signing_input = [header_b64.as_bytes(), b".", payload_enc].concat();
-    Ok(DecodedJWS {
-        header,
+    Ok(DecodedJWS::new(
         signing_input,
-        payload,
-        signature,
-    })
+        JWS::new(header, payload, signature),
+    ))
 }
 
 /// Verify a JWS with detached payload. Returns the JWS header on success.
 pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Header, Error> {
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let DecodedJWS {
-        header,
-        signing_input,
-        payload: _,
-        signature,
+        signing_bytes,
+        decoded: jws,
     } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
-    verify_bytes(header.algorithm, &signing_input, key, &signature)?;
-    Ok(header)
+    verify_bytes(jws.header.algorithm, &signing_bytes, key, &jws.signature)?;
+    Ok(jws.header)
 }
 
 /// Recover a JWK from a JWS and payload, if the algorithm supports that (such as [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r)).
 pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), Error> {
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let DecodedJWS {
-        header,
-        signing_input,
-        payload: _,
-        signature,
+        signing_bytes,
+        decoded: jws,
     } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
-    let key = recover(header.algorithm, &signing_input, &signature)?;
-    Ok((header, key))
+    let key = recover(jws.header.algorithm, &signing_bytes, &jws.signature)?;
+    Ok((jws.header, key))
 }
 
 pub fn detached_recover_legacy_keccak_es256kr(
@@ -1460,41 +912,35 @@ pub fn detached_recover_legacy_keccak_es256kr(
 ) -> Result<(Header, JWK), Error> {
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
     let DecodedJWS {
-        mut header,
-        signing_input,
-        payload: _,
-        signature,
+        signing_bytes,
+        decoded: mut jws,
     } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
     // Allow ESKeccakK-R misimplementation of ES256K-R, for legacy reasons.
-    if header.algorithm != Algorithm::ES256KR {
+    if jws.header.algorithm != Algorithm::ES256KR {
         return Err(Error::AlgorithmMismatch);
     }
-    header.algorithm = Algorithm::ESKeccakKR;
-    let key = recover(header.algorithm, &signing_input, &signature)?;
-    Ok((header, key))
+    jws.header.algorithm = Algorithm::ESKeccakKR;
+    let key = recover(jws.header.algorithm, &signing_bytes, &jws.signature)?;
+    Ok((jws.header, key))
 }
 
 pub fn decode_verify(jws: &str, key: &JWK) -> Result<(Header, Vec<u8>), Error> {
     let (header_b64, payload_enc, signature_b64) = split_jws(jws)?;
     let DecodedJWS {
-        header,
-        signing_input,
-        payload,
-        signature,
+        signing_bytes,
+        decoded: jws,
     } = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?;
-    verify_bytes(header.algorithm, &signing_input, key, &signature)?;
-    Ok((header, payload))
+    verify_bytes(jws.header.algorithm, &signing_bytes, key, &jws.signature)?;
+    Ok((jws.header, jws.payload))
 }
 
 pub fn decode_unverified(jws: &str) -> Result<(Header, Vec<u8>), Error> {
     let (header_b64, payload_enc, signature_b64) = split_jws(jws)?;
     let DecodedJWS {
-        header,
-        signing_input: _,
-        payload,
-        signature: _,
+        signing_bytes: _,
+        decoded: jws,
     } = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?;
-    Ok((header, payload))
+    Ok((jws.header, jws.payload))
 }
 
 #[cfg(test)]

@@ -120,19 +120,19 @@ impl<F, A> Ucan<F, A> {
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
         let (payload, codec): (Payload<F, A>, UcanCodec) =
-            match serde_json::from_slice(&parts.payload) {
+            match serde_json::from_slice(&parts.decoded.payload) {
                 Ok(p) => Ok((p, UcanCodec::Raw(jwt.to_string()))),
-                Err(e) => match DagJsonCodec.decode(&parts.payload) {
+                Err(e) => match DagJsonCodec.decode(&parts.decoded.payload) {
                     Ok(p) => Ok((p, UcanCodec::DagJson)),
                     Err(_) => Err(e),
                 },
             }?;
 
-        if parts.header.type_.as_deref() != Some("JWT") {
+        if parts.decoded.header.type_.as_deref() != Some("JWT") {
             return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
-        match parts.header.additional_parameters.get("ucv") {
+        match parts.decoded.header.additional_parameters.get("ucv") {
             Some(JsonValue::String(v)) if v == "0.9.0" => (),
             _ => return Err(Error::MissingUCANHeaderField("ucv: 0.9.0")),
         }
@@ -142,9 +142,9 @@ impl<F, A> Ucan<F, A> {
         }
 
         Ok(Self {
-            header: parts.header,
+            header: parts.decoded.header,
             payload,
-            signature: parts.signature,
+            signature: parts.decoded.signature,
             codec,
         })
     }

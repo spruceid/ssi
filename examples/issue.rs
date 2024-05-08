@@ -7,7 +7,7 @@ use ssi_claims::data_integrity::{
     AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
 };
 use ssi_dids::DIDResolver;
-use ssi_verification_methods::{AnyJwkMethod, SingleSecretSigner};
+use ssi_verification_methods::SingleSecretSigner;
 use static_iref::iri;
 
 #[async_std::main]
@@ -60,7 +60,8 @@ async fn main() {
                 .await
                 .unwrap();
 
-            if !jwt.verify::<AnyJwkMethod>(&resolver).await.unwrap() {
+            let result = jwt.verify(&resolver).await.expect("verification failed");
+            if !result.is_valid() {
                 panic!("verify failed");
             }
 

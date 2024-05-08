@@ -54,7 +54,9 @@ fn generate_codecs(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<
 
         let const_name = all_caps(name);
 
-        writeln!(f, "#[doc = \"{description}\"]")?;
+        if !description.is_empty() {
+            writeln!(f, "#[doc = \"{description}\"]")?;
+        }
 
         if matches!(status, Status::Deprecated) {
             writeln!(f, "#[deprecated]")?

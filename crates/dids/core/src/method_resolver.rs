@@ -1,24 +1,32 @@
+use std::marker::PhantomData;
+
 use crate::{document::Document, resolution, DIDResolver, DID, DIDURL};
 use ssi_verification_methods_core::{
     ControllerError, GenericVerificationMethod, InvalidVerificationMethod, ProofPurposes,
     ReferenceOrOwnedRef, VerificationMethodResolutionError,
 };
 
-pub struct VerificationMethodDIDResolver<T> {
+pub struct VerificationMethodDIDResolver<T, M> {
     resolver: T,
     options: resolution::Options,
+    method: PhantomData<M>,
 }
 
-impl<T> VerificationMethodDIDResolver<T> {
+impl<T, M> VerificationMethodDIDResolver<T, M> {
     pub fn new(resolver: T) -> Self {
         Self {
             resolver,
             options: resolution::Options::default(),
+            method: PhantomData,
         }
     }
 
     pub fn new_with_options(resolver: T, options: resolution::Options) -> Self {
-        Self { resolver, options }
+        Self {
+            resolver,
+            options,
+            method: PhantomData,
+        }
     }
 
     pub fn resolver(&self) -> &T {
@@ -39,8 +47,8 @@ impl ssi_verification_methods_core::Controller for Document {
     }
 }
 
-impl<T: DIDResolver> ssi_verification_methods_core::ControllerProvider
-    for VerificationMethodDIDResolver<T>
+impl<T: DIDResolver, M> ssi_verification_methods_core::ControllerProvider
+    for VerificationMethodDIDResolver<T, M>
 {
     type Controller<'a> = Document where Self: 'a;
 
@@ -68,13 +76,13 @@ impl<T: DIDResolver> ssi_verification_methods_core::ControllerProvider
 }
 
 // #[async_trait]
-impl<T: DIDResolver, M> ssi_verification_methods_core::VerificationMethodResolver<M>
-    for VerificationMethodDIDResolver<T>
+impl<T: DIDResolver, M> ssi_verification_methods_core::VerificationMethodResolver
+    for VerificationMethodDIDResolver<T, M>
 where
     M: ssi_verification_methods_core::VerificationMethod,
     M: TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
-    // type ResolveVerificationMethod<'a> = ResolveVerificationMethod<'a, M, T> where Self: 'a, M: 'a;
+    type Method = M;
 
     async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,

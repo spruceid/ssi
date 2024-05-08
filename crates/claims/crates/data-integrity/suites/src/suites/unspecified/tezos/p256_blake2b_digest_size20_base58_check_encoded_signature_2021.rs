@@ -4,6 +4,7 @@ use super::{Options, TZ_CONTEXT};
 use iref::Iri;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
+use ssi_jws::JWS;
 use ssi_verification_methods::{
     P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, SignatureError, VerificationError,
 };
@@ -84,7 +85,9 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
     ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
         if method.matches_public_key(options.public_key_jwk)? {
-            let (header, _, signature) = signature
+            let JWS {
+                header, signature, ..
+            } = signature
                 .jws
                 .decode()
                 .map_err(|_| VerificationError::InvalidSignature)?;

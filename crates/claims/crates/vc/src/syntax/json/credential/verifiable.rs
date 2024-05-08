@@ -125,10 +125,6 @@ impl<P> crate::Credential for JsonVerifiableCredential<P> {
 
 impl<P> VerifiableClaims for JsonVerifiableCredential<P> {
     type Proof = Vec<P>;
-
-    fn proof(&self) -> &Vec<P> {
-        &self.proofs
-    }
 }
 
 impl<P> ExtractProof for JsonVerifiableCredential<P> {

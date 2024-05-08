@@ -232,7 +232,7 @@ pub trait CredentialStatus {
     async fn check(
         &self,
         credential: &JsonVerifiableCredential,
-        resolver: &impl VerificationMethodResolver<AnyMethod>,
+        resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         context_loader: &mut ContextLoader,
     ) -> Result<StatusCheck, StatusCheckError>;
 }

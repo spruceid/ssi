@@ -142,7 +142,7 @@ impl<P: Serialize> JWTClaims<P> {
     pub async fn sign<'m, M: 'm + MaybeJwkVerificationMethod>(
         &self,
         verification_method: impl Into<ReferenceOrOwnedRef<'m, M>>,
-        resolver: &impl VerificationMethodResolver<M>,
+        resolver: &impl VerificationMethodResolver<Method = M>,
         signers: &impl Signer<M, Algorithm>,
     ) -> Result<CompactJWSString, SignatureError> {
         sign_claims(self, verification_method, resolver, signers).await
@@ -156,7 +156,7 @@ pub type AnyClaims = HashMap<String, serde_json::Value>;
 pub async fn sign_claims<'m, M: 'm + MaybeJwkVerificationMethod>(
     claims: &impl Serialize,
     verification_method: impl Into<ReferenceOrOwnedRef<'m, M>>,
-    resolver: &impl VerificationMethodResolver<M>,
+    resolver: &impl VerificationMethodResolver<Method = M>,
     signers: &impl Signer<M, Algorithm>,
 ) -> Result<CompactJWSString, SignatureError> {
     let verification_method = resolver

@@ -1,7 +1,7 @@
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_jwk::Algorithm;
-use ssi_jws::{CompactJWSStr, CompactJWSString};
+use ssi_jws::{CompactJWSStr, CompactJWSString, JWS};
 use ssi_verification_methods::{SignatureError, VerificationError};
 
 /// Common signature format where the proof value is multibase-encoded.
@@ -121,11 +121,13 @@ impl<'a> JwsSignatureRef<'a> {
         &self,
         message: &[u8],
     ) -> Result<(Vec<u8>, Vec<u8>, Algorithm), VerificationError> {
-        let (header, _, signature_bytes) = self
+        let JWS {
+            header, signature, ..
+        } = self
             .jws
             .decode()
             .map_err(|_| VerificationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(message);
-        Ok((signing_bytes, signature_bytes, header.algorithm))
+        Ok((signing_bytes, signature, header.algorithm))
     }
 }

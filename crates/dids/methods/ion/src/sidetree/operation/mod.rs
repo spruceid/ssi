@@ -8,6 +8,7 @@ pub use deactivate::*;
 pub use recover::*;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use ssi_jwk::JWK;
+use ssi_jws::JWS;
 pub use update::*;
 
 use super::{
@@ -300,17 +301,19 @@ pub fn jws_decode_verify_inner<Claims: DeserializeOwned>(
     let (header_b64, payload_enc, signature_b64) =
         split_jws(jwt).map_err(JWSDecodeVerifyError::SplitJWS)?;
     let DecodedJWS {
-        header,
-        signing_input,
-        payload,
-        signature,
+        signing_bytes,
+        decoded: JWS {
+            header,
+            payload,
+            signature,
+        },
     } = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)
         .map_err(JWSDecodeVerifyError::DecodeJWSParts)?;
     let claims: Claims =
         serde_json::from_slice(&payload).map_err(JWSDecodeVerifyError::DeserializeJWSPayload)?;
     let pk = get_key(&claims);
     let pk = JWK::try_from(pk.clone()).map_err(JWSDecodeVerifyError::JWKFromPublicKeyJwk)?;
-    verify_bytes(header.algorithm, &signing_input, &pk, &signature)
+    verify_bytes(header.algorithm, &signing_bytes, &pk, &signature)
         .map_err(JWSDecodeVerifyError::VerifyJWS)?;
     Ok((header, claims))
 }

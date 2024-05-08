@@ -2,6 +2,7 @@
 use std::fs;
 
 use ssi_dids::{DIDResolver, StaticDIDResolver, VerificationMethodDIDResolver};
+use ssi_verification_methods::AnyMethod;
 
 #[async_std::main]
 async fn main() {
@@ -21,7 +22,7 @@ async fn main() {
     println!("Success!")
 }
 
-fn create_verifier() -> VerificationMethodDIDResolver<StaticDIDResolver> {
+fn create_verifier() -> VerificationMethodDIDResolver<StaticDIDResolver, AnyMethod> {
     // Create a static DID resolver that resolves `did:example:foo` into a
     // static DID document.
     let mut did_resolver = ssi::dids::StaticDIDResolver::new();

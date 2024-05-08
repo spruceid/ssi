@@ -109,7 +109,7 @@ impl CredentialStatus for RevocationList2020Status {
     async fn check(
         &self,
         credential: &JsonVerifiableCredential,
-        resolver: &impl VerificationMethodResolver<AnyMethod>,
+        resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         context_loader: &mut ContextLoader,
     ) -> Result<StatusCheck, StatusCheckError> {
         use bitvec::prelude::*;

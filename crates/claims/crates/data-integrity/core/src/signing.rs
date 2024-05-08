@@ -4,7 +4,7 @@ use ssi_verification_methods_core::{SignatureError, Signer, VerificationMethodRe
 
 use crate::{
     suite::{CryptographicSuiteInput, CryptographicSuiteOptions, HashError, TransformError},
-    ConfigurationExpansionError, CryptographicSuite, PreparedProof, Proof, ProofConfiguration,
+    ConfigurationExpansionError, PreparedProof, Proof, ProofConfiguration,
     ProofConfigurationRefExpansion, Proofs,
 };
 
@@ -26,16 +26,7 @@ pub enum Error<E = ssi_json_ld::UnknownContext> {
     ConfigurationExpansionFailed(#[from] ConfigurationExpansionError<E>),
 }
 
-// impl From<crate::Error> for Error {
-//     fn from(value: crate::Error) -> Self {
-//         match value {
-//             crate::Error::Transform(e) => Self::Transform(e),
-//             crate::Error::HashFailed(e) => Self::HashFailed(e),
-//         }
-//     }
-// }
-
-pub async fn sign<'max, T, S: CryptographicSuite, X, R, N>(
+pub async fn sign<'max, T, S, X, R, N>(
     input: T,
     environment: X,
     resolver: &'max R,
@@ -47,7 +38,7 @@ where
     T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
-    R: 'max + VerificationMethodResolver<S::VerificationMethod>,
+    R: 'max + VerificationMethodResolver<Method = S::VerificationMethod>,
     N: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     X: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
@@ -58,7 +49,7 @@ where
     )
 }
 
-pub async fn sign_single<'max, T, S: CryptographicSuite, X, R, N>(
+pub async fn sign_single<'max, T, S, X, R, N>(
     input: T,
     mut environment: X,
     resolver: &'max R,
@@ -70,7 +61,7 @@ where
     T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, X>,
     S::VerificationMethod: 'max,
-    R: 'max + VerificationMethodResolver<S::VerificationMethod>,
+    R: 'max + VerificationMethodResolver<Method = S::VerificationMethod>,
     N: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
     X: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
@@ -101,51 +92,4 @@ where
         input,
         PreparedProof::new(proof, hash),
     ))
-}
-
-// impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
-//     /// Sign the given credential with the given Data Integrity cryptographic
-//     /// suite.
-//     pub async fn sign<'max, X, I>(
-//         input: T,
-//         context: X,
-//         signer: &'max I,
-//         suite: S,
-//         params: ProofConfiguration<S::VerificationMethod, S::Options>,
-//     ) -> Result<Verifiable<DataIntegrity<T, S>>, Error>
-//     where
-//         S: CryptographicSuiteInput<T, X>,
-//         S::VerificationMethod: 'max,
-//         I: 'max + Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
-//     {
-//         let di = DataIntegrity::new(input, context, &suite, params.borrowed()).await?;
-
-//         let proof = suite.generate_proof(&di.hash, signer, params).await?;
-
-//         Ok(Verifiable::new(di, proof.into_typed(suite)))
-//     }
-// }
-
-/// Prepare the signing bytes.
-trait PrepareSigningBytes<Algorithm, Protocol> {
-    /// Signature preparation.
-    type Preparation;
-
-    /// Prepares the signing bytes.
-    fn prepare_signing_bytes(
-        bytes: &[u8],
-        algorithm: Algorithm,
-        protocol: Protocol,
-    ) -> (Self::Preparation, Vec<u8>);
-}
-
-/// Encode the signature.
-trait EncodeSignature<Algorithm, Protocol>: PrepareSigningBytes<Algorithm, Protocol> {
-    /// Encode the signature.
-    fn encode(preparation: Self::Preparation, signature: Vec<u8>) -> Self;
-}
-
-trait DecodeSignature<Algorithm, Protocol>: PrepareSigningBytes<Algorithm, Protocol> {
-    /// Decode the signature.
-    fn decode(self, preparation: Self::Preparation) -> Vec<u8>;
 }

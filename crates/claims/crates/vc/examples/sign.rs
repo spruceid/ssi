@@ -254,7 +254,9 @@ impl ControllerProvider for Keyring {
     }
 }
 
-impl VerificationMethodResolver<Ed25519VerificationKey2020> for Keyring {
+impl VerificationMethodResolver for Keyring {
+    type Method = Ed25519VerificationKey2020;
+
     async fn resolve_verification_method<'a, 'm: 'a>(
         &'a self,
         _issuer: Option<&'a Iri>,

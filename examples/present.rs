@@ -15,7 +15,7 @@ use ssi::{
         jws::CompactJWSString,
         vc::JsonVerifiableCredential,
     },
-    verification_methods::{AnyJwkMethod, ProofPurpose, SingleSecretSigner},
+    verification_methods::{ProofPurpose, SingleSecretSigner},
 };
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
@@ -94,7 +94,8 @@ async fn main() {
                 .await
                 .unwrap();
 
-            if !jwt.verify::<AnyJwkMethod>(&resolver).await.unwrap() {
+            let result = jwt.verify(&resolver).await.expect("verification failed");
+            if !result.is_valid() {
                 panic!("verify failed");
             }
 
