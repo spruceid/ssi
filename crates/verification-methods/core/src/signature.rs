@@ -1,8 +1,9 @@
-use crate::{InvalidVerificationMethod, VerificationError, VerificationMethodResolutionError};
+use crate::{InvalidVerificationMethod, VerificationMethodResolutionError};
 
 mod signer;
 
 pub use signer::*;
+use ssi_claims_core::ProofValidationError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignatureError {
@@ -62,7 +63,7 @@ pub enum InvalidSignature {
     AmbiguousPublicKey,
 }
 
-impl From<InvalidSignature> for VerificationError {
+impl From<InvalidSignature> for ProofValidationError {
     fn from(value: InvalidSignature) -> Self {
         match value {
             InvalidSignature::MissingValue => Self::MissingSignature,

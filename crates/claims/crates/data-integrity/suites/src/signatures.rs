@@ -1,8 +1,9 @@
+use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_jwk::Algorithm;
 use ssi_jws::{CompactJWSStr, CompactJWSString, JWS};
-use ssi_verification_methods::{SignatureError, VerificationError};
+use ssi_verification_methods::SignatureError;
 
 /// Common signature format where the proof value is multibase-encoded.
 #[derive(
@@ -28,10 +29,10 @@ impl MultibaseSignature {
         }
     }
 
-    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+    pub fn decode(&self) -> Result<Vec<u8>, ProofValidationError> {
         multibase::decode(&self.proof_value)
             .map(|(_, data)| data)
-            .map_err(|_| VerificationError::InvalidSignature)
+            .map_err(|_| ProofValidationError::InvalidSignature)
     }
 }
 
@@ -54,10 +55,10 @@ pub struct MultibaseSignatureRef<'a> {
 }
 
 impl<'a> MultibaseSignatureRef<'a> {
-    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+    pub fn decode(&self) -> Result<Vec<u8>, ProofValidationError> {
         multibase::decode(self.proof_value)
             .map(|(_, data)| data)
-            .map_err(|_| VerificationError::InvalidSignature)
+            .map_err(|_| ProofValidationError::InvalidSignature)
     }
 }
 
@@ -120,13 +121,13 @@ impl<'a> JwsSignatureRef<'a> {
     pub fn decode(
         &self,
         message: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>, Algorithm), VerificationError> {
+    ) -> Result<(Vec<u8>, Vec<u8>, Algorithm), ProofValidationError> {
         let JWS {
             header, signature, ..
         } = self
             .jws
             .decode()
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(message);
         Ok((signing_bytes, signature, header.algorithm))
     }

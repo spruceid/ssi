@@ -2,6 +2,7 @@ use iref::Iri;
 use json_syntax::Print;
 use lazy_static::lazy_static;
 use serde::Serialize;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
@@ -11,7 +12,7 @@ use ssi_data_integrity_core::{
 use ssi_jwk::algorithm::AnyBlake2b;
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{SignatureError, TezosMethod2021, VerificationError};
+use ssi_verification_methods::{SignatureError, TezosMethod2021};
 use static_iref::iri;
 
 use super::{decode_jwk_from_multibase, TezosWallet};
@@ -179,10 +180,10 @@ impl CryptographicSuite for TezosJcsSignature2021 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let public_key_jwk = options
             .public_key_multibase
-            .map(|k| decode_jwk_from_multibase(k).map_err(|_| VerificationError::InvalidKey))
+            .map(|k| decode_jwk_from_multibase(k).map_err(|_| ProofValidationError::InvalidKey))
             .transpose()?;
 
         let (algorithm, signature_bytes) = signature.decode()?;

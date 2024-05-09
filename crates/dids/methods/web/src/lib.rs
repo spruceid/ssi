@@ -286,7 +286,7 @@ mod tests {
             serde_json::to_string_pretty(vc.proof()).unwrap()
         );
         assert_eq!(vc.proof().first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
-        assert!(vc.verify(&didweb).await.unwrap().is_valid());
+        assert!(vc.verify(&didweb).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
         let vc_bad_issuer =
@@ -297,7 +297,7 @@ mod tests {
             .await
             .unwrap();
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didweb).await.unwrap().is_invalid());
+        assert!(vc_bad_issuer.verify(&didweb).await.unwrap().is_err());
 
         PROXY.with(|proxy| {
             proxy.replace(None);

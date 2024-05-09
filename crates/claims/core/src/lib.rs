@@ -29,7 +29,7 @@ impl<T, P: Proof> Verifiable<T, P> {
         Self { claims, proof }
     }
 
-    pub async fn new<U, E>(value: U) -> Result<Self, P::Error>
+    pub async fn new<U, E>(value: U) -> Result<Self, ProofPreparationError>
     where
         U: ExtractProof<Proofless = T, Proof = P>,
         P: PrepareWith<T, E>,
@@ -38,7 +38,7 @@ impl<T, P: Proof> Verifiable<T, P> {
         Self::new_with(value, E::default()).await
     }
 
-    pub async fn new_with<U, E>(value: U, mut environment: E) -> Result<Self, P::Error>
+    pub async fn new_with<U, E>(value: U, mut environment: E) -> Result<Self, ProofPreparationError>
     where
         U: ExtractProof<Proofless = T, Proof = P>,
         P: PrepareWith<T, E>,
@@ -69,7 +69,7 @@ impl<T, P: Proof> Verifiable<T, P> {
         self,
         environment: E,
         f: impl FnOnce(T) -> U,
-    ) -> Result<Verifiable<U, P>, P::Error>
+    ) -> Result<Verifiable<U, P>, ProofPreparationError>
     where
         P: PrepareWith<U, E>,
         P::Prepared: UnprepareProof<Unprepared = P>,
@@ -85,7 +85,7 @@ impl<T, P: Proof> Verifiable<T, P> {
         mut environment: E,
         f: impl FnOnce(T) -> U,
         mut g: impl FnMut(P) -> P,
-    ) -> Result<Verifiable<U, P>, P::Error>
+    ) -> Result<Verifiable<U, P>, ProofPreparationError>
     where
         P: PrepareWith<U, E>,
         P::Prepared: UnprepareProof<Unprepared = P>,
@@ -118,16 +118,35 @@ impl<T, P: Proof> Verifiable<T, P> {
     }
 
     /// Validates the claims and verify them against the proof.
-    pub async fn verify<V, E>(&self, verifier: &V) -> Result<ProofValidity, E>
+    pub async fn verify<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
     where
-        T: Validate,
-        P::Prepared: VerifyClaimsWith<T, V, Error = E>,
+        T: Validate<ValidationEnvironment>,
+        P::Prepared: ValidateProof<T, V>,
     {
-        if self.claims.is_valid() {
-            self.proof.verify_claims_with(&self.claims, verifier).await
-        } else {
-            // Claims are not valid on their own.
-            Ok(ProofValidity::Invalid)
+        let env = ValidationEnvironment::default();
+        self.verify_with(verifier, &env).await
+    }
+
+    /// Validates the claims and verify them against the proof.
+    pub async fn verify_with<V, E>(
+        &self,
+        verifier: &V,
+        env: &E,
+    ) -> Result<Verification, ProofValidationError>
+    where
+        T: Validate<E>,
+        P::Prepared: ValidateProof<T, V>,
+    {
+        match self.claims.validate(env) {
+            Ok(_) => self
+                .proof
+                .validate_proof(&self.claims, verifier)
+                .await
+                .map(|r| r.map_err(Invalid::Proof)),
+            Err(e) => {
+                // Claims are not valid on their own.
+                Ok(Err(Invalid::Claims(e)))
+            }
         }
     }
 

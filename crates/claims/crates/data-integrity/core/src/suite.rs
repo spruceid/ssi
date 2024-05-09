@@ -1,11 +1,11 @@
 //! Cryptographic suites.
 use iref::Iri;
-use ssi_claims_core::{ProofValidity, Verifiable};
+use ssi_claims_core::{ProofPreparationError, ProofValidationError, ProofValidity, Verifiable};
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
 use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{
-    InvalidVerificationMethod, SignatureError, Signer, VerificationError, VerificationMethod,
+    InvalidVerificationMethod, SignatureError, Signer, VerificationMethod,
     VerificationMethodResolver,
 };
 use std::convert::Infallible;
@@ -72,6 +72,12 @@ impl From<ProofConfigurationCastError<InvalidVerificationMethod, Infallible>> fo
     }
 }
 
+impl From<TransformError> for ProofPreparationError {
+    fn from(value: TransformError) -> Self {
+        ProofPreparationError::Claims(value.to_string())
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum HashError {
     #[error("invalid verification method")]
@@ -81,10 +87,16 @@ pub enum HashError {
     TooLong,
 
     #[error("invalid message: {0}")]
-    InvalidMessage(Box<dyn 'static + std::error::Error>),
+    InvalidMessage(String),
 
     #[error("invalid transformed input")]
     InvalidTransformedInput,
+}
+
+impl From<HashError> for ProofPreparationError {
+    fn from(value: HashError) -> Self {
+        ProofPreparationError::Claims(value.to_string())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -93,10 +105,10 @@ pub enum InvalidOptions {
     MissingPublicKey,
 }
 
-impl From<InvalidOptions> for VerificationError {
+impl From<InvalidOptions> for ProofValidationError {
     fn from(value: InvalidOptions) -> Self {
         match value {
-            InvalidOptions::MissingPublicKey => VerificationError::MissingPublicKey,
+            InvalidOptions::MissingPublicKey => ProofValidationError::MissingPublicKey,
         }
     }
 }
@@ -196,7 +208,7 @@ pub trait CryptographicSuite: Sized {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ProofValidity, VerificationError>;
+    ) -> Result<ProofValidity, ProofValidationError>;
 
     #[allow(async_fn_in_trait)]
     async fn generate_proof<S>(
@@ -243,7 +255,7 @@ pub trait CryptographicSuite: Sized {
         data: &Self::Hashed,
         verifier: &impl VerificationMethodResolver<Method = Self::VerificationMethod>,
         proof: ProofRef<'_, Self>,
-    ) -> Result<ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         // Resolve the verification method.
         let verification_method = verifier
             .resolve_verification_method(None, Some(proof.verification_method))

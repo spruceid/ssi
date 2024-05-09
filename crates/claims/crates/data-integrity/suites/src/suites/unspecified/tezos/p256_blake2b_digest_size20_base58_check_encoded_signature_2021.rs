@@ -2,11 +2,12 @@ use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
 use super::{Options, TZ_CONTEXT};
 use iref::Iri;
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jws::JWS;
 use ssi_verification_methods::{
-    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, SignatureError, VerificationError,
+    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, SignatureError,
 };
 use static_iref::iri;
 
@@ -83,14 +84,14 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         if method.matches_public_key(options.public_key_jwk)? {
             let JWS {
                 header, signature, ..
             } = signature
                 .jws
                 .decode()
-                .map_err(|_| VerificationError::InvalidSignature)?;
+                .map_err(|_| ProofValidationError::InvalidSignature)?;
             let signing_bytes = header.encode_signing_bytes(bytes);
             Ok(ssi_jws::verify_bytes(
                 header.algorithm,
@@ -98,10 +99,9 @@ impl CryptographicSuite for P256BLAKE2BDigestSize20Base58CheckEncodedSignature20
                 options.public_key_jwk,
                 &signature,
             )
-            .is_ok()
-            .into())
+            .map_err(|_| InvalidProof::Signature))
         } else {
-            Ok(ssi_claims_core::ProofValidity::Invalid)
+            Ok(Err(InvalidProof::KeyMismatch))
         }
     }
 }

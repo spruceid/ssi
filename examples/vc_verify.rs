@@ -18,7 +18,7 @@ async fn main() {
     let verifier = create_verifier();
 
     // Verify the VC!
-    assert!(vc.verify(&verifier).await.unwrap().is_valid());
+    assert!(vc.verify(&verifier).await.unwrap().is_ok());
     println!("Success!")
 }
 

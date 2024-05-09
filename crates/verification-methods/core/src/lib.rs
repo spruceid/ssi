@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use iref::{Iri, IriBuf};
+use ssi_claims_core::ProofValidationError;
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSignatureError, MessageSigner, SignatureProtocol};
 use ssi_jwk::JWK;
@@ -112,6 +113,15 @@ pub enum VerificationMethodResolutionError {
     /// Verifier internal error.
     #[error("internal error: {0}")]
     InternalError(String),
+}
+
+impl From<VerificationMethodResolutionError> for ProofValidationError {
+    fn from(value: VerificationMethodResolutionError) -> Self {
+        match value {
+            VerificationMethodResolutionError::MissingVerificationMethod => Self::MissingPublicKey,
+            e => Self::Other(e.to_string()),
+        }
+    }
 }
 
 pub trait VerificationMethodResolver {
@@ -279,6 +289,12 @@ impl InvalidVerificationMethod {
 
     pub fn invalid_property(name: &str) -> Self {
         Self::InvalidProperty(name.to_owned())
+    }
+}
+
+impl From<InvalidVerificationMethod> for ProofValidationError {
+    fn from(_value: InvalidVerificationMethod) -> Self {
+        Self::InvalidKey
     }
 }
 

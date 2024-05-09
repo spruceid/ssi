@@ -11,6 +11,7 @@ documentation = "https://docs.rs/ssi-verification-methods/"
 [dependencies]
 ssi-core.workspace = true
 ssi-crypto.workspace = true
+ssi-claims-core.workspace = true
 ssi-jwk.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true

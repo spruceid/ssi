@@ -530,7 +530,7 @@ mod tests {
         } else {
             assert_eq!(vc.proof().first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
-        assert!(vc.verify(&didethr).await.unwrap().is_valid());
+        assert!(vc.verify(&didethr).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
         let vc_bad_issuer =
@@ -541,7 +541,7 @@ mod tests {
             .await
             .unwrap();
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_invalid());
+        assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_key = JWK::generate_secp256k1().unwrap();
@@ -561,7 +561,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(vc_wrong_key.verify(&didethr).await.unwrap().is_invalid());
+        assert!(vc_wrong_key.verify(&didethr).await.unwrap().is_err());
 
         // Make it into a VP
         let presentation = JsonPresentation::new(
@@ -589,7 +589,7 @@ mod tests {
             .unwrap();
 
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        assert!(vp.verify(&didethr).await.unwrap().is_valid());
+        assert!(vp.verify(&didethr).await.unwrap().is_ok());
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
@@ -606,7 +606,7 @@ mod tests {
             value.push_str("ff");
         }
         let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
-        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // test that holder is verified
         let vp_bad_holder = Verifiable::tamper(vp, AnyInputContext::default(), |mut pres| {
@@ -616,7 +616,7 @@ mod tests {
         .await
         .unwrap();
         // It should fail.
-        assert!(vp_bad_holder.verify(&didethr).await.unwrap().is_invalid());
+        assert!(vp_bad_holder.verify(&didethr).await.unwrap().is_err());
     }
 
     #[tokio::test]
@@ -626,6 +626,6 @@ mod tests {
             .await
             .unwrap();
         // eprintln!("vc {:?}", vc);
-        assert!(vc.verify(&didethr).await.unwrap().is_valid())
+        assert!(vc.verify(&didethr).await.unwrap().is_ok())
     }
 }

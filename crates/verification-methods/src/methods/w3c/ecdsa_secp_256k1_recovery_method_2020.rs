@@ -2,6 +2,7 @@ use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
@@ -10,7 +11,7 @@ use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE: &str = "EcdsaSecp256k1RecoveryMethod2020";
@@ -150,23 +151,26 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
         signing_bytes: &[u8],
         signature: &[u8],
         digest_function: DigestFunction,
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         // Recover the key used to sign the message.
         let algorithm = digest_function.into_crypto_algorithm();
         let key = ssi_jws::recover(algorithm, signing_bytes, signature)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         // Check the validity of the signing key.
         let matching_keys = self
             .public_key
             .matches(&key)
-            .map_err(|_| VerificationError::InvalidProof)?;
+            .map_err(|_| ProofValidationError::InvalidProof)?;
         if !matching_keys {
-            return Ok(false);
+            return Ok(Err(InvalidProof::KeyMismatch));
         }
 
         // Verify the signature.
-        Ok(ssi_jws::verify_bytes(algorithm, signing_bytes, &key, signature).is_ok())
+        Ok(
+            ssi_jws::verify_bytes(algorithm, signing_bytes, &key, signature)
+                .map_err(|_| InvalidProof::Signature),
+        )
     }
 }
 
@@ -218,7 +222,7 @@ pub enum InvalidPublicKey {
     HashError(String),
 }
 
-impl From<InvalidPublicKey> for VerificationError {
+impl From<InvalidPublicKey> for ProofValidationError {
     fn from(_value: InvalidPublicKey) -> Self {
         Self::InvalidKey
     }

@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_data_integrity_core::{
@@ -203,7 +204,7 @@ impl CryptographicSuite for EthereumEip712Signature2021v0_1 {
         _proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         data.encode()
-            .map_err(|e| HashError::InvalidMessage(Box::new(e)))
+            .map_err(|e| HashError::InvalidMessage(e.to_string()))
     }
 
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
@@ -229,7 +230,7 @@ impl CryptographicSuite for EthereumEip712Signature2021v0_1 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }

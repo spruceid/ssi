@@ -1,3 +1,4 @@
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
@@ -110,7 +111,7 @@ impl CryptographicSuite for TezosSignature2021 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let (algorithm, signature_bytes) = signature.decode()?;
         method
             .verify_bytes(options.public_key_jwk, bytes, algorithm, &signature_bytes)

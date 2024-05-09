@@ -1,8 +1,53 @@
+use std::fmt;
+
 use chrono::{DateTime, Utc};
-use ssi_jwt::{JWTClaims, RegisteredClaim, RegisteredClaimKind};
+use ssi_jwt::TryRemoveClaim;
+
+pub trait JwtVcClaims:
+    TryRemoveClaim<ssi_jwt::VerifiableCredential>
+    + TryRemoveClaim<ssi_jwt::ExpirationTime>
+    + TryRemoveClaim<ssi_jwt::Issuer>
+    + TryRemoveClaim<ssi_jwt::IssuedAt>
+    + TryRemoveClaim<ssi_jwt::NotBefore>
+    + TryRemoveClaim<ssi_jwt::Subject>
+    + TryRemoveClaim<ssi_jwt::JwtId>
+{
+}
+
+impl<T> JwtVcClaims for T where
+    T: TryRemoveClaim<ssi_jwt::VerifiableCredential>
+        + TryRemoveClaim<ssi_jwt::ExpirationTime>
+        + TryRemoveClaim<ssi_jwt::Issuer>
+        + TryRemoveClaim<ssi_jwt::IssuedAt>
+        + TryRemoveClaim<ssi_jwt::NotBefore>
+        + TryRemoveClaim<ssi_jwt::Subject>
+        + TryRemoveClaim<ssi_jwt::JwtId>
+{
+}
+
+pub trait JwtVpClaims:
+    TryRemoveClaim<ssi_jwt::VerifiablePresentation>
+    + TryRemoveClaim<ssi_jwt::Issuer>
+    + TryRemoveClaim<ssi_jwt::IssuedAt>
+    + TryRemoveClaim<ssi_jwt::NotBefore>
+    + TryRemoveClaim<ssi_jwt::JwtId>
+{
+}
+
+impl<T> JwtVpClaims for T where
+    T: TryRemoveClaim<ssi_jwt::VerifiablePresentation>
+        + TryRemoveClaim<ssi_jwt::Issuer>
+        + TryRemoveClaim<ssi_jwt::IssuedAt>
+        + TryRemoveClaim<ssi_jwt::NotBefore>
+        + TryRemoveClaim<ssi_jwt::JwtId>
+{
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcDecodeError {
+    #[error("unable to read claim: {0}")]
+    Claim(String),
+
     #[error("missing credential value")]
     MissingCredential,
 
@@ -16,34 +61,59 @@ pub enum JwtVcDecodeError {
     Deserialization(#[from] json_syntax::DeserializeError),
 }
 
+impl JwtVcDecodeError {
+    fn claim(e: impl fmt::Display) -> Self {
+        Self::Claim(e.to_string())
+    }
+}
+
 /// Decodes a Verifiable Credential form a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vc_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVcDecodeError>
+pub fn decode_jwt_vc_claims<T>(mut jwt: impl JwtVcClaims) -> Result<T, JwtVcDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
-    match jwt
-        .registered_claims
-        .remove(RegisteredClaimKind::VerifiableCredential)
-    {
-        Some(RegisteredClaim::VerifiableCredential(vc)) => match vc {
-            json_syntax::Value::Object(mut vc) => {
-                decode_jwt_vc_specific_headers(jwt, &mut vc)?;
-                Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
-            }
-            v => Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind())),
-        },
-        Some(_) => panic!(), // unsound claim set.
-        None => Err(JwtVcDecodeError::MissingCredential),
+    let ssi_jwt::VerifiableCredential(vc) = jwt
+        .try_remove()
+        .map_err(JwtVcDecodeError::claim)?
+        .ok_or(JwtVcDecodeError::MissingCredential)?;
+
+    match vc {
+        json_syntax::Value::Object(mut vc) => {
+            decode_jwt_vc_specific_headers(jwt, &mut vc)?;
+            Ok(json_syntax::from_value(json_syntax::Value::Object(vc))?)
+        }
+        v => Err(JwtVcDecodeError::UnexpectedCredentialValue(v.kind())),
     }
 }
 
 fn decode_jwt_vc_specific_headers(
-    jwt: JWTClaims,
+    mut jwt: impl JwtVcClaims,
     target: &mut json_syntax::Object,
 ) -> Result<(), JwtVcDecodeError> {
-    if let Some(exp) = jwt.expiration_time {
+    let exp = jwt
+        .try_remove::<ssi_jwt::ExpirationTime>()
+        .map_err(JwtVcDecodeError::claim)?;
+    let iss = jwt
+        .try_remove::<ssi_jwt::Issuer>()
+        .map_err(JwtVcDecodeError::claim)?;
+    let iat = jwt
+        .try_remove::<ssi_jwt::IssuedAt>()
+        .map_err(JwtVcDecodeError::claim)?
+        .map(|iat| iat.0);
+    let nbf = jwt
+        .try_remove::<ssi_jwt::NotBefore>()
+        .map_err(JwtVcDecodeError::claim)?
+        .map(|nbf| nbf.0);
+    let sub = jwt
+        .try_remove::<ssi_jwt::Subject>()
+        .map_err(JwtVcDecodeError::claim)?;
+    let jti = jwt
+        .try_remove::<ssi_jwt::JwtId>()
+        .map_err(JwtVcDecodeError::claim)?;
+
+    if let Some(ssi_jwt::ExpirationTime(exp)) = exp {
         let exp_date_time: chrono::LocalResult<DateTime<Utc>> = exp.into();
         if let Some(time) = exp_date_time.latest() {
             let credential_subject = target
@@ -60,11 +130,11 @@ fn decode_jwt_vc_specific_headers(
         }
     }
 
-    if let Some(iss) = jwt.issuer {
+    if let Some(ssi_jwt::Issuer(iss)) = iss {
         target.insert("issuer".into(), iss.into_string().into());
     }
 
-    if let Some(nbf) = jwt.issuance_date.or(jwt.not_before) {
+    if let Some(nbf) = iat.or(nbf) {
         let nbf_date_time: chrono::LocalResult<DateTime<Utc>> = nbf.into();
         if let Some(time) = nbf_date_time.latest() {
             target.insert(
@@ -74,7 +144,7 @@ fn decode_jwt_vc_specific_headers(
         }
     }
 
-    if let Some(sub) = jwt.subject {
+    if let Some(ssi_jwt::Subject(sub)) = sub {
         let credential_subject = target
             .get_mut_or_insert_with("credentialSubject", || json_syntax::Object::new().into());
         let kind = credential_subject.kind();
@@ -85,7 +155,7 @@ fn decode_jwt_vc_specific_headers(
             .insert("id".into(), sub.into_string().into());
     }
 
-    if let Some(jti) = jwt.jwt_id {
+    if let Some(ssi_jwt::JwtId(jti)) = jti {
         target.insert("id".into(), jti.into());
     }
 
@@ -94,6 +164,9 @@ fn decode_jwt_vc_specific_headers(
 
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVpDecodeError {
+    #[error("unable to read claim: {0}")]
+    Claim(String),
+
     #[error("missing presentation value")]
     MissingPresentation,
 
@@ -104,35 +177,57 @@ pub enum JwtVpDecodeError {
     Deserialization(#[from] json_syntax::DeserializeError),
 }
 
-/// Decodes a Verifiable Presentation from a JWT.
-///
-/// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vp_claims<T>(mut jwt: JWTClaims) -> Result<T, JwtVpDecodeError>
-where
-    T: for<'a> serde::Deserialize<'a>,
-{
-    match jwt
-        .registered_claims
-        .remove(RegisteredClaimKind::VerifiableCredential)
-    {
-        Some(RegisteredClaim::VerifiablePresentation(vp)) => match vp {
-            json_syntax::Value::Object(mut vp) => {
-                decode_jwt_vp_specific_headers(jwt, &mut vp);
-                Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
-            }
-            v => Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind())),
-        },
-        Some(_) => panic!(), // unsound claim set.
-        None => Err(JwtVpDecodeError::MissingPresentation),
+impl JwtVpDecodeError {
+    fn claim(e: impl fmt::Display) -> Self {
+        Self::Claim(e.to_string())
     }
 }
 
-fn decode_jwt_vp_specific_headers(jwt: JWTClaims, target: &mut json_syntax::Object) {
-    if let Some(iss) = jwt.issuer {
+/// Decodes a Verifiable Presentation from a JWT.
+///
+/// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
+pub fn decode_jwt_vp_claims<T>(mut jwt: impl JwtVpClaims) -> Result<T, JwtVpDecodeError>
+where
+    T: for<'a> serde::Deserialize<'a>,
+{
+    let ssi_jwt::VerifiablePresentation(vp) = jwt
+        .try_remove()
+        .map_err(JwtVpDecodeError::claim)?
+        .ok_or(JwtVpDecodeError::MissingPresentation)?;
+
+    match vp {
+        json_syntax::Value::Object(mut vp) => {
+            decode_jwt_vp_specific_headers(jwt, &mut vp)?;
+            Ok(json_syntax::from_value(json_syntax::Value::Object(vp))?)
+        }
+        v => Err(JwtVpDecodeError::UnexpectedPresentationValue(v.kind())),
+    }
+}
+
+fn decode_jwt_vp_specific_headers(
+    mut jwt: impl JwtVpClaims,
+    target: &mut json_syntax::Object,
+) -> Result<(), JwtVpDecodeError> {
+    let iss = jwt
+        .try_remove::<ssi_jwt::Issuer>()
+        .map_err(JwtVpDecodeError::claim)?;
+    let iat = jwt
+        .try_remove::<ssi_jwt::IssuedAt>()
+        .map_err(JwtVpDecodeError::claim)?
+        .map(|iat| iat.0);
+    let nbf = jwt
+        .try_remove::<ssi_jwt::NotBefore>()
+        .map_err(JwtVpDecodeError::claim)?
+        .map(|nbf| nbf.0);
+    let jti = jwt
+        .try_remove::<ssi_jwt::JwtId>()
+        .map_err(JwtVpDecodeError::claim)?;
+
+    if let Some(ssi_jwt::Issuer(iss)) = iss {
         target.insert("holder".into(), iss.into_string().into());
     }
 
-    if let Some(nbf) = jwt.issuance_date.or(jwt.not_before) {
+    if let Some(nbf) = iat.or(nbf) {
         let nbf_date_time: chrono::LocalResult<DateTime<Utc>> = nbf.into();
         if let Some(time) = nbf_date_time.latest() {
             target.insert(
@@ -142,7 +237,9 @@ fn decode_jwt_vp_specific_headers(jwt: JWTClaims, target: &mut json_syntax::Obje
         }
     }
 
-    if let Some(jti) = jwt.jwt_id {
+    if let Some(ssi_jwt::JwtId(jti)) = jti {
         target.insert("id".into(), jti.into());
     }
+
+    Ok(())
 }

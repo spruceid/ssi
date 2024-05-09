@@ -2,10 +2,11 @@ use std::{borrow::Cow, hash::Hash};
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{JwkVerificationMethod, VerificationError};
+use ssi_verification_methods_core::JwkVerificationMethod;
 use static_iref::iri;
 
 use crate::{
@@ -70,13 +71,17 @@ impl RsaVerificationKey2018 {
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
         let result =
             ssi_jws::verify_bytes(ssi_jwk::Algorithm::RS256, data, &self.public_key, signature);
         match result {
-            Ok(()) => Ok(true),
-            Err(ssi_jws::Error::InvalidSignature) => Ok(false),
-            Err(_) => Err(VerificationError::InvalidSignature),
+            Ok(()) => Ok(Ok(())),
+            Err(ssi_jws::Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
+            Err(_) => Err(ProofValidationError::InvalidSignature),
         }
     }
 }

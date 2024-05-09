@@ -2,34 +2,21 @@ use std::marker::PhantomData;
 
 use serde::de::Visitor;
 
-use crate::{ClaimKind, JWTClaims, RegisteredClaim, RegisteredClaimKind};
+use crate::{ClaimKind, JWTClaims, RegisteredClaimKind, RegisteredClaims};
 
 struct ClaimsDeserializer<D> {
     inner: D,
-    result: JWTClaims<()>,
+    result: RegisteredClaims,
 }
 
 impl<'de, D: serde::de::MapAccess<'de>> ClaimsDeserializer<D> {
     fn deserialize_registered_claim(&mut self, kind: RegisteredClaimKind) -> Result<(), D::Error> {
-        match kind.deserialize_value(&mut self.inner)? {
-            RegisteredClaim::Issuer(value) => {
-                self.result.issuer = Some(value);
-            }
-            RegisteredClaim::Subject(value) => self.result.subject = Some(value),
-            RegisteredClaim::Audience(value) => self.result.audience = Some(value),
-            RegisteredClaim::ExpirationTime(value) => self.result.expiration_time = Some(value),
-            RegisteredClaim::NotBefore(value) => self.result.not_before = Some(value),
-            RegisteredClaim::IssuedAt(value) => self.result.issuance_date = Some(value),
-            RegisteredClaim::JwtId(value) => self.result.jwt_id = Some(value),
-            other => {
-                self.result.registered_claims.insert(other);
-            }
-        }
-
+        self.result
+            .insert_any(kind.deserialize_value(&mut self.inner)?);
         Ok(())
     }
 
-    fn into_registered_claims(mut self) -> Result<JWTClaims<()>, D::Error> {
+    fn into_registered_claims(mut self) -> Result<RegisteredClaims, D::Error> {
         while let Some(claim) = self.inner.next_key()? {
             match claim {
                 ClaimKind::Registered(r) => self.deserialize_registered_claim(r)?,
@@ -492,7 +479,7 @@ impl<'de, P: serde::Deserialize<'de>> serde::Deserialize<'de> for JWTClaims<P> {
             {
                 let mut claims_deserializer = ClaimsDeserializer {
                     inner: map,
-                    result: JWTClaims::default(),
+                    result: RegisteredClaims::new(),
                 };
 
                 let private_claims = P::deserialize(&mut claims_deserializer)?;

@@ -19,16 +19,15 @@ use ssi_claims::{
     data_integrity::{
         signing, AnyInputContext, AnyProof, AnySignatureProtocol, AnySuite, AnySuiteOptions,
         CryptographicSuiteInput, Proof, ProofConfiguration, ProofConfigurationExpansion,
-        ProofConfigurationRefExpansion, ProofPreparationError,
+        ProofConfigurationRefExpansion,
     },
     vc::{Context, RequiredContext},
-    ExtractProof, MergeWithProof, ProofValidity, Validate, Verifiable, VerifiableClaims,
+    ClaimsValidity, ExtractProof, MergeWithProof, ProofPreparationError, ProofValidationError,
+    Validate, Verifiable, VerifiableClaims, Verification,
 };
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject};
 use ssi_verification_methods::Signer;
-use ssi_verification_methods::{
-    AnyMethod, ProofPurpose, VerificationError, VerificationMethodResolver,
-};
+use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationMethodResolver};
 use static_iref::iri;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -187,9 +186,9 @@ impl<C, P> JsonLdObject for Delegation<C, P> {
 
 impl<C, P> JsonLdNodeObject for Delegation<C, P> {}
 
-impl<C, P> Validate for Delegation<C, P> {
-    fn is_valid(&self) -> bool {
-        true
+impl<C, P, E> Validate<E> for Delegation<C, P> {
+    fn validate(&self, _: &E) -> ClaimsValidity {
+        Ok(())
     }
 }
 
@@ -243,7 +242,7 @@ pub enum DelegationVerificationError {
     ProofPreparation(#[from] ProofPreparationError),
 
     #[error(transparent)]
-    Verification(#[from] VerificationError),
+    Verification(#[from] ProofValidationError),
 }
 
 impl<C, P> VerifiableDelegation<C, P> {
@@ -265,7 +264,7 @@ impl<C, P> VerifiableDelegation<C, P> {
     pub async fn verify(
         &self,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
-    ) -> Result<ProofValidity, DelegationVerificationError>
+    ) -> Result<Verification, DelegationVerificationError>
     where
         C: Clone + Serialize,
         P: Clone + Serialize,
@@ -402,9 +401,9 @@ where
     }
 }
 
-impl<P> Validate for Invocation<P> {
-    fn is_valid(&self) -> bool {
-        true
+impl<P, E> Validate<E> for Invocation<P> {
+    fn validate(&self, _: &E) -> ClaimsValidity {
+        Ok(())
     }
 }
 
@@ -447,7 +446,7 @@ impl<P> VerifiableInvocation<P> {
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, Q>,
         verifier: &impl VerificationMethodResolver<Method = AnyMethod>,
-    ) -> Result<ProofValidity, InvocationVerificationError>
+    ) -> Result<Verification, InvocationVerificationError>
     where
         P: Clone + Serialize,
     {
@@ -497,7 +496,7 @@ pub enum InvocationVerificationError {
     ProofPreparation(#[from] ProofPreparationError),
 
     #[error(transparent)]
-    Verification(#[from] VerificationError),
+    Verification(#[from] ProofValidationError),
 }
 
 #[cfg(test)]
@@ -622,13 +621,13 @@ mod tests {
             .unwrap();
 
         // happy path
-        assert!(signed_del.verify(&dk).await.unwrap().is_valid());
+        assert!(signed_del.verify(&dk).await.unwrap().is_ok());
 
         assert!(signed_inv
             .verify(signed_del.claims(), &dk)
             .await
             .unwrap()
-            .is_valid());
+            .is_ok());
 
         let bad_sig_del = VerifiableDelegation::new(
             Delegation {
@@ -641,12 +640,12 @@ mod tests {
         bad_sig_inv.id = uri!("urn:different_id").to_owned();
 
         // invalid proof for data
-        assert!(bad_sig_del.verify(&dk).await.unwrap().is_invalid());
+        assert!(bad_sig_del.verify(&dk).await.unwrap().is_err());
         assert!(bad_sig_inv
             .verify(signed_del.claims(), &dk)
             .await
             .unwrap()
-            .is_invalid());
+            .is_err());
 
         // invalid cap attrs, invoker not matching
         let wrong_del = Delegation {

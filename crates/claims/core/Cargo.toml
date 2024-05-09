@@ -29,6 +29,7 @@ linked-data = ["dep:linked-data"]
 ssi-core.workspace = true
 educe.workspace = true
 thiserror.workspace = true
+chrono.workspace = true
 
 serde = { workspace = true, optional = true }
 linked-data = { workspace = true, optional = true }

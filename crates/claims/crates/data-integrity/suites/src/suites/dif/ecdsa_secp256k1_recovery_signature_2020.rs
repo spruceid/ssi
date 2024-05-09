@@ -1,11 +1,12 @@
 use iref::Iri;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jws::JWS;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, EcdsaSecp256k1RecoveryMethod2020,
-    SignatureError, VerificationError,
+    SignatureError,
 };
 use static_iref::iri;
 
@@ -79,13 +80,13 @@ impl CryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let JWS {
             header, signature, ..
         } = signature
             .jws
             .decode()
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
         let signing_bytes = header.encode_signing_bytes(bytes);
 
         method

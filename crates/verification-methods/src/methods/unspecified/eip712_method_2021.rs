@@ -3,6 +3,7 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::BlockchainAccountIdVerifyError;
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
@@ -10,7 +11,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 // mod context;
@@ -86,19 +87,19 @@ impl Eip712Method2021 {
         &self,
         data: &[u8],
         signature_bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         use sha3::Digest;
         if signature_bytes.len() != 65 {
-            return Err(VerificationError::InvalidSignature);
+            return Err(ProofValidationError::InvalidSignature);
         }
 
         // Interpret the signature.
         let signature = k256::ecdsa::Signature::try_from(&signature_bytes[..64])
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         // Recover the signing key.
         let rec_id = k256::ecdsa::RecoveryId::try_from(signature_bytes[64])
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         let recovered_key: k256::ecdsa::VerifyingKey =
             k256::ecdsa::VerifyingKey::recover_from_digest(
@@ -106,7 +107,7 @@ impl Eip712Method2021 {
                 &signature,
                 rec_id,
             )
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         // Check the signing key.
         let jwk = JWK {
@@ -127,9 +128,11 @@ impl Eip712Method2021 {
         };
 
         match self.blockchain_account_id.verify(&jwk) {
-            Ok(()) => Ok(true),
-            Err(BlockchainAccountIdVerifyError::KeyMismatch(_, _)) => Ok(false),
-            Err(_) => Err(VerificationError::InvalidKey),
+            Ok(()) => Ok(Ok(())),
+            Err(BlockchainAccountIdVerifyError::KeyMismatch(_, _)) => {
+                Ok(Err(InvalidProof::KeyMismatch))
+            }
+            Err(_) => Err(ProofValidationError::InvalidKey),
         }
     }
 }

@@ -1,5 +1,6 @@
 //! EIP-712 Signature 2021 implementation.
 use rdf_types::{LexicalQuad, Quad};
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{HashError, TransformError},
@@ -10,7 +11,6 @@ use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
     EcdsaSecp256k1VerificationKey2019, Eip712Method2021, InvalidVerificationMethod, SignatureError,
-    VerificationError,
 };
 use static_iref::iri;
 
@@ -89,7 +89,7 @@ impl<'a> VerificationMethodRef<'a> {
         &self,
         signing_bytes: &[u8],
         signature_bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         match self {
             Self::Eip712Method2021(m) => m.verify_bytes(signing_bytes, signature_bytes),
             Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
@@ -202,7 +202,7 @@ impl CryptographicSuite for Eip712Signature2021 {
         _proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         data.encode()
-            .map_err(|e| HashError::InvalidMessage(Box::new(e)))
+            .map_err(|e| HashError::InvalidMessage(e.to_string()))
     }
 
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
@@ -225,7 +225,7 @@ impl CryptographicSuite for Eip712Signature2021 {
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }

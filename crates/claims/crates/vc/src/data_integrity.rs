@@ -33,7 +33,7 @@ pub async fn any_credential_from_json_slice_with<
 >(
     json: &[u8],
     environment: AnyInputContext<E, Y>,
-) -> Result<Verifiable<SpecializedJsonCredential, Proofs<AnySuite>>, DecodeError<L::Error>>
+) -> Result<Verifiable<SpecializedJsonCredential, Proofs<AnySuite>>, DecodeError>
 where
     E: AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>,
     V: VocabularyMut,
@@ -70,7 +70,7 @@ pub async fn any_credential_from_json_str_with<
 >(
     json: &str,
     environment: AnyInputContext<E, Y>,
-) -> Result<Verifiable<JsonCredential, Proofs<AnySuite>>, DecodeError<L::Error>>
+) -> Result<Verifiable<JsonCredential, Proofs<AnySuite>>, DecodeError>
 where
     E: AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>,
     V: VocabularyMut,

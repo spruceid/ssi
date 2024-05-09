@@ -8,12 +8,13 @@ use rdf_types::{
     Id, InterpretationMut, LexicalQuad, Quad, Term, Triple, VocabularyMut,
 };
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::ProofPreparationError;
 use ssi_core::Referencable;
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdTypes};
 use ssi_rdf::{urdna2015, IntoNQuads};
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use static_iref::iri;
-use std::{collections::BTreeMap, hash::Hash, ops::Deref};
+use std::{collections::BTreeMap, fmt, hash::Hash, ops::Deref};
 
 use crate::{CryptographicSuite, Proof};
 
@@ -374,12 +375,13 @@ impl<'a, M: Referencable, O: Referencable> ProofConfigurationRef<'a, M, O> {
 }
 
 pub trait ProofConfigurationExpansion {
-    type LoadError;
+    type LoadError: fmt::Display;
 }
 
 impl<E: AnyJsonLdEnvironment, I> ProofConfigurationExpansion for E
 where
     E::Vocabulary: IriVocabulary<Iri = I>,
+    <E::Loader as json_ld::Loader<I>>::Error: fmt::Display,
 {
     type LoadError = <E::Loader as json_ld::Loader<I>>::Error;
 }
@@ -543,6 +545,12 @@ pub enum ConfigurationExpansionError<E> {
 
     #[error("invalid JSON-LD context")]
     InvalidContext,
+}
+
+impl<E: fmt::Display> From<ConfigurationExpansionError<E>> for ProofPreparationError {
+    fn from(value: ConfigurationExpansionError<E>) -> Self {
+        Self::Proof(format!("proof configuration expansion failed: {value}"))
+    }
 }
 
 /// Linked-Data proof configuration.

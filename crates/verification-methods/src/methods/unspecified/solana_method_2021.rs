@@ -2,6 +2,7 @@ use std::{borrow::Cow, hash::Hash};
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
@@ -10,7 +11,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationMethod,
 };
 
 pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
@@ -68,10 +69,14 @@ impl SolanaMethod2021 {
             .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
-    pub fn verify_bytes(&self, data: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        data: &[u8],
+        signature: &[u8],
+    ) -> Result<bool, ProofValidationError> {
         match self.public_key.algorithm.as_ref() {
             Some(a) => Ok(ssi_jws::verify_bytes(*a, data, &self.public_key, signature).is_ok()),
-            None => Err(VerificationError::InvalidKey),
+            None => Err(ProofValidationError::InvalidKey),
         }
     }
 }

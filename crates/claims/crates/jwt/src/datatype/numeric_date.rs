@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use chrono::{prelude::*, Duration, LocalResult};
+use ordered_float::NotNan;
 use serde::{Deserialize, Serialize, Serializer};
 
 /// Represents NumericDate (see <https://datatracker.ietf.org/doc/html/rfc7519#section-2>)
@@ -15,8 +16,8 @@ use serde::{Deserialize, Serialize, Serializer};
 ///     +-2^53 / (1000000 * 60 * 60 * 24 * 365.25) ~= +-285,
 /// which is centered around the Unix epoch start date Jan 1, 1970, 00:00:00 UTC, giving
 /// the years 1685 to 2255.
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, PartialOrd)]
-pub struct NumericDate(#[serde(serialize_with = "interop_serialize")] f64);
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NumericDate(#[serde(serialize_with = "interop_serialize")] NotNan<f64>);
 
 /// As many JWT libraries only accept integers, this serializer aims for a
 /// middle ground by serializing a date as an integer if it does not have
@@ -34,6 +35,9 @@ where
 
 #[derive(thiserror::Error, Debug)]
 pub enum NumericDateConversionError {
+    #[error("Not a number")]
+    Nan,
+
     #[error("Invalid float literal")]
     InvalidFloatLiteral,
 
@@ -41,21 +45,30 @@ pub enum NumericDateConversionError {
     OutOfMicrosecondPrecisionRange,
 }
 
+impl From<ordered_float::FloatIsNan> for NumericDateConversionError {
+    fn from(_: ordered_float::FloatIsNan) -> Self {
+        Self::Nan
+    }
+}
+
 impl NumericDate {
     /// This is -2^53 / 1_000_000, which is the smallest NumericDate that faithfully
     /// represents full microsecond precision.
-    pub const MIN: NumericDate = NumericDate(-9_007_199_254.740_992);
+    pub const MIN: NumericDate =
+        NumericDate(unsafe { NotNan::new_unchecked(-9_007_199_254.740_992) });
     /// This is 2^53 / 1_000_000, which is the largest NumericDate that faithfully
     /// represents full microsecond precision.
-    pub const MAX: NumericDate = NumericDate(9_007_199_254.740_992);
+    pub const MAX: NumericDate =
+        NumericDate(unsafe { NotNan::new_unchecked(9_007_199_254.740_992) });
 
     /// Return the f64-valued number of seconds represented by this NumericDate.
     pub fn as_seconds(self) -> f64 {
-        self.0
+        *self.0
     }
     /// Try to create NumericDate from a f64 value, returning error upon out-of-range.
     pub fn try_from_seconds(seconds: f64) -> Result<Self, NumericDateConversionError> {
-        if seconds.abs() > Self::MAX.0 {
+        let seconds = NotNan::new(seconds)?;
+        if seconds.abs() > *Self::MAX.0 {
             Err(NumericDateConversionError::OutOfMicrosecondPrecisionRange)
         } else {
             Ok(NumericDate(seconds))
@@ -143,7 +156,7 @@ impl FromStr for NumericDate {
     type Err = NumericDateConversionError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let f: f64 = s
+        let f: NotNan<f64> = s
             .parse()
             .map_err(|_| NumericDateConversionError::InvalidFloatLiteral)?;
         Ok(Self(f))

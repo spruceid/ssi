@@ -5,6 +5,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use rand_core::{CryptoRng, RngCore};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
@@ -15,7 +16,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 /// Ed25519 Verification Key 2020 type name.
@@ -125,9 +126,9 @@ impl Ed25519VerificationKey2020 {
         &self,
         data: &[u8],
         signature_bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature = ed25519_dalek::Signature::try_from(signature_bytes)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
         Ok(self.public_key.verify(data, &signature))
     }
 }
@@ -298,8 +299,10 @@ impl PublicKey {
         self.decoded.into()
     }
 
-    pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> bool {
-        self.decoded.verify(data, signature).is_ok()
+    pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> ProofValidity {
+        self.decoded
+            .verify(data, signature)
+            .map_err(|_| InvalidProof::Signature)
     }
 }
 

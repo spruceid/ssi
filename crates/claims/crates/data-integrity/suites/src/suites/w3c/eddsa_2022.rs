@@ -3,6 +3,7 @@
 //! This is the successor of the EdDSA Cryptosuite v2020.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/>
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{Multikey, SignatureError};
@@ -80,7 +81,7 @@ impl CryptographicSuite for EdDsa2022 {
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }

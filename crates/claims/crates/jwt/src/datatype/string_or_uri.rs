@@ -2,7 +2,7 @@ use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 
 /// `StringOrURI` datatype defined in [RFC7519](https://datatracker.ietf.org/doc/html/rfc7519#section-2)
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[serde(untagged)]
 #[serde(try_from = "String")]
 pub enum StringOrURI {

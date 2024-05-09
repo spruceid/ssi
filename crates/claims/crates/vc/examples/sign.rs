@@ -47,9 +47,12 @@ impl ssi_json_ld::JsonLdNodeObject for Credential {
     }
 }
 
-impl ssi_claims_core::Validate for Credential {
-    fn is_valid(&self) -> bool {
-        ssi_vc::Credential::is_valid_credential(self)
+impl<E> ssi_claims_core::Validate<E> for Credential
+where
+    E: ssi_claims_core::DateTimeEnvironment,
+{
+    fn validate(&self, env: &E) -> ssi_claims_core::ClaimsValidity {
+        ssi_vc::Credential::validate_credential(self, env)
     }
 }
 
@@ -161,7 +164,6 @@ async fn main() {
         .verify(&keyring)
         .await
         .expect("verification failed")
-        .into_result()
         .expect("invalid proof");
 
     // Put the verifiable credential in JSON(-LD) form.

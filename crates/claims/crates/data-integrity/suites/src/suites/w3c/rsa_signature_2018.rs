@@ -1,7 +1,8 @@
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{RsaVerificationKey2018, SignatureError, VerificationError};
+use ssi_verification_methods::{RsaVerificationKey2018, SignatureError};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
@@ -75,9 +76,9 @@ impl CryptographicSuite for RsaSignature2018 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature = base64::decode(signature.signature_value)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
         method.verify_bytes(bytes, &signature).map(Into::into)
     }
 }

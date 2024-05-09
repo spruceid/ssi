@@ -3,6 +3,7 @@
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 use lazy_static::lazy_static;
 use pin_project::pin_project;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::Referencable;
 use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_data_integrity_core::{
@@ -14,7 +15,6 @@ use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
     EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, JsonWebKey2020, SignatureError,
-    VerificationError,
 };
 use static_iref::{iri, iri_ref};
 use std::{future::Future, pin::Pin, task};
@@ -217,7 +217,11 @@ impl<'a> VerificationMethodRef<'a> {
         }
     }
 
-    pub fn verify_bytes(&self, bytes: &[u8], signature: &[u8]) -> Result<bool, VerificationError> {
+    pub fn verify_bytes(
+        &self,
+        bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
         match self {
             Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
                 bytes,
@@ -340,7 +344,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
         _proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
     ) -> Result<Self::Hashed, HashError> {
         data.encode()
-            .map_err(|e| HashError::InvalidMessage(Box::new(e)))
+            .map_err(|e| HashError::InvalidMessage(e.to_string()))
     }
 
     fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
@@ -366,7 +370,7 @@ impl CryptographicSuite for EthereumEip712Signature2021 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = signature.decode()?;
         method.verify_bytes(bytes, &signature_bytes).map(Into::into)
     }

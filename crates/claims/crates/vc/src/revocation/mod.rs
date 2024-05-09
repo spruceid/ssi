@@ -9,8 +9,9 @@ use bitvec::slice::BitSlice;
 use core::convert::TryFrom;
 use iref::{IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::ProofValidationError;
 use ssi_json_ld::ContextLoader;
-use ssi_verification_methods::{AnyMethod, VerificationError, VerificationMethodResolver};
+use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 use thiserror::Error;
 
 mod v2020;
@@ -195,10 +196,10 @@ pub enum Reason {
     TooManyCredentialSubjects,
 
     #[error("Proof preparation failed: `{0}`")]
-    ProofPreparation(ssi_data_integrity::ProofPreparationError),
+    ProofPreparation(ssi_data_integrity::LdProofPreparationError),
 
-    #[error("Credential verification failed")]
-    CredentialVerification,
+    #[error("Credential verification failed: {0}")]
+    CredentialVerification(ssi_claims_core::Invalid),
 
     #[error("Unable to decode revocation list: {0}")]
     DecodeListError(DecodeListError),
@@ -221,7 +222,7 @@ pub enum StatusCheckError {
     LoadCredential(#[from] LoadResourceError),
 
     #[error("Credential verification failed: {0}")]
-    CredentialVerification(#[from] VerificationError),
+    CredentialVerification(#[from] ProofValidationError),
 
     #[error("Revocation list is too large (length is `{0}`)")]
     RevocationListTooLarge(usize),

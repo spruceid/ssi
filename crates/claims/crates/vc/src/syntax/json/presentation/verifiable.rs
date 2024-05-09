@@ -1,6 +1,6 @@
 use iref::{Uri, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ExtractProof, Validate, VerifiableClaims};
+use ssi_claims_core::{ClaimsValidity, ExtractProof, Validate, VerifiableClaims};
 
 use crate::Credential;
 
@@ -40,9 +40,9 @@ impl<C, P> JsonVerifiablePresentation<C, P> {
     }
 }
 
-impl<C, P> Validate for JsonVerifiablePresentation<C, P> {
-    fn is_valid(&self) -> bool {
-        true
+impl<C, P, E> Validate<E> for JsonVerifiablePresentation<C, P> {
+    fn validate(&self, _: &E) -> ClaimsValidity {
+        Ok(())
     }
 }
 

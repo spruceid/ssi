@@ -1,10 +1,11 @@
 use iref::UriBuf;
 use linked_data::{LinkedData, LinkedDataGraph};
 use rdf_types::{Interpretation, Vocabulary};
+use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSigner;
 use ssi_jwk::algorithm::AnyESKeccakK;
-use ssi_verification_methods::{SignatureError, VerificationError};
+use ssi_verification_methods::SignatureError;
 
 /// Common signature format for EIP-712-based cryptographic suites.
 ///
@@ -55,14 +56,14 @@ pub struct Eip712SignatureRef<'a> {
 }
 
 impl<'a> Eip712SignatureRef<'a> {
-    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+    pub fn decode(&self) -> Result<Vec<u8>, ProofValidationError> {
         if self.proof_value.len() >= 4 && &self.proof_value[0..2] == "0x" {
             let mut bytes = hex::decode(&self.proof_value[2..])
-                .map_err(|_| VerificationError::InvalidSignature)?;
+                .map_err(|_| ProofValidationError::InvalidSignature)?;
             bytes[64] -= 27;
             Ok(bytes)
         } else {
-            Err(VerificationError::InvalidSignature)
+            Err(ProofValidationError::InvalidSignature)
         }
     }
 }

@@ -5,7 +5,7 @@ use bitvec::prelude::Lsb0;
 use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ProofValidity, Verifiable};
+use ssi_claims_core::Verifiable;
 use ssi_data_integrity::{AnyInputContext, AnyProofs};
 use ssi_json_ld::{ContextLoader, STATUS_LIST_2021_V1_CONTEXT};
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
@@ -187,8 +187,8 @@ impl CredentialStatus for StatusList2021Entry {
 
         let vc_result = status_list_credential.verify(resolver).await?;
 
-        if let ProofValidity::Invalid = vc_result {
-            return Ok(StatusCheck::Invalid(Reason::CredentialVerification));
+        if let Err(e) = vc_result {
+            return Ok(StatusCheck::Invalid(Reason::CredentialVerification(e)));
         }
 
         if status_list_credential.id.as_deref() != Some(self.status_list_credential.as_uri()) {

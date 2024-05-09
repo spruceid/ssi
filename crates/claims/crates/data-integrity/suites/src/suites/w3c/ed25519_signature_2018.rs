@@ -1,3 +1,4 @@
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{Ed25519VerificationKey2018, SignatureError};
@@ -69,7 +70,7 @@ impl CryptographicSuite for Ed25519Signature2018 {
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let (signing_bytes, signature_bytes, _) = signature.decode(bytes)?;
         method
             .verify_bytes(&signing_bytes, &signature_bytes)

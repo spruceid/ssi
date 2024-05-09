@@ -1,4 +1,5 @@
 use lazy_static::lazy_static;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{JsonWebKey2020, SignatureError};
@@ -87,7 +88,7 @@ impl CryptographicSuite for JsonWebSignature2020 {
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ssi_verification_methods::VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let (signing_bytes, signature_bytes, algorithm) = signature.decode(bytes)?;
         method
             .verify_bytes(&signing_bytes, &signature_bytes, Some(algorithm))

@@ -1,5 +1,7 @@
 use iref::Uri;
-use ssi_claims_core::{Proof, Verifiable, VerifiableClaims};
+use ssi_claims_core::{
+    ClaimsValidity, DateTimeEnvironment, InvalidClaims, Proof, Verifiable, VerifiableClaims,
+};
 use xsd_types::DateTime;
 
 use super::{CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse};
@@ -128,22 +130,27 @@ pub trait Credential {
     ///
     /// Validation may fail even if the credential proof is successfully
     /// verified.
-    fn is_valid_credential(&self) -> bool {
-        let now = chrono::Utc::now();
+    fn validate_credential<E>(&self, env: &E) -> ClaimsValidity
+    where
+        E: DateTimeEnvironment,
+    {
+        let now = env.date_time();
 
-        if self.issuance_date().earliest() > now {
+        let valid_from = self.issuance_date().earliest().to_utc();
+        if valid_from > now {
             // Credential is issued in the future!
-            return false;
+            return Err(InvalidClaims::Premature { now, valid_from });
         }
 
         if let Some(t) = self.expiration_date() {
-            if now >= t.latest() {
+            let valid_until = t.latest().to_utc();
+            if now >= valid_until {
                 // Credential has expired.
-                return false;
+                return Err(InvalidClaims::Expired { now, valid_until });
             }
         }
 
-        true
+        Ok(())
     }
 }
 

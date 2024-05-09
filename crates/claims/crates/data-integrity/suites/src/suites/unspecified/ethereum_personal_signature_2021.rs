@@ -1,3 +1,4 @@
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::{protocol::EthereumWallet, MessageSigner};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
@@ -7,7 +8,6 @@ use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
     EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, SignatureError,
-    VerificationError,
 };
 use static_iref::iri;
 
@@ -58,7 +58,7 @@ impl<'a> VerificationMethodRef<'a> {
         &self,
         message: &[u8],
         signature: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         match self {
             Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
                 message,
@@ -196,7 +196,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         data: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let message = EthereumWallet::prepare_message(data.as_bytes());
         let signature_bytes = signature.decode()?;
         Ok(method.verify_bytes(&message, &signature_bytes)?.into())
@@ -233,14 +233,14 @@ pub struct SignatureRef<'a> {
 }
 
 impl<'a> SignatureRef<'a> {
-    pub fn decode(&self) -> Result<Vec<u8>, VerificationError> {
+    pub fn decode(&self) -> Result<Vec<u8>, ProofValidationError> {
         EthereumWallet::decode_signature(self.proof_value.as_bytes())
-            .map_err(|_| VerificationError::InvalidSignature)
+            .map_err(|_| ProofValidationError::InvalidSignature)
     }
 }
 
 impl<'a> VerificationMethodRef<'a> {
-    pub fn check_jwk(&self, jwk: &JWK) -> Result<bool, VerificationError> {
+    pub fn check_jwk(&self, jwk: &JWK) -> Result<bool, ProofValidationError> {
         match self {
             Self::EcdsaSecp256k1RecoveryMethod2020(m) => Ok(m.public_key.matches(jwk)?),
             Self::EcdsaSecp256k1VerificationKey2019(m) => {

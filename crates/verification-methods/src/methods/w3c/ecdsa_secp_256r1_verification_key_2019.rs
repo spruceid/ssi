@@ -1,6 +1,7 @@
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
@@ -12,7 +13,7 @@ use std::{borrow::Cow, hash::Hash, str::FromStr};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationMethod,
 };
 
 pub const ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256r1VerificationKey2019";
@@ -125,9 +126,9 @@ impl EcdsaSecp256r1VerificationKey2019 {
         &self,
         data: &[u8],
         signature_bytes: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature = p256::ecdsa::Signature::try_from(signature_bytes)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         Ok(self.public_key.verify(data, &signature))
     }
@@ -255,10 +256,12 @@ impl PublicKey {
         self.decoded.into()
     }
 
-    pub fn verify(&self, data: &[u8], signature: &p256::ecdsa::Signature) -> bool {
+    pub fn verify(&self, data: &[u8], signature: &p256::ecdsa::Signature) -> ProofValidity {
         use p256::ecdsa::signature::Verifier;
         let verifying_key = p256::ecdsa::VerifyingKey::from(self.decoded);
-        verifying_key.verify(data, signature).is_ok()
+        verifying_key
+            .verify(data, signature)
+            .map_err(|_| InvalidProof::Signature)
     }
 }
 

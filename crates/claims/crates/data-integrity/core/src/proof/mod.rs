@@ -2,6 +2,7 @@ use crate::{
     suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput,
 };
+use ssi_claims_core::ProofPreparationError;
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany, Referencable};
 use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
@@ -167,7 +168,7 @@ impl<S: CryptographicSuite> ssi_claims_core::Proof for Proof<S> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum ProofPreparationError<E = ssi_json_ld::UnknownContext> {
+pub enum LdProofPreparationError<E = ssi_json_ld::UnknownContext> {
     #[error("proof expansion failed: {0}")]
     ProofExpansion(#[from] ConfigurationExpansionError<E>),
 
@@ -187,8 +188,6 @@ where
     S: CryptographicSuiteInput<T, E>,
     E: for<'a> ProofConfigurationRefExpansion<'a, S>,
 {
-    type Error = ProofPreparationError<E::LoadError>;
-
     /// Creates a new data integrity credential from the given input data.
     ///
     /// This will transform and hash the input data using the cryptographic
@@ -197,7 +196,7 @@ where
         mut self,
         value: &T,
         environment: &mut E,
-    ) -> Result<Self::Prepared, Self::Error> {
+    ) -> Result<Self::Prepared, ProofPreparationError> {
         let configuration = self.configuration();
         let ld_configuration = configuration
             .expand(

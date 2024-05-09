@@ -2,6 +2,7 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
@@ -9,7 +10,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 pub const P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE: &str =
@@ -51,11 +52,11 @@ impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
 
-    pub fn matches_public_key(&self, public_key: &JWK) -> Result<bool, VerificationError> {
+    pub fn matches_public_key(&self, public_key: &JWK) -> Result<bool, ProofValidationError> {
         use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
         match self.blockchain_account_id.verify(public_key) {
             Err(VerifyError::UnknownChainId(_) | VerifyError::HashError(_)) => {
-                Err(VerificationError::InvalidKey)
+                Err(ProofValidationError::InvalidKey)
             }
             Err(VerifyError::KeyMismatch(_, _)) => Ok(false),
             Ok(()) => Ok(true),

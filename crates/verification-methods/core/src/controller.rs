@@ -1,6 +1,7 @@
 use iref::Iri;
+use ssi_claims_core::ProofValidationError;
 
-use crate::{ProofPurpose, ProofPurposes, VerificationError};
+use crate::{ProofPurpose, ProofPurposes};
 
 /// Verification method controller.
 ///
@@ -78,12 +79,12 @@ pub trait ControllerProvider {
         controller_id: &'a Iri,
         method_id: &'a Iri,
         proof_purpose: ProofPurpose,
-    ) -> Result<(), VerificationError> {
+    ) -> Result<(), ProofValidationError> {
         let controller = self.require_controller(controller_id).await?;
         if controller.allows_verification_method(method_id, proof_purpose.into()) {
             Ok(())
         } else {
-            Err(VerificationError::InvalidKeyUse(proof_purpose))
+            Err(ProofValidationError::InvalidKeyUse)
         }
     }
 }
@@ -101,22 +102,20 @@ pub enum ControllerError {
     /// controller.
     Invalid,
 
-    /// Unsupported controller identifier scheme.
-    ///
-    /// The controller scheme is provided as argument.
-    UnsupportedScheme(String),
+    /// Unsupported controller identifier.
+    Unsupported(String),
 
     /// Custom error from the controller provider.
     InternalError(String),
 }
 
-impl From<ControllerError> for VerificationError {
+impl From<ControllerError> for ProofValidationError {
     fn from(value: ControllerError) -> Self {
         match value {
             ControllerError::NotFound(id) => Self::KeyControllerNotFound(id),
             ControllerError::Invalid => Self::InvalidKeyController,
-            ControllerError::UnsupportedScheme(s) => Self::UnsupportedControllerScheme(s),
-            ControllerError::InternalError(e) => Self::InternalError(e),
+            ControllerError::Unsupported(s) => Self::UnsupportedKeyController(s),
+            ControllerError::InternalError(e) => Self::Other(e),
         }
     }
 }

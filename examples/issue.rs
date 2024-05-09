@@ -3,8 +3,9 @@
 // cargo run --example issue jwt > examples/files/vc.jwt
 
 use serde_json::json;
-use ssi_claims::data_integrity::{
-    AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration,
+use ssi_claims::{
+    data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
+    jwt::ClaimSet,
 };
 use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;
@@ -45,7 +46,7 @@ async fn main() {
                 .unwrap();
 
             let result = vc.verify(&resolver).await.expect("verification failed");
-            if !result.is_valid() {
+            if !result.is_ok() {
                 panic!("verify failed");
             }
 
@@ -61,7 +62,7 @@ async fn main() {
                 .unwrap();
 
             let result = jwt.verify(&resolver).await.expect("verification failed");
-            if !result.is_valid() {
+            if !result.is_ok() {
                 panic!("verify failed");
             }
 

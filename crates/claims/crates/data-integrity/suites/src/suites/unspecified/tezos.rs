@@ -14,6 +14,7 @@ pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed255
 
 #[cfg(feature = "secp256r1")]
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
+use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::{
     protocol::InvalidProtocolSignature, MessageSignatureError, MessageSigner, SignatureProtocol,
@@ -21,7 +22,7 @@ use ssi_crypto::{
 use ssi_data_integrity_core::suite::CryptographicSuiteOptions;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods::{SignatureError, VerificationError};
+use ssi_verification_methods::SignatureError;
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
 
@@ -155,9 +156,9 @@ pub struct SignatureRef<'a> {
 }
 
 impl<'a> SignatureRef<'a> {
-    pub fn decode(&self) -> Result<(AnyBlake2b, Vec<u8>), VerificationError> {
+    pub fn decode(&self) -> Result<(AnyBlake2b, Vec<u8>), ProofValidationError> {
         TezosWallet::decode_signature(self.proof_value.as_bytes())
-            .map_err(|_| VerificationError::InvalidSignature)
+            .map_err(|_| ProofValidationError::InvalidSignature)
     }
 }
 

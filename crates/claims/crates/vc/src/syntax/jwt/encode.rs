@@ -1,5 +1,5 @@
 use serde::Serialize;
-use ssi_jwt::{JWTClaims, RegisteredClaim};
+use ssi_jwt::RegisteredClaims;
 
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcEncodeError {
@@ -28,11 +28,13 @@ pub enum JwtVcEncodeError {
     InvalidUri(#[from] iref::InvalidUri<String>),
 }
 
-pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, JwtVcEncodeError> {
+pub fn encode_jwt_vc_claims<T: Serialize>(
+    credential: &T,
+) -> Result<RegisteredClaims, JwtVcEncodeError> {
     let mut credential = json_syntax::to_value(credential)?
         .into_object()
         .ok_or(JwtVcEncodeError::ExpectedJsonObject)?;
-    let mut claims: JWTClaims = Default::default();
+    let mut claims = RegisteredClaims::default();
 
     if let Some(date_value) =
         take_object_property(&mut credential, "credentialSubject", "expirationDate")
@@ -42,7 +44,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, J
                 let date_value: xsd_types::DateTime = date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.expiration_time = Some(date_value.earliest().try_into()?)
+                claims.insert(ssi_jwt::ExpirationTime(date_value.earliest().try_into()?));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -50,7 +52,9 @@ pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, J
 
     if let Some(issuer_entry) = credential.remove("issuer").next() {
         match issuer_entry.value.into_string() {
-            Some(issuer_value) => claims.issuer = Some(issuer_value.into_string().try_into()?),
+            Some(issuer_value) => {
+                claims.insert(ssi_jwt::Issuer(issuer_value.into_string().try_into()?));
+            }
             None => return Err(JwtVcEncodeError::InvalidIssuerValue),
         }
     }
@@ -61,7 +65,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, J
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.not_before = Some(issuance_date_value.latest().try_into()?)
+                claims.insert(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -71,23 +75,25 @@ pub fn encode_jwt_vc_claims<T: Serialize>(credential: &T) -> Result<JWTClaims, J
         take_value_or_object_property(&mut credential, "credentialSubject", "id")
     {
         match subject_value.into_string() {
-            Some(subject_value) => claims.subject = Some(subject_value.into_string().try_into()?),
+            Some(subject_value) => {
+                claims.insert(ssi_jwt::Subject(subject_value.into_string().try_into()?));
+            }
             None => return Err(JwtVcEncodeError::InvalidSubjectValue),
         }
     }
 
     if let Some(id_entry) = credential.remove("id").next() {
         match id_entry.value.into_string() {
-            Some(id_value) => claims.jwt_id = Some(id_value.into_string()),
+            Some(id_value) => {
+                claims.insert(ssi_jwt::JwtId(id_value.into_string()));
+            }
             None => return Err(JwtVcEncodeError::InvalidIdValue),
         }
     }
 
-    claims
-        .registered_claims
-        .insert(RegisteredClaim::VerifiableCredential(
-            json_syntax::Value::Object(credential),
-        ));
+    claims.insert(ssi_jwt::VerifiableCredential(json_syntax::Value::Object(
+        credential,
+    )));
 
     Ok(claims)
 }
@@ -116,15 +122,19 @@ pub enum JwtVpEncodeError {
     InvalidUri(#[from] iref::InvalidUri<String>),
 }
 
-pub fn encode_jwt_vp_claims<T: Serialize>(presentation: &T) -> Result<JWTClaims, JwtVpEncodeError> {
+pub fn encode_jwt_vp_claims<T: Serialize>(
+    presentation: &T,
+) -> Result<RegisteredClaims, JwtVpEncodeError> {
     let mut vp = json_syntax::to_value(presentation)?
         .into_object()
         .ok_or(JwtVpEncodeError::ExpectedJsonObject)?;
-    let mut claims: JWTClaims = Default::default();
+    let mut claims = RegisteredClaims::default();
 
     if let Some(holder_entry) = vp.remove("holder").next() {
         match holder_entry.value.into_string() {
-            Some(holder_value) => claims.issuer = Some(holder_value.into_string().try_into()?),
+            Some(holder_value) => {
+                claims.insert(ssi_jwt::Issuer(holder_value.into_string().try_into()?));
+            }
             None => return Err(JwtVpEncodeError::InvalidHolderValue),
         }
     }
@@ -135,7 +145,7 @@ pub fn encode_jwt_vp_claims<T: Serialize>(presentation: &T) -> Result<JWTClaims,
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVpEncodeError::InvalidDateValue)?;
-                claims.not_before = Some(issuance_date_value.latest().try_into()?)
+                claims.insert(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
             }
             None => return Err(JwtVpEncodeError::InvalidDateValue),
         }
@@ -143,16 +153,16 @@ pub fn encode_jwt_vp_claims<T: Serialize>(presentation: &T) -> Result<JWTClaims,
 
     if let Some(id_entry) = vp.remove("id").next() {
         match id_entry.value.into_string() {
-            Some(id_value) => claims.jwt_id = Some(id_value.into_string()),
+            Some(id_value) => {
+                claims.insert(ssi_jwt::JwtId(id_value.into_string()));
+            }
             None => return Err(JwtVpEncodeError::InvalidIdValue),
         }
     }
 
-    claims
-        .registered_claims
-        .insert(RegisteredClaim::VerifiablePresentation(
-            json_syntax::Value::Object(vp),
-        ));
+    claims.insert(ssi_jwt::VerifiablePresentation(json_syntax::Value::Object(
+        vp,
+    )));
 
     Ok(claims)
 }

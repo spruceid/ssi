@@ -44,6 +44,7 @@ ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-security.workspace = true
 ssi-caips.workspace = true
+ssi-claims-core.workspace = true
 ssi-verification-methods-core.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
 ssi-eip712 = { workspace = true, optional = true }

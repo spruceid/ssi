@@ -1,6 +1,8 @@
 use iref::{Uri, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ExtractProof, Validate, VerifiableClaims};
+use ssi_claims_core::{
+    ClaimsValidity, DateTimeEnvironment, ExtractProof, Validate, VerifiableClaims,
+};
 use std::ops::{Deref, DerefMut};
 use xsd_types::DateTime;
 
@@ -63,9 +65,12 @@ impl<P> JsonVerifiableCredential<P> {
     }
 }
 
-impl<P> Validate for JsonVerifiableCredential<P> {
-    fn is_valid(&self) -> bool {
-        crate::Credential::is_valid_credential(self)
+impl<P, E> Validate<E> for JsonVerifiableCredential<P>
+where
+    E: DateTimeEnvironment,
+{
+    fn validate(&self, env: &E) -> ClaimsValidity {
+        crate::Credential::validate_credential(self, env)
     }
 }
 

@@ -17,6 +17,7 @@ use ssi::{
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
 };
+use ssi_claims::jwt::ClaimSet;
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
@@ -79,7 +80,7 @@ async fn main() {
                 .unwrap();
 
             let result = vp.verify(&resolver).await.expect("verification failed");
-            if !result.is_valid() {
+            if !result.is_ok() {
                 panic!("verify failed");
             }
 
@@ -95,7 +96,7 @@ async fn main() {
                 .unwrap();
 
             let result = jwt.verify(&resolver).await.expect("verification failed");
-            if !result.is_valid() {
+            if !result.is_ok() {
                 panic!("verify failed");
             }
 

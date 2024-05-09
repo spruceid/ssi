@@ -1,4 +1,5 @@
 use iref::IriBuf;
+use ssi_claims_core::ProofPreparationError;
 use std::fmt;
 
 /// Proof type.
@@ -60,4 +61,10 @@ pub enum UnsupportedProofSuite {
 
     #[error("unsupported proof suite: {0}")]
     Expanded(ExpandedType),
+}
+
+impl From<UnsupportedProofSuite> for ProofPreparationError {
+    fn from(value: UnsupportedProofSuite) -> Self {
+        Self::Proof(value.to_string())
+    }
 }

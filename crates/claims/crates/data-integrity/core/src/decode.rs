@@ -1,15 +1,12 @@
 use json_syntax::Parse;
 use serde::de::DeserializeOwned;
-use ssi_claims_core::Verifiable;
+use ssi_claims_core::{ProofPreparationError, Verifiable};
 use ssi_json_ld::JsonLdNodeObject;
 
-use crate::{
-    proof, CryptographicSuiteInput, Proof, ProofConfigurationRefExpansion, ProofPreparationError,
-    Proofs,
-};
+use crate::{proof, CryptographicSuiteInput, Proof, ProofConfigurationRefExpansion, Proofs};
 
 #[derive(Debug, thiserror::Error)]
-pub enum DecodeError<E = ssi_json_ld::UnknownContext> {
+pub enum DecodeError {
     #[error("invalid JSON claims (expected JSON object)")]
     ExpectedJsonObject,
 
@@ -26,7 +23,7 @@ pub enum DecodeError<E = ssi_json_ld::UnknownContext> {
     Deserialization(json_syntax::DeserializeError),
 
     #[error("proof preparation failed: {0}")]
-    ProofPreparation(ProofPreparationError<E>),
+    ProofPreparation(ProofPreparationError),
 }
 
 /// Decodes a Data-Integrity credential or presentation from its JSON binary
@@ -34,7 +31,7 @@ pub enum DecodeError<E = ssi_json_ld::UnknownContext> {
 pub async fn from_json_slice<T, S, E>(
     json: &[u8],
     environment: E,
-) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
+) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
@@ -57,7 +54,7 @@ where
 pub async fn from_json_str<T, S, E>(
     json: &str,
     environment: E,
-) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
+) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
@@ -74,7 +71,7 @@ where
 pub async fn from_json<T, S, E>(
     json: json_syntax::Value,
     mut environment: E,
-) -> Result<Verifiable<T, Proofs<S>>, DecodeError<E::LoadError>>
+) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
     S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,

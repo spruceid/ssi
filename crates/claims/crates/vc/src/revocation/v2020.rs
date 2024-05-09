@@ -5,7 +5,7 @@ use bitvec::prelude::Lsb0;
 use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ProofValidity, Verifiable};
+use ssi_claims_core::Verifiable;
 use ssi_data_integrity::{AnyInputContext, AnyProofs};
 use ssi_json_ld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT};
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
@@ -161,8 +161,8 @@ impl CredentialStatus for RevocationList2020Status {
 
         let vc_result = revocation_list_credential.verify(resolver).await?;
 
-        if let ProofValidity::Invalid = vc_result {
-            return Ok(StatusCheck::Invalid(Reason::CredentialVerification));
+        if let Err(e) = vc_result {
+            return Ok(StatusCheck::Invalid(Reason::CredentialVerification(e)));
         }
 
         if revocation_list_credential.id.as_deref()

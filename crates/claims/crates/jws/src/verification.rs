@@ -1,12 +1,11 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error};
 use iref::Iri;
 use ssi_claims_core::{
-    ExtractProof, PrepareWith, Proof, ProofValidity, Validate, VerifiableClaims, VerifyClaimsWith,
+    ExtractProof, InvalidProof, PrepareWith, Proof, ProofPreparationError, ProofValidationError,
+    ProofValidity, Validate, ValidateProof, VerifiableClaims,
 };
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::{
-    MaybeJwkVerificationMethod, VerificationError, VerificationMethodResolver,
-};
+use ssi_verification_methods_core::{MaybeJwkVerificationMethod, VerificationMethodResolver};
 use std::borrow::Cow;
 
 /// JWS verifier.
@@ -18,7 +17,7 @@ pub trait JWSVerifier {
     ///
     /// The key identifier is optional since the key may be known in advance.
     #[allow(async_fn_in_trait)]
-    async fn fetch_jwk(&self, key_id: Option<&str>) -> Result<Cow<JWK>, VerificationError>;
+    async fn fetch_jwk(&self, key_id: Option<&str>) -> Result<Cow<JWK>, ProofValidationError>;
 
     #[allow(async_fn_in_trait)]
     async fn verify(
@@ -27,12 +26,12 @@ pub trait JWSVerifier {
         signature: &[u8],
         key_id: Option<&str>,
         algorithm: Algorithm,
-    ) -> Result<ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let key = self.fetch_jwk(key_id).await?;
         match verify_bytes(algorithm, signing_bytes, &key, signature) {
-            Ok(()) => Ok(ProofValidity::Valid),
-            Err(Error::InvalidSignature) => Ok(ProofValidity::Invalid),
-            Err(_) => Err(VerificationError::InvalidSignature),
+            Ok(()) => Ok(Ok(())),
+            Err(Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
+            Err(_) => Err(ProofValidationError::InvalidSignature),
         }
     }
 }
@@ -41,18 +40,12 @@ impl<V: VerificationMethodResolver> JWSVerifier for V
 where
     V::Method: MaybeJwkVerificationMethod,
 {
-    async fn fetch_jwk(&self, key_id: Option<&str>) -> Result<Cow<JWK>, VerificationError> {
-        use ssi_verification_methods_core::{
-            ReferenceOrOwnedRef, VerificationMethodResolutionError,
-        };
+    async fn fetch_jwk(&self, key_id: Option<&str>) -> Result<Cow<JWK>, ProofValidationError> {
+        use ssi_verification_methods_core::ReferenceOrOwnedRef;
         let vm = match key_id {
             Some(id) => match Iri::new(id) {
                 Ok(iri) => Some(ReferenceOrOwnedRef::Reference(iri)),
-                Err(_) => {
-                    return Err(VerificationError::Resolution(
-                        VerificationMethodResolutionError::MissingVerificationMethod,
-                    ))
-                }
+                Err(_) => return Err(ProofValidationError::MissingPublicKey),
             },
             None => None,
         };
@@ -62,16 +55,14 @@ where
             .try_to_jwk()
             .map(Cow::into_owned)
             .map(Cow::Owned)
-            .ok_or(VerificationError::Resolution(
-                VerificationMethodResolutionError::MissingVerificationMethod,
-            ))
+            .ok_or(ProofValidationError::MissingPublicKey)
     }
 }
 
 /// Signing bytes are valid if the decoded payload is valid.
-impl<T: Validate> Validate for DecodedSigningBytes<T> {
-    fn is_valid(&self) -> bool {
-        self.payload.is_valid()
+impl<E, T: Validate<E>> Validate<E> for DecodedSigningBytes<T> {
+    fn validate(&self, env: &E) -> ssi_claims_core::ClaimsValidity {
+        self.payload.validate(env)
     }
 }
 
@@ -102,25 +93,21 @@ impl Proof for Signature {
 }
 
 impl<T> PrepareWith<DecodedSigningBytes<T>> for Signature {
-    type Error = std::convert::Infallible;
-
     async fn prepare_with(
         self,
         _claims: &DecodedSigningBytes<T>,
         _environment: &mut (),
-    ) -> Result<Self::Prepared, Self::Error> {
+    ) -> Result<Self::Prepared, ProofPreparationError> {
         Ok(self)
     }
 }
 
-impl<T, V: JWSVerifier> VerifyClaimsWith<DecodedSigningBytes<T>, V> for Signature {
-    type Error = VerificationError;
-
-    async fn verify_claims_with<'a>(
+impl<T, V: JWSVerifier> ValidateProof<DecodedSigningBytes<T>, V> for Signature {
+    async fn validate_proof<'a>(
         &'a self,
         claims: &'a DecodedSigningBytes<T>,
         verifier: &'a V,
-    ) -> Result<ProofValidity, Self::Error> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         verifier
             .verify(
                 &claims.bytes,

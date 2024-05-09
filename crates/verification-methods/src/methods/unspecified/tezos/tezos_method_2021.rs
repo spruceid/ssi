@@ -1,5 +1,6 @@
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
@@ -8,7 +9,7 @@ use std::{collections::BTreeMap, hash::Hash};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
-    TypedVerificationMethod, VerificationError, VerificationMethod,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 pub const TEZOS_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#TezosMethod2021");
@@ -75,7 +76,7 @@ impl TezosMethod2021 {
         message: &[u8],
         algorithm: AnyBlake2b,
         signature: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         self.public_key
             .verify_bytes(public_key_jwk, message, algorithm, signature)
     }
@@ -111,13 +112,13 @@ impl PublicKey {
         }
     }
 
-    pub fn matches(&self, other: &JWK) -> Result<bool, VerificationError> {
+    pub fn matches(&self, other: &JWK) -> Result<bool, ProofValidationError> {
         use ssi_caips::caip10::BlockchainAccountIdVerifyError as VerifyError;
         match self {
             Self::Jwk(jwk) => Ok(jwk.equals_public(other)),
             Self::BlockchainAccountId(id) => match id.verify(other) {
                 Err(VerifyError::UnknownChainId(_) | VerifyError::HashError(_)) => {
-                    Err(VerificationError::InvalidKey)
+                    Err(ProofValidationError::InvalidKey)
                 }
                 Err(VerifyError::KeyMismatch(_, _)) => Ok(false),
                 Ok(()) => Ok(true),
@@ -153,20 +154,22 @@ impl PublicKey {
         message: &[u8],
         algorithm: AnyBlake2b,
         signature: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         match self {
             Self::BlockchainAccountId(account_id) => match public_key_jwk {
                 Some(jwk) => match account_id.verify(jwk) {
                     Ok(()) => Ok(
-                        ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature).is_ok(),
+                        ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature)
+                            .map_err(|_| InvalidProof::Signature),
                     ),
-                    Err(_) => Ok(false),
+                    Err(_) => Ok(Err(InvalidProof::KeyMismatch)),
                 },
-                None => Err(VerificationError::MissingPublicKey),
+                None => Err(ProofValidationError::MissingPublicKey),
             },
-            Self::Jwk(jwk) => {
-                Ok(ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature).is_ok())
-            }
+            Self::Jwk(jwk) => Ok(
+                ssi_jws::verify_bytes(algorithm.into(), message, jwk, signature)
+                    .map_err(|_| InvalidProof::Signature),
+            ),
         }
     }
 

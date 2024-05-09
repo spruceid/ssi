@@ -1002,7 +1002,7 @@ mod tests {
             .await
             .unwrap();
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
-        assert!(vc.verify(&didpkh).await.unwrap().is_valid());
+        assert!(vc.verify(&didpkh).await.unwrap().is_ok());
 
         // Test that issuer property is used for verification.
         let vc_bad_issuer =
@@ -1013,7 +1013,7 @@ mod tests {
             .await
             .unwrap();
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_invalid());
+        assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone());
@@ -1027,13 +1027,13 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_invalid());
+        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_err());
 
         // Mess with proof signature to make verify fail.
         let mut vc_fuzzed = vc.clone();
         fuzz_proof_value(vc_fuzzed.proof_mut().first_mut().unwrap());
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
-        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Make it into a VP.
         let presentation = JsonPresentation::new(None, vec![did.clone().into()], vec![vc]);
@@ -1068,13 +1068,13 @@ mod tests {
             .unwrap();
 
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        assert!(vp.verify(&didpkh).await.unwrap().is_valid());
+        assert!(vp.verify(&didpkh).await.unwrap().is_ok());
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
         fuzz_proof_value(vp_fuzzed.proof_mut().first_mut().unwrap());
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
-        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Test that holder is verified.
         let vp_bad_holder =
@@ -1085,7 +1085,7 @@ mod tests {
             .await
             .unwrap();
         // It should fail.
-        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
+        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_err());
     }
 
     #[cfg(all(feature = "eip", feature = "tezos"))]
@@ -1141,7 +1141,7 @@ mod tests {
             .await
             .unwrap();
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
-        assert!(vc.verify(&didpkh).await.unwrap().is_valid());
+        assert!(vc.verify(&didpkh).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
         let vc_bad_issuer =
@@ -1151,7 +1151,7 @@ mod tests {
             })
             .await
             .unwrap();
-        assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_valid());
+        assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_ok());
 
         // Check that proof JWK must match proof verificationMethod.
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone());
@@ -1165,13 +1165,13 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_invalid());
+        assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_err());
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
         fuzz_proof_value(vc_fuzzed.proof_mut().first_mut().unwrap());
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
-        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+        assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Make it into a VP
         let presentation = JsonPresentation::new(None, vec![did.clone().into()], vec![vc]);
@@ -1199,13 +1199,13 @@ mod tests {
             .unwrap();
 
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        assert!(vp.verify(&didpkh).await.unwrap().is_valid());
+        assert!(vp.verify(&didpkh).await.unwrap().is_ok());
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
         fuzz_proof_value(vp_fuzzed.proof_mut().first_mut().unwrap());
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
-        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_invalid()));
+        assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Test that holder is verified.
         let vp_bad_holder =
@@ -1216,7 +1216,7 @@ mod tests {
             .await
             .unwrap();
         // It should fail.
-        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_invalid());
+        assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_err());
     }
 
     // fn sign_tezos(prep: &ssi_ldp::ProofPreparation, algorithm: Algorithm, key: &JWK) -> String {
@@ -1553,7 +1553,7 @@ mod tests {
 
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
         let verification_result = vc.verify(&didpkh).await.unwrap();
-        assert!(verification_result.is_valid());
+        assert!(verification_result.is_ok());
 
         // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
 
@@ -1605,7 +1605,7 @@ mod tests {
         .unwrap();
 
         let verification_result = bad_vc.verify(&didpkh).await.unwrap();
-        assert!(verification_result.is_invalid());
+        assert!(verification_result.is_err());
     }
 
     #[tokio::test]

@@ -1,4 +1,5 @@
-use ssi_verification_methods::{SignatureError, VerificationError};
+use ssi_claims_core::ProofValidationError;
+use ssi_verification_methods::SignatureError;
 
 #[derive(Debug, thiserror::Error)]
 #[error("invalid hash")]
@@ -10,9 +11,9 @@ impl From<InvalidHash> for SignatureError {
     }
 }
 
-impl From<InvalidHash> for VerificationError {
-    fn from(_value: InvalidHash) -> Self {
-        Self::InvalidHash
+impl From<InvalidHash> for ProofValidationError {
+    fn from(value: InvalidHash) -> Self {
+        Self::InvalidInputData(value.to_string())
     }
 }
 

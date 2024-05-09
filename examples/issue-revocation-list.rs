@@ -48,7 +48,7 @@ async fn main() {
         .await
         .unwrap();
 
-    assert!(vc.verify(&resolver).await.unwrap().is_valid());
+    assert!(vc.verify(&resolver).await.unwrap().is_ok());
 
     let stdout_writer = std::io::BufWriter::new(std::io::stdout());
     serde_json::to_writer_pretty(stdout_writer, &vc).unwrap();

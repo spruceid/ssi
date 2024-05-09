@@ -4,6 +4,7 @@ use hex::FromHexError;
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
@@ -12,7 +13,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationMethod,
 };
 
 pub const ECDSA_SECP_256K1_VERIFICATION_KEY_2019_TYPE: &str = "EcdsaSecp256k1VerificationKey2019";
@@ -98,14 +99,17 @@ impl EcdsaSecp256k1VerificationKey2019 {
         data: &[u8],
         signature: &[u8],
         digest_function: DigestFunction,
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let public_key = self.public_key.to_jwk();
         let algorithm = digest_function.into_crypto_algorithm();
         if !algorithm.is_compatible_with(public_key.algorithm.unwrap_or(algorithm)) {
-            return Err(VerificationError::InvalidKey);
+            return Err(ProofValidationError::InvalidKey);
         }
 
-        Ok(ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256K, data, &public_key, signature).is_ok())
+        Ok(
+            ssi_jws::verify_bytes(ssi_jwk::Algorithm::ES256K, data, &public_key, signature)
+                .map_err(|_| InvalidProof::Signature),
+        )
     }
 }
 
@@ -353,7 +357,7 @@ pub enum InvalidPublicKey {
     K256(#[from] k256::elliptic_curve::Error),
 }
 
-impl From<InvalidPublicKey> for VerificationError {
+impl From<InvalidPublicKey> for ProofValidationError {
     fn from(_value: InvalidPublicKey) -> Self {
         Self::InvalidKey
     }

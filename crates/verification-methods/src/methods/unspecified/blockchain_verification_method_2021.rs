@@ -2,10 +2,10 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::VerificationError;
 use static_iref::iri;
 
 use crate::{
@@ -60,13 +60,13 @@ impl BlockchainVerificationMethod2021 {
         message: &[u8],
         algorithm: ssi_jwk::Algorithm,
         signature: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<bool, ProofValidationError> {
         match public_key_jwk {
             Some(jwk) => match self.blockchain_account_id.verify(jwk) {
                 Ok(()) => Ok(ssi_jws::verify_bytes(algorithm, message, jwk, signature).is_ok()),
                 Err(_) => Ok(false),
             },
-            None => Err(VerificationError::MissingPublicKey),
+            None => Err(ProofValidationError::MissingPublicKey),
         }
     }
 

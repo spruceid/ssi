@@ -4,16 +4,14 @@ use rdf_types::{
     dataset::PatternMatchingDataset, interpretation::ReverseIriInterpretation, Interpretation,
     Vocabulary,
 };
-use ssi_claims_core::ProofValidity;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::Referencable;
 use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::HashError, CryptographicSuite, ExpandedConfiguration, UnsupportedProofSuite,
 };
 use ssi_jwk::JWK;
-use ssi_verification_methods::{
-    AnyMethod, AnyMethodRef, ReferenceOrOwned, SignatureError, VerificationError,
-};
+use ssi_verification_methods::{AnyMethod, AnyMethodRef, ReferenceOrOwned, SignatureError};
 
 use super::{
     AnyHash, AnySignature, AnySignatureRef, AnySuiteOptions, AnySuiteOptionsRef, Transformed,
@@ -303,7 +301,7 @@ macro_rules! crypto_suites {
                 method: AnyMethodRef,
                 bytes: &Self::Hashed,
                 signature: AnySignatureRef
-            ) -> Result<ProofValidity, VerificationError> {
+            ) -> Result<ProofValidity, ProofValidationError> {
                 match self {
                     $(
                         $(#[cfg($($t)*)])?

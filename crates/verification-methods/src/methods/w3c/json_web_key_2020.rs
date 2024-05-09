@@ -2,6 +2,7 @@ use std::{borrow::Cow, hash::Hash};
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::{Algorithm, JWK};
@@ -10,7 +11,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
-    VerificationError, VerificationMethod,
+    VerificationMethod,
 };
 
 pub const JSON_WEB_KEY_2020_TYPE: &str = "JsonWebKey2020";
@@ -81,21 +82,24 @@ impl JsonWebKey2020 {
         data: &[u8],
         signature: &[u8],
         algorithm: Option<Algorithm>,
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let algorithm = match (self.public_key.algorithm, algorithm) {
             (Some(a), Some(b)) => {
                 if a == b {
                     a
                 } else {
-                    return Ok(false);
+                    return Ok(Err(InvalidProof::AlgorithmMismatch));
                 }
             }
             (Some(a), None) => a,
             (None, Some(b)) => b,
-            (None, None) => return Err(VerificationError::InvalidKey),
+            (None, None) => return Err(ProofValidationError::InvalidKey),
         };
 
-        Ok(ssi_jws::verify_bytes(algorithm, data, &self.public_key, signature).is_ok())
+        Ok(
+            ssi_jws::verify_bytes(algorithm, data, &self.public_key, signature)
+                .map_err(|_| InvalidProof::Signature),
+        )
     }
 }
 

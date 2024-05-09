@@ -5,12 +5,13 @@ use iref::{Iri, IriBuf, UriBuf};
 use rand_core::{CryptoRng, RngCore};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
 use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods_core::{JwkVerificationMethod, VerificationError};
+use ssi_verification_methods_core::JwkVerificationMethod;
 use static_iref::iri;
 
 use crate::{
@@ -133,9 +134,9 @@ impl Multikey {
         &self,
         signing_bytes: &[u8],
         signature: &[u8],
-    ) -> Result<bool, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let signature = ed25519_dalek::Signature::try_from(signature)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
         Ok(self.public_key.verify(signing_bytes, &signature))
     }
 }
@@ -276,9 +277,11 @@ impl PublicKey {
         self.decoded.into()
     }
 
-    pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> bool {
+    pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> ProofValidity {
         use ed25519_dalek::Verifier;
-        self.decoded.verify(data, signature).is_ok()
+        self.decoded
+            .verify(data, signature)
+            .map_err(|_| InvalidProof::Signature)
     }
 }
 

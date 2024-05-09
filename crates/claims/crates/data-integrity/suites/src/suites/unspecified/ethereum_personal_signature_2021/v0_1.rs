@@ -1,11 +1,12 @@
 use crate::impl_rdf_input_urdna2015;
 
 use super::{Signature, VerificationMethod, EPSIG_CONTEXT};
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::Referencable;
 use ssi_crypto::protocol::EthereumWallet;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_rdf::IntoNQuads;
-use ssi_verification_methods::{SignatureError, VerificationError};
+use ssi_verification_methods::SignatureError;
 use static_iref::iri;
 
 pub struct EthereumPersonalSignature2021v0_1;
@@ -83,7 +84,7 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         data: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ProofValidity, ProofValidationError> {
         let message = EthereumWallet::prepare_message(data.as_bytes());
         let signature_bytes = signature.decode()?;
         Ok(method.verify_bytes(&message, &signature_bytes)?.into())
