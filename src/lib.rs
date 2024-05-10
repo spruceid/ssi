@@ -159,7 +159,6 @@
 //! ```
 //! # #[async_std::main]
 //! # async fn main() {
-//! use json_syntax::json;
 //! use static_iref::uri;
 //! use serde::{Serialize, Deserialize};
 //! use ssi::prelude::*;
