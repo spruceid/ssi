@@ -11,6 +11,7 @@
 //! Use [`CompactJWS::verify`] to decode a JWS.
 //!
 //! ```
+//! # #[cfg(feature = "secp256r1")]
 //! # async_std::task::block_on(async {
 //! use serde_json::json;
 //! use ssi_jwk::JWK;
@@ -53,6 +54,7 @@
 //! Use the [`JWSPayload::sign`] method to sign a payload into a compact JWS.
 //!
 //! ```
+//! # #[cfg(feature = "secp256r1")]
 //! # async_std::task::block_on(async {
 //! use serde_json::json;
 //! use ssi_jwk::JWK;
