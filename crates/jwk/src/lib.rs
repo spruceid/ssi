@@ -92,6 +92,14 @@ impl FromStr for JWK {
     }
 }
 
+impl TryFrom<serde_json::Value> for JWK {
+    type Error = serde_json::Error;
+
+    fn try_from(value: serde_json::Value) -> Result<Self, Self::Error> {
+        serde_json::from_value(value)
+    }
+}
+
 impl fmt::Display for JWK {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         serde_jcs::to_string(self).unwrap().fmt(f)

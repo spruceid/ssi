@@ -44,7 +44,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
                 let date_value: xsd_types::DateTime = date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.insert(ssi_jwt::ExpirationTime(date_value.earliest().try_into()?));
+                claims.set(ssi_jwt::ExpirationTime(date_value.earliest().try_into()?));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -53,7 +53,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
     if let Some(issuer_entry) = credential.remove("issuer").next() {
         match issuer_entry.value.into_string() {
             Some(issuer_value) => {
-                claims.insert(ssi_jwt::Issuer(issuer_value.into_string().try_into()?));
+                claims.set(ssi_jwt::Issuer(issuer_value.into_string().try_into()?));
             }
             None => return Err(JwtVcEncodeError::InvalidIssuerValue),
         }
@@ -65,7 +65,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVcEncodeError::InvalidDateValue)?;
-                claims.insert(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
+                claims.set(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
             }
             None => return Err(JwtVcEncodeError::InvalidDateValue),
         }
@@ -76,7 +76,7 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
     {
         match subject_value.into_string() {
             Some(subject_value) => {
-                claims.insert(ssi_jwt::Subject(subject_value.into_string().try_into()?));
+                claims.set(ssi_jwt::Subject(subject_value.into_string().try_into()?));
             }
             None => return Err(JwtVcEncodeError::InvalidSubjectValue),
         }
@@ -85,13 +85,13 @@ pub fn encode_jwt_vc_claims<T: Serialize>(
     if let Some(id_entry) = credential.remove("id").next() {
         match id_entry.value.into_string() {
             Some(id_value) => {
-                claims.insert(ssi_jwt::JwtId(id_value.into_string()));
+                claims.set(ssi_jwt::JwtId(id_value.into_string()));
             }
             None => return Err(JwtVcEncodeError::InvalidIdValue),
         }
     }
 
-    claims.insert(ssi_jwt::VerifiableCredential(json_syntax::Value::Object(
+    claims.set(ssi_jwt::VerifiableCredential(json_syntax::Value::Object(
         credential,
     )));
 
@@ -133,7 +133,7 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
     if let Some(holder_entry) = vp.remove("holder").next() {
         match holder_entry.value.into_string() {
             Some(holder_value) => {
-                claims.insert(ssi_jwt::Issuer(holder_value.into_string().try_into()?));
+                claims.set(ssi_jwt::Issuer(holder_value.into_string().try_into()?));
             }
             None => return Err(JwtVpEncodeError::InvalidHolderValue),
         }
@@ -145,7 +145,7 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
                 let issuance_date_value: xsd_types::DateTime = issuance_date_value
                     .parse()
                     .map_err(|_| JwtVpEncodeError::InvalidDateValue)?;
-                claims.insert(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
+                claims.set(ssi_jwt::NotBefore(issuance_date_value.latest().try_into()?));
             }
             None => return Err(JwtVpEncodeError::InvalidDateValue),
         }
@@ -154,13 +154,13 @@ pub fn encode_jwt_vp_claims<T: Serialize>(
     if let Some(id_entry) = vp.remove("id").next() {
         match id_entry.value.into_string() {
             Some(id_value) => {
-                claims.insert(ssi_jwt::JwtId(id_value.into_string()));
+                claims.set(ssi_jwt::JwtId(id_value.into_string()));
             }
             None => return Err(JwtVpEncodeError::InvalidIdValue),
         }
     }
 
-    claims.insert(ssi_jwt::VerifiablePresentation(json_syntax::Value::Object(
+    claims.set(ssi_jwt::VerifiablePresentation(json_syntax::Value::Object(
         vp,
     )));
 

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {
     /// Validity period starts in the future.
     #[error("premature claim")]

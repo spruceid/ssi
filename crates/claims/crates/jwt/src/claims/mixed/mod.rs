@@ -2,15 +2,16 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
+use ssi_jws::JWSPayload;
 
 use crate::{GetClaim, RemoveClaim, SetClaim, TryRemoveClaim, TrySetClaim};
 
-use super::{Claim, ClaimSet, PrivateClaimSet, RegisteredClaims, TryGetClaim};
+use super::{Claim, ClaimSet, RegisteredClaims, TryGetClaim};
 
 mod de;
 
 /// JSON Web Token claims.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize)]
 pub struct JWTClaims<T = AnyClaims> {
     /// Registered claims.
     #[serde(flatten)]
@@ -21,11 +22,37 @@ pub struct JWTClaims<T = AnyClaims> {
     pub private: T,
 }
 
-impl<T: PrivateClaimSet> ClaimSet for JWTClaims<T> {
-    type Error = <T as ClaimSet>::Error;
+impl<T> JWTClaims<T> {
+    pub fn new() -> Self
+    where
+        T: Default,
+    {
+        Self::default()
+    }
+
+    pub fn with_private_claims(private: T) -> Self {
+        Self {
+            registered: RegisteredClaims::default(),
+            private,
+        }
+    }
 }
 
-impl<C: Claim, T: PrivateClaimSet> TryGetClaim<C> for JWTClaims<T>
+impl<T: ClaimSet> ClaimSet for JWTClaims<T> {
+    type Error = T::Error;
+}
+
+impl<T: Serialize> JWSPayload for JWTClaims<T> {
+    fn typ(&self) -> Option<&'static str> {
+        Some("JWT")
+    }
+
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(serde_json::to_vec(self).unwrap())
+    }
+}
+
+impl<C: Claim, T: ClaimSet> TryGetClaim<C> for JWTClaims<T>
 where
     T: TryGetClaim<C::Private>,
 {
@@ -43,7 +70,7 @@ where
     }
 }
 
-impl<C: Claim, T: PrivateClaimSet> GetClaim<C> for JWTClaims<T>
+impl<C: Claim, T: ClaimSet> GetClaim<C> for JWTClaims<T>
 where
     T: GetClaim<C::Private>,
 {
@@ -60,14 +87,14 @@ where
     }
 }
 
-impl<C: Claim, T: PrivateClaimSet> TrySetClaim<C> for JWTClaims<T>
+impl<C: Claim, T: ClaimSet> TrySetClaim<C> for JWTClaims<T>
 where
     T: TrySetClaim<C::Private>,
 {
     fn try_set_claim(&mut self, claim: C) -> Result<(), Self::Error> {
         match claim.into_registered() {
             Ok(claim) => {
-                self.registered.insert(claim);
+                self.registered.set(claim);
                 Ok(())
             }
             Err(claim) => self.private.try_set(claim),
@@ -75,21 +102,21 @@ where
     }
 }
 
-impl<C: Claim, T: PrivateClaimSet> SetClaim<C> for JWTClaims<T>
+impl<C: Claim, T: ClaimSet> SetClaim<C> for JWTClaims<T>
 where
     T: SetClaim<C::Private>,
 {
     fn set_claim(&mut self, claim: C) {
         match claim.into_registered() {
             Ok(claim) => {
-                self.registered.insert(claim);
+                self.registered.set(claim);
             }
             Err(claim) => self.private.set(claim),
         }
     }
 }
 
-impl<C: Claim, T: PrivateClaimSet> TryRemoveClaim<C> for JWTClaims<T>
+impl<C: Claim, T: ClaimSet> TryRemoveClaim<C> for JWTClaims<T>
 where
     T: TryRemoveClaim<C::Private>,
 {
@@ -107,7 +134,7 @@ where
     }
 }
 
-impl<C: Claim, T: PrivateClaimSet> RemoveClaim<C> for JWTClaims<T>
+impl<C: Claim, T: ClaimSet> RemoveClaim<C> for JWTClaims<T>
 where
     T: RemoveClaim<C::Private>,
 {
@@ -124,20 +151,56 @@ where
     }
 }
 
-impl<T: PrivateClaimSet + Validate<E>, E> Validate<E> for JWTClaims<T>
+impl<T: ClaimSet + Validate<E>, E> Validate<E> for JWTClaims<T>
 where
     E: DateTimeEnvironment,
 {
     fn validate(&self, env: &E) -> ClaimsValidity {
-        ClaimSet::validate_registered_claims(self, env)?;
+        self.registered.validate(env)?;
         self.private.validate(env)
     }
 }
 
 /// Any set of JWT claims.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(transparent)]
 pub struct AnyClaims(BTreeMap<String, serde_json::Value>);
+
+impl AnyClaims {
+    pub fn get(&self, key: &str) -> Option<&serde_json::Value> {
+        self.0.get(key)
+    }
+
+    pub fn set(&mut self, key: String, value: serde_json::Value) -> Option<serde_json::Value> {
+        self.0.insert(key, value)
+    }
+
+    pub fn remove(&mut self, key: &str) -> Option<serde_json::Value> {
+        self.0.remove(key)
+    }
+
+    pub fn iter(&self) -> std::collections::btree_map::Iter<String, serde_json::Value> {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a AnyClaims {
+    type IntoIter = std::collections::btree_map::Iter<'a, String, serde_json::Value>;
+    type Item = (&'a String, &'a serde_json::Value);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl IntoIterator for AnyClaims {
+    type IntoIter = std::collections::btree_map::IntoIter<String, serde_json::Value>;
+    type Item = (String, serde_json::Value);
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
 
 impl ClaimSet for AnyClaims {
     type Error = serde_json::Error;

@@ -1,3 +1,5 @@
+use ssi_claims_core::SignatureError;
+
 use crate::InvalidHeader;
 
 #[derive(thiserror::Error, Debug)]
@@ -63,5 +65,16 @@ impl From<InvalidHeader> for Error {
 impl From<ring::error::Unspecified> for Error {
     fn from(e: ring::error::Unspecified) -> Self {
         ssi_jwk::Error::from(e).into()
+    }
+}
+
+impl From<Error> for SignatureError {
+    fn from(value: Error) -> Self {
+        match value {
+            Error::AlgorithmMismatch => Self::AlgorithmMismatch,
+            Error::AlgorithmNotImplemented => Self::UnsupportedAlgorithm,
+            Error::UnsupportedAlgorithm => Self::UnsupportedAlgorithm,
+            other => Self::other(other),
+        }
     }
 }

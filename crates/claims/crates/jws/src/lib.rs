@@ -1,7 +1,69 @@
+//! JSON Web Signature (JWS) implementation following [RFC 7515] and [RFC 7797]
+//! (Unencoded Payload Option).
+//!
+//! [RFC 7515]: <https://datatracker.ietf.org/doc/html/rfc7515>
+//! [RFC 7797]: <https://datatracker.ietf.org/doc/html/rfc7797>
+//!
+//! # Usage
+//!
+//! # Decoding & Verification
+//!
+//! Use [`CompactJWS::to_decoded`] to decode the JWS,
+//! [`VerifiableClaims::into_verifiable`] to separate the payload from the
+//! signature then [`Verifiable::verify`] to validate the signature.
+//!
+//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
+//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
+//!
+//! ```
+//! # async_std::task::block_on(async {
+//! use serde_json::json;
+//! use ssi_claims_core::VerifiableClaims;
+//! use ssi_jwk::JWK;
+//! use ssi_jws::CompactJWSStr;
+//!
+//! let jws = CompactJWSStr::new(b"eyJhbGciOiJFUzI1NiJ9.cGF5bG9hZA.LW6XkHmgfNnb2CA-2qdeMVGpekAoxRNsAHoeLpnton3QMaQ3dMj-5G9SlP8dHj7cHf2HtRPdy6-9LbxYKvumKw").unwrap();
+//! let decoded_jws = jws.to_decoded().unwrap();
+//! let verifiable_jws = decoded_jws.into_verifiable().await.unwrap();
+//!
+//! let jwk: JWK = json!({
+//!     "kty": "EC",
+//!     "use": "sig",
+//!     "crv": "P-256",
+//!     "x": "dxdB360AJqJFYhdctoKZD_a_P6vLGAxtEVaCLnyraXQ",
+//!     "y": "iH6o0l5AECsfRuEw2Eghbrp-6Fob3j98-1Cbe1YOmwM",
+//!     "alg": "ES256"
+//! }).try_into().unwrap();
+//!
+//! assert_eq!(verifiable_jws.verify(&jwk).await.unwrap(), Ok(()));
+//! # })
+//! ```
+//!
+//! # Signature
+//!
+//! Use the [`JWSPayload::sign`] method to sign a payload into a compact JWS.
+//!
+//! ```
+//! # async_std::task::block_on(async {
+//! use serde_json::json;
+//! use ssi_jwk::JWK;
+//! use ssi_jws::JWSPayload;
+//!
+//! let jwk: JWK = json!({
+//!     "kty": "EC",
+//!     "d": "3KSLs0_obYeQXfEI9I3BBH5y7aOm028bEx3rW6i5UN4",
+//!     "use": "sig",
+//!     "crv": "P-256",
+//!     "x": "dxdB360AJqJFYhdctoKZD_a_P6vLGAxtEVaCLnyraXQ",
+//!     "y": "iH6o0l5AECsfRuEw2Eghbrp-6Fob3j98-1Cbe1YOmwM",
+//!     "alg": "ES256"
+//! }).try_into().unwrap();
+//!
+//! let jwt = "payload".sign(&jwk).await.unwrap();
+//! assert_eq!(jwt, "eyJhbGciOiJFUzI1NiJ9.cGF5bG9hZA.LW6XkHmgfNnb2CA-2qdeMVGpekAoxRNsAHoeLpnton3QMaQ3dMj-5G9SlP8dHj7cHf2HtRPdy6-9LbxYKvumKw")
+//! # })
+//! ```
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-
-// TODO reinstate Error::MissingFeatures ?
-
 pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
 pub use error::Error;
@@ -11,11 +73,11 @@ use std::{borrow::Cow, collections::BTreeMap};
 
 pub type VerificationWarnings = Vec<String>;
 
-// RFC 7515 - JSON Web Signature (JWS)
-// RFC 7797 - JSON Web Signature (JWS) Unencoded Payload Option
-
 mod compact;
 pub use compact::*;
+
+mod signature;
+pub use signature::*;
 
 mod verification;
 pub use verification::*;
@@ -83,6 +145,17 @@ impl<T> DecodedJWS<T> {
             signing_bytes,
             decoded,
         }
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedJWS<U> {
+        DecodedJWS::new(self.signing_bytes, self.decoded.map(f))
+    }
+
+    pub fn try_map<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<DecodedJWS<U>, E> {
+        Ok(DecodedJWS::new(
+            self.signing_bytes,
+            self.decoded.try_map(f)?,
+        ))
     }
 }
 

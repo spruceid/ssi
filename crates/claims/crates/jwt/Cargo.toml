@@ -19,16 +19,18 @@ ssi-crypto.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
 ssi-claims-core.workspace = true
-ssi-verification-methods.workspace = true
-iref.workspace = true
+iref = { workspace = true, features = ["serde"] }
 serde_with = "2.3.2"
 hashbrown = "0.14.3"
 slab = "0.4.9"
 ordered-float = { version = "4.2.0", features = ["serde"] }
-
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { version = "0.4", features = ["serde", "wasmbind"] }
+
+[dev-dependencies]
+async-std.workspace = true
+ssi-jws = { workspace = true, features = ["secp256r1"] }

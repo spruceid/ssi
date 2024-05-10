@@ -8,16 +8,11 @@ mod private;
 pub use private::*;
 mod mixed;
 pub use mixed::*;
-use serde::Serialize;
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
-use ssi_jwk::Algorithm;
-use ssi_jws::CompactJWSString;
-use ssi_verification_methods::{
-    MaybeJwkVerificationMethod, ReferenceOrOwnedRef, SignatureError, Signer,
-    VerificationMethodResolver,
-};
-
-use crate::sign_claims;
+// use ssi_verification_methods::{
+//     MaybeJwkVerificationMethod, ReferenceOrOwnedRef, SignatureError, Signer,
+//     VerificationMethodResolver,
+// };
 
 /// JWT claim.
 ///
@@ -117,14 +112,14 @@ pub trait ClaimSet {
 
         if let Some(iat) = self.try_get::<IssuedAt>().map_err(InvalidClaims::other)? {
             let valid_from: chrono::DateTime<Utc> = iat.0.into();
-            if valid_from < now {
+            if valid_from > now {
                 return Err(InvalidClaims::Premature { now, valid_from });
             }
         }
 
         if let Some(nbf) = self.try_get::<NotBefore>().map_err(InvalidClaims::other)? {
             let valid_from: chrono::DateTime<Utc> = nbf.0.into();
-            if valid_from < now {
+            if valid_from > now {
                 return Err(InvalidClaims::Premature { now, valid_from });
             }
         }
@@ -134,26 +129,12 @@ pub trait ClaimSet {
             .map_err(InvalidClaims::other)?
         {
             let valid_until: chrono::DateTime<Utc> = exp.0.into();
-            if valid_until > now {
+            if valid_until <= now {
                 return Err(InvalidClaims::Expired { now, valid_until });
             }
         }
 
         Ok(())
-    }
-
-    /// Sign the claims and return a JWT.
-    #[allow(async_fn_in_trait)]
-    async fn sign<'m, M: 'm + MaybeJwkVerificationMethod>(
-        &self,
-        verification_method: impl Into<ReferenceOrOwnedRef<'m, M>>,
-        resolver: &impl VerificationMethodResolver<Method = M>,
-        signers: &impl Signer<M, Algorithm>,
-    ) -> Result<CompactJWSString, SignatureError>
-    where
-        Self: Sized + Serialize,
-    {
-        sign_claims(self, verification_method, resolver, signers).await
     }
 }
 

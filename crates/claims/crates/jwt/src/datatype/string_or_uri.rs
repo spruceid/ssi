@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 
@@ -56,5 +58,13 @@ impl TryFrom<&str> for StringOrURI {
 impl From<UriBuf> for StringOrURI {
     fn from(uri: UriBuf) -> Self {
         StringOrURI::URI(uri)
+    }
+}
+
+impl FromStr for StringOrURI {
+    type Err = iref::InvalidUri<String>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.try_into()
     }
 }

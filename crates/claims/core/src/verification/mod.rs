@@ -24,12 +24,38 @@ pub use claims::*;
 mod proof;
 pub use proof::*;
 
+use crate::Verifiable;
+
 /// Verifiable Claims.
 ///
 /// Set of claims bundled with a proof.
 pub trait VerifiableClaims {
     /// Proof type.
     type Proof;
+
+    #[allow(async_fn_in_trait)]
+    async fn into_verifiable<T, E>(
+        self,
+    ) -> Result<Verifiable<T, Self::Proof>, ProofPreparationError>
+    where
+        Self: ExtractProof<Proofless = T>,
+        Self::Proof: PrepareWith<T, E>,
+        E: Default,
+    {
+        Verifiable::new(self).await
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn into_verifiable_with<T, E>(
+        self,
+        env: E,
+    ) -> Result<Verifiable<T, Self::Proof>, ProofPreparationError>
+    where
+        Self: ExtractProof<Proofless = T>,
+        Self::Proof: PrepareWith<T, E>,
+    {
+        Verifiable::new_with(self, env).await
+    }
 }
 
 /// Proof extraction trait.
@@ -59,7 +85,7 @@ pub trait MergeWithProof<P> {
 pub type Verification = Result<(), Invalid>;
 
 /// Invalid verifiable claims.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum Invalid {
     #[error("invalid claims: {0}")]
     Claims(#[from] InvalidClaims),

@@ -1,6 +1,9 @@
-mod verification;
 use std::ops::Deref;
 
+mod signature;
+pub use signature::*;
+
+mod verification;
 pub use verification::*;
 
 /// Claims serialization utils.

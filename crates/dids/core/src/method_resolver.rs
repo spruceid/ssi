@@ -1,9 +1,14 @@
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 
 use crate::{document::Document, resolution, DIDResolver, DID, DIDURL};
+use iref::Iri;
+use ssi_claims_core::ProofValidationError;
+use ssi_jwk::JWK;
+use ssi_jws::JWSVerifier;
 use ssi_verification_methods_core::{
-    ControllerError, GenericVerificationMethod, InvalidVerificationMethod, ProofPurposes,
-    ReferenceOrOwnedRef, VerificationMethodResolutionError,
+    ControllerError, ControllerProvider, GenericVerificationMethod, InvalidVerificationMethod,
+    MaybeJwkVerificationMethod, ProofPurposes, ReferenceOrOwnedRef, VerificationMethod,
+    VerificationMethodCow, VerificationMethodResolutionError, VerificationMethodResolver,
 };
 
 pub struct VerificationMethodDIDResolver<T, M> {
@@ -47,9 +52,7 @@ impl ssi_verification_methods_core::Controller for Document {
     }
 }
 
-impl<T: DIDResolver, M> ssi_verification_methods_core::ControllerProvider
-    for VerificationMethodDIDResolver<T, M>
-{
+impl<T: DIDResolver, M> ControllerProvider for VerificationMethodDIDResolver<T, M> {
     type Controller<'a> = Document where Self: 'a;
 
     async fn get_controller<'a>(
@@ -61,25 +64,20 @@ impl<T: DIDResolver, M> ssi_verification_methods_core::ControllerProvider
                 Ok(did) => match self.resolver.resolve_with(did, self.options.clone()).await {
                     Ok(output) => Ok(Some(output.document.into_document())),
                     Err(resolution::Error::NotFound) => Ok(None),
-                    Err(e) => Err(
-                        ssi_verification_methods_core::ControllerError::InternalError(
-                            e.to_string(),
-                        ),
-                    ),
+                    Err(e) => Err(ControllerError::InternalError(e.to_string())),
                 },
-                Err(_) => Err(ssi_verification_methods_core::ControllerError::Invalid),
+                Err(_) => Err(ControllerError::Invalid),
             }
         } else {
-            Err(ssi_verification_methods_core::ControllerError::Invalid)
+            Err(ControllerError::Invalid)
         }
     }
 }
 
 // #[async_trait]
-impl<T: DIDResolver, M> ssi_verification_methods_core::VerificationMethodResolver
-    for VerificationMethodDIDResolver<T, M>
+impl<T: DIDResolver, M> VerificationMethodResolver for VerificationMethodDIDResolver<T, M>
 where
-    M: ssi_verification_methods_core::VerificationMethod,
+    M: VerificationMethod,
     M: TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
 {
     type Method = M;
@@ -88,10 +86,7 @@ where
         &'a self,
         _issuer: Option<&'a iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<
-        ssi_verification_methods_core::VerificationMethodCow<'a, M>,
-        VerificationMethodResolutionError,
-    > {
+    ) -> Result<VerificationMethodCow<'a, M>, VerificationMethodResolutionError> {
         match method {
             Some(method) => {
                 if method.id().scheme().as_str() == "did" {
@@ -136,5 +131,32 @@ where
             }
             None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
         }
+    }
+}
+
+impl<T: DIDResolver, M> JWSVerifier for VerificationMethodDIDResolver<T, M>
+where
+    M: MaybeJwkVerificationMethod
+        + TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,
+{
+    async fn fetch_public_jwk(
+        &self,
+        key_id: Option<&str>,
+    ) -> Result<Cow<JWK>, ProofValidationError> {
+        use ssi_verification_methods_core::ReferenceOrOwnedRef;
+        let vm = match key_id {
+            Some(id) => match Iri::new(id) {
+                Ok(iri) => Some(ReferenceOrOwnedRef::Reference(iri)),
+                Err(_) => return Err(ProofValidationError::MissingPublicKey),
+            },
+            None => None,
+        };
+
+        self.resolve_verification_method(None, vm)
+            .await?
+            .try_to_jwk()
+            .map(Cow::into_owned)
+            .map(Cow::Owned)
+            .ok_or(ProofValidationError::MissingPublicKey)
     }
 }

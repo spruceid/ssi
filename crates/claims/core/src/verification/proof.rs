@@ -68,7 +68,7 @@ pub enum ProofValidationError {
     Other(String),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidProof {
     /// Proof is missing.
     #[error("missing proof")]

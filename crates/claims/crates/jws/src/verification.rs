@@ -1,11 +1,9 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error};
-use iref::Iri;
 use ssi_claims_core::{
     ExtractProof, InvalidProof, PrepareWith, Proof, ProofPreparationError, ProofValidationError,
     ProofValidity, Validate, ValidateProof, VerifiableClaims,
 };
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::{MaybeJwkVerificationMethod, VerificationMethodResolver};
 use std::borrow::Cow;
 
 /// JWS verifier.
@@ -17,7 +15,10 @@ pub trait JWSVerifier {
     ///
     /// The key identifier is optional since the key may be known in advance.
     #[allow(async_fn_in_trait)]
-    async fn fetch_jwk(&self, key_id: Option<&str>) -> Result<Cow<JWK>, ProofValidationError>;
+    async fn fetch_public_jwk(
+        &self,
+        key_id: Option<&str>,
+    ) -> Result<Cow<JWK>, ProofValidationError>;
 
     #[allow(async_fn_in_trait)]
     async fn verify(
@@ -27,7 +28,7 @@ pub trait JWSVerifier {
         key_id: Option<&str>,
         algorithm: Algorithm,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let key = self.fetch_jwk(key_id).await?;
+        let key = self.fetch_public_jwk(key_id).await?;
         match verify_bytes(algorithm, signing_bytes, &key, signature) {
             Ok(()) => Ok(Ok(())),
             Err(Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
@@ -36,26 +37,12 @@ pub trait JWSVerifier {
     }
 }
 
-impl<V: VerificationMethodResolver> JWSVerifier for V
-where
-    V::Method: MaybeJwkVerificationMethod,
-{
-    async fn fetch_jwk(&self, key_id: Option<&str>) -> Result<Cow<JWK>, ProofValidationError> {
-        use ssi_verification_methods_core::ReferenceOrOwnedRef;
-        let vm = match key_id {
-            Some(id) => match Iri::new(id) {
-                Ok(iri) => Some(ReferenceOrOwnedRef::Reference(iri)),
-                Err(_) => return Err(ProofValidationError::MissingPublicKey),
-            },
-            None => None,
-        };
-
-        self.resolve_verification_method(None, vm)
-            .await?
-            .try_to_jwk()
-            .map(Cow::into_owned)
-            .map(Cow::Owned)
-            .ok_or(ProofValidationError::MissingPublicKey)
+impl JWSVerifier for JWK {
+    async fn fetch_public_jwk(
+        &self,
+        _key_id: Option<&str>,
+    ) -> Result<Cow<JWK>, ProofValidationError> {
+        Ok(Cow::Borrowed(self))
     }
 }
 

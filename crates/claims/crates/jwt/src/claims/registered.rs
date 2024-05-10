@@ -5,6 +5,7 @@ use crate::{
 };
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
 use ssi_core::OneOrMany;
+use ssi_jws::JWSPayload;
 use std::{borrow::Cow, collections::BTreeMap};
 
 pub trait RegisteredClaim: Claim + Into<AnyRegisteredClaim> {
@@ -71,7 +72,7 @@ impl RegisteredClaims {
             .and_then(C::extract_mut)
     }
 
-    pub fn insert<C: RegisteredClaim>(&mut self, claim: C) -> Option<C> {
+    pub fn set<C: RegisteredClaim>(&mut self, claim: C) -> Option<C> {
         self.0
             .insert(C::JWT_REGISTERED_CLAIM_KIND, claim.into())
             .and_then(C::extract)
@@ -99,6 +100,16 @@ impl ClaimSet for RegisteredClaims {
     type Error = std::convert::Infallible;
 }
 
+impl JWSPayload for RegisteredClaims {
+    fn typ(&self) -> Option<&'static str> {
+        Some("JWT")
+    }
+
+    fn payload_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(serde_json::to_vec(self).unwrap())
+    }
+}
+
 impl<C: RegisteredClaim> TryGetClaim<C> for RegisteredClaims {
     fn try_get_claim(&self) -> Result<Option<Cow<C>>, Self::Error> {
         Ok(self.get().map(Cow::Borrowed))
@@ -113,14 +124,14 @@ impl<C: RegisteredClaim> GetClaim<C> for RegisteredClaims {
 
 impl<C: RegisteredClaim> TrySetClaim<C> for RegisteredClaims {
     fn try_set_claim(&mut self, claim: C) -> Result<(), Self::Error> {
-        self.insert(claim);
+        self.set(claim);
         Ok(())
     }
 }
 
 impl<C: RegisteredClaim> SetClaim<C> for RegisteredClaims {
     fn set_claim(&mut self, claim: C) {
-        self.insert(claim);
+        self.set(claim);
     }
 }
 

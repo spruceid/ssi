@@ -9,7 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-jws/"
 
 [features]
-# default = ["secp256k1", "secp256r1", "ed25519", "rsa", "eip", "ssi-jwk/ripemd-160"]
+default = ["secp256k1", "secp256r1", "ed25519", "rsa"]
 
 ## Enable secp256k1 signatures.
 secp256k1 = ["ssi-jwk/secp256k1", "k256", "ssi-crypto/secp256k1", "blake2", "dep:sha2", "dep:sha3"]
@@ -60,7 +60,9 @@ linked-data.workspace = true
 hex.workspace = true
 ssi-core.workspace = true
 ssi-claims-core.workspace = true
-ssi-verification-methods-core.workspace = true
+
+[dev-dependencies]
+async-std.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 clear_on_drop = "0.2.4"

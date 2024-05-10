@@ -12,12 +12,11 @@
 use ssi::{
     claims::{
         data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
-        jws::CompactJWSString,
+        jws::{CompactJWSString, JWSPayload},
         vc::JsonVerifiableCredential,
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
 };
-use ssi_claims::jwt::ClaimSet;
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
@@ -91,7 +90,7 @@ async fn main() {
             let jwt = vp
                 .to_jwt_claims()
                 .unwrap()
-                .sign(&verification_method, &resolver, &signer)
+                .sign(&key)
                 .await
                 .unwrap();
 

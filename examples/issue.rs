@@ -5,7 +5,7 @@
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
-    jwt::ClaimSet,
+    jws::JWSPayload
 };
 use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;
@@ -57,7 +57,7 @@ async fn main() {
             let jwt = vc
                 .to_jwt_claims()
                 .unwrap()
-                .sign(&verification_method, &resolver, &signer)
+                .sign(&key)
                 .await
                 .unwrap();
 

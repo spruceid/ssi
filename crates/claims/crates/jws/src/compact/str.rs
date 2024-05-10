@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{ops::Deref, str::FromStr};
 
-use crate::{CompactJWS, Header, InvalidCompactJWS};
+use crate::{CompactJWS, DecodeError, DecodedJWS, Header, InvalidCompactJWS};
 
 /// JWS in UTF-8 compact serialized form.
 ///
@@ -12,7 +12,14 @@ use crate::{CompactJWS, Header, InvalidCompactJWS};
 pub struct CompactJWSStr(CompactJWS);
 
 impl CompactJWSStr {
-    pub fn new(data: &str) -> Result<&Self, InvalidCompactJWS<&str>> {
+    pub fn new(data: &[u8]) -> Result<&Self, InvalidCompactJWS<&[u8]>> {
+        match std::str::from_utf8(data) {
+            Ok(s) => Self::from_string(s).map_err(|_| InvalidCompactJWS(data)),
+            Err(_) => Err(InvalidCompactJWS(data)),
+        }
+    }
+
+    pub fn from_string(data: &str) -> Result<&Self, InvalidCompactJWS<&str>> {
         let inner = CompactJWS::new(data.as_bytes()).map_err(|_| InvalidCompactJWS(data))?;
         Ok(unsafe { std::mem::transmute(inner) })
     }
@@ -62,6 +69,42 @@ impl serde::Serialize for CompactJWSStr {
         S: serde::Serializer,
     {
         self.as_str().serialize(serializer)
+    }
+}
+
+impl PartialEq<str> for CompactJWSStr {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<String> for CompactJWSStr {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl<'a> PartialEq<String> for &'a CompactJWSStr {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<CompactJWSStr> for str {
+    fn eq(&self, other: &CompactJWSStr) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl PartialEq<CompactJWSStr> for String {
+    fn eq(&self, other: &CompactJWSStr) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl<'a> PartialEq<&'a CompactJWSStr> for String {
+    fn eq(&self, other: &&'a CompactJWSStr) -> bool {
+        self == other.as_str()
     }
 }
 
@@ -173,6 +216,16 @@ impl CompactJWSString {
     pub fn into_string(self) -> String {
         self.0
     }
+
+    /// Decodes the entire JWS while preserving the signing bytes so they can
+    /// be verified.
+    pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
+        let decoded = self.decode()?.into_owned();
+        Ok(DecodedJWS::new(
+            self.into_signing_bytes().into_bytes(),
+            decoded,
+        ))
+    }
 }
 
 impl Deref for CompactJWSString {
@@ -241,5 +294,41 @@ impl<'de> serde::Deserialize<'de> for CompactJWSString {
         }
 
         deserializer.deserialize_string(Visitor)
+    }
+}
+
+impl PartialEq<str> for CompactJWSString {
+    fn eq(&self, other: &str) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl<'a> PartialEq<&'a str> for CompactJWSString {
+    fn eq(&self, other: &&'a str) -> bool {
+        self.as_str() == *other
+    }
+}
+
+impl PartialEq<String> for CompactJWSString {
+    fn eq(&self, other: &String) -> bool {
+        self.as_str() == other
+    }
+}
+
+impl PartialEq<CompactJWSString> for str {
+    fn eq(&self, other: &CompactJWSString) -> bool {
+        self == other.as_str()
+    }
+}
+
+impl<'a> PartialEq<CompactJWSString> for &'a str {
+    fn eq(&self, other: &CompactJWSString) -> bool {
+        *self == other.as_str()
+    }
+}
+
+impl PartialEq<CompactJWSString> for String {
+    fn eq(&self, other: &CompactJWSString) -> bool {
+        self == other.as_str()
     }
 }
