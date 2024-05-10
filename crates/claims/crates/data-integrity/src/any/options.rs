@@ -126,12 +126,12 @@ impl CryptographicSuiteOptions<AnySuite> for AnySuiteOptions {
         }
 
         #[cfg(all(feature = "w3c", feature = "eip712"))]
-        if !suite.requires_eip721() {
+        if !suite.requires_eip712() {
             self.eip712 = None
         }
 
         #[cfg(all(feature = "w3c", feature = "eip712"))]
-        if !suite.requires_eip721_v0_1() {
+        if !suite.requires_eip712_v0_1() {
             self.eip712_v0_1 = None
         }
     }

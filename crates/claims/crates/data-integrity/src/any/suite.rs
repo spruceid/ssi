@@ -412,7 +412,7 @@ crypto_suites! {
 
 impl AnySuite {
     #[cfg(feature = "eip712")]
-    pub fn requires_eip721(&self) -> bool {
+    pub fn requires_eip712(&self) -> bool {
         #[cfg(feature = "w3c")]
         if matches!(self, Self::EthereumEip712Signature2021) {
             return true;
@@ -422,7 +422,7 @@ impl AnySuite {
     }
 
     #[cfg(feature = "eip712")]
-    pub fn requires_eip721_v0_1(&self) -> bool {
+    pub fn requires_eip712_v0_1(&self) -> bool {
         #[cfg(feature = "w3c")]
         if matches!(self, Self::EthereumEip712Signature2021v0_1) {
             return true;
