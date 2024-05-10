@@ -1,13 +1,12 @@
-use ssi_claims_core::ProofValidationError;
-use ssi_verification_methods::SignatureError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 
 #[derive(Debug, thiserror::Error)]
 #[error("invalid hash")]
 pub struct InvalidHash;
 
 impl From<InvalidHash> for SignatureError {
-    fn from(_value: InvalidHash) -> Self {
-        Self::InvalidHash
+    fn from(value: InvalidHash) -> Self {
+        Self::Claims(value.to_string())
     }
 }
 

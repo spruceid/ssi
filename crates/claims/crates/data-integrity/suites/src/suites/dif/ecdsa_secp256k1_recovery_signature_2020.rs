@@ -1,12 +1,11 @@
 use iref::Iri;
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::Referencable;
-use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jws::JWS;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, EcdsaSecp256k1RecoveryMethod2020,
-    SignatureError,
+    MessageSigner,
 };
 use static_iref::iri;
 

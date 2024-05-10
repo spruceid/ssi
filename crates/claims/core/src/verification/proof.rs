@@ -16,6 +16,9 @@ pub enum ProofValidationError {
     #[error("invalid input data: {0}")]
     InvalidInputData(String),
 
+    #[error(transparent)]
+    Preparation(#[from] ProofPreparationError),
+
     /// Proof could not be understood.
     #[error("invalid proof")]
     InvalidProof,

@@ -8,7 +8,7 @@ use rdf_types::{
     Id, InterpretationMut, LexicalQuad, Quad, Term, Triple, VocabularyMut,
 };
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::ProofPreparationError;
+use ssi_claims_core::{ProofPreparationError, SignatureError};
 use ssi_core::Referencable;
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdTypes};
 use ssi_rdf::{urdna2015, IntoNQuads};
@@ -550,6 +550,12 @@ pub enum ConfigurationExpansionError<E> {
 impl<E: fmt::Display> From<ConfigurationExpansionError<E>> for ProofPreparationError {
     fn from(value: ConfigurationExpansionError<E>) -> Self {
         Self::Proof(format!("proof configuration expansion failed: {value}"))
+    }
+}
+
+impl<E: fmt::Display> From<ConfigurationExpansionError<E>> for SignatureError {
+    fn from(value: ConfigurationExpansionError<E>) -> Self {
+        Self::ProofConfiguration(format!("expansion failed: {value}"))
     }
 }
 

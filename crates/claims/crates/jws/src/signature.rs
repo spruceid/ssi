@@ -103,16 +103,37 @@ pub trait JWSSigner {
     }
 }
 
+impl<'a, T: JWSSigner> JWSSigner for &'a T {
+    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
+        T::fetch_info(*self).await
+    }
+
+    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+        T::sign_bytes(*self, signing_bytes).await
+    }
+
+    async fn sign(
+        &self,
+        payload: &(impl ?Sized + JWSPayload),
+    ) -> Result<CompactJWSString, SignatureError> {
+        T::sign(*self, payload).await
+    }
+}
+
 impl JWSSigner for JWK {
     async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
         Ok(JWSSignerInfo {
             key_id: self.key_id.clone(),
-            algorithm: self.algorithm.ok_or(SignatureError::MissingAlgorithm)?,
+            algorithm: self
+                .get_algorithm()
+                .ok_or(SignatureError::MissingAlgorithm)?,
         })
     }
 
     async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
-        let algorithm = self.algorithm.ok_or(SignatureError::MissingAlgorithm)?;
+        let algorithm = self
+            .get_algorithm()
+            .ok_or(SignatureError::MissingAlgorithm)?;
         crate::sign_bytes(algorithm, signing_bytes, self).map_err(Into::into)
     }
 }

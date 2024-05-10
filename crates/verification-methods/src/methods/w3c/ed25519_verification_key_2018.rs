@@ -4,17 +4,16 @@ use ed25519_dalek::{Signer, Verifier};
 use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_verification_methods_core::JwkVerificationMethod;
+use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
 use static_iref::iri;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SignatureError,
-    SigningMethod, TypedVerificationMethod, VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, SigningMethod,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 /// Ed25519 Verification Key 2018 type name.

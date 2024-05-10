@@ -1,57 +1,10 @@
-use crate::{InvalidVerificationMethod, VerificationMethodResolutionError};
-
-mod signer;
-
-pub use signer::*;
 use ssi_claims_core::ProofValidationError;
 
-#[derive(Debug, thiserror::Error)]
-pub enum SignatureError {
-    #[error("verification method resolution failed: {0}")]
-    Resolution(#[from] VerificationMethodResolutionError),
+pub mod protocol;
+pub use protocol::SignatureProtocol;
 
-    #[error("missing verification method")]
-    MissingVerificationMethod,
-
-    #[error("unknown verification method")]
-    UnknownVerificationMethod,
-
-    #[error("no signer for requested verification method")]
-    MissingSigner,
-
-    #[error("invalid hash")]
-    InvalidHash,
-
-    #[error("invalid public key")]
-    InvalidPublicKey,
-
-    #[error("invalid secret key")]
-    InvalidSecretKey,
-
-    #[error(transparent)]
-    InvalidVerificationMethod(#[from] InvalidVerificationMethod),
-
-    #[error("missing public key")]
-    MissingPublicKey,
-
-    #[error(transparent)]
-    Signer(#[from] ssi_crypto::MessageSignatureError),
-
-    #[error("invalid received signature")]
-    InvalidSignature,
-
-    #[error("invalid signature algorithm")]
-    InvalidAlgorithm,
-
-    #[error("missing signature algorithm")]
-    MissingAlgorithm,
-}
-
-impl From<std::convert::Infallible> for SignatureError {
-    fn from(_value: std::convert::Infallible) -> Self {
-        unreachable!()
-    }
-}
+mod signer;
+pub use signer::*;
 
 pub enum InvalidSignature {
     MissingValue,

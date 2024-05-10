@@ -22,3 +22,6 @@ thiserror.workspace = true
 json-ld.workspace = true
 linked-data = { workspace = true, features = ["derive"] }
 educe.workspace = true
+multibase.workspace = true
+bs58.workspace = true
+hex.workspace = true

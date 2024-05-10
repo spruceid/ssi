@@ -3,10 +3,9 @@
 //! This is the successor of the EdDSA Cryptosuite v2020.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/>
-use ssi_claims_core::{ProofValidationError, ProofValidity};
-use ssi_crypto::MessageSigner;
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{Multikey, SignatureError};
+use ssi_verification_methods::{MessageSigner, Multikey};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};

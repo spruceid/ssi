@@ -1,6 +1,7 @@
+use ssi_claims_core::{ProofValidationError, VerifiableClaims, Verification};
 use ssi_jws::{
     CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, DecodeError as JWSDecodeError,
-    DecodedJWS,
+    DecodedJWS, JWSVerifier,
 };
 
 use crate::JWTClaims;
@@ -14,6 +15,12 @@ pub enum DecodeError {
     Claims(#[from] serde_json::Error),
 }
 
+impl From<DecodeError> for ProofValidationError {
+    fn from(value: DecodeError) -> Self {
+        Self::InvalidInputData(value.to_string())
+    }
+}
+
 /// Decoded JWT.
 ///
 /// By definition this is a decoded JWS with JWT claims as payload.
@@ -22,6 +29,21 @@ pub type DecodedJWT = DecodedJWS<JWTClaims>;
 /// JWT borrowing decoding.
 pub trait ToDecodedJWT {
     fn to_decoded_jwt(&self) -> Result<DecodedJWT, DecodeError>;
+
+    /// Verify the JWS signature.
+    ///
+    /// This check the signature and the validity of registered claims.
+    #[allow(async_fn_in_trait)]
+    async fn verify_jwt(
+        &self,
+        verifier: &impl JWSVerifier,
+    ) -> Result<Verification, ProofValidationError> {
+        self.to_decoded_jwt()?
+            .into_verifiable()
+            .await?
+            .verify(verifier)
+            .await
+    }
 }
 
 /// JWT consuming decoding.

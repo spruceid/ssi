@@ -1,10 +1,9 @@
 mod w3c;
 use std::borrow::Cow;
 
-use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use ssi_verification_methods_core::{
-    JwkVerificationMethod, MaybeJwkVerificationMethod, SigningMethod,
+    JwkVerificationMethod, MaybeJwkVerificationMethod, MessageSignatureError, SigningMethod,
 };
 pub use w3c::*;
 

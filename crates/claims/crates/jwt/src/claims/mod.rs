@@ -9,10 +9,6 @@ pub use private::*;
 mod mixed;
 pub use mixed::*;
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
-// use ssi_verification_methods::{
-//     MaybeJwkVerificationMethod, ReferenceOrOwnedRef, SignatureError, Signer,
-//     VerificationMethodResolver,
-// };
 
 /// JWT claim.
 ///

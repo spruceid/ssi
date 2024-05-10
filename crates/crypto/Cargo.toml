@@ -38,7 +38,6 @@ digest = "0.9"
 iref.workspace = true
 static-iref.workspace = true
 async-trait.workspace = true
-multibase.workspace = true
 pin-project.workspace = true
 hex.workspace = true
 

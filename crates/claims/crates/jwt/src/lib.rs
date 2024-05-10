@@ -6,24 +6,14 @@
 //!
 //! ## Decoding & Verification
 //!
-//! Use [`ToDecodedJWT::to_decoded_jwt`] to decode the JWT,
-//! [`VerifiableClaims::into_verifiable`] to separate the payload from the
-//! signature then [`Verifiable::verify`] to validate the signature.
-//!
-//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
-//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
-//!
 //! ```
 //! # async_std::task::block_on(async {
 //! use serde_json::json;
-//! use ssi_claims_core::VerifiableClaims;
 //! use ssi_jwk::JWK;
 //! use ssi_jws::CompactJWSStr;
 //! use ssi_jwt::ToDecodedJWT;
 //!
 //! let jws = CompactJWSStr::new(b"eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJuYW1lIjoiSm9obiBTbWl0aCIsImlhdCI6MTcxNTM0Mjc5MCwiaXNzIjoiaHR0cDovL2V4YW1wbGUub3JnLyNpc3N1ZXIifQ.S51Gmlkwy4UxOhhc4nVl4_sHHVPSrNmjZDwJCDXDbKp2MT8-UyhZLw03gVKe-JRUzcsteWoeRCUoA5rwnuTSoA").unwrap();
-//! let decoded_jwt = jws.to_decoded_jwt().unwrap();
-//! let verifiable_jwt = decoded_jwt.into_verifiable().await.unwrap();
 //!
 //! let jwk: JWK = json!({
 //!     "kty": "EC",
@@ -34,9 +24,18 @@
 //!     "alg": "ES256"
 //! }).try_into().unwrap();
 //!
-//! assert_eq!(verifiable_jwt.verify(&jwk).await.unwrap(), Ok(()));
+//! assert!(jws.verify_jwt(&jwk).await.unwrap().is_ok());
 //! # })
 //! ```
+//!
+//! Internally [`ToDecodedJWT::verify_jwt`] uses
+//! [`ToDecodedJWT::to_decoded_jwt`] to decode the JWT,
+//! [`VerifiableClaims::into_verifiable`] to separate the payload from the
+//! signature then [`Verifiable::verify`] to validate the signature and
+//! registered claims.
+//!
+//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
+//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
 //!
 //! ## Signature
 //!

@@ -1,6 +1,6 @@
-use ssi_claims_core::Verifiable;
+use ssi_claims_core::{SignatureError, Verifiable};
 use ssi_json_ld::JsonLdNodeObject;
-use ssi_verification_methods_core::{SignatureError, Signer, VerificationMethodResolver};
+use ssi_verification_methods_core::{Signer, VerificationMethodResolver};
 
 use crate::{
     suite::{CryptographicSuiteInput, CryptographicSuiteOptions, HashError, TransformError},
@@ -33,7 +33,7 @@ pub async fn sign<'max, T, S, X, R, N>(
     signer: &'max N,
     suite: S,
     params: ProofConfiguration<S::VerificationMethod, S::Options>,
-) -> Result<Verifiable<T, Proofs<S>>, Error<X::LoadError>>
+) -> Result<Verifiable<T, Proofs<S>>, SignatureError>
 where
     T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, X>,
@@ -56,7 +56,7 @@ pub async fn sign_single<'max, T, S, X, R, N>(
     signer: &'max N,
     suite: S,
     mut params: ProofConfiguration<S::VerificationMethod, S::Options>,
-) -> Result<Verifiable<T, Proof<S>>, Error<X::LoadError>>
+) -> Result<Verifiable<T, Proof<S>>, SignatureError>
 where
     T: JsonLdNodeObject,
     S: CryptographicSuiteInput<T, X>,

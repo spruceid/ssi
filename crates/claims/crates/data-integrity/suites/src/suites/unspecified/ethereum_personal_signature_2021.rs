@@ -1,13 +1,13 @@
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::{protocol::EthereumWallet, MessageSigner};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jwk::JWK;
 use ssi_rdf::IntoNQuads;
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020::DigestFunction, ecdsa_secp_256k1_verification_key_2019,
-    verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, SignatureError,
+    protocol::EthereumWallet, verification_method_union, AnyMethod, AnyMethodRef,
+    EcdsaSecp256k1RecoveryMethod2020, EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod,
+    MessageSigner,
 };
 use static_iref::iri;
 

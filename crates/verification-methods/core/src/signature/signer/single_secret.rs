@@ -1,6 +1,4 @@
-use ssi_crypto::SignatureProtocol;
-
-use crate::{MethodWithSecret, Referencable, Signer, SigningMethod};
+use crate::{MethodWithSecret, Referencable, SignatureProtocol, Signer, SigningMethod};
 
 /// Simple signer implementation that always uses the given secret to sign
 /// every message.

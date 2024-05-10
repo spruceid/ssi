@@ -1,7 +1,6 @@
 //! EIP-712 Signature 2021 implementation.
 use rdf_types::{LexicalQuad, Quad};
-use ssi_claims_core::{ProofValidationError, ProofValidity};
-use ssi_crypto::MessageSigner;
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{
     suite::{HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
@@ -10,7 +9,7 @@ use ssi_rdf::{AnyLdEnvironment, Expandable, NQuadsStatement};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, Eip712Method2021, InvalidVerificationMethod, SignatureError,
+    EcdsaSecp256k1VerificationKey2019, Eip712Method2021, InvalidVerificationMethod, MessageSigner,
 };
 use static_iref::iri;
 

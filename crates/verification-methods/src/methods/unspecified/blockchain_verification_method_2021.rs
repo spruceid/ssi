@@ -4,8 +4,8 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::ProofValidationError;
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
+use ssi_verification_methods_core::MessageSignatureError;
 use static_iref::iri;
 
 use crate::{

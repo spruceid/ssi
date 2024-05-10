@@ -4,10 +4,9 @@
 //! and Curve25519. It is recommended to use `edssa-2022` instead.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-use ssi_claims_core::{ProofValidationError, ProofValidity};
-use ssi_crypto::MessageSigner;
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{Ed25519VerificationKey2020, SignatureError};
+use ssi_verification_methods::{Ed25519VerificationKey2020, MessageSigner};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};

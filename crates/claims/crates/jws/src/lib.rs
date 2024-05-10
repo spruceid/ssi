@@ -8,23 +8,15 @@
 //!
 //! # Decoding & Verification
 //!
-//! Use [`CompactJWS::to_decoded`] to decode the JWS,
-//! [`VerifiableClaims::into_verifiable`] to separate the payload from the
-//! signature then [`Verifiable::verify`] to validate the signature.
-//!
-//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
-//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
+//! Use [`CompactJWS::verify`] to decode a JWS.
 //!
 //! ```
 //! # async_std::task::block_on(async {
 //! use serde_json::json;
-//! use ssi_claims_core::VerifiableClaims;
 //! use ssi_jwk::JWK;
 //! use ssi_jws::CompactJWSStr;
 //!
 //! let jws = CompactJWSStr::new(b"eyJhbGciOiJFUzI1NiJ9.cGF5bG9hZA.LW6XkHmgfNnb2CA-2qdeMVGpekAoxRNsAHoeLpnton3QMaQ3dMj-5G9SlP8dHj7cHf2HtRPdy6-9LbxYKvumKw").unwrap();
-//! let decoded_jws = jws.to_decoded().unwrap();
-//! let verifiable_jws = decoded_jws.into_verifiable().await.unwrap();
 //!
 //! let jwk: JWK = json!({
 //!     "kty": "EC",
@@ -35,9 +27,26 @@
 //!     "alg": "ES256"
 //! }).try_into().unwrap();
 //!
-//! assert_eq!(verifiable_jws.verify(&jwk).await.unwrap(), Ok(()));
+//! assert!(jws.verify(&jwk).await.unwrap().is_ok());
 //! # })
 //! ```
+//!
+//! Internally [`CompactJWS::verify`] uses [`CompactJWS::to_decoded`] to decode
+//! the JWS, [`VerifiableClaims::into_verifiable`] to separate the payload from
+//! the signature then [`Verifiable::verify`] to validate the signature.
+//!
+//! [`VerifiableClaims::into_verifiable`]: ssi_claims_core::VerifiableClaims::into_verifiable
+//! [`Verifiable::verify`]: ssi_claims_core::Verifiable::verify
+//!
+//! ```ignore
+//! let decoded_jws = jws.to_decoded().unwrap();
+//! let verifiable_jws = decoded_jws.into_verifiable().await.unwrap();
+//! assert_eq!(verifiable_jws.verify(&jwk).await.unwrap().is_ok());
+//! ```
+//!
+//! You can use this method to decode the payload before the verification
+//! (using [`DecodedJWS::try_map`] for instance) so it can be verified along the
+//! signature.
 //!
 //! # Signature
 //!
@@ -352,7 +361,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                         rsa::PaddingScheme::new_pss_with_salt::<sha2::Sha256, _>(rng, hash.size());
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
-                _ => return Err(Error::AlgorithmNotImplemented),
+                _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
             private_key
                 .sign(padding, &hashed)
@@ -362,7 +371,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
         JWKParams::OKP(okp) => {
             use blake2::digest::{consts::U32, Digest};
             if algorithm != Algorithm::EdDSA && algorithm != Algorithm::EdBlake2b {
-                return Err(Error::UnsupportedAlgorithm);
+                return Err(Error::UnsupportedAlgorithm(algorithm.to_string()));
             }
             if okp.curve != *"Ed25519" {
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
@@ -487,7 +496,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
                 sig.to_bytes().to_vec()
             }
             _ => {
-                return Err(Error::UnsupportedAlgorithm);
+                return Err(Error::UnsupportedAlgorithm(algorithm.to_string()));
             }
         },
         _ => {
@@ -556,7 +565,7 @@ pub fn verify_bytes_warnable(
                     padding = rsa::PaddingScheme::new_pss::<sha2::Sha256, _>(rng);
                     hashed = ssi_crypto::hashes::sha256::sha256(data);
                 }
-                _ => return Err(Error::AlgorithmNotImplemented),
+                _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             }
             public_key
                 .verify(padding, &hashed, signature)
@@ -749,7 +758,7 @@ pub fn verify_bytes_warnable(
                     .map_err(ssi_jwk::Error::from)?;
             }
             _ => {
-                return Err(Error::UnsupportedAlgorithm);
+                return Err(Error::UnsupportedAlgorithm(algorithm.to_string()));
             }
         },
         _ => {
@@ -832,7 +841,7 @@ pub fn recover(algorithm: Algorithm, data: &[u8], signature: &[u8]) -> Result<JW
         _ => {
             let _ = data;
             let _ = signature;
-            Err(Error::UnsupportedAlgorithm)
+            Err(Error::UnsupportedAlgorithm(algorithm.to_string()))
         }
     }
 }

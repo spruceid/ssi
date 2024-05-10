@@ -1,8 +1,7 @@
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{RsaVerificationKey2018, SignatureError};
+use ssi_verification_methods::{MessageSigner, RsaVerificationKey2018};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};

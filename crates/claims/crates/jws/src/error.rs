@@ -39,13 +39,13 @@ pub enum Error {
     #[error("Invalid JWS")]
     InvalidJWS,
     /// Unsupported algorithm
-    #[error("Unsupported algorithm")]
-    UnsupportedAlgorithm,
+    #[error("Unsupported algorithm `{0}`")]
+    UnsupportedAlgorithm(String),
     /// Missing crate features
     #[error("Missing features: {0}")]
     MissingFeatures(&'static str),
-    #[error("Algorithm not implemented")]
-    AlgorithmNotImplemented,
+    #[error("Algorithm `{0}` not implemented")]
+    AlgorithmNotImplemented(String),
     #[error("Expected signature length {0} but found {1}")]
     UnexpectedSignatureLength(usize, usize),
     #[error("Invalid signature")]
@@ -72,8 +72,8 @@ impl From<Error> for SignatureError {
     fn from(value: Error) -> Self {
         match value {
             Error::AlgorithmMismatch => Self::AlgorithmMismatch,
-            Error::AlgorithmNotImplemented => Self::UnsupportedAlgorithm,
-            Error::UnsupportedAlgorithm => Self::UnsupportedAlgorithm,
+            Error::AlgorithmNotImplemented(name) => Self::UnsupportedAlgorithm(name),
+            Error::UnsupportedAlgorithm(name) => Self::UnsupportedAlgorithm(name),
             other => Self::other(other),
         }
     }

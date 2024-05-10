@@ -2,9 +2,8 @@ use iref::Iri;
 use json_syntax::Print;
 use lazy_static::lazy_static;
 use serde::Serialize;
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
@@ -12,7 +11,7 @@ use ssi_data_integrity_core::{
 use ssi_jwk::algorithm::AnyBlake2b;
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{SignatureError, TezosMethod2021};
+use ssi_verification_methods::{MessageSigner, TezosMethod2021};
 use static_iref::iri;
 
 use super::{decode_jwk_from_multibase, TezosWallet};

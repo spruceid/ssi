@@ -1,8 +1,7 @@
 use lazy_static::lazy_static;
-use ssi_claims_core::{ProofValidationError, ProofValidity};
-use ssi_crypto::MessageSigner;
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{JsonWebKey2020, SignatureError};
+use ssi_verification_methods::{JsonWebKey2020, MessageSigner};
 use static_iref::{iri, iri_ref};
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};

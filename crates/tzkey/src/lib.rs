@@ -13,14 +13,24 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
         Params::OKP(okp_params) if okp_params.curve == "Ed25519" => {
             if let Some(ref _sk) = okp_params.private_key {
                 // TODO: edsk
-                return Err(JwsError::UnsupportedAlgorithm);
+                return Err(JwsError::UnsupportedAlgorithm(
+                    jwk.algorithm
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| "OKP".to_string()),
+                ));
             }
             (EDPK_PREFIX, &okp_params.public_key.0)
         }
         Params::EC(ec_params) if ec_params.curve == Some("secp256k1".to_string()) => {
             if let Some(ref _sk) = ec_params.ecc_private_key {
                 // TODO: spsk
-                return Err(JwsError::UnsupportedAlgorithm);
+                return Err(JwsError::UnsupportedAlgorithm(
+                    jwk.algorithm
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| "EC".to_string()),
+                ));
             }
             {
                 // TODO: p2sk
@@ -30,7 +40,12 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
         }
         Params::EC(ec_params) if ec_params.curve == Some("P-256".to_string()) => {
             if let Some(ref _sk) = ec_params.ecc_private_key {
-                return Err(JwsError::UnsupportedAlgorithm);
+                return Err(JwsError::UnsupportedAlgorithm(
+                    jwk.algorithm
+                        .as_ref()
+                        .map(ToString::to_string)
+                        .unwrap_or_else(|| "EC".to_string()),
+                ));
             }
             {
                 bytes = ssi_jwk::serialize_p256(ec_params)?;
@@ -38,7 +53,12 @@ pub fn jwk_to_tezos_key(jwk: &JWK) -> Result<String, JwsError> {
             }
         }
         _ => {
-            return Err(JwsError::UnsupportedAlgorithm);
+            return Err(JwsError::UnsupportedAlgorithm(
+                jwk.algorithm
+                    .as_ref()
+                    .map(ToString::to_string)
+                    .unwrap_or_else(|| "OCT".to_string()),
+            ));
         }
     };
     tzkey_prefixed.extend_from_slice(&prefix);

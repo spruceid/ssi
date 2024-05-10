@@ -14,15 +14,14 @@ pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed255
 
 #[cfg(feature = "secp256r1")]
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
-use ssi_claims_core::ProofValidationError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::{
-    protocol::InvalidProtocolSignature, MessageSignatureError, MessageSigner, SignatureProtocol,
-};
 use ssi_data_integrity_core::suite::CryptographicSuiteOptions;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods::SignatureError;
+use ssi_verification_methods::{
+    protocol::InvalidProtocolSignature, MessageSignatureError, MessageSigner, SignatureProtocol,
+};
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
 

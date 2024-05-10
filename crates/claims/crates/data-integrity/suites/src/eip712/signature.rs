@@ -1,11 +1,10 @@
 use iref::UriBuf;
 use linked_data::{LinkedData, LinkedDataGraph};
 use rdf_types::{Interpretation, Vocabulary};
-use ssi_claims_core::ProofValidationError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSigner;
 use ssi_jwk::algorithm::AnyESKeccakK;
-use ssi_verification_methods::SignatureError;
+use ssi_verification_methods::MessageSigner;
 
 /// Common signature format for EIP-712-based cryptographic suites.
 ///

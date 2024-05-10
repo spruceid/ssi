@@ -6,9 +6,8 @@ use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::JwkVerificationMethod;
+use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
 use static_iref::iri;
 
 use crate::{

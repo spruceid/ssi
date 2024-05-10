@@ -1,9 +1,8 @@
-use ssi_claims_core::ProofValidationError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSigner;
 use ssi_jwk::Algorithm;
 use ssi_jws::{CompactJWSStr, CompactJWSString, JWS};
-use ssi_verification_methods::SignatureError;
+use ssi_verification_methods::MessageSigner;
 
 /// Common signature format where the proof value is multibase-encoded.
 #[derive(

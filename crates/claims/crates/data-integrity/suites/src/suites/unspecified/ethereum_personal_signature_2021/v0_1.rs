@@ -1,12 +1,11 @@
 use crate::impl_rdf_input_urdna2015;
 
 use super::{Signature, VerificationMethod, EPSIG_CONTEXT};
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::Referencable;
-use ssi_crypto::protocol::EthereumWallet;
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_rdf::IntoNQuads;
-use ssi_verification_methods::SignatureError;
+use ssi_verification_methods::{protocol::EthereumWallet, MessageSigner};
 use static_iref::iri;
 
 pub struct EthereumPersonalSignature2021v0_1;
@@ -67,8 +66,8 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
         _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         data: &Self::Hashed,
-        signer: impl ssi_crypto::MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
-    ) -> Result<Self::Signature, ssi_verification_methods::SignatureError> {
+        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+    ) -> Result<Self::Signature, SignatureError> {
         let proof_value_bytes = signer
             .sign(method.algorithm(), EthereumWallet, data.as_bytes())
             .await?;

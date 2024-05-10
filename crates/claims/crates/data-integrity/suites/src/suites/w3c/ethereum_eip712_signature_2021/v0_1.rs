@@ -1,12 +1,11 @@
 use lazy_static::lazy_static;
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::Referencable;
-use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
 };
-use ssi_verification_methods::SignatureError;
+use ssi_verification_methods::{MessageSignatureError, MessageSigner};
 use static_iref::{iri, iri_ref};
 
 use crate::eip712::{Eip712Signature, TypesProvider};

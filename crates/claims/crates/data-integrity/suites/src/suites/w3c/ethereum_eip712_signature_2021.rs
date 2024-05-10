@@ -3,9 +3,8 @@
 //! See: <https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/>
 use lazy_static::lazy_static;
 use pin_project::pin_project;
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::Referencable;
-use ssi_crypto::{MessageSignatureError, MessageSigner};
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError, TransformError},
     CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
@@ -14,7 +13,8 @@ use ssi_jwk::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
-    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, JsonWebKey2020, SignatureError,
+    EcdsaSecp256k1VerificationKey2019, InvalidVerificationMethod, JsonWebKey2020,
+    MessageSignatureError, MessageSigner,
 };
 use static_iref::{iri, iri_ref};
 use std::{future::Future, pin::Pin, task};

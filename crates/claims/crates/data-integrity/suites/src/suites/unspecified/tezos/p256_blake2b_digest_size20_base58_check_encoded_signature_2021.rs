@@ -2,12 +2,11 @@ use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};
 
 use super::{Options, TZ_CONTEXT};
 use iref::Iri;
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_crypto::MessageSigner;
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_jws::JWS;
 use ssi_verification_methods::{
-    P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021, SignatureError,
+    MessageSigner, P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021,
 };
 use static_iref::iri;
 

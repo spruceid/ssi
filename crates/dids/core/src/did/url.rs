@@ -417,6 +417,10 @@ impl DIDURLBuf {
     pub fn into_uri(self) -> UriBuf {
         unsafe { UriBuf::new_unchecked(self.0) }
     }
+
+    pub fn into_string(self) -> String {
+        unsafe { String::from_utf8_unchecked(self.0) }
+    }
 }
 
 impl TryFrom<String> for DIDURLBuf {
@@ -442,6 +446,12 @@ impl From<DIDURLBuf> for UriBuf {
 impl From<DIDURLBuf> for IriBuf {
     fn from(value: DIDURLBuf) -> Self {
         unsafe { IriBuf::new_unchecked(String::from_utf8_unchecked(value.0)) }
+    }
+}
+
+impl From<DIDURLBuf> for String {
+    fn from(value: DIDURLBuf) -> Self {
+        value.into_string()
     }
 }
 

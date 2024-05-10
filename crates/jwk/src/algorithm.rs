@@ -219,24 +219,9 @@ pub enum AlgorithmError {
     Unsupported(Algorithm),
 }
 
-impl From<AlgorithmError> for ssi_crypto::MessageSignatureError {
-    fn from(value: AlgorithmError) -> Self {
-        match value {
-            AlgorithmError::Missing => Self::MissingAlgorithm,
-            AlgorithmError::Unsupported(a) => Self::UnsupportedAlgorithm(a.to_string()),
-        }
-    }
-}
-
 #[derive(Debug, thiserror::Error)]
 #[error("unsupported signature algorithm `{0}`")]
 pub struct UnsupportedAlgorithm(pub Algorithm);
-
-impl From<UnsupportedAlgorithm> for ssi_crypto::MessageSignatureError {
-    fn from(value: UnsupportedAlgorithm) -> Self {
-        Self::UnsupportedAlgorithm(value.0.to_string())
-    }
-}
 
 /// ECDSA using secp256k1 (K-256) and SHA-256, with or without recovery bit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

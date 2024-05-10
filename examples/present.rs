@@ -87,12 +87,7 @@ async fn main() {
             serde_json::to_writer_pretty(writer, &vp).unwrap();
         }
         "jwt" => {
-            let jwt = vp
-                .to_jwt_claims()
-                .unwrap()
-                .sign(&key)
-                .await
-                .unwrap();
+            let jwt = vp.to_jwt_claims().unwrap().sign(&key).await.unwrap();
 
             let result = jwt.verify(&resolver).await.expect("verification failed");
             if !result.is_ok() {

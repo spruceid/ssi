@@ -1,21 +1,20 @@
 //! Cryptographic suites.
 use iref::Iri;
-use ssi_claims_core::{ProofPreparationError, ProofValidationError, ProofValidity, Verifiable};
+use ssi_claims_core::{
+    ProofPreparationError, ProofValidationError, ProofValidity, SignatureError, Verifiable,
+};
 use ssi_core::Referencable;
-use ssi_crypto::MessageSigner;
 use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{
-    InvalidVerificationMethod, SignatureError, Signer, VerificationMethod,
+    InvalidVerificationMethod, MessageSigner, SignatureProtocol, Signer, VerificationMethod,
     VerificationMethodResolver,
 };
 use std::convert::Infallible;
 
 use crate::{
-    sign,
-    signing::{self, sign_single},
-    ExpandedConfiguration, ExpandedConfigurationRef, ExpandedType, Proof, ProofConfiguration,
-    ProofConfigurationCastError, ProofConfigurationRefExpansion, ProofRef, Proofs,
-    UnsupportedProofSuite,
+    sign, signing::sign_single, ExpandedConfiguration, ExpandedConfigurationRef, ExpandedType,
+    Proof, ProofConfiguration, ProofConfigurationCastError, ProofConfigurationRefExpansion,
+    ProofRef, Proofs, UnsupportedProofSuite,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -78,6 +77,12 @@ impl From<TransformError> for ProofPreparationError {
     }
 }
 
+impl From<TransformError> for SignatureError {
+    fn from(value: TransformError) -> Self {
+        SignatureError::Claims(value.to_string())
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum HashError {
     #[error("invalid verification method")]
@@ -95,7 +100,13 @@ pub enum HashError {
 
 impl From<HashError> for ProofPreparationError {
     fn from(value: HashError) -> Self {
-        ProofPreparationError::Claims(value.to_string())
+        Self::Claims(value.to_string())
+    }
+}
+
+impl From<HashError> for SignatureError {
+    fn from(value: HashError) -> Self {
+        Self::Claims(value.to_string())
     }
 }
 
@@ -150,7 +161,7 @@ pub trait CryptographicSuite: Sized {
 
     type MessageSignatureAlgorithm: Copy;
 
-    type SignatureProtocol: ssi_crypto::SignatureProtocol<Self::MessageSignatureAlgorithm>;
+    type SignatureProtocol: SignatureProtocol<Self::MessageSignatureAlgorithm>;
 
     /// Signature.
     type Signature: Referencable;
@@ -296,7 +307,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         resolver: &'max R,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Verifiable<T, Proofs<Self>>, signing::Error<C::LoadError>>
+    ) -> Result<Verifiable<T, Proofs<Self>>, SignatureError>
     where
         Self::VerificationMethod: 'max,
         T: JsonLdNodeObject,
@@ -320,7 +331,7 @@ pub trait CryptographicSuiteInput<T, C = ()>: CryptographicSuite {
         resolver: &'max R,
         signer: &'max S,
         params: ProofConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Verifiable<T, Proof<Self>>, signing::Error<C::LoadError>>
+    ) -> Result<Verifiable<T, Proof<Self>>, SignatureError>
     where
         Self::VerificationMethod: 'max,
         T: JsonLdNodeObject,

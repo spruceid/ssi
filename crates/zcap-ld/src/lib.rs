@@ -23,7 +23,7 @@ use ssi_claims::{
     },
     vc::{Context, RequiredContext},
     ClaimsValidity, ExtractProof, MergeWithProof, ProofPreparationError, ProofValidationError,
-    Validate, Verifiable, VerifiableClaims, Verification,
+    SignatureError, Validate, Verifiable, VerifiableClaims, Verification,
 };
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject};
 use ssi_verification_methods::Signer;
@@ -133,7 +133,7 @@ impl<C, P> Delegation<C, P> {
         signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
         proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Self, AnyProof>, signing::Error>
+    ) -> Result<Verifiable<Self, AnyProof>, SignatureError>
     where
         C: Serialize,
         P: Serialize,
@@ -158,7 +158,7 @@ impl<C, P> Delegation<C, P> {
         signer: &impl Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
         mut proof_configuration: ProofConfiguration<S::VerificationMethod, S::Options>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Self, Proof<S>>, signing::Error<E::LoadError>>
+    ) -> Result<Verifiable<Self, Proof<S>>, SignatureError>
     where
         S: CryptographicSuiteInput<Self, E>,
         E: ProofConfigurationExpansion + for<'a> ProofConfigurationRefExpansion<'a, S>,

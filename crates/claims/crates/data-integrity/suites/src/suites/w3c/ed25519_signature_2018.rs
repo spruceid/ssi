@@ -1,7 +1,6 @@
-use ssi_claims_core::{ProofValidationError, ProofValidity};
-use ssi_crypto::MessageSigner;
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{Ed25519VerificationKey2018, SignatureError};
+use ssi_verification_methods::{Ed25519VerificationKey2018, MessageSigner};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, JwsSignature};

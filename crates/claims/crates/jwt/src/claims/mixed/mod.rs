@@ -30,7 +30,7 @@ impl<T> JWTClaims<T> {
         Self::default()
     }
 
-    pub fn with_private_claims(private: T) -> Self {
+    pub fn from_private_claims(private: T) -> Self {
         Self {
             registered: RegisteredClaims::default(),
             private,

@@ -1,9 +1,8 @@
 use std::borrow::Cow;
 
 use iref::{Iri, IriBuf};
-use ssi_claims_core::ProofValidationError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_core::Referencable;
-use ssi_crypto::{MessageSignatureError, MessageSigner, SignatureProtocol};
 use ssi_jwk::JWK;
 use static_iref::iri;
 
@@ -120,6 +119,15 @@ impl From<VerificationMethodResolutionError> for ProofValidationError {
         match value {
             VerificationMethodResolutionError::MissingVerificationMethod => Self::MissingPublicKey,
             e => Self::Other(e.to_string()),
+        }
+    }
+}
+
+impl From<VerificationMethodResolutionError> for SignatureError {
+    fn from(value: VerificationMethodResolutionError) -> Self {
+        match value {
+            VerificationMethodResolutionError::MissingVerificationMethod => Self::MissingSigner,
+            e => Self::other(e),
         }
     }
 }
@@ -295,6 +303,12 @@ impl InvalidVerificationMethod {
 impl From<InvalidVerificationMethod> for ProofValidationError {
     fn from(_value: InvalidVerificationMethod) -> Self {
         Self::InvalidKey
+    }
+}
+
+impl From<InvalidVerificationMethod> for SignatureError {
+    fn from(value: InvalidVerificationMethod) -> Self {
+        Self::other(value)
     }
 }
 

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use ssi_crypto::{protocol, MessageSignatureError};
+use ssi_verification_methods::{protocol, MessageSignatureError, SignatureProtocol};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AnySignatureProtocol {
@@ -12,33 +12,25 @@ pub enum AnySignatureProtocol {
     TezosWallet,
 }
 
-impl ssi_crypto::SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol {
+impl SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol {
     fn prepare_message<'b>(&self, bytes: &'b [u8]) -> Cow<'b, [u8]> {
         match self {
-            Self::Direct => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(&(), bytes)
-            }
-            Self::Base58Btc => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(
-                    &protocol::Base58Btc,
-                    bytes,
-                )
-            }
-            Self::Base58BtcMultibase => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(
-                    &protocol::Base58BtcMultibase,
-                    bytes,
-                )
-            }
-            Self::EthereumWallet => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(
-                    &protocol::EthereumWallet,
-                    bytes,
-                )
-            }
+            Self::Direct => SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(&(), bytes),
+            Self::Base58Btc => SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(
+                &protocol::Base58Btc,
+                bytes,
+            ),
+            Self::Base58BtcMultibase => SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(
+                &protocol::Base58BtcMultibase,
+                bytes,
+            ),
+            Self::EthereumWallet => SignatureProtocol::<ssi_jwk::Algorithm>::prepare_message(
+                &protocol::EthereumWallet,
+                bytes,
+            ),
             #[cfg(feature = "tezos")]
             Self::TezosWallet => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::algorithm::AnyBlake2b>::prepare_message(
+                SignatureProtocol::<ssi_jwk::algorithm::AnyBlake2b>::prepare_message(
                     &ssi_data_integrity_suites::tezos::TezosWallet,
                     bytes,
                 )
@@ -71,31 +63,24 @@ impl ssi_crypto::SignatureProtocol<ssi_jwk::Algorithm> for AnySignatureProtocol 
         encoded_signature: &'s [u8],
     ) -> Result<Cow<'s, [u8]>, protocol::InvalidProtocolSignature> {
         match self {
-            Self::Direct => ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
-                &(),
+            Self::Direct => {
+                SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(&(), encoded_signature)
+            }
+            Self::Base58Btc => SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
+                &protocol::Base58Btc,
                 encoded_signature,
             ),
-            Self::Base58Btc => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
-                    &protocol::Base58Btc,
-                    encoded_signature,
-                )
-            }
-            Self::Base58BtcMultibase => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
-                    &protocol::Base58BtcMultibase,
-                    encoded_signature,
-                )
-            }
-            Self::EthereumWallet => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
-                    &protocol::EthereumWallet,
-                    encoded_signature,
-                )
-            }
+            Self::Base58BtcMultibase => SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
+                &protocol::Base58BtcMultibase,
+                encoded_signature,
+            ),
+            Self::EthereumWallet => SignatureProtocol::<ssi_jwk::Algorithm>::decode_signature(
+                &protocol::EthereumWallet,
+                encoded_signature,
+            ),
             #[cfg(feature = "tezos")]
             Self::TezosWallet => {
-                ssi_crypto::SignatureProtocol::<ssi_jwk::algorithm::AnyBlake2b>::decode_signature(
+                SignatureProtocol::<ssi_jwk::algorithm::AnyBlake2b>::decode_signature(
                     &ssi_data_integrity_suites::tezos::TezosWallet,
                     encoded_signature,
                 )

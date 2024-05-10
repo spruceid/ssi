@@ -7,7 +7,7 @@ pub use ssi_claims_core::*;
 /// See: <https://datatracker.ietf.org/doc/html/rfc7515>
 pub use ssi_jws as jws;
 
-pub use jws::{CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString};
+pub use jws::{CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload};
 
 /// JSON Web tokens (JWT).
 ///

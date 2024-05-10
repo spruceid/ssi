@@ -1,13 +1,12 @@
-use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSigner;
 use ssi_data_integrity_core::{
     suite::{CryptographicSuiteOptions, HashError},
     CryptographicSuite, ExpandedConfiguration,
 };
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{SignatureError, TezosMethod2021};
+use ssi_verification_methods::{MessageSigner, TezosMethod2021};
 use static_iref::iri;
 
 use crate::impl_rdf_input_urdna2015;
