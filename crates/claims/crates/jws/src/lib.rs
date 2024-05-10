@@ -335,7 +335,7 @@ pub fn sign_bytes(algorithm: Algorithm, data: &[u8], key: &JWK) -> Result<Vec<u8
             let padding_alg: &dyn ring::signature::RsaEncoding = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_SHA256,
                 Algorithm::PS256 => &ring::signature::RSA_PSS_SHA256,
-                _ => return Err(Error::AlgorithmNotImplemented),
+                _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             };
             let mut sig = vec![0u8; key_pair.public_modulus_len()];
             let rng = ring::rand::SystemRandom::new();
@@ -542,7 +542,7 @@ pub fn verify_bytes_warnable(
             let parameters = match algorithm {
                 Algorithm::RS256 => &ring::signature::RSA_PKCS1_2048_8192_SHA256,
                 Algorithm::PS256 => &ring::signature::RSA_PSS_2048_8192_SHA256,
-                _ => return Err(Error::AlgorithmNotImplemented),
+                _ => return Err(Error::AlgorithmNotImplemented(algorithm.to_string())),
             };
             public_key.verify(parameters, data, signature)?
         }

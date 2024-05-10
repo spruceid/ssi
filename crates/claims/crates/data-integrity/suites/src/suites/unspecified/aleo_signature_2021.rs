@@ -1,9 +1,9 @@
-use ssi_crypto::{protocol::Base58BtcMultibase, MessageSigner};
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
 use ssi_verification_methods::{
-    verification_method_union, AleoMethod2021, AnyMethod, AnyMethodRef,
-    BlockchainVerificationMethod2021, InvalidVerificationMethod, SignatureError,
-    TypedVerificationMethod, VerificationError,
+    protocol::Base58BtcMultibase, verification_method_union, AleoMethod2021, AnyMethod,
+    AnyMethodRef, BlockchainVerificationMethod2021, InvalidVerificationMethod, MessageSigner,
+    TypedVerificationMethod,
 };
 use static_iref::iri;
 
@@ -117,28 +117,28 @@ impl CryptographicSuite for AleoSignature2021 {
         method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
         let (_, signature_bytes) = multibase::decode(signature.proof_value)
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         let account_id = method.blockchain_account_id();
 
         if account_id.chain_id.namespace != BLOCKCHAIN_NAMESPACE {
-            return Err(VerificationError::InvalidKey);
+            return Err(ProofValidationError::InvalidKey);
         }
 
         if account_id.chain_id.reference != BLOCKCHAIN_NETWORK_ID {
-            return Err(VerificationError::InvalidKey);
+            return Err(ProofValidationError::InvalidKey);
         }
 
         let result = ssi_jwk::aleo::verify(bytes, &account_id.account_address, &signature_bytes);
 
         match result {
-            Ok(()) => Ok(ssi_claims_core::ProofValidity::Valid),
+            Ok(()) => Ok(Ok(())),
             Err(ssi_jwk::aleo::AleoVerifyError::InvalidSignature) => {
-                Ok(ssi_claims_core::ProofValidity::Invalid)
+                Ok(Err(ssi_claims_core::InvalidProof::Signature))
             }
-            Err(_) => Err(VerificationError::InvalidSignature),
+            Err(_) => Err(ProofValidationError::InvalidSignature),
         }
     }
 }

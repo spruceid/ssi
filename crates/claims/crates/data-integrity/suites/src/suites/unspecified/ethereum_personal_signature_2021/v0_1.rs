@@ -86,6 +86,6 @@ impl CryptographicSuite for EthereumPersonalSignature2021v0_1 {
     ) -> Result<ProofValidity, ProofValidationError> {
         let message = EthereumWallet::prepare_message(data.as_bytes());
         let signature_bytes = signature.decode()?;
-        Ok(method.verify_bytes(&message, &signature_bytes)?.into())
+        method.verify_bytes(&message, &signature_bytes)
     }
 }

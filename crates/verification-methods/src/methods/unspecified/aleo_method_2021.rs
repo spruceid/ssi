@@ -2,14 +2,13 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::AleoBlockchainAccountId;
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::MessageSignatureError;
 use ssi_jwk::JWK;
 use static_iref::iri;
 use std::hash::Hash;
 
 use crate::{
-    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
-    VerificationMethod,
+    ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, MessageSignatureError,
+    TypedVerificationMethod, VerificationMethod,
 };
 
 // pub const ALEO_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#AleoMethod2021");

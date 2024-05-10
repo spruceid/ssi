@@ -258,7 +258,7 @@ where
     }
 }
 
-fn transform<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T>(
+fn transform<V: rdf_types::Vocabulary, I, E, T>(
     _suite: &Eip712Signature2021,
     data: &T,
     context: &mut E,

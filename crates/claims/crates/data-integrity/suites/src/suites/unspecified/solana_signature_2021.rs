@@ -1,7 +1,7 @@
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_core::{covariance_rule, Referencable};
-use ssi_crypto::{protocol::Base58Btc, MessageSigner};
 use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{SignatureError, SolanaMethod2021, VerificationError};
+use ssi_verification_methods::{protocol::Base58Btc, MessageSigner, SolanaMethod2021};
 use static_iref::iri;
 
 use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
@@ -93,20 +93,19 @@ impl CryptographicSuite for SolanaSignature2021 {
         method: <Self::VerificationMethod as Referencable>::Reference<'_>,
         bytes: &Self::Hashed,
         signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, VerificationError> {
+    ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
         let tx = LocalSolanaTransaction::with_message(bytes);
         let signing_bytes = tx.to_bytes();
 
         let signature_bytes = Base58Btc::decode_signature(signature.proof_value.as_bytes())
-            .map_err(|_| VerificationError::InvalidSignature)?;
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
         Ok(ssi_jws::verify_bytes(
             ssi_jwk::Algorithm::EdDSA,
             &signing_bytes,
             &method.public_key,
             &signature_bytes,
         )
-        .is_ok()
-        .into())
+        .map_err(|_| ssi_claims_core::InvalidProof::Signature))
     }
 }
 
