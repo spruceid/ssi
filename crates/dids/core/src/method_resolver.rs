@@ -143,7 +143,6 @@ where
         &self,
         key_id: Option<&str>,
     ) -> Result<Cow<JWK>, ProofValidationError> {
-        use ssi_verification_methods_core::ReferenceOrOwnedRef;
         let vm = match key_id {
             Some(id) => match Iri::new(id) {
                 Ok(iri) => Some(ReferenceOrOwnedRef::Reference(iri)),
