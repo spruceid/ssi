@@ -62,10 +62,10 @@ let jwt = CompactJWSString::from_string(
 // public key used to sign the JWT.
 // Here we use the example `ExampleDIDResolver` resolver, enabled with the
 // `example` feature.
-let vm_resolver = ExampleDIDResolver::default().with_default_options();
+let vm_resolver = ExampleDIDResolver::default().with_default_options::<AnyJwkMethod>();
 
 // Verify the JWT.
-assert!(jwt.verify::<AnyJwkMethod>(&vm_resolver).await.expect("verification failed"))
+assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok())
 ```
 
 #### Verifiable Credentials
@@ -91,7 +91,7 @@ let vc = any_credential_from_json_str(
 // public key used to sign the JWT.
 let vm_resolver = ExampleDIDResolver::default().with_default_options();
 
-assert!(vc.verify(&vm_resolver).await.expect("verification failed").is_valid());
+assert!(vc.verify(&vm_resolver).await.expect("verification failed").is_ok());
 ```
 
 ### Signature & Custom Claims
@@ -124,27 +124,19 @@ let claims = JWTClaims::from_private_claims(MyClaims {
 });
 
 // Create a random signing key, and turn its public part into a DID URL.
-let key = JWK::generate_p256(); // requires the `p256` feature.
+let mut key = JWK::generate_p256(); // requires the `p256` feature.
 let did = DIDJWK::generate_url(&key.to_public());
+key.key_id = Some(did.into());
+
+// Sign the claims.
+let jwt = claims.sign(&key).await.expect("signature failed");
 
 // Create a verification method resolver, which will be in charge of
 // decoding the DID back into a public key.
-let vm_resolver = DIDJWK.with_default_options();
-
-// Create a signer from the secret key.
-// Here we use the simple `SingleSecretSigner` signer type which always uses
-// the same provided secret key to sign messages.
-let signer = SingleSecretSigner::new(key);
-
-// Sign the claims.
-let jwt = claims.sign::<AnyJwkMethod>(
-  &did,
-  &vm_resolver,
-  &signer
-).await.expect("signature failed");
+let vm_resolver = DIDJWK.with_default_options::<AnyJwkMethod>();
 
 // Verify the JWT.
-assert!(jwt.verify::<AnyJwkMethod>(&vm_resolver).await.expect("verification failed"));
+assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok());
 
 // Print the JWT.
 println!("{jwt}")
@@ -159,7 +151,6 @@ yourself.
 
 
 ```rust
-use json_syntax::json;
 use static_iref::uri;
 use serde::{Serialize, Deserialize};
 use ssi::prelude::*;
