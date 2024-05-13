@@ -19,7 +19,10 @@ use iref::{Uri, UriBuf};
 use multibase::Base;
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims, Proof, Validate, ValidateProof, Verifiable, Invalid};
+use ssi_claims_core::{
+    ClaimsValidity, DateTimeEnvironment, Invalid, InvalidClaims, Proof, Validate, ValidateProof,
+    Verifiable,
+};
 use ssi_data_integrity::{ssi_rdf::Expandable, AnyInputContext, AnyProofs};
 use ssi_json_ld::{
     AnyJsonLdEnvironment, CompactJsonLd, JsonLdError, JsonLdNodeObject, JsonLdObject,
@@ -118,7 +121,7 @@ where
 
 impl<E> Validate<E> for BitstringStatusListCredential
 where
-    E: DateTimeEnvironment
+    E: DateTimeEnvironment,
 {
     fn validate(&self, env: &E) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
@@ -128,8 +131,8 @@ where
             if now < valid_from {
                 return Err(InvalidClaims::Premature {
                     now,
-                    valid_from: valid_from.into()
-                })
+                    valid_from: valid_from.into(),
+                });
             }
         }
 
@@ -137,8 +140,8 @@ where
             if now > valid_until {
                 return Err(InvalidClaims::Expired {
                     now,
-                    valid_until: valid_until.into()
-                })
+                    valid_until: valid_until.into(),
+                });
             }
         }
 
@@ -199,7 +202,7 @@ pub enum FromBytesError {
 
 impl<V> FromBytes<V> for BitstringStatusListCredential
 where
-    <AnyProofs as Proof>::Prepared: ValidateProof<Self, V>
+    <AnyProofs as Proof>::Prepared: ValidateProof<Self, V>,
 {
     type Error = FromBytesError;
 
@@ -220,8 +223,7 @@ where
                     ssi_data_integrity::from_json_slice(bytes, AnyInputContext::default())
                         .await
                         .map_err(|e| FromBytesError::Credential(e.to_string()))?;
-                vc
-                    .verify(verifier)
+                vc.verify(verifier)
                     .await
                     .map_err(|e| FromBytesError::VerificationFailed(e.to_string()))?
                     .map_err(FromBytesError::InvalidProof)?;
@@ -299,7 +301,7 @@ impl BitstringStatusList {
 
     pub fn decode(&self) -> Result<StatusList, DecodeError> {
         let bytes = self.encoded_list.decode(None)?;
-        Ok(StatusList::from_bytes(self.status_size, self.ttl, bytes))
+        Ok(StatusList::from_bytes(self.status_size, bytes, self.ttl))
     }
 }
 
@@ -369,16 +371,17 @@ impl<'de> Deserialize<'de> for StatusSize {
     }
 }
 
+#[derive(Debug)]
 struct Offset {
     byte: usize,
     bit: usize,
 }
 
 impl Offset {
-    fn left_shift(&self, status_size: StatusSize) -> (isize, Option<usize>) {
-        let high = 8 - status_size.0 as isize - self.bit as isize;
+    fn left_shift(&self, status_size: StatusSize) -> (i32, Option<u32>) {
+        let high = (8 - status_size.0 as isize - self.bit as isize) as i32;
         let low = if high < 0 {
-            Some((8 + high) as usize)
+            Some((8 + high) as u32)
         } else {
             None
         };
@@ -558,7 +561,9 @@ impl StatusMapEntrySet for BitstringStatusListEntrySetCredential {
     type Entry<'a> = &'a BitstringStatusListEntry where Self: 'a;
 
     fn get_entry(&self, purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
-        (&self.credential_status).into_iter().find(|&entry| entry.status_purpose == purpose)
+        (&self.credential_status)
+            .into_iter()
+            .find(|&entry| entry.status_purpose == purpose)
     }
 }
 
@@ -594,9 +599,9 @@ impl<'a> PartialEq<crate::StatusPurpose<&'a str>> for StatusPurpose {
     fn eq(&self, other: &crate::StatusPurpose<&'a str>) -> bool {
         matches!(
             (self, other),
-            (Self::Revocation, crate::StatusPurpose::Revocation) |
-            (Self::Suspension, crate::StatusPurpose::Suspension) |
-            (Self::Message, crate::StatusPurpose::Other("message"))
+            (Self::Revocation, crate::StatusPurpose::Revocation)
+                | (Self::Suspension, crate::StatusPurpose::Suspension)
+                | (Self::Message, crate::StatusPurpose::Other("message"))
         )
     }
 }
@@ -652,39 +657,49 @@ mod base10_nat_string {
 ///
 /// See: <https://www.w3.org/TR/vc-bitstring-status-list/#bitstring-encoding>
 #[derive(Debug, Clone)]
-pub struct StatusList {
+pub struct BitString {
     status_size: StatusSize,
     bytes: Vec<u8>,
     len: usize,
-    ttl: TimeToLive,
 }
 
-impl StatusList {
-    pub fn new(status_size: StatusSize, ttl: TimeToLive) -> Self {
+impl BitString {
+    pub fn new(status_size: StatusSize) -> Self {
         Self {
             status_size,
             bytes: Vec::new(),
             len: 0,
-            ttl,
         }
     }
 
-    pub fn from_bytes(status_size: StatusSize, ttl: TimeToLive, bytes: Vec<u8>) -> Self {
+    pub fn from_bytes(status_size: StatusSize, bytes: Vec<u8>) -> Self {
         let len = bytes.len() * 8usize / status_size.0 as usize;
         Self {
             status_size,
             bytes,
             len,
-            ttl,
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub fn get(&self, index: usize) -> Option<u8> {
         let offset = self.status_size.offset_of(index);
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
-        let high = *self.bytes.get(offset.byte)? >> high_shift;
+        let high = self
+            .bytes
+            .get(offset.byte)?
+            .overflowing_signed_shr(high_shift)
+            .0;
         let low = match low_shift {
-            Some(low_shift) => *self.bytes.get(offset.byte + 1)? >> low_shift,
+            Some(low_shift) => {
+                self.bytes
+                    .get(offset.byte + 1)?
+                    .overflowing_shr(low_shift)
+                    .0
+            }
             None => 0,
         };
         Some((high | low) & self.status_size.mask())
@@ -696,39 +711,113 @@ impl StatusList {
         let offset = self.status_size.offset_of(index);
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
 
-        self.bytes[offset.byte] &= !mask << high_shift; // clear high
-        self.bytes[offset.byte] |= value << high_shift; // set high
+        self.bytes[offset.byte] &= !mask.overflowing_signed_shl(high_shift).0; // clear high
+        self.bytes[offset.byte] |= value.overflowing_signed_shl(high_shift).0; // set high
         if let Some(low_shift) = low_shift {
-            self.bytes[offset.byte + 1] &= !mask << low_shift; // clear low
-            self.bytes[offset.byte + 1] |= value << low_shift; // set low
+            self.bytes[offset.byte + 1] &= !mask.overflowing_shl(low_shift).0; // clear low
+            self.bytes[offset.byte + 1] |= value.overflowing_shl(low_shift).0; // set low
         }
     }
 
+    /// Push a new value into the bitstring.
+    ///
+    /// Only the low `status_size` bits will be pushed to the list.
     pub fn push(&mut self, value: u8) -> usize {
         let value = value & self.status_size.mask();
         let index = self.len;
         let offset = self.status_size.offset_of(index);
+
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
 
         if offset.byte == self.bytes.len() {
-            self.bytes.push(value << high_shift);
+            self.bytes.push(value.overflowing_signed_shl(high_shift).0);
         } else {
-            self.bytes[offset.byte] |= value << high_shift
+            self.bytes[offset.byte] |= value.overflowing_signed_shl(high_shift).0
         }
 
         if let Some(low_shift) = low_shift {
-            self.bytes.push(value << low_shift);
+            self.bytes.push(value.overflowing_shl(low_shift).0);
         }
 
         self.len += 1;
         index
     }
 
-    pub fn iter(&self) -> StatusListIter {
-        StatusListIter {
-            status_list: self,
+    pub fn iter(&self) -> BitStringIter {
+        BitStringIter {
+            bit_string: self,
             index: 0,
         }
+    }
+
+    pub fn encode(&self) -> EncodedList {
+        EncodedList::encode(&self.bytes)
+    }
+}
+
+trait OverflowingSignedShift: Sized {
+    fn overflowing_signed_shl(self, shift: i32) -> (Self, bool);
+
+    fn overflowing_signed_shr(self, shift: i32) -> (Self, bool);
+}
+
+impl OverflowingSignedShift for u8 {
+    fn overflowing_signed_shl(self, shift: i32) -> (u8, bool) {
+        if shift < 0 {
+            self.overflowing_shr(shift.unsigned_abs())
+        } else {
+            self.overflowing_shl(shift.unsigned_abs())
+        }
+    }
+
+    fn overflowing_signed_shr(self, shift: i32) -> (u8, bool) {
+        if shift < 0 {
+            self.overflowing_shl(shift.unsigned_abs())
+        } else {
+            self.overflowing_shr(shift.unsigned_abs())
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StatusList {
+    bit_string: BitString,
+    ttl: TimeToLive,
+}
+
+impl StatusList {
+    pub fn new(status_size: StatusSize, ttl: TimeToLive) -> Self {
+        Self {
+            bit_string: BitString::new(status_size),
+            ttl,
+        }
+    }
+
+    pub fn from_bytes(status_size: StatusSize, bytes: Vec<u8>, ttl: TimeToLive) -> Self {
+        Self {
+            bit_string: BitString::from_bytes(status_size, bytes),
+            ttl,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.bit_string.len()
+    }
+
+    pub fn get(&self, index: usize) -> Option<u8> {
+        self.bit_string.get(index)
+    }
+
+    pub fn set(&mut self, index: usize, value: u8) {
+        self.bit_string.set(index, value)
+    }
+
+    pub fn push(&mut self, value: u8) -> usize {
+        self.bit_string.push(value)
+    }
+
+    pub fn iter(&self) -> BitStringIter {
+        self.bit_string.iter()
     }
 
     pub fn to_credential_subject(
@@ -740,24 +829,24 @@ impl StatusList {
         BitstringStatusList::new(
             id,
             status_purpose,
-            self.status_size,
-            EncodedList::encode(&self.bytes),
+            self.bit_string.status_size,
+            self.bit_string.encode(),
             self.ttl,
             status_message,
         )
     }
 }
 
-pub struct StatusListIter<'a> {
-    status_list: &'a StatusList,
+pub struct BitStringIter<'a> {
+    bit_string: &'a BitString,
     index: usize,
 }
 
-impl<'a> Iterator for StatusListIter<'a> {
+impl<'a> Iterator for BitStringIter<'a> {
     type Item = u8;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.status_list.get(self.index).map(|status| {
+        self.bit_string.get(self.index).map(|status| {
             self.index += 1;
             status
         })
@@ -773,6 +862,152 @@ impl StatusMap for StatusList {
     }
 
     fn get_by_key(&self, key: Self::Key) -> Option<u8> {
-        self.get(key).map(Into::into)
+        self.bit_string.get(key).map(Into::into)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
+
+    use super::{BitString, StatusSize};
+
+    fn random_bit_string(
+        rng: &mut StdRng,
+        status_size: StatusSize,
+        len: usize,
+    ) -> (Vec<u8>, BitString) {
+        let mut values = Vec::with_capacity(len);
+
+        for _ in 0..len {
+            values.push((rng.next_u32() & 0xff) as u8 & status_size.mask())
+        }
+
+        let mut bit_string = BitString::new(status_size);
+        for &s in &values {
+            bit_string.push(s);
+        }
+
+        (values, bit_string)
+    }
+
+    fn randomized_roundtrip(seed: u64, status_size: StatusSize, len: usize) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let (values, bit_string) = random_bit_string(&mut rng, status_size, len);
+
+        let encoded = bit_string.encode();
+        let decoded = BitString::from_bytes(status_size, encoded.decode(None).unwrap());
+
+        assert!(decoded.len() >= len);
+
+        for i in 0..len {
+            assert_eq!(decoded.get(i), Some(values[i]))
+        }
+    }
+
+    fn randomized_write(seed: u64, status_size: StatusSize, len: usize) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let (mut values, mut bit_string) = random_bit_string(&mut rng, status_size, len);
+
+        for _ in 0..len {
+            let i = (rng.next_u32() as usize) % len;
+            let value = (rng.next_u32() & 0xff) as u8 & status_size.mask();
+            bit_string.set(i, value);
+            values[i] = value;
+        }
+
+        for i in 0..len {
+            assert_eq!(bit_string.get(i), Some(values[i]))
+        }
+    }
+
+    #[test]
+    fn randomized_roundtrip_1bit() {
+        for i in 0..10 {
+            randomized_roundtrip(i, 1u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 1u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 1u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_write_1bits() {
+        for i in 0..10 {
+            randomized_write(i, 1u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 1u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 1u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_roundtrip_3bits() {
+        for i in 0..10 {
+            randomized_roundtrip(i, 3u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 3u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 3u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_write_3bits() {
+        for i in 0..10 {
+            randomized_write(i, 3u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 3u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 3u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_roundtrip_7bits() {
+        for i in 0..10 {
+            randomized_roundtrip(i, 7u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 7u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 7u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_write_7bits() {
+        for i in 0..10 {
+            randomized_write(i, 7u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 7u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 7u8.try_into().unwrap(), 1000);
+        }
     }
 }
