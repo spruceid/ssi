@@ -1,4 +1,4 @@
-use crate::{RemoveClaim, TryGetClaim, TryRemoveClaim, TrySetClaim};
+use crate::{NoClaim, RemoveClaim, TryGetClaim, TryRemoveClaim, TrySetClaim};
 
 use super::{Claim, ClaimSet, GetClaim, SetClaim};
 use core::fmt;
@@ -10,7 +10,7 @@ pub trait PrivateClaim: Clone {
 
 impl<T: PrivateClaim> Claim for T {
     type Private = Self;
-    type Registered = std::convert::Infallible;
+    type Registered = NoClaim;
 
     const JWT_CLAIM_NAME: &'static str = T::JWT_PRIVATE_CLAIM_NAME;
     const IS_REGISTERED_JWT_CLAIM: bool = false;
@@ -44,10 +44,6 @@ impl<T: PrivateClaim> Claim for T {
     }
 }
 
-impl PrivateClaim for std::convert::Infallible {
-    const JWT_PRIVATE_CLAIM_NAME: &'static str = "";
-}
-
 pub trait PrivateClaimSet {
     type Error: fmt::Display;
 }
@@ -56,38 +52,38 @@ impl<T: PrivateClaimSet> ClaimSet for T {
     type Error = <T as PrivateClaimSet>::Error;
 }
 
-impl<T: PrivateClaimSet> GetClaim<std::convert::Infallible> for T {
-    fn get_claim(&self) -> Option<Cow<std::convert::Infallible>> {
+impl<T: PrivateClaimSet> GetClaim<NoClaim> for T {
+    fn get_claim(&self) -> Option<Cow<NoClaim>> {
         None
     }
 }
 
-impl<T: PrivateClaimSet> TryGetClaim<std::convert::Infallible> for T {
-    fn try_get_claim(&self) -> Result<Option<Cow<std::convert::Infallible>>, Self::Error> {
+impl<T: PrivateClaimSet> TryGetClaim<NoClaim> for T {
+    fn try_get_claim(&self) -> Result<Option<Cow<NoClaim>>, Self::Error> {
         Ok(None)
     }
 }
 
-impl<T: PrivateClaimSet> SetClaim<std::convert::Infallible> for T {
-    fn set_claim(&mut self, _: std::convert::Infallible) {
+impl<T: PrivateClaimSet> SetClaim<NoClaim> for T {
+    fn set_claim(&mut self, _: NoClaim) {
         unreachable!()
     }
 }
 
-impl<T: PrivateClaimSet> TrySetClaim<std::convert::Infallible> for T {
-    fn try_set_claim(&mut self, _: std::convert::Infallible) -> Result<(), Self::Error> {
+impl<T: PrivateClaimSet> TrySetClaim<NoClaim> for T {
+    fn try_set_claim(&mut self, _: NoClaim) -> Result<(), Self::Error> {
         unreachable!()
     }
 }
 
-impl<T: PrivateClaimSet> RemoveClaim<std::convert::Infallible> for T {
-    fn remove_claim(&mut self) -> Option<std::convert::Infallible> {
+impl<T: PrivateClaimSet> RemoveClaim<NoClaim> for T {
+    fn remove_claim(&mut self) -> Option<NoClaim> {
         None
     }
 }
 
-impl<T: PrivateClaimSet> TryRemoveClaim<std::convert::Infallible> for T {
-    fn try_remove_claim(&mut self) -> Result<Option<std::convert::Infallible>, Self::Error> {
+impl<T: PrivateClaimSet> TryRemoveClaim<NoClaim> for T {
+    fn try_remove_claim(&mut self) -> Result<Option<NoClaim>, Self::Error> {
         Ok(None)
     }
 }

@@ -1,6 +1,6 @@
 use super::{Claim, JWTClaims};
 use crate::{
-    ClaimSet, GetClaim, NumericDate, RemoveClaim, SetClaim, StringOrURI, TryGetClaim,
+    ClaimSet, GetClaim, NoClaim, NumericDate, RemoveClaim, SetClaim, StringOrURI, TryGetClaim,
     TryRemoveClaim, TrySetClaim,
 };
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
@@ -18,7 +18,7 @@ pub trait RegisteredClaim: Claim + Into<AnyRegisteredClaim> {
     fn extract_mut(claim: &mut AnyRegisteredClaim) -> Option<&mut Self>;
 }
 
-impl RegisteredClaim for std::convert::Infallible {
+impl RegisteredClaim for NoClaim {
     const JWT_REGISTERED_CLAIM_KIND: RegisteredClaimKind = RegisteredClaimKind::Audience;
 
     fn extract(_: AnyRegisteredClaim) -> Option<Self> {
@@ -34,8 +34,8 @@ impl RegisteredClaim for std::convert::Infallible {
     }
 }
 
-impl From<std::convert::Infallible> for AnyRegisteredClaim {
-    fn from(_: std::convert::Infallible) -> Self {
+impl From<NoClaim> for AnyRegisteredClaim {
+    fn from(_: NoClaim) -> Self {
         unreachable!()
     }
 }
@@ -97,7 +97,7 @@ impl RegisteredClaims {
 }
 
 impl ClaimSet for RegisteredClaims {
-    type Error = std::convert::Infallible;
+    type Error = NoClaim;
 }
 
 impl JWSPayload for RegisteredClaims {
@@ -225,7 +225,7 @@ macro_rules! registered_claims {
             pub struct $variant(pub $ty);
 
             impl Claim for $variant {
-                type Private = std::convert::Infallible;
+                type Private = NoClaim;
                 type Registered = Self;
 
                 const JWT_CLAIM_NAME: &'static str = $name;

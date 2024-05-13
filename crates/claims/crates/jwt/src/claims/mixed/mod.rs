@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
 use ssi_jws::JWSPayload;
 
-use crate::{GetClaim, RemoveClaim, SetClaim, TryRemoveClaim, TrySetClaim};
+use crate::{GetClaim, PrivateClaimSet, RemoveClaim, SetClaim, TryRemoveClaim, TrySetClaim};
 
 use super::{Claim, ClaimSet, RegisteredClaims, TryGetClaim};
 
@@ -202,7 +202,7 @@ impl IntoIterator for AnyClaims {
     }
 }
 
-impl ClaimSet for AnyClaims {
+impl PrivateClaimSet for AnyClaims {
     type Error = serde_json::Error;
 }
 

@@ -14,14 +14,46 @@ use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
 ///
 /// You do not need to implement this trait yourself to define a private claim
 /// type. Simply implement the [`PrivateClaim`] trait instead.
+///
+/// # Why is this trait so complicated?
+///
+/// JWT makes the distinction between registered claims defined in the
+/// [IANA registry][1] and private (application specific) claims. To manage them
+/// easily, this library provides the [`JWTClaims`] type that combines public
+/// claims and private claims. This type implements the generic [`ClaimSet`]
+/// trait, allowing one to read (or write) any claim, registered or not, using
+/// [`ClaimSet::get`] (or [`ClaimSet::set`]).
+///
+/// For this method to work however, we must have a mechanism to recognize if
+/// the claim, provided as type parameter, is a registered claim or a private
+/// claim.
+/// This will decide from which underlying set the claim will be pulled
+/// ([`JWTClaims::registered`] or [`JWTClaims::private`]).
+///
+/// Currently this cannot be done statically because Rust has no support for
+/// [specialization][2] yet. Instead we use associated consts/types and methods
+/// to specialize claims dynamically (although the Rust compiler should be
+/// smart enough to optimize away all of the added complexity).
+///
+/// [1]: <https://www.iana.org/assignments/jwt/jwt.xhtml>
+/// [2]: <https://github.com/rust-lang/rust/issues/31844>
 pub trait Claim: Clone {
-    /// This same claim type, as a private claim.
-    type Private: PrivateClaim;
-
-    /// This same claim type, as a registered claim.
+    /// Registered claim type specialization.
+    ///
+    /// This must be `Self` if this is a registered claim, and [`NoClaim`] if
+    /// it is a private claim.
     type Registered: RegisteredClaim;
 
+    /// Private claim type specialization.
+    ///
+    /// This must be `Self` if this is a private claim, and [`NoClaim`] if
+    /// it is a registered claim.
+    type Private: PrivateClaim;
+
+    /// Claim name, used as key in the JSON representation.
     const JWT_CLAIM_NAME: &'static str;
+
+    /// Is this a registered claim type?
     const IS_REGISTERED_JWT_CLAIM: bool;
 
     fn from_registered(claim: Self::Registered) -> Option<Self>;
@@ -51,6 +83,23 @@ pub trait Claim: Clone {
     }
 
     fn into_registered(self) -> Result<Self::Registered, Self::Private>;
+}
+
+/// Empty claim.
+///
+/// This is the empty claim type used for registered/private claim
+/// specialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum NoClaim {}
+
+impl fmt::Display for NoClaim {
+    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unreachable!()
+    }
+}
+
+impl PrivateClaim for NoClaim {
+    const JWT_PRIVATE_CLAIM_NAME: &'static str = "";
 }
 
 /// Set of JWT claims.
