@@ -48,7 +48,7 @@ impl AnyStatusMap {
 
         if media_type.accepts_jws() {
             if let Ok(jws) = CompactJWS::new(bytes) {
-                let (_, payload, _) = jws.decode()?;
+                let payload = jws.decode()?.payload;
                 return match serde_json::from_slice(&payload) {
                     Ok(jwt_vc) => {
                         let result = Self::from_jwt_vc_claims(jwt_vc)?;
@@ -187,7 +187,7 @@ impl AnyEntrySet {
 
         if media_type.accepts_jws() {
             if let Ok(jws) = CompactJWS::new(bytes) {
-                let (_, payload, _) = jws.decode()?;
+                let payload = jws.decode()?.payload;
                 return match serde_json::from_slice(&payload) {
                     Ok(jwt_vc) => {
                         let result = Self::from_jwt_vc_claims(jwt_vc)?;

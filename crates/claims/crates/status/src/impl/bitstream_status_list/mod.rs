@@ -19,7 +19,7 @@ use iref::{Uri, UriBuf};
 use multibase::Base;
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{Proof, Validate, Verifiable, VerifyClaimsWith};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims, Proof, Validate, ValidateProof, Verifiable, Invalid};
 use ssi_data_integrity::{ssi_rdf::Expandable, AnyInputContext, AnyProofs};
 use ssi_json_ld::{
     AnyJsonLdEnvironment, CompactJsonLd, JsonLdError, JsonLdNodeObject, JsonLdObject,
@@ -116,9 +116,33 @@ where
     }
 }
 
-impl Validate for BitstringStatusListCredential {
-    fn is_valid(&self) -> bool {
-        true
+impl<E> Validate<E> for BitstringStatusListCredential
+where
+    E: DateTimeEnvironment
+{
+    fn validate(&self, env: &E) -> ClaimsValidity {
+        // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
+        let now = env.date_time();
+
+        if let Some(valid_from) = self.valid_from {
+            if now < valid_from {
+                return Err(InvalidClaims::Premature {
+                    now,
+                    valid_from: valid_from.into()
+                })
+            }
+        }
+
+        if let Some(valid_until) = self.valid_until {
+            if now > valid_until {
+                return Err(InvalidClaims::Expired {
+                    now,
+                    valid_until: valid_until.into()
+                })
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -161,7 +185,7 @@ pub enum FromBytesError {
     VerificationFailed(String),
 
     #[error("invalid proof")]
-    InvalidProof,
+    InvalidProof(Invalid),
 
     #[error("invalid credential: {0}")]
     Credential(String),
@@ -173,10 +197,9 @@ pub enum FromBytesError {
     UnsupportedMediaType(String),
 }
 
-impl<V, E> FromBytes<V> for BitstringStatusListCredential
+impl<V> FromBytes<V> for BitstringStatusListCredential
 where
-    <AnyProofs as Proof>::Prepared: VerifyClaimsWith<Self, V, Error = E>,
-    E: ToString,
+    <AnyProofs as Proof>::Prepared: ValidateProof<Self, V>
 {
     type Error = FromBytesError;
 
@@ -197,13 +220,11 @@ where
                     ssi_data_integrity::from_json_slice(bytes, AnyInputContext::default())
                         .await
                         .map_err(|e| FromBytesError::Credential(e.to_string()))?;
-                let proof_status = vc
+                vc
                     .verify(verifier)
                     .await
-                    .map_err(|e| FromBytesError::VerificationFailed(e.to_string()))?;
-                if proof_status.is_invalid() {
-                    return Err(FromBytesError::InvalidProof);
-                }
+                    .map_err(|e| FromBytesError::VerificationFailed(e.to_string()))?
+                    .map_err(FromBytesError::InvalidProof)?;
 
                 Ok(vc.into_parts().0)
             }
