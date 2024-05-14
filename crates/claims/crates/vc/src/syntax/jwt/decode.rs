@@ -1,47 +1,7 @@
 use std::fmt;
 
 use chrono::{DateTime, Utc};
-use ssi_jwt::TryRemoveClaim;
-
-pub trait JwtVcClaims:
-    TryRemoveClaim<ssi_jwt::VerifiableCredential>
-    + TryRemoveClaim<ssi_jwt::ExpirationTime>
-    + TryRemoveClaim<ssi_jwt::Issuer>
-    + TryRemoveClaim<ssi_jwt::IssuedAt>
-    + TryRemoveClaim<ssi_jwt::NotBefore>
-    + TryRemoveClaim<ssi_jwt::Subject>
-    + TryRemoveClaim<ssi_jwt::JwtId>
-{
-}
-
-impl<T> JwtVcClaims for T where
-    T: TryRemoveClaim<ssi_jwt::VerifiableCredential>
-        + TryRemoveClaim<ssi_jwt::ExpirationTime>
-        + TryRemoveClaim<ssi_jwt::Issuer>
-        + TryRemoveClaim<ssi_jwt::IssuedAt>
-        + TryRemoveClaim<ssi_jwt::NotBefore>
-        + TryRemoveClaim<ssi_jwt::Subject>
-        + TryRemoveClaim<ssi_jwt::JwtId>
-{
-}
-
-pub trait JwtVpClaims:
-    TryRemoveClaim<ssi_jwt::VerifiablePresentation>
-    + TryRemoveClaim<ssi_jwt::Issuer>
-    + TryRemoveClaim<ssi_jwt::IssuedAt>
-    + TryRemoveClaim<ssi_jwt::NotBefore>
-    + TryRemoveClaim<ssi_jwt::JwtId>
-{
-}
-
-impl<T> JwtVpClaims for T where
-    T: TryRemoveClaim<ssi_jwt::VerifiablePresentation>
-        + TryRemoveClaim<ssi_jwt::Issuer>
-        + TryRemoveClaim<ssi_jwt::IssuedAt>
-        + TryRemoveClaim<ssi_jwt::NotBefore>
-        + TryRemoveClaim<ssi_jwt::JwtId>
-{
-}
+use ssi_jwt::ClaimSet;
 
 #[derive(Debug, thiserror::Error)]
 pub enum JwtVcDecodeError {
@@ -70,7 +30,7 @@ impl JwtVcDecodeError {
 /// Decodes a Verifiable Credential form a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vc_claims<T>(mut jwt: impl JwtVcClaims) -> Result<T, JwtVcDecodeError>
+pub fn decode_jwt_vc_claims<T>(mut jwt: impl ClaimSet) -> Result<T, JwtVcDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
@@ -89,7 +49,7 @@ where
 }
 
 fn decode_jwt_vc_specific_headers(
-    mut jwt: impl JwtVcClaims,
+    mut jwt: impl ClaimSet,
     target: &mut json_syntax::Object,
 ) -> Result<(), JwtVcDecodeError> {
     let exp = jwt
@@ -186,7 +146,7 @@ impl JwtVpDecodeError {
 /// Decodes a Verifiable Presentation from a JWT.
 ///
 /// See: <https://www.w3.org/TR/vc-data-model/#json-web-token>
-pub fn decode_jwt_vp_claims<T>(mut jwt: impl JwtVpClaims) -> Result<T, JwtVpDecodeError>
+pub fn decode_jwt_vp_claims<T>(mut jwt: impl ClaimSet) -> Result<T, JwtVpDecodeError>
 where
     T: for<'a> serde::Deserialize<'a>,
 {
@@ -205,7 +165,7 @@ where
 }
 
 fn decode_jwt_vp_specific_headers(
-    mut jwt: impl JwtVpClaims,
+    mut jwt: impl ClaimSet,
     target: &mut json_syntax::Object,
 ) -> Result<(), JwtVpDecodeError> {
     let iss = jwt

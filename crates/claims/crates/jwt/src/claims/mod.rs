@@ -4,154 +4,33 @@ use std::borrow::Cow;
 
 use chrono::Utc;
 pub use registered::*;
-mod private;
-pub use private::*;
 mod mixed;
 pub use mixed::*;
+mod matching;
+pub use matching::*;
+mod any;
+pub use any::*;
+use serde::{de::DeserializeOwned, Serialize};
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
 
 /// JWT claim.
-///
-/// You do not need to implement this trait yourself to define a private claim
-/// type. Simply implement the [`PrivateClaim`] trait instead.
-///
-/// # Why is this trait so complicated?
-///
-/// JWT makes the distinction between registered claims defined in the
-/// [IANA registry][1] and private (application specific) claims. To manage them
-/// easily, this library provides the [`JWTClaims`] type that combines public
-/// claims and private claims. This type implements the generic [`ClaimSet`]
-/// trait, allowing one to read (or write) any claim, registered or not, using
-/// [`ClaimSet::get`] (or [`ClaimSet::set`]).
-///
-/// For this method to work however, we must have a mechanism to recognize if
-/// the claim, provided as type parameter, is a registered claim or a private
-/// claim.
-/// This will decide from which underlying set the claim will be pulled
-/// ([`JWTClaims::registered`] or [`JWTClaims::private`]).
-///
-/// Currently this cannot be done statically because Rust has no support for
-/// [specialization][2] yet. Instead we use associated consts/types and methods
-/// to specialize claims dynamically (although the Rust compiler should be
-/// smart enough to optimize away all of the added complexity).
-///
-/// [1]: <https://www.iana.org/assignments/jwt/jwt.xhtml>
-/// [2]: <https://github.com/rust-lang/rust/issues/31844>
-pub trait Claim: Clone {
-    /// Registered claim type specialization.
-    ///
-    /// This must be `Self` if this is a registered claim, and [`NoClaim`] if
-    /// it is a private claim.
-    type Registered: RegisteredClaim;
-
-    /// Private claim type specialization.
-    ///
-    /// This must be `Self` if this is a private claim, and [`NoClaim`] if
-    /// it is a registered claim.
-    type Private: PrivateClaim;
-
+pub trait Claim: 'static + Clone + Serialize + DeserializeOwned {
     /// Claim name, used as key in the JSON representation.
     const JWT_CLAIM_NAME: &'static str;
-
-    /// Is this a registered claim type?
-    const IS_REGISTERED_JWT_CLAIM: bool;
-
-    fn from_registered(claim: Self::Registered) -> Option<Self>;
-
-    fn from_registered_ref(claim: &Self::Registered) -> Option<&Self>;
-
-    fn from_registered_mut(claim: &mut Self::Registered) -> Option<&mut Self>;
-
-    fn from_registered_cow(claim: Cow<Self::Registered>) -> Option<Cow<Self>> {
-        match claim {
-            Cow::Owned(c) => Self::from_registered(c).map(Cow::Owned),
-            Cow::Borrowed(c) => Self::from_registered_ref(c).map(Cow::Borrowed),
-        }
-    }
-
-    fn from_private(claim: Self::Private) -> Option<Self>;
-
-    fn from_private_ref(claim: &Self::Private) -> Option<&Self>;
-
-    fn from_private_mut(claim: &mut Self::Private) -> Option<&mut Self>;
-
-    fn from_private_cow(claim: Cow<Self::Private>) -> Option<Cow<Self>> {
-        match claim {
-            Cow::Owned(c) => Self::from_private(c).map(Cow::Owned),
-            Cow::Borrowed(c) => Self::from_private_ref(c).map(Cow::Borrowed),
-        }
-    }
-
-    fn into_registered(self) -> Result<Self::Registered, Self::Private>;
 }
 
-/// Empty claim.
-///
-/// This is the empty claim type used for registered/private claim
-/// specialization.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum NoClaim {}
-
-impl fmt::Display for NoClaim {
-    fn fmt(&self, _: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unreachable!()
-    }
-}
-
-impl PrivateClaim for NoClaim {
-    const JWT_PRIVATE_CLAIM_NAME: &'static str = "";
-}
-
-/// Set of JWT claims.
 pub trait ClaimSet {
     type Error: fmt::Display;
 
-    fn try_get<C: Clone>(&self) -> Result<Option<Cow<C>>, Self::Error>
-    where
-        Self: TryGetClaim<C>,
-    {
-        TryGetClaim::<C>::try_get_claim(self)
-    }
+    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error>;
 
-    fn get<C: Clone>(&self) -> Option<Cow<C>>
-    where
-        Self: GetClaim<C>,
-    {
-        GetClaim::<C>::get_claim(self)
-    }
+    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error>;
 
-    fn try_set<C: Clone>(&mut self, claim: C) -> Result<(), Self::Error>
-    where
-        Self: TrySetClaim<C>,
-    {
-        TrySetClaim::<C>::try_set_claim(self, claim)
-    }
-
-    fn set<C: Clone>(&mut self, claim: C)
-    where
-        Self: SetClaim<C>,
-    {
-        SetClaim::<C>::set_claim(self, claim)
-    }
-
-    fn try_remove<C: Clone>(&mut self) -> Result<Option<C>, Self::Error>
-    where
-        Self: TryRemoveClaim<C>,
-    {
-        TryRemoveClaim::<C>::try_remove_claim(self)
-    }
-
-    fn remove<C: Clone>(&mut self) -> Option<C>
-    where
-        Self: RemoveClaim<C>,
-    {
-        RemoveClaim::<C>::remove_claim(self)
-    }
+    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error>;
 
     fn validate_registered_claims<E>(&self, env: &E) -> ClaimsValidity
     where
         E: DateTimeEnvironment,
-        Self: TryGetClaim<IssuedAt> + TryGetClaim<NotBefore> + TryGetClaim<ExpirationTime>,
     {
         let now = env.date_time();
 
@@ -183,38 +62,27 @@ pub trait ClaimSet {
     }
 }
 
-/// JWT claim set supporting reading claim `C`.
-pub trait TryGetClaim<C: Clone>: ClaimSet {
-    /// Returns the value of the given claim.
-    fn try_get_claim(&self) -> Result<Option<Cow<C>>, Self::Error>;
+/// Set of JWT claims.
+pub trait InfallibleClaimSet: ClaimSet {
+    fn get<C: Claim>(&self) -> Option<Cow<C>>;
+
+    fn set<C: Claim>(&mut self, claim: C) -> Result<(), C>;
+
+    fn remove<C: Claim>(&mut self) -> Option<C>;
 }
 
-/// JWT claim set supporting reading claim `C`.
-pub trait GetClaim<C: Clone>: ClaimSet {
-    /// Returns the value of the given claim.
-    fn get_claim(&self) -> Option<Cow<C>>;
-}
+impl<T: ClaimSet<Error = std::convert::Infallible>> InfallibleClaimSet for T {
+    fn get<C: Claim>(&self) -> Option<Cow<C>> {
+        Self::try_get(self).unwrap()
+    }
 
-/// JWT claim set supporting writing claim `C`.
-pub trait TrySetClaim<C>: ClaimSet {
-    fn try_set_claim(&mut self, claim: C) -> Result<(), Self::Error>;
-}
+    fn set<C: Claim>(&mut self, claim: C) -> Result<(), C> {
+        Self::try_set(self, claim).unwrap()
+    }
 
-/// JWT claim set supporting writing claim `C`.
-pub trait SetClaim<C>: ClaimSet {
-    fn set_claim(&mut self, claim: C);
-}
-
-/// JWT claim set supporting removing claim `C`.
-pub trait TryRemoveClaim<C: Clone>: ClaimSet {
-    /// Removes and return the claim.
-    fn try_remove_claim(&mut self) -> Result<Option<C>, Self::Error>;
-}
-
-/// JWT claim set supporting removing claim `C`.
-pub trait RemoveClaim<C: Clone>: ClaimSet {
-    /// Removes and return the claim.
-    fn remove_claim(&mut self) -> Option<C>;
+    fn remove<C: Claim>(&mut self) -> Option<C> {
+        Self::try_remove(self).unwrap()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

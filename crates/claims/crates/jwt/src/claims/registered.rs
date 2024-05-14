@@ -1,8 +1,5 @@
 use super::{Claim, JWTClaims};
-use crate::{
-    ClaimSet, GetClaim, NoClaim, NumericDate, RemoveClaim, SetClaim, StringOrURI, TryGetClaim,
-    TryRemoveClaim, TrySetClaim,
-};
+use crate::{CastClaim, ClaimSet, NumericDate, StringOrURI};
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
 use ssi_core::OneOrMany;
 use ssi_jws::JWSPayload;
@@ -16,28 +13,6 @@ pub trait RegisteredClaim: Claim + Into<AnyRegisteredClaim> {
     fn extract_ref(claim: &AnyRegisteredClaim) -> Option<&Self>;
 
     fn extract_mut(claim: &mut AnyRegisteredClaim) -> Option<&mut Self>;
-}
-
-impl RegisteredClaim for NoClaim {
-    const JWT_REGISTERED_CLAIM_KIND: RegisteredClaimKind = RegisteredClaimKind::Audience;
-
-    fn extract(_: AnyRegisteredClaim) -> Option<Self> {
-        None
-    }
-
-    fn extract_ref(_: &AnyRegisteredClaim) -> Option<&Self> {
-        None
-    }
-
-    fn extract_mut(_: &mut AnyRegisteredClaim) -> Option<&mut Self> {
-        None
-    }
-}
-
-impl From<NoClaim> for AnyRegisteredClaim {
-    fn from(_: NoClaim) -> Self {
-        unreachable!()
-    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -96,9 +71,9 @@ impl RegisteredClaims {
     }
 }
 
-impl ClaimSet for RegisteredClaims {
-    type Error = NoClaim;
-}
+// impl ClaimSet for RegisteredClaims {
+//     type Error = std::convert::Infallible;
+// }
 
 impl JWSPayload for RegisteredClaims {
     fn typ(&self) -> Option<&'static str> {
@@ -110,42 +85,42 @@ impl JWSPayload for RegisteredClaims {
     }
 }
 
-impl<C: RegisteredClaim> TryGetClaim<C> for RegisteredClaims {
-    fn try_get_claim(&self) -> Result<Option<Cow<C>>, Self::Error> {
-        Ok(self.get().map(Cow::Borrowed))
-    }
-}
+// impl<C: RegisteredClaim> TryGetClaim<C> for RegisteredClaims {
+//     fn try_get_claim(&self) -> Result<Option<Cow<C>>, Self::Error> {
+//         Ok(self.get().map(Cow::Borrowed))
+//     }
+// }
 
-impl<C: RegisteredClaim> GetClaim<C> for RegisteredClaims {
-    fn get_claim(&self) -> Option<Cow<C>> {
-        self.get().map(Cow::Borrowed)
-    }
-}
+// impl<C: RegisteredClaim> GetClaim<C> for RegisteredClaims {
+//     fn get_claim(&self) -> Option<Cow<C>> {
+//         self.get().map(Cow::Borrowed)
+//     }
+// }
 
-impl<C: RegisteredClaim> TrySetClaim<C> for RegisteredClaims {
-    fn try_set_claim(&mut self, claim: C) -> Result<(), Self::Error> {
-        self.set(claim);
-        Ok(())
-    }
-}
+// impl<C: RegisteredClaim> TrySetClaim<C> for RegisteredClaims {
+//     fn try_set_claim(&mut self, claim: C) -> Result<(), Self::Error> {
+//         self.set(claim);
+//         Ok(())
+//     }
+// }
 
-impl<C: RegisteredClaim> SetClaim<C> for RegisteredClaims {
-    fn set_claim(&mut self, claim: C) {
-        self.set(claim);
-    }
-}
+// impl<C: RegisteredClaim> SetClaim<C> for RegisteredClaims {
+//     fn set_claim(&mut self, claim: C) {
+//         self.set(claim);
+//     }
+// }
 
-impl<C: RegisteredClaim> TryRemoveClaim<C> for RegisteredClaims {
-    fn try_remove_claim(&mut self) -> Result<Option<C>, Self::Error> {
-        Ok(self.remove::<C>())
-    }
-}
+// impl<C: RegisteredClaim> TryRemoveClaim<C> for RegisteredClaims {
+//     fn try_remove_claim(&mut self) -> Result<Option<C>, Self::Error> {
+//         Ok(self.remove::<C>())
+//     }
+// }
 
-impl<C: RegisteredClaim> RemoveClaim<C> for RegisteredClaims {
-    fn remove_claim(&mut self) -> Option<C> {
-        self.remove::<C>()
-    }
-}
+// impl<C: RegisteredClaim> RemoveClaim<C> for RegisteredClaims {
+//     fn remove_claim(&mut self) -> Option<C> {
+//         self.remove::<C>()
+//     }
+// }
 
 impl<E> Validate<E> for RegisteredClaims
 where
@@ -225,39 +200,7 @@ macro_rules! registered_claims {
             pub struct $variant(pub $ty);
 
             impl Claim for $variant {
-                type Private = NoClaim;
-                type Registered = Self;
-
                 const JWT_CLAIM_NAME: &'static str = $name;
-                const IS_REGISTERED_JWT_CLAIM: bool = true;
-
-                fn from_registered(claim: Self::Registered) -> Option<Self> {
-                    Some(claim)
-                }
-
-                fn from_registered_ref(claim: &Self::Registered) -> Option<&Self> {
-                    Some(claim)
-                }
-
-                fn from_registered_mut(claim: &mut Self::Registered) -> Option<&mut Self> {
-                    Some(claim)
-                }
-
-                fn from_private(_: Self::Private) -> Option<Self> {
-                    None
-                }
-
-                fn from_private_ref(_: &Self::Private) -> Option<&Self> {
-                    None
-                }
-
-                fn from_private_mut(_: &mut Self::Private) -> Option<&mut Self> {
-                    None
-                }
-
-				fn into_registered(self) -> Result<Self, Self::Private> {
-					Ok(self)
-				}
             }
 
             impl RegisteredClaim for $variant {
@@ -285,6 +228,41 @@ macro_rules! registered_claims {
                 }
             }
         )*
+
+        impl ClaimSet for RegisteredClaims {
+            type Error = std::convert::Infallible;
+
+            fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
+                $(
+                    if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
+                        return Ok(unsafe { CastClaim::cast_claim(self.get::<$variant>()) }.map(Cow::Borrowed));
+                    }
+                )*
+
+                Ok(None)
+            }
+
+            fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error> {
+                $(
+                    if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
+                        self.set::<$variant>(unsafe { CastClaim::cast_claim(claim) });
+                        return Ok(Ok(()))
+                    }
+                )*
+
+                Ok(Err(claim))
+            }
+
+            fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error> {
+                $(
+                    if std::any::TypeId::of::<C>() == std::any::TypeId::of::<$variant>() {
+                        return Ok(unsafe { CastClaim::cast_claim(self.remove::<$variant>()) });
+                    }
+                )*
+
+                Ok(None)
+            }
+        }
 
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub enum RegisteredClaimKind {

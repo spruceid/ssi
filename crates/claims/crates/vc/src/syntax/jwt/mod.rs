@@ -1,5 +1,5 @@
 use serde::{de::DeserializeOwned, Serialize};
-use ssi_jwt::RegisteredClaims;
+use ssi_jwt::{ClaimSet, RegisteredClaims};
 
 mod decode;
 mod encode;
@@ -12,7 +12,7 @@ impl<P: DeserializeOwned> super::JsonVerifiableCredential<P> {
     /// standard [JWT-VC encoding].
     ///
     /// [JWT-VC encoding]: <https://www.w3.org/TR/vc-data-model/#jwt-encoding>
-    pub fn from_jwt_claims(jwt: impl JwtVcClaims) -> Result<Self, JwtVcDecodeError> {
+    pub fn from_jwt_claims(jwt: impl ClaimSet) -> Result<Self, JwtVcDecodeError> {
         decode_jwt_vc_claims(jwt)
     }
 }
@@ -42,7 +42,7 @@ impl<C: DeserializeOwned, P: DeserializeOwned> super::JsonVerifiablePresentation
     /// standard [JWT-VP encoding].
     ///
     /// [JWT-VP encoding]: <https://www.w3.org/TR/vc-data-model/#jwt-encoding>
-    pub fn from_jwt_claims(jwt: impl JwtVpClaims) -> Result<Self, JwtVpDecodeError> {
+    pub fn from_jwt_claims(jwt: impl ClaimSet) -> Result<Self, JwtVpDecodeError> {
         decode_jwt_vp_claims(jwt)
     }
 }
