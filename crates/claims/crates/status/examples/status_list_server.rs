@@ -7,9 +7,9 @@
 //!
 //! The credential is read from the standard input or the provided file path.
 //! ```console
-//! $ cargo run --example status_list_server -- examples/files/status-list-credential.json
+//! $ cargo run --example status_list_server -- -t application/ld+json examples/files/status-list-credential.jsonld
 //! serving /credentials/status/3 at 127.0.0.1:3000...
-//! $ cargo run --example status_list_server -- examples/files/local-status-list-credential.jsonld
+//! $ cargo run --example status_list_server -- -t application/ld+json examples/files/local-status-list-credential.jsonld
 //! serving /#statusList at 127.0.0.1:3000...
 //! ```
 use clap::Parser;
@@ -22,7 +22,8 @@ use hyper::{
     Request, Response,
 };
 use hyper_util::rt::TokioIo;
-use ssi_status::any::AnyStatusMap;
+use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
+use ssi_status::{any::AnyStatusMap, FromBytes};
 use std::{
     fs,
     io::{self, Read},
@@ -46,7 +47,7 @@ struct Args {
 
     /// Input status list media type.
     #[clap(short = 't', long)]
-    media_type: Option<ssi_status::any::MediaType>,
+    media_type: String,
 
     /// URL path, query and fragment where the status list will be served at.
     #[clap(short, long)]
@@ -76,10 +77,11 @@ async fn run(args: Args) -> Result<(), Error> {
         Err(e) => return Err(Error::ReadFile(input, e)),
     };
 
-    let (status_list, input_medial_type) =
-        AnyStatusMap::decode(&bytes, args.media_type).map_err(|e| Error::Decode(input, e))?;
+    let verifier = VerificationMethodDIDResolver::new(DIDJWK);
 
-    let media_type = args.media_type.unwrap_or(input_medial_type);
+    let status_list = AnyStatusMap::from_bytes(&bytes, &args.media_type, &verifier)
+        .await
+        .map_err(|e| Error::Decode(input, e))?;
 
     let path = status_list
         .credential_url()
@@ -97,7 +99,7 @@ async fn run(args: Args) -> Result<(), Error> {
     let configuration = Arc::new(Configuration {
         path,
         bytes,
-        media_type,
+        media_type: args.media_type,
     });
 
     let addr = args
@@ -127,7 +129,7 @@ async fn run(args: Args) -> Result<(), Error> {
 struct Configuration {
     path: String,
     bytes: Vec<u8>,
-    media_type: ssi_status::any::MediaType,
+    media_type: String,
 }
 
 #[derive(Clone)]
@@ -167,7 +169,7 @@ enum Error {
     ReadFile(Source, io::Error),
 
     #[error("unable to decode {0}: {1}")]
-    Decode(Source, ssi_status::any::Error),
+    Decode(Source, ssi_status::any::FromBytesError),
 
     #[error("missing serve path")]
     MissingPath,

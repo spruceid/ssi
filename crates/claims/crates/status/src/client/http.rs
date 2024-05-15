@@ -24,20 +24,19 @@ impl<T: EncodedStatusMap + FromBytes<V>, V> TypedStatusMapProvider<Uri, T> for H
     async fn get_typed(&self, url: &Uri) -> Result<MaybeCached<T::Decoded>, ProviderError> {
         match self.client.get(url.as_str()).send().await {
             Ok(response) => {
-                let media_type = match response.headers().get(reqwest::header::CONTENT_TYPE) {
-                    Some(m) => Some(
-                        m.to_str()
-                            .map_err(|_| ProviderError::InvalidMediaType)?
-                            .to_owned(),
-                    ),
-                    None => None,
-                };
+                let media_type = response
+                    .headers()
+                    .get(reqwest::header::CONTENT_TYPE)
+                    .ok_or(ProviderError::MissingMediaType)?
+                    .to_str()
+                    .map_err(|_| ProviderError::InvalidMediaType)?
+                    .to_owned();
 
                 let bytes = response
                     .bytes()
                     .await
                     .map_err(|e| ProviderError::Internal(e.to_string()))?;
-                let encoded = T::from_bytes(bytes.as_ref(), media_type.as_deref(), &self.verifier)
+                let encoded = T::from_bytes(bytes.as_ref(), &media_type, &self.verifier)
                     .await
                     .map_err(|e| ProviderError::Encoded(e.to_string()))?;
                 encoded

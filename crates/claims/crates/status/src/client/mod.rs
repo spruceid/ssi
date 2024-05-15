@@ -15,6 +15,9 @@ pub enum ProviderError {
     #[error("internal error: {0}")]
     Internal(String),
 
+    #[error("missing media type")]
+    MissingMediaType,
+
     #[error("invalid media type")]
     InvalidMediaType,
 

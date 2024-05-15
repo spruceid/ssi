@@ -10,6 +10,10 @@ use crate::{Claim, ClaimSet};
 pub struct AnyClaims(BTreeMap<String, serde_json::Value>);
 
 impl AnyClaims {
+    pub fn contains(&self, key: &str) -> bool {
+        self.0.contains_key(key)
+    }
+
     pub fn get(&self, key: &str) -> Option<&serde_json::Value> {
         self.0.get(key)
     }
@@ -47,6 +51,10 @@ impl IntoIterator for AnyClaims {
 
 impl ClaimSet for AnyClaims {
     type Error = serde_json::Error;
+
+    fn contains<C: Claim>(&self) -> bool {
+        self.contains(C::JWT_CLAIM_NAME)
+    }
 
     fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
         self.get(C::JWT_CLAIM_NAME)

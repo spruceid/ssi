@@ -11,18 +11,14 @@ pub trait EncodedStatusMap {
     type Decoded: StatusMap;
     type DecodeError: std::error::Error;
 
-    fn decode(&self) -> Result<Self::Decoded, Self::DecodeError>;
+    fn decode(self) -> Result<Self::Decoded, Self::DecodeError>;
 }
 
-pub trait FromBytes<V>: Sized + EncodedStatusMap {
+pub trait FromBytes<V>: Sized {
     type Error: std::error::Error;
 
     #[allow(async_fn_in_trait)]
-    async fn from_bytes(
-        bytes: &[u8],
-        media_type: Option<&str>,
-        verifier: &V,
-    ) -> Result<Self, Self::Error>;
+    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error>;
 }
 
 pub trait StatusMap: Clone {

@@ -248,3 +248,9 @@ impl Deref for CompactJWSBuf {
 #[derive(Debug, thiserror::Error)]
 #[error("invalid compact JWS")]
 pub struct InvalidCompactJWS<B = String>(pub B);
+
+impl<'a> InvalidCompactJWS<&'a [u8]> {
+    pub fn into_owned(self) -> InvalidCompactJWS<Vec<u8>> {
+        InvalidCompactJWS(self.0.to_owned())
+    }
+}

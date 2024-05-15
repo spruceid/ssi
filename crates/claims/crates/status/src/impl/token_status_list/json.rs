@@ -1,99 +1,165 @@
 //! JWT encoding of a Status Lists.
-use std::collections::HashMap;
+use std::borrow::Cow;
 
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_jwt::{NumericDate, StringOrURI};
+use ssi_claims_core::Validate;
+use ssi_jwt::{match_claim_type, AnyClaims, Claim, ClaimSet, IssuedAt, Issuer, JWTClaims, Subject};
 
-use crate::token_status_list::{StatusList, StatusSize};
+use crate::{
+    token_status_list::{BitString, StatusSize},
+    StatusMapEntry, StatusMapEntrySet,
+};
+
+use super::{DecodeError, StatusList};
 
 /// Status List JWT.
 ///
 /// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#name-status-list-token>
+pub type StatusListJwt = JWTClaims<StatusListJwtPrivateClaims>;
+
+pub fn decode_status_list_jwt(mut claims: impl ClaimSet) -> Result<StatusList, DecodeError> {
+    let _ = claims
+        .try_remove::<Issuer>()
+        .map_err(DecodeError::claim)?
+        .ok_or(DecodeError::MissingIssuer)?;
+
+    let _ = claims
+        .try_remove::<Subject>()
+        .map_err(DecodeError::claim)?
+        .ok_or(DecodeError::MissingSubject)?;
+
+    let _ = claims
+        .try_remove::<IssuedAt>()
+        .map_err(DecodeError::claim)?
+        .ok_or(DecodeError::MissingSubject)?;
+    let ttl = claims
+        .try_remove()
+        .map_err(DecodeError::claim)?
+        .map(TimeToLiveClaim::unwrap);
+
+    let bit_string = claims
+        .try_remove::<JsonStatusList>()
+        .map_err(DecodeError::claim)?
+        .ok_or(DecodeError::MissingStatusList)?
+        .decode()?;
+
+    Ok(StatusList::new(bit_string, ttl))
+}
+
+/// Status List JWT private claims.
+///
+/// This includes status list specific claims such as `ttl` and `status_list`,
+/// but also all the extra claims unrelated to status lists.
+///
+/// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#name-status-list-token>
 #[derive(Serialize, Deserialize)]
-pub struct StatusListJwt {
-    /// Issuer (`iss`) claim.
-    ///
-    /// Principal that issued the JWT. The processing of this claim is generally
-    /// application specific.
-    #[serde(rename = "iss")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuer: Option<StringOrURI>,
-
-    /// Subject (`sub`) claim.
-    ///
-    /// Principal that is the subject of the JWT. The claims in a JWT are
-    /// normally statements about the subject. The subject value MUST either be
-    /// scoped to be locally unique in the context of the issuer or be globally
-    /// unique.
-    ///
-    /// The processing of this claim is generally application specific.
-    #[serde(rename = "sub")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subject: Option<StringOrURI>,
-
-    /// Expiration Time (`exp`) claim.
-    ///
-    /// Expiration time on or after which the JWT MUST NOT be accepted for
-    /// processing. The processing of the `exp` claim requires that the current
-    /// date/time MUST be before the expiration date/time listed in the `exp`
-    /// claim.
-    #[serde(rename = "exp")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expiration_time: Option<NumericDate>,
-
-    /// Issued At (`iat`) claim.
-    ///
-    /// Time at which the JWT was issued. This claim can be used to determine
-    /// the age of the JWT.
-    #[serde(rename = "iat")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub issuance_date: Option<NumericDate>,
-
+pub struct StatusListJwtPrivateClaims {
     /// Time to live.
     ///
     /// Maximum amount of time, in seconds, that the Status List Token can be
     /// cached by a consumer before a fresh copy *should* be retrieved. The
     /// value of the claim *must* be a positive number.
     #[serde(rename = "ttl")]
-    pub time_to_live: Option<u64>,
+    pub time_to_live: Option<TimeToLiveClaim>,
 
     /// Status list.
-    #[serde(
-        serialize_with = "serialize_status_list",
-        deserialize_with = "deserialize_status_list"
-    )]
-    pub status_list: StatusList,
+    pub status_list: Option<JsonStatusList>,
 
     /// Other claims.
-    pub other_claims: HashMap<String, serde_json::Value>,
+    #[serde(flatten)]
+    pub other_claims: AnyClaims,
 }
 
-fn serialize_status_list<S: serde::Serializer>(
-    list: &StatusList,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    let lst = base64::encode_config(list.as_bytes(), base64::URL_SAFE);
-    JsonStatusList {
-        bits: list.status_size(),
-        lst,
+impl ClaimSet for StatusListJwtPrivateClaims {
+    type Error = serde_json::Error;
+
+    fn contains<C: Claim>(&self) -> bool {
+        match_claim_type! {
+            match C {
+                TimeToLiveClaim => self.time_to_live.is_some(),
+                JsonStatusList => self.status_list.is_some(),
+                _ => ClaimSet::contains::<C>(&self.other_claims)
+            }
+        }
     }
-    .serialize(serializer)
+
+    fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
+        match_claim_type! {
+            match C {
+                TimeToLiveClaim => {
+                    Ok(self.time_to_live.as_ref().map(Cow::Borrowed))
+                },
+                JsonStatusList => {
+                    Ok(self.status_list.as_ref().map(Cow::Borrowed))
+                },
+                _ => {
+                    self.other_claims.try_get()
+                }
+            }
+        }
+    }
+
+    fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error> {
+        match_claim_type! {
+            match claim: C {
+                TimeToLiveClaim => {
+                    self.time_to_live = Some(claim);
+                    Ok(Ok(()))
+                },
+                JsonStatusList => {
+                    self.status_list = Some(claim);
+                    Ok(Ok(()))
+                },
+                _ => {
+                    self.other_claims.try_set(claim)
+                }
+            }
+        }
+    }
+
+    fn try_remove<C: Claim>(&mut self) -> Result<Option<C>, Self::Error> {
+        match_claim_type! {
+            match C {
+                TimeToLiveClaim => {
+                    Ok(self.time_to_live.take())
+                },
+                JsonStatusList => {
+                    Ok(self.status_list.take())
+                },
+                _ => {
+                    self.other_claims.try_remove()
+                }
+            }
+        }
+    }
 }
 
-fn deserialize_status_list<'de, D: serde::Deserializer<'de>>(
-    deserializer: D,
-) -> Result<StatusList, D::Error> {
-    let json = JsonStatusList::deserialize(deserializer)?;
-    let bytes =
-        base64::decode_config(&json.lst, base64::URL_SAFE).map_err(serde::de::Error::custom)?;
-    Ok(StatusList::from_parts(json.bits, bytes))
+impl<E> Validate<E> for StatusListJwtPrivateClaims {
+    fn validate(&self, _env: &E) -> ssi_claims_core::ClaimsValidity {
+        Ok(())
+    }
+}
+
+/// Time to live JWT claim.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct TimeToLiveClaim(pub u64);
+
+impl TimeToLiveClaim {
+    pub fn unwrap(self) -> u64 {
+        self.0
+    }
+}
+
+impl Claim for TimeToLiveClaim {
+    const JWT_CLAIM_NAME: &'static str = "ttl";
 }
 
 /// JSON Status List.
 ///
 /// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#name-status-list>
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct JsonStatusList {
     /// Number of bits per Referenced Token in `lst`.
     bits: StatusSize,
@@ -102,13 +168,43 @@ pub struct JsonStatusList {
     lst: String,
 }
 
+impl JsonStatusList {
+    pub fn encode(bit_string: &BitString) -> Self {
+        Self {
+            bits: bit_string.status_size(),
+            lst: base64::encode_config(bit_string.as_bytes(), base64::URL_SAFE),
+        }
+    }
+
+    pub fn decode(&self) -> Result<BitString, DecodeError> {
+        let bytes = base64::decode_config(&self.lst, base64::URL_SAFE)?;
+        Ok(BitString::from_parts(self.bits, bytes))
+    }
+}
+
+impl Claim for JsonStatusList {
+    const JWT_CLAIM_NAME: &'static str = "status_list";
+}
+
 /// Status claim value.
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Status {
     pub status_list: StatusListReference,
 }
 
-#[derive(Serialize, Deserialize)]
+impl Claim for Status {
+    const JWT_CLAIM_NAME: &'static str = "status";
+}
+
+impl StatusMapEntrySet for Status {
+    type Entry<'a> = &'a StatusListReference;
+
+    fn get_entry(&self, _purpose: crate::StatusPurpose<&str>) -> Option<Self::Entry<'_>> {
+        Some(&self.status_list)
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct StatusListReference {
     /// Index to check for status information in the Status List for the current
     /// Referenced Token.
@@ -117,4 +213,16 @@ pub struct StatusListReference {
     /// Identifies the Status List or Status List Token containing the status
     /// information for the Referenced Token.
     pub uri: UriBuf,
+}
+
+impl StatusMapEntry for StatusListReference {
+    type Key = usize;
+
+    fn key(&self) -> Self::Key {
+        self.idx
+    }
+
+    fn status_list_url(&self) -> &iref::Uri {
+        &self.uri
+    }
 }

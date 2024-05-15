@@ -122,6 +122,14 @@ impl<A, B> CastClaim<A, B> for () {
     }
 }
 
+impl<A, B> CastClaim<A, B> for bool {
+    type Target = Self;
+
+    unsafe fn cast_claim(value: Self) -> Self::Target {
+        value
+    }
+}
+
 impl<A, B, T: CastClaim<A, B>> CastClaim<A, B> for Option<T> {
     type Target = Option<T::Target>;
 
@@ -170,6 +178,15 @@ mod tests {
 
     impl ClaimSet for CustomClaimSet {
         type Error = serde_json::Error;
+
+        fn contains<C: Claim>(&self) -> bool {
+            match_claim_type! {
+                match C {
+                    CustomClaim => self.custom.is_some(),
+                    _ => ClaimSet::contains::<C>(&self.other_claims)
+                }
+            }
+        }
 
         fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
             match_claim_type! {

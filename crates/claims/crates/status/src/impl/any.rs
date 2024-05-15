@@ -1,214 +1,207 @@
-use std::str::FromStr;
-
 use iref::Uri;
-use serde::Deserialize;
-use ssi_jws::CompactJWS;
-use ssi_jwt::JWTClaims;
+use ssi_claims_core::{Proof, ValidateProof};
+use ssi_data_integrity::AnyProofs;
+use ssi_jws::JWSVerifier;
 
 use crate::{
     bitstream_status_list::{
-        BitstringStatusListCredential, BitstringStatusListEntry,
+        self, BitstringStatusListCredential, BitstringStatusListEntry,
         BitstringStatusListEntrySetCredential,
     },
-    StatusMapEntry, StatusMapEntrySet,
+    token_status_list::{self, StatusListToken},
+    EncodedStatusMap, FromBytes, StatusMap, StatusMapEntry, StatusMapEntrySet,
 };
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("invalid JWS: {0}")]
-    Jws(#[from] ssi_jws::DecodeError),
-
-    #[error("unrecognized status list")]
-    UnrecognizedStatusMap,
-
-    #[error("unrecognized credential")]
-    UnrecognizedEntrySet,
-}
 
 pub enum AnyStatusMap {
     BitstringStatusList(BitstringStatusListCredential),
+    TokenStatusList(StatusListToken),
 }
 
 impl AnyStatusMap {
-    /// Tries to decode any status list from the given bytes.
-    pub fn decode(bytes: &[u8], media_type: Option<MediaType>) -> Result<(Self, MediaType), Error> {
-        if media_type.accepts_json() {
-            if let Ok(json) = serde_json::from_slice(bytes) {
-                return match json {
-                    AnyJsonStatusMap::BitstringStatusList(cred) => {
-                        Ok((Self::BitstringStatusList(cred), MediaType::VcLdJson))
-                    }
-                    AnyJsonStatusMap::JwtVc(jwt_vc) => {
-                        let result = Self::from_jwt_vc_claims(jwt_vc)?;
-                        Ok((result, MediaType::Json))
-                    }
-                };
-            }
-        }
-
-        if media_type.accepts_jws() {
-            if let Ok(jws) = CompactJWS::new(bytes) {
-                let payload = jws.decode()?.payload;
-                return match serde_json::from_slice(&payload) {
-                    Ok(jwt_vc) => {
-                        let result = Self::from_jwt_vc_claims(jwt_vc)?;
-                        Ok((result, MediaType::Jwt))
-                    }
-                    Err(_) => Err(Error::UnrecognizedStatusMap),
-                };
-            }
-        }
-
-        Err(Error::UnrecognizedStatusMap)
-    }
-
-    fn from_jwt_vc_claims(claims: JWTClaims) -> Result<Self, Error> {
-        match ssi_vc::decode_jwt_vc_claims(claims) {
-            Ok(cred) => match cred {
-                AnyStatusMapCredential::BitstringStatusList(cred) => {
-                    Ok(AnyStatusMap::BitstringStatusList(cred))
-                }
-            },
-            Err(_) => Err(Error::UnrecognizedStatusMap),
-        }
-    }
-
     /// Returns the URL of the status list credential.
     pub fn credential_url(&self) -> Option<&Uri> {
         match self {
             Self::BitstringStatusList(cred) => cred.id.as_deref(),
+            Self::TokenStatusList(_) => None,
         }
-    }
-}
-
-macro_rules! media_types {
-    ($($id:ident: $name:literal),*) => {
-        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-        pub enum MediaType {
-            $($id),*
-        }
-
-        impl MediaType {
-            pub fn new(name: &str) -> Option<Self> {
-                match name {
-                    $($name => Some(Self::$id),)*
-                    _ => None
-                }
-            }
-
-            pub fn as_str(&self) -> &'static str {
-                match self {
-                    $(Self::$id => $name),*
-                }
-            }
-        }
-    };
-}
-
-media_types! {
-    Json: "application/json",
-    LdJson: "application/ld+json",
-    VcLdJson: "application/vc+ld+json",
-    Jwt: "application/jwt",
-    SdJwt: "application/sd-jwt",
-    Cwt: "application/cwt"
-}
-
-impl MediaType {
-    pub fn is_json(&self) -> bool {
-        matches!(self, Self::Json | Self::LdJson | Self::VcLdJson)
-    }
-
-    pub fn is_jws(&self) -> bool {
-        matches!(self, Self::Jwt | Self::SdJwt)
     }
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("unknown media type `{0}`")]
-pub struct UnknownStatusMapMediaType(pub String);
+pub enum FromBytesError {
+    #[error("unexpected media type `{0}`")]
+    UnexpectedMediaType(String),
 
-impl FromStr for MediaType {
-    type Err = UnknownStatusMapMediaType;
+    #[error(transparent)]
+    BitstringStatusList(bitstream_status_list::FromBytesError),
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::new(s).ok_or_else(|| UnknownStatusMapMediaType(s.to_owned()))
+    #[error(transparent)]
+    TokenStatusList(token_status_list::FromBytesError),
+}
+
+impl<V> FromBytes<V> for AnyStatusMap
+where
+    V: JWSVerifier,
+    <AnyProofs as Proof>::Prepared: ValidateProof<BitstringStatusListCredential, V>,
+{
+    type Error = FromBytesError;
+
+    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+        match media_type {
+            "statuslist+jwt" | "statuslist+cwt" => {
+                StatusListToken::from_bytes(bytes, media_type, verifier)
+                    .await
+                    .map(AnyStatusMap::TokenStatusList)
+                    .map_err(FromBytesError::TokenStatusList)
+            }
+            "application/vc+ld+json+jwt"
+            | "application/vc+ld+json+sd-jwt"
+            | "application/vc+ld+json+cose"
+            | "application/vc+ld+json"
+            | "application/ld+json" => {
+                BitstringStatusListCredential::from_bytes(bytes, media_type, verifier)
+                    .await
+                    .map(AnyStatusMap::BitstringStatusList)
+                    .map_err(FromBytesError::BitstringStatusList)
+            }
+            other => Err(FromBytesError::UnexpectedMediaType(other.to_owned())),
+        }
     }
 }
 
-trait OptionalMediaType {
-    fn accepts_json(&self) -> bool;
+#[derive(Debug, thiserror::Error)]
+pub enum DecodeError {
+    #[error(transparent)]
+    BitstringStatusList(#[from] bitstream_status_list::DecodeError),
 
-    fn accepts_jws(&self) -> bool;
+    #[error(transparent)]
+    TokenStatusList(#[from] token_status_list::DecodeError),
 }
 
-impl OptionalMediaType for Option<MediaType> {
-    fn accepts_json(&self) -> bool {
-        self.as_ref().map(MediaType::is_json).unwrap_or(true)
+impl EncodedStatusMap for AnyStatusMap {
+    type DecodeError = DecodeError;
+    type Decoded = AnyDecodedStatusMap;
+
+    fn decode(self) -> Result<Self::Decoded, Self::DecodeError> {
+        match self {
+            Self::BitstringStatusList(m) => m
+                .decode()
+                .map(AnyDecodedStatusMap::BitstringStatusList)
+                .map_err(Into::into),
+            Self::TokenStatusList(m) => m
+                .decode()
+                .map(AnyDecodedStatusMap::TokenStatusList)
+                .map_err(Into::into),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub enum AnyDecodedStatusMap {
+    BitstringStatusList(bitstream_status_list::StatusList),
+    TokenStatusList(token_status_list::StatusList),
+}
+
+impl AnyDecodedStatusMap {
+    pub fn iter(&self) -> AnyDecodedStatusMapIter {
+        match self {
+            Self::BitstringStatusList(m) => AnyDecodedStatusMapIter::BitstringStatusList(m.iter()),
+            Self::TokenStatusList(m) => AnyDecodedStatusMapIter::TokenStatusList(m.iter()),
+        }
+    }
+}
+
+impl StatusMap for AnyDecodedStatusMap {
+    type Key = usize;
+    type Status = u8;
+
+    fn time_to_live(&self) -> Option<std::time::Duration> {
+        match self {
+            Self::BitstringStatusList(m) => m.time_to_live(),
+            Self::TokenStatusList(m) => m.time_to_live(),
+        }
     }
 
-    fn accepts_jws(&self) -> bool {
-        self.as_ref().map(MediaType::is_jws).unwrap_or(true)
+    fn get_by_key(&self, key: Self::Key) -> Option<Self::Status> {
+        match self {
+            Self::BitstringStatusList(m) => m.get_by_key(key),
+            Self::TokenStatusList(m) => m.get_by_key(key),
+        }
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum AnyJsonStatusMap {
-    BitstringStatusList(BitstringStatusListCredential),
-    JwtVc(ssi_jwt::JWTClaims),
+impl<'a> IntoIterator for &'a AnyDecodedStatusMap {
+    type IntoIter = AnyDecodedStatusMapIter<'a>;
+    type Item = u8;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum AnyStatusMapCredential {
-    BitstringStatusList(BitstringStatusListCredential),
+pub enum AnyDecodedStatusMapIter<'a> {
+    BitstringStatusList(bitstream_status_list::BitStringIter<'a>),
+    TokenStatusList(token_status_list::BitStringIter<'a>),
+}
+
+impl<'a> Iterator for AnyDecodedStatusMapIter<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::BitstringStatusList(i) => i.next(),
+            Self::TokenStatusList(i) => i.next(),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EntrySetFromBytesError {
+    #[error(transparent)]
+    TokenStatusList(#[from] token_status_list::EntrySetFromBytesError),
+
+    #[error(transparent)]
+    BitstringStatusList(#[from] bitstream_status_list::FromBytesError),
+
+    #[error("unexpected media type `{0}`")]
+    UnexpectedMediaType(String),
 }
 
 pub enum AnyEntrySet {
     BitstringStatusList(BitstringStatusListEntrySetCredential),
+    TokenStatusList(token_status_list::AnyStatusListEntrySet),
 }
 
-impl AnyEntrySet {
-    pub fn decode(bytes: &[u8], media_type: Option<MediaType>) -> Result<(Self, MediaType), Error> {
-        if media_type.accepts_json() {
-            if let Ok(json) = serde_json::from_slice(bytes) {
-                return match json {
-                    AnyJsonStatusMapEntrySet::BitstringStatusList(cred) => {
-                        Ok((Self::BitstringStatusList(cred), MediaType::VcLdJson))
-                    }
-                    AnyJsonStatusMapEntrySet::JwtVc(jwt_vc) => {
-                        let result = Self::from_jwt_vc_claims(jwt_vc)?;
-                        Ok((result, MediaType::Json))
-                    }
-                };
+impl<V> FromBytes<V> for AnyEntrySet
+where
+    V: JWSVerifier,
+    <AnyProofs as Proof>::Prepared: ValidateProof<BitstringStatusListEntrySetCredential, V>,
+{
+    type Error = EntrySetFromBytesError;
+
+    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+        match media_type {
+            "application/json" | "application/jwt" | "application/cbor" | "application/cwt" => {
+                token_status_list::AnyStatusListEntrySet::from_bytes(bytes, media_type, verifier)
+                    .await
+                    .map(Self::TokenStatusList)
+                    .map_err(Into::into)
             }
-        }
-
-        if media_type.accepts_jws() {
-            if let Ok(jws) = CompactJWS::new(bytes) {
-                let payload = jws.decode()?.payload;
-                return match serde_json::from_slice(&payload) {
-                    Ok(jwt_vc) => {
-                        let result = Self::from_jwt_vc_claims(jwt_vc)?;
-                        Ok((result, MediaType::Jwt))
-                    }
-                    Err(_) => Err(Error::UnrecognizedEntrySet),
-                };
+            "application/vc+ld+json+jwt"
+            | "application/vc+ld+json+sd-jwt"
+            | "application/vc+ld+json+cose"
+            | "application/vc+ld+json"
+            | "application/ld+json" => {
+                bitstream_status_list::BitstringStatusListEntrySetCredential::from_bytes(
+                    bytes, media_type, verifier,
+                )
+                .await
+                .map(Self::BitstringStatusList)
+                .map_err(Into::into)
             }
-        }
-
-        Err(Error::UnrecognizedEntrySet)
-    }
-
-    fn from_jwt_vc_claims(claims: JWTClaims) -> Result<Self, Error> {
-        match ssi_vc::decode_jwt_vc_claims(claims) {
-            Ok(cred) => match cred {
-                AnyStatusMapEntrySetCredential::BitstringStatusList(cred) => {
-                    Ok(AnyEntrySet::BitstringStatusList(cred))
-                }
-            },
-            Err(_) => Err(Error::UnrecognizedEntrySet),
+            other => Err(EntrySetFromBytesError::UnexpectedMediaType(
+                other.to_owned(),
+            )),
         }
     }
 }
@@ -221,25 +214,16 @@ impl StatusMapEntrySet for AnyEntrySet {
             Self::BitstringStatusList(s) => s
                 .get_entry(purpose)
                 .map(AnyStatusMapEntryRef::BitstringStatusList),
+            Self::TokenStatusList(s) => s
+                .get_entry(purpose)
+                .map(AnyStatusMapEntryRef::TokenStatusList),
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum AnyJsonStatusMapEntrySet {
-    BitstringStatusList(BitstringStatusListEntrySetCredential),
-    JwtVc(ssi_jwt::JWTClaims),
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum AnyStatusMapEntrySetCredential {
-    BitstringStatusList(BitstringStatusListEntrySetCredential),
-}
-
 pub enum AnyStatusMapEntryRef<'a> {
     BitstringStatusList(&'a BitstringStatusListEntry),
+    TokenStatusList(token_status_list::AnyStatusListReference<'a>),
 }
 
 impl<'a> StatusMapEntry for AnyStatusMapEntryRef<'a> {
@@ -248,12 +232,14 @@ impl<'a> StatusMapEntry for AnyStatusMapEntryRef<'a> {
     fn status_list_url(&self) -> &Uri {
         match self {
             Self::BitstringStatusList(e) => e.status_list_url(),
+            Self::TokenStatusList(e) => e.status_list_url(),
         }
     }
 
     fn key(&self) -> Self::Key {
         match self {
             Self::BitstringStatusList(e) => e.key(),
+            Self::TokenStatusList(e) => e.key(),
         }
     }
 }

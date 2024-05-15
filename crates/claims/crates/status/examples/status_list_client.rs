@@ -8,9 +8,9 @@
 //! # Usage
 //!
 //! ```console
-//! $ cargo run --example status_list_client -- examples/files/status_list_revocable_1.jsonld
+//! $ cargo run --example status_list_client -- -t application/ld+json examples/files/status_list_revocable_1.jsonld
 //! unrevoked
-//! $ cargo run --example status_list_client -- examples/files/status_list_revocable_3.jsonld
+//! $ cargo run --example status_list_client -- -t application/ld+json examples/files/status_list_revocable_3.jsonld
 //! REVOKED
 //! ```
 //!
@@ -19,17 +19,16 @@
 //! `http://127.0.0.1:3000/#statusList`. To reproduce the example above you
 //! serve the status list using the `status-list-server` example:
 //! ```console
-//! $ cargo run --example status_list_server -- examples/files/local-status-list-credential.jsonld
+//! $ cargo run --example status_list_server -- -t application/vc+ld+json examples/files/local-status-list-credential.jsonld
 //! serving /#statusList at 127.0.0.1:3000...
 //! ```
 use clap::Parser;
 use core::fmt;
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_status::{
-    any::{AnyEntrySet, AnyStatusMapEntryRef},
-    bitstream_status_list::BitstringStatusListCredential,
+    any::{AnyEntrySet, AnyStatusMap},
     client::StatusMapProvider,
-    StatusMapEntry, StatusMapEntrySet, StatusPurpose,
+    FromBytes, StatusMapEntry, StatusMapEntrySet, StatusPurpose,
 };
 use std::{
     fs,
@@ -52,7 +51,7 @@ struct Args {
 
     /// Input credential media type.
     #[clap(short = 't', long)]
-    media_type: Option<ssi_status::any::MediaType>,
+    media_type: String,
 
     /// Server address.
     #[clap(short, long)]
@@ -80,7 +79,7 @@ enum Error {
     ReadFile(Source, io::Error),
 
     #[error("unable to decode {0}: {1}")]
-    Decode(Source, ssi_status::any::Error),
+    Decode(Source, ssi_status::any::EntrySetFromBytesError),
 
     #[error("unable to fetch status list: {0}")]
     Provider(#[from] ssi_status::client::ProviderError),
@@ -96,27 +95,26 @@ async fn run(args: Args) -> Result<(), Error> {
         Err(e) => return Err(Error::ReadFile(input, e)),
     };
 
-    let (status_list, _) =
-        AnyEntrySet::decode(&bytes, args.media_type).map_err(|e| Error::Decode(input, e))?;
-
     let verifier = VerificationMethodDIDResolver::new(DIDJWK);
+
+    let entry_set = AnyEntrySet::from_bytes(&bytes, &args.media_type, &verifier)
+        .await
+        .map_err(|e| Error::Decode(input, e))?;
+
     let client = ssi_status::client::HttpClient::new(verifier);
 
-    if let Some(entry) = status_list.get_entry(StatusPurpose::Revocation) {
+    if let Some(entry) = entry_set.get_entry(StatusPurpose::Revocation) {
         use ssi_status::StatusMap;
-        match entry {
-            AnyStatusMapEntryRef::BitstringStatusList(entry) => {
-                let status_list = client
-                    .get::<BitstringStatusListCredential>(entry.status_list_url())
-                    .await?;
-                let status = status_list
-                    .get_entry(entry)
-                    .ok_or(Error::MissingEntry(entry.key()))?;
-                match status {
-                    0 => println!("unrevoked"),
-                    _ => println!("REVOKED"),
-                }
-            }
+
+        let status_list = client.get::<AnyStatusMap>(entry.status_list_url()).await?;
+
+        let status = status_list
+            .get_entry(&entry)
+            .ok_or(Error::MissingEntry(entry.key()))?;
+
+        match status {
+            0 => println!("unrevoked"),
+            _ => println!("REVOKED"),
         }
     }
 
