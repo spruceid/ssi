@@ -4,9 +4,10 @@ use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{
-        AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration,
+        AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
+        ProofConfiguration,
     },
-    vc::{JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation},
+    vc::{JsonCredential, JsonPresentation},
     Verifiable,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
@@ -203,13 +204,15 @@ async fn credential_prove_verify_did_tz1() {
     )));
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
-    let cred = JsonVerifiableCredential::new(
-        None,
-        did.clone().into_uri().into(),
-        "2021-01-27T16:39:07Z".parse().unwrap(),
-        vec![json_syntax::json!({
-            "id": "did:example:foo"
-        })],
+    let cred = DataIntegrity::new(
+        JsonCredential::new(
+            None,
+            did.clone().into_uri().into(),
+            "2021-01-27T16:39:07Z".parse().unwrap(),
+            vec![json_syntax::json!({
+                "id": "did:example:foo"
+            })]
+        ),
         vec![ssi_claims::data_integrity::Proof::new(
             ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             "2021-03-02T18:59:44.462Z".parse().unwrap(),
@@ -221,7 +224,7 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::JwsSignature::new(
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
             )
-        ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())]
+        ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())].into()
     );
 
     let vc = Verifiable::new_with(cred, JsonLdEnvironment::default())
@@ -244,20 +247,22 @@ async fn credential_prove_verify_did_tz1() {
     let wrong_signer = SingleSecretSigner::new(JWK::generate_ed25519().unwrap());
     let vc_wrong_key =
     ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021.sign(
-        vc.claims().clone(),
+        vc.claims.clone(),
         JsonLdEnvironment::default(),
         &didtz,
         &wrong_signer,
-        vc.proof().first().unwrap().clone_configuration()
+        vc.proof.first().unwrap().clone_configuration()
     )
     .await
     .unwrap();
     assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
 
-    let presentation = JsonVerifiablePresentation::new(
-        Some(uri!("http://example.org/presentations/3731").to_owned()),
-        vec![vc],
-        vec![did.into()],
+    let presentation = DataIntegrity::new(
+        JsonPresentation::new(
+            Some(uri!("http://example.org/presentations/3731").to_owned()),
+            vec![did.into()],
+            vec![vc]
+        ),
         vec![ssi_claims::data_integrity::Proof::new(
             ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021,
             "2021-03-02T19:05:08.271Z".parse().unwrap(),
@@ -269,7 +274,7 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::JwsSignature::new(
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
             )
-        ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())]
+        ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())].into()
     );
 
     let vp = Verifiable::new_with(presentation, JsonLdEnvironment::default())
@@ -282,11 +287,9 @@ async fn credential_prove_verify_did_tz1() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().first_mut().unwrap().signature.jws = CompactJWSString::from_string(format!(
-        "x{}",
-        vp1.proof_mut().first_mut().unwrap().signature.jws
-    ))
-    .unwrap();
+    vp1.proof.first_mut().unwrap().signature.jws =
+        CompactJWSString::from_string(format!("x{}", vp1.proof.first_mut().unwrap().signature.jws))
+            .unwrap();
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
@@ -341,7 +344,7 @@ async fn credential_prove_verify_did_tz2() {
         )
         .await
         .unwrap();
-    println!("{}", serde_json::to_string_pretty(vc.proof()).unwrap());
+    println!("{}", serde_json::to_string_pretty(&vc.proof).unwrap());
     assert!(vc.verify(&didtz).await.unwrap().is_ok());
 
     // Test that issuer property is used for verification.
@@ -357,11 +360,11 @@ async fn credential_prove_verify_did_tz2() {
     let wrong_signer = SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng).unwrap());
     let vc_wrong_key = suite
         .sign(
-            vc.claims().clone(),
+            vc.claims.clone(),
             AnyInputContext::default(),
             &didtz,
             &wrong_signer,
-            vc.proof().first().unwrap().clone_configuration(),
+            vc.proof.first().unwrap().clone_configuration(),
         )
         .await
         .unwrap();
@@ -392,15 +395,15 @@ async fn credential_prove_verify_did_tz2() {
         )
         .await
         .unwrap();
-    println!("VP: {}", serde_json::to_string_pretty(vp.proof()).unwrap());
+    println!("VP: {}", serde_json::to_string_pretty(&vp.proof).unwrap());
     assert!(vp.verify(&didtz).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().first_mut().unwrap().signature.jws = Some(
+    vp1.proof.first_mut().unwrap().signature.jws = Some(
         CompactJWSString::from_string(format!(
             "x{}",
-            vp.proof().first().unwrap().signature.jws.as_ref().unwrap()
+            vp.proof.first().unwrap().signature.jws.as_ref().unwrap()
         ))
         .unwrap(),
     );
@@ -459,7 +462,7 @@ async fn credential_prove_verify_did_tz3() {
         )
         .await
         .unwrap();
-    println!("{}", serde_json::to_string_pretty(vc.proof()).unwrap());
+    println!("{}", serde_json::to_string_pretty(&vc.proof).unwrap());
     assert!(vc.verify(&didtz).await.unwrap().is_ok());
 
     // Test that issuer property is used for verification.
@@ -475,11 +478,11 @@ async fn credential_prove_verify_did_tz3() {
     let wrong_signer = SingleSecretSigner::new(JWK::generate_p256_from(&mut rng));
     let vc_wrong_key = suite
         .sign(
-            vc.claims().clone(),
+            vc.claims.clone(),
             AnyInputContext::default(),
             &didtz,
             &wrong_signer,
-            vc.proof().first().unwrap().clone_configuration(),
+            vc.proof.first().unwrap().clone_configuration(),
         )
         .await
         .unwrap();
@@ -512,15 +515,15 @@ async fn credential_prove_verify_did_tz3() {
         )
         .await
         .unwrap();
-    println!("VP: {}", serde_json::to_string_pretty(vp.proof()).unwrap());
+    println!("VP: {}", serde_json::to_string_pretty(&vp.proof).unwrap());
     assert!(vp.verify(&didtz).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof_mut().first_mut().unwrap().signature.jws = Some(
+    vp1.proof.first_mut().unwrap().signature.jws = Some(
         CompactJWSString::from_string(format!(
             "x{}",
-            vp.proof().first().unwrap().signature.jws.as_ref().unwrap()
+            vp.proof.first().unwrap().signature.jws.as_ref().unwrap()
         ))
         .unwrap(),
     );

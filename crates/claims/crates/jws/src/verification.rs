@@ -47,9 +47,9 @@ impl JWSVerifier for JWK {
 }
 
 /// Signing bytes are valid if the decoded payload is valid.
-impl<E, T: Validate<E>> Validate<E> for DecodedSigningBytes<T> {
-    fn validate(&self, env: &E) -> ssi_claims_core::ClaimsValidity {
-        self.payload.validate(env)
+impl<E, P: Proof, T: Validate<E, P>> Validate<E, P> for DecodedSigningBytes<T> {
+    fn validate(&self, env: &E, proof: &P::Prepared) -> ssi_claims_core::ClaimsValidity {
+        self.payload.validate(env, proof)
     }
 }
 

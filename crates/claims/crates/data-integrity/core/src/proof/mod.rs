@@ -1,12 +1,19 @@
 use crate::{
     suite::{HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput,
+    CryptographicSuite, CryptographicSuiteInput, DataIntegrity,
 };
-use ssi_claims_core::ProofPreparationError;
+use educe::Educe;
+use serde::{Deserialize, Serialize};
+use ssi_claims_core::{AttachProof, ProofPreparationError};
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany, Referencable};
 use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, ReferenceOrOwnedRef};
 use std::collections::BTreeMap;
+use std::{
+    borrow::{Borrow, BorrowMut},
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+};
 
 mod configuration;
 mod prepared;
@@ -16,10 +23,14 @@ pub use configuration::*;
 pub use prepared::*;
 pub use r#type::*;
 
-pub type Proofs<T> = Vec<Proof<T>>;
-
 /// Data Integrity Compact Proof.
-#[derive(Debug, Clone)]
+#[derive(Educe)]
+#[educe(Debug(bound(
+    "S: Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug"
+)))]
+#[educe(Clone(bound(
+    "S: Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone"
+)))]
 pub struct Proof<S: CryptographicSuite> {
     /// Proof context.
     pub context: Option<json_ld::syntax::Context>,
@@ -219,6 +230,14 @@ where
     }
 }
 
+impl<T, S: CryptographicSuite> AttachProof<T> for Proof<S> {
+    type Attached = DataIntegrity<T, S>;
+
+    fn attach_to(self, claims: T) -> Self::Attached {
+        DataIntegrity::new(claims, self.into())
+    }
+}
+
 // #[derive(linked_data::Deserialize)]
 // struct ExpandedProofDocument<S: CryptographicSuite> {
 //     #[ld("https://w3id.org/security#proof")]
@@ -370,4 +389,185 @@ pub struct ProofRef<'a, S: CryptographicSuite> {
 
     /// Extra properties.
     pub extra_properties: &'a BTreeMap<String, json_syntax::Value>,
+}
+
+/// Set of Data-Integrity proofs.
+#[derive(Educe)]
+#[educe(Debug(bound(
+    "S: Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug"
+)))]
+#[educe(Clone(bound(
+    "S: Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone"
+)))]
+#[educe(Default)]
+pub struct Proofs<S: CryptographicSuite>(pub(crate) Vec<Proof<S>>);
+
+impl<S: CryptographicSuite> Proofs<S> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn as_slice(&self) -> &[Proof<S>] {
+        &self.0
+    }
+
+    pub fn as_mut_slice(&mut self) -> &mut [Proof<S>] {
+        &mut self.0
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<Proof<S>> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<Proof<S>> {
+        self.0.iter_mut()
+    }
+}
+
+impl<S: CryptographicSuite> Deref for Proofs<S> {
+    type Target = Vec<Proof<S>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S: CryptographicSuite> DerefMut for Proofs<S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<S: CryptographicSuite> Borrow<[Proof<S>]> for Proofs<S> {
+    fn borrow(&self) -> &[Proof<S>] {
+        self.as_slice()
+    }
+}
+
+impl<S: CryptographicSuite> BorrowMut<[Proof<S>]> for Proofs<S> {
+    fn borrow_mut(&mut self) -> &mut [Proof<S>] {
+        self.as_mut_slice()
+    }
+}
+
+impl<S: CryptographicSuite> AsRef<[Proof<S>]> for Proofs<S> {
+    fn as_ref(&self) -> &[Proof<S>] {
+        self.as_slice()
+    }
+}
+
+impl<S: CryptographicSuite> AsMut<[Proof<S>]> for Proofs<S> {
+    fn as_mut(&mut self) -> &mut [Proof<S>] {
+        self.as_mut_slice()
+    }
+}
+
+impl<S: CryptographicSuite> From<Proof<S>> for Proofs<S> {
+    fn from(value: Proof<S>) -> Self {
+        Self(vec![value])
+    }
+}
+
+impl<S: CryptographicSuite> From<Vec<Proof<S>>> for Proofs<S> {
+    fn from(value: Vec<Proof<S>>) -> Self {
+        Self(value)
+    }
+}
+
+impl<T, S: CryptographicSuite> AttachProof<T> for Proofs<S> {
+    type Attached = DataIntegrity<T, S>;
+
+    fn attach_to(self, claims: T) -> Self::Attached {
+        DataIntegrity::new(claims, self)
+    }
+}
+
+impl<S: CryptographicSuite> Extend<Proof<S>> for Proofs<S> {
+    fn extend<T: IntoIterator<Item = Proof<S>>>(&mut self, iter: T) {
+        self.0.extend(iter)
+    }
+}
+
+impl<S: CryptographicSuite> IntoIterator for Proofs<S> {
+    type IntoIter = std::vec::IntoIter<Proof<S>>;
+    type Item = Proof<S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, S: CryptographicSuite> IntoIterator for &'a Proofs<S> {
+    type IntoIter = std::slice::Iter<'a, Proof<S>>;
+    type Item = &'a Proof<S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'a, S: CryptographicSuite> IntoIterator for &'a mut Proofs<S> {
+    type IntoIter = std::slice::IterMut<'a, Proof<S>>;
+    type Item = &'a mut Proof<S>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_mut()
+    }
+}
+
+impl<T: CryptographicSuite> Serialize for Proofs<T>
+where
+    T::VerificationMethod: Serialize,
+    T::Options: Serialize,
+    T::Signature: Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        OneOrManyRef::from_slice(&self.0).serialize(serializer)
+    }
+}
+
+impl<'de, S: CryptographicSuite + TryFrom<Type>> Deserialize<'de> for Proofs<S>
+where
+    S::VerificationMethod: serde::Deserialize<'de>,
+    S::Options: serde::Deserialize<'de>,
+    S::Signature: serde::Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match OneOrMany::<Proof<S>>::deserialize(deserializer)? {
+            OneOrMany::One(proof) => Ok(Self(vec![proof])),
+            OneOrMany::Many(proofs) => Ok(Self(proofs)),
+        }
+    }
+}
+
+impl<S: CryptographicSuite> ssi_claims_core::Proof for Proofs<S> {
+    type Prepared = PreparedProofs<S>;
+}
+
+impl<T, E, S> ssi_claims_core::PrepareWith<T, E> for Proofs<S>
+where
+    T: JsonLdNodeObject,
+    S: CryptographicSuiteInput<T, E>,
+    E: for<'a> ProofConfigurationRefExpansion<'a, S>,
+{
+    async fn prepare_with(
+        self,
+        claims: &T,
+        environment: &mut E,
+    ) -> Result<Self::Prepared, ProofPreparationError> {
+        self.0
+            .prepare_with(claims, environment)
+            .await
+            .map(PreparedProofs)
+    }
 }

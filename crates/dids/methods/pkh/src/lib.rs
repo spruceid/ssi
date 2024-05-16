@@ -1031,7 +1031,7 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vc_fuzzed = vc.clone();
-        fuzz_proof_value(vc_fuzzed.proof_mut().first_mut().unwrap());
+        fuzz_proof_value(vc_fuzzed.proof.first_mut().unwrap());
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
@@ -1072,7 +1072,7 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        fuzz_proof_value(vp_fuzzed.proof_mut().first_mut().unwrap());
+        fuzz_proof_value(vp_fuzzed.proof.first_mut().unwrap());
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
@@ -1169,7 +1169,7 @@ mod tests {
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
-        fuzz_proof_value(vc_fuzzed.proof_mut().first_mut().unwrap());
+        fuzz_proof_value(vc_fuzzed.proof.first_mut().unwrap());
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
@@ -1203,7 +1203,7 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        fuzz_proof_value(vp_fuzzed.proof_mut().first_mut().unwrap());
+        fuzz_proof_value(vp_fuzzed.proof.first_mut().unwrap());
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 

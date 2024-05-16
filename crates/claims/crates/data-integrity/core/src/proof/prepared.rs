@@ -1,10 +1,13 @@
-use ssi_claims_core::serde::{SerializeVerifiableClaims, SerializeVerifiableClaimsFromSlice};
+use educe::Educe;
+use ssi_claims_core::serde::SerializeVerifiableClaims;
+use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::one_or_many::OneOrManyRef;
-use std::fmt;
+use ssi_verification_methods_core::VerificationMethodResolver;
+use std::fmt::{self, Debug};
 use std::ops::{Deref, DerefMut};
 
 use super::Proof;
-use crate::CryptographicSuite;
+use crate::{CryptographicSuite, Proofs};
 
 /// Prepared Data-Integrity Proof.
 pub struct PreparedProof<T: CryptographicSuite> {
@@ -40,6 +43,21 @@ impl<T: CryptographicSuite> Deref for PreparedProof<T> {
 impl<T: CryptographicSuite> DerefMut for PreparedProof<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.proof
+    }
+}
+
+impl<T, S: CryptographicSuite, V: VerificationMethodResolver<Method = S::VerificationMethod>>
+    ssi_claims_core::ValidateProof<T, V> for PreparedProof<S>
+{
+    async fn validate_proof<'a>(
+        &'a self,
+        _claims: &'a T,
+        verifier: &'a V,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        let suite = self.proof().suite();
+        suite
+            .verify_proof(self.hash(), verifier, self.proof().borrowed())
+            .await
     }
 }
 
@@ -126,18 +144,74 @@ where
     }
 }
 
-impl<T: serde::Serialize, S: CryptographicSuite> SerializeVerifiableClaimsFromSlice<T>
-    for PreparedProof<S>
+#[derive(Educe)]
+#[educe(Debug(bound("S: Debug, S::Hashed: Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug")))]
+#[educe(Clone(bound("S: Clone, S::Hashed: Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone")))]
+#[educe(Default)]
+pub struct PreparedProofs<S: CryptographicSuite>(pub(crate) Vec<PreparedProof<S>>);
+
+impl<S: CryptographicSuite> Deref for PreparedProofs<S> {
+    type Target = Vec<PreparedProof<S>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<S: CryptographicSuite> DerefMut for PreparedProofs<S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<S: CryptographicSuite> From<PreparedProof<S>> for PreparedProofs<S> {
+    fn from(value: PreparedProof<S>) -> Self {
+        Self(vec![value])
+    }
+}
+
+impl<S: CryptographicSuite> ssi_claims_core::UnprepareProof for PreparedProofs<S> {
+    type Unprepared = Proofs<S>;
+
+    fn unprepare(self) -> Self::Unprepared {
+        Proofs(self.0.unprepare())
+    }
+}
+
+impl<T, S: CryptographicSuite, V: VerificationMethodResolver<Method = S::VerificationMethod>>
+    ssi_claims_core::ValidateProof<T, V> for PreparedProofs<S>
+{
+    async fn validate_proof<'a>(
+        &'a self,
+        claims: &'a T,
+        verifier: &'a V,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.0.validate_proof(claims, verifier).await
+    }
+}
+
+impl<T: CryptographicSuite> serde::Serialize for PreparedProofs<T>
 where
+    T::VerificationMethod: serde::Serialize,
+    T::Options: serde::Serialize,
+    T::Signature: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        OneOrManyRef::from_slice(&self.0).serialize(serializer)
+    }
+}
+
+impl<T: serde::Serialize, S> SerializeVerifiableClaims<T> for PreparedProofs<S>
+where
+    S: CryptographicSuite,
     S::VerificationMethod: serde::Serialize,
     S::Options: serde::Serialize,
     S::Signature: serde::Serialize,
 {
-    fn serialize_verifiable_claims_from_slice<U>(
-        proofs: &[Self],
-        claims: &T,
-        serializer: U,
-    ) -> Result<U::Ok, U::Error>
+    fn serialize_verifiable_claims<U>(&self, claims: &T, serializer: U) -> Result<U::Ok, U::Error>
     where
         U: serde::Serializer,
     {
@@ -153,11 +227,7 @@ where
 
         WithClaims {
             claims,
-            proof: if proofs.len() == 1 {
-                OneOrManyRef::One(&proofs[0])
-            } else {
-                OneOrManyRef::Many(proofs)
-            },
+            proof: OneOrManyRef::from_slice(&self.0),
         }
         .serialize(serializer)
     }

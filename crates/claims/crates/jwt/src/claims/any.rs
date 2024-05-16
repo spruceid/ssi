@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Proof, Validate};
 
 use crate::{Claim, ClaimSet};
 
@@ -67,11 +67,11 @@ impl ClaimSet for AnyClaims {
     }
 }
 
-impl<E> Validate<E> for AnyClaims
+impl<E, P: Proof> Validate<E, P> for AnyClaims
 where
     E: DateTimeEnvironment,
 {
-    fn validate(&self, env: &E) -> ClaimsValidity {
+    fn validate(&self, env: &E, _proof: &P::Prepared) -> ClaimsValidity {
         ClaimSet::validate_registered_claims(self, env)
     }
 }

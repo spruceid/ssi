@@ -2,14 +2,13 @@
 //! Credentials.
 //!
 //! See: <https://w3c-ccg.github.io/vc-status-rl-2020/>
-//! See:
-use crate::JsonVerifiableCredential;
 use bitvec::prelude::Lsb0;
 use bitvec::slice::BitSlice;
 use core::convert::TryFrom;
 use iref::{IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::ProofValidationError;
+use ssi_claims_core::{ProofPreparationError, ProofValidationError};
+use ssi_data_integrity::AnyDataIntegrity;
 use ssi_json_ld::ContextLoader;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 use thiserror::Error;
@@ -19,6 +18,8 @@ mod v2021;
 
 pub use v2020::*;
 pub use v2021::*;
+
+use crate::JsonCredential;
 
 /// Minimum length of a revocation list bit-string.
 ///
@@ -180,9 +181,6 @@ pub enum Reason {
     #[error("Invalid URI scheme `{0}`")]
     UnsupportedUriScheme(iref::uri::SchemeBuf),
 
-    #[error("Credential decode error: {0}")]
-    CredentialDecodeError(ssi_data_integrity::DecodeError),
-
     #[error("Revocation list issuer mismatch (credential issuer is `{0}`, revocation list issuer is `{1}`)")]
     IssuerMismatch(UriBuf, UriBuf),
 
@@ -221,6 +219,12 @@ pub enum StatusCheckError {
     #[error("Loading credential failed: {0}")]
     LoadCredential(#[from] LoadResourceError),
 
+    #[error("Syntax error: {0}")]
+    Syntax(#[from] serde_json::Error),
+
+    #[error("Proof preparation failed: {0}")]
+    ProofPreparation(#[from] ProofPreparationError),
+
     #[error("Credential verification failed: {0}")]
     CredentialVerification(#[from] ProofValidationError),
 
@@ -232,7 +236,7 @@ pub trait CredentialStatus {
     #[allow(async_fn_in_trait)]
     async fn check(
         &self,
-        credential: &JsonVerifiableCredential,
+        credential: &AnyDataIntegrity<JsonCredential>,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         context_loader: &mut ContextLoader,
     ) -> Result<StatusCheck, StatusCheckError>;
@@ -365,9 +369,8 @@ async fn load_resource(url: &str) -> Result<Vec<u8>, LoadResourceError> {
 pub enum LoadCredentialError {
     #[error("Unable to load resource: {0}")]
     Load(#[from] LoadResourceError),
-
-    #[error("Error reading HTTP response: {0}")]
-    Decode(#[from] ssi_data_integrity::DecodeError),
+    // #[error("Error reading HTTP response: {0}")]
+    // Decode(#[from] ssi_data_integrity::DecodeError),
 }
 
 #[cfg(test)]

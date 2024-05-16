@@ -45,7 +45,7 @@ where
     Ok(
         sign_single(input, environment, resolver, signer, suite, params)
             .await?
-            .map(|t, p| (t, vec![p])),
+            .map(|t, p| (t, p.into())),
     )
 }
 

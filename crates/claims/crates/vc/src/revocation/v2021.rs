@@ -5,8 +5,8 @@ use bitvec::prelude::Lsb0;
 use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::Verifiable;
-use ssi_data_integrity::{AnyInputContext, AnyProofs};
+use ssi_claims_core::VerifiableClaims;
+use ssi_data_integrity::{AnyDataIntegrity, AnyInputContext};
 use ssi_json_ld::{ContextLoader, STATUS_LIST_2021_V1_CONTEXT};
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 use static_iref::iri;
@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use crate::{
     json::RequiredCredentialType,
     revocation::{load_resource, Reason},
-    JsonVerifiableCredential, RequiredContext, SpecializedJsonCredential, V1,
+    JsonCredential, RequiredContext, SpecializedJsonCredential, V1,
 };
 
 use super::{
@@ -137,7 +137,7 @@ impl CredentialStatus for StatusList2021Entry {
     /// [1]: https://w3c-ccg.github.io/vc-status-list-2021/#validate-algorithm
     async fn check(
         &self,
-        credential: &JsonVerifiableCredential,
+        credential: &AnyDataIntegrity<JsonCredential>,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         context_loader: &mut ContextLoader,
     ) -> Result<StatusCheck, StatusCheckError> {
@@ -167,16 +167,10 @@ impl CredentialStatus for StatusList2021Entry {
         }
 
         let credential_data = load_resource(&self.status_list_credential).await?;
-        let status_list_credential: Verifiable<StatusList2021Credential, AnyProofs> =
-            match ssi_data_integrity::from_json_slice(
-                &credential_data,
-                AnyInputContext::from_ld_context_loader(context_loader),
-            )
-            .await
-            {
-                Ok(credential) => credential,
-                Err(e) => return Ok(StatusCheck::Invalid(Reason::CredentialDecodeError(e))),
-            };
+        let status_list_credential =
+            serde_json::from_slice::<AnyDataIntegrity<StatusList2021Credential>>(&credential_data)?
+                .into_verifiable_with(AnyInputContext::from_ld_context_loader(context_loader))
+                .await?;
 
         if credential.issuer.id() != status_list_credential.issuer.id() {
             return Ok(StatusCheck::Invalid(Reason::IssuerMismatch(

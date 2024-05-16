@@ -1,6 +1,9 @@
 //! Verifiable Claims.
 use ::serde::{Deserialize, Serialize};
+use data_integrity::{CryptographicSuite, DataIntegrity};
+use educe::Educe;
 pub use ssi_claims_core::*;
+use std::fmt::Debug;
 
 /// JSON Web signature (JWS).
 ///
@@ -27,9 +30,8 @@ pub use ssi_sd_jwt as sd_jwt;
 pub use ssi_vc as vc;
 
 pub use vc::{
-    Credential, JsonCredential, JsonPresentation, JsonVerifiableCredential,
-    JsonVerifiablePresentation, Presentation, SpecializedJsonCredential, VerifiableCredential,
-    VerifiablePresentation,
+    Credential, JsonCredential, JsonPresentation, Presentation, SpecializedJsonCredential,
+    VerifiableCredential, VerifiablePresentation,
 };
 
 /// Data-Integrity Proofs.
@@ -38,22 +40,20 @@ pub use vc::{
 pub use ssi_data_integrity as data_integrity;
 
 /// JSON-like verifiable credential or JWS (presumably JWT).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
-pub enum JsonCredentialOrJws<P = json_syntax::Value> {
+#[derive(Educe, Serialize, Deserialize)]
+#[serde(
+    untagged,
+    bound(
+        serialize = "S::VerificationMethod: Serialize, S::Options: Serialize, S::Signature: Serialize",
+        deserialize = "S: CryptographicSuite + TryFrom<data_integrity::Type>, S::VerificationMethod: Deserialize<'de>, S::Options: Deserialize<'de>, S::Signature: Deserialize<'de>"
+    )
+)]
+#[educe(Clone(bound("S: CryptographicSuite + Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone")))]
+#[educe(Debug(bound("S: CryptographicSuite + Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug")))]
+pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     /// JSON-like verifiable credential.
-    Credential(vc::JsonVerifiableCredential<P>),
+    Credential(DataIntegrity<vc::JsonCredential, S>),
 
     /// JSON Web Signature.
     Jws(jws::CompactJWSString),
 }
-
-// impl JsonCredentialOrJws {
-// 	pub fn into_credential<P>(self) -> Result<vc::JsonVerifiableCredential<P>, JwtVcIntoCredentialError> {
-// 		jwt::decode_unverified(jwt)
-// 	}
-// }
-
-// pub enum JwtVcIntoCredentialError {
-// 	// ...
-// }

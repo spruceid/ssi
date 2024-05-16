@@ -73,12 +73,12 @@ pub trait ExtractProof: Sized + VerifiableClaims {
 /// Proof bundling trait.
 ///
 /// Provides a method to bundle the set of claims with a proof.
-pub trait MergeWithProof<P> {
+pub trait AttachProof<T> {
     /// Set of claims with a proof.
-    type WithProofs;
+    type Attached;
 
-    /// Bundles this set of claims with the given proof.
-    fn merge_with_proof(self, proof: P) -> Self::WithProofs;
+    /// Bundles the given claims with this proof.
+    fn attach_to(self, claims: T) -> Self::Attached;
 }
 
 /// Verification outcome.

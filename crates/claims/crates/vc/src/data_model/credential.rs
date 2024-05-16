@@ -168,47 +168,47 @@ impl<T: Credential, P: Proof> Credential for Verifiable<T, P> {
     type Schema = T::Schema;
 
     fn id(&self) -> Option<&Uri> {
-        T::id(self.claims())
+        T::id(&self.claims)
     }
 
     fn additional_types(&self) -> &[String] {
-        T::additional_types(self.claims())
+        T::additional_types(&self.claims)
     }
 
     fn credential_subjects(&self) -> &[Self::Subject] {
-        T::credential_subjects(self.claims())
+        T::credential_subjects(&self.claims)
     }
 
     fn issuer(&self) -> &Self::Issuer {
-        T::issuer(self.claims())
+        T::issuer(&self.claims)
     }
 
     fn issuance_date(&self) -> DateTime {
-        T::issuance_date(self.claims())
+        T::issuance_date(&self.claims)
     }
 
     fn expiration_date(&self) -> Option<DateTime> {
-        T::expiration_date(self.claims())
+        T::expiration_date(&self.claims)
     }
 
     fn credential_status(&self) -> &[Self::Status] {
-        T::credential_status(self.claims())
+        T::credential_status(&self.claims)
     }
 
     fn refresh_services(&self) -> &[Self::RefreshService] {
-        T::refresh_services(self.claims())
+        T::refresh_services(&self.claims)
     }
 
     fn terms_of_use(&self) -> &[Self::TermsOfUse] {
-        T::terms_of_use(self.claims())
+        T::terms_of_use(&self.claims)
     }
 
     fn evidences(&self) -> &[Self::Evidence] {
-        T::evidences(self.claims())
+        T::evidences(&self.claims)
     }
 
     fn credential_schemas(&self) -> &[Self::Schema] {
-        T::credential_schemas(self.claims())
+        T::credential_schemas(&self.claims)
     }
 }
 

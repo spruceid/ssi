@@ -4,10 +4,7 @@ pub mod json;
 mod jwt;
 
 pub use context::*;
-pub use json::{
-    JsonCredential, JsonPresentation, JsonVerifiableCredential, JsonVerifiablePresentation,
-    SpecializedJsonCredential,
-};
+pub use json::{JsonCredential, JsonPresentation, SpecializedJsonCredential};
 pub use jwt::*;
 
 pub(crate) mod value_or_array {

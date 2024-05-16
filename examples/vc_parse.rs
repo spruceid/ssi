@@ -1,7 +1,7 @@
 //! This example shows how to parse a verifiable credential.
 use std::fs;
 
-use ssi_claims::{data_integrity::AnyProof, vc::JsonVerifiableCredential};
+use ssi_claims::{data_integrity::AnyDataIntegrity, JsonCredential};
 
 #[async_std::main]
 async fn main() {
@@ -9,7 +9,7 @@ async fn main() {
     let credential_content = fs::read_to_string("examples/files/vc.jsonld").unwrap();
 
     // Parse the credential into a JSON VC with any Data-Integrity proof.
-    let credential: JsonVerifiableCredential<AnyProof> =
+    let credential: AnyDataIntegrity<JsonCredential> =
         serde_json::from_str(&credential_content).unwrap();
 
     // Separate the claims from the proofs and turn it into actually verifiable

@@ -6,6 +6,7 @@ use serde_json::json;
 use ssi_claims::{
     data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
     jws::JWSPayload,
+    vc::ToJwtClaims,
 };
 use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;

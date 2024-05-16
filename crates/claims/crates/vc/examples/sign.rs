@@ -2,6 +2,7 @@
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use rand_chacha::rand_core::SeedableRng;
+use ssi_claims_core::Proof;
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuiteInput};
 use ssi_rdf::Expandable;
 use ssi_verification_methods::{
@@ -47,11 +48,11 @@ impl ssi_json_ld::JsonLdNodeObject for Credential {
     }
 }
 
-impl<E> ssi_claims_core::Validate<E> for Credential
+impl<E, P: Proof> ssi_claims_core::Validate<E, P> for Credential
 where
     E: ssi_claims_core::DateTimeEnvironment,
 {
-    fn validate(&self, env: &E) -> ssi_claims_core::ClaimsValidity {
+    fn validate(&self, env: &E, _proof: &P::Prepared) -> ssi_claims_core::ClaimsValidity {
         ssi_vc::Credential::validate_credential(self, env)
     }
 }

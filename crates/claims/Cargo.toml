@@ -76,6 +76,7 @@ serde_json.workspace = true
 json-syntax.workspace = true
 json-ld.workspace = true
 locspan.workspace = true
+educe.workspace = true
 
 # use crate::{
 #     suite::{AnySignature, AnySignatureRef, HashError},

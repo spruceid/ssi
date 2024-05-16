@@ -18,13 +18,13 @@ pub mod linked_data;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Verifiable<Claims, P: Proof> {
     /// Claims.
-    claims: Claims,
+    pub claims: Claims,
 
     /// Prepared proof.
     ///
     /// This is not just the proof, but also any information derived from the
     /// claims and/or proof required for the verification.
-    proof: P::Prepared,
+    pub proof: P::Prepared,
 }
 
 impl<T, P: Proof> Verifiable<T, P> {
@@ -55,14 +55,13 @@ impl<T, P: Proof> Verifiable<T, P> {
     ///
     /// This will effectively unprepare the proof and make them unverifiable
     /// until [`Self::new`] is called again.
-    pub fn unprepare(self) -> T::WithProofs
+    pub fn unprepare(self) -> P::Attached
     where
-        T: MergeWithProof<P>,
+        P: AttachProof<T>,
         P::Prepared: UnprepareProof<Unprepared = P>,
     {
         let (claims, prepared_proof) = self.into_parts();
-        let proof = prepared_proof.unprepare();
-        T::merge_with_proof(claims, proof)
+        prepared_proof.unprepare().attach_to(claims)
     }
 
     /// Tamper with the claims without changing the proofs.
@@ -104,26 +103,10 @@ impl<T, P: Proof> Verifiable<T, P> {
         .await
     }
 
-    pub fn claims(&self) -> &T {
-        &self.claims
-    }
-
-    pub fn claims_mut(&mut self) -> &mut T {
-        &mut self.claims
-    }
-
-    pub fn proof(&self) -> &P::Prepared {
-        &self.proof
-    }
-
-    pub fn proof_mut(&mut self) -> &mut P::Prepared {
-        &mut self.proof
-    }
-
     /// Validates the claims and verify them against the proof.
     pub async fn verify<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
     where
-        T: Validate<ValidationEnvironment>,
+        T: Validate<ValidationEnvironment, P>,
         P::Prepared: ValidateProof<T, V>,
     {
         let env = ValidationEnvironment::default();
@@ -137,10 +120,10 @@ impl<T, P: Proof> Verifiable<T, P> {
         env: &E,
     ) -> Result<Verification, ProofValidationError>
     where
-        T: Validate<E>,
+        T: Validate<E, P>,
         P::Prepared: ValidateProof<T, V>,
     {
-        match self.claims.validate(env) {
+        match self.claims.validate(env, &self.proof) {
             Ok(_) => self
                 .proof
                 .validate_proof(&self.claims, verifier)

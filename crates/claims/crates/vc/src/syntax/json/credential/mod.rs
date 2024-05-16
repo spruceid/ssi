@@ -1,7 +1,7 @@
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Proof, Validate};
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use xsd_types::DateTime;
@@ -16,7 +16,6 @@ mod schema;
 mod status;
 mod terms_of_use;
 mod r#type;
-mod verifiable;
 
 pub use evidence::*;
 pub use issuer::*;
@@ -25,7 +24,6 @@ pub use refresh_service::*;
 pub use schema::*;
 pub use status::*;
 pub use terms_of_use::*;
-pub use verifiable::*;
 
 /// JSON Credential.
 pub type JsonCredential = SpecializedJsonCredential;
@@ -154,11 +152,11 @@ impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T, E> Validate<E> for SpecializedJsonCredential<S, C, T>
+impl<S, C, T, E, P: Proof> Validate<E, P> for SpecializedJsonCredential<S, C, T>
 where
     E: DateTimeEnvironment,
 {
-    fn validate(&self, env: &E) -> ClaimsValidity {
+    fn validate(&self, env: &E, _proof: &P::Prepared) -> ClaimsValidity {
         crate::Credential::validate_credential(self, env)
     }
 }

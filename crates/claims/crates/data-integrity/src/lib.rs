@@ -8,4 +8,7 @@ pub use any::*;
 pub type AnyProof = Proof<AnySuite>;
 
 /// List of any Data-Integrity proof known by this library.
-pub type AnyProofs = Vec<Proof<AnySuite>>;
+pub type AnyProofs = Proofs<AnySuite>;
+
+/// Data-Integrity-secured claims with any cryptographic suite.
+pub type AnyDataIntegrity<T> = DataIntegrity<T, AnySuite>;

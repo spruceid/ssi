@@ -13,10 +13,10 @@ use ssi::{
     claims::{
         data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
         jws::{CompactJWSString, JWSPayload},
-        vc::JsonVerifiableCredential,
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
 };
+use ssi_claims::{data_integrity::AnyDataIntegrity, vc::ToJwtClaims, JsonCredential};
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
@@ -34,7 +34,7 @@ async fn main() {
     let mut reader = std::io::BufReader::new(std::io::stdin());
     let vc = match &proof_format_in[..] {
         "ldp" => {
-            let vc_ldp: JsonVerifiableCredential = serde_json::from_reader(reader).unwrap();
+            let vc_ldp: AnyDataIntegrity<JsonCredential> = serde_json::from_reader(reader).unwrap();
             ssi::claims::JsonCredentialOrJws::Credential(vc_ldp)
         }
         "jwt" => {
