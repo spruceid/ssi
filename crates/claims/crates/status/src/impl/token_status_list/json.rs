@@ -3,7 +3,7 @@ use std::borrow::Cow;
 
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::Validate;
+use ssi_claims_core::{Proof, Validate};
 use ssi_jwt::{match_claim_type, AnyClaims, Claim, ClaimSet, IssuedAt, Issuer, JWTClaims, Subject};
 
 use crate::{
@@ -135,8 +135,8 @@ impl ClaimSet for StatusListJwtPrivateClaims {
     }
 }
 
-impl<E> Validate<E> for StatusListJwtPrivateClaims {
-    fn validate(&self, _env: &E) -> ssi_claims_core::ClaimsValidity {
+impl<E, P: Proof> Validate<E, P> for StatusListJwtPrivateClaims {
+    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ssi_claims_core::ClaimsValidity {
         Ok(())
     }
 }

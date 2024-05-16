@@ -8,9 +8,9 @@
 //! # Usage
 //!
 //! ```console
-//! $ cargo run --example status_list_client -- -t application/ld+json examples/files/status_list_revocable_1.jsonld
+//! $ cargo run --example status_list_client -- -t application/vc+ld+json examples/files/status_list_revocable_1.jsonld
 //! unrevoked
-//! $ cargo run --example status_list_client -- -t application/ld+json examples/files/status_list_revocable_3.jsonld
+//! $ cargo run --example status_list_client -- -t application/vc+ld+json examples/files/status_list_revocable_3.jsonld
 //! REVOKED
 //! ```
 //!

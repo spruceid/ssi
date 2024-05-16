@@ -9,7 +9,7 @@ use crate::{
         BitstringStatusListEntrySetCredential,
     },
     token_status_list::{self, StatusListToken},
-    EncodedStatusMap, FromBytes, StatusMap, StatusMapEntry, StatusMapEntrySet,
+    EncodedStatusMap, FromBytes, FromBytesOptions, StatusMap, StatusMapEntry, StatusMapEntrySet,
 };
 
 pub enum AnyStatusMap {
@@ -46,10 +46,15 @@ where
 {
     type Error = FromBytesError;
 
-    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+    async fn from_bytes_with(
+        bytes: &[u8],
+        media_type: &str,
+        verifier: &V,
+        options: FromBytesOptions,
+    ) -> Result<Self, Self::Error> {
         match media_type {
             "statuslist+jwt" | "statuslist+cwt" => {
-                StatusListToken::from_bytes(bytes, media_type, verifier)
+                StatusListToken::from_bytes_with(bytes, media_type, verifier, options)
                     .await
                     .map(AnyStatusMap::TokenStatusList)
                     .map_err(FromBytesError::TokenStatusList)
@@ -57,9 +62,8 @@ where
             "application/vc+ld+json+jwt"
             | "application/vc+ld+json+sd-jwt"
             | "application/vc+ld+json+cose"
-            | "application/vc+ld+json"
-            | "application/ld+json" => {
-                BitstringStatusListCredential::from_bytes(bytes, media_type, verifier)
+            | "application/vc+ld+json" => {
+                BitstringStatusListCredential::from_bytes_with(bytes, media_type, verifier, options)
                     .await
                     .map(AnyStatusMap::BitstringStatusList)
                     .map_err(FromBytesError::BitstringStatusList)
@@ -179,21 +183,27 @@ where
 {
     type Error = EntrySetFromBytesError;
 
-    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+    async fn from_bytes_with(
+        bytes: &[u8],
+        media_type: &str,
+        verifier: &V,
+        options: FromBytesOptions,
+    ) -> Result<Self, Self::Error> {
         match media_type {
             "application/json" | "application/jwt" | "application/cbor" | "application/cwt" => {
-                token_status_list::AnyStatusListEntrySet::from_bytes(bytes, media_type, verifier)
-                    .await
-                    .map(Self::TokenStatusList)
-                    .map_err(Into::into)
+                token_status_list::AnyStatusListEntrySet::from_bytes_with(
+                    bytes, media_type, verifier, options,
+                )
+                .await
+                .map(Self::TokenStatusList)
+                .map_err(Into::into)
             }
             "application/vc+ld+json+jwt"
             | "application/vc+ld+json+sd-jwt"
             | "application/vc+ld+json+cose"
-            | "application/vc+ld+json"
-            | "application/ld+json" => {
-                bitstream_status_list::BitstringStatusListEntrySetCredential::from_bytes(
-                    bytes, media_type, verifier,
+            | "application/vc+ld+json" => {
+                bitstream_status_list::BitstringStatusListEntrySetCredential::from_bytes_with(
+                    bytes, media_type, verifier, options,
                 )
                 .await
                 .map(Self::BitstringStatusList)

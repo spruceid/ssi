@@ -1,19 +1,25 @@
 use iref::Uri;
 
-use crate::{EncodedStatusMap, FromBytes};
+use crate::{EncodedStatusMap, FromBytes, FromBytesOptions};
 
 use super::{MaybeCached, ProviderError, StatusMapProvider, TypedStatusMapProvider};
 
 pub struct HttpClient<V> {
     client: reqwest::Client,
     verifier: V,
+    options: FromBytesOptions,
 }
 
 impl<V> HttpClient<V> {
     pub fn new(verifier: V) -> Self {
+        Self::new_with(verifier, FromBytesOptions::default())
+    }
+
+    pub fn new_with(verifier: V, options: FromBytesOptions) -> Self {
         Self {
             client: reqwest::Client::new(),
             verifier,
+            options,
         }
     }
 }
@@ -36,9 +42,10 @@ impl<T: EncodedStatusMap + FromBytes<V>, V> TypedStatusMapProvider<Uri, T> for H
                     .bytes()
                     .await
                     .map_err(|e| ProviderError::Internal(e.to_string()))?;
-                let encoded = T::from_bytes(bytes.as_ref(), &media_type, &self.verifier)
-                    .await
-                    .map_err(|e| ProviderError::Encoded(e.to_string()))?;
+                let encoded =
+                    T::from_bytes_with(bytes.as_ref(), &media_type, &self.verifier, self.options)
+                        .await
+                        .map_err(|e| ProviderError::Encoded(e.to_string()))?;
                 encoded
                     .decode()
                     .map_err(|e| ProviderError::Decoding(e.to_string()))

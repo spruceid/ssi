@@ -14,11 +14,33 @@ pub trait EncodedStatusMap {
     fn decode(self) -> Result<Self::Decoded, Self::DecodeError>;
 }
 
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FromBytesOptions {
+    /// Allow unsecured claims.
+    pub allow_unsecured: bool,
+}
+
+impl FromBytesOptions {
+    pub const ALLOW_UNSECURED: Self = Self {
+        allow_unsecured: true,
+    };
+}
+
 pub trait FromBytes<V>: Sized {
     type Error: std::error::Error;
 
     #[allow(async_fn_in_trait)]
-    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error>;
+    async fn from_bytes_with(
+        bytes: &[u8],
+        media_type: &str,
+        verifier: &V,
+        options: FromBytesOptions,
+    ) -> Result<Self, Self::Error>;
+
+    #[allow(async_fn_in_trait)]
+    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+        Self::from_bytes_with(bytes, media_type, verifier, FromBytesOptions::default()).await
+    }
 }
 
 pub trait StatusMap: Clone {

@@ -200,6 +200,10 @@ impl BitString {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     pub fn len(&self) -> usize {
         self.len
     }
@@ -317,6 +321,10 @@ impl StatusList {
             bit_string: BitString::from_bytes(status_size, bytes),
             ttl,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.bit_string.is_empty()
     }
 
     pub fn len(&self) -> usize {

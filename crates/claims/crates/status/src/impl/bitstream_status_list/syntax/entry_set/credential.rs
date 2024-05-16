@@ -12,7 +12,9 @@ use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier};
 use ssi_vc::{json::JsonCredentialTypes, Context, V2};
 use ssi_verification_methods::ssi_core::OneOrMany;
 
-use crate::{bitstream_status_list::FromBytesError, FromBytes, StatusMapEntrySet};
+use crate::{
+    bitstream_status_list::FromBytesError, FromBytes, FromBytesOptions, StatusMapEntrySet,
+};
 
 use super::BitstringStatusListEntry;
 
@@ -78,8 +80,8 @@ where
     }
 }
 
-impl<E> Validate<E> for BitstringStatusListEntrySetCredential {
-    fn validate(&self, _env: &E) -> ClaimsValidity {
+impl<E, P: Proof> Validate<E, P> for BitstringStatusListEntrySetCredential {
+    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
         Ok(())
     }
@@ -92,7 +94,12 @@ where
 {
     type Error = FromBytesError;
 
-    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+    async fn from_bytes_with(
+        bytes: &[u8],
+        media_type: &str,
+        verifier: &V,
+        options: FromBytesOptions,
+    ) -> Result<Self, Self::Error> {
         match media_type {
             "application/vc+ld+json+jwt" => {
                 use ssi_claims_core::VerifiableClaims;
@@ -114,10 +121,13 @@ where
             "application/vc+ld+json" => {
                 let vc: Verifiable<Self, AnyProofs> =
                     ssi_data_integrity::from_json_slice(bytes, AnyInputContext::default()).await?;
-                vc.verify(verifier).await??;
+
+                if !options.allow_unsecured || !vc.proof.is_empty() {
+                    vc.verify(verifier).await??;
+                }
+
                 Ok(vc.into_parts().0)
             }
-            "application/ld+json" => serde_json::from_slice(bytes).map_err(Into::into),
             other => Err(FromBytesError::UnexpectedMediaType(other.to_owned())),
         }
     }

@@ -32,10 +32,12 @@ where
     I::Owned: Eq + Hash,
 {
     async fn get_entry(&self, id: &I) -> Result<CacheEntry<T::Decoded>, ProviderError> {
-        let map = self.map.read();
-        if let Some(entry) = map.get(id) {
-            if !entry.is_expired(self.maximum_ttl) {
-                return Ok(entry.clone());
+        {
+            let map = self.map.read();
+            if let Some(entry) = map.get(id) {
+                if !entry.is_expired(self.maximum_ttl) {
+                    return Ok(entry.clone());
+                }
             }
         }
 

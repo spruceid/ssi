@@ -5,8 +5,8 @@
 //! Read a status list from a JWT, JWT-VC claims or Credential:
 //! ```console
 //! $ cargo run --example status_list -- read -t application/vc+ld+json+jwt examples/files/status-list.jws
-//! $ cargo run --example status_list -- read -t application/ld+json examples/files/status-list-credential.json
-//! $ cargo run --example status_list -- read -t application/vc+ld+json examples/files/status-list-credential-di.json
+//! $ cargo run --example status_list -- read -t application/vc+ld+json examples/files/status-list-credential.jsonld
+//! $ cargo run --example status_list -- read -t application/vc+ld+json examples/files/local-status-list-credential.jsonld
 //! ```
 //!
 //! Create a new status list:
@@ -19,7 +19,9 @@ use iref::UriBuf;
 use ssi_data_integrity::{AnyInputContext, AnySuite, ProofConfiguration};
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
-use ssi_status::{any::AnyStatusMap, bitstream_status_list, EncodedStatusMap, FromBytes};
+use ssi_status::{
+    any::AnyStatusMap, bitstream_status_list, EncodedStatusMap, FromBytes, FromBytesOptions,
+};
 use ssi_verification_methods::{ReferenceOrOwned, SingleSecretSigner};
 use std::{
     fs,
@@ -117,11 +119,16 @@ impl Command {
                 };
 
                 let verifier = VerificationMethodDIDResolver::new(DIDJWK);
-                let status_list = AnyStatusMap::from_bytes(&bytes, &media_type, &verifier)
-                    .await
-                    .map_err(|e| Error::FromBytes(source.clone(), e))?
-                    .decode()
-                    .map_err(|e| Error::Decode(source, e))?;
+                let status_list = AnyStatusMap::from_bytes_with(
+                    &bytes,
+                    &media_type,
+                    &verifier,
+                    FromBytesOptions::ALLOW_UNSECURED,
+                )
+                .await
+                .map_err(|e| Error::FromBytes(source.clone(), e))?
+                .decode()
+                .map_err(|e| Error::Decode(source, e))?;
 
                 let list: Vec<_> = status_list.iter().collect();
 

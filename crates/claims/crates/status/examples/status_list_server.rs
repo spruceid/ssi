@@ -7,9 +7,9 @@
 //!
 //! The credential is read from the standard input or the provided file path.
 //! ```console
-//! $ cargo run --example status_list_server -- -t application/ld+json examples/files/status-list-credential.jsonld
+//! $ cargo run --example status_list_server -- -t application/vc+ld+json examples/files/status-list-credential.jsonld
 //! serving /credentials/status/3 at 127.0.0.1:3000...
-//! $ cargo run --example status_list_server -- -t application/ld+json examples/files/local-status-list-credential.jsonld
+//! $ cargo run --example status_list_server -- -t application/vc+ld+json examples/files/local-status-list-credential.jsonld
 //! serving /#statusList at 127.0.0.1:3000...
 //! ```
 use clap::Parser;
@@ -23,7 +23,7 @@ use hyper::{
 };
 use hyper_util::rt::TokioIo;
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
-use ssi_status::{any::AnyStatusMap, FromBytes};
+use ssi_status::{any::AnyStatusMap, FromBytes, FromBytesOptions};
 use std::{
     fs,
     io::{self, Read},
@@ -79,9 +79,14 @@ async fn run(args: Args) -> Result<(), Error> {
 
     let verifier = VerificationMethodDIDResolver::new(DIDJWK);
 
-    let status_list = AnyStatusMap::from_bytes(&bytes, &args.media_type, &verifier)
-        .await
-        .map_err(|e| Error::Decode(input, e))?;
+    let status_list = AnyStatusMap::from_bytes_with(
+        &bytes,
+        &args.media_type,
+        &verifier,
+        FromBytesOptions::ALLOW_UNSECURED,
+    )
+    .await
+    .map_err(|e| Error::Decode(input, e))?;
 
     let path = status_list
         .credential_url()

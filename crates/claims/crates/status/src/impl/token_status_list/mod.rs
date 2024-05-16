@@ -19,7 +19,9 @@ pub use json::StatusListJwt;
 use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier};
 use ssi_jwt::{ClaimSet, JWTClaims, ToDecodedJWT};
 
-use crate::{EncodedStatusMap, FromBytes, StatusMap, StatusMapEntry, StatusMapEntrySet};
+use crate::{
+    EncodedStatusMap, FromBytes, FromBytesOptions, StatusMap, StatusMapEntry, StatusMapEntrySet,
+};
 
 /// Token Status List, serialized as a JWT or CWT.
 pub enum StatusListToken {
@@ -67,7 +69,12 @@ pub enum FromBytesError {
 impl<V: JWSVerifier> FromBytes<V> for StatusListToken {
     type Error = FromBytesError;
 
-    async fn from_bytes(bytes: &[u8], media_type: &str, verifier: &V) -> Result<Self, Self::Error> {
+    async fn from_bytes_with(
+        bytes: &[u8],
+        media_type: &str,
+        verifier: &V,
+        _options: FromBytesOptions,
+    ) -> Result<Self, Self::Error> {
         match media_type {
             "statuslist+jwt" => {
                 use ssi_claims_core::VerifiableClaims;
@@ -358,10 +365,11 @@ pub enum AnyStatusListEntrySet {
 impl<V: JWSVerifier> FromBytes<V> for AnyStatusListEntrySet {
     type Error = EntrySetFromBytesError;
 
-    async fn from_bytes(
+    async fn from_bytes_with(
         bytes: &[u8],
         media_type: &str,
         verifier: &V,
+        _options: FromBytesOptions,
     ) -> Result<Self, EntrySetFromBytesError> {
         match media_type {
             "application/json" => {
