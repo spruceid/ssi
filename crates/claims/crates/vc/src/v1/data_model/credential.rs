@@ -1,11 +1,17 @@
-use iref::Uri;
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims, VerifiableClaims};
+use iref::{Iri, Uri};
+use ssi_claims_core::{
+    ClaimsValidity, DateTimeEnvironment, InvalidClaims, VerifiableClaims,
+};
 use ssi_data_integrity::{CryptographicSuite, DataIntegrity};
+use static_iref::iri;
 use xsd_types::DateTime;
 
 use super::{CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse};
 
 pub const VERIFIABLE_CREDENTIAL_TYPE: &str = "VerifiableCredential";
+
+pub const VERIFIABLE_CREDENTIAL: &Iri =
+    iri!("https://www.w3.org/2018/credentials#VerifiableCredential");
 
 /// Credential trait.
 pub trait Credential {

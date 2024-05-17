@@ -5,23 +5,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct TermsOfUse {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<UriBuf>,
+pub struct Status {
+    pub id: UriBuf,
 
     #[serde(rename = "type")]
     pub type_: String,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(flatten)]
     pub property_set: Option<BTreeMap<String, json_syntax::Value>>,
 }
 
-impl crate::TermsOfUse for TermsOfUse {
-    fn id(&self) -> Option<&Uri> {
-        self.id.as_deref()
-    }
-
-    fn type_(&self) -> &str {
-        &self.type_
+impl crate::v1::CredentialStatus for Status {
+    fn id(&self) -> &Uri {
+        &self.id
     }
 }

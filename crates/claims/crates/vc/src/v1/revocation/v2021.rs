@@ -13,9 +13,11 @@ use static_iref::iri;
 use std::collections::BTreeMap;
 
 use crate::{
-    json::RequiredCredentialType,
-    revocation::{load_resource, Reason},
-    JsonCredential, RequiredContext, SpecializedJsonCredential,
+    syntax::RequiredType,
+    v1::{
+        revocation::{load_resource, Reason},
+        JsonCredential, RequiredContext, SpecializedJsonCredential,
+    },
 };
 
 use super::{
@@ -64,8 +66,8 @@ pub enum StatusList2021Subject {
 
 pub struct StatusList2021CredentialType;
 
-impl RequiredCredentialType for StatusList2021CredentialType {
-    const REQUIRED_CREDENTIAL_TYPE: &'static str = "StatusList2021Credential";
+impl RequiredType for StatusList2021CredentialType {
+    const REQUIRED_TYPE: &'static str = "StatusList2021Credential";
 }
 
 /// Verifiable Credential of type RevocationList2020Credential.

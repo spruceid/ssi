@@ -8,8 +8,8 @@ use ssi_rdf::{Interpretation, LdEnvironment};
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use xsd_types::DateTime;
 
-use super::super::value_or_array;
-use crate::{Context, RequiredContextSet, V1};
+use crate::syntax::{value_or_array, RequiredContextList, RequiredTypeSet};
+use crate::v1::Context;
 
 mod evidence;
 mod issuer;
@@ -34,9 +34,9 @@ pub type JsonCredential = SpecializedJsonCredential;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
     serialize = "S: Serialize",
-    deserialize = "S: Deserialize<'de>, C: RequiredContextSet, T: RequiredCredentialTypeSet"
+    deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct SpecializedJsonCredential<S = json_syntax::Value, C = V1, T = ()> {
+pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,
@@ -119,7 +119,7 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = V1, T = ()> {
     pub additional_properties: BTreeMap<String, json_syntax::Value>,
 }
 
-impl<S, C: RequiredContextSet, T: RequiredCredentialTypeSet> SpecializedJsonCredential<S, C, T> {
+impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S, C, T> {
     pub fn new(
         id: Option<UriBuf>,
         issuer: Issuer,
@@ -161,11 +161,11 @@ where
     E: DateTimeEnvironment,
 {
     fn validate(&self, env: &E, _proof: &P) -> ClaimsValidity {
-        crate::Credential::validate_credential(self, env)
+        crate::v1::Credential::validate_credential(self, env)
     }
 }
 
-impl<S, C, T> crate::Credential for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> crate::v1::Credential for SpecializedJsonCredential<S, C, T> {
     type Subject = S;
     type Issuer = Issuer;
     type Status = Status;

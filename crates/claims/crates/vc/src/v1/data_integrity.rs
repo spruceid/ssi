@@ -1,5 +1,6 @@
-use crate::{JsonCredential, SpecializedJsonCredential};
 use ssi_data_integrity::{AnySuite, DataIntegrity, DecodeError};
+
+use super::{JsonCredential, SpecializedJsonCredential};
 
 /// Decodes a Data-Integrity credential or presentation from its JSON binary
 /// representation.

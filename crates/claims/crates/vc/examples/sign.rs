@@ -22,11 +22,11 @@ use xsd_types::DateTime;
 pub struct Credential {
     #[ld(ignore)]
     #[serde(rename = "@context")]
-    context: ssi_vc::Context,
+    context: ssi_vc::v1::Context,
 
     #[ld(ignore)]
     #[serde(rename = "type")]
-    type_: ssi_vc::json::JsonCredentialTypes,
+    type_: ssi_vc::v1::JsonCredentialTypes,
 
     #[ld("cred:credentialSubject")]
     credential_subject: CredentialSubject,
@@ -55,11 +55,11 @@ where
     E: ssi_claims_core::DateTimeEnvironment,
 {
     fn validate(&self, env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
-        ssi_vc::Credential::validate_credential(self, env)
+        ssi_vc::v1::Credential::validate_credential(self, env)
     }
 }
 
-impl ssi_vc::Credential for Credential {
+impl ssi_vc::v1::Credential for Credential {
     type Subject = CredentialSubject;
     type Issuer = Uri;
     type Status = std::convert::Infallible;

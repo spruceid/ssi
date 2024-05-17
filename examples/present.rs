@@ -17,7 +17,10 @@ use ssi::{
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
 };
-use ssi_claims::{data_integrity::AnyDataIntegrity, vc::ToJwtClaims, JsonCredential};
+use ssi_claims::{
+    data_integrity::AnyDataIntegrity,
+    vc::v1::{JsonCredential, ToJwtClaims},
+};
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
@@ -53,7 +56,7 @@ async fn main() {
         format => panic!("unknown input proof format: {}", format),
     };
 
-    let vp = ssi::claims::vc::JsonPresentation::new(
+    let vp = ssi::claims::vc::v1::JsonPresentation::new(
         None,
         Some(uri!("did:example:foo").to_owned()),
         vec![vc],

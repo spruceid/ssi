@@ -952,10 +952,8 @@ mod tests {
     ) {
         use iref::IriBuf;
         use ssi_claims::{
-            data_integrity::{
-                signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
-            },
-            vc::{JsonCredential, JsonPresentation},
+            data_integrity::{AnyInputSuiteOptions, CryptographicSuite, ProofOptions, signing::AlterSignature},
+            vc::v1::{JsonCredential, JsonPresentation},
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
         use static_iref::uri;
@@ -998,6 +996,7 @@ mod tests {
         let signer = SingleSecretSigner::new(key.clone()).into_local();
         eprintln!("key: {key}");
         eprintln!("suite: {proof_suite:?}");
+        println!("cred: {}", serde_json::to_string_pretty(&cred).unwrap());
         let vc = proof_suite
             .sign(cred.clone(), &didpkh, &signer, issue_options.clone())
             .await
@@ -1079,11 +1078,8 @@ mod tests {
     ) {
         use iref::IriBuf;
         use ssi_claims::{
-            data_integrity::{
-                signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
-            },
-            vc::{JsonCredential, JsonPresentation},
-            VerifiableClaims,
+            data_integrity::{AnyInputSuiteOptions, CryptographicSuite, ProofOptions, signing::AlterSignature},
+            vc::v1::{JsonCredential, JsonPresentation},
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
         use static_iref::uri;
@@ -1503,7 +1499,8 @@ mod tests {
         eprintln!("test verify vc `{name}`");
         eprintln!("input: {vc_str}");
 
-        let vc = ssi_claims::vc::any_credential_from_json_str(vc_str).unwrap();
+        let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(vc_str)
+            .unwrap();
 
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
         let verification_result = vc.verify(&didpkh).await.unwrap();

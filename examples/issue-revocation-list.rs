@@ -2,8 +2,8 @@
 // cargo run --example issue-revocation-list > tests/revocationList.json
 use ssi::{
     claims::{
-        data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-        vc::revocation::{
+        data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofOptions},
+        vc::v1::revocation::{
             RevocationList2020, RevocationList2020Credential, RevocationList2020Subject,
         },
         VerifiableClaims,

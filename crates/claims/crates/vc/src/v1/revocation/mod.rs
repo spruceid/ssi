@@ -18,7 +18,7 @@ mod v2021;
 pub use v2020::*;
 pub use v2021::*;
 
-use crate::JsonCredential;
+use super::JsonCredential;
 
 /// Minimum length of a revocation list bit-string.
 ///
@@ -374,11 +374,11 @@ mod tests {
 
     pub const EXAMPLE_REVOCATION_2020_LIST_URL: &str = "https://example.test/revocationList.json";
     pub const EXAMPLE_REVOCATION_2020_LIST: &[u8] =
-        include_bytes!("../../../../../../tests/revocationList.json");
+        include_bytes!("../../../../../../../tests/revocationList.json");
 
     pub const EXAMPLE_STATUS_LIST_2021_URL: &str = "https://example.com/credentials/status/3";
     pub const EXAMPLE_STATUS_LIST_2021: &[u8] =
-        include_bytes!("../../../../../../tests/statusList.json");
+        include_bytes!("../../../../../../../tests/statusList.json");
 
     #[test]
     fn default_list() {

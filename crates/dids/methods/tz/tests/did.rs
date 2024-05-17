@@ -7,7 +7,7 @@ use ssi_claims::{
         signing::AlterSignature, AnyInputSuiteOptions, AnySuite, CryptographicSuite, DataIntegrity,
         ProofOptions as SuiteOptions,
     },
-    vc::{JsonCredential, JsonPresentation},
+    vc::v1::{JsonCredential, JsonPresentation},
     VerifiableClaims,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};

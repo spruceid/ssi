@@ -9,8 +9,9 @@ async fn main() {
     // Load the credential textual representation from the file system.
     let credential_content = fs::read_to_string("examples/files/vc.jsonld").unwrap();
 
-    // Parse the VC.
-    let vc = ssi::claims::vc::any_credential_from_json_str(&credential_content).unwrap();
+    // All of the above can be done with the following helper function.
+    let vc = ssi::claims::vc::v1::data_integrity::any_credential_from_json_str(&credential_content)
+        .unwrap();
 
     // Prepare our verifier.
     let verifier = create_verifier();

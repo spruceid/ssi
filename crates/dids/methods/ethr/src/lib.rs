@@ -380,7 +380,7 @@ mod tests {
             signing::AlterSignature, AnyInputSuiteOptions, AnySuite, CryptographicSuite,
             ProofOptions,
         },
-        vc::{JsonCredential, JsonPresentation},
+        vc::v1::{JsonCredential, JsonPresentation},
         VerifiableClaims,
     };
     use ssi_dids_core::{did, DIDResolver};
@@ -592,8 +592,10 @@ mod tests {
     #[tokio::test]
     async fn credential_verify_eip712vm() {
         let didethr = DIDEthr.with_default_options();
-        let vc = ssi_claims::vc::any_credential_from_json_str(include_str!("../tests/vc.jsonld"))
-            .unwrap();
+        let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(include_str!(
+            "../tests/vc.jsonld"
+        ))
+        .unwrap();
         // eprintln!("vc {:?}", vc);
         assert!(vc.verify(&didethr).await.unwrap().is_ok())
     }

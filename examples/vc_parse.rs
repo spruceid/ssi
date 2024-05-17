@@ -1,7 +1,7 @@
 //! This example shows how to parse a verifiable credential.
 use std::fs;
 
-use ssi_claims::{data_integrity::AnyDataIntegrity, JsonCredential};
+use ssi_claims::{data_integrity::AnyDataIntegrity, vc::v1::JsonCredential};
 
 #[async_std::main]
 async fn main() {
@@ -13,8 +13,9 @@ async fn main() {
 
     println!("{}", serde_json::to_string_pretty(&vc).unwrap());
 
-    // The above can also be done with the following helper function.
-    let vc = ssi::claims::vc::any_credential_from_json_str(&credential_content).unwrap();
+    // All of the above can be done with the following helper function.
+    let vc = ssi::claims::vc::v1::data_integrity::any_credential_from_json_str(&credential_content)
+        .unwrap();
 
     // Print the same credential.
     println!("{}", serde_json::to_string_pretty(&vc).unwrap());

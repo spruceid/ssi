@@ -5,23 +5,23 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
-pub struct Evidence {
+pub struct TermsOfUse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<UriBuf>,
 
     #[serde(rename = "type")]
-    pub type_: Vec<String>,
+    pub type_: String,
 
     #[serde(flatten)]
     pub property_set: Option<BTreeMap<String, json_syntax::Value>>,
 }
 
-impl crate::Evidence for Evidence {
+impl crate::v1::TermsOfUse for TermsOfUse {
     fn id(&self) -> Option<&Uri> {
         self.id.as_deref()
     }
 
-    fn type_(&self) -> &[String] {
+    fn type_(&self) -> &str {
         &self.type_
     }
 }

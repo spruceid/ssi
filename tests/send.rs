@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use ssi::{
     claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-        vc::SpecializedJsonCredential,
+        vc::v1::SpecializedJsonCredential,
     },
     dids::{DIDResolver, DIDJWK},
     verification_methods::SingleSecretSigner,

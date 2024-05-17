@@ -15,10 +15,7 @@ use ssi_claims::{
         suite::{CryptographicSuiteSigning, InputOptions},
         AnyDataIntegrity, AnyProofs, AnySignatureAlgorithm, AnySuite, CryptographicSuite,
         DataIntegrity, Proof, Proofs,
-    },
-    vc::{Context, RequiredContext},
-    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims, SignatureError,
-    Validate, VerificationEnvironment,
+    }, vc::syntax::{Context, RequiredContext}, ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims, SignatureError, Validate
 };
 use ssi_json_ld::{ContextLoaderEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
@@ -145,9 +142,8 @@ impl<C, P> Delegation<C, P> {
         S: Signer<AnyMethod>,
         S::MessageSigner: MessageSigner<AnySignatureAlgorithm>,
     {
-        self.sign_with(
+        self.sign(
             suite,
-            VerificationEnvironment::default(),
             resolver,
             signer,
             proof_configuration,
@@ -429,7 +425,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_claims::VerifiableClaims;
+    use ssi_claims::{VerifiableClaims, VerificationEnvironment};
     use ssi_data_integrity::DataIntegrity;
     use ssi_dids_core::{example::ExampleDIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;

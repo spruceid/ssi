@@ -1,11 +1,8 @@
-//! Syntaxes for the VC data model.
 mod context;
-pub mod json;
-mod jwt;
+mod types;
 
 pub use context::*;
-pub use json::{JsonCredential, JsonPresentation, SpecializedJsonCredential};
-pub use jwt::*;
+pub use types::*;
 
 pub(crate) mod value_or_array {
     use serde::{Deserialize, Serialize};

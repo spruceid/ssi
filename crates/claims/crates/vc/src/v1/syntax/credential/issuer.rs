@@ -25,7 +25,7 @@ impl From<UriBuf> for Issuer {
     }
 }
 
-impl crate::Issuer for Issuer {
+impl crate::v1::Issuer for Issuer {
     fn id(&self) -> &Uri {
         self.id()
     }

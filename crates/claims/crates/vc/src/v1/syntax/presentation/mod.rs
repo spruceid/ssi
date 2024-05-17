@@ -1,6 +1,7 @@
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
-use crate::{Context, Credential};
+use crate::syntax::value_or_array;
+use crate::v1::{Context, Credential};
 use iref::{Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::VocabularyMut;
@@ -9,7 +10,7 @@ use ssi_claims_core::{ClaimsValidity, Validate};
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment};
 
-use super::{super::value_or_array, SpecializedJsonCredential};
+use super::SpecializedJsonCredential;
 
 mod r#type;
 pub use r#type::*;
@@ -95,7 +96,7 @@ impl<C, E, P> Validate<E, P> for JsonPresentation<C> {
     }
 }
 
-impl<C: Credential> crate::Presentation for JsonPresentation<C> {
+impl<C: Credential> crate::v1::Presentation for JsonPresentation<C> {
     /// Verifiable credential type.
     type Credential = C;
 
