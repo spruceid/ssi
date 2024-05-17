@@ -28,4 +28,5 @@ exec curl \
 	https://w3id.org/vc/status-list/2021/v1 -o w3id-vc-status-list-2021-v1.jsonld \
 	https://demo.didkit.dev/2022/cacao-zcap/contexts/v1.json -o cacao-zcap-v1.jsonld \
 	https://w3c-ccg.github.io/vc-ed/plugfest-1-2022/jff-vc-edu-plugfest-1-context.json -o jff-vc-edu-plugfest-1-context.json \
+	https://identity.foundation/.well-known/did-configuration/v1 -o did-configuration-v1.jsonld \
 	-L
