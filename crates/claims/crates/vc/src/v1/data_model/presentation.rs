@@ -45,6 +45,15 @@ pub struct PresentationTypes<'a> {
     additional_types: std::slice::Iter<'a, String>,
 }
 
+impl<'a> PresentationTypes<'a> {
+    pub fn from_additional_types(additional_types: &'a [String]) -> Self {
+        Self {
+            base_type: true,
+            additional_types: additional_types.iter(),
+        }
+    }
+}
+
 impl<'a> Iterator for PresentationTypes<'a> {
     type Item = &'a str;
 

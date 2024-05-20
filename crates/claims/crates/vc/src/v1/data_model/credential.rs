@@ -63,10 +63,7 @@ pub trait Credential {
     }
 
     fn types(&self) -> CredentialTypes {
-        CredentialTypes {
-            base_type: true,
-            additional_types: self.additional_types().iter(),
-        }
+        CredentialTypes::from_additional_types(self.additional_types())
     }
 
     /// Credential subject.
@@ -226,6 +223,15 @@ impl<T: Credential, S: CryptographicSuite> Credential for DataIntegrity<T, S> {
 pub struct CredentialTypes<'a> {
     base_type: bool,
     additional_types: std::slice::Iter<'a, String>,
+}
+
+impl<'a> CredentialTypes<'a> {
+    pub fn from_additional_types(additional_types: &'a [String]) -> Self {
+        Self {
+            base_type: true,
+            additional_types: additional_types.iter(),
+        }
+    }
 }
 
 impl<'a> Iterator for CredentialTypes<'a> {
