@@ -2,12 +2,10 @@ use iref::Uri;
 use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
 use xsd_types::DateTimeStamp;
 
-use super::{
-    Evidence, Identified, InternationalString, MaybeIdentified, RefreshService, RelatedResource,
-    Status, TermsOfUse,
-};
+use super::{InternationalString, RelatedResource};
 
 pub use crate::v1::CredentialTypes;
+use crate::{Identified, MaybeIdentified, Typed};
 
 /// Verifiable Credential.
 pub trait Credential: MaybeIdentified {
@@ -15,23 +13,23 @@ pub trait Credential: MaybeIdentified {
     type Description: InternationalString;
 
     /// Credential subject type.
-    type Subject: MaybeIdentified;
+    type Subject;
 
     /// Return type of the [`issuer`](Credential::issuer) method.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#issuer>
     type Issuer: Identified;
 
-    type Status: Status;
+    type Status: MaybeIdentified + Typed;
 
-    type Schema;
+    type Schema: Identified + Typed;
 
     type RelatedResource: RelatedResource;
 
     /// Refresh service.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#refreshing>
-    type RefreshService: RefreshService;
+    type RefreshService: Typed;
 
     /// Terms of Use type.
     ///
@@ -40,13 +38,13 @@ pub trait Credential: MaybeIdentified {
     /// issued.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#terms-of-use>
-    type TermsOfUse: TermsOfUse;
+    type TermsOfUse: MaybeIdentified + Typed;
 
     /// Evidence type.
     ///
     /// Can be included by an issuer to provide the verifier with additional
     /// supporting information in a verifiable credential.
-    type Evidence: Evidence;
+    type Evidence: MaybeIdentified + Typed;
 
     /// Identifier.
     fn id(&self) -> Option<&Uri> {
@@ -152,7 +150,7 @@ pub trait Credential: MaybeIdentified {
     /// credential, such as whether it is suspended or revoked.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#status>
-    fn credential_status(&self) -> &[&Self::Status] {
+    fn credential_status(&self) -> &[Self::Status] {
         &[]
     }
 
@@ -162,7 +160,7 @@ pub trait Credential: MaybeIdentified {
     /// collection of data.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#data-schemas>
-    fn credential_schemas(&self) -> &[&Self::Schema] {
+    fn credential_schemas(&self) -> &[Self::Schema] {
         &[]
     }
 

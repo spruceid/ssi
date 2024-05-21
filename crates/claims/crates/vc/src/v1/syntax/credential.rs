@@ -8,27 +8,26 @@ use ssi_rdf::{Interpretation, LdEnvironment};
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use xsd_types::DateTime;
 
-use crate::syntax::{value_or_array, RequiredContextList, RequiredTypeSet};
-use crate::v1::Context;
+use crate::syntax::{
+    value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject, MaybeIdentifiedTypedObject,
+    RequiredContextList, RequiredType, RequiredTypeSet, TypeSerializationPolicy, Types,
+};
 
-mod evidence;
-mod issuer;
-mod refresh_service;
-mod schema;
-mod status;
-mod terms_of_use;
-mod r#type;
+use super::Context;
 
-pub use evidence::*;
-pub use issuer::*;
-pub use r#type::*;
-pub use refresh_service::*;
-pub use schema::*;
-pub use status::*;
-pub use terms_of_use::*;
+pub const VERIFIABLE_CREDENTIAL_TYPE: &str = "VerifiableCredential";
 
-/// JSON Credential.
-pub type JsonCredential = SpecializedJsonCredential;
+pub struct CredentialType;
+
+impl RequiredType for CredentialType {
+    const REQUIRED_TYPE: &'static str = VERIFIABLE_CREDENTIAL_TYPE;
+}
+
+impl TypeSerializationPolicy for CredentialType {
+    const PREFER_ARRAY: bool = true;
+}
+
+pub type JsonCredentialTypes<T = ()> = Types<CredentialType, T>;
 
 /// Specialized JSON Credential.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,7 +35,7 @@ pub type JsonCredential = SpecializedJsonCredential;
     serialize = "S: Serialize",
     deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
+pub struct JsonCredential<S = json_syntax::Value, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,
@@ -59,7 +58,7 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
     pub credential_subjects: Vec<S>,
 
     /// Issuer.
-    pub issuer: Issuer,
+    pub issuer: IdOr<IdentifiedObject>,
 
     /// Issuance date.
     ///
@@ -79,7 +78,7 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub credential_status: Vec<Status>,
+    pub credential_status: Vec<IdentifiedTypedObject>,
 
     /// Terms of use.
     #[serde(rename = "termsOfUse")]
@@ -88,7 +87,7 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub terms_of_use: Vec<TermsOfUse>,
+    pub terms_of_use: Vec<MaybeIdentifiedTypedObject>,
 
     /// Evidences.
     #[serde(rename = "evidence")]
@@ -97,7 +96,7 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub evidences: Vec<Evidence>,
+    pub evidences: Vec<MaybeIdentifiedTypedObject>,
 
     #[serde(rename = "credentialSchema")]
     #[serde(
@@ -105,7 +104,7 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub credential_schema: Vec<Schema>,
+    pub credential_schema: Vec<IdentifiedTypedObject>,
 
     #[serde(rename = "refreshService")]
     #[serde(
@@ -113,16 +112,16 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub refresh_services: Vec<RefreshService>,
+    pub refresh_services: Vec<IdentifiedTypedObject>,
 
     #[serde(flatten)]
     pub additional_properties: BTreeMap<String, json_syntax::Value>,
 }
 
-impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S, C, T> {
+impl<S, C: RequiredContextList, T: RequiredTypeSet> JsonCredential<S, C, T> {
     pub fn new(
         id: Option<UriBuf>,
-        issuer: Issuer,
+        issuer: IdOr<IdentifiedObject>,
         issuance_date: xsd_types::DateTime,
         credential_subjects: Vec<S>,
     ) -> Self {
@@ -144,19 +143,19 @@ impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S,
     }
 }
 
-impl<S, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> JsonLdObject for JsonCredential<S, C, T> {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
-impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> JsonLdNodeObject for JsonCredential<S, C, T> {
     fn json_ld_type(&self) -> JsonLdTypes {
         self.types.to_json_ld_types()
     }
 }
 
-impl<S, C, T, E, P> Validate<E, P> for SpecializedJsonCredential<S, C, T>
+impl<S, C, T, E, P> Validate<E, P> for JsonCredential<S, C, T>
 where
     E: DateTimeEnvironment,
 {
@@ -165,14 +164,14 @@ where
     }
 }
 
-impl<S, C, T> crate::v1::Credential for SpecializedJsonCredential<S, C, T> {
+impl<S, C, T> crate::v1::Credential for JsonCredential<S, C, T> {
     type Subject = S;
-    type Issuer = Issuer;
-    type Status = Status;
-    type RefreshService = RefreshService;
-    type TermsOfUse = TermsOfUse;
-    type Evidence = Evidence;
-    type Schema = Schema;
+    type Issuer = IdOr<IdentifiedObject>;
+    type Status = IdentifiedTypedObject;
+    type RefreshService = IdentifiedTypedObject;
+    type TermsOfUse = MaybeIdentifiedTypedObject;
+    type Evidence = MaybeIdentifiedTypedObject;
+    type Schema = IdentifiedTypedObject;
 
     fn id(&self) -> Option<&Uri> {
         self.id.as_deref()
@@ -219,7 +218,7 @@ impl<S, C, T> crate::v1::Credential for SpecializedJsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T> ssi_json_ld::Expandable for SpecializedJsonCredential<S, C, T>
+impl<S, C, T> ssi_json_ld::Expandable for JsonCredential<S, C, T>
 where
     S: Serialize,
 {
@@ -246,14 +245,4 @@ where
         let json = ssi_json_ld::CompactJsonLd(json_syntax::to_value(self).unwrap());
         json.expand_with(ld, loader).await
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectWithId {
-    pub id: UriBuf,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(flatten)]
-    pub property_set: Option<BTreeMap<String, json_syntax::Value>>,
 }

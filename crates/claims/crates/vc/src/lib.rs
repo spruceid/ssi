@@ -2,6 +2,11 @@
 //!
 //! See: <https://www.w3.org/TR/vc-data-model/>
 //! See: <https://www.w3.org/TR/vc-data-model-2.0/>
+mod id;
+pub use id::*;
+mod typed;
+pub use typed::*;
+
 pub mod datatype;
 pub mod syntax;
 pub mod v1;

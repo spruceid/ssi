@@ -55,7 +55,7 @@ where
     }
 }
 
-impl ToJwtClaims for super::SpecializedJsonCredential {
+impl ToJwtClaims for super::JsonCredential {
     type Error = JwtVcEncodeError;
 
     /// Encodes this credential into the claims of a JWT following the standard

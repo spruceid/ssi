@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
-use crate::syntax::value_or_array;
+use crate::syntax::{value_or_array, RequiredType, TypeSerializationPolicy, Types};
 use crate::v1::{Context, Credential};
 use iref::{Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
@@ -10,10 +10,21 @@ use ssi_claims_core::{ClaimsValidity, Validate};
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment};
 
-use super::SpecializedJsonCredential;
+use super::JsonCredential;
 
-mod r#type;
-pub use r#type::*;
+pub const VERIFIABLE_PRESENTATION_TYPE: &str = "VerifiablePresentation";
+
+pub struct PresentationType;
+
+impl RequiredType for PresentationType {
+    const REQUIRED_TYPE: &'static str = VERIFIABLE_PRESENTATION_TYPE;
+}
+
+impl TypeSerializationPolicy for PresentationType {
+    const PREFER_ARRAY: bool = false;
+}
+
+pub type JsonPresentationTypes<T = ()> = Types<PresentationType, T>;
 
 /// JSON Presentation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -21,7 +32,7 @@ pub use r#type::*;
     serialize = "C: serde::Serialize",
     deserialize = "C: serde::Deserialize<'de>"
 ))]
-pub struct JsonPresentation<C = SpecializedJsonCredential> {
+pub struct JsonPresentation<C = JsonCredential> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context,

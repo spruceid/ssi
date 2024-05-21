@@ -5,8 +5,11 @@ use iref::Iri;
 
 use crate::syntax::RequiredContext;
 
-pub mod data_model;
+mod data_model;
 pub mod syntax;
+
+pub use data_model::*;
+pub use syntax::{Context, JsonCredential, JsonCredentialTypes};
 
 /// JSON-LD context IRI.
 pub const CREDENTIALS_V2_CONTEXT_IRI: &Iri =

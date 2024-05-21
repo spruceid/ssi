@@ -6,9 +6,7 @@ use ssi_data_integrity::{CryptographicSuite, DataIntegrity};
 use static_iref::iri;
 use xsd_types::DateTime;
 
-use super::{CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse};
-
-pub const VERIFIABLE_CREDENTIAL_TYPE: &str = "VerifiableCredential";
+use crate::{v1::syntax::VERIFIABLE_CREDENTIAL_TYPE, Identified, MaybeIdentified, Typed};
 
 pub const VERIFIABLE_CREDENTIAL: &Iri =
     iri!("https://www.w3.org/2018/credentials#VerifiableCredential");
@@ -19,33 +17,33 @@ pub trait Credential {
     type Subject;
 
     /// Issuer type.
-    type Issuer: ?Sized + Issuer;
+    type Issuer: ?Sized + Identified;
 
     /// Credential status type.
-    type Status: CredentialStatus;
+    type Status: Identified + Typed;
 
     /// Refresh service.
     ///
     /// See: <https://www.w3.org/TR/vc-data-model//#refreshing>
-    type RefreshService: RefreshService;
+    type RefreshService: Identified + Typed;
 
     /// Terms of Use type.
     ///
     /// Terms of use can be utilized by an issuer or a holder to communicate the
     /// terms under which a verifiable credential or verifiable presentation was
     /// issued.
-    type TermsOfUse: TermsOfUse;
+    type TermsOfUse: MaybeIdentified + Typed;
 
     /// Evidence type.
     ///
     /// Can be included by an issuer to provide the verifier with additional
     /// supporting information in a verifiable credential.
-    type Evidence: Evidence;
+    type Evidence: MaybeIdentified + Typed;
 
     /// Credential Schemas (Zero-Knowledge Proofs).
     ///
     /// See: <https://www.w3.org/TR/vc-data-model//#zero-knowledge-proofs>
-    type Schema;
+    type Schema: Identified + Typed;
 
     /// Identifier.
     fn id(&self) -> Option<&Uri> {

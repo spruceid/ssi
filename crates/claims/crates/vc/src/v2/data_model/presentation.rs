@@ -1,8 +1,9 @@
 use iref::Uri;
 
-use super::{Credential, Identified, MaybeIdentified};
+use super::Credential;
 
 pub use crate::v1::PresentationTypes;
+use crate::{Identified, MaybeIdentified};
 
 /// Verifiable Presentation.
 pub trait Presentation: MaybeIdentified {
@@ -30,7 +31,7 @@ pub trait Presentation: MaybeIdentified {
         &[]
     }
 
-    fn holders(&self) -> &[&Self::Holder] {
+    fn holders(&self) -> &[Self::Holder] {
         &[]
     }
 }

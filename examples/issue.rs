@@ -19,7 +19,7 @@ async fn main() {
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
-    let vc: ssi::claims::vc::v1::SpecializedJsonCredential = serde_json::from_value(json!({
+    let vc: ssi::claims::vc::v1::JsonCredential = serde_json::from_value(json!({
         "@context": ["https://www.w3.org/2018/credentials/v1"],
         "type": "VerifiableCredential",
         "issuer": "did:example:foo",

@@ -173,7 +173,7 @@
 //!   email: String
 //! }
 //!
-//! let credential = ssi::claims::vc::v1::SpecializedJsonCredential::<MyCredentialSubject>::new(
+//! let credential = ssi::claims::vc::v1::JsonCredential::<MyCredentialSubject>::new(
 //!   Some(uri!("https://example.org/#CredentialId").to_owned()), // id
 //!   uri!("https://example.org/#Issuer").to_owned().into(), // issuer
 //!   DateTime::now(), // issuance date

@@ -16,7 +16,7 @@ use crate::{
     syntax::RequiredType,
     v1::{
         revocation::{load_resource, Reason},
-        JsonCredential, RequiredContext, SpecializedJsonCredential,
+        JsonCredential, RequiredContext,
     },
 };
 
@@ -73,11 +73,8 @@ impl RequiredType for StatusList2021CredentialType {
 /// Verifiable Credential of type RevocationList2020Credential.
 ///
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020credential>
-pub type StatusList2021Credential = SpecializedJsonCredential<
-    StatusList2021Subject,
-    StatusList2021Context,
-    StatusList2021CredentialType,
->;
+pub type StatusList2021Credential =
+    JsonCredential<StatusList2021Subject, StatusList2021Context, StatusList2021CredentialType>;
 
 /// Credential subject of type StatusList2021, expected to be used in a Verifiable Credential of type [StatusList2021Credential](https://w3c-ccg.github.io/vc-status-list-2021/#statuslist2021credential)
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

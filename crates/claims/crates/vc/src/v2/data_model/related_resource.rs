@@ -1,4 +1,4 @@
-use super::Identified;
+use crate::Identified;
 
 /// Integrity metadata about each resource referenced by the verifiable
 /// credential.

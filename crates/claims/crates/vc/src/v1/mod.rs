@@ -13,7 +13,6 @@ pub use data_model::*;
 pub use jwt::*;
 pub use syntax::{
     Context, JsonCredential, JsonCredentialTypes, JsonPresentation, JsonPresentationTypes,
-    SpecializedJsonCredential,
 };
 
 use crate::syntax::RequiredContext;

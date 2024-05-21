@@ -1,9 +1,9 @@
 use iref::Uri;
 use ssi_claims_core::VerifiableClaims;
 
-use super::Credential;
+use crate::v1::syntax::VERIFIABLE_PRESENTATION_TYPE;
 
-pub const VERIFIABLE_PRESENTATION_TYPE: &str = "VerifiablePresentation";
+use super::Credential;
 
 /// Presentation trait.
 pub trait Presentation {

@@ -964,7 +964,7 @@ mod tests {
         let did = DIDPKH::generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
-        let cred = JsonCredential::new(
+        let cred: JsonCredential = JsonCredential::new(
             None,
             did.clone().into_uri().into(),
             "2021-03-18T16:38:25Z".parse().unwrap(),
@@ -1088,7 +1088,7 @@ mod tests {
         let did = DIDPKH::generate(&key, type_).unwrap();
 
         eprintln!("did: {}", did);
-        let cred = JsonCredential::new(
+        let cred: JsonCredential = JsonCredential::new(
             None,
             did.clone().into_uri().into(),
             "2021-03-18T16:38:25Z".parse().unwrap(),
