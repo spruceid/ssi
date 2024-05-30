@@ -98,9 +98,9 @@ pub enum ReferenceOrOwnedRef<'a, M> {
 
 impl<'a, M: VerificationMethod> ReferenceOrOwnedRef<'a, M> {
     pub fn cloned(&self) -> ReferenceOrOwned<M> {
-        match self {
-            &Self::Reference(iri) => ReferenceOrOwned::Reference(iri.to_owned()),
-            &Self::Owned(m) => ReferenceOrOwned::Owned(m.clone()),
+        match *self {
+            Self::Reference(iri) => ReferenceOrOwned::Reference(iri.to_owned()),
+            Self::Owned(m) => ReferenceOrOwned::Owned(m.clone()),
         }
     }
 
