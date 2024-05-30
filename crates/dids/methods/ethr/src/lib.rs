@@ -377,7 +377,8 @@ mod tests {
     use serde_json::json;
     use ssi_claims::{
         data_integrity::{
-            AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, ProofConfiguration,
+            signing::AlterSignature, AnyInputContext, AnyInputOptions, AnySuite,
+            CryptographicSuite, ProofOptions,
         },
         vc::{JsonCredential, JsonPresentation},
         Verifiable,
@@ -502,15 +503,15 @@ mod tests {
         };
 
         let suite = AnySuite::pick(&key, Some(&verification_method)).unwrap();
-        let issue_options = ProofConfiguration::new(
+        let issue_options = ProofOptions::new(
             "2021-02-18T20:23:13Z".parse().unwrap(),
             verification_method,
             ProofPurpose::Assertion,
-            AnySuiteOptions::default(),
+            AnyInputOptions::default(),
         );
 
         eprintln!("vm {:?}", issue_options.verification_method);
-        let signer = SingleSecretSigner::new(key);
+        let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
             .sign(
                 cred.clone(),
@@ -526,9 +527,9 @@ mod tests {
             serde_json::to_string_pretty(&vc.proof).unwrap()
         );
         if eip712 {
-            assert_eq!(vc.proof.first().unwrap().signature.proof_value.as_deref().unwrap(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
+            assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
         } else {
-            assert_eq!(vc.proof.first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
+            assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
         assert!(vc.verify(&didethr).await.unwrap().is_ok());
 
@@ -545,15 +546,15 @@ mod tests {
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_key = JWK::generate_secp256k1().unwrap();
-        let wrong_signer = SingleSecretSigner::new(wrong_key.clone());
+        let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = suite
             .sign(
                 cred,
                 AnyInputContext::default(),
                 &didethr,
                 &wrong_signer,
-                ProofConfiguration {
-                    options: AnySuiteOptions::default()
+                ProofOptions {
+                    options: AnyInputOptions::default()
                         .with_public_key(wrong_key.to_public())
                         .unwrap(),
                     ..issue_options
@@ -570,11 +571,11 @@ mod tests {
             vec![vc],
         );
 
-        let vp_issue_options = ProofConfiguration::new(
+        let vp_issue_options = ProofOptions::new(
             "2021-02-18T20:23:13Z".parse().unwrap(),
             IriBuf::new(format!("{did}#controller")).unwrap().into(),
             ProofPurpose::Authentication,
-            AnySuiteOptions::default(),
+            AnyInputOptions::default(),
         );
 
         let vp = suite
@@ -593,12 +594,7 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        if let Some(value) = &mut vp_fuzzed.proof.first_mut().unwrap().signature.jws {
-            *value = format!("{value}ff").try_into().unwrap()
-        }
-        if let Some(value) = &mut vp_fuzzed.proof.first_mut().unwrap().signature.proof_value {
-            value.push_str("ff");
-        }
+        vp_fuzzed.proof.first_mut().unwrap().signature.alter();
         let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 

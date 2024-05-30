@@ -194,7 +194,7 @@
 //! // Create a signer from the secret key.
 //! // Here we use the simple `SingleSecretSigner` signer type which always uses
 //! // the same provided secret key to sign messages.
-//! let signer = SingleSecretSigner::new(key.clone());
+//! let signer = SingleSecretSigner::new(key.clone()).into_local();
 //!
 //! // Turn the DID URL into a verification method reference.
 //! let verification_method = did.into_iri().into();
@@ -208,7 +208,7 @@
 //!   AnyInputContext::default(),
 //!   &vm_resolver,
 //!   &signer,
-//!   ProofConfiguration::from_method(verification_method)
+//!   ProofOptions::from_method(verification_method)
 //! ).await.expect("signature failed");
 //! # }
 //! ```

@@ -2,7 +2,6 @@ use iref::UriBuf;
 use linked_data::{LinkedData, LinkedDataGraph};
 use rdf_types::{Interpretation, Vocabulary};
 use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::algorithm::AnyESKeccakK;
 use ssi_verification_methods::MessageSigner;
 
@@ -25,36 +24,6 @@ impl Eip712Signature {
         }
     }
 
-    pub async fn sign<S: MessageSigner<AnyESKeccakK>>(
-        bytes: &[u8],
-        signer: S,
-        algorithm: AnyESKeccakK,
-    ) -> Result<Self, SignatureError> {
-        let signature = signer.sign(algorithm, (), bytes).await?;
-        Ok(Eip712Signature::from_bytes(signature))
-    }
-}
-
-impl Referencable for Eip712Signature {
-    type Reference<'a> = Eip712SignatureRef<'a> where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        Eip712SignatureRef {
-            proof_value: &self.proof_value,
-        }
-    }
-
-    covariance_rule!();
-}
-
-/// Reference to [`Eip712Signature`].
-#[derive(Debug, Clone, Copy)]
-pub struct Eip712SignatureRef<'a> {
-    /// Proof value
-    pub proof_value: &'a str,
-}
-
-impl<'a> Eip712SignatureRef<'a> {
     pub fn decode(&self) -> Result<Vec<u8>, ProofValidationError> {
         if self.proof_value.len() >= 4 && &self.proof_value[0..2] == "0x" {
             let mut bytes = hex::decode(&self.proof_value[2..])
@@ -64,6 +33,27 @@ impl<'a> Eip712SignatureRef<'a> {
         } else {
             Err(ProofValidationError::InvalidSignature)
         }
+    }
+
+    pub async fn sign<S: MessageSigner<AnyESKeccakK>>(
+        bytes: &[u8],
+        signer: S,
+        algorithm: AnyESKeccakK,
+    ) -> Result<Self, SignatureError> {
+        let signature = signer.sign(algorithm, bytes).await?;
+        Ok(Eip712Signature::from_bytes(signature))
+    }
+}
+
+impl AsRef<str> for Eip712Signature {
+    fn as_ref(&self) -> &str {
+        &self.proof_value
+    }
+}
+
+impl ssi_data_integrity_core::signing::AlterSignature for Eip712Signature {
+    fn alter(&mut self) {
+        self.proof_value.push_str("ff")
     }
 }
 

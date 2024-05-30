@@ -1,24 +1,28 @@
-use crate::SignatureProtocol;
 use ssi_claims_core::SignatureError;
-use ssi_core::Referencable;
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
+
+pub mod local;
+pub use local::LocalSigner;
 
 pub mod single_secret;
 pub use single_secret::SingleSecretSigner;
 
+use crate::VerificationMethod;
+
 /// Verification method signer.
-///
-/// `M` is the verification method type.
-/// `B` is the cryptographic signature algorithm to be used with the verification method.
-/// `P` is the signature protocol.
-pub trait Signer<M: Referencable, A, P: SignatureProtocol<A> = ()> {
-    type MessageSigner<'a>: MessageSigner<A, P>
-    where
-        Self: 'a,
-        M: 'a;
+pub trait Signer<M: VerificationMethod> {
+    type MessageSigner;
 
     #[allow(async_fn_in_trait)]
-    async fn for_method<'a>(&'a self, method: M::Reference<'a>) -> Option<Self::MessageSigner<'a>>;
+    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner>;
+}
+
+impl<'s, M: VerificationMethod, S: Signer<M>> Signer<M> for &'s S {
+    type MessageSigner = S::MessageSigner;
+
+    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner> {
+        S::for_method(*self, method).await
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +44,9 @@ pub enum MessageSignatureError {
 
     #[error("unsupported signature algorithm `{0}`")]
     UnsupportedAlgorithm(String),
+
+    #[error("unsupported verification method `{0}`")]
+    UnsupportedVerificationMethod(String),
 }
 
 impl MessageSignatureError {
@@ -76,58 +83,36 @@ impl From<MessageSignatureError> for SignatureError {
     }
 }
 
-pub trait MessageSigner<A, P: SignatureProtocol<A> = ()> {
+pub trait MessageSigner<A> {
     #[allow(async_fn_in_trait)]
-    async fn sign(
-        self,
-        algorithm: A,
-        protocol: P,
-        message: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError>;
+    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError>;
 }
 
-pub struct SignerAdapter<S, A, P> {
+pub struct MessageSignerAdapter<S, A> {
     // Underlying signer.
     signer: S,
 
-    protocol: PhantomData<(A, P)>,
+    algorithm: PhantomData<A>,
 }
 
-impl<S, A, P> SignerAdapter<S, A, P> {
+impl<S, A> MessageSignerAdapter<S, A> {
     pub fn new(signer: S) -> Self {
         Self {
             signer,
-            protocol: PhantomData,
+            algorithm: PhantomData,
         }
     }
 }
 
-impl<S: MessageSigner<A, P>, A, B, P: SignatureProtocol<A>, Q: SignatureProtocol<B>>
-    MessageSigner<B, Q> for SignerAdapter<S, A, P>
+impl<S: MessageSigner<A>, A, B> MessageSigner<B> for MessageSignerAdapter<S, A>
 where
-    P: TryFrom<Q>,
     A: TryFrom<B>,
 {
-    async fn sign(
-        self,
-        algorithm: B,
-        protocol: Q,
-        message: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        match algorithm
+    async fn sign(self, algorithm: B, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+        let algorithm = algorithm
             .try_into()
-            .map_err(|_| MessageSignatureError::InvalidQuery)
-        {
-            Ok(algorithm) => {
-                match protocol
-                    .try_into()
-                    .map_err(|_| MessageSignatureError::InvalidQuery)
-                {
-                    Ok(protocol) => self.signer.sign(algorithm, protocol, message).await,
-                    Err(e) => Err(e),
-                }
-            }
-            Err(e) => Err(e),
-        }
+            .map_err(|_| MessageSignatureError::InvalidQuery)?;
+
+        self.signer.sign(algorithm, message).await
     }
 }

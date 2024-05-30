@@ -12,16 +12,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims::{
     data_integrity::{
-        signing, AnyDataIntegrity, AnyInputContext, AnyProofs, AnySignatureProtocol, AnySuite,
-        AnySuiteOptions, CryptographicSuiteInput, PreparedProof, PreparedProofs,
-        ProofConfiguration, ProofConfigurationExpansion, ProofConfigurationRefExpansion, Proofs,
+        suite::{CryptographicSuiteInstance, CryptographicSuiteSigning, InputOptions},
+        AnyDataIntegrity, AnyInputContext, AnyProofs, AnySignatureAlgorithm, AnySuite,
+        CryptographicSuite, PreparedProof, PreparedProofs, Proofs,
     },
     vc::{Context, RequiredContext},
     ClaimsValidity, InvalidClaims, SignatureError, Validate, Verifiable,
 };
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject};
-use ssi_verification_methods::Signer;
 use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationMethodResolver};
+use ssi_verification_methods::{MessageSigner, Signer};
 use static_iref::iri;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -132,17 +132,19 @@ impl<C, P> Delegation<C, P> {
     }
 
     /// Sign the delegation.
-    pub async fn sign(
+    pub async fn sign<S>(
         self,
         suite: AnySuite,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
-        signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
-        proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
+        signer: S,
+        proof_configuration: InputOptions<AnySuite>,
         capability_chain: &[&str],
     ) -> Result<Verifiable<Self, AnyProofs>, SignatureError>
     where
         C: Serialize,
         P: Serialize,
+        S: Signer<AnyMethod>,
+        S::MessageSigner: MessageSigner<AnySignatureAlgorithm>,
     {
         self.sign_with(
             suite,
@@ -156,18 +158,17 @@ impl<C, P> Delegation<C, P> {
     }
 
     /// Sign the delegation with a custom cryptographic suite and environment.
-    pub async fn sign_with<S, E>(
+    pub async fn sign_with<D, E, R, S>(
         self,
-        suite: S,
+        suite: D,
         environment: E,
-        resolver: &impl VerificationMethodResolver<Method = S::VerificationMethod>,
-        signer: &impl Signer<S::VerificationMethod, S::MessageSignatureAlgorithm, S::SignatureProtocol>,
-        mut proof_configuration: ProofConfiguration<S::VerificationMethod, S::Options>,
+        resolver: R,
+        signer: S,
+        mut proof_configuration: InputOptions<D>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Self, Proofs<S>>, SignatureError>
+    ) -> Result<Verifiable<Self, Proofs<D>>, SignatureError>
     where
-        S: CryptographicSuiteInput<Self, E>,
-        E: ProofConfigurationExpansion + for<'a> ProofConfigurationRefExpansion<'a, S>,
+        D: CryptographicSuiteInstance<Self, E> + CryptographicSuiteSigning<R, S>,
     {
         proof_configuration.extra_properties.insert(
             "capabilityChain".into(),
@@ -267,16 +268,18 @@ impl<P> Invocation<P> {
     }
 
     /// Sign the delegation.
-    pub async fn sign(
+    pub async fn sign<S>(
         self,
         suite: AnySuite,
-        resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
-        signer: &impl Signer<AnyMethod, ssi_jwk::Algorithm, AnySignatureProtocol>,
-        mut proof_configuration: ProofConfiguration<AnyMethod, AnySuiteOptions>,
+        resolver: impl VerificationMethodResolver<Method = AnyMethod>,
+        signer: S,
+        mut proof_configuration: InputOptions<AnySuite>,
         target: &Uri,
-    ) -> Result<AnyDataIntegrity<Invocation<P>>, signing::Error>
+    ) -> Result<AnyDataIntegrity<Invocation<P>>, SignatureError>
     where
         P: Serialize,
+        S: Signer<AnyMethod>,
+        S::MessageSigner: MessageSigner<AnySignatureAlgorithm>,
     {
         proof_configuration
             .extra_properties
@@ -284,7 +287,7 @@ impl<P> Invocation<P> {
 
         Ok(Verifiable::unprepare(
             suite
-                .sign_single(
+                .sign(
                     self,
                     AnyInputContext::default(),
                     resolver,
@@ -430,6 +433,8 @@ mod tests {
 
     #[async_std::test]
     async fn round_trip() {
+        use ssi_data_integrity::ProofOptions;
+
         let dk = VerificationMethodDIDResolver::new(ExampleDIDResolver::new());
 
         let alice_did = "did:example:foo";
@@ -437,14 +442,16 @@ mod tests {
         let alice = SingleSecretSigner::new(JWK {
             key_id: Some(alice_vm.clone().into()),
             ..serde_json::from_str(include_str!("../../../tests/ed25519-2020-10-18.json")).unwrap()
-        });
+        })
+        .into_local();
 
         let bob_did = "did:example:bar";
         let bob_vm = UriBuf::new(format!("{}#key1", bob_did).into_bytes()).unwrap();
         let bob = SingleSecretSigner::new(JWK {
             key_id: Some(bob_vm.clone().into()),
             ..serde_json::from_str(include_str!("../../../tests/ed25519-2021-06-16.json")).unwrap()
-        });
+        })
+        .into_local();
 
         let del: Delegation<(), DefaultProps<Actions>> = Delegation {
             invoker: Some(bob_vm.clone()),
@@ -459,13 +466,13 @@ mod tests {
             DefaultProps::new(Some(Actions::Read)),
         );
 
-        let ldpo_alice = ProofConfiguration::new(
+        let ldpo_alice = ProofOptions::new(
             "2024-02-13T16:25:26Z".parse().unwrap(),
             alice_vm.clone().into_iri().into(),
             ProofPurpose::CapabilityDelegation,
             Default::default(),
         );
-        let ldpo_bob = ProofConfiguration::new(
+        let ldpo_bob = ProofOptions::new(
             "2024-02-13T16:25:26Z".parse().unwrap(),
             bob_vm.clone().into_iri().into(),
             ProofPurpose::CapabilityInvocation,

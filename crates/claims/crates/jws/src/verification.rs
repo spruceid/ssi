@@ -1,7 +1,7 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error};
 use ssi_claims_core::{
-    ExtractProof, InvalidProof, PrepareWith, Proof, ProofPreparationError, ProofValidationError,
-    ProofValidity, Validate, ValidateProof, VerifiableClaims,
+    DefaultEnvironment, ExtractProof, InvalidProof, PrepareWith, Proof, ProofPreparationError,
+    ProofValidationError, ProofValidity, Validate, ValidateProof, VerifiableClaims,
 };
 use ssi_jwk::{Algorithm, JWK};
 use std::borrow::Cow;
@@ -57,6 +57,10 @@ pub struct Signature(Vec<u8>);
 
 impl<T> VerifiableClaims for DecodedJWS<T> {
     type Proof = Signature;
+}
+
+impl<T> DefaultEnvironment for DecodedJWS<T> {
+    type Environment = ();
 }
 
 impl<T> ExtractProof for DecodedJWS<T> {

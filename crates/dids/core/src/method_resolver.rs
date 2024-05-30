@@ -8,7 +8,7 @@ use ssi_jws::JWSVerifier;
 use ssi_verification_methods_core::{
     ControllerError, ControllerProvider, GenericVerificationMethod, InvalidVerificationMethod,
     MaybeJwkVerificationMethod, ProofPurposes, ReferenceOrOwnedRef, VerificationMethod,
-    VerificationMethodCow, VerificationMethodResolutionError, VerificationMethodResolver,
+    VerificationMethodResolutionError, VerificationMethodResolver,
 };
 
 pub struct VerificationMethodDIDResolver<T, M> {
@@ -86,7 +86,7 @@ where
         &'a self,
         _issuer: Option<&'a iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<VerificationMethodCow<'a, M>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'a, M>, VerificationMethodResolutionError> {
         match method {
             Some(method) => {
                 if method.id().scheme().as_str() == "did" {
@@ -94,11 +94,9 @@ where
                         Ok(url) => {
                             match self.resolver.dereference(url).await {
                                 Ok(deref) => match deref.content.into_verification_method() {
-                                    Ok(any_method) => Ok(
-                                        ssi_verification_methods_core::VerificationMethodCow::Owned(
-                                            M::try_from(any_method.into())?,
-                                        ),
-                                    ),
+                                    Ok(any_method) => {
+                                        Ok(Cow::Owned(M::try_from(any_method.into())?))
+                                    }
                                     Err(_) => {
                                         // The IRI is not referring to a verification method.
                                         Err(VerificationMethodResolutionError::NotAVerificationMethod(

@@ -32,13 +32,12 @@ impl<T, P: Proof> Verifiable<T, P> {
         Self { claims, proof }
     }
 
-    pub async fn new<U, E>(value: U) -> Result<Self, ProofPreparationError>
+    pub async fn new<U>(value: U) -> Result<Self, ProofPreparationError>
     where
-        U: ExtractProof<Proofless = T, Proof = P>,
-        P: PrepareWith<T, E>,
-        E: Default,
+        U: ExtractProof<Proofless = T, Proof = P> + DefaultEnvironment,
+        P: PrepareWith<T, U::Environment>,
     {
-        Self::new_with(value, E::default()).await
+        Self::new_with(value, U::Environment::default()).await
     }
 
     pub async fn new_with<U, E>(value: U, mut environment: E) -> Result<Self, ProofPreparationError>

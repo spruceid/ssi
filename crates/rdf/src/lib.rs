@@ -73,22 +73,26 @@ pub type DataSet = IndexedBTreeDataset<rdf_types::Term>;
 /// Quad iterator extension to produce an N-Quads document.
 ///
 /// See <https://www.w3.org/TR/n-quads/>.
-pub trait IntoNQuads {
-    fn into_nquads(self) -> String;
+pub trait IntoNQuads: Sized {
+    fn into_nquads_lines(self) -> Vec<String>;
+
+    fn into_nquads(self) -> String {
+        self.into_nquads_lines().join("")
+    }
 }
 
 impl<Q: IntoIterator> IntoNQuads for Q
 where
     Q::Item: Borrow<LexicalQuad>,
 {
-    fn into_nquads(self) -> String {
+    fn into_nquads_lines(self) -> Vec<String> {
         let mut lines = self
             .into_iter()
             .map(|quad| NQuadsStatement(quad.borrow()).to_string())
             .collect::<Vec<String>>();
         lines.sort();
         lines.dedup();
-        lines.join("")
+        lines
     }
 }
 

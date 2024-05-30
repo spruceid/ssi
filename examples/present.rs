@@ -11,7 +11,7 @@
 // cat examples/files/vc.jwt | cargo run --example present jwt jwt | save examples/files/vp-jwtvc.jwt
 use ssi::{
     claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
+        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
         jws::{CompactJWSString, JWSPayload},
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
@@ -29,7 +29,7 @@ async fn main() {
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
-    let signer = SingleSecretSigner::new(key.clone());
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let mut reader = std::io::BufReader::new(std::io::stdin());
     let vc = match &proof_format_in[..] {
@@ -67,7 +67,7 @@ async fn main() {
 
     match &proof_format_out[..] {
         "ldp" => {
-            let mut params = ProofConfiguration::from_method(verification_method);
+            let mut params = ProofOptions::from_method(verification_method);
 
             params.proof_purpose = ProofPurpose::Authentication;
             params.challenge = Some("example".to_owned());

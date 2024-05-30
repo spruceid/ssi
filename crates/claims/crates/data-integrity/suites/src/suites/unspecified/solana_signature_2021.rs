@@ -1,10 +1,19 @@
-use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_core::{covariance_rule, Referencable};
-use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{protocol::Base58Btc, MessageSigner, SolanaMethod2021};
+use k256::sha2::Sha256;
+use serde::{Deserialize, Serialize};
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_data_integrity_core::{
+    canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
+    suite::{
+        standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm, VerificationAlgorithm},
+        NoConfiguration,
+    },
+    ProofConfigurationRef, ProofRef, StandardCryptographicSuite, TypeRef,
+};
+use ssi_verification_methods::{
+    protocol::{Base58Btc, WithProtocol},
+    MessageSigner, SolanaMethod2021,
+};
 use static_iref::iri;
-
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
 
 /// Solana Signature 2021
 ///
@@ -32,6 +41,7 @@ use crate::{impl_rdf_input_urdna2015, suites::sha256_hash};
 /// # Signature protocol
 ///
 /// The [`SolanaWallet`] protocol is used.
+#[derive(Debug, Default, Clone, Copy)]
 pub struct SolanaSignature2021;
 
 impl SolanaSignature2021 {
@@ -40,72 +50,21 @@ impl SolanaSignature2021 {
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#SolanaSignature2021");
 }
 
-impl_rdf_input_urdna2015!(SolanaSignature2021);
+impl StandardCryptographicSuite for SolanaSignature2021 {
+    type Configuration = NoConfiguration;
 
-impl CryptographicSuite for SolanaSignature2021 {
-    type Transformed = String;
-    type Hashed = [u8; 64];
+    type Transformation = CanonicalizeClaimsAndConfiguration;
+
+    type Hashing = HashCanonicalClaimsAndConfiguration<Sha256>; // ssi_jwk::algorithm::EdDSA, Base58Btc
 
     type VerificationMethod = SolanaMethod2021;
 
-    type Signature = Signature;
+    type SignatureAlgorithm = SolanaSignatureAlgorithm;
 
-    type SignatureProtocol = Base58Btc;
+    type ProofOptions = ();
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
-
-    type Options = ();
-
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn iri(&self) -> &iref::Iri {
-        Self::IRI
-    }
-
-    fn cryptographic_suite(&self) -> Option<&str> {
-        None
-    }
-
-    /// Hashing algorithm.
-    fn hash(
-        &self,
-        data: String,
-        proof_configuration: ExpandedConfiguration<Self::VerificationMethod>,
-    ) -> Result<Self::Hashed, HashError> {
-        Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
-    }
-
-    async fn sign_hash(
-        &self,
-        _options: <Self::Options as Referencable>::Reference<'_>,
-        _method: <Self::VerificationMethod as Referencable>::Reference<'_>,
-        _bytes: &Self::Hashed,
-        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
-    ) -> Result<Self::Signature, SignatureError> {
-        todo!()
-    }
-
-    fn verify_hash(
-        &self,
-        _options: <Self::Options as Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        let tx = LocalSolanaTransaction::with_message(bytes);
-        let signing_bytes = tx.to_bytes();
-
-        let signature_bytes = Base58Btc::decode_signature(signature.proof_value.as_bytes())
-            .map_err(|_| ProofValidationError::InvalidSignature)?;
-        Ok(ssi_jws::verify_bytes(
-            ssi_jwk::Algorithm::EdDSA,
-            &signing_bytes,
-            &method.public_key,
-            &signature_bytes,
-        )
-        .map_err(|_| ssi_claims_core::InvalidProof::Signature))
+    fn type_(&self) -> TypeRef {
+        TypeRef::Other(Self::NAME)
     }
 }
 
@@ -117,28 +76,64 @@ impl CryptographicSuite for SolanaSignature2021 {
 //     Ok(Base58Btc::encode_signature(&signature))
 // }
 
-#[derive(Debug, Clone)]
+pub struct SolanaSignatureAlgorithm;
+
+impl SignatureAndVerificationAlgorithm for SolanaSignatureAlgorithm {
+    type Signature = Signature;
+}
+
+impl<T> SignatureAlgorithm<SolanaSignature2021, T> for SolanaSignatureAlgorithm
+where
+    T: MessageSigner<WithProtocol<ssi_jwk::Algorithm, Base58Btc>>,
+{
+    async fn sign(
+        _verification_method: &SolanaMethod2021,
+        _signer: T,
+        _prepared_claims: &[u8; 64],
+        _proof_configuration: ProofConfigurationRef<'_, SolanaSignature2021>,
+    ) -> Result<Self::Signature, SignatureError> {
+        todo!()
+    }
+}
+
+impl VerificationAlgorithm<SolanaSignature2021> for SolanaSignatureAlgorithm {
+    fn verify(
+        method: &SolanaMethod2021,
+        prepared_claims: &[u8; 64],
+        proof: ProofRef<SolanaSignature2021>,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        let tx = LocalSolanaTransaction::with_message(prepared_claims);
+        let signing_bytes = tx.to_bytes();
+
+        let signature_bytes = Base58Btc::decode_signature(proof.signature.proof_value.as_bytes())
+            .map_err(|_| ProofValidationError::InvalidSignature)?;
+        Ok(ssi_jws::verify_bytes(
+            ssi_jwk::Algorithm::EdDSA,
+            &signing_bytes,
+            &method.public_key,
+            &signature_bytes,
+        )
+        .map_err(|_| ssi_claims_core::InvalidProof::Signature))
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Signature {
     /// Base58Btc encoded signature.
     pub proof_value: String,
 }
 
-impl Referencable for Signature {
-    type Reference<'a> = SignatureRef<'a> where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        SignatureRef {
-            proof_value: &self.proof_value,
-        }
+impl AsRef<str> for Signature {
+    fn as_ref(&self) -> &str {
+        &self.proof_value
     }
-
-    covariance_rule!();
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct SignatureRef<'a> {
-    /// Base58Btc encoded signature.
-    pub proof_value: &'a str,
+impl ssi_data_integrity_core::signing::AlterSignature for Signature {
+    fn alter(&mut self) {
+        self.proof_value.push_str("ff")
+    }
 }
 
 pub struct LocalSolanaTransaction {

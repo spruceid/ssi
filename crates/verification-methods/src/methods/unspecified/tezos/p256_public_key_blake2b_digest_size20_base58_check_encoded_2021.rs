@@ -2,10 +2,9 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::ProofValidationError;
-use ssi_core::{covariance_rule, Referencable};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::MessageSignatureError;
+use ssi_verification_methods_core::{MessageSignatureError, VerifyBytesWithRecoveryJwk};
 use static_iref::iri;
 
 use crate::{
@@ -49,6 +48,7 @@ pub struct P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
 }
 
 impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+    pub const NAME: &'static str = "P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
 
@@ -64,16 +64,6 @@ impl P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     }
 }
 
-impl Referencable for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     fn id(&self) -> &Iri {
         self.id.as_iri()
@@ -81,14 +71,6 @@ impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded20
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -108,9 +90,29 @@ impl TypedVerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEnco
     fn type_(&self) -> &str {
         P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
+}
 
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
-        P256_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
+impl VerifyBytesWithRecoveryJwk<ssi_jwk::algorithm::ESBlake2b>
+    for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+{
+    fn verify_bytes_with_public_jwk(
+        &self,
+        public_jwk: &JWK,
+        _: ssi_jwk::algorithm::ESBlake2b,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        if self.matches_public_key(public_jwk)? {
+            Ok(ssi_jws::verify_bytes(
+                ssi_jwk::Algorithm::ESBlake2b,
+                signing_bytes,
+                public_jwk,
+                signature,
+            )
+            .map_err(|_| InvalidProof::Signature))
+        } else {
+            Ok(Err(InvalidProof::KeyMismatch))
+        }
     }
 }
 
@@ -148,8 +150,8 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
 impl SigningMethod<JWK, ssi_jwk::algorithm::ESBlake2b>
     for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 {
-    fn sign_bytes_ref(
-        _this: &Self,
+    fn sign_bytes(
+        &self,
         key: &JWK,
         _algorithm: ssi_jwk::algorithm::ESBlake2b,
         bytes: &[u8],

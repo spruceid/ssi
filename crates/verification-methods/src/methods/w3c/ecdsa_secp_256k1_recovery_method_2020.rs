@@ -3,9 +3,8 @@ use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_core::{covariance_rule, Referencable};
-use ssi_jwk::JWK;
-use ssi_verification_methods_core::MessageSignatureError;
+use ssi_jwk::{algorithm::ES256KR, JWK};
+use ssi_verification_methods_core::{MessageSignatureError, VerifyBytes};
 use static_iref::iri;
 use std::{borrow::Cow, hash::Hash, str::FromStr};
 
@@ -48,16 +47,6 @@ pub struct EcdsaSecp256k1RecoveryMethod2020 {
     pub public_key: PublicKey,
 }
 
-impl Referencable for EcdsaSecp256k1RecoveryMethod2020 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     /// Returns the identifier of the key.
     fn id(&self) -> &Iri {
@@ -67,14 +56,6 @@ impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -93,10 +74,6 @@ impl TypedVerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
 
     /// Returns the type of the key.
     fn type_(&self) -> &str {
-        ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
-    }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
         ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE
     }
 }
@@ -123,6 +100,7 @@ impl DigestFunction {
 }
 
 impl EcdsaSecp256k1RecoveryMethod2020 {
+    pub const NAME: &'static str = ECDSA_SECP_256K1_RECOVERY_METHOD_2020_TYPE;
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256k1RecoveryMethod2020");
 
@@ -171,6 +149,17 @@ impl EcdsaSecp256k1RecoveryMethod2020 {
             ssi_jws::verify_bytes(algorithm, signing_bytes, &key, signature)
                 .map_err(|_| InvalidProof::Signature),
         )
+    }
+}
+
+impl VerifyBytes<ES256KR> for EcdsaSecp256k1RecoveryMethod2020 {
+    fn verify_bytes(
+        &self,
+        _: ES256KR,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.verify_bytes(signing_bytes, signature, DigestFunction::Sha256)
     }
 }
 
@@ -430,25 +419,25 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256k1RecoveryMethod2020 {
 }
 
 impl SigningMethod<JWK, ssi_jwk::algorithm::ES256KR> for EcdsaSecp256k1RecoveryMethod2020 {
-    fn sign_bytes_ref(
-        this: Self::Reference<'_>,
+    fn sign_bytes(
+        &self,
         secret: &JWK,
         _algorithm: ssi_jwk::algorithm::ES256KR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        this.sign(secret, bytes, DigestFunction::Sha256)
+        self.sign(secret, bytes, DigestFunction::Sha256)
             .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }
 
 impl SigningMethod<JWK, ssi_jwk::algorithm::ESKeccakKR> for EcdsaSecp256k1RecoveryMethod2020 {
-    fn sign_bytes_ref(
-        this: Self::Reference<'_>,
+    fn sign_bytes(
+        &self,
         secret: &JWK,
         _algorithm: ssi_jwk::algorithm::ESKeccakKR,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        this.sign(secret, bytes, DigestFunction::Keccack)
+        self.sign(secret, bytes, DigestFunction::Keccack)
             .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
     }
 }

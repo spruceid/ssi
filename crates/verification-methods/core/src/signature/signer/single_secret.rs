@@ -1,4 +1,6 @@
-use crate::{MethodWithSecret, Referencable, SignatureProtocol, Signer, SigningMethod};
+use std::{borrow::Cow, sync::Arc};
+
+use crate::{local::LocalSigner, MethodWithSecret, Signer, VerificationMethod};
 
 /// Simple signer implementation that always uses the given secret to sign
 /// every message.
@@ -7,28 +9,33 @@ use crate::{MethodWithSecret, Referencable, SignatureProtocol, Signer, SigningMe
 /// applications since the secret used to sign messages will realistically not
 /// match the verification method used to verify the signature.
 pub struct SingleSecretSigner<S> {
-    secret: S,
+    secret: Arc<S>,
 }
 
 impl<S> SingleSecretSigner<S> {
     /// Creates a new signer with the given secret.
     pub fn new(secret: S) -> Self {
-        Self { secret }
+        Self {
+            secret: Arc::new(secret),
+        }
     }
 
     pub fn secret(&self) -> &S {
         &self.secret
     }
+
+    pub fn into_local(self) -> LocalSigner<Self> {
+        LocalSigner(self)
+    }
 }
 
-impl<M: Referencable, A: Copy, P: Copy + SignatureProtocol<A>, S> Signer<M, A, P>
-    for SingleSecretSigner<S>
-where
-    M: SigningMethod<S, A>,
-{
-    type MessageSigner<'a> = MethodWithSecret<'a, 'a, M, S> where Self: 'a, M: 'a;
+impl<M: VerificationMethod, S> Signer<M> for SingleSecretSigner<S> {
+    type MessageSigner = MethodWithSecret<M, S>;
 
-    async fn for_method<'a>(&'a self, method: M::Reference<'a>) -> Option<Self::MessageSigner<'a>> {
-        Some(MethodWithSecret::new(method, &self.secret))
+    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner> {
+        Some(MethodWithSecret::new(
+            method.into_owned(),
+            self.secret.clone(),
+        ))
     }
 }

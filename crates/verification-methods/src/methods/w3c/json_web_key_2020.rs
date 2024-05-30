@@ -3,9 +3,8 @@ use std::{borrow::Cow, hash::Hash};
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
+use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError, VerifyBytes};
 use static_iref::iri;
 
 use crate::{
@@ -57,6 +56,7 @@ pub struct JsonWebKey2020 {
 }
 
 impl JsonWebKey2020 {
+    pub const NAME: &'static str = JSON_WEB_KEY_2020_TYPE;
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#JsonWebKey2020");
 
     pub fn public_key_jwk(&self) -> &JWK {
@@ -102,16 +102,6 @@ impl JsonWebKey2020 {
     }
 }
 
-impl Referencable for JsonWebKey2020 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for JsonWebKey2020 {
     /// Returns the identifier of the key.
     fn id(&self) -> &Iri {
@@ -121,14 +111,6 @@ impl VerificationMethod for JsonWebKey2020 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -145,19 +127,22 @@ impl TypedVerificationMethod for JsonWebKey2020 {
     fn type_(&self) -> &str {
         JSON_WEB_KEY_2020_TYPE
     }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
-        JSON_WEB_KEY_2020_TYPE
-    }
 }
 
 impl JwkVerificationMethod for JsonWebKey2020 {
     fn to_jwk(&self) -> Cow<JWK> {
         Cow::Borrowed(self.public_key_jwk())
     }
+}
 
-    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
-        <Self as JwkVerificationMethod>::to_jwk(r)
+impl VerifyBytes<Algorithm> for JsonWebKey2020 {
+    fn verify_bytes(
+        &self,
+        algorithm: Algorithm,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.verify_bytes(signing_bytes, signature, Some(algorithm))
     }
 }
 

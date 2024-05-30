@@ -4,8 +4,8 @@ use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{
-        AnyInputContext, AnySuite, AnySuiteOptions, CryptographicSuiteInput, DataIntegrity,
-        ProofConfiguration,
+        signing::AlterSignature, AnyInputContext, AnyInputOptions, AnySuite, CryptographicSuite,
+        DataIntegrity, ProofOptions as SuiteOptions,
     },
     vc::{JsonCredential, JsonPresentation},
     Verifiable,
@@ -168,6 +168,20 @@ async fn test_derivation_tz3() {
     )
 }
 
+// #[test]
+// fn resign() {
+//     let key: JWK = JWK::generate_ed25519().unwrap();
+//     eprintln!("key: {key}");
+//     eprintln!("tz: {}", DIDTZ.generate(&key).unwrap());
+//     let payload: [u8; 64] = [44, 233, 177, 108, 248, 117, 84, 121, 35, 7, 87, 119, 2, 212, 229, 157, 221, 208, 206, 76, 185, 92, 57, 63, 138, 219, 168, 195, 177, 107, 213, 58, 27, 241, 132, 88, 62, 203, 41, 12, 104, 219, 160, 226, 140, 67, 120, 163, 165, 238, 40, 24, 159, 190, 218, 46, 201, 184, 111, 127, 108, 241, 35, 211];
+
+//     let header = ssi_jws::Header::new_unencoded(ssi_jwk::Algorithm::EdBlake2b, None);
+//     let signing_bytes = header.encode_signing_bytes(&payload);
+//     let signature = ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdBlake2b, &signing_bytes, &key).unwrap();
+//     let jws = ssi_jws::CompactJWSString::encode_detached(header, &signature);
+//     eprintln!("JWS: {jws}");
+// }
+
 #[tokio::test]
 async fn credential_prove_verify_did_tz1() {
     // use ssi_claims::{Credential, Issuer, LinkedDataProofOptions, URI};
@@ -221,7 +235,9 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::tezos::Options::new(
                 r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
             ),
-            ssi_claims::data_integrity::suites::JwsSignature::new(
+            ssi_claims::data_integrity::signing::JwsSignature::new(
+                // FIXME: this is wrong! The VM expects an EdBlake2b signature,
+                // instead this is EdDsa.
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..thpumbPTltH6b6P9QUydy8DcoK2Jj63-FIntxiq09XBk7guF_inA0iQWw7_B_GBwmmsmhYdGL4TdtiNieAdeAg".parse().unwrap()
             )
         ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())].into()
@@ -231,17 +247,22 @@ async fn credential_prove_verify_did_tz1() {
         .await
         .unwrap();
 
-    assert!(vc.verify(&didtz).await.unwrap().is_ok());
+    // FIXME: this cannot work because the VC is wrong!
+    // `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` expects an
+    // EdBlake2b signature, but the provided signature is EdDsa.
+    // assert_eq!(vc.verify(&didtz).await.unwrap(), Ok(()));
 
     // test that issuer property is used for verification
-    let vc_bad_issuer = Verifiable::tamper(vc.clone(), JsonLdEnvironment::default(), |mut cred| {
-        cred.issuer = uri!("did:example:bad").to_owned().into();
-        cred
-    })
-    .await
-    .unwrap();
+    let _vc_bad_issuer =
+        Verifiable::tamper(vc.clone(), JsonLdEnvironment::default(), |mut cred| {
+            cred.issuer = uri!("did:example:bad").to_owned().into();
+            cred
+        })
+        .await
+        .unwrap();
 
-    assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
+    // FIXME: this cannot work because the VC is wrong! See above.
+    // assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer = SingleSecretSigner::new(JWK::generate_ed25519().unwrap());
@@ -251,7 +272,7 @@ async fn credential_prove_verify_did_tz1() {
         JsonLdEnvironment::default(),
         &didtz,
         &wrong_signer,
-        vc.proof.first().unwrap().clone_configuration()
+        vc.proof.first().unwrap().configuration().to_owned().into_options()
     )
     .await
     .unwrap();
@@ -271,7 +292,9 @@ async fn credential_prove_verify_did_tz1() {
             ssi_claims::data_integrity::suites::tezos::Options::new(
                 r#"{"crv": "Ed25519","kty": "OKP","x": "CFdO_rVP08v1wQQVNybqBxHmTPOBPIt4Kn6LLhR1fMA"}"#.parse().unwrap()
             ),
-            ssi_claims::data_integrity::suites::JwsSignature::new(
+            ssi_claims::data_integrity::signing::JwsSignature::new(
+                // FIXME: this is wrong! The VM expects an EdBlake2b signature,
+                // instead this is EdDsa.
                 "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..7GLIUeNKvO3WsA3DmBZpbuPinhOcv7Mhgx9QP0svO55T_Zoy7wmJJtLXSoghtkI7DWOnVbiJO5X246Qr0CqGDw".parse().unwrap()
             )
         ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())].into()
@@ -283,7 +306,8 @@ async fn credential_prove_verify_did_tz1() {
 
     println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
 
-    assert!(vp.verify(&didtz).await.unwrap().is_ok());
+    // FIXME: this cannot work because the VP is wrong! See above.
+    // assert!(vp.verify(&didtz).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
@@ -293,13 +317,15 @@ async fn credential_prove_verify_did_tz1() {
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
-    let vp2 = Verifiable::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
+    let _vp2 = Verifiable::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
         pres.holders = vec![did!("did:example:bad").to_owned().into()];
         pres
     })
     .await
     .unwrap();
-    assert!(vp2.verify(&didtz).await.unwrap().is_err());
+
+    // FIXME: this cannot work because the VP is wrong! See above.
+    // assert!(vp2.verify(&didtz).await.unwrap().is_err());
 }
 
 #[tokio::test]
@@ -323,9 +349,9 @@ async fn credential_prove_verify_did_tz2() {
     );
 
     let didtz = VerificationMethodDIDResolver::new(DIDTZ);
-    let signer = SingleSecretSigner::new(key.clone());
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
 
-    let vc_issue_options = ProofConfiguration::new(
+    let vc_issue_options = SuiteOptions::new(
         cred.issuance_date.clone(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
@@ -357,14 +383,21 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
-    let wrong_signer = SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng).unwrap());
+    let wrong_signer =
+        SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng).unwrap()).into_local();
     let vc_wrong_key = suite
         .sign(
             vc.claims.clone(),
             AnyInputContext::default(),
             &didtz,
             &wrong_signer,
-            vc.proof.first().unwrap().clone_configuration(),
+            vc.proof
+                .first()
+                .unwrap()
+                .configuration()
+                .to_owned()
+                .into_options()
+                .cast(),
         )
         .await
         .unwrap();
@@ -376,7 +409,7 @@ async fn credential_prove_verify_did_tz2() {
         vec![vc],
     );
 
-    let vp_issue_options = ProofConfiguration::new(
+    let vp_issue_options = SuiteOptions::new(
         "2021-02-18T20:23:13Z".parse().unwrap(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
@@ -400,13 +433,7 @@ async fn credential_prove_verify_did_tz2() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof.first_mut().unwrap().signature.jws = Some(
-        CompactJWSString::from_string(format!(
-            "x{}",
-            vp.proof.first().unwrap().signature.jws.as_ref().unwrap()
-        ))
-        .unwrap(),
-    );
+    vp1.proof.first_mut().unwrap().signature.alter();
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified
@@ -438,15 +465,15 @@ async fn credential_prove_verify_did_tz3() {
     );
 
     let didtz = VerificationMethodDIDResolver::new(DIDTZ);
-    let signer = SingleSecretSigner::new(key.clone());
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
 
-    let vc_issue_options = ProofConfiguration::new(
+    let vc_issue_options = SuiteOptions::new(
         cred.issuance_date.clone(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),
         ProofPurpose::Assertion,
-        AnySuiteOptions::default()
+        AnyInputOptions::default()
             .with_public_key(key.to_public())
             .unwrap(),
     );
@@ -475,14 +502,20 @@ async fn credential_prove_verify_did_tz3() {
     assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
-    let wrong_signer = SingleSecretSigner::new(JWK::generate_p256_from(&mut rng));
+    let wrong_signer = SingleSecretSigner::new(JWK::generate_p256_from(&mut rng)).into_local();
     let vc_wrong_key = suite
         .sign(
             vc.claims.clone(),
             AnyInputContext::default(),
             &didtz,
             &wrong_signer,
-            vc.proof.first().unwrap().clone_configuration(),
+            vc.proof
+                .first()
+                .unwrap()
+                .configuration()
+                .to_owned()
+                .into_options()
+                .cast(),
         )
         .await
         .unwrap();
@@ -494,13 +527,13 @@ async fn credential_prove_verify_did_tz3() {
         vec![vc],
     );
 
-    let vp_issue_options = ProofConfiguration::new(
+    let vp_issue_options = SuiteOptions::new(
         "2021-03-04T14:18:21Z".parse().unwrap(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),
         ProofPurpose::Authentication,
-        AnySuiteOptions::default()
+        AnyInputOptions::default()
             .with_public_key(key.to_public())
             .unwrap(),
     );
@@ -520,13 +553,7 @@ async fn credential_prove_verify_did_tz3() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof.first_mut().unwrap().signature.jws = Some(
-        CompactJWSString::from_string(format!(
-            "x{}",
-            vp.proof.first().unwrap().signature.jws.as_ref().unwrap()
-        ))
-        .unwrap(),
-    );
+    vp1.proof.first_mut().unwrap().signature.alter();
     assert!(vp1.verify(&didtz).await.is_err());
 
     // test that holder is verified

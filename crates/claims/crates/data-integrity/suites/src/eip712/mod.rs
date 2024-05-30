@@ -1,11 +1,9 @@
 use iref::Uri;
-use serde::Serialize;
-use ssi_core::Referencable;
-use ssi_data_integrity_core::ProofConfigurationRef;
-use std::future::Future;
+
+mod hashing;
+pub use hashing::Eip712Hashing;
 
 mod signature;
-
 pub use signature::*;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
@@ -30,39 +28,17 @@ pub enum InvalidInput {
 }
 
 impl Input {
-    pub fn try_into_typed_data<'a, M: Referencable, O: Referencable>(
+    pub fn try_into_typed_data(
         mut self,
-        // proof_context: &'static json_ld::syntax::Context,
-        proof_type: &'static str,
-        proof_configuration: ProofConfigurationRef<'a, M, O>,
-    ) -> Result<ssi_eip712::TypedData, InvalidInput>
-    where
-        M::Reference<'a>: serde::Serialize,
-        O::Reference<'a>: serde::Serialize,
-    {
+        proof_configuration: &impl serde::Serialize,
+    ) -> Result<ssi_eip712::TypedData, InvalidInput> {
         let domain = self.domain.unwrap_or_else(Self::default_domain);
         let primary_type = self.primary_type.unwrap_or_else(Self::default_primary_type);
 
-        #[derive(Serialize)]
-        #[serde(bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize"))]
-        struct ProofConfigurationWithContext<'a, M: Referencable, O: Referencable> {
-            // #[serde(rename = "@context")]
-            // proof_context: &'static json_ld::syntax::Context,
-            #[serde(rename = "type")]
-            proof_type: &'static str,
-
-            #[serde(flatten)]
-            proof_configuration: ProofConfigurationRef<'a, M, O>,
-        }
-
-        let proof = ProofConfigurationWithContext {
-            // proof_context,
-            proof_type,
-            proof_configuration,
-        };
-
-        self.message
-            .insert("proof".to_string(), ssi_eip712::to_value(&proof).unwrap());
+        self.message.insert(
+            "proof".to_string(),
+            ssi_eip712::to_value(proof_configuration).unwrap(),
+        );
 
         let message = ssi_eip712::Value::Struct(self.message);
 
@@ -124,23 +100,19 @@ pub enum TypesFetchError {
 /// A default implementation is provided for the `()` type that always return
 /// `TypesFetchError::Unsupported`.
 pub trait TypesProvider {
-    /// Future returned by `fetch_types`.
-    type Fetch: Future<Output = Result<ssi_eip712::Types, TypesFetchError>>;
-
     /// Fetches the type definitions located behind the given `uri`.
     ///
     /// This is an asynchronous function returning a `Self::Fetch` future that
     /// resolves into ether the EIP712 [`Types`](ssi_eip712::Types) or an error
     /// of type `TypesFetchError`.
-    fn fetch_types(&self, uri: &Uri) -> Self::Fetch;
+    #[allow(async_fn_in_trait)]
+    async fn fetch_types(&self, uri: &Uri) -> Result<ssi_eip712::Types, TypesFetchError>;
 }
 
 /// Simple EIP712 loader implementation that always return
 /// `TypesFetchError::Unsupported`.
 impl TypesProvider for () {
-    type Fetch = std::future::Ready<Result<ssi_eip712::Types, TypesFetchError>>;
-
-    fn fetch_types(&self, _uri: &Uri) -> Self::Fetch {
-        std::future::ready(Err(TypesFetchError::Unsupported))
+    async fn fetch_types(&self, _uri: &Uri) -> Result<ssi_eip712::Types, TypesFetchError> {
+        Err(TypesFetchError::Unsupported)
     }
 }

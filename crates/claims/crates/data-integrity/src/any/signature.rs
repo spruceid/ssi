@@ -1,301 +1,139 @@
-use ssi_core::{covariance_rule, Referencable};
-use ssi_data_integrity_suites::{
-    JwsSignature, JwsSignatureRef, MultibaseSignature, MultibaseSignatureRef,
-};
-use ssi_jws::{CompactJWSStr, CompactJWSString};
-use ssi_verification_methods::InvalidSignature;
+use std::borrow::Cow;
 
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    serde::Serialize,
-    serde::Deserialize,
-    linked_data::Serialize,
-    linked_data::Deserialize,
-)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-#[serde(rename_all = "camelCase")]
-pub struct AnySignature {
-    #[ld("sec:proofValue")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub proof_value: Option<String>,
+use ssi_verification_methods::{protocol::WithProtocol, VerificationMethod};
 
-    #[ld("sec:signatureValue")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub signature_value: Option<String>,
+use crate::AnyProtocol;
 
-    #[ld("sec:jws")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub jws: Option<CompactJWSString>,
+pub struct AnySigner<S>(pub S);
 
-    #[cfg(feature = "eip712")]
-    #[ld("https://w3c-ccg.github.io/ethereum-eip712-signature-2021-spec/#eip712-domain")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub eip712: Option<ssi_data_integrity_suites::eip712::Eip712Metadata>,
-}
-
-impl Referencable for AnySignature {
-    type Reference<'a> = AnySignatureRef<'a> where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        AnySignatureRef {
-            proof_value: self.proof_value.as_deref(),
-            signature_value: self.signature_value.as_deref(),
-            jws: self.jws.as_deref(),
-            #[cfg(feature = "eip712")]
-            eip712: self.eip712.as_ref(),
-        }
-    }
-
-    covariance_rule!();
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-pub struct AnySignatureRef<'a> {
-    pub proof_value: Option<&'a str>,
-
-    pub signature_value: Option<&'a str>,
-
-    pub jws: Option<&'a CompactJWSStr>,
-
-    #[cfg(feature = "eip712")]
-    pub eip712: Option<&'a ssi_data_integrity_suites::eip712::Eip712Metadata>,
-}
-
-impl From<MultibaseSignature> for AnySignature {
-    fn from(value: MultibaseSignature) -> Self {
-        AnySignature {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for MultibaseSignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        match value.proof_value {
-            Some(v) => Ok(Self { proof_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
-    }
-}
-
-impl From<JwsSignature> for AnySignature {
-    fn from(value: JwsSignature) -> Self {
-        AnySignature {
-            jws: Some(value.jws),
-            ..Default::default()
-        }
-    }
-}
-
-impl<'a> TryFrom<AnySignatureRef<'a>> for JwsSignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        match value.jws {
-            Some(v) => Ok(Self { jws: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
-    }
-}
-
-#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
-impl From<ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature> for AnySignature {
-    fn from(value: ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
-impl TryFrom<AnySignature>
-    for ssi_data_integrity_suites::ethereum_personal_signature_2021::Signature
+impl<M, S> ssi_verification_methods::Signer<M> for AnySigner<S>
+where
+    M: VerificationMethod + Into<ssi_verification_methods::AnyMethod>,
+    S: ssi_verification_methods::Signer<ssi_verification_methods::AnyMethod>,
 {
-    type Error = InvalidSignature;
+    type MessageSigner = AnyMessageSigner<S::MessageSigner>;
 
-    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
+    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner> {
+        let any_method = method.into_owned().into();
+        self.0
+            .for_method(Cow::Owned(any_method))
+            .await
+            .map(AnyMessageSigner)
     }
 }
 
-#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
-impl<'a> From<ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>>
-    for AnySignatureRef<'a>
+pub struct AnyMessageSigner<S>(pub S);
+
+impl<S, A> ssi_verification_methods::MessageSigner<A> for AnyMessageSigner<S>
+where
+    S: ssi_verification_methods::MessageSigner<AnySignatureAlgorithm>,
+    A: IntoAnySignatureAlgorithm,
 {
-    fn from(
-        value: ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>,
-    ) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
+    async fn sign(
+        self,
+        algorithm: A,
+        message: &[u8],
+    ) -> Result<Vec<u8>, ssi_verification_methods::MessageSignatureError> {
+        self.0
+            .sign(algorithm.into_any_signature_algorithm(), message)
+            .await
     }
 }
 
-#[cfg(all(feature = "ethereum", feature = "secp256k1"))]
-impl<'a> TryFrom<AnySignatureRef<'a>>
-    for ssi_data_integrity_suites::ethereum_personal_signature_2021::SignatureRef<'a>
-{
-    type Error = InvalidSignature;
+pub type AnySignatureAlgorithm = WithProtocol<ssi_jwk::Algorithm, AnyProtocol>;
 
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
+pub trait IntoAnySignatureAlgorithm {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm;
+}
+
+impl IntoAnySignatureAlgorithm for ssi_jwk::Algorithm {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self, AnyProtocol::None)
     }
 }
 
-#[cfg(feature = "solana")]
-impl From<ssi_data_integrity_suites::solana_signature_2021::Signature> for AnySignature {
-    fn from(value: ssi_data_integrity_suites::solana_signature_2021::Signature) -> Self {
-        AnySignature {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::RS256 {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-#[cfg(feature = "solana")]
-impl TryFrom<AnySignature> for ssi_data_integrity_suites::solana_signature_2021::Signature {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
-        match value.proof_value {
-            Some(v) => Ok(Self { proof_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ES256 {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-#[cfg(feature = "solana")]
-impl<'a> From<ssi_data_integrity_suites::solana_signature_2021::SignatureRef<'a>>
-    for AnySignatureRef<'a>
-{
-    fn from(value: ssi_data_integrity_suites::solana_signature_2021::SignatureRef<'a>) -> Self {
-        AnySignatureRef {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ES256K {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
-#[cfg(feature = "solana")]
-impl<'a> TryFrom<AnySignatureRef<'a>>
-    for ssi_data_integrity_suites::solana_signature_2021::SignatureRef<'a>
-{
-    type Error = InvalidSignature;
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ES256KR {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
 
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        match value.proof_value {
-            Some(v) => Ok(Self { proof_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::AnyESKeccakK {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
+
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::EdDSA {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
+
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::EdBlake2b {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
+    }
+}
+
+impl IntoAnySignatureAlgorithm for ssi_jwk::algorithm::ESBlake2b {
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.into(), AnyProtocol::None)
     }
 }
 
 #[cfg(feature = "tezos")]
-impl From<ssi_data_integrity_suites::tezos::Signature> for AnySignature {
-    fn from(value: ssi_data_integrity_suites::tezos::Signature) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(feature = "tezos")]
-impl<'a> From<ssi_data_integrity_suites::tezos::SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: ssi_data_integrity_suites::tezos::SignatureRef<'a>) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(feature = "tezos")]
-impl<'a> TryFrom<AnySignatureRef<'a>> for ssi_data_integrity_suites::tezos::SignatureRef<'a> {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
-    }
-}
-
-#[cfg(all(feature = "w3c", feature = "rsa"))]
-impl From<ssi_data_integrity_suites::rsa_signature_2018::Signature> for AnySignature {
-    fn from(value: ssi_data_integrity_suites::rsa_signature_2018::Signature) -> Self {
-        AnySignature {
-            signature_value: Some(value.signature_value),
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(all(feature = "w3c", feature = "rsa"))]
-impl<'a> TryFrom<AnySignatureRef<'a>>
-    for ssi_data_integrity_suites::rsa_signature_2018::SignatureRef<'a>
+impl IntoAnySignatureAlgorithm
+    for WithProtocol<ssi_jwk::algorithm::AnyBlake2b, ssi_data_integrity_suites::TezosWallet>
 {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        match value.signature_value {
-            Some(v) => Ok(Self { signature_value: v }),
-            None => Err(InvalidSignature::MissingValue),
-        }
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.0.into(), self.1.into())
     }
 }
 
-#[cfg(feature = "eip712")]
-impl From<ssi_data_integrity_suites::eip712::Eip712Signature> for AnySignature {
-    fn from(value: ssi_data_integrity_suites::eip712::Eip712Signature) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(feature = "eip712")]
-impl TryFrom<AnySignature> for ssi_data_integrity_suites::eip712::Eip712Signature {
-    type Error = InvalidSignature;
-
-    fn try_from(value: AnySignature) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
-    }
-}
-
-#[cfg(feature = "eip712")]
-impl<'a> From<ssi_data_integrity_suites::eip712::Eip712SignatureRef<'a>> for AnySignatureRef<'a> {
-    fn from(value: ssi_data_integrity_suites::eip712::Eip712SignatureRef<'a>) -> Self {
-        Self {
-            proof_value: Some(value.proof_value),
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(feature = "eip712")]
-impl<'a> TryFrom<AnySignatureRef<'a>>
-    for ssi_data_integrity_suites::eip712::Eip712SignatureRef<'a>
+impl IntoAnySignatureAlgorithm
+    for WithProtocol<
+        ssi_jwk::algorithm::AnyESKeccakK,
+        ssi_verification_methods::protocol::EthereumWallet,
+    >
 {
-    type Error = InvalidSignature;
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.0.into(), self.1.into())
+    }
+}
 
-    fn try_from(value: AnySignatureRef<'a>) -> Result<Self, Self::Error> {
-        Ok(Self {
-            proof_value: value.proof_value.ok_or(InvalidSignature::MissingValue)?,
-        })
+#[cfg(feature = "solana")]
+impl IntoAnySignatureAlgorithm
+    for WithProtocol<ssi_jwk::Algorithm, ssi_verification_methods::protocol::Base58Btc>
+{
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.0, self.1.into())
+    }
+}
+
+#[cfg(feature = "aleo")]
+impl IntoAnySignatureAlgorithm
+    for WithProtocol<ssi_jwk::Algorithm, ssi_verification_methods::protocol::Base58BtcMultibase>
+{
+    fn into_any_signature_algorithm(self) -> AnySignatureAlgorithm {
+        WithProtocol(self.0, self.1.into())
     }
 }

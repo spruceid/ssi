@@ -20,7 +20,7 @@ documentation = "https://docs.rs/ssi-data-integrity/"
 ##   - `EcdsaSecp256k1Signature2019` (requires `secp256k1`)
 ##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
 ##   - `EthereumEip712Signature2021` (requires `eip712`)
-w3c = []
+w3c = ["k256"]
 
 ## Signature suites specified by the Decentralized Identify Foundation (DIF).
 ##
@@ -65,17 +65,17 @@ rsa = ["ssi-verification-methods/rsa"]
 tezos = ["serde_json", "serde_jcs", "ssi-tzkey", "bs58", "ssi-verification-methods/tezos"]
 
 ## Enables `AleoSignature2021`.
-aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo"]
+aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo", "k256"]
 
 ## Signature suites based on Ethereum EIP-712.
 ## 
 ## This includes:
 ##   - `Eip712Signature2021` (requires `ethereum`).
 ##   - `EthereumEip712Signature2021` (requires `w3c`)
-eip712 = ["ssi-eip712", "ssi-jws/eip", "serde_json", "ssi-verification-methods/eip712"]
+eip712 = ["ssi-jws/eip", "serde_json", "ssi-verification-methods/eip712"]
 
 # Enables `SolanaSignature2021`
-solana = ["ssi-verification-methods/solana"]
+solana = ["ssi-verification-methods/solana", "k256"]
 
 ## Ethereum signature suites.
 ##
@@ -102,7 +102,7 @@ ssi-contexts.workspace = true
 ssi-claims-core.workspace = true
 ssi-security.workspace = true
 ssi-tzkey = { workspace = true, optional = true }
-ssi-eip712 = { workspace = true, optional = true }
+ssi-eip712.workspace = true
 ssi-caips.workspace = true
 chrono.workspace = true
 multibase.workspace = true

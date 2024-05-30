@@ -193,9 +193,6 @@ pub enum Reason {
     #[error("Too many credential subjects")]
     TooManyCredentialSubjects,
 
-    #[error("Proof preparation failed: `{0}`")]
-    ProofPreparation(ssi_data_integrity::LdProofPreparationError),
-
     #[error("Credential verification failed: {0}")]
     CredentialVerification(ssi_claims_core::Invalid),
 

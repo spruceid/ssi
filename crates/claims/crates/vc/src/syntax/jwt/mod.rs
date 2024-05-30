@@ -24,7 +24,7 @@ impl<S> FromJwtClaims for DataIntegrity<super::JsonCredential, S>
 where
     S: CryptographicSuite + TryFrom<ssi_data_integrity::Type>,
     S::VerificationMethod: DeserializeOwned,
-    S::Options: DeserializeOwned,
+    S::ProofOptions: DeserializeOwned,
     S::Signature: DeserializeOwned,
 {
     type Error = JwtVcDecodeError;
@@ -41,7 +41,7 @@ where
 impl<S: CryptographicSuite> ToJwtClaims for DataIntegrity<super::JsonCredential, S>
 where
     S::VerificationMethod: Serialize,
-    S::Options: Serialize,
+    S::ProofOptions: Serialize,
     S::Signature: Serialize,
 {
     type Error = JwtVcEncodeError;
@@ -71,7 +71,7 @@ impl<C: DeserializeOwned, S> FromJwtClaims for DataIntegrity<super::JsonPresenta
 where
     S: CryptographicSuite + TryFrom<ssi_data_integrity::Type>,
     S::VerificationMethod: DeserializeOwned,
-    S::Options: DeserializeOwned,
+    S::ProofOptions: DeserializeOwned,
     S::Signature: DeserializeOwned,
 {
     type Error = JwtVpDecodeError;
@@ -89,7 +89,7 @@ impl<C: Serialize, S: CryptographicSuite> ToJwtClaims
     for DataIntegrity<super::JsonPresentation<C>, S>
 where
     S::VerificationMethod: Serialize,
-    S::Options: Serialize,
+    S::ProofOptions: Serialize,
     S::Signature: Serialize,
 {
     type Error = JwtVpEncodeError;

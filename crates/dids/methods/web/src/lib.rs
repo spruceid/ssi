@@ -137,7 +137,7 @@ impl DIDMethodResolver for DIDWeb {
 #[cfg(test)]
 mod tests {
     use ssi_claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
+        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
         vc::JsonCredential,
         Verifiable,
     };
@@ -263,13 +263,13 @@ mod tests {
             .unwrap();
         let verification_method = iri!("did:web:localhost#key1").to_owned().into();
         let suite = AnySuite::pick(&key, Some(&verification_method)).unwrap();
-        let issue_options = ProofConfiguration::new(
+        let issue_options = ProofOptions::new(
             "2021-01-26T16:57:27Z".parse().unwrap(),
             verification_method,
             ProofPurpose::Assertion,
             Default::default(),
         );
-        let signer = SingleSecretSigner::new(key);
+        let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
             .sign(
                 cred,
@@ -285,7 +285,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(&vc.proof).unwrap()
         );
-        assert_eq!(vc.proof.first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
+        assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
         assert!(vc.verify(&didweb).await.unwrap().is_ok());
 
         // test that issuer property is used for verification

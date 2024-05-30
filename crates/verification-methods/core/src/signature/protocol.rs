@@ -2,6 +2,15 @@ use std::borrow::Cow;
 
 use crate::MessageSignatureError;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WithProtocol<A, P>(pub A, pub P);
+
+impl<A, P> WithProtocol<A, P> {
+    pub fn new(algorithm: A, protocol: P) -> Self {
+        Self(algorithm, protocol)
+    }
+}
+
 /// Signature protocol.
 ///
 /// Specifies how the client and signer communicates together to produce a
@@ -137,6 +146,7 @@ impl<A> SignatureProtocol<A> for Base58Btc {
 /// `\x19Ethereum Signed Message:\n` followed by the byte length of the message
 /// and send back the signature encoded in hexadecimal, with a `0x` prefix.
 /// The recovery ID in the signature must start at 27 instead of 0.
+#[derive(Debug, Clone, Copy)]
 pub struct EthereumWallet;
 
 impl EthereumWallet {

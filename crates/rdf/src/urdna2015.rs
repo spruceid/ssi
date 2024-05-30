@@ -312,6 +312,10 @@ pub struct NormalizedQuads<'a, Q> {
 }
 
 impl<'a, Q: Iterator<Item = LexicalQuadRef<'a>>> NormalizedQuads<'a, Q> {
+    pub fn into_nquads_lines(self) -> Vec<String> {
+        IntoNQuads::into_nquads_lines(self)
+    }
+
     pub fn into_nquads(self) -> String {
         IntoNQuads::into_nquads(self)
     }

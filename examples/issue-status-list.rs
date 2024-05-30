@@ -2,7 +2,7 @@
 // cargo run --example issue-status-list > tests/statusList.json
 use ssi::{
     claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
+        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
         vc::revocation::{StatusList2021, StatusList2021Credential, StatusList2021Subject},
     },
     jwk::JWK,
@@ -15,7 +15,7 @@ use static_iref::{iri, uri};
 async fn main() {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let key: JWK = serde_json::from_str(key_str).unwrap();
-    let signer = SingleSecretSigner::new(key.clone());
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     // DID resolver.
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
@@ -31,8 +31,7 @@ async fn main() {
 
     let verification_method = iri!("did:example:12345#key1").into();
 
-    let params =
-        ProofConfiguration::from_method_and_options(verification_method, Default::default());
+    let params = ProofOptions::from_method_and_options(verification_method, Default::default());
 
     let suite = AnySuite::pick(&key, Some(&params.verification_method)).unwrap();
     let vc = suite

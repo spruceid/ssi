@@ -1,8 +1,7 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use iref::{Iri, IriBuf};
 use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_core::Referencable;
 use ssi_jwk::JWK;
 use static_iref::iri;
 
@@ -38,52 +37,13 @@ impl From<String> for ExpectedType {
     }
 }
 
-pub enum VerificationMethodCow<'a, T: 'a + Referencable> {
-    Borrowed(T::Reference<'a>),
-    Owned(T),
-}
-
-impl<'a, T: 'a + Referencable> VerificationMethodCow<'a, T> {
-    pub fn as_reference<'b>(&'b self) -> T::Reference<'b>
-    where
-        'a: 'b,
-    {
-        match self {
-            Self::Borrowed(b) => T::apply_covariance(*b),
-            Self::Owned(m) => m.as_reference(),
-        }
-    }
-}
-
-impl<'a, T: 'a + JwkVerificationMethod> VerificationMethodCow<'a, T> {
-    pub fn to_jwk(&self) -> Cow<JWK> {
-        match self {
-            Self::Borrowed(r) => T::ref_to_jwk(*r),
-            Self::Owned(m) => m.to_jwk(),
-        }
-    }
-}
-
-impl<'a, T: 'a + MaybeJwkVerificationMethod> VerificationMethodCow<'a, T> {
-    pub fn try_to_jwk(&self) -> Option<Cow<JWK>> {
-        match self {
-            Self::Borrowed(r) => T::try_ref_to_jwk(*r),
-            Self::Owned(m) => m.try_to_jwk(),
-        }
-    }
-}
-
 /// Verification method.
-pub trait VerificationMethod: Referencable {
+pub trait VerificationMethod: Clone {
     /// Identifier of the verification method.
     fn id(&self) -> &Iri;
 
     /// Returns the IRI of the verification method controller.
     fn controller(&self) -> Option<&Iri>; // Should be an URI.
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri;
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri>;
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -134,7 +94,7 @@ impl From<VerificationMethodResolutionError> for SignatureError {
 
 pub trait VerificationMethodResolver {
     /// Verification method type.
-    type Method: Referencable;
+    type Method: Clone;
 
     /// Resolve the verification method reference.
     #[allow(async_fn_in_trait)]
@@ -142,7 +102,7 @@ pub trait VerificationMethodResolver {
         &'a self,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, Self::Method>>,
-    ) -> Result<VerificationMethodCow<'a, Self::Method>, VerificationMethodResolutionError>;
+    ) -> Result<Cow<'a, Self::Method>, VerificationMethodResolutionError>;
 }
 
 impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
@@ -152,72 +112,41 @@ impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
         &'a self,
         issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, T::Method>>,
-    ) -> Result<VerificationMethodCow<'a, T::Method>, VerificationMethodResolutionError> {
+    ) -> Result<Cow<'a, T::Method>, VerificationMethodResolutionError> {
         T::resolve_verification_method(self, issuer, method).await
     }
 }
 
-pub trait SigningMethod<S, A: Copy>: VerificationMethod + Referencable {
-    fn sign(
-        &self,
-        secret: &S,
-        algorithm: A,
-        protocol: impl SignatureProtocol<A>,
-        bytes: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        Self::sign_ref(self.as_reference(), secret, algorithm, protocol, bytes)
-    }
-
-    fn sign_ref(
-        this: Self::Reference<'_>,
-        secret: &S,
-        algorithm: A,
-        protocol: impl SignatureProtocol<A>,
-        bytes: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        let prepared_bytes = protocol.prepare_message(bytes);
-        let signed_bytes = Self::sign_bytes_ref(this, secret, algorithm, &prepared_bytes)?;
-        protocol.encode_signature(algorithm, signed_bytes)
-    }
+pub trait SigningMethod<S, A: Copy>: VerificationMethod {
+    // fn sign(
+    //     &self,
+    //     secret: &S,
+    //     algorithm: A,
+    //     bytes: &[u8],
+    // ) -> Result<Vec<u8>, MessageSignatureError>;
 
     fn sign_bytes(
         &self,
         secret: &S,
         algorithm: A,
         bytes: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        Self::sign_bytes_ref(self.as_reference(), secret, algorithm, bytes)
-    }
-
-    fn sign_bytes_ref(
-        this: Self::Reference<'_>,
-        secret: &S,
-        algorithm: A,
-        bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError>;
 }
 
-pub struct MethodWithSecret<'m, 's, M: 'm + Referencable, S> {
-    pub method: M::Reference<'m>,
-    pub secret: &'s S,
+pub struct MethodWithSecret<M: VerificationMethod, S> {
+    pub method: M,
+    pub secret: Arc<S>,
 }
 
-impl<'m, 's, M: 'm + Referencable, S> MethodWithSecret<'m, 's, M, S> {
-    pub fn new(method: M::Reference<'m>, secret: &'s S) -> Self {
+impl<M: VerificationMethod, S> MethodWithSecret<M, S> {
+    pub fn new(method: M, secret: Arc<S>) -> Self {
         Self { method, secret }
     }
 }
 
-impl<'m, 's, A: Copy, P: SignatureProtocol<A>, M: 'm + Referencable + SigningMethod<S, A>, S>
-    MessageSigner<A, P> for MethodWithSecret<'m, 's, M, S>
-{
-    async fn sign(
-        self,
-        algorithm: A,
-        protocol: P,
-        message: &[u8],
-    ) -> Result<Vec<u8>, MessageSignatureError> {
-        M::sign_ref(self.method, self.secret, algorithm, protocol, message)
+impl<A: Copy, M: SigningMethod<S, A>, S> MessageSigner<A> for MethodWithSecret<M, S> {
+    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+        self.method.sign_bytes(&self.secret, algorithm, message)
     }
 }
 
@@ -226,26 +155,7 @@ pub trait TypedVerificationMethod: VerificationMethod {
 
     fn type_match(ty: &str) -> bool;
 
-    /// Returns the name of the verification method's type.
     fn type_(&self) -> &str;
-
-    fn ref_type(r: Self::Reference<'_>) -> &str;
-}
-
-impl<'m, M: VerificationMethod> VerificationMethodCow<'m, M> {
-    pub fn id(&self) -> &Iri {
-        match self {
-            Self::Owned(m) => m.id(),
-            Self::Borrowed(b) => M::ref_id(*b),
-        }
-    }
-
-    pub fn controller(&self) -> Option<&Iri> {
-        match self {
-            Self::Owned(m) => m.controller(),
-            Self::Borrowed(b) => M::ref_controller(*b),
-        }
-    }
 }
 
 pub trait LinkedDataVerificationMethod {
@@ -315,23 +225,15 @@ impl From<InvalidVerificationMethod> for SignatureError {
 /// Verification method that can be turned into a JSON Web Key.
 pub trait JwkVerificationMethod: VerificationMethod {
     fn to_jwk(&self) -> Cow<JWK>;
-
-    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK>;
 }
 
 /// Verification method that *may* be turned into a JSON Web Key.
 pub trait MaybeJwkVerificationMethod: VerificationMethod {
     fn try_to_jwk(&self) -> Option<Cow<JWK>>;
-
-    fn try_ref_to_jwk(r: Self::Reference<'_>) -> Option<Cow<'_, JWK>>;
 }
 
 impl<M: JwkVerificationMethod> MaybeJwkVerificationMethod for M {
     fn try_to_jwk(&self) -> Option<Cow<JWK>> {
         Some(M::to_jwk(self))
-    }
-
-    fn try_ref_to_jwk(r: Self::Reference<'_>) -> Option<Cow<'_, JWK>> {
-        Some(M::ref_to_jwk(r))
     }
 }

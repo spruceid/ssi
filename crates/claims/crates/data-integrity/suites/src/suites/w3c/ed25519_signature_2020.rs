@@ -4,12 +4,15 @@
 //! and Curve25519. It is recommended to use `edssa-2022` instead.
 //!
 //! See: <https://w3c.github.io/vc-di-eddsa/#the-ed25519signature2020-suite>
-use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
-use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
-use ssi_verification_methods::{Ed25519VerificationKey2020, MessageSigner};
+use k256::sha2::Sha256;
+use ssi_data_integrity_core::{
+    canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
+    signing::{Base58Btc, MultibaseSigning},
+    suite::NoConfiguration,
+    StandardCryptographicSuite, TypeRef,
+};
+use ssi_verification_methods::Ed25519VerificationKey2020;
 use static_iref::iri;
-
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 
 /// EdDSA Cryptosuite v2020.
 ///
@@ -26,63 +29,20 @@ impl Ed25519Signature2020 {
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Ed25519Signature2020");
 }
 
-impl_rdf_input_urdna2015!(Ed25519Signature2020);
+impl StandardCryptographicSuite for Ed25519Signature2020 {
+    type Configuration = NoConfiguration;
 
-impl CryptographicSuite for Ed25519Signature2020 {
-    type Transformed = String;
-    type Hashed = [u8; 64];
+    type Transformation = CanonicalizeClaimsAndConfiguration;
+
+    type Hashing = HashCanonicalClaimsAndConfiguration<Sha256>;
 
     type VerificationMethod = Ed25519VerificationKey2020;
 
-    type Signature = MultibaseSignature;
+    type SignatureAlgorithm = MultibaseSigning<ssi_jwk::algorithm::EdDSA, Base58Btc>;
 
-    type SignatureProtocol = ();
+    type ProofOptions = ();
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::EdDSA;
-
-    type Options = ();
-
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn iri(&self) -> &iref::Iri {
-        Self::IRI
-    }
-
-    fn cryptographic_suite(&self) -> Option<&str> {
-        None
-    }
-
-    /// Hashing algorithm.
-    fn hash(
-        &self,
-        data: String,
-        proof_configuration: ExpandedConfiguration<Self::VerificationMethod>,
-    ) -> Result<Self::Hashed, HashError> {
-        Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
-    }
-
-    async fn sign_hash(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
-    ) -> Result<Self::Signature, SignatureError> {
-        Ok(MultibaseSignature::new_base58btc(
-            signer.sign(ssi_jwk::algorithm::EdDSA, (), bytes).await?,
-        ))
-    }
-
-    fn verify_hash(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        let signature_bytes = signature.decode()?;
-        method.verify_bytes(bytes, &signature_bytes).map(Into::into)
+    fn type_(&self) -> TypeRef {
+        TypeRef::Other(Self::NAME)
     }
 }

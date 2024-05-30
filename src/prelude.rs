@@ -1,8 +1,8 @@
 pub use crate::{
     claims::{
         data_integrity::{
-            AnyDataIntegrity, AnyInputContext, AnySuite, CryptographicSuiteInput, DataIntegrity,
-            ProofConfiguration,
+            AnyDataIntegrity, AnyInputContext, AnySuite, CryptographicSuite, DataIntegrity,
+            ProofConfiguration, ProofOptions,
         },
         vc::{
             any_credential_from_json_slice, any_credential_from_json_slice_with,

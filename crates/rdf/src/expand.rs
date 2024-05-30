@@ -44,11 +44,10 @@ pub trait AnyLdEnvironment {
         linked_data::to_lexical_quads_with(this.vocabulary, this.interpretation, input)
     }
 
-    /// Returns the canonical form of the dataset, in the N-Quads format.
-    fn canonical_form_of<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
+    fn canonical_quads_of<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
         &mut self,
         input: &T,
-    ) -> Result<String, linked_data::IntoQuadsError>
+    ) -> Result<Vec<rdf_types::LexicalQuad>, linked_data::IntoQuadsError>
     where
         Self::Vocabulary: Vocabulary,
         Self::Interpretation: InterpretationMut<Self::Vocabulary>
@@ -61,7 +60,28 @@ pub trait AnyLdEnvironment {
         let quads = self.quads_of(input)?;
         Ok(
             crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_lexical_quad_ref()))
-                .into_nquads(),
+                .collect(),
+        )
+    }
+
+    /// Returns the canonical form of the dataset, in the N-Quads format.
+    fn canonical_form_of<T: LinkedData<Self::Interpretation, Self::Vocabulary>>(
+        &mut self,
+        input: &T,
+    ) -> Result<Vec<String>, linked_data::IntoQuadsError>
+    where
+        Self::Vocabulary: Vocabulary,
+        Self::Interpretation: InterpretationMut<Self::Vocabulary>
+            + ReverseTermInterpretation<
+                Iri = <Self::Vocabulary as IriVocabulary>::Iri,
+                BlankId = <Self::Vocabulary as BlankIdVocabulary>::BlankId,
+                Literal = <Self::Vocabulary as LiteralVocabulary>::Literal,
+            >,
+    {
+        let quads = self.quads_of(input)?;
+        Ok(
+            crate::urdna2015::normalize(quads.iter().map(|quad| quad.as_lexical_quad_ref()))
+                .into_nquads_lines(),
         )
     }
 }

@@ -58,6 +58,9 @@ pub enum ProofValidationError {
     #[error("invalid use of key")]
     InvalidKeyUse,
 
+    #[error("missing signature algorithm")]
+    MissingAlgorithm,
+
     #[error("missing signature")]
     MissingSignature,
 
@@ -69,6 +72,12 @@ pub enum ProofValidationError {
 
     #[error("{0}")]
     Other(String),
+}
+
+impl ProofValidationError {
+    pub fn other(e: impl ToString) -> Self {
+        Self::Other(e.to_string())
+    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq)]

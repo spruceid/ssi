@@ -34,13 +34,12 @@ pub trait VerifiableClaims {
     type Proof;
 
     #[allow(async_fn_in_trait)]
-    async fn into_verifiable<T, E>(
+    async fn into_verifiable(
         self,
-    ) -> Result<Verifiable<T, Self::Proof>, ProofPreparationError>
+    ) -> Result<Verifiable<Self::Proofless, Self::Proof>, ProofPreparationError>
     where
-        Self: ExtractProof<Proofless = T>,
-        Self::Proof: PrepareWith<T, E>,
-        E: Default,
+        Self: ExtractProof + DefaultEnvironment,
+        Self::Proof: PrepareWith<Self::Proofless, Self::Environment>,
     {
         Verifiable::new(self).await
     }
@@ -56,6 +55,10 @@ pub trait VerifiableClaims {
     {
         Verifiable::new_with(self, env).await
     }
+}
+
+pub trait DefaultEnvironment {
+    type Environment: Default;
 }
 
 /// Proof extraction trait.

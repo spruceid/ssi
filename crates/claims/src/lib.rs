@@ -1,9 +1,11 @@
 //! Verifiable Claims.
 use ::serde::{Deserialize, Serialize};
-use data_integrity::{CryptographicSuite, DataIntegrity};
+use data_integrity::{
+    CloneCryptographicSuite, CryptographicSuite, DataIntegrity, DebugCryptographicSuite,
+    DeserializeCryptographicSuite, SerializeCryptographicSuite,
+};
 use educe::Educe;
 pub use ssi_claims_core::*;
-use std::fmt::Debug;
 
 /// JSON Web signature (JWS).
 ///
@@ -44,12 +46,12 @@ pub use ssi_data_integrity as data_integrity;
 #[serde(
     untagged,
     bound(
-        serialize = "S::VerificationMethod: Serialize, S::Options: Serialize, S::Signature: Serialize",
-        deserialize = "S: CryptographicSuite + TryFrom<data_integrity::Type>, S::VerificationMethod: Deserialize<'de>, S::Options: Deserialize<'de>, S::Signature: Deserialize<'de>"
+        serialize = "S: SerializeCryptographicSuite",
+        deserialize = "S: DeserializeCryptographicSuite<'de>"
     )
 )]
-#[educe(Clone(bound("S: CryptographicSuite + Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone")))]
-#[educe(Debug(bound("S: CryptographicSuite + Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug")))]
+#[educe(Clone(bound("S: CloneCryptographicSuite")))]
+#[educe(Debug(bound("S: DebugCryptographicSuite")))]
 pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     /// JSON-like verifiable credential.
     Credential(DataIntegrity<vc::JsonCredential, S>),

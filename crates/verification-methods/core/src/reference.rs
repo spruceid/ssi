@@ -1,10 +1,7 @@
-use std::borrow::Borrow;
-
 use crate::{LinkedDataVerificationMethod, VerificationMethod};
 use educe::Educe;
 use iref::{Iri, IriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_core::Referencable;
 
 /// Reference to a verification method.
 #[derive(
@@ -37,13 +34,17 @@ impl<M> ReferenceOrOwned<M> {
         }
     }
 
-    pub fn borrowed<'a>(&'a self) -> ReferenceOrOwnedRef<'a, M>
-    where
-        M: 'a + Referencable,
-    {
+    pub fn borrowed(&self) -> ReferenceOrOwnedRef<M> {
         match self {
             Self::Reference(r) => ReferenceOrOwnedRef::Reference(r.as_iri()),
-            Self::Owned(m) => ReferenceOrOwnedRef::Owned(m.as_reference()),
+            Self::Owned(m) => ReferenceOrOwnedRef::Owned(m),
+        }
+    }
+
+    pub fn map<N>(self, f: impl FnOnce(M) -> N) -> ReferenceOrOwned<N> {
+        match self {
+            Self::Reference(r) => ReferenceOrOwned::Reference(r),
+            Self::Owned(o) => ReferenceOrOwned::Owned(f(o)),
         }
     }
 
@@ -87,59 +88,41 @@ impl<M: LinkedDataVerificationMethod> LinkedDataVerificationMethod for Reference
 }
 
 /// Reference to a verification method.
-#[derive(Serialize, linked_data::Serialize, linked_data::Deserialize, Educe)]
-#[educe(Debug(bound = "M::Reference<'a>: core::fmt::Debug"))]
-#[serde(untagged, bound(serialize = "M::Reference<'a>: Serialize"))]
-pub enum ReferenceOrOwnedRef<'a, M: 'a + Referencable> {
+#[derive(Educe, Debug, Serialize, linked_data::Serialize, linked_data::Deserialize)]
+#[educe(Clone, Copy)]
+#[serde(untagged)]
+pub enum ReferenceOrOwnedRef<'a, M> {
     Reference(#[ld(id)] &'a Iri),
-    Owned(M::Reference<'a>),
-}
-
-impl<'a, M: 'a + Referencable> From<&'a ReferenceOrOwned<M>> for ReferenceOrOwnedRef<'a, M> {
-    fn from(value: &'a ReferenceOrOwned<M>) -> Self {
-        value.borrowed()
-    }
-}
-
-impl<'a, M: 'a + Referencable, I: Borrow<Iri>> From<&'a I> for ReferenceOrOwnedRef<'a, M> {
-    fn from(value: &'a I) -> Self {
-        Self::Reference(value.borrow())
-    }
-}
-
-impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
-    pub fn shorten_lifetime<'b>(self) -> ReferenceOrOwnedRef<'b, M>
-    where
-        'a: 'b,
-    {
-        match self {
-            Self::Reference(i) => ReferenceOrOwnedRef::Reference(i),
-            Self::Owned(r) => ReferenceOrOwnedRef::Owned(M::apply_covariance(r)),
-        }
-    }
+    Owned(&'a M),
 }
 
 impl<'a, M: VerificationMethod> ReferenceOrOwnedRef<'a, M> {
+    pub fn cloned(&self) -> ReferenceOrOwned<M> {
+        match self {
+            &Self::Reference(iri) => ReferenceOrOwned::Reference(iri.to_owned()),
+            &Self::Owned(m) => ReferenceOrOwned::Owned(m.clone()),
+        }
+    }
+
     pub fn id(&self) -> &'a Iri {
         match self {
             Self::Reference(r) => r,
-            Self::Owned(m) => M::ref_id(*m),
+            Self::Owned(m) => m.id(),
         }
     }
 }
 
-impl<'a, M: Referencable> Clone for ReferenceOrOwnedRef<'a, M> {
-    fn clone(&self) -> Self {
-        *self
+impl<'a, M> ReferenceOrOwnedRef<'a, M> {
+    pub fn map<N>(self, f: impl FnOnce(&'a M) -> &'a N) -> ReferenceOrOwnedRef<'a, N> {
+        match self {
+            Self::Reference(r) => ReferenceOrOwnedRef::Reference(r),
+            Self::Owned(o) => ReferenceOrOwnedRef::Owned(f(o)),
+        }
     }
-}
 
-impl<'a, M: Referencable> Copy for ReferenceOrOwnedRef<'a, M> {}
-
-impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
-    pub fn try_map<N: 'a + Referencable, E>(
+    pub fn try_map<N, E>(
         self,
-        f: impl FnOnce(M::Reference<'a>) -> Result<N::Reference<'a>, E>,
+        f: impl FnOnce(&'a M) -> Result<&'a N, E>,
     ) -> Result<ReferenceOrOwnedRef<'a, N>, E> {
         match self {
             Self::Reference(r) => Ok(ReferenceOrOwnedRef::Reference(r)),
@@ -147,19 +130,17 @@ impl<'a, M: Referencable> ReferenceOrOwnedRef<'a, M> {
         }
     }
 
-    pub fn try_cast<N: 'a + Referencable>(
-        self,
-    ) -> Result<ReferenceOrOwnedRef<'a, N>, <M::Reference<'a> as TryInto<N::Reference<'a>>>::Error>
+    pub fn try_cast<N>(self) -> Result<ReferenceOrOwnedRef<'a, N>, <&'a M as TryInto<&'a N>>::Error>
     where
-        M::Reference<'a>: TryInto<N::Reference<'a>>,
+        &'a M: TryInto<&'a N>,
     {
         self.try_map(TryInto::try_into)
     }
 }
 
-impl<'a, M: Referencable> LinkedDataVerificationMethod for ReferenceOrOwnedRef<'a, M>
+impl<'a, M> LinkedDataVerificationMethod for ReferenceOrOwnedRef<'a, M>
 where
-    M::Reference<'a>: LinkedDataVerificationMethod,
+    &'a M: LinkedDataVerificationMethod,
 {
     fn quads(&self, quads: &mut Vec<rdf_types::Quad>) -> rdf_types::Object {
         match self {

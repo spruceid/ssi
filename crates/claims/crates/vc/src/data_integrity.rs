@@ -28,8 +28,7 @@ pub async fn any_credential_from_json_slice_with<
     I,
     L,
     E,
-    #[cfg(feature = "eip712")] Y: ssi_data_integrity::suites::eip712::TypesProvider,
-    #[cfg(not(feature = "eip712"))] Y,
+    Y: ssi_data_integrity::suites::eip712::TypesProvider,
 >(
     json: &[u8],
     environment: AnyInputContext<E, Y>,
@@ -65,8 +64,7 @@ pub async fn any_credential_from_json_str_with<
     I,
     L,
     E,
-    #[cfg(feature = "eip712")] Y: ssi_data_integrity::suites::eip712::TypesProvider,
-    #[cfg(not(feature = "eip712"))] Y,
+    Y: ssi_data_integrity::suites::eip712::TypesProvider,
 >(
     json: &str,
     environment: AnyInputContext<E, Y>,

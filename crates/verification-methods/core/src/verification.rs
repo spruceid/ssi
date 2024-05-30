@@ -4,6 +4,8 @@ use std::{
 };
 
 use iref::{Iri, IriBuf};
+use ssi_claims_core::{ProofValidationError, ProofValidity};
+use ssi_jwk::JWK;
 use static_iref::iri;
 
 macro_rules! proof_purposes {
@@ -301,4 +303,23 @@ impl TryFrom<IriBuf> for ProofPurpose {
             None => Err(UnknownProofPurpose(value)),
         }
     }
+}
+
+pub trait VerifyBytes<A> {
+    fn verify_bytes(
+        &self,
+        algorithm: A,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError>;
+}
+
+pub trait VerifyBytesWithRecoveryJwk<A> {
+    fn verify_bytes_with_public_jwk(
+        &self,
+        public_jwk: &JWK,
+        algorithm: A,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError>;
 }

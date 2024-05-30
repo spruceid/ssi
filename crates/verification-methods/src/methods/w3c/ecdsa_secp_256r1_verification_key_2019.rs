@@ -2,11 +2,10 @@ use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
+use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError, VerifyBytes};
 use static_iref::iri;
 use std::{borrow::Cow, hash::Hash, str::FromStr};
 
@@ -87,6 +86,7 @@ impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
 }
 
 impl EcdsaSecp256r1VerificationKey2019 {
+    pub const NAME: &'static str = ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE;
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019");
 
@@ -133,16 +133,6 @@ impl EcdsaSecp256r1VerificationKey2019 {
     }
 }
 
-impl Referencable for EcdsaSecp256r1VerificationKey2019 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     /// Returns the identifier of the key.
     fn id(&self) -> &Iri {
@@ -152,14 +142,6 @@ impl VerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -180,19 +162,22 @@ impl TypedVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     fn type_(&self) -> &str {
         ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
     }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
-        ECDSA_SECP_256R1_VERIFICATION_KEY_2019_TYPE
-    }
 }
 
 impl JwkVerificationMethod for EcdsaSecp256r1VerificationKey2019 {
     fn to_jwk(&self) -> Cow<JWK> {
         Cow::Owned(self.public_key_jwk())
     }
+}
 
-    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
-        <Self as JwkVerificationMethod>::to_jwk(r)
+impl VerifyBytes<ssi_jwk::algorithm::ES256> for EcdsaSecp256r1VerificationKey2019 {
+    fn verify_bytes(
+        &self,
+        _: ssi_jwk::algorithm::ES256,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.verify_bytes(signing_bytes, signature)
     }
 }
 

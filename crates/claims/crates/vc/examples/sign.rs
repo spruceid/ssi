@@ -3,7 +3,7 @@
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use rand_chacha::rand_core::SeedableRng;
 use ssi_claims_core::Proof;
-use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuiteInput};
+use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuite, ProofOptions};
 use ssi_rdf::Expandable;
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, MethodWithSecret,
@@ -11,7 +11,7 @@ use ssi_verification_methods::{
     VerificationMethodResolutionError, VerificationMethodResolver,
 };
 use static_iref::{iri, uri};
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 use xsd_types::DateTime;
 
 #[derive(Clone, linked_data::Serialize, serde::Serialize)]
@@ -141,7 +141,7 @@ async fn main() {
 
     // Signature options, defining the crypto suite, signature date,
     // signing key and proof purpose.
-    let proof_options = ssi_data_integrity::ProofConfiguration::new(
+    let proof_options = ProofOptions::new(
         DateTime::now(),
         iri!("https://example.com/controller#key").to_owned().into(),
         ProofPurpose::Assertion,
@@ -208,7 +208,7 @@ pub struct Keyring {
         IriBuf,
         (
             Ed25519VerificationKey2020,
-            ssi_verification_methods::ed25519_dalek::SigningKey,
+            Arc<ssi_verification_methods::ed25519_dalek::SigningKey>,
         ),
     >,
 }
@@ -223,26 +223,26 @@ impl Keyring {
         verification_key: Ed25519VerificationKey2020,
         key_pair: ssi_verification_methods::ed25519_dalek::SigningKey,
     ) {
-        self.keys
-            .insert(verification_key.id.clone(), (verification_key, key_pair));
+        self.keys.insert(
+            verification_key.id.clone(),
+            (verification_key, Arc::new(key_pair)),
+        );
     }
 }
 
-impl Signer<Ed25519VerificationKey2020, ssi_jwk::algorithm::EdDSA, ()> for Keyring {
-    type MessageSigner<'a> = MethodWithSecret<
-        'a,
-        'a,
+impl Signer<Ed25519VerificationKey2020> for Keyring {
+    type MessageSigner = MethodWithSecret<
         Ed25519VerificationKey2020,
         ssi_verification_methods::ed25519_dalek::SigningKey,
     >;
 
-    async fn for_method<'a>(
-        &'a self,
-        method: <Ed25519VerificationKey2020 as ssi_core::Referencable>::Reference<'a>,
-    ) -> Option<Self::MessageSigner<'a>> {
+    async fn for_method(
+        &self,
+        method: Cow<'_, Ed25519VerificationKey2020>,
+    ) -> Option<Self::MessageSigner> {
         self.keys
             .get(method.id())
-            .map(|(method, key_pair)| MethodWithSecret::new(method, key_pair))
+            .map(|(method, key_pair)| MethodWithSecret::new(method.clone(), key_pair.clone()))
     }
 }
 
@@ -264,10 +264,7 @@ impl VerificationMethodResolver for Keyring {
         &'a self,
         _issuer: Option<&'a Iri>,
         method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
-    ) -> Result<
-        ssi_verification_methods::VerificationMethodCow<'a, Ed25519VerificationKey2020>,
-        VerificationMethodResolutionError,
-    > {
+    ) -> Result<Cow<'a, Ed25519VerificationKey2020>, VerificationMethodResolutionError> {
         match method {
             Some(ReferenceOrOwnedRef::Owned(_key)) => {
                 // If we get here, this means the VC embeds the public key used
@@ -277,9 +274,7 @@ impl VerificationMethodResolver for Keyring {
                 todo!()
             }
             Some(ReferenceOrOwnedRef::Reference(id)) => match self.keys.get(id) {
-                Some((key, _)) => Ok(ssi_verification_methods::VerificationMethodCow::Borrowed(
-                    key,
-                )),
+                Some((key, _)) => Ok(Cow::Borrowed(key)),
                 None => Err(VerificationMethodResolutionError::UnknownKey),
             },
             None => Err(VerificationMethodResolutionError::MissingVerificationMethod),

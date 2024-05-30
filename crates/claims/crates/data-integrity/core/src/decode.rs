@@ -3,7 +3,8 @@ use ssi_claims_core::{ProofPreparationError, Verifiable, VerifiableClaims};
 use ssi_json_ld::JsonLdNodeObject;
 
 use crate::{
-    proof, CryptographicSuiteInput, DataIntegrity, ProofConfigurationRefExpansion, Proofs,
+    suite::{CryptographicSuiteInstance, DeserializeCryptographicSuiteOwned},
+    DataIntegrity, Proofs,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -23,11 +24,7 @@ pub async fn from_json_slice<T, S, E>(
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
-    S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
-    S::VerificationMethod: DeserializeOwned,
-    S::Options: DeserializeOwned,
-    S::Signature: DeserializeOwned,
-    E: for<'a> ProofConfigurationRefExpansion<'a, S>,
+    S: DeserializeCryptographicSuiteOwned + CryptographicSuiteInstance<T, E>,
 {
     serde_json::from_slice::<DataIntegrity<T, S>>(json)?
         .into_verifiable_with(environment)
@@ -43,11 +40,7 @@ pub async fn from_json_str<T, S, E>(
 ) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
-    S: CryptographicSuiteInput<T, E> + TryFrom<proof::Type>,
-    S::VerificationMethod: DeserializeOwned,
-    S::Options: DeserializeOwned,
-    S::Signature: DeserializeOwned,
-    E: for<'a> ProofConfigurationRefExpansion<'a, S>,
+    S: DeserializeCryptographicSuiteOwned + CryptographicSuiteInstance<T, E>,
 {
     from_json_slice(json.as_bytes(), environment).await
 }

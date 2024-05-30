@@ -1,67 +1,56 @@
 use std::marker::PhantomData;
 
+use crate::{CryptographicSuite, DataIntegrity, DeserializeCryptographicSuite, Proofs};
 use serde::Deserialize;
 
-use crate::{CryptographicSuite, DataIntegrity, Proofs, Type};
-
-impl<'de, T: Deserialize<'de>, S> Deserialize<'de> for DataIntegrity<T, S>
+impl<'de, T, S> Deserialize<'de> for DataIntegrity<T, S>
 where
-    S: CryptographicSuite + TryFrom<Type>,
-    S::VerificationMethod: serde::Deserialize<'de>,
-    S::Options: serde::Deserialize<'de>,
-    S::Signature: serde::Deserialize<'de>,
+    T: Deserialize<'de>,
+    S: DeserializeCryptographicSuite<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de>,
+        D: serde::de::Deserializer<'de>,
     {
-        struct Visitor<T, S>(PhantomData<(T, S)>);
-
-        impl<'de, T: Deserialize<'de>, S> serde::de::Visitor<'de> for Visitor<T, S>
-        where
-            S: CryptographicSuite + TryFrom<Type>,
-            S::VerificationMethod: serde::Deserialize<'de>,
-            S::Options: serde::Deserialize<'de>,
-            S::Signature: serde::Deserialize<'de>,
-        {
-            type Value = DataIntegrity<T, S>;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "Data-Integrity-secured claims")
-            }
-
-            fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'de>,
-            {
-                let mut deserializer = Deserializer {
-                    inner: map,
-                    proofs: Proofs::default(),
-                };
-
-                let claims = T::deserialize(&mut deserializer)?;
-                let proofs = deserializer.proofs;
-
-                Ok(DataIntegrity::new(claims, proofs))
-            }
-        }
-
         deserializer.deserialize_map(Visitor(PhantomData))
     }
 }
 
-struct Deserializer<D, S: CryptographicSuite> {
-    inner: D,
-    proofs: Proofs<S>,
+struct Visitor<T, S>(PhantomData<(T, S)>);
+
+impl<'de, T, S> serde::de::Visitor<'de> for Visitor<T, S>
+where
+    T: Deserialize<'de>,
+    S: DeserializeCryptographicSuite<'de>,
+{
+    type Value = DataIntegrity<T, S>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(formatter, "data integrity document")
+    }
+
+    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::MapAccess<'de>,
+    {
+        let mut proofs = Proofs::default();
+        let claims = T::deserialize(Deserializer {
+            inner: map,
+            proofs: &mut proofs,
+        })?;
+
+        Ok(DataIntegrity { claims, proofs })
+    }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::de::MapAccess<'de>
-    for &'a mut Deserializer<D, S>
+struct Deserializer<'a, D, S: CryptographicSuite> {
+    inner: D,
+    proofs: &'a mut Proofs<S>,
+}
+
+impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::de::MapAccess<'de> for Deserializer<'a, D, S>
 where
-    S: CryptographicSuite + TryFrom<Type>,
-    S::VerificationMethod: serde::Deserialize<'de>,
-    S::Options: serde::Deserialize<'de>,
-    S::Signature: serde::Deserialize<'de>,
+    S: DeserializeCryptographicSuite<'de>,
 {
     type Error = D::Error;
 
@@ -93,13 +82,9 @@ where
     }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de>
-    for &'a mut Deserializer<D, S>
+impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de> for Deserializer<'a, D, S>
 where
-    S: CryptographicSuite + TryFrom<Type>,
-    S::VerificationMethod: serde::Deserialize<'de>,
-    S::Options: serde::Deserialize<'de>,
-    S::Signature: serde::Deserialize<'de>,
+    S: DeserializeCryptographicSuite<'de>,
 {
     type Error = D::Error;
 

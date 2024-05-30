@@ -3,7 +3,6 @@ use std::{borrow::Cow, hash::Hash};
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
 use static_iref::iri;
@@ -55,6 +54,7 @@ pub struct RsaVerificationKey2018 {
 }
 
 impl RsaVerificationKey2018 {
+    pub const NAME: &'static str = RSA_VERIFICATION_KEY_2018_TYPE;
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#RsaVerificationKey2018");
 
     pub fn public_key_jwk(&self) -> &JWK {
@@ -85,16 +85,6 @@ impl RsaVerificationKey2018 {
     }
 }
 
-impl Referencable for RsaVerificationKey2018 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns the identifier of the key.
     fn id(&self) -> &Iri {
@@ -104,14 +94,6 @@ impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -128,19 +110,11 @@ impl TypedVerificationMethod for RsaVerificationKey2018 {
     fn type_(&self) -> &str {
         RSA_VERIFICATION_KEY_2018_TYPE
     }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
-        RSA_VERIFICATION_KEY_2018_TYPE
-    }
 }
 
 impl JwkVerificationMethod for RsaVerificationKey2018 {
     fn to_jwk(&self) -> Cow<JWK> {
         Cow::Borrowed(self.public_key_jwk())
-    }
-
-    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
-        <Self as JwkVerificationMethod>::to_jwk(r)
     }
 }
 

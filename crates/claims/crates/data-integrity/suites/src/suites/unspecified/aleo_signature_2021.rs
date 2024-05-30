@@ -1,13 +1,20 @@
-use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_data_integrity_core::{suite::HashError, CryptographicSuite, ExpandedConfiguration};
+use k256::sha2::Sha256;
+use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_data_integrity_core::{
+    canonicalization::{CanonicalizeClaimsAndConfiguration, HashCanonicalClaimsAndConfiguration},
+    signing::MultibaseSignature,
+    suite::{
+        standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm, VerificationAlgorithm},
+        NoConfiguration,
+    },
+    ProofConfigurationRef, ProofRef, StandardCryptographicSuite, TypeRef,
+};
 use ssi_verification_methods::{
-    protocol::Base58BtcMultibase, verification_method_union, AleoMethod2021, AnyMethod,
-    AnyMethodRef, BlockchainVerificationMethod2021, InvalidVerificationMethod, MessageSigner,
-    TypedVerificationMethod,
+    protocol::{Base58BtcMultibase, WithProtocol},
+    verification_method_union, AleoMethod2021, AnyMethod, BlockchainVerificationMethod2021,
+    InvalidVerificationMethod, MessageSigner,
 };
 use static_iref::iri;
-
-use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 
 /// Aleo Signature 2021
 ///
@@ -42,6 +49,7 @@ use crate::{impl_rdf_input_urdna2015, suites::sha256_hash, MultibaseSignature};
 /// `Base58Btc` base.
 ///
 /// [2]: <https://github.com/multiformats/multibase>
+#[derive(Debug, Default, Clone, Copy)]
 pub struct AleoSignature2021;
 
 impl AleoSignature2021 {
@@ -54,55 +62,45 @@ const BLOCKCHAIN_NETWORK_ID: &str = "1";
 const BLOCKCHAIN_NAMESPACE: &str = "aleo";
 
 verification_method_union! {
-    pub enum VerificationMethod, VerificationMethodRef, VerificationMethodType {
+    pub enum VerificationMethod, VerificationMethodType {
         AleoMethod2021,
         BlockchainVerificationMethod2021
     }
 }
 
-impl_rdf_input_urdna2015!(AleoSignature2021);
+impl StandardCryptographicSuite for AleoSignature2021 {
+    type Configuration = NoConfiguration;
 
-impl CryptographicSuite for AleoSignature2021 {
-    type Transformed = String;
-    type Hashed = [u8; 64];
+    type Transformation = CanonicalizeClaimsAndConfiguration;
+
+    type Hashing = HashCanonicalClaimsAndConfiguration<Sha256>;
 
     type VerificationMethod = VerificationMethod;
 
+    type SignatureAlgorithm = AleoSignatureAlgorithm;
+
+    type ProofOptions = ();
+
+    fn type_(&self) -> TypeRef {
+        TypeRef::Other(Self::NAME)
+    }
+}
+
+pub struct AleoSignatureAlgorithm;
+
+impl SignatureAndVerificationAlgorithm for AleoSignatureAlgorithm {
     type Signature = MultibaseSignature;
+}
 
-    type SignatureProtocol = Base58BtcMultibase;
-
-    type MessageSignatureAlgorithm = ssi_jwk::Algorithm;
-
-    type Options = ();
-
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn iri(&self) -> &iref::Iri {
-        Self::IRI
-    }
-
-    fn cryptographic_suite(&self) -> Option<&str> {
-        None
-    }
-
-    /// Hashing algorithm.
-    fn hash(
-        &self,
-        data: String,
-        proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Hashed, HashError> {
-        Ok(sha256_hash(data.as_bytes(), self, proof_configuration))
-    }
-
-    async fn sign_hash(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        _method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        _hash: &Self::Hashed,
-        _signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
+impl<T> SignatureAlgorithm<AleoSignature2021, T> for AleoSignatureAlgorithm
+where
+    T: MessageSigner<WithProtocol<ssi_jwk::Algorithm, Base58BtcMultibase>>,
+{
+    async fn sign(
+        _verification_method: &VerificationMethod,
+        _signer: T,
+        _prepared_claims: &[u8; 64],
+        _proof_configuration: ProofConfigurationRef<'_, AleoSignature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         // ssi_jws::sign_bytes(algorithm, data, key)
         // let signature = ssi_jwk::aleo::sign(hash, key).map_err(MessageSignatureError::signature_failed)?;
@@ -110,15 +108,15 @@ impl CryptographicSuite for AleoSignature2021 {
         // Ok(Base58BtcMultibase::encode_signature(&signature))
         unimplemented!("AleoSignature2021 signing is not supported")
     }
+}
 
-    fn verify_hash(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        let (_, signature_bytes) = multibase::decode(signature.proof_value)
+impl VerificationAlgorithm<AleoSignature2021> for AleoSignatureAlgorithm {
+    fn verify(
+        method: &VerificationMethod,
+        prepared_claims: &[u8; 64],
+        proof: ProofRef<AleoSignature2021>,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        let (_, signature_bytes) = multibase::decode(&proof.signature.proof_value)
             .map_err(|_| ProofValidationError::InvalidSignature)?;
 
         let account_id = method.blockchain_account_id();
@@ -131,7 +129,11 @@ impl CryptographicSuite for AleoSignature2021 {
             return Err(ProofValidationError::InvalidKey);
         }
 
-        let result = ssi_jwk::aleo::verify(bytes, &account_id.account_address, &signature_bytes);
+        let result = ssi_jwk::aleo::verify(
+            prepared_claims,
+            &account_id.account_address,
+            &signature_bytes,
+        );
 
         match result {
             Ok(()) => Ok(Ok(())),
@@ -149,7 +151,7 @@ impl CryptographicSuite for AleoSignature2021 {
 //     Ok(Base58BtcMultibase::encode_signature(&signature))
 // }
 
-impl<'a> VerificationMethodRef<'a> {
+impl VerificationMethod {
     pub fn blockchain_account_id(&self) -> &ssi_caips::caip10::BlockchainAccountId {
         match self {
             Self::AleoMethod2021(m) => &m.blockchain_account_id,
@@ -179,33 +181,6 @@ impl From<VerificationMethod> for AnyMethod {
         match value {
             VerificationMethod::AleoMethod2021(m) => Self::AleoMethod2021(m),
             VerificationMethod::BlockchainVerificationMethod2021(m) => {
-                Self::BlockchainVerificationMethod2021(m)
-            }
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyMethodRef<'a>> for VerificationMethodRef<'a> {
-    type Error = InvalidVerificationMethod;
-
-    fn try_from(value: AnyMethodRef<'a>) -> Result<Self, Self::Error> {
-        match value {
-            AnyMethodRef::AleoMethod2021(m) => Ok(Self::AleoMethod2021(m)),
-            AnyMethodRef::BlockchainVerificationMethod2021(m) => {
-                Ok(Self::BlockchainVerificationMethod2021(m))
-            }
-            m => Err(InvalidVerificationMethod::invalid_type_name(
-                AnyMethod::ref_type(m),
-            )),
-        }
-    }
-}
-
-impl<'a> From<VerificationMethodRef<'a>> for AnyMethodRef<'a> {
-    fn from(value: VerificationMethodRef<'a>) -> Self {
-        match value {
-            VerificationMethodRef::AleoMethod2021(m) => Self::AleoMethod2021(m),
-            VerificationMethodRef::BlockchainVerificationMethod2021(m) => {
                 Self::BlockchainVerificationMethod2021(m)
             }
         }

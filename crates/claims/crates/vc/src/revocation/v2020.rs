@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use crate::{
     json::RequiredCredentialType,
     revocation::{load_resource, Reason, StatusCheckError},
-    JsonCredential, RequiredContext, SpecializedJsonCredential, V1,
+    JsonCredential, RequiredContext, SpecializedJsonCredential,
 };
 
 use super::{
@@ -55,7 +55,7 @@ impl RequiredCredentialType for RevocationList2020CredentialType {
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020credential>
 pub type RevocationList2020Credential = SpecializedJsonCredential<
     RevocationList2020Subject,
-    (V1, RevocationList2020Context),
+    RevocationList2020Context,
     RevocationList2020CredentialType,
 >;
 

@@ -1,26 +1,32 @@
 use iref::Iri;
 use json_syntax::Print;
 use lazy_static::lazy_static;
-use serde::Serialize;
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
-use ssi_core::{covariance_rule, Referencable};
 use ssi_data_integrity_core::{
-    suite::{CryptographicSuiteOptions, HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
+    suite::{
+        standard::{
+            HashingAlgorithm, HashingError, JsonObjectTransformation, SignatureAlgorithm,
+            SignatureAndVerificationAlgorithm, VerificationAlgorithm,
+        },
+        AddProofContext,
+    },
+    CryptographicSuite, ProofConfigurationRef, ProofRef, StandardCryptographicSuite, TypeRef,
 };
 use ssi_jwk::algorithm::AnyBlake2b;
-use ssi_security::{Multibase, MultibaseBuf};
+use ssi_security::MultibaseBuf;
 use ssi_tzkey::EncodeTezosSignedMessageError;
-use ssi_verification_methods::{MessageSigner, TezosMethod2021};
+use ssi_verification_methods::{protocol::WithProtocol, MessageSigner, TezosMethod2021};
 use static_iref::iri;
 
-use super::{decode_jwk_from_multibase, TezosWallet};
-pub use super::{Signature, SignatureRef, TZJCSVM_CONTEXT};
+use crate::{TezosJcsVmV1Context, TezosWallet};
+
+use super::decode_jwk_from_multibase;
+pub use super::{Signature, TZJCSVM_CONTEXT};
 
 pub const TZ_JCS_PROOF_CONTEXT_STR: &str = include_str!("tzjcsvm-2021-v1.jsonld");
 
 lazy_static! {
-    pub static ref TZ_JCS_PROOF_CONTEXT: serde_json::Value =
+    pub static ref TZ_JCS_PROOF_CONTEXT: json_ld::syntax::Context =
         serde_json::from_str(TZ_JCS_PROOF_CONTEXT_STR).unwrap();
 }
 
@@ -52,6 +58,7 @@ lazy_static! {
 /// # Verification method
 ///
 /// The [`TezosMethod2021`] verification method is used.
+#[derive(Debug, Default, Clone, Copy)]
 pub struct TezosJcsSignature2021;
 
 impl TezosJcsSignature2021 {
@@ -60,135 +67,21 @@ impl TezosJcsSignature2021 {
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#TezosJcsSignature2021");
 }
 
-impl<C, T: Serialize> CryptographicSuiteInput<T, C> for TezosJcsSignature2021 {
-    // type Transform<'a> = std::future::Ready<Result<Self::Transformed, TransformError>> where Self: 'a, T: 'a, C: 'a;
+impl StandardCryptographicSuite for TezosJcsSignature2021 {
+    type Configuration = AddProofContext<TezosJcsVmV1Context>;
 
-    /// Transformation algorithm.
-    async fn transform<'a, 'c: 'a>(
-        &'a self,
-        data: &'a T,
-        context: &'a mut C,
-        _options: ExpandedConfigurationRef<'c, Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Transformed, TransformError>
-    where
-        C: 'a,
-    {
-        transform(data, context)
-    }
-}
+    type Transformation = JsonObjectTransformation;
 
-fn transform<C, T: Serialize>(
-    data: &T,
-    _context: C,
-) -> Result<json_syntax::Object, TransformError> {
-    let json = json_syntax::to_value(data).map_err(TransformError::JsonSerialization)?;
-    match json {
-        json_syntax::Value::Object(obj) => Ok(obj),
-        _ => Err(TransformError::ExpectedJsonObject),
-    }
-}
-
-impl CryptographicSuite for TezosJcsSignature2021 {
-    type Transformed = json_syntax::Object;
-    type Hashed = Vec<u8>;
+    type Hashing = TezosJcsHashingAlgorithm;
 
     type VerificationMethod = TezosMethod2021;
 
-    type Signature = Signature;
+    type SignatureAlgorithm = TezosJcsSignatureAlgorithm;
 
-    type SignatureProtocol = TezosWallet;
+    type ProofOptions = Options;
 
-    type MessageSignatureAlgorithm = AnyBlake2b;
-
-    type Options = Options;
-
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn iri(&self) -> &iref::Iri {
-        Self::IRI
-    }
-
-    fn cryptographic_suite(&self) -> Option<&str> {
-        None
-    }
-
-    fn hash(
-        &self,
-        mut data: json_syntax::Object,
-        proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Hashed, HashError> {
-        #[derive(Serialize)]
-        #[serde(bound(serialize = "M::Reference<'a>: Serialize, O::Reference<'a>: Serialize"))]
-        struct ProofConfigurationWithContext<'a, M: Referencable, O: Referencable> {
-            #[serde(rename = "@context")]
-            context: &'static serde_json::Value,
-
-            #[serde(rename = "type")]
-            type_: &'static str,
-
-            #[serde(flatten)]
-            proof_configuration: ExpandedConfiguration<'a, M, O>,
-        }
-
-        let json_proof_configuration = json_syntax::to_value(ProofConfigurationWithContext {
-            context: &TZ_JCS_PROOF_CONTEXT,
-            type_: "TezosJcsSignature2021",
-            proof_configuration,
-        })
-        .unwrap();
-
-        data.insert("proof".into(), json_proof_configuration);
-        data.canonicalize();
-        let msg = json_syntax::Value::Object(data).compact_print().to_string();
-
-        match ssi_tzkey::encode_tezos_signed_message(&msg) {
-            Ok(data) => Ok(data),
-            Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashError::TooLong),
-        }
-    }
-
-    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
-        Some(json_ld::syntax::Context::One(TZJCSVM_CONTEXT.clone()))
-    }
-
-    async fn sign_hash(
-        &self,
-        options: <Self::Options as Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
-    ) -> Result<Self::Signature, SignatureError> {
-        let public_key_jwk = options
-            .public_key_multibase
-            .map(|k| decode_jwk_from_multibase(k).map_err(|_| SignatureError::InvalidPublicKey))
-            .transpose();
-
-        match public_key_jwk {
-            Ok(key) => {
-                Signature::sign(method.public_key.as_jwk().or(key.as_ref()), bytes, signer).await
-            }
-            Err(e) => Err(e),
-        }
-    }
-
-    fn verify_hash(
-        &self,
-        options: <Self::Options as Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signature: <Self::Signature as Referencable>::Reference<'_>,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        let public_key_jwk = options
-            .public_key_multibase
-            .map(|k| decode_jwk_from_multibase(k).map_err(|_| ProofValidationError::InvalidKey))
-            .transpose()?;
-
-        let (algorithm, signature_bytes) = signature.decode()?;
-        method
-            .verify_bytes(public_key_jwk.as_ref(), bytes, algorithm, &signature_bytes)
-            .map(Into::into)
+    fn type_(&self) -> TypeRef {
+        TypeRef::Other(Self::NAME)
     }
 }
 
@@ -215,24 +108,93 @@ impl Options {
     }
 }
 
-impl<T> CryptographicSuiteOptions<T> for Options {}
+pub struct TezosJcsHashingAlgorithm;
 
-impl Referencable for Options {
-    type Reference<'a> = OptionsRef<'a>;
+impl HashingAlgorithm<TezosJcsSignature2021> for TezosJcsHashingAlgorithm {
+    type Output = Vec<u8>;
 
-    fn as_reference(&self) -> Self::Reference<'_> {
-        OptionsRef {
-            public_key_multibase: self.public_key_multibase.as_deref(),
+    fn hash(
+        mut object: json_syntax::Object,
+        proof_configuration: ProofConfigurationRef<TezosJcsSignature2021>,
+    ) -> Result<Self::Output, HashingError> {
+        let json_proof_configuration = json_syntax::to_value(ProofConfigurationRef {
+            context: Some(&TZ_JCS_PROOF_CONTEXT),
+            ..proof_configuration
+        })
+        .unwrap();
+
+        object.insert("proof".into(), json_proof_configuration);
+        object.canonicalize();
+
+        let msg = json_syntax::Value::Object(object)
+            .compact_print()
+            .to_string();
+
+        match ssi_tzkey::encode_tezos_signed_message(&msg) {
+            Ok(data) => Ok(data),
+            Err(EncodeTezosSignedMessageError::Length(_)) => Err(HashingError::TooLong),
         }
     }
-
-    covariance_rule!();
 }
 
-#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct OptionsRef<'a> {
-    #[serde(rename = "publicKeyMultibase", skip_serializing_if = "Option::is_none")]
-    #[ld("sec:publicKeyMultibase")]
-    pub public_key_multibase: Option<&'a Multibase>,
+pub struct TezosJcsSignatureAlgorithm;
+
+impl SignatureAndVerificationAlgorithm for TezosJcsSignatureAlgorithm {
+    type Signature = Signature;
+}
+
+impl<T> SignatureAlgorithm<TezosJcsSignature2021, T> for TezosJcsSignatureAlgorithm
+where
+    T: MessageSigner<WithProtocol<AnyBlake2b, TezosWallet>>,
+{
+    async fn sign(
+        verification_method: &<TezosJcsSignature2021 as CryptographicSuite>::VerificationMethod,
+        signer: T,
+        prepared_claims: &Vec<u8>,
+        proof_configuration: ProofConfigurationRef<'_, TezosJcsSignature2021>,
+    ) -> Result<Self::Signature, SignatureError> {
+        let public_key_jwk = proof_configuration
+            .options
+            .public_key_multibase
+            .as_ref()
+            .map(|k| decode_jwk_from_multibase(k).map_err(|_| SignatureError::InvalidPublicKey))
+            .transpose();
+
+        match public_key_jwk {
+            Ok(key) => {
+                Signature::sign(
+                    verification_method.public_key.as_jwk().or(key.as_ref()),
+                    prepared_claims,
+                    signer,
+                )
+                .await
+            }
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl VerificationAlgorithm<TezosJcsSignature2021> for TezosJcsSignatureAlgorithm {
+    fn verify(
+        method: &TezosMethod2021,
+        prepared_claims: &Vec<u8>,
+        proof: ProofRef<TezosJcsSignature2021>,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        let public_key_jwk = proof
+            .options
+            .public_key_multibase
+            .as_ref()
+            .map(|k| decode_jwk_from_multibase(k).map_err(|_| ProofValidationError::InvalidKey))
+            .transpose()?;
+
+        let (algorithm, signature_bytes) = proof.signature.decode()?;
+        method
+            .verify_bytes(
+                public_key_jwk.as_ref(),
+                prepared_claims,
+                algorithm,
+                &signature_bytes,
+            )
+            .map(Into::into)
+    }
 }

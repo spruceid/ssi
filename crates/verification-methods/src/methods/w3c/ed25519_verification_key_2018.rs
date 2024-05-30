@@ -5,10 +5,9 @@ use iref::{Iri, IriBuf, UriBuf};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
+use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError, VerifyBytes};
 use static_iref::iri;
 
 use crate::{
@@ -53,6 +52,7 @@ pub struct Ed25519VerificationKey2018 {
 }
 
 impl Ed25519VerificationKey2018 {
+    pub const NAME: &'static str = ED25519_VERIFICATION_KEY_2018_TYPE;
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#Ed25519VerificationKey2018");
 
     pub fn public_key_jwk(&self) -> JWK {
@@ -87,16 +87,6 @@ impl Ed25519VerificationKey2018 {
     }
 }
 
-impl Referencable for Ed25519VerificationKey2018 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for Ed25519VerificationKey2018 {
     fn id(&self) -> &Iri {
         self.id.as_iri()
@@ -104,14 +94,6 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -127,19 +109,11 @@ impl TypedVerificationMethod for Ed25519VerificationKey2018 {
     fn type_(&self) -> &str {
         ED25519_VERIFICATION_KEY_2018_TYPE
     }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
-        ED25519_VERIFICATION_KEY_2018_TYPE
-    }
 }
 
 impl JwkVerificationMethod for Ed25519VerificationKey2018 {
     fn to_jwk(&self) -> Cow<JWK> {
         Cow::Owned(self.public_key_jwk())
-    }
-
-    fn ref_to_jwk(r: Self::Reference<'_>) -> Cow<'_, JWK> {
-        <Self as JwkVerificationMethod>::to_jwk(r)
     }
 }
 
@@ -163,14 +137,25 @@ impl TryFrom<GenericVerificationMethod> for Ed25519VerificationKey2018 {
 }
 
 impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2018 {
-    fn sign_bytes_ref(
-        _this: Self::Reference<'_>,
+    fn sign_bytes(
+        &self,
         secret: &JWK,
         _algorithm: ssi_jwk::algorithm::EdDSA,
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, bytes, secret)
             .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+    }
+}
+
+impl VerifyBytes<ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey2018 {
+    fn verify_bytes(
+        &self,
+        _: ssi_jwk::algorithm::EdDSA,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.verify_bytes(signing_bytes, signature)
     }
 }
 

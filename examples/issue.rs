@@ -4,7 +4,7 @@
 
 use serde_json::json;
 use ssi_claims::{
-    data_integrity::{AnyInputContext, AnySuite, CryptographicSuiteInput, ProofConfiguration},
+    data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
     jws::JWSPayload,
     vc::ToJwtClaims,
 };
@@ -17,7 +17,7 @@ async fn main() {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
-    let signer = SingleSecretSigner::new(key.clone());
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc: ssi::claims::vc::SpecializedJsonCredential = serde_json::from_value(json!({
         "@context": ["https://www.w3.org/2018/credentials/v1"],
@@ -35,10 +35,8 @@ async fn main() {
     let proof_format = std::env::args().nth(1);
     match &proof_format.unwrap()[..] {
         "ldp" => {
-            let params = ProofConfiguration::from_method_and_options(
-                verification_method,
-                Default::default(),
-            );
+            let params =
+                ProofOptions::from_method_and_options(verification_method, Default::default());
 
             let suite = AnySuite::pick(&key, Some(&params.verification_method)).unwrap();
             let vc = suite

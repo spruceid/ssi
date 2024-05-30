@@ -1,25 +1,47 @@
 //! EIP-712 Signature 2021 implementation.
-use rdf_types::{LexicalQuad, Quad};
+use crate::eip712::{Eip712Hashing, Eip712Signature};
+use linked_data::LinkedData;
+use rdf_types::{
+    interpretation::{
+        ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseLiteralInterpretation,
+    },
+    InterpretationMut, LexicalQuad, Quad, Vocabulary,
+};
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{
-    suite::{HashError, TransformError},
-    CryptographicSuite, CryptographicSuiteInput, ExpandedConfiguration, ExpandedConfigurationRef,
+    suite::{
+        standard::{
+            SignatureAlgorithm, SignatureAndVerificationAlgorithm, TransformationAlgorithm,
+            TransformationError, TypedTransformationAlgorithm, VerificationAlgorithm,
+        },
+        AddProofContext,
+    },
+    ConfigurationExpandingEnvironment, CryptographicSuite, ProofConfigurationRef,
+    StandardCryptographicSuite, TypeRef,
 };
+use ssi_json_ld::JsonLdNodeObject;
 use ssi_rdf::{AnyLdEnvironment, Expandable, NQuadsStatement};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
-    verification_method_union, AnyMethod, AnyMethodRef, EcdsaSecp256k1RecoveryMethod2020,
+    verification_method_union, AnyMethod, EcdsaSecp256k1RecoveryMethod2020,
     EcdsaSecp256k1VerificationKey2019, Eip712Method2021, InvalidVerificationMethod, MessageSigner,
 };
 use static_iref::iri;
-
-use crate::eip712::Eip712Signature;
 
 lazy_static::lazy_static! {
     pub static ref EIP712VM_CONTEXT: json_ld::syntax::ContextEntry = {
         let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(context_str).unwrap()
     };
+}
+
+#[derive(Default)]
+pub struct Eip712VmContext;
+
+impl From<Eip712VmContext> for json_ld::syntax::Context {
+    fn from(_: Eip712VmContext) -> Self {
+        json_ld::syntax::Context::One(EIP712VM_CONTEXT.clone())
+    }
 }
 
 /// EIP-712 Signature 2021.
@@ -64,220 +86,64 @@ impl Eip712Signature2021 {
     pub const IRI: &'static iref::Iri = iri!("https://w3id.org/security#Eip712Signature2021");
 }
 
-verification_method_union! {
-    pub enum VerificationMethod, VerificationMethodRef, VerificationMethodType {
-        Eip712Method2021,
-        EcdsaSecp256k1VerificationKey2019,
-        EcdsaSecp256k1RecoveryMethod2020
-    }
-}
+impl StandardCryptographicSuite for Eip712Signature2021 {
+    type Configuration = AddProofContext<Eip712VmContext>;
 
-impl<'a> VerificationMethodRef<'a> {
-    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyESKeccakK {
-        match self {
-            Self::EcdsaSecp256k1VerificationKey2019(_) => {
-                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakK
-            }
-            Self::Eip712Method2021(_) | Self::EcdsaSecp256k1RecoveryMethod2020(_) => {
-                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakKR
-            }
-        }
-    }
+    type Transformation = Eip712Transformation;
 
-    pub fn verify_bytes(
-        &self,
-        signing_bytes: &[u8],
-        signature_bytes: &[u8],
-    ) -> Result<ProofValidity, ProofValidationError> {
-        match self {
-            Self::Eip712Method2021(m) => m.verify_bytes(signing_bytes, signature_bytes),
-            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
-                signing_bytes,
-                signature_bytes,
-                ecdsa_secp_256k1_verification_key_2019::DigestFunction::Keccack,
-            ),
-            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(
-                signing_bytes,
-                signature_bytes,
-                ecdsa_secp_256k1_recovery_method_2020::DigestFunction::Keccack,
-            ),
-        }
-    }
-}
-
-impl TryFrom<AnyMethod> for VerificationMethod {
-    type Error = InvalidVerificationMethod;
-
-    fn try_from(value: AnyMethod) -> Result<Self, Self::Error> {
-        match value {
-            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => {
-                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
-            }
-            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
-                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
-            }
-            AnyMethod::Eip712Method2021(m) => Ok(Self::Eip712Method2021(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
-        }
-    }
-}
-
-impl From<VerificationMethod> for AnyMethod {
-    fn from(value: VerificationMethod) -> Self {
-        match value {
-            VerificationMethod::EcdsaSecp256k1VerificationKey2019(m) => {
-                Self::EcdsaSecp256k1VerificationKey2019(m)
-            }
-            VerificationMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
-                Self::EcdsaSecp256k1RecoveryMethod2020(m)
-            }
-            VerificationMethod::Eip712Method2021(m) => Self::Eip712Method2021(m),
-        }
-    }
-}
-
-impl<'a> TryFrom<AnyMethodRef<'a>> for VerificationMethodRef<'a> {
-    type Error = InvalidVerificationMethod;
-
-    fn try_from(value: AnyMethodRef<'a>) -> Result<Self, Self::Error> {
-        match value {
-            AnyMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
-                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
-            }
-            AnyMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {
-                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
-            }
-            AnyMethodRef::Eip712Method2021(m) => Ok(Self::Eip712Method2021(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
-        }
-    }
-}
-
-impl<'a> From<VerificationMethodRef<'a>> for AnyMethodRef<'a> {
-    fn from(value: VerificationMethodRef<'a>) -> Self {
-        match value {
-            VerificationMethodRef::EcdsaSecp256k1VerificationKey2019(m) => {
-                Self::EcdsaSecp256k1VerificationKey2019(m)
-            }
-            VerificationMethodRef::EcdsaSecp256k1RecoveryMethod2020(m) => {
-                Self::EcdsaSecp256k1RecoveryMethod2020(m)
-            }
-            VerificationMethodRef::Eip712Method2021(m) => Self::Eip712Method2021(m),
-        }
-    }
-}
-
-impl CryptographicSuite for Eip712Signature2021 {
-    type Transformed = ssi_eip712::TypedData;
-
-    type Hashed = [u8; 66];
+    type Hashing = Eip712Hashing;
 
     type VerificationMethod = VerificationMethod;
 
-    type Signature = Eip712Signature;
+    type SignatureAlgorithm = Eip712SignatureAlgorithm;
 
-    type SignatureProtocol = ();
+    type ProofOptions = ();
 
-    type MessageSignatureAlgorithm = ssi_jwk::algorithm::AnyESKeccakK;
-
-    type Options = ();
-
-    fn name(&self) -> &str {
-        Self::NAME
-    }
-
-    fn iri(&self) -> &iref::Iri {
-        Self::IRI
-    }
-
-    fn cryptographic_suite(&self) -> Option<&str> {
-        None
-    }
-
-    /// Hashing algorithm.
-    fn hash(
-        &self,
-        data: ssi_eip712::TypedData,
-        _proof_configuration: ExpandedConfiguration<Self::VerificationMethod, Self::Options>,
-    ) -> Result<Self::Hashed, HashError> {
-        data.encode()
-            .map_err(|e| HashError::InvalidMessage(e.to_string()))
-    }
-
-    fn required_proof_context(&self) -> Option<json_ld::syntax::Context> {
-        Some(json_ld::syntax::Context::One(EIP712VM_CONTEXT.clone()))
-    }
-
-    async fn sign_hash(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signer: impl MessageSigner<Self::MessageSignatureAlgorithm, Self::SignatureProtocol>,
-    ) -> Result<Self::Signature, SignatureError> {
-        Eip712Signature::sign(bytes, signer, method.algorithm()).await
-    }
-
-    fn verify_hash(
-        &self,
-        _options: <Self::Options as ssi_core::Referencable>::Reference<'_>,
-        method: <Self::VerificationMethod as ssi_core::Referencable>::Reference<'_>,
-        bytes: &Self::Hashed,
-        signature: <Self::Signature as ssi_core::Referencable>::Reference<'_>,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        let signature_bytes = signature.decode()?;
-        method.verify_bytes(bytes, &signature_bytes).map(Into::into)
+    fn type_(&self) -> TypeRef {
+        TypeRef::Other(Self::NAME)
     }
 }
 
-impl<V: rdf_types::Vocabulary, I: rdf_types::Interpretation, E, T> CryptographicSuiteInput<T, E>
-    for Eip712Signature2021
-where
-    E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
-    I: rdf_types::interpretation::InterpretationMut<V>
-        + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
-        + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>,
-    T: Expandable<E>,
-    T::Expanded: linked_data::LinkedData<I, V>,
-{
-    // type Transform<'t> = std::future::Ready<Result<Self::Transformed, TransformError>> where T: 't, E: 't;
+pub struct Eip712Transformation;
 
-    /// Transformation algorithm.
-    async fn transform<'t, 'c: 't>(
-        &'t self,
-        data: &'t T,
-        context: &'t mut E,
-        options: ExpandedConfigurationRef<'c, VerificationMethod>,
-    ) -> Result<Self::Transformed, TransformError> {
+impl TransformationAlgorithm<Eip712Signature2021> for Eip712Transformation {
+    type Output = ssi_eip712::TypedData;
+}
+
+impl<T, C, V, I> TypedTransformationAlgorithm<Eip712Signature2021, T, C> for Eip712Transformation
+where
+    T: Expandable<C> + JsonLdNodeObject,
+    T::Expanded: LinkedData<I, V>,
+    C: AnyLdEnvironment<Vocabulary = V, Interpretation = I> + ConfigurationExpandingEnvironment,
+    V: Vocabulary,
+    I: InterpretationMut<V>
+        + ReverseIriInterpretation<Iri = V::Iri>
+        + ReverseBlankIdInterpretation<BlankId = V::BlankId>
+        + ReverseLiteralInterpretation<Literal = V::Literal>,
+{
+    async fn transform(
+        context: &mut C,
+        data: &T,
+        proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
+    ) -> Result<ssi_eip712::TypedData, TransformationError> {
         let expanded = data
             .expand(context)
             .await
-            .map_err(|e| TransformError::ExpansionFailed(e.to_string()))?;
-        transform(self, &expanded, context, options)
-    }
-}
+            .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?;
 
-fn transform<V: rdf_types::Vocabulary, I, E, T>(
-    _suite: &Eip712Signature2021,
-    data: &T,
-    context: &mut E,
-    options: ExpandedConfigurationRef<VerificationMethod>,
-) -> Result<ssi_eip712::TypedData, TransformError>
-where
-    E: AnyLdEnvironment<Vocabulary = V, Interpretation = I>,
-    I: rdf_types::interpretation::InterpretationMut<V>
-        + rdf_types::interpretation::ReverseIriInterpretation<Iri = V::Iri>
-        + rdf_types::interpretation::ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + rdf_types::interpretation::ReverseLiteralInterpretation<Literal = V::Literal>,
-    T: linked_data::LinkedData<I, V>,
-{
-    let document_quads = context.quads_of(data)?;
-    let document_quads: Vec<_> =
-        ssi_rdf::urdna2015::normalize(document_quads.iter().map(|quad| quad.as_lexical_quad_ref()))
+        let claims = context
+            .canonical_quads_of(&expanded)
+            .map_err(TransformationError::JsonLdDeserialization)?;
+
+        let configuration = proof_configuration
+            .expand(context, data)
+            .await
+            .map_err(TransformationError::ProofConfigurationExpansion)?
+            .quads()
             .collect();
-    let proof_quads = options.quads().collect();
-    Ok(new_ldp_siging_request(document_quads, proof_quads))
+
+        Ok(new_ldp_siging_request(claims, configuration))
+    }
 }
 
 /// Creates a typed structured data representing a Linked Data signing
@@ -376,5 +242,115 @@ pub fn new_ldp_siging_request(
             .into_iter()
             .collect(),
         ),
+    }
+}
+
+pub struct Eip712SignatureAlgorithm;
+
+impl SignatureAndVerificationAlgorithm for Eip712SignatureAlgorithm {
+    type Signature = Eip712Signature;
+}
+
+impl<T> SignatureAlgorithm<Eip712Signature2021, T> for Eip712SignatureAlgorithm
+where
+    T: MessageSigner<ssi_jwk::algorithm::AnyESKeccakK>,
+{
+    async fn sign(
+        verification_method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
+        signer: T,
+        prepared_claims: &<Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
+        _proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
+    ) -> Result<Self::Signature, SignatureError> {
+        Eip712Signature::sign(
+            prepared_claims.as_slice(),
+            signer,
+            verification_method.algorithm(),
+        )
+        .await
+    }
+}
+
+impl VerificationAlgorithm<Eip712Signature2021> for Eip712SignatureAlgorithm {
+    fn verify(
+        method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
+        prepared_claims: &<Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
+        proof: ssi_data_integrity_core::ProofRef<Eip712Signature2021>,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        let signature_bytes = proof.signature.decode()?;
+        method
+            .verify_bytes(prepared_claims.as_slice(), &signature_bytes)
+            .map(Into::into)
+    }
+}
+
+verification_method_union! {
+    pub enum VerificationMethod, VerificationMethodType {
+        Eip712Method2021,
+        EcdsaSecp256k1VerificationKey2019,
+        EcdsaSecp256k1RecoveryMethod2020
+    }
+}
+
+impl VerificationMethod {
+    pub fn algorithm(&self) -> ssi_jwk::algorithm::AnyESKeccakK {
+        match self {
+            Self::EcdsaSecp256k1VerificationKey2019(_) => {
+                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakK
+            }
+            Self::Eip712Method2021(_) | Self::EcdsaSecp256k1RecoveryMethod2020(_) => {
+                ssi_jwk::algorithm::AnyESKeccakK::ESKeccakKR
+            }
+        }
+    }
+
+    pub fn verify_bytes(
+        &self,
+        signing_bytes: &[u8],
+        signature_bytes: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        match self {
+            Self::Eip712Method2021(m) => m.verify_bytes(signing_bytes, signature_bytes),
+            Self::EcdsaSecp256k1VerificationKey2019(m) => m.verify_bytes(
+                signing_bytes,
+                signature_bytes,
+                ecdsa_secp_256k1_verification_key_2019::DigestFunction::Keccack,
+            ),
+            Self::EcdsaSecp256k1RecoveryMethod2020(m) => m.verify_bytes(
+                signing_bytes,
+                signature_bytes,
+                ecdsa_secp_256k1_recovery_method_2020::DigestFunction::Keccack,
+            ),
+        }
+    }
+}
+
+impl TryFrom<AnyMethod> for VerificationMethod {
+    type Error = InvalidVerificationMethod;
+
+    fn try_from(value: AnyMethod) -> Result<Self, Self::Error> {
+        match value {
+            AnyMethod::EcdsaSecp256k1VerificationKey2019(m) => {
+                Ok(Self::EcdsaSecp256k1VerificationKey2019(m))
+            }
+            AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
+            }
+            AnyMethod::Eip712Method2021(m) => Ok(Self::Eip712Method2021(m)),
+            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
+        }
+    }
+}
+
+impl From<VerificationMethod> for AnyMethod {
+    fn from(value: VerificationMethod) -> Self {
+        match value {
+            VerificationMethod::EcdsaSecp256k1VerificationKey2019(m) => {
+                Self::EcdsaSecp256k1VerificationKey2019(m)
+            }
+            VerificationMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
+                Self::EcdsaSecp256k1RecoveryMethod2020(m)
+            }
+            VerificationMethod::Eip712Method2021(m) => Self::Eip712Method2021(m),
+        }
     }
 }

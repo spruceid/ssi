@@ -1,32 +1,36 @@
-//! Data Integrity Proofs format for Verifiable Credentials.
+//! Verifiable Credential Data Integrity 1.0 core implementation.
+//!
+//! See: <https://www.w3.org/TR/vc-data-integrity/>
+use std::ops::{Deref, DerefMut};
 
+pub mod canonicalization;
 mod de;
 mod decode;
+pub mod hashing;
+mod options;
 mod proof;
 pub mod signing;
 pub mod suite;
 
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
-
 pub use decode::*;
 use educe::Educe;
+pub use options::ProofOptions;
 pub use proof::*;
 use serde::Serialize;
-pub use signing::sign;
-use ssi_claims_core::{ExtractProof, VerifiableClaims};
-pub use suite::{CryptographicSuite, CryptographicSuiteInput};
+use ssi_claims_core::{DefaultEnvironment, ExtractProof, VerifiableClaims};
+pub use suite::{
+    CloneCryptographicSuite, CryptographicSuite, DebugCryptographicSuite,
+    DeserializeCryptographicSuite, SerializeCryptographicSuite, StandardCryptographicSuite,
+};
 
 #[doc(hidden)]
 pub use ssi_rdf;
 
 /// Data-Integrity-secured document.
 #[derive(Educe, Serialize)]
-#[serde(
-    bound = "T: Serialize, S::VerificationMethod: Serialize, S::Options: Serialize, S::Signature: Serialize"
-)]
-#[educe(Debug(bound("T: Debug, S: CryptographicSuite + Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug")))]
-#[educe(Clone(bound("T: Clone, S: CryptographicSuite + Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone")))]
+#[serde(bound(serialize = "T: Serialize, S: SerializeCryptographicSuite"))]
+#[educe(Debug(bound("T: std::fmt::Debug, S: DebugCryptographicSuite")))]
+#[educe(Clone(bound("T: Clone, S: CloneCryptographicSuite")))]
 pub struct DataIntegrity<T, S: CryptographicSuite> {
     #[serde(flatten)]
     pub claims: T,
@@ -57,6 +61,10 @@ impl<T, S: CryptographicSuite> DerefMut for DataIntegrity<T, S> {
 
 impl<T, S: CryptographicSuite> VerifiableClaims for DataIntegrity<T, S> {
     type Proof = Proofs<S>;
+}
+
+impl<T, S: CryptographicSuite + DefaultEnvironment> DefaultEnvironment for DataIntegrity<T, S> {
+    type Environment = S::Environment;
 }
 
 impl<T, S: CryptographicSuite> ExtractProof for DataIntegrity<T, S> {

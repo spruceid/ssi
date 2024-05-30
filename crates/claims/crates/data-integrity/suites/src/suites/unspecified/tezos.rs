@@ -15,12 +15,12 @@ pub use ed25519_blake2b_digest_size20_base58_check_encoded_signature_2021::Ed255
 #[cfg(feature = "secp256r1")]
 pub use p256_blake2b_digest_size20_base58_check_encoded_signature_2021::P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021;
 use ssi_claims_core::{ProofValidationError, SignatureError};
-use ssi_core::{covariance_rule, Referencable};
-use ssi_data_integrity_core::suite::CryptographicSuiteOptions;
+use ssi_data_integrity_core::signing::RecoverPublicJwk;
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
 use ssi_security::{Multibase, MultibaseBuf};
 use ssi_verification_methods::{
-    protocol::InvalidProtocolSignature, MessageSignatureError, MessageSigner, SignatureProtocol,
+    protocol::{InvalidProtocolSignature, WithProtocol},
+    MessageSignatureError, MessageSigner, SignatureProtocol,
 };
 pub use tezos_jcs_signature_2021::TezosJcsSignature2021;
 pub use tezos_signature_2021::TezosSignature2021;
@@ -47,6 +47,33 @@ lazy_static::lazy_static! {
     };
 }
 
+#[derive(Default)]
+pub struct TezosV2Context;
+
+impl From<TezosV2Context> for json_ld::syntax::Context {
+    fn from(_: TezosV2Context) -> Self {
+        json_ld::syntax::Context::One(TZ_CONTEXT.clone())
+    }
+}
+
+#[derive(Default)]
+pub struct TezosJcsVmV1Context;
+
+impl From<TezosJcsVmV1Context> for json_ld::syntax::Context {
+    fn from(_: TezosJcsVmV1Context) -> Self {
+        json_ld::syntax::Context::One(TZJCSVM_CONTEXT.clone())
+    }
+}
+
+#[derive(Default)]
+pub struct TezosVmV1Context;
+
+impl From<TezosVmV1Context> for json_ld::syntax::Context {
+    fn from(_: TezosVmV1Context) -> Self {
+        json_ld::syntax::Context::One(TZVM_CONTEXT.clone())
+    }
+}
+
 #[derive(
     Debug,
     Clone,
@@ -70,26 +97,10 @@ impl Options {
     }
 }
 
-impl<T> CryptographicSuiteOptions<T> for Options {}
-
-impl Referencable for Options {
-    type Reference<'a> = OptionsRef<'a>;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        OptionsRef {
-            public_key_jwk: &self.public_key_jwk,
-        }
+impl RecoverPublicJwk for Options {
+    fn public_jwk(&self) -> Cow<JWK> {
+        Cow::Borrowed(&self.public_key_jwk)
     }
-
-    covariance_rule!();
-}
-
-#[derive(Debug, Clone, Copy, serde::Serialize, linked_data::Serialize)]
-#[ld(prefix("sec" = "https://w3id.org/security#"))]
-pub struct OptionsRef<'a> {
-    #[serde(rename = "publicKeyJwk")]
-    #[ld("sec:publicKeyJwk")]
-    pub public_key_jwk: &'a JWK,
 }
 
 #[derive(
@@ -101,6 +112,7 @@ pub struct OptionsRef<'a> {
     linked_data::Deserialize,
 )]
 #[ld(prefix("sec" = "https://w3id.org/security#"))]
+#[serde(rename_all = "camelCase")]
 pub struct Signature {
     /// Base58check-encoded signature.
     ///
@@ -115,7 +127,12 @@ impl Signature {
         Self { proof_value }
     }
 
-    pub async fn sign<'a, S: 'a + MessageSigner<AnyBlake2b, TezosWallet>>(
+    pub fn decode(&self) -> Result<(AnyBlake2b, Vec<u8>), ProofValidationError> {
+        TezosWallet::decode_signature(self.proof_value.as_bytes())
+            .map_err(|_| ProofValidationError::InvalidSignature)
+    }
+
+    pub async fn sign<'a, S: 'a + MessageSigner<WithProtocol<AnyBlake2b, TezosWallet>>>(
         public_key: Option<&JWK>,
         message: &'a [u8],
         signer: S,
@@ -123,7 +140,9 @@ impl Signature {
         match public_key {
             Some(jwk) => match jwk.algorithm.try_into() {
                 Ok(algorithm) => {
-                    let proof_value_bytes = signer.sign(algorithm, TezosWallet, message).await?;
+                    let proof_value_bytes = signer
+                        .sign(WithProtocol(algorithm, TezosWallet), message)
+                        .await?;
                     match String::from_utf8(proof_value_bytes) {
                         Ok(proof_value) => Ok(Signature::new(proof_value)),
                         Err(_) => Err(SignatureError::InvalidSignature),
@@ -136,28 +155,15 @@ impl Signature {
     }
 }
 
-impl Referencable for Signature {
-    type Reference<'a> = SignatureRef<'a> where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        SignatureRef {
-            proof_value: &self.proof_value,
-        }
+impl AsRef<str> for Signature {
+    fn as_ref(&self) -> &str {
+        &self.proof_value
     }
-
-    covariance_rule!();
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct SignatureRef<'a> {
-    /// Base58-encoded signature.
-    pub proof_value: &'a str,
-}
-
-impl<'a> SignatureRef<'a> {
-    pub fn decode(&self) -> Result<(AnyBlake2b, Vec<u8>), ProofValidationError> {
-        TezosWallet::decode_signature(self.proof_value.as_bytes())
-            .map_err(|_| ProofValidationError::InvalidSignature)
+impl ssi_data_integrity_core::signing::AlterSignature for Signature {
+    fn alter(&mut self) {
+        self.proof_value.push_str("ff")
     }
 }
 
@@ -167,6 +173,7 @@ impl<'a> SignatureRef<'a> {
 /// `TezosJcsSignature2021` cryptographic suites. The signer (the Tezos Wallet)
 /// must prefix the signature with a unique value identifying the signature
 /// algorithm used, and encode the result in base58check.
+#[derive(Debug, Clone, Copy)]
 pub struct TezosWallet;
 
 impl TezosWallet {

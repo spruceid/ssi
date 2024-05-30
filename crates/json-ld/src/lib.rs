@@ -158,6 +158,7 @@ pub trait JsonLdNodeObject: JsonLdObject {
     }
 }
 
+#[derive(Debug)]
 pub struct JsonLdTypes<'a> {
     static_: &'static [&'static str],
     non_static: Cow<'a, [String]>,
@@ -183,6 +184,13 @@ impl<'a> JsonLdTypes<'a> {
 
     pub fn is_empty(&self) -> bool {
         self.static_.is_empty() && self.non_static.is_empty()
+    }
+
+    pub fn reborrow(&self) -> JsonLdTypes {
+        JsonLdTypes {
+            static_: self.static_,
+            non_static: Cow::Borrowed(&self.non_static),
+        }
     }
 }
 

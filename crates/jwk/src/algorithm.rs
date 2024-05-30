@@ -408,28 +408,3 @@ impl TryFrom<Option<Algorithm>> for AnyBlake2b {
         }
     }
 }
-
-// pub enum CryptoAlgorithm {
-//     HS,
-//     RS,
-//     ES
-// }
-
-// #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// pub enum DigestAlgorithm {
-//     Sha256,
-//     Keccack
-// }
-
-// impl DigestAlgorithm {
-//     pub fn into_full_algorithm(
-//         self,
-//         crypto_algorithm: CryptoAlgorithm,
-//         recovery: bool
-//     ) -> Option<Algorithm> {
-//         match self {
-//             Self::Sha256 => ssi_jwk::Algorithm::ES256KR,
-//             Self::Keccack => ssi_jwk::Algorithm::ESKeccakKR
-//         }
-//     }
-// }

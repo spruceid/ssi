@@ -1,12 +1,16 @@
 use educe::Educe;
+use serde::Serialize;
 use ssi_claims_core::serde::SerializeVerifiableClaims;
 use ssi_claims_core::{ProofValidationError, ProofValidity};
 use ssi_core::one_or_many::OneOrManyRef;
-use ssi_verification_methods_core::VerificationMethodResolver;
-use std::fmt::{self, Debug};
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use super::Proof;
+use crate::suite::{
+    CloneCryptographicSuite, CryptographicSuiteVerification, DebugCryptographicSuite,
+    SerializeCryptographicSuite,
+};
 use crate::{CryptographicSuite, Proofs};
 
 /// Prepared Data-Integrity Proof.
@@ -15,11 +19,11 @@ pub struct PreparedProof<T: CryptographicSuite> {
     proof: Proof<T>,
 
     /// Hashed credential/presentation value.
-    hash: T::Hashed,
+    hash: T::PreparedClaims,
 }
 
 impl<T: CryptographicSuite> PreparedProof<T> {
-    pub fn new(proof: Proof<T>, hash: T::Hashed) -> Self {
+    pub fn new(proof: Proof<T>, hash: T::PreparedClaims) -> Self {
         Self { proof, hash }
     }
 
@@ -27,7 +31,7 @@ impl<T: CryptographicSuite> PreparedProof<T> {
         &self.proof
     }
 
-    pub fn hash(&self) -> &T::Hashed {
+    pub fn hash(&self) -> &T::PreparedClaims {
         &self.hash
     }
 }
@@ -46,17 +50,18 @@ impl<T: CryptographicSuite> DerefMut for PreparedProof<T> {
     }
 }
 
-impl<T, S: CryptographicSuite, V: VerificationMethodResolver<Method = S::VerificationMethod>>
-    ssi_claims_core::ValidateProof<T, V> for PreparedProof<S>
+impl<T, S: CryptographicSuite, V> ssi_claims_core::ValidateProof<T, V> for PreparedProof<S>
+where
+    S: CryptographicSuiteVerification<V>,
 {
     async fn validate_proof<'a>(
         &'a self,
         _claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let suite = self.proof().suite();
-        suite
-            .verify_proof(self.hash(), verifier, self.proof().borrowed())
+        self.proof()
+            .suite()
+            .verify_prepared_claims(verifier, self.hash(), self.proof().borrowed())
             .await
     }
 }
@@ -69,12 +74,7 @@ impl<S: CryptographicSuite> ssi_claims_core::UnprepareProof for PreparedProof<S>
     }
 }
 
-impl<T: CryptographicSuite> serde::Serialize for PreparedProof<T>
-where
-    T::VerificationMethod: serde::Serialize,
-    T::Options: serde::Serialize,
-    T::Signature: serde::Serialize,
-{
+impl<T: SerializeCryptographicSuite> serde::Serialize for PreparedProof<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -83,70 +83,55 @@ where
     }
 }
 
-impl<T: CryptographicSuite> fmt::Debug for PreparedProof<T>
-where
-    T: fmt::Debug,
-    T::VerificationMethod: fmt::Debug,
-    T::Options: fmt::Debug,
-    T::Signature: fmt::Debug,
-    T::Hashed: fmt::Debug,
-{
+impl<T: DebugCryptographicSuite> fmt::Debug for PreparedProof<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("PreparedProof { proof: ")?;
         self.proof.fmt(f)?;
         f.write_str(", hash: ")?;
-        self.hash.fmt(f)?;
+        T::fmt_prepared_claims(&self.hash, f)?;
         f.write_str(" }")
     }
 }
 
-impl<T: CryptographicSuite> Clone for PreparedProof<T>
+impl<T: CloneCryptographicSuite> Clone for PreparedProof<T>
 where
     T: Clone,
-    T::VerificationMethod: Clone,
-    T::Options: Clone,
-    T::Signature: Clone,
-    T::Hashed: Clone,
 {
     fn clone(&self) -> Self {
         Self {
             proof: self.proof.clone(),
-            hash: self.hash.clone(),
+            hash: T::clone_prepared_claims(&self.hash),
         }
     }
 }
 
-impl<T: serde::Serialize, S: CryptographicSuite> SerializeVerifiableClaims<T> for PreparedProof<S>
-where
-    S::VerificationMethod: serde::Serialize,
-    S::Options: serde::Serialize,
-    S::Signature: serde::Serialize,
+impl<T: Serialize, S: SerializeCryptographicSuite> SerializeVerifiableClaims<T>
+    for PreparedProof<S>
 {
     fn serialize_verifiable_claims<U>(&self, claims: &T, serializer: U) -> Result<U::Ok, U::Error>
     where
         U: serde::Serializer,
     {
-        use serde::Serialize;
-
-        #[derive(serde::Serialize)]
-        struct WithClaims<'a, T, P> {
+        #[derive(Serialize)]
+        #[serde(bound = "T: Serialize, S: SerializeCryptographicSuite")]
+        struct WithClaims<'a, T, S: CryptographicSuite> {
             #[serde(flatten)]
             claims: &'a T,
 
-            proof: &'a P,
+            proof: &'a Proof<S>,
         }
 
         WithClaims {
             claims,
-            proof: self,
+            proof: &self.proof,
         }
         .serialize(serializer)
     }
 }
 
 #[derive(Educe)]
-#[educe(Debug(bound("S: Debug, S::Hashed: Debug, S::VerificationMethod: Debug, S::Options: Debug, S::Signature: Debug")))]
-#[educe(Clone(bound("S: Clone, S::Hashed: Clone, S::VerificationMethod: Clone, S::Options: Clone, S::Signature: Clone")))]
+#[educe(Debug(bound("S: DebugCryptographicSuite")))]
+#[educe(Clone(bound("S: CloneCryptographicSuite")))]
 #[educe(Default)]
 pub struct PreparedProofs<S: CryptographicSuite>(pub(crate) Vec<PreparedProof<S>>);
 
@@ -178,8 +163,8 @@ impl<S: CryptographicSuite> ssi_claims_core::UnprepareProof for PreparedProofs<S
     }
 }
 
-impl<T, S: CryptographicSuite, V: VerificationMethodResolver<Method = S::VerificationMethod>>
-    ssi_claims_core::ValidateProof<T, V> for PreparedProofs<S>
+impl<T, S: CryptographicSuiteVerification<V>, V> ssi_claims_core::ValidateProof<T, V>
+    for PreparedProofs<S>
 {
     async fn validate_proof<'a>(
         &'a self,
@@ -190,12 +175,7 @@ impl<T, S: CryptographicSuite, V: VerificationMethodResolver<Method = S::Verific
     }
 }
 
-impl<T: CryptographicSuite> serde::Serialize for PreparedProofs<T>
-where
-    T::VerificationMethod: serde::Serialize,
-    T::Options: serde::Serialize,
-    T::Signature: serde::Serialize,
-{
+impl<T: SerializeCryptographicSuite> serde::Serialize for PreparedProofs<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -204,25 +184,20 @@ where
     }
 }
 
-impl<T: serde::Serialize, S> SerializeVerifiableClaims<T> for PreparedProofs<S>
-where
-    S: CryptographicSuite,
-    S::VerificationMethod: serde::Serialize,
-    S::Options: serde::Serialize,
-    S::Signature: serde::Serialize,
+impl<T: Serialize, S: SerializeCryptographicSuite> SerializeVerifiableClaims<T>
+    for PreparedProofs<S>
 {
     fn serialize_verifiable_claims<U>(&self, claims: &T, serializer: U) -> Result<U::Ok, U::Error>
     where
         U: serde::Serializer,
     {
-        use serde::Serialize;
-
-        #[derive(serde::Serialize)]
-        struct WithClaims<'a, T, P> {
+        #[derive(Serialize)]
+        #[serde(bound = "T: Serialize, S: SerializeCryptographicSuite")]
+        struct WithClaims<'a, T, S: CryptographicSuite> {
             #[serde(flatten)]
             claims: &'a T,
 
-            proof: OneOrManyRef<'a, P>,
+            proof: OneOrManyRef<'a, PreparedProof<S>>,
         }
 
         WithClaims {

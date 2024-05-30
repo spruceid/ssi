@@ -3,7 +3,6 @@ use std::hash::Hash;
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::ProofValidationError;
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use ssi_verification_methods_core::MessageSignatureError;
 use static_iref::iri;
@@ -51,6 +50,7 @@ pub struct BlockchainVerificationMethod2021 {
 }
 
 impl BlockchainVerificationMethod2021 {
+    pub const NAME: &'static str = BLOCKCHAIN_VERIFICATION_METHOD_2021_TYPE;
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#BlockchainVerificationMethod2021");
 
@@ -81,16 +81,6 @@ impl BlockchainVerificationMethod2021 {
     }
 }
 
-impl Referencable for BlockchainVerificationMethod2021 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for BlockchainVerificationMethod2021 {
     fn id(&self) -> &Iri {
         self.id.as_iri()
@@ -98,14 +88,6 @@ impl VerificationMethod for BlockchainVerificationMethod2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -119,10 +101,6 @@ impl TypedVerificationMethod for BlockchainVerificationMethod2021 {
     }
 
     fn type_(&self) -> &str {
-        BLOCKCHAIN_VERIFICATION_METHOD_2021_TYPE
-    }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
         BLOCKCHAIN_VERIFICATION_METHOD_2021_TYPE
     }
 }

@@ -375,11 +375,11 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
 mod tests {
     use rand_chacha::rand_core::SeedableRng;
     use ssi_claims::{
-        data_integrity::{AnyInputContext, AnySuite, AnySuiteOptions},
+        data_integrity::{AnyInputContext, AnyInputOptions, AnySuite},
         vc::JsonCredential,
         Verifiable,
     };
-    use ssi_data_integrity::{CryptographicSuiteInput, ProofConfiguration};
+    use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
     use ssi_dids_core::{
         did, resolution::Options, DIDResolver, VerificationMethodDIDResolver, DIDURL,
     };
@@ -530,13 +530,13 @@ mod tests {
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
 
-        let issue_options = ProofConfiguration::new(
+        let issue_options = SuiteOptions::new(
             "2020-08-19T21:41:50Z".parse().unwrap(),
             verification_method_ref,
             ProofPurpose::Assertion,
-            AnySuiteOptions::default(),
+            AnyInputOptions::default(),
         );
-        let signer = SingleSecretSigner::new(key);
+        let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
             .sign(
                 cred,
@@ -551,7 +551,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(&vc.proof).unwrap()
         );
-        assert_eq!(vc.proof.first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
+        assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
         assert!(vc.verify(&didkey).await.unwrap().is_ok());
 
         // test that issuer is verified
@@ -593,13 +593,13 @@ mod tests {
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
         eprintln!("suite: {suite:?}");
-        let issue_options = ProofConfiguration::new(
+        let issue_options = SuiteOptions::new(
             "2021-02-18T20:17:46Z".parse().unwrap(),
             verification_method_ref,
             ProofPurpose::Assertion,
-            AnySuiteOptions::default(),
+            AnyInputOptions::default(),
         );
-        let signer = SingleSecretSigner::new(key);
+        let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
             .sign(
                 cred,
@@ -614,7 +614,7 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(&vc.proof).unwrap()
         );
-        assert_eq!(vc.proof.first().unwrap().signature.jws.as_ref().unwrap().as_str(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
+        assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
         assert!(vc.verify(&didkey).await.unwrap().is_ok());
 
         // test that issuer is verified
@@ -656,13 +656,13 @@ mod tests {
         // issue_options.verification_method = Some(URI::String(verification_method));
         let suite = AnySuite::pick(&key, Some(&verification_method_ref)).unwrap();
         eprintln!("suite: {suite:?}");
-        let issue_options = ProofConfiguration::new(
+        let issue_options = SuiteOptions::new(
             "2021-02-18T20:17:46Z".parse().unwrap(),
             verification_method_ref,
             ProofPurpose::Assertion,
-            AnySuiteOptions::default(),
+            AnyInputOptions::default(),
         );
-        let signer = SingleSecretSigner::new(key);
+        let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
             .sign(
                 cred,

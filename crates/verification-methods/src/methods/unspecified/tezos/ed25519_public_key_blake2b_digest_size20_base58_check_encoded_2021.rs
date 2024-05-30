@@ -2,10 +2,9 @@ use std::hash::Hash;
 
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::ProofValidationError;
-use ssi_core::{covariance_rule, Referencable};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::MessageSignatureError;
+use ssi_verification_methods_core::{MessageSignatureError, VerifyBytesWithRecoveryJwk};
 use static_iref::iri;
 
 use crate::{
@@ -49,6 +48,7 @@ pub struct Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
 }
 
 impl Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+    pub const NAME: &'static str = "Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021";
     pub const IRI: &'static Iri =
         iri!("https://w3id.org/security#Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021");
 
@@ -64,14 +64,26 @@ impl Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
     }
 }
 
-impl Referencable for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
+impl<A> VerifyBytesWithRecoveryJwk<A> for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
+where
+    A: Into<ssi_jwk::Algorithm>,
+{
+    fn verify_bytes_with_public_jwk(
+        &self,
+        public_jwk: &JWK,
+        algorithm: A,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        if self.matches_public_key(public_jwk)? {
+            Ok(
+                ssi_jws::verify_bytes(algorithm.into(), signing_bytes, public_jwk, signature)
+                    .map_err(|_| InvalidProof::Signature),
+            )
+        } else {
+            Ok(Err(InvalidProof::KeyMismatch))
+        }
     }
-
-    covariance_rule!();
 }
 
 impl VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
@@ -81,14 +93,6 @@ impl VerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncode
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -106,10 +110,6 @@ impl TypedVerificationMethod for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckE
     }
 
     fn type_(&self) -> &str {
-        ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
-    }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
         ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE
     }
 }
@@ -148,8 +148,8 @@ impl TryFrom<GenericVerificationMethod>
 impl SigningMethod<JWK, ssi_jwk::algorithm::EdBlake2b>
     for Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021
 {
-    fn sign_bytes_ref(
-        _this: &Self,
+    fn sign_bytes(
+        &self,
         key: &JWK,
         _algorithm: ssi_jwk::algorithm::EdBlake2b,
         bytes: &[u8],

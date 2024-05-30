@@ -1,7 +1,6 @@
 use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::AleoBlockchainAccountId;
-use ssi_core::{covariance_rule, Referencable};
 use ssi_jwk::JWK;
 use static_iref::iri;
 use std::hash::Hash;
@@ -58,6 +57,7 @@ pub struct AleoMethod2021 {
 }
 
 impl AleoMethod2021 {
+    pub const NAME: &'static str = ALEO_METHOD_2021_TYPE;
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#AleoMethod2021");
 
     pub fn sign_bytes(
@@ -86,16 +86,6 @@ impl AleoMethod2021 {
     }
 }
 
-impl Referencable for AleoMethod2021 {
-    type Reference<'a> = &'a Self where Self: 'a;
-
-    fn as_reference(&self) -> Self::Reference<'_> {
-        self
-    }
-
-    covariance_rule!();
-}
-
 impl VerificationMethod for AleoMethod2021 {
     fn id(&self) -> &Iri {
         self.id.as_iri()
@@ -103,14 +93,6 @@ impl VerificationMethod for AleoMethod2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
-    }
-
-    fn ref_id(r: Self::Reference<'_>) -> &Iri {
-        r.id.as_iri()
-    }
-
-    fn ref_controller(r: Self::Reference<'_>) -> Option<&Iri> {
-        Some(r.controller.as_iri())
     }
 }
 
@@ -124,10 +106,6 @@ impl TypedVerificationMethod for AleoMethod2021 {
     }
 
     fn type_(&self) -> &str {
-        ALEO_METHOD_2021_TYPE
-    }
-
-    fn ref_type(_r: Self::Reference<'_>) -> &str {
         ALEO_METHOD_2021_TYPE
     }
 }
