@@ -221,6 +221,10 @@ impl DIDBuf {
     pub fn into_uri(self) -> UriBuf {
         unsafe { UriBuf::new_unchecked(self.0) }
     }
+
+    pub fn into_string(self) -> String {
+        unsafe { String::from_utf8_unchecked(self.0) }
+    }
 }
 
 impl TryFrom<String> for DIDBuf {

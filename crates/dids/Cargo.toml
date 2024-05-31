@@ -24,6 +24,7 @@ aleo = ["did-pkh/aleo"]
 solana = ["did-pkh/solana"]
 
 [dependencies]
+ssi-jwk.workspace = true
 ssi-dids-core.workspace = true
 did-ethr.workspace = true
 did-ion.workspace = true
@@ -32,3 +33,4 @@ did-method-key.workspace = true
 did-pkh.workspace = true
 did-tz.workspace = true
 did-web.workspace = true
+thiserror.workspace = true

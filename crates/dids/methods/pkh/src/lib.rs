@@ -525,31 +525,31 @@ impl DIDMethodResolver for DIDPKH {
     }
 }
 
-fn generate_sol(jwk: &JWK) -> Option<String> {
+fn generate_sol(jwk: &JWK) -> Result<String, GenerateError> {
     match jwk.params {
         Params::OKP(ref params) if params.curve == "Ed25519" => {
-            Some(bs58::encode(&params.public_key.0).into_string())
+            Ok(bs58::encode(&params.public_key.0).into_string())
         }
-        _ => None,
+        _ => Err(GenerateError::UnsupportedKeyType),
     }
 }
 
 #[cfg(feature = "ripemd-160")]
-fn generate_btc(key: &JWK) -> Result<String, String> {
-    let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(|e| e.to_string())?;
+fn generate_btc(key: &JWK) -> Result<String, GenerateError> {
+    let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(GenerateError::other)?;
     #[cfg(test)]
     if !addr.starts_with('1') {
-        return Err("Expected Bitcoin address".to_string());
+        return Err(GenerateError::other("Expected Bitcoin address"));
     }
     Ok(addr)
 }
 
 #[cfg(feature = "ripemd-160")]
-fn generate_doge(key: &JWK) -> Result<String, String> {
-    let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(|e| e.to_string())?;
+fn generate_doge(key: &JWK) -> Result<String, GenerateError> {
+    let addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(GenerateError::other)?;
     #[cfg(test)]
     if !addr.starts_with('D') {
-        return Err("Expected Dogecoin address".to_string());
+        return Err(GenerateError::other("Expected Dogecoin address"));
     }
     Ok(addr)
 }
@@ -558,8 +558,8 @@ fn generate_doge(key: &JWK) -> Result<String, String> {
 fn generate_caip10_tezos(
     key: &JWK,
     ref_opt: Option<String>,
-) -> Result<BlockchainAccountId, String> {
-    let hash = ssi_jwk::blakesig::hash_public_key(key).map_err(|e| e.to_string())?;
+) -> Result<BlockchainAccountId, GenerateError> {
+    let hash = ssi_jwk::blakesig::hash_public_key(key).map_err(GenerateError::other)?;
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_TEZOS_MAINNET.to_string());
     Ok(BlockchainAccountId {
         account_address: hash,
@@ -574,8 +574,8 @@ fn generate_caip10_tezos(
 fn generate_caip10_eip155(
     key: &JWK,
     ref_opt: Option<String>,
-) -> Result<BlockchainAccountId, String> {
-    let hash = ssi_jwk::eip155::hash_public_key_eip55(key).map_err(|e| e.to_string())?;
+) -> Result<BlockchainAccountId, GenerateError> {
+    let hash = ssi_jwk::eip155::hash_public_key_eip55(key).map_err(GenerateError::other)?;
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_EIP155_ETHEREUM_MAINNET.to_string());
     Ok(BlockchainAccountId {
         account_address: hash,
@@ -590,24 +590,24 @@ fn generate_caip10_eip155(
 fn generate_caip10_bip122(
     key: &JWK,
     ref_opt: Option<String>,
-) -> Result<BlockchainAccountId, String> {
+) -> Result<BlockchainAccountId, GenerateError> {
     let reference = ref_opt.unwrap_or_else(|| REFERENCE_BIP122_BITCOIN_MAINNET.to_string());
     let addr;
     match &reference[..] {
         REFERENCE_BIP122_BITCOIN_MAINNET => {
-            addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(|e| e.to_string())?;
+            addr = ssi_jwk::ripemd160::hash_public_key(key, 0x00).map_err(GenerateError::other)?;
             if !addr.starts_with('1') {
-                return Err("Expected Bitcoin address".to_string());
+                return Err(GenerateError::other("Expected Bitcoin address"));
             }
         }
         REFERENCE_BIP122_DOGECOIN_MAINNET => {
-            addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(|e| e.to_string())?;
+            addr = ssi_jwk::ripemd160::hash_public_key(key, 0x1e).map_err(GenerateError::other)?;
             if !addr.starts_with('D') {
-                return Err("Expected Dogecoin address".to_string());
+                return Err(GenerateError::other("Expected Dogecoin address"));
             }
         }
         _ => {
-            return Err("Expected Bitcoin address type".to_string());
+            return Err(GenerateError::other("Expected Bitcoin address type"));
         }
     }
 
@@ -666,7 +666,7 @@ fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<Blockchain
 }
 
 #[allow(unused, unreachable_code)]
-fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
+fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, GenerateError> {
     // Require name to be a either CAIP-2 namespace or a
     // full CAIP-2 string - namespace and reference (e.g. internal
     // chain id or genesis hash).
@@ -676,7 +676,7 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
     let (namespace, reference_opt) = match name.splitn(2, ':').collect::<Vec<&str>>().as_slice() {
         [namespace] => (namespace.to_string(), None),
         [namespace, reference] => (namespace.to_string(), Some(reference.to_string())),
-        _ => return Err("Unable to parse chain id or namespace".to_string()),
+        _ => return Err(GenerateError::InvalidChainId),
     };
     let account_id: BlockchainAccountId = match &namespace[..] {
         #[cfg(feature = "tezos")]
@@ -689,35 +689,55 @@ fn generate_caip10_did(key: &JWK, name: &str) -> Result<DIDBuf, String> {
         "solana" => generate_caip10_solana(key, reference_opt)?,
         #[cfg(feature = "aleo")]
         "aleo" => generate_caip10_aleo(key, reference_opt)?,
-        _ => return Err("Namespace not supported".to_string()),
+        _ => return Err(GenerateError::UnsupportedNamespace),
     };
+
     Ok(DIDBuf::from_string(format!("did:pkh:{}", account_id)).unwrap())
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum GenerateError {
+    #[error("Unable to parse chain id or namespace")]
+    InvalidChainId,
+
+    #[error("Namespace not supported")]
+    UnsupportedNamespace,
+
+    #[error("Unsupported key type")]
+    UnsupportedKeyType,
+
+    #[error("{0}")]
+    Other(String),
+}
+
+impl GenerateError {
+    pub fn other(e: impl ToString) -> Self {
+        Self::Other(e.to_string())
+    }
+}
+
 impl DIDPKH {
-    pub fn generate(key: &JWK, pkh_name: &str) -> Option<DIDBuf> {
-        let addr = match match pkh_name {
+    pub fn generate(key: &JWK, pkh_name: &str) -> Result<DIDBuf, GenerateError> {
+        let addr = match pkh_name {
             // Aliases for did:pkh pre-CAIP-10. Deprecate?
             #[cfg(feature = "tezos")]
-            "tz" => ssi_jwk::blakesig::hash_public_key(key).ok(),
+            "tz" => ssi_jwk::blakesig::hash_public_key(key).map_err(GenerateError::other)?,
             #[cfg(feature = "eip")]
-            "eth" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            "eth" => ssi_jwk::eip155::hash_public_key(key).map_err(GenerateError::other)?,
             #[cfg(feature = "eip")]
-            "celo" => ssi_jwk::eip155::hash_public_key(key).ok(),
+            "celo" => ssi_jwk::eip155::hash_public_key(key).map_err(GenerateError::other)?,
             #[cfg(feature = "eip")]
-            "poly" => ssi_jwk::eip155::hash_public_key(key).ok(),
-            "sol" => generate_sol(key),
+            "poly" => ssi_jwk::eip155::hash_public_key(key).map_err(GenerateError::other)?,
+            "sol" => generate_sol(key)?,
             #[cfg(feature = "ripemd-160")]
-            "btc" => generate_btc(key).ok(),
+            "btc" => generate_btc(key)?,
             #[cfg(feature = "ripemd-160")]
-            "doge" => generate_doge(key).ok(),
+            "doge" => generate_doge(key)?,
             // CAIP-10/CAIP-2 chain id
-            name => return generate_caip10_did(key, name).ok(),
-        } {
-            Some(addr) => addr,
-            None => return None,
+            name => return generate_caip10_did(key, name),
         };
-        Some(DIDBuf::from_string(format!("did:pkh:{}:{}", pkh_name, addr)).unwrap())
+
+        Ok(DIDBuf::from_string(format!("did:pkh:{}:{}", pkh_name, addr)).unwrap())
     }
 }
 

@@ -36,97 +36,110 @@ pub enum Unsupported {
     P384,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum GenerateError {
+    #[error("missing curve")]
+    MissingCurve,
+
+    #[error("unsupported curve `{0}`")]
+    UnsupportedCurve(String),
+
+    #[error("unsupported key type")]
+    UnsupportedKeyType,
+
+    #[error("invalid input key")]
+    InvalidInputKey,
+}
+
 pub struct DIDKey;
 
 impl DIDKey {
-    pub fn generate(jwk: &JWK) -> Option<DIDBuf> {
+    pub fn generate(jwk: &JWK) -> Result<DIDBuf, GenerateError> {
         use ssi_jwk::Params;
         let id = match jwk.params {
-            Params::OKP(ref params) => {
-                match &params.curve[..] {
-                    "Ed25519" => Some(multibase::encode(
-                        multibase::Base::Base58Btc,
-                        [DID_KEY_ED25519_PREFIX.to_vec(), params.public_key.0.clone()].concat(),
-                    )),
-                    "Bls12381G2" => Some(multibase::encode(
-                        multibase::Base::Base58Btc,
-                        [
-                            DID_KEY_BLS12381_G2_PREFIX.to_vec(),
-                            params.public_key.0.clone(),
-                        ]
-                        .concat(),
-                    )),
-                    //_ => return Some(Err(DIDKeyError::UnsupportedCurve(params.curve.clone()))),
-                    _ => return None,
-                }
-            }
+            Params::OKP(ref params) => match &params.curve[..] {
+                "Ed25519" => multibase::encode(
+                    multibase::Base::Base58Btc,
+                    [DID_KEY_ED25519_PREFIX.to_vec(), params.public_key.0.clone()].concat(),
+                ),
+                "Bls12381G2" => multibase::encode(
+                    multibase::Base::Base58Btc,
+                    [
+                        DID_KEY_BLS12381_G2_PREFIX.to_vec(),
+                        params.public_key.0.clone(),
+                    ]
+                    .concat(),
+                ),
+                _ => return Err(GenerateError::UnsupportedCurve(params.curve.clone())),
+            },
             Params::EC(ref params) => {
                 let curve = match params.curve {
                     Some(ref curve) => curve,
-                    None => return None,
+                    None => return Err(GenerateError::MissingCurve),
                 };
-                match &curve[..] {
+
+                match curve.as_str() {
                     #[cfg(feature = "secp256k1")]
                     "secp256k1" => {
                         use k256::elliptic_curve::sec1::ToEncodedPoint;
                         let pk = match k256::PublicKey::try_from(params) {
                             Ok(pk) => pk,
-                            Err(_err) => return None,
+                            Err(_err) => return Err(GenerateError::InvalidInputKey),
                         };
 
-                        Some(multibase::encode(
+                        multibase::encode(
                             multibase::Base::Base58Btc,
                             [
                                 DID_KEY_SECP256K1_PREFIX.to_vec(),
                                 pk.to_encoded_point(true).as_bytes().to_vec(),
                             ]
                             .concat(),
-                        ))
+                        )
                     }
                     #[cfg(feature = "secp256r1")]
                     "P-256" => {
                         use p256::elliptic_curve::sec1::ToEncodedPoint;
                         let pk = match p256::PublicKey::try_from(params) {
                             Ok(pk) => pk,
-                            Err(_err) => return None,
+                            Err(_err) => return Err(GenerateError::InvalidInputKey),
                         };
 
-                        Some(multibase::encode(
+                        multibase::encode(
                             multibase::Base::Base58Btc,
                             [
                                 DID_KEY_P256_PREFIX.to_vec(),
                                 pk.to_encoded_point(true).as_bytes().to_vec(),
                             ]
                             .concat(),
-                        ))
+                        )
                     }
                     #[cfg(feature = "secp384r1")]
                     "P-384" => {
                         let pk_bytes = match ssi_jwk::serialize_p384(params) {
                             Ok(pk) => pk,
-                            Err(_err) => return None,
+                            Err(_err) => return Err(GenerateError::InvalidInputKey),
                         };
 
-                        Some(multibase::encode(
+                        multibase::encode(
                             multibase::Base::Base58Btc,
                             [DID_KEY_P384_PREFIX.to_vec(), pk_bytes].concat(),
-                        ))
+                        )
                     }
-                    //_ => return Some(Err(DIDKeyError::UnsupportedCurve(params.curve.clone()))),
-                    _ => return None,
+                    _ => return Err(GenerateError::UnsupportedCurve(curve.to_owned())),
                 }
             }
             Params::RSA(ref params) => {
-                let der = simple_asn1::der_encode(&params.to_public()).ok()?;
-                Some(multibase::encode(
+                let der = simple_asn1::der_encode(&params.to_public())
+                    .map_err(|_| GenerateError::InvalidInputKey)?;
+                multibase::encode(
                     multibase::Base::Base58Btc,
                     [DID_KEY_RSA_PREFIX.to_vec(), der.to_vec()].concat(),
-                ))
+                )
             }
-            _ => return None, // _ => return Some(Err(DIDKeyError::UnsupportedKeyType)),
+            _ => return Err(GenerateError::UnsupportedKeyType),
         };
 
-        id.map(|id| DIDBuf::from_string(format!("did:key:{id}")).unwrap())
+        Ok(DIDBuf::from_string(format!("did:key:{id}")).unwrap())
     }
 }
 
@@ -314,7 +327,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
             Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
         }
         #[cfg(not(feature = "secp256k1"))]
-        Err(Error::Internal(Box::new(Unsupported::Secp256k1)))
+        Err(Error::internal(Unsupported::Secp256k1))
     } else if data[0] == DID_KEY_P256_PREFIX[0] && data[1] == DID_KEY_P256_PREFIX[1] {
         #[cfg(feature = "secp256r1")]
         {
@@ -329,7 +342,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
             ))
         }
         #[cfg(not(feature = "secp256r1"))]
-        return Err(Error::Internal(Box::new(Unsupported::P256)));
+        return Err(Error::internal(Unsupported::P256));
     } else if data[0] == DID_KEY_P384_PREFIX[0] && data[1] == DID_KEY_P384_PREFIX[1] {
         #[cfg(feature = "secp384r1")]
         match ssi_jwk::p384_parse(&data[2..]) {

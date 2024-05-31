@@ -23,6 +23,24 @@ pub use pkh::DIDPKH;
 pub use tz::DIDTz;
 pub use web::DIDWeb;
 
+#[derive(Debug, thiserror::Error)]
+pub enum GenerateError {
+    #[error(transparent)]
+    Ethr(ssi_jwk::Error),
+
+    #[error(transparent)]
+    Key(key::GenerateError),
+
+    #[error(transparent)]
+    Pkh(pkh::GenerateError),
+
+    #[error(transparent)]
+    Tz(ssi_jwk::Error),
+
+    #[error("unsupported method pattern `{0}`")]
+    UnsupportedMethodPattern(String),
+}
+
 #[derive(Default)]
 pub struct AnyDidMethod {
     ion: DIDION,
@@ -32,6 +50,29 @@ pub struct AnyDidMethod {
 impl AnyDidMethod {
     pub fn new(ion: DIDION, tz: DIDTz) -> Self {
         Self { ion, tz }
+    }
+
+    pub fn generate(
+        &self,
+        key: &ssi_jwk::JWK,
+        method_pattern: &str,
+    ) -> Result<DIDBuf, GenerateError> {
+        match method_pattern
+            .split_once(':')
+            .map(|(m, p)| (m, Some(p)))
+            .unwrap_or((method_pattern, None))
+        {
+            ("ethr", None) => ethr::DIDEthr::generate(key).map_err(GenerateError::Ethr),
+            ("jwk", None) => Ok(jwk::DIDJWK::generate(key)),
+            ("key", None) => key::DIDKey::generate(key).map_err(GenerateError::Key),
+            ("pkh", Some(pkh_name)) => {
+                pkh::DIDPKH::generate(key, pkh_name).map_err(GenerateError::Pkh)
+            }
+            ("tz", None) => self.tz.generate(key).map_err(GenerateError::Tz),
+            _ => Err(GenerateError::UnsupportedMethodPattern(
+                method_pattern.to_string(),
+            )),
+        }
     }
 }
 

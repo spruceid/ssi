@@ -32,6 +32,7 @@ async-trait.workspace = true
 bs58 = { workspace = true, features = ["check"] }
 bech32 = "0.8"
 chrono = { workspace = true, features = ["serde"] }
+thiserror.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 chrono = { workspace = true, features = ["serde", "wasmbind"] }
