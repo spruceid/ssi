@@ -624,7 +624,7 @@ fn generate_caip10_bip122(
 fn generate_caip10_solana(
     key: &JWK,
     ref_opt: Option<String>,
-) -> Result<BlockchainAccountId, String> {
+) -> Result<BlockchainAccountId, GenerateError> {
     let reference = ref_opt.unwrap_or_default();
     let chain_id = ChainId {
         namespace: "solana".to_string(),
@@ -634,7 +634,7 @@ fn generate_caip10_solana(
         Params::OKP(ref params) if params.curve == "Ed25519" => {
             bs58::encode(&params.public_key.0).into_string()
         }
-        _ => return Err("Invalid public key type for Solana".to_string()),
+        _ => return Err(GenerateError::UnsupportedKeyType),
     };
     Ok(BlockchainAccountId {
         account_address: pk_bs58,
@@ -643,7 +643,10 @@ fn generate_caip10_solana(
 }
 
 #[cfg(feature = "aleo")]
-fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<BlockchainAccountId, String> {
+fn generate_caip10_aleo(
+    key: &JWK,
+    ref_opt: Option<String>,
+) -> Result<BlockchainAccountId, GenerateError> {
     let reference = ref_opt.unwrap_or_else(|| "1".to_string());
     let chain_id = ChainId {
         namespace: "aleo".to_string(),
@@ -657,7 +660,7 @@ fn generate_caip10_aleo(key: &JWK, ref_opt: Option<String>) -> Result<Blockchain
             bech32::Variant::Bech32m,
         )
         .unwrap(),
-        _ => return Err("Invalid public key type for Aleo".to_string()),
+        _ => return Err(GenerateError::UnsupportedKeyType),
     };
     Ok(BlockchainAccountId {
         account_address: pk_bs58,
