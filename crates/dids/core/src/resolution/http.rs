@@ -74,7 +74,7 @@ impl DIDResolver for HTTPDIDResolver {
 
         let client = reqwest::Client::builder()
             .build()
-            .map_err(|_| Error::Internal(Box::new(InternalError::Initialization)))?;
+            .map_err(|_| Error::internal(InternalError::Initialization))?;
 
         let mut request = client.get(url);
         if let Some(accept) = options.accept {
@@ -85,7 +85,7 @@ impl DIDResolver for HTTPDIDResolver {
             .header("User-Agent", USER_AGENT)
             .send()
             .await
-            .map_err(|e| Error::Internal(Box::new(InternalError::Reqwest(e))))?;
+            .map_err(|e| Error::internal(InternalError::Reqwest(e)))?;
 
         match response.status() {
             StatusCode::OK => {
@@ -95,23 +95,23 @@ impl DIDResolver for HTTPDIDResolver {
                             if content_type == accept.name() {
                                 Some(accept.name().to_string())
                             } else {
-                                return Err(Error::Internal(Box::new(
+                                return Err(Error::internal(
                                     InternalError::ContentTypeMismatch,
-                                )));
+                                ));
                             }
                         }
                         (Some(content_type), None) => Some(
                             content_type
                                 .to_str()
                                 .map_err(|_| {
-                                    Error::Internal(Box::new(InternalError::InvalidContentType))
+                                    Error::internal(InternalError::InvalidContentType)
                                 })?
                                 .to_string(),
                         ),
                         (None, Some(_)) => {
-                            return Err(Error::Internal(Box::new(
+                            return Err(Error::internal(
                                 InternalError::MissingContentType,
-                            )))
+                            ))
                         }
                         (None, None) => None,
                     };
@@ -120,7 +120,7 @@ impl DIDResolver for HTTPDIDResolver {
                     response
                         .bytes()
                         .await
-                        .map_err(|e| Error::Internal(Box::new(InternalError::Reqwest(e))))?
+                        .map_err(|e| Error::internal(InternalError::Reqwest(e)))?
                         .to_vec(),
                     document::Metadata::default(),
                     Metadata::from_content_type(content_type),
@@ -137,7 +137,7 @@ impl DIDResolver for HTTPDIDResolver {
                     .unwrap_or_default()
                     .to_string(),
             )),
-            error_code => Err(Error::Internal(Box::new(InternalError::Error(error_code)))),
+            error_code => Err(Error::internal(InternalError::Error(error_code))),
         }
     }
 }

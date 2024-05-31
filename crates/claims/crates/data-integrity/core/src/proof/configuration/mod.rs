@@ -1,9 +1,10 @@
 use iref::Iri;
+use serde::Serialize;
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
 use static_iref::iri;
 use std::collections::BTreeMap;
 
-use crate::{CryptographicSuite, Proof, ProofOptions};
+use crate::{CryptographicSuite, SerializeCryptographicSuite, Proof, ProofOptions};
 
 pub const DC_CREATED_IRI: &Iri = iri!("http://purl.org/dc/terms/created");
 
@@ -18,23 +19,28 @@ pub use reference::*;
 /// Proof configuration.
 ///
 /// Proof object without the signature value.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase", bound = "S: SerializeCryptographicSuite")]
 pub struct ProofConfiguration<S: CryptographicSuite> {
+    #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
     pub context: Option<json_ld::syntax::Context>,
 
     /// Proof type.
+    #[serde(flatten, serialize_with = "S::serialize_type")]
     pub type_: S,
 
     /// Date a creation of the proof.
     pub created: xsd_types::DateTime,
 
     /// Verification method.
+    #[serde(serialize_with = "S::serialize_verification_method_ref")]
     pub verification_method: ReferenceOrOwned<S::VerificationMethod>,
 
     /// Purpose of the proof.
     pub proof_purpose: ProofPurpose,
 
     /// Specifies when the proof expires.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expires: Option<xsd_types::DateTimeStamp>,
 
     #[allow(rustdoc::bare_urls)]
@@ -50,6 +56,7 @@ pub struct ProofConfiguration<S: CryptographicSuite> {
     /// Example domain values include: `domain.example`` (DNS domain),
     /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
     /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub domains: Vec<String>,
 
     /// Used to mitigate replay attacks.
@@ -57,21 +64,25 @@ pub struct ProofConfiguration<S: CryptographicSuite> {
     /// Used once for a particular domain and window of time. Examples of a
     /// challenge value include: `1235abcd6789`,
     /// `79d34551-ae81-44ae-823b-6dadbab9ebd4`, and `ruby`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub challenge: Option<String>,
 
     /// Arbitrary string supplied by the proof creator.
     ///
     /// One use of this field is to increase privacy by decreasing linkability
     /// that is the result of deterministically generated signatures.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
 
     /// Additional proof options required by the cryptographic suite.
     ///
     /// For instance, tezos cryptosuites requires the public key associated with
     /// the verification method, which is a blockchain account id.
+    #[serde(flatten, serialize_with = "S::serialize_proof_options")]
     pub options: S::ProofOptions,
 
     /// Extra properties.
+    #[serde(flatten)]
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 

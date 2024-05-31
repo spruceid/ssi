@@ -157,6 +157,6 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::ESBlake2b>
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(Algorithm::ESBlake2b, bytes, key)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }

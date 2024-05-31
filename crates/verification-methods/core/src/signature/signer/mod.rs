@@ -27,8 +27,8 @@ impl<'s, M: VerificationMethod, S: Signer<M>> Signer<M> for &'s S {
 
 #[derive(Debug, thiserror::Error)]
 pub enum MessageSignatureError {
-    #[error(transparent)]
-    SignatureFailed(Box<dyn 'static + std::error::Error>),
+    #[error("0")]
+    SignatureFailed(String),
 
     #[error("invalid signature client query")]
     InvalidQuery,
@@ -50,8 +50,8 @@ pub enum MessageSignatureError {
 }
 
 impl MessageSignatureError {
-    pub fn signature_failed<E: 'static + std::error::Error>(e: E) -> Self {
-        Self::SignatureFailed(Box::new(e))
+    pub fn signature_failed(e: impl ToString) -> Self {
+        Self::SignatureFailed(e.to_string())
     }
 }
 

@@ -180,7 +180,7 @@ impl PublicKey {
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(algorithm.into(), bytes, key)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }
 
@@ -232,6 +232,6 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::AnyBlake2b> for TezosMethod2021 {
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(algorithm.into(), bytes, key)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }

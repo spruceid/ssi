@@ -426,7 +426,7 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::ES256KR> for EcdsaSecp256k1RecoveryM
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign(secret, bytes, DigestFunction::Sha256)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }
 
@@ -438,6 +438,6 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::ESKeccakKR> for EcdsaSecp256k1Recove
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         self.sign(secret, bytes, DigestFunction::Keccack)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }

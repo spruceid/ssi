@@ -55,12 +55,12 @@ pub enum Error {
     InvalidOptions,
 
     #[error("DID resolver internal error: {0}")]
-    Internal(Box<DynInternalError>),
+    Internal(String),
 }
 
 impl Error {
-    pub fn internal<E: 'static + std::error::Error + Send>(error: E) -> Self {
-        Self::Internal(Box::new(error))
+    pub fn internal(error: impl ToString) -> Self {
+        Self::Internal(error.to_string())
     }
 
     pub fn kind(&self) -> ErrorKind {
@@ -78,12 +78,6 @@ impl Error {
         }
     }
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type DynInternalError = dyn Send + std::error::Error;
-
-#[cfg(target_arch = "wasm32")]
-pub type DynInternalError = dyn std::error::Error;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ErrorKind {

@@ -1,11 +1,13 @@
 use std::collections::BTreeMap;
 
+use serde::{Deserialize, Serialize};
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
 
 use crate::{CryptographicSuite, ProofConfiguration};
 
 /// Proof options.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProofOptions<M, T> {
     /// Date a creation of the proof.
     pub created: xsd_types::DateTime,
@@ -17,6 +19,7 @@ pub struct ProofOptions<M, T> {
     pub proof_purpose: ProofPurpose,
 
     /// Specifies when the proof expires.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub expires: Option<xsd_types::DateTimeStamp>,
 
     #[allow(rustdoc::bare_urls)]
@@ -32,6 +35,7 @@ pub struct ProofOptions<M, T> {
     /// Example domain values include: `domain.example`` (DNS domain),
     /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
     /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub domains: Vec<String>,
 
     /// Used to mitigate replay attacks.
@@ -39,21 +43,25 @@ pub struct ProofOptions<M, T> {
     /// Used once for a particular domain and window of time. Examples of a
     /// challenge value include: `1235abcd6789`,
     /// `79d34551-ae81-44ae-823b-6dadbab9ebd4`, and `ruby`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub challenge: Option<String>,
 
     /// Arbitrary string supplied by the proof creator.
     ///
     /// One use of this field is to increase privacy by decreasing linkability
     /// that is the result of deterministically generated signatures.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
 
     /// Additional proof options required by the cryptographic suite.
     ///
     /// For instance, tezos cryptosuites requires the public key associated with
     /// the verification method, which is a blockchain account id.
+    #[serde(flatten)]
     pub options: T,
 
     /// Extra properties.
+    #[serde(flatten)]
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 

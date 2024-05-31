@@ -71,7 +71,7 @@ impl Eip712Method2021 {
         let signing_key = k256::ecdsa::SigningKey::from(secret_key);
         let (sig, rec_id) = signing_key
             .sign_digest_recoverable(sha3::Keccak256::new_with_prefix(data))
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))?;
+            .map_err(MessageSignatureError::signature_failed)?;
 
         // let sig: k256::ecdsa::recoverable::Signature = signing_key
         //     .try_sign(data)

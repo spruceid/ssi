@@ -340,7 +340,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
             Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
         }
         #[cfg(not(feature = "secp384r1"))]
-        Err(Error::Internal(Box::new(Unsupported::P384)))
+        Err(Error::internal(Unsupported::P384))
     } else if data[0] == DID_KEY_RSA_PREFIX[0] && data[1] == DID_KEY_RSA_PREFIX[1] {
         match ssi_jwk::rsa_x509_pub_parse(&data[2..]) {
             Ok(jwk) => Ok((
@@ -375,7 +375,7 @@ fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMet
 mod tests {
     use rand_chacha::rand_core::SeedableRng;
     use ssi_claims::{
-        data_integrity::{AnyInputContext, AnyInputOptions, AnySuite},
+        data_integrity::{AnyInputContext, AnyInputSuiteOptions, AnySuite},
         vc::JsonCredential,
         Verifiable,
     };
@@ -534,7 +534,7 @@ mod tests {
             "2020-08-19T21:41:50Z".parse().unwrap(),
             verification_method_ref,
             ProofPurpose::Assertion,
-            AnyInputOptions::default(),
+            AnyInputSuiteOptions::default(),
         );
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
@@ -597,7 +597,7 @@ mod tests {
             "2021-02-18T20:17:46Z".parse().unwrap(),
             verification_method_ref,
             ProofPurpose::Assertion,
-            AnyInputOptions::default(),
+            AnyInputSuiteOptions::default(),
         );
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
@@ -660,7 +660,7 @@ mod tests {
             "2021-02-18T20:17:46Z".parse().unwrap(),
             verification_method_ref,
             ProofPurpose::Assertion,
-            AnyInputOptions::default(),
+            AnyInputSuiteOptions::default(),
         );
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite

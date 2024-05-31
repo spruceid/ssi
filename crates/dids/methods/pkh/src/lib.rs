@@ -930,7 +930,7 @@ mod tests {
         use iref::IriBuf;
         use ssi_claims::{
             data_integrity::{
-                signing::AlterSignature, AnyInputOptions, CryptographicSuite, ProofOptions,
+                signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
             },
             vc::{JsonCredential, JsonPresentation},
         };
@@ -958,7 +958,7 @@ mod tests {
                 .unwrap()
                 .into(),
             ProofPurpose::Assertion,
-            AnyInputOptions {
+            AnyInputSuiteOptions {
                 eip712: eip712_domain_opt.clone(),
                 // eip712_v0_1: eip712_domain_opt.clone().map(Into::into),
                 ..Default::default()
@@ -1028,7 +1028,7 @@ mod tests {
                 .unwrap()
                 .into(),
             ProofPurpose::Authentication,
-            AnyInputOptions {
+            AnyInputSuiteOptions {
                 eip712: vp_eip712_domain_opt.clone(),
                 ..Default::default()
             }
@@ -1083,7 +1083,7 @@ mod tests {
         use iref::IriBuf;
         use ssi_claims::{
             data_integrity::{
-                signing::AlterSignature, AnyInputOptions, CryptographicSuite, ProofOptions,
+                signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
             },
             vc::{JsonCredential, JsonPresentation},
         };
@@ -1108,7 +1108,7 @@ mod tests {
                 .unwrap()
                 .into(),
             ProofPurpose::Assertion,
-            AnyInputOptions::default()
+            AnyInputSuiteOptions::default()
                 .with_public_key(key.to_public())
                 .unwrap(),
         );
@@ -1168,7 +1168,7 @@ mod tests {
                 .unwrap()
                 .into(),
             ProofPurpose::Authentication,
-            AnyInputOptions::default()
+            AnyInputSuiteOptions::default()
                 .with_public_key(key.to_public())
                 .unwrap(),
         );

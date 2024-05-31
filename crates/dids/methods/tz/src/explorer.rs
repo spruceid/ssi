@@ -16,7 +16,7 @@ pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PK
 pub async fn retrieve_did_manager(tzkt_url: &Uri, address: &str) -> Result<Option<String>, Error> {
     let client = reqwest::Client::builder()
         .build()
-        .map_err(|e| Error::Internal(Box::new(e)))?;
+        .map_err(Error::internal)?;
     let url = Url::parse(tzkt_url).unwrap();
     let contracts: Vec<String> = client
         .get(url.join("/v1/contracts").unwrap())
@@ -29,10 +29,10 @@ pub async fn retrieve_did_manager(tzkt_url: &Uri, address: &str) -> Result<Optio
         ])
         .send()
         .await
-        .map_err(|e| Error::Internal(Box::new(e)))?
+        .map_err(Error::internal)?
         .json()
         .await
-        .map_err(|e| Error::Internal(Box::new(e)))?;
+        .map_err(Error::internal)?;
 
     if !contracts.is_empty() {
         Ok(Some(contracts[0].clone()))
@@ -66,19 +66,19 @@ pub async fn execute_service_view(
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .build()
-        .map_err(|e| Error::Internal(Box::new(e)))?;
+        .map_err(Error::internal)?;
     let url = Url::parse(tzkt_url).unwrap();
     let service_result: ServiceResult = client
         .get(
             url.join(&format!("/v1/contracts/{contract}/storage"))
-                .map_err(|e| Error::Internal(Box::new(e)))?,
+                .map_err(Error::internal)?,
         )
         .send()
         .await
-        .map_err(|e| Error::Internal(Box::new(e)))?
+        .map_err(Error::internal)?
         .json()
         .await
-        .map_err(|e| Error::Internal(Box::new(e)))?;
+        .map_err(Error::internal)?;
 
     Ok(Service {
         id: UriBuf::new(format!("{did}#discovery").into_bytes()).unwrap(),
@@ -98,22 +98,22 @@ struct AuthResult {
 pub async fn execute_auth_view(tzkt_url: &str, contract: &str) -> Result<DIDURLBuf, Error> {
     let client = reqwest::Client::builder()
         .build()
-        .map_err(|e| Error::Internal(Box::new(e)))?;
+        .map_err(Error::internal)?;
     let url = Url::parse(tzkt_url).unwrap();
     let auth_result: AuthResult = client
         .get(
             url.join(&format!("/v1/contracts/{}/storage", contract))
-                .map_err(|e| Error::Internal(Box::new(e)))?,
+                .map_err(Error::internal)?,
         )
         .send()
         .await
-        .map_err(|e| Error::Internal(Box::new(e)))?
+        .map_err(Error::internal)?
         .json()
         .await
-        .map_err(|e| Error::Internal(Box::new(e)))?;
+        .map_err(Error::internal)?;
 
     DIDURLBuf::from_string(auth_result.verification_method)
-        .map_err(|e| Error::Internal(Box::new(e)))
+        .map_err(Error::internal)
 }
 
 #[cfg(test)]

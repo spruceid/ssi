@@ -1,15 +1,23 @@
+use serde::{Deserialize, Serialize};
+use ssi_data_integrity_core::ProofOptions;
 use ssi_jwk::JWK;
+use ssi_verification_methods::AnyMethod;
 
-/// Options for all cryptographic suites.
-#[derive(Debug, Clone, Default)]
-pub struct AnyInputOptions {
+pub type AnyInputOptions = ProofOptions<AnyMethod, AnyInputSuiteOptions>;
+
+/// Suite-specific options for all cryptographic suites.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnyInputSuiteOptions {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub public_key_jwk: Option<Box<JWK>>,
 
     #[cfg(all(feature = "w3c", feature = "eip712"))]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub eip712: Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>,
 }
 
-impl AnyInputOptions {
+impl AnyInputSuiteOptions {
     pub fn new() -> Self {
         Self::default()
     }
@@ -23,11 +31,11 @@ impl AnyInputOptions {
     }
 }
 
-impl From<AnyInputOptions> for () {
-    fn from(_: AnyInputOptions) -> Self {}
+impl From<AnyInputSuiteOptions> for () {
+    fn from(_: AnyInputSuiteOptions) -> Self {}
 }
 
-impl From<()> for AnyInputOptions {
+impl From<()> for AnyInputSuiteOptions {
     fn from(_: ()) -> Self {
         Self::default()
     }
@@ -35,7 +43,7 @@ impl From<()> for AnyInputOptions {
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
 impl From<Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>>
-    for AnyInputOptions
+    for AnyInputSuiteOptions
 {
     fn from(
         value: Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip712Options>,
@@ -48,8 +56,8 @@ impl From<Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip7
 }
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
-impl From<AnyInputOptions> for ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options {
-    fn from(value: AnyInputOptions) -> Self {
+impl From<AnyInputSuiteOptions> for ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options {
+    fn from(value: AnyInputSuiteOptions) -> Self {
         Self {
             eip712: value.eip712,
         }
@@ -57,7 +65,7 @@ impl From<AnyInputOptions> for ssi_data_integrity_suites::ethereum_eip712_signat
 }
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
-impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options> for AnyInputOptions {
+impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options> for AnyInputSuiteOptions {
     fn from(value: ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options) -> Self {
         Self {
             eip712: value.eip712,
@@ -67,10 +75,10 @@ impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options> fo
 }
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
-impl From<AnyInputOptions>
+impl From<AnyInputSuiteOptions>
     for ssi_data_integrity_suites::ethereum_eip712_signature_2021::v0_1::Options
 {
-    fn from(value: AnyInputOptions) -> Self {
+    fn from(value: AnyInputSuiteOptions) -> Self {
         Self {
             eip712: value.eip712.map(Into::into),
         }
@@ -79,7 +87,7 @@ impl From<AnyInputOptions>
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
 impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::v0_1::Options>
-    for AnyInputOptions
+    for AnyInputSuiteOptions
 {
     fn from(
         value: ssi_data_integrity_suites::ethereum_eip712_signature_2021::v0_1::Options,
@@ -92,10 +100,10 @@ impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::v0_1::Optio
 }
 
 #[cfg(feature = "tezos")]
-impl TryFrom<AnyInputOptions> for ssi_data_integrity_suites::tezos::Options {
+impl TryFrom<AnyInputSuiteOptions> for ssi_data_integrity_suites::tezos::Options {
     type Error = ssi_data_integrity_core::suite::ConfigurationError;
 
-    fn try_from(value: AnyInputOptions) -> Result<Self, Self::Error> {
+    fn try_from(value: AnyInputSuiteOptions) -> Result<Self, Self::Error> {
         Ok(Self {
             public_key_jwk: value.public_key_jwk.ok_or(
                 ssi_data_integrity_core::suite::ConfigurationError::MissingOption(
@@ -107,7 +115,7 @@ impl TryFrom<AnyInputOptions> for ssi_data_integrity_suites::tezos::Options {
 }
 
 #[cfg(feature = "tezos")]
-impl From<ssi_data_integrity_suites::tezos::Options> for AnyInputOptions {
+impl From<ssi_data_integrity_suites::tezos::Options> for AnyInputSuiteOptions {
     fn from(value: ssi_data_integrity_suites::tezos::Options) -> Self {
         Self {
             public_key_jwk: Some(value.public_key_jwk),
@@ -117,10 +125,10 @@ impl From<ssi_data_integrity_suites::tezos::Options> for AnyInputOptions {
 }
 
 #[cfg(feature = "tezos")]
-impl TryFrom<AnyInputOptions> for ssi_data_integrity_suites::tezos_signature_2021::Options {
+impl TryFrom<AnyInputSuiteOptions> for ssi_data_integrity_suites::tezos_signature_2021::Options {
     type Error = ssi_data_integrity_core::suite::ConfigurationError;
 
-    fn try_from(value: AnyInputOptions) -> Result<Self, Self::Error> {
+    fn try_from(value: AnyInputSuiteOptions) -> Result<Self, Self::Error> {
         Ok(Self {
             public_key_jwk: value.public_key_jwk,
         })
@@ -128,7 +136,7 @@ impl TryFrom<AnyInputOptions> for ssi_data_integrity_suites::tezos_signature_202
 }
 
 #[cfg(feature = "tezos")]
-impl From<ssi_data_integrity_suites::tezos_signature_2021::Options> for AnyInputOptions {
+impl From<ssi_data_integrity_suites::tezos_signature_2021::Options> for AnyInputSuiteOptions {
     fn from(value: ssi_data_integrity_suites::tezos_signature_2021::Options) -> Self {
         Self {
             public_key_jwk: value.public_key_jwk,
@@ -138,12 +146,12 @@ impl From<ssi_data_integrity_suites::tezos_signature_2021::Options> for AnyInput
 }
 
 #[cfg(feature = "tezos")]
-impl TryFrom<AnyInputOptions>
+impl TryFrom<AnyInputSuiteOptions>
     for ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options
 {
     type Error = ssi_data_integrity_core::suite::ConfigurationError;
 
-    fn try_from(value: AnyInputOptions) -> Result<Self, Self::Error> {
+    fn try_from(value: AnyInputSuiteOptions) -> Result<Self, Self::Error> {
         Ok(Self {
             public_key_multibase: value
                 .public_key_jwk
@@ -156,7 +164,7 @@ impl TryFrom<AnyInputOptions>
 }
 
 #[cfg(feature = "tezos")]
-impl From<ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options> for AnyInputOptions {
+impl From<ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options> for AnyInputSuiteOptions {
     fn from(value: ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options) -> Self {
         Self {
             public_key_jwk: value

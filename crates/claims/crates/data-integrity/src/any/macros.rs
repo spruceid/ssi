@@ -70,7 +70,7 @@ macro_rules! crypto_suites {
             #[allow(unused_variables)]
             impl Project<ssi_data_integrity_suites::$name> for AnySuite {
                 fn project_input_options(
-                    options: ssi_data_integrity_core::ProofOptions<ssi_verification_methods::AnyMethod, crate::AnyInputOptions>
+                    options: ssi_data_integrity_core::ProofOptions<ssi_verification_methods::AnyMethod, crate::AnyInputSuiteOptions>
                 ) -> Result<ssi_data_integrity_core::ProofOptions<ssi_data_integrity_core::suite::InputVerificationMethod<ssi_data_integrity_suites::$name>, ssi_data_integrity_core::suite::InputSuiteOptions<ssi_data_integrity_suites::$name>>, ssi_data_integrity_core::suite::ConfigurationError> {
                     options.try_map::<_, _, ssi_data_integrity_core::suite::ConfigurationError>(
                         |method| method.try_into().map_err(ssi_data_integrity_core::suite::ConfigurationError::other),
@@ -410,7 +410,7 @@ macro_rules! crypto_suites {
             }
         }
 
-        impl From<AnyProofOptions> for crate::AnyInputOptions {
+        impl From<AnyProofOptions> for crate::AnyInputSuiteOptions {
             fn from(value: AnyProofOptions) -> Self {
                 match value {
                     $(
@@ -427,7 +427,7 @@ macro_rules! crypto_suites {
         #[allow(unused_variables)]
         impl ssi_data_integrity_core::suite::ConfigurationAlgorithm<AnySuite> for AnyConfigurationAlgorithm {
             type InputVerificationMethod = ssi_verification_methods::AnyMethod;
-            type InputSuiteOptions = crate::AnyInputOptions;
+            type InputSuiteOptions = crate::AnyInputSuiteOptions;
 
             fn configure(suite: &AnySuite, options: ssi_data_integrity_core::suite::InputOptions<AnySuite>) -> Result<ssi_data_integrity_core::ProofConfiguration<AnySuite>, ssi_data_integrity_core::suite::ConfigurationError> {
                 match suite {

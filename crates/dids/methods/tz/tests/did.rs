@@ -4,7 +4,7 @@ use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{
-        signing::AlterSignature, AnyInputContext, AnyInputOptions, AnySuite, CryptographicSuite,
+        signing::AlterSignature, AnyInputContext, AnyInputSuiteOptions, AnySuite, CryptographicSuite,
         DataIntegrity, ProofOptions as SuiteOptions,
     },
     vc::{JsonCredential, JsonPresentation},
@@ -473,7 +473,7 @@ async fn credential_prove_verify_did_tz3() {
             .unwrap()
             .into(),
         ProofPurpose::Assertion,
-        AnyInputOptions::default()
+        AnyInputSuiteOptions::default()
             .with_public_key(key.to_public())
             .unwrap(),
     );
@@ -533,7 +533,7 @@ async fn credential_prove_verify_did_tz3() {
             .unwrap()
             .into(),
         ProofPurpose::Authentication,
-        AnyInputOptions::default()
+        AnyInputSuiteOptions::default()
             .with_public_key(key.to_public())
             .unwrap(),
     );

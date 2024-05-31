@@ -137,19 +137,19 @@ pub enum DIDTransactionError {
     UnsupportedDIDMethod(String),
 
     #[error("invalid transaction: {0}")]
-    InvalidTransaction(Box<dyn 'static + Send + std::error::Error>),
+    InvalidTransaction(String),
 
     #[error("transaction failed: {0}")]
-    Failed(Box<dyn 'static + Send + std::error::Error>),
+    Failed(String),
 }
 
 impl DIDTransactionError {
-    pub fn invalid<E: 'static + Send + std::error::Error>(error: E) -> Self {
-        Self::InvalidTransaction(Box::new(error))
+    pub fn invalid(error: impl ToString) -> Self {
+        Self::InvalidTransaction(error.to_string())
     }
 
-    pub fn failed<E: 'static + Send + std::error::Error>(error: E) -> Self {
-        Self::Failed(Box::new(error))
+    pub fn failed(error: impl ToString) -> Self {
+        Self::Failed(error.to_string())
     }
 }
 
@@ -227,13 +227,13 @@ pub enum DIDTransactionCreationError {
     #[error("unsupported service: {reason}")]
     UnsupportedService { reason: Cow<'static, str> },
 
-    #[error(transparent)]
-    Internal(Box<dyn 'static + Send + std::error::Error>),
+    #[error("{0}")]
+    Internal(String),
 }
 
 impl DIDTransactionCreationError {
-    pub fn internal<E: 'static + Send + std::error::Error>(e: E) -> Self {
-        Self::Internal(Box::new(e))
+    pub fn internal(e: impl ToString) -> Self {
+        Self::Internal(e.to_string())
     }
 }
 

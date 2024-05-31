@@ -77,7 +77,7 @@ impl BlockchainVerificationMethod2021 {
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(algorithm, bytes, key)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }
 

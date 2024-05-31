@@ -199,7 +199,7 @@ impl DIDMethodResolver for DIDTz {
 
             self.tier3_updates(prefix, &mut doc, updates)
                 .await
-                .map_err(|e| Error::Internal(Box::new(e)))?;
+                .map_err(Error::internal)?;
         }
 
         let content_type = options.accept.unwrap_or(MediaType::JsonLd);

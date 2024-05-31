@@ -144,7 +144,7 @@ impl SigningMethod<JWK, ssi_jwk::algorithm::EdDSA> for Ed25519VerificationKey201
         bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
         ssi_jws::sign_bytes(ssi_jwk::Algorithm::EdDSA, bytes, secret)
-            .map_err(|e| MessageSignatureError::SignatureFailed(Box::new(e)))
+            .map_err(MessageSignatureError::signature_failed)
     }
 }
 
