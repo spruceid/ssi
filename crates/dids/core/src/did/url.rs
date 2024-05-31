@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{borrow::Borrow, ops::Deref, usize};
+use std::{borrow::Borrow, ops::Deref, str::FromStr, usize};
 
 use crate::DIDBuf;
 
@@ -423,6 +423,14 @@ impl DIDURLBuf {
     }
 }
 
+impl FromStr for DIDURLBuf {
+    type Err = InvalidDIDURL<String>;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.to_owned().try_into()
+    }
+}
+
 impl TryFrom<String> for DIDURLBuf {
     type Error = InvalidDIDURL<String>;
 
@@ -478,6 +486,12 @@ impl Borrow<Uri> for DIDURLBuf {
 impl Borrow<Iri> for DIDURLBuf {
     fn borrow(&self) -> &Iri {
         self.as_iri()
+    }
+}
+
+impl AsRef<[u8]> for DIDURLBuf {
+    fn as_ref(&self) -> &[u8] {
+        self.as_bytes()
     }
 }
 

@@ -13,6 +13,9 @@ pub type InputOptions<S> = ProofOptions<InputVerificationMethod<S>, InputSuiteOp
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigurationError {
+    #[error("missing verification method")]
+    MissingVerificationMethod,
+
     #[error("missing option `{0}`")]
     MissingOption(String),
 
@@ -58,7 +61,7 @@ impl<S: CryptographicSuite> ConfigurationAlgorithm<S> for NoConfiguration {
         suite: &S,
         options: ProofOptions<S::VerificationMethod, S::ProofOptions>,
     ) -> Result<ProofConfiguration<S>, ConfigurationError> {
-        Ok(options.into_configuration(suite.clone()))
+        options.into_configuration(suite.clone())
     }
 }
 
@@ -75,7 +78,7 @@ where
         suite: &S,
         options: ProofOptions<S::VerificationMethod, S::ProofOptions>,
     ) -> Result<ProofConfiguration<S>, ConfigurationError> {
-        let mut result = options.into_configuration(suite.clone());
+        let mut result = options.into_configuration(suite.clone())?;
         result.context = Some(C::default().into());
         Ok(result)
     }

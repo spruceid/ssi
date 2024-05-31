@@ -59,3 +59,22 @@ pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     /// JSON Web Signature.
     Jws(jws::CompactJWSString),
 }
+
+/// JSON-like verifiable presentation or JWS (presumably JWT).
+#[derive(Educe, Serialize, Deserialize)]
+#[serde(
+    untagged,
+    bound(
+        serialize = "S: SerializeCryptographicSuite",
+        deserialize = "S: DeserializeCryptographicSuite<'de>"
+    )
+)]
+#[educe(Clone(bound("S: CloneCryptographicSuite")))]
+#[educe(Debug(bound("S: DebugCryptographicSuite")))]
+pub enum JsonPresentationOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
+    /// JSON-like verifiable presentation.
+    Presentation(DataIntegrity<vc::JsonPresentation, S>),
+
+    /// JSON Web Signature.
+    Jws(jws::CompactJWSString),
+}

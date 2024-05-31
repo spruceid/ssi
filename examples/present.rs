@@ -54,7 +54,7 @@ async fn main() {
 
     let vp = ssi::claims::vc::JsonPresentation::new(
         None,
-        vec![uri!("did:example:foo").to_owned()],
+        Some(uri!("did:example:foo").to_owned()),
         vec![vc],
     );
 
@@ -72,7 +72,7 @@ async fn main() {
             params.proof_purpose = ProofPurpose::Authentication;
             params.challenge = Some("example".to_owned());
 
-            let suite = AnySuite::pick(&key, Some(&params.verification_method)).unwrap();
+            let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
             let vp = suite
                 .sign(vp, AnyInputContext::default(), &resolver, &signer, params)
                 .await

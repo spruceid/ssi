@@ -108,7 +108,7 @@ impl<'a> PartialEq<&'a CompactJWSStr> for String {
     }
 }
 
-/// JWS in compact serialized form, with a base64 payload.
+/// JWS in compact serialized form, with an UTF-8 encoded payload.
 ///
 /// Contrarily to [`CompactJWS`], this type guarantees that the payload is
 /// a valid UTF-8 string, meaning the whole compact JWS is an UTF-8 string.

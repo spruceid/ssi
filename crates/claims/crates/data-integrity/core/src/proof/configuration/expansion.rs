@@ -47,7 +47,7 @@ impl<'a, S: CryptographicSuite> ProofConfigurationRef<'a, S> {
 /// unique implementation.
 pub trait ConfigurationExpandingEnvironment {
     #[allow(async_fn_in_trait)]
-    async fn expand_configuration<'a, S: SerializeCryptographicSuite>(
+    async fn expand_configuration<S: SerializeCryptographicSuite>(
         &mut self,
         document: &impl JsonLdNodeObject,
         proof_configuration: ProofConfigurationRef<'_, S>,
@@ -66,7 +66,7 @@ where
     L: json_ld::Loader<V::Iri>,
     L::Error: fmt::Display,
 {
-    async fn expand_configuration<'a, S: SerializeCryptographicSuite>(
+    async fn expand_configuration<S: SerializeCryptographicSuite>(
         &mut self,
         document: &impl JsonLdNodeObject,
         proof_configuration: ProofConfigurationRef<'_, S>,

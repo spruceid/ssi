@@ -1,4 +1,5 @@
 use ssi_claims_core::SignatureError;
+use ssi_jwk::JWK;
 use std::{borrow::Cow, marker::PhantomData};
 
 pub mod local;
@@ -86,6 +87,13 @@ impl From<MessageSignatureError> for SignatureError {
 pub trait MessageSigner<A> {
     #[allow(async_fn_in_trait)]
     async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError>;
+}
+
+impl<A: Into<ssi_jwk::Algorithm>> MessageSigner<A> for JWK {
+    async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
+        ssi_jws::sign_bytes(algorithm.into(), message, &self)
+            .map_err(MessageSignatureError::signature_failed)
+    }
 }
 
 pub struct MessageSignerAdapter<S, A> {

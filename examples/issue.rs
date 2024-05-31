@@ -38,7 +38,7 @@ async fn main() {
             let params =
                 ProofOptions::from_method_and_options(verification_method, Default::default());
 
-            let suite = AnySuite::pick(&key, Some(&params.verification_method)).unwrap();
+            let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
             let vc = suite
                 .sign(vc, AnyInputContext::default(), &resolver, &signer, params)
                 .await

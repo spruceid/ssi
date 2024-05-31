@@ -23,6 +23,7 @@ pub use pkh::DIDPKH;
 pub use tz::DIDTz;
 pub use web::DIDWeb;
 
+#[derive(Default)]
 pub struct AnyDidMethod {
     ion: DIDION,
     tz: DIDTz,

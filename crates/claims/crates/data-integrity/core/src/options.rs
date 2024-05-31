@@ -3,23 +3,25 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
 
-use crate::{CryptographicSuite, ProofConfiguration};
+use crate::{suite::ConfigurationError, CryptographicSuite, ProofConfiguration};
 
 /// Proof options.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProofOptions<M, T> {
     /// Date a creation of the proof.
+    #[serde(default = "xsd_types::DateTime::now")]
     pub created: xsd_types::DateTime,
 
     /// Verification method.
-    pub verification_method: ReferenceOrOwned<M>,
+    pub verification_method: Option<ReferenceOrOwned<M>>,
 
     /// Purpose of the proof.
+    #[serde(default)]
     pub proof_purpose: ProofPurpose,
 
     /// Specifies when the proof expires.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires: Option<xsd_types::DateTimeStamp>,
 
     #[allow(rustdoc::bare_urls)]
@@ -35,7 +37,7 @@ pub struct ProofOptions<M, T> {
     /// Example domain values include: `domain.example`` (DNS domain),
     /// `https://domain.example:8443` (Web origin), `mycorp-intranet` (bespoke
     /// text string), and `b31d37d4-dd59-47d3-9dd8-c973da43b63a` (UUID).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub domains: Vec<String>,
 
     /// Used to mitigate replay attacks.
@@ -43,14 +45,14 @@ pub struct ProofOptions<M, T> {
     /// Used once for a particular domain and window of time. Examples of a
     /// challenge value include: `1235abcd6789`,
     /// `79d34551-ae81-44ae-823b-6dadbab9ebd4`, and `ruby`.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub challenge: Option<String>,
 
     /// Arbitrary string supplied by the proof creator.
     ///
     /// One use of this field is to increase privacy by decreasing linkability
     /// that is the result of deterministically generated signatures.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
 
     /// Additional proof options required by the cryptographic suite.
@@ -65,6 +67,22 @@ pub struct ProofOptions<M, T> {
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 
+impl<M, T: Default> Default for ProofOptions<M, T> {
+    fn default() -> Self {
+        Self {
+            created: xsd_types::DateTime::now_ms(),
+            verification_method: None,
+            proof_purpose: ProofPurpose::default(),
+            expires: None,
+            domains: Vec::new(),
+            challenge: None,
+            nonce: None,
+            options: Default::default(),
+            extra_properties: BTreeMap::new(),
+        }
+    }
+}
+
 impl<M, T> ProofOptions<M, T> {
     pub fn new(
         created: xsd_types::DateTime,
@@ -74,7 +92,7 @@ impl<M, T> ProofOptions<M, T> {
     ) -> Self {
         Self {
             created,
-            verification_method,
+            verification_method: Some(verification_method),
             proof_purpose,
             expires: None,
             domains: Vec::new(),
@@ -88,7 +106,7 @@ impl<M, T> ProofOptions<M, T> {
     pub fn from_method_and_options(verification_method: ReferenceOrOwned<M>, options: T) -> Self {
         Self {
             created: xsd_types::DateTime::now_ms(),
-            verification_method,
+            verification_method: Some(verification_method),
             proof_purpose: ProofPurpose::default(),
             expires: None,
             domains: Vec::new(),
@@ -113,7 +131,9 @@ impl<M, T> ProofOptions<M, T> {
     ) -> ProofOptions<N, U> {
         ProofOptions {
             created: self.created,
-            verification_method: self.verification_method.map(map_verification_method),
+            verification_method: self
+                .verification_method
+                .map(|m| m.map(map_verification_method)),
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
@@ -139,7 +159,10 @@ impl<M, T> ProofOptions<M, T> {
     ) -> Result<ProofOptions<N, U>, E> {
         Ok(ProofOptions {
             created: self.created,
-            verification_method: self.verification_method.try_map(map_verification_method)?,
+            verification_method: self
+                .verification_method
+                .map(|m| m.try_map(map_verification_method))
+                .transpose()?,
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
@@ -154,15 +177,17 @@ impl<M, T> ProofOptions<M, T> {
         self,
         type_: S,
         f: impl FnOnce(T) -> S::ProofOptions,
-    ) -> ProofConfiguration<S>
+    ) -> Result<ProofConfiguration<S>, ConfigurationError>
     where
         S: CryptographicSuite<VerificationMethod = M>,
     {
-        ProofConfiguration {
+        Ok(ProofConfiguration {
             context: None,
             type_,
             created: self.created,
-            verification_method: self.verification_method,
+            verification_method: self
+                .verification_method
+                .ok_or(ConfigurationError::MissingVerificationMethod)?,
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
@@ -170,10 +195,13 @@ impl<M, T> ProofOptions<M, T> {
             nonce: self.nonce,
             options: f(self.options),
             extra_properties: self.extra_properties,
-        }
+        })
     }
 
-    pub fn into_configuration<S>(self, type_: S) -> ProofConfiguration<S>
+    pub fn into_configuration<S>(
+        self,
+        type_: S,
+    ) -> Result<ProofConfiguration<S>, ConfigurationError>
     where
         S: CryptographicSuite<VerificationMethod = M, ProofOptions = T>,
     {

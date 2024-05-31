@@ -1,9 +1,12 @@
+use serde::Serialize;
+
 use crate::{Document, DID, DIDURL};
 
 use super::DIDVerificationMethod;
 
 /// Reference to an arbitrary resource in a DID document.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(untagged)]
 pub enum Resource {
     /// DID document.
     Document(Document),

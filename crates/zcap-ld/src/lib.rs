@@ -482,7 +482,7 @@ mod tests {
         let signed_del = del
             .clone()
             .sign(
-                AnySuite::pick(alice.secret(), Some(&ldpo_alice.verification_method)).unwrap(),
+                AnySuite::pick(alice.secret(), ldpo_alice.verification_method.as_ref()).unwrap(),
                 &dk,
                 &alice,
                 ldpo_alice.clone(),
@@ -493,7 +493,7 @@ mod tests {
 
         let signed_inv = inv
             .sign(
-                AnySuite::pick(bob.secret(), Some(&ldpo_bob.verification_method)).unwrap(),
+                AnySuite::pick(bob.secret(), ldpo_bob.verification_method.as_ref()).unwrap(),
                 &dk,
                 &bob,
                 ldpo_bob,
@@ -548,7 +548,7 @@ mod tests {
         };
         let signed_wrong_del = wrong_del
             .sign(
-                AnySuite::pick(alice.secret(), Some(&ldpo_alice.verification_method)).unwrap(),
+                AnySuite::pick(alice.secret(), ldpo_alice.verification_method.as_ref()).unwrap(),
                 &dk,
                 &alice,
                 ldpo_alice,

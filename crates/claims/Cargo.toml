@@ -77,15 +77,3 @@ json-syntax.workspace = true
 json-ld.workspace = true
 locspan.workspace = true
 educe.workspace = true
-
-# use crate::{
-#     suite::{AnySignature, AnySignatureRef, HashError},
-#     CryptographicSuite, ProofConfigurationRef,
-# };
-# use pin_project::pin_project;
-# use ssi_core::futures::FailibleFuture;
-# use ssi_crypto::{MessageSigner, SignerAdapter, MessageSignatureError};
-# use ssi_jwk::JWK;
-# use ssi_verification_methods::{
-#     AnyMethod, AnyMethodRef, Referencable, SigningMethod, SignatureAlgorithm, SignatureError, VerificationError, ReferenceOrOwnedRef, ReferenceOrOwned,
-# };

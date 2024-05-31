@@ -112,8 +112,7 @@ pub async fn execute_auth_view(tzkt_url: &str, contract: &str) -> Result<DIDURLB
         .await
         .map_err(Error::internal)?;
 
-    DIDURLBuf::from_string(auth_result.verification_method)
-        .map_err(Error::internal)
+    DIDURLBuf::from_string(auth_result.verification_method).map_err(Error::internal)
 }
 
 #[cfg(test)]

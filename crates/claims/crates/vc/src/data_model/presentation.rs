@@ -1,4 +1,4 @@
-use iref::{Uri, UriBuf};
+use iref::Uri;
 use ssi_claims_core::VerifiableClaims;
 
 use super::Credential;
@@ -31,8 +31,8 @@ pub trait Presentation {
         &[]
     }
 
-    fn holders(&self) -> &[UriBuf] {
-        &[]
+    fn holder(&self) -> Option<&Uri> {
+        None
     }
 }
 

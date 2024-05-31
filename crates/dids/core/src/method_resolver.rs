@@ -52,6 +52,16 @@ impl ssi_verification_methods_core::Controller for Document {
     }
 }
 
+impl<T: DIDResolver, M> DIDResolver for VerificationMethodDIDResolver<T, M> {
+    async fn resolve_representation<'a>(
+        &'a self,
+        did: &'a DID,
+        options: resolution::Options,
+    ) -> Result<resolution::Output<Vec<u8>>, resolution::Error> {
+        T::resolve_representation(&self.resolver, did, options).await
+    }
+}
+
 impl<T: DIDResolver, M> ControllerProvider for VerificationMethodDIDResolver<T, M> {
     type Controller<'a> = Document where Self: 'a;
 
@@ -82,11 +92,11 @@ where
 {
     type Method = M;
 
-    async fn resolve_verification_method<'a, 'm: 'a>(
-        &'a self,
-        _issuer: Option<&'a iref::Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, M>>,
-    ) -> Result<Cow<'a, M>, VerificationMethodResolutionError> {
+    async fn resolve_verification_method(
+        &self,
+        _issuer: Option<&iref::Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, M>>,
+    ) -> Result<Cow<M>, VerificationMethodResolutionError> {
         match method {
             Some(method) => {
                 if method.id().scheme().as_str() == "did" {

@@ -377,7 +377,7 @@ mod tests {
     use serde_json::json;
     use ssi_claims::{
         data_integrity::{
-            signing::AlterSignature, AnyInputContext, AnyInputOptions, AnySuite,
+            signing::AlterSignature, AnyInputContext, AnyInputSuiteOptions, AnySuite,
             CryptographicSuite, ProofOptions,
         },
         vc::{JsonCredential, JsonPresentation},
@@ -507,7 +507,7 @@ mod tests {
             "2021-02-18T20:23:13Z".parse().unwrap(),
             verification_method,
             ProofPurpose::Assertion,
-            AnyInputOptions::default(),
+            AnyInputSuiteOptions::default(),
         );
 
         eprintln!("vm {:?}", issue_options.verification_method);
@@ -554,7 +554,7 @@ mod tests {
                 &didethr,
                 &wrong_signer,
                 ProofOptions {
-                    options: AnyInputOptions::default()
+                    options: AnyInputSuiteOptions::default()
                         .with_public_key(wrong_key.to_public())
                         .unwrap(),
                     ..issue_options
@@ -567,7 +567,7 @@ mod tests {
         // Make it into a VP
         let presentation = JsonPresentation::new(
             Some(uri!("http://example.org/presentations/3731").to_owned()),
-            Vec::new(),
+            None,
             vec![vc],
         );
 
@@ -575,7 +575,7 @@ mod tests {
             "2021-02-18T20:23:13Z".parse().unwrap(),
             IriBuf::new(format!("{did}#controller")).unwrap().into(),
             ProofPurpose::Authentication,
-            AnyInputOptions::default(),
+            AnyInputSuiteOptions::default(),
         );
 
         let vp = suite
@@ -600,7 +600,7 @@ mod tests {
 
         // test that holder is verified
         let vp_bad_holder = Verifiable::tamper(vp, AnyInputContext::default(), |mut pres| {
-            pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
+            pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
             pres
         })
         .await

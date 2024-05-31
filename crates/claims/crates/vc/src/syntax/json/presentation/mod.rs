@@ -31,14 +31,10 @@ pub struct JsonPresentation<C = SpecializedJsonCredential> {
     #[serde(rename = "type")]
     pub types: JsonPresentationTypes,
 
-    /// Holders.
+    /// Holder.
     #[serde(rename = "holder")]
-    #[serde(
-        with = "value_or_array",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub holders: Vec<UriBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub holder: Option<UriBuf>,
 
     /// Verifiable credentials.
     #[serde(rename = "verifiableCredential")]
@@ -60,19 +56,19 @@ impl Default for JsonPresentation {
             id: None,
             types: JsonPresentationTypes::default(),
             verifiable_credentials: Vec::new(),
-            holders: Vec::new(),
+            holder: None,
             additional_properties: BTreeMap::new(),
         }
     }
 }
 
 impl<C> JsonPresentation<C> {
-    pub fn new(id: Option<UriBuf>, holders: Vec<UriBuf>, verifiable_credentials: Vec<C>) -> Self {
+    pub fn new(id: Option<UriBuf>, holder: Option<UriBuf>, verifiable_credentials: Vec<C>) -> Self {
         Self {
             context: Context::default(),
             id,
             types: JsonPresentationTypes::default(),
-            holders,
+            holder,
             verifiable_credentials,
             additional_properties: BTreeMap::new(),
         }
@@ -115,8 +111,8 @@ impl<C: Credential> crate::Presentation for JsonPresentation<C> {
         &self.verifiable_credentials
     }
 
-    fn holders(&self) -> &[UriBuf] {
-        &self.holders
+    fn holder(&self) -> Option<&Uri> {
+        self.holder.as_deref()
     }
 }
 

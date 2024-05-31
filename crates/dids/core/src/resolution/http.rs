@@ -95,23 +95,17 @@ impl DIDResolver for HTTPDIDResolver {
                             if content_type == accept.name() {
                                 Some(accept.name().to_string())
                             } else {
-                                return Err(Error::internal(
-                                    InternalError::ContentTypeMismatch,
-                                ));
+                                return Err(Error::internal(InternalError::ContentTypeMismatch));
                             }
                         }
                         (Some(content_type), None) => Some(
                             content_type
                                 .to_str()
-                                .map_err(|_| {
-                                    Error::internal(InternalError::InvalidContentType)
-                                })?
+                                .map_err(|_| Error::internal(InternalError::InvalidContentType))?
                                 .to_string(),
                         ),
                         (None, Some(_)) => {
-                            return Err(Error::internal(
-                                InternalError::MissingContentType,
-                            ))
+                            return Err(Error::internal(InternalError::MissingContentType))
                         }
                         (None, None) => None,
                     };

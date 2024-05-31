@@ -1020,7 +1020,7 @@ mod tests {
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Make it into a VP.
-        let presentation = JsonPresentation::new(None, vec![did.clone().into()], vec![vc]);
+        let presentation = JsonPresentation::new(None, Some(did.clone().into()), vec![vc]);
 
         let vp_issue_options = ProofOptions::new(
             "2021-03-18T16:38:25Z".parse().unwrap(),
@@ -1063,7 +1063,7 @@ mod tests {
         // Test that holder is verified.
         let vp_bad_holder =
             Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-                pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
+                pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
                 pres
             })
             .await
@@ -1160,7 +1160,7 @@ mod tests {
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Make it into a VP
-        let presentation = JsonPresentation::new(None, vec![did.clone().into()], vec![vc]);
+        let presentation = JsonPresentation::new(None, Some(did.clone().into()), vec![vc]);
 
         let vp_issue_options = ProofOptions::new(
             "2021-03-18T16:38:25Z".parse().unwrap(),
@@ -1196,7 +1196,7 @@ mod tests {
         // Test that holder is verified.
         let vp_bad_holder =
             Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-                pres.holders = vec![uri!("did:pkh:example:bad").to_owned().into()];
+                pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
                 pres
             })
             .await

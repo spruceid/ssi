@@ -36,14 +36,8 @@ pub enum Error {
     #[error("no representation specified")]
     NoRepresentation,
 
-    #[error(transparent)]
-    UnknownRepresentation(#[from] representation::Unknown),
-
     #[error("DID representation `{0}` not supported")]
     RepresentationNotSupported(String),
-
-    #[error("invalid DID representation media type")]
-    InvalidRepresentationMediaType,
 
     #[error(transparent)]
     InvalidData(InvalidData),
@@ -68,8 +62,6 @@ impl Error {
             Self::MethodNotSupported(_) => ErrorKind::MethodNotSupported,
             Self::NotFound => ErrorKind::NotFound,
             Self::NoRepresentation => ErrorKind::NoRepresentation,
-            Self::UnknownRepresentation(_) => ErrorKind::UnknownRepresentation,
-            Self::InvalidRepresentationMediaType => ErrorKind::InvalidRepresentationMediaType,
             Self::RepresentationNotSupported(_) => ErrorKind::RepresentationNotSupported,
             Self::InvalidData(_) => ErrorKind::InvalidData,
             Self::InvalidMethodSpecificId(_) => ErrorKind::InvalidMethodSpecificId,
@@ -79,13 +71,17 @@ impl Error {
     }
 }
 
+impl From<representation::Unknown> for Error {
+    fn from(value: representation::Unknown) -> Self {
+        Self::RepresentationNotSupported(value.0)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ErrorKind {
     MethodNotSupported,
     NotFound,
     NoRepresentation,
-    UnknownRepresentation,
-    InvalidRepresentationMediaType,
     RepresentationNotSupported,
     InvalidData,
     InvalidMethodSpecificId,
@@ -421,9 +417,10 @@ impl Parameter {
 }
 
 /// Resolution output metadata.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    content_type: Option<String>,
+    pub content_type: Option<String>,
 }
 
 impl Metadata {

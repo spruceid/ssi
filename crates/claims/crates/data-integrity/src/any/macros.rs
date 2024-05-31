@@ -450,10 +450,10 @@ macro_rules! crypto_suites {
                             ))
                         },
                     )*
-                    AnySuite::Unknown(_) => Ok(options.map(
+                    AnySuite::Unknown(_) => options.map(
                         |m| AnySuiteVerificationMethod::Unknown(m.into()),
                         |_| AnyProofOptions::Unknown
-                    ).into_configuration(suite.clone()))
+                    ).into_configuration(suite.clone())
                 }
             }
         }

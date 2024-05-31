@@ -2,7 +2,7 @@ use ssi_jwk::{Algorithm, JWK};
 
 use crate::sidetree::{KeyGenerationFailed, Sidetree};
 
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct ION;
 
 impl Sidetree for ION {

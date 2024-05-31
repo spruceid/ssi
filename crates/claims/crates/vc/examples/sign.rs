@@ -260,11 +260,11 @@ impl ControllerProvider for Keyring {
 impl VerificationMethodResolver for Keyring {
     type Method = Ed25519VerificationKey2020;
 
-    async fn resolve_verification_method<'a, 'm: 'a>(
-        &'a self,
-        _issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, Ed25519VerificationKey2020>>,
-    ) -> Result<Cow<'a, Ed25519VerificationKey2020>, VerificationMethodResolutionError> {
+    async fn resolve_verification_method(
+        &self,
+        _issuer: Option<&Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, Ed25519VerificationKey2020>>,
+    ) -> Result<Cow<Ed25519VerificationKey2020>, VerificationMethodResolutionError> {
         match method {
             Some(ReferenceOrOwnedRef::Owned(_key)) => {
                 // If we get here, this means the VC embeds the public key used

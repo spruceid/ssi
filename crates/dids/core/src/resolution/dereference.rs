@@ -40,12 +40,12 @@ pub enum DerefError {
 
 pub struct DerefOutput<T = Content> {
     pub content: T,
-    pub content_metadata: ContentMetadata,
+    pub content_metadata: document::Metadata,
     pub metadata: Metadata,
 }
 
 impl<T> DerefOutput<T> {
-    pub fn new(content: T, content_metadata: ContentMetadata, metadata: Metadata) -> Self {
+    pub fn new(content: T, content_metadata: document::Metadata, metadata: Metadata) -> Self {
         Self {
             content,
             content_metadata,
@@ -59,7 +59,7 @@ impl<T> DerefOutput<T> {
     {
         Self::new(
             url.into(),
-            ContentMetadata::default(),
+            document::Metadata::default(),
             Metadata::from_content_type(Some(MEDIA_TYPE_URL.to_string())),
         )
     }
@@ -85,7 +85,7 @@ impl DerefOutput<PrimaryContent> {
     pub fn null() -> Self {
         Self::new(
             PrimaryContent::Null,
-            ContentMetadata::default(),
+            document::Metadata::default(),
             Metadata::default(),
         )
     }
@@ -138,11 +138,6 @@ impl From<PrimaryContent> for Content {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct ContentMetadata {
-    // ...
-}
-
 /// [Dereferencing the Primary Resource](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm-primary) - a subalgorithm of [DID URL dereferencing](https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm)
 pub(crate) async fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
     resolver: &'a R,
@@ -193,7 +188,7 @@ pub(crate) async fn dereference_primary_resource<'a, R: ?Sized + DIDResolver>(
                 // 2.1
                 return Ok(DerefOutput::new(
                     PrimaryContent::Document(resolution_output.document),
-                    ContentMetadata::default(),
+                    document::Metadata::default(),
                     resolution_output.metadata,
                 ));
             }
@@ -268,7 +263,7 @@ impl Represented {
         self,
         primary_did_url: &PrimaryDIDURL,
         fragment: &Fragment,
-        content_metadata: ContentMetadata,
+        content_metadata: document::Metadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
         match self {
@@ -293,7 +288,7 @@ impl representation::Json {
         self,
         primary_did_url: &PrimaryDIDURL,
         fragment: &Fragment,
-        content_metadata: ContentMetadata,
+        content_metadata: document::Metadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
         let id = primary_did_url.to_owned().with_fragment(fragment);
@@ -313,7 +308,7 @@ impl representation::JsonLd {
         self,
         primary_did_url: &PrimaryDIDURL,
         fragment: &Fragment,
-        content_metadata: ContentMetadata,
+        content_metadata: document::Metadata,
         metadata: Metadata,
     ) -> Result<DerefOutput, DerefError> {
         // TODO: use actual JSON-LD fragment dereferencing

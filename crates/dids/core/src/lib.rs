@@ -9,6 +9,7 @@ use static_iref::iri;
 
 mod did;
 pub mod document;
+pub mod http;
 pub mod method_resolver;
 pub mod registration;
 pub mod resolution;

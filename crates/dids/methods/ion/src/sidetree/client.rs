@@ -20,7 +20,7 @@ use super::{
 pub struct MissingSidetreeApiEndpoint;
 
 /// Sidetree DID Method client implementation
-#[derive(Clone)]
+#[derive(Default, Clone)]
 pub struct SidetreeClient<S: Sidetree> {
     pub resolver: Option<HTTPSidetreeDIDResolver<S>>,
     pub endpoint: Option<UriBuf>,
@@ -178,10 +178,9 @@ impl<S: Sidetree> DIDMethodRegistry for SidetreeClient<S> {
             });
         }
 
-        let update_key =
-            update_key.ok_or_else(|| DIDTransactionCreationError::MissingRequiredUpdateKey)?;
-        let new_update_key = new_update_key
-            .ok_or_else(|| DIDTransactionCreationError::MissingRequiredNewUpdateKey)?;
+        let update_key = update_key.ok_or(DIDTransactionCreationError::MissingRequiredUpdateKey)?;
+        let new_update_key =
+            new_update_key.ok_or(DIDTransactionCreationError::MissingRequiredNewUpdateKey)?;
         if !S::validate_key(&new_update_key) {
             return Err(DIDTransactionCreationError::InvalidUpdateKey);
         }
@@ -196,8 +195,7 @@ impl<S: Sidetree> DIDMethodRegistry for SidetreeClient<S> {
     fn deactivate(&self, deactivate: DIDDeactivate) -> Result<Value, DIDTransactionCreationError> {
         let DIDDeactivate { did, key, options } = deactivate;
         let did: SidetreeDID<S> = did.as_str().parse()?;
-        let recovery_key =
-            key.ok_or_else(|| DIDTransactionCreationError::MissingRequiredRecoveryKey)?;
+        let recovery_key = key.ok_or(DIDTransactionCreationError::MissingRequiredRecoveryKey)?;
         if let Some(opt) = options.keys().next() {
             return Err(DIDTransactionCreationError::UnsupportedOption {
                 operation: DIDTransactionKind::Deactivate,
@@ -227,7 +225,7 @@ impl<S: Sidetree> DIDMethodRegistry for SidetreeClient<S> {
             });
         }
         let recovery_key =
-            recovery_key.ok_or_else(|| DIDTransactionCreationError::MissingRequiredRecoveryKey)?;
+            recovery_key.ok_or(DIDTransactionCreationError::MissingRequiredRecoveryKey)?;
         let (new_update_pk, new_recovery_pk, patches) =
             new_did_state::<S>(new_update_key, new_recovery_key, new_verification_key)?;
         let operation = S::recover_existing(
@@ -246,15 +244,14 @@ fn new_did_state<S: Sidetree>(
     recovery_key: Option<JWK>,
     verification_key: Option<JWK>,
 ) -> Result<(PublicKeyJwk, PublicKeyJwk, Vec<DIDStatePatch>), DIDTransactionCreationError> {
-    let update_key =
-        update_key.ok_or_else(|| DIDTransactionCreationError::MissingRequiredUpdateKey)?;
+    let update_key = update_key.ok_or(DIDTransactionCreationError::MissingRequiredUpdateKey)?;
     if !S::validate_key(&update_key) {
         return Err(DIDTransactionCreationError::InvalidUpdateKey);
     }
     let update_pk = PublicKeyJwk::try_from(update_key.to_public())
         .map_err(|_| DIDTransactionCreationError::InvalidUpdateKey)?;
     let recovery_key =
-        recovery_key.ok_or_else(|| DIDTransactionCreationError::MissingRequiredRecoveryKey)?;
+        recovery_key.ok_or(DIDTransactionCreationError::MissingRequiredRecoveryKey)?;
     if !S::validate_key(&recovery_key) {
         return Err(DIDTransactionCreationError::InvalidRecoveryKey);
     }

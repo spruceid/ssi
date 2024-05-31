@@ -120,6 +120,23 @@ impl<'a, T: JWSSigner> JWSSigner for &'a T {
     }
 }
 
+impl<'a, T: JWSSigner + Clone> JWSSigner for Cow<'a, T> {
+    async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
+        T::fetch_info(self.as_ref()).await
+    }
+
+    async fn sign_bytes(&self, signing_bytes: &[u8]) -> Result<Vec<u8>, SignatureError> {
+        T::sign_bytes(self.as_ref(), signing_bytes).await
+    }
+
+    async fn sign(
+        &self,
+        payload: &(impl ?Sized + JWSPayload),
+    ) -> Result<CompactJWSString, SignatureError> {
+        T::sign(self.as_ref(), payload).await
+    }
+}
+
 impl JWSSigner for JWK {
     async fn fetch_info(&self) -> Result<JWSSignerInfo, SignatureError> {
         Ok(JWSSignerInfo {

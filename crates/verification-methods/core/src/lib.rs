@@ -98,21 +98,21 @@ pub trait VerificationMethodResolver {
 
     /// Resolve the verification method reference.
     #[allow(async_fn_in_trait)]
-    async fn resolve_verification_method<'a, 'm: 'a>(
-        &'a self,
-        issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, Self::Method>>,
-    ) -> Result<Cow<'a, Self::Method>, VerificationMethodResolutionError>;
+    async fn resolve_verification_method(
+        &self,
+        issuer: Option<&Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError>;
 }
 
 impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
     type Method = T::Method;
 
-    async fn resolve_verification_method<'a, 'm: 'a>(
-        &'a self,
-        issuer: Option<&'a Iri>,
-        method: Option<ReferenceOrOwnedRef<'m, T::Method>>,
-    ) -> Result<Cow<'a, T::Method>, VerificationMethodResolutionError> {
+    async fn resolve_verification_method(
+        &self,
+        issuer: Option<&Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, T::Method>>,
+    ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
         T::resolve_verification_method(self, issuer, method).await
     }
 }

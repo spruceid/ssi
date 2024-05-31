@@ -4,8 +4,8 @@ use rand_chacha::rand_core::SeedableRng;
 use serde_json::json;
 use ssi_claims::{
     data_integrity::{
-        signing::AlterSignature, AnyInputContext, AnyInputSuiteOptions, AnySuite, CryptographicSuite,
-        DataIntegrity, ProofOptions as SuiteOptions,
+        signing::AlterSignature, AnyInputContext, AnyInputSuiteOptions, AnySuite,
+        CryptographicSuite, DataIntegrity, ProofOptions as SuiteOptions,
     },
     vc::{JsonCredential, JsonPresentation},
     Verifiable,
@@ -281,7 +281,7 @@ async fn credential_prove_verify_did_tz1() {
     let presentation = DataIntegrity::new(
         JsonPresentation::new(
             Some(uri!("http://example.org/presentations/3731").to_owned()),
-            vec![did.into()],
+            Some(did.into()),
             vec![vc]
         ),
         vec![ssi_claims::data_integrity::Proof::new(
@@ -318,7 +318,7 @@ async fn credential_prove_verify_did_tz1() {
 
     // test that holder is verified
     let _vp2 = Verifiable::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
-        pres.holders = vec![did!("did:example:bad").to_owned().into()];
+        pres.holder = Some(did!("did:example:bad").to_owned().into());
         pres
     })
     .await
@@ -359,7 +359,7 @@ async fn credential_prove_verify_did_tz2() {
         ProofPurpose::Assertion,
         Default::default(),
     );
-    let suite = AnySuite::pick(&key, Some(&vc_issue_options.verification_method)).unwrap();
+    let suite = AnySuite::pick(&key, vc_issue_options.verification_method.as_ref()).unwrap();
     let vc = suite
         .sign(
             cred,
@@ -405,7 +405,7 @@ async fn credential_prove_verify_did_tz2() {
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
-        vec![did.clone().into()],
+        Some(did.clone().into()),
         vec![vc],
     );
 
@@ -417,7 +417,7 @@ async fn credential_prove_verify_did_tz2() {
         ProofPurpose::Authentication,
         Default::default(),
     );
-    let suite = AnySuite::pick(&key, Some(&vp_issue_options.verification_method)).unwrap();
+    let suite = AnySuite::pick(&key, vp_issue_options.verification_method.as_ref()).unwrap();
     let vp = suite
         .sign(
             presentation,
@@ -438,7 +438,7 @@ async fn credential_prove_verify_did_tz2() {
 
     // test that holder is verified
     let vp2 = Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-        pres.holders = vec![did!("did:example:bad").to_owned().into()];
+        pres.holder = Some(did!("did:example:bad").to_owned().into());
         pres
     })
     .await
@@ -477,7 +477,7 @@ async fn credential_prove_verify_did_tz3() {
             .with_public_key(key.to_public())
             .unwrap(),
     );
-    let suite = AnySuite::pick(&key, Some(&vc_issue_options.verification_method)).unwrap();
+    let suite = AnySuite::pick(&key, vc_issue_options.verification_method.as_ref()).unwrap();
     eprintln!("suite {suite:?}");
     let vc = suite
         .sign(
@@ -523,7 +523,7 @@ async fn credential_prove_verify_did_tz3() {
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
-        vec![did.clone().into()],
+        Some(did.clone().into()),
         vec![vc],
     );
 
@@ -537,7 +537,7 @@ async fn credential_prove_verify_did_tz3() {
             .with_public_key(key.to_public())
             .unwrap(),
     );
-    let suite = AnySuite::pick(&key, Some(&vp_issue_options.verification_method)).unwrap();
+    let suite = AnySuite::pick(&key, vp_issue_options.verification_method.as_ref()).unwrap();
     let vp = suite
         .sign(
             presentation,
@@ -558,7 +558,7 @@ async fn credential_prove_verify_did_tz3() {
 
     // test that holder is verified
     let vp2 = Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-        pres.holders = vec![did!("did:example:bad").to_owned().into()];
+        pres.holder = Some(did!("did:example:bad").to_owned().into());
         pres
     })
     .await

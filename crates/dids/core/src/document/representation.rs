@@ -82,7 +82,7 @@ impl<D> Deref for Represented<D> {
 
 #[derive(Debug, thiserror::Error)]
 #[error("unknown DID document representation `{0}`")]
-pub struct Unknown(String);
+pub struct Unknown(pub String);
 
 /// DID document representation media type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

@@ -56,7 +56,9 @@ impl From<Option<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Eip7
 }
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
-impl From<AnyInputSuiteOptions> for ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options {
+impl From<AnyInputSuiteOptions>
+    for ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options
+{
     fn from(value: AnyInputSuiteOptions) -> Self {
         Self {
             eip712: value.eip712,
@@ -65,7 +67,9 @@ impl From<AnyInputSuiteOptions> for ssi_data_integrity_suites::ethereum_eip712_s
 }
 
 #[cfg(all(feature = "w3c", feature = "eip712"))]
-impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options> for AnyInputSuiteOptions {
+impl From<ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options>
+    for AnyInputSuiteOptions
+{
     fn from(value: ssi_data_integrity_suites::ethereum_eip712_signature_2021::Options) -> Self {
         Self {
             eip712: value.eip712,
@@ -164,7 +168,9 @@ impl TryFrom<AnyInputSuiteOptions>
 }
 
 #[cfg(feature = "tezos")]
-impl From<ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options> for AnyInputSuiteOptions {
+impl From<ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options>
+    for AnyInputSuiteOptions
+{
     fn from(value: ssi_data_integrity_suites::tezos::tezos_jcs_signature_2021::Options) -> Self {
         Self {
             public_key_jwk: value

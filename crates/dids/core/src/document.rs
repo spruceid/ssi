@@ -170,9 +170,10 @@ pub enum InvalidData {
 }
 
 /// Document metadata.
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Metadata {
-    // ...
+    pub deactivated: Option<bool>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize, Clone, PartialEq, Eq)]

@@ -4,7 +4,7 @@ use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
 use static_iref::iri;
 use std::collections::BTreeMap;
 
-use crate::{CryptographicSuite, SerializeCryptographicSuite, Proof, ProofOptions};
+use crate::{CryptographicSuite, Proof, ProofOptions, SerializeCryptographicSuite};
 
 pub const DC_CREATED_IRI: &Iri = iri!("http://purl.org/dc/terms/created");
 
@@ -142,7 +142,7 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
     pub fn into_options(self) -> ProofOptions<S::VerificationMethod, S::ProofOptions> {
         ProofOptions {
             created: self.created,
-            verification_method: self.verification_method,
+            verification_method: Some(self.verification_method),
             proof_purpose: self.proof_purpose,
             expires: self.expires,
             domains: self.domains,
