@@ -1,7 +1,5 @@
 use iref::{Iri, Uri};
-use ssi_claims_core::{
-    ClaimsValidity, DateTimeEnvironment, InvalidClaims, VerifiableClaims,
-};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims, VerifiableClaims};
 use ssi_data_integrity::{CryptographicSuite, DataIntegrity};
 use static_iref::iri;
 use xsd_types::DateTime;

@@ -23,7 +23,7 @@ fn assert_send(f: impl Send + Future) {
 
 #[test]
 fn data_integrity_sign_is_send() {
-    let credential = SpecializedJsonCredential::<Claims>::new(
+    let credential = JsonCredential::<Claims>::new(
         Some(uri!("https://example.org/#CredentialId").to_owned()), // id
         uri!("https://example.org/#Issuer").to_owned().into(),      // issuer
         xsd_types::DateTime::now(),                                 // issuance date

@@ -15,7 +15,10 @@ use ssi_claims::{
         suite::{CryptographicSuiteSigning, InputOptions},
         AnyDataIntegrity, AnyProofs, AnySignatureAlgorithm, AnySuite, CryptographicSuite,
         DataIntegrity, Proof, Proofs,
-    }, vc::syntax::{Context, RequiredContext}, ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims, SignatureError, Validate
+    },
+    vc::syntax::{Context, RequiredContext},
+    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims, SignatureError,
+    Validate,
 };
 use ssi_json_ld::{ContextLoaderEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};

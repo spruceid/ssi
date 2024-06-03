@@ -26,9 +26,9 @@ impl<V: RequiredContext, T: RequiredContextList> Default for Context<V, T> {
                     V::CONTEXT_IRI.as_iri_ref().to_owned(),
                 ))
                 .chain(
-                    T::CONTEXT_IRIS
-                        .iter()
-                        .map(|&i| ssi_json_ld::syntax::ContextEntry::IriRef(i.as_iri_ref().to_owned())),
+                    T::CONTEXT_IRIS.iter().map(|&i| {
+                        ssi_json_ld::syntax::ContextEntry::IriRef(i.as_iri_ref().to_owned())
+                    }),
                 )
                 .collect(),
             ),

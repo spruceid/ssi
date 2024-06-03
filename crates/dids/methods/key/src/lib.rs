@@ -447,9 +447,9 @@ mod tests {
     use rand_chacha::rand_core::SeedableRng;
     use resolution::Parameters;
     use ssi_claims::{
-        data_integrity::{AnySuite, AnyInputSuiteOptions},
-        vc::v1::JsonCredential,
+        data_integrity::{AnyInputSuiteOptions, AnySuite},
         jws::JWSVerifier,
+        vc::v1::JsonCredential,
         VerifiableClaims,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
