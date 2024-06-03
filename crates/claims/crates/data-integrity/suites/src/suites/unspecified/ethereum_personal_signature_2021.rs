@@ -202,7 +202,9 @@ impl TryFrom<AnyMethod> for VerificationMethod {
             AnyMethod::EcdsaSecp256k1RecoveryMethod2020(m) => {
                 Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
             }
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
+            other => Err(InvalidVerificationMethod::UnsupportedMethodType(
+                other.type_().name().to_owned(),
+            )),
         }
     }
 }

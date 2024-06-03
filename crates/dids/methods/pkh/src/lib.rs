@@ -976,7 +976,7 @@ mod tests {
         );
 
         let issue_options = ProofOptions::new(
-            cred.issuance_date.clone(),
+            cred.issuance_date.clone().unwrap(),
             IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),
@@ -1126,7 +1126,7 @@ mod tests {
             })],
         );
         let issue_options = ProofOptions::new(
-            cred.issuance_date.clone(),
+            cred.issuance_date.clone().unwrap(),
             IriBuf::new(did.to_string() + vm_relative_url)
                 .unwrap()
                 .into(),

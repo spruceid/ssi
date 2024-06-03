@@ -41,7 +41,7 @@ pub enum GenerateError {
     UnsupportedMethodPattern(String),
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct AnyDidMethod {
     ion: DIDION,
     tz: DIDTz,

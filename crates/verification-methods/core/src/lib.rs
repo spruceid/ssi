@@ -188,8 +188,8 @@ pub enum InvalidVerificationMethod {
     #[error("ambiguous public key")]
     AmbiguousPublicKey,
 
-    #[error("unsupported method type")]
-    UnsupportedMethodType,
+    #[error("unsupported method type `{0}`")]
+    UnsupportedMethodType(String),
 }
 
 impl InvalidVerificationMethod {

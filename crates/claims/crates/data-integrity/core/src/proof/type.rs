@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 use ssi_claims_core::ProofPreparationError;
 use std::fmt;
 
+#[derive(Debug, Clone, Copy, thiserror::Error)]
+#[error("missing `cryptosuite` parameter")]
+pub struct MissingCryptosuite;
+
 /// Proof type.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Type {
@@ -11,6 +15,16 @@ pub enum Type {
 }
 
 impl Type {
+    pub fn new(type_: String, cryptosuite: Option<String>) -> Result<Self, MissingCryptosuite> {
+        if type_ == "DataIntegrityProof" {
+            cryptosuite
+                .ok_or(MissingCryptosuite)
+                .map(Self::DataIntegrityProof)
+        } else {
+            Ok(Self::Other(type_.to_owned()))
+        }
+    }
+
     pub fn as_ref(&self) -> TypeRef {
         match self {
             Self::DataIntegrityProof(c) => TypeRef::DataIntegrityProof(c),

@@ -74,8 +74,8 @@ impl ssi_vc::Credential for Credential {
         &self.issuer.0
     }
 
-    fn issuance_date(&self) -> DateTime {
-        self.issuance_date
+    fn issuance_date(&self) -> Option<DateTime> {
+        Some(self.issuance_date)
     }
 }
 

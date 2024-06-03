@@ -235,23 +235,21 @@ macro_rules! crypto_suites {
             }
         }
 
-        impl TryFrom<ssi_data_integrity_core::Type> for AnySuite {
-            type Error = ssi_data_integrity_core::UnsupportedProofSuite;
-
-            fn try_from(
+        impl From<ssi_data_integrity_core::Type> for AnySuite {
+            fn from(
                 ty: ssi_data_integrity_core::Type
-            ) -> Result<Self, Self::Error> {
+            ) -> Self {
                 $(
                     $(#[cfg($($t)*)])?
                     {
                         let suite = ssi_data_integrity_suites::$name;
                         if ty == <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::type_(&suite) {
-                            return Ok(Self::$name)
+                            return Self::$name
                         }
                     }
                 )*
 
-                Ok(Self::Unknown(UnknownSuite::new(ty)))
+                Self::Unknown(UnknownSuite::new(ty))
             }
         }
 

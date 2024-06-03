@@ -352,7 +352,7 @@ async fn credential_prove_verify_did_tz2() {
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc_issue_options = SuiteOptions::new(
-        cred.issuance_date.clone(),
+        cred.issuance_date.clone().unwrap(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),
@@ -468,7 +468,7 @@ async fn credential_prove_verify_did_tz3() {
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc_issue_options = SuiteOptions::new(
-        cred.issuance_date.clone(),
+        cred.issuance_date.clone().unwrap(),
         IriBuf::new(format!("{did}#blockchainAccountId"))
             .unwrap()
             .into(),

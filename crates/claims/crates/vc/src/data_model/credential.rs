@@ -75,7 +75,9 @@ pub trait Credential {
     fn issuer(&self) -> &Self::Issuer;
 
     /// Issuance date.
-    fn issuance_date(&self) -> DateTime;
+    ///
+    /// This property is *required* for the credential to be *verifiable*.
+    fn issuance_date(&self) -> Option<DateTime>;
 
     /// Expiration date.
     fn expiration_date(&self) -> Option<DateTime> {
@@ -136,7 +138,11 @@ pub trait Credential {
     {
         let now = env.date_time();
 
-        let valid_from = self.issuance_date().earliest().to_utc();
+        let issuance_date = self
+            .issuance_date()
+            .ok_or(InvalidClaims::MissingIssuanceDate)?;
+
+        let valid_from = issuance_date.earliest().to_utc();
         if valid_from > now {
             // Credential is issued in the future!
             return Err(InvalidClaims::Premature { now, valid_from });
@@ -183,7 +189,7 @@ impl<T: Credential, P: Proof> Credential for Verifiable<T, P> {
         T::issuer(&self.claims)
     }
 
-    fn issuance_date(&self) -> DateTime {
+    fn issuance_date(&self) -> Option<DateTime> {
         T::issuance_date(&self.claims)
     }
 

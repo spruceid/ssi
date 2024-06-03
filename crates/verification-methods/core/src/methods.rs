@@ -187,7 +187,7 @@ macro_rules! verification_method_union {
 					}
 				)*
 
-				Err($crate::InvalidVerificationMethod::UnsupportedMethodType)
+				Err($crate::InvalidVerificationMethod::UnsupportedMethodType(value.type_))
 			}
 		}
 	};

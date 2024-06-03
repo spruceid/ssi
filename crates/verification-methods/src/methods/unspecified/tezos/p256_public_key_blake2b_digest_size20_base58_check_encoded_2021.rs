@@ -142,7 +142,7 @@ impl TryFrom<GenericVerificationMethod> for P256PublicKeyBLAKE2BDigestSize20Base
 
             Ok(r)
         } else {
-            Err(InvalidVerificationMethod::InvalidTypeName(value.type_))
+            Err(InvalidVerificationMethod::invalid_type_name(&value.type_))
         }
     }
 }

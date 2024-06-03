@@ -140,7 +140,7 @@ impl TryFrom<GenericVerificationMethod>
                     })?,
             })
         } else {
-            Err(InvalidVerificationMethod::InvalidTypeName(value.type_))
+            Err(InvalidVerificationMethod::invalid_type_name(&value.type_))
         }
     }
 }

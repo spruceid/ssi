@@ -237,7 +237,9 @@ impl TryFrom<AnyMethod> for VerificationMethod {
                 Ok(Self::EcdsaSecp256k1RecoveryMethod2020(m))
             }
             AnyMethod::JsonWebKey2020(m) => Ok(Self::JsonWebKey2020(m)),
-            _ => Err(InvalidVerificationMethod::UnsupportedMethodType),
+            other => Err(InvalidVerificationMethod::UnsupportedMethodType(
+                other.type_().name().to_owned(),
+            )),
         }
     }
 }

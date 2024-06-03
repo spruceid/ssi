@@ -7,6 +7,9 @@ use crate::Proof;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {
+    #[error("missing issuance date")]
+    MissingIssuanceDate,
+
     /// Validity period starts in the future.
     #[error("premature claim")]
     Premature {

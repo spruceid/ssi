@@ -60,8 +60,10 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = V1, T = ()> {
     pub issuer: Issuer,
 
     /// Issuance date.
+    ///
+    /// This property is required for validation.
     #[serde(rename = "issuanceDate")]
-    pub issuance_date: xsd_types::DateTime,
+    pub issuance_date: Option<xsd_types::DateTime>,
 
     /// Expiration date.
     #[serde(rename = "expirationDate")]
@@ -127,7 +129,7 @@ impl<S, C: RequiredContextSet, T: RequiredCredentialTypeSet> SpecializedJsonCred
             id,
             types: JsonCredentialTypes::default(),
             issuer,
-            issuance_date,
+            issuance_date: Some(issuance_date),
             credential_subjects,
             expiration_date: None,
             credential_status: Vec::new(),
@@ -186,7 +188,7 @@ impl<S, C, T> crate::Credential for SpecializedJsonCredential<S, C, T> {
         &self.issuer
     }
 
-    fn issuance_date(&self) -> DateTime {
+    fn issuance_date(&self) -> Option<DateTime> {
         self.issuance_date
     }
 

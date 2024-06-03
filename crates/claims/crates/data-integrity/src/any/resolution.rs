@@ -1,6 +1,6 @@
 use std::{borrow::Cow, marker::PhantomData};
 
-use ssi_verification_methods::VerificationMethod;
+use ssi_verification_methods::{InvalidVerificationMethod, VerificationMethod};
 
 pub struct AnyResolver<R, M>(R, PhantomData<M>);
 
@@ -16,7 +16,7 @@ where
         Method = ssi_verification_methods::AnyMethod,
     >,
     M: VerificationMethod
-        + TryFrom<ssi_verification_methods::AnyMethod>
+        + TryFrom<ssi_verification_methods::AnyMethod, Error = InvalidVerificationMethod>
         + Into<ssi_verification_methods::AnyMethod>,
 {
     type Method = M;
@@ -41,10 +41,8 @@ where
             .resolve_verification_method(issuer, method.as_ref().map(|m| m.borrowed()))
             .await?
             .into_owned();
-        any_method.try_into().map(Cow::Owned).map_err(|_| {
-            ssi_verification_methods::VerificationMethodResolutionError::InvalidVerificationMethod(
-                ssi_verification_methods::InvalidVerificationMethod::UnsupportedMethodType,
-            )
-        })
+        any_method.try_into().map(Cow::Owned).map_err(
+            ssi_verification_methods::VerificationMethodResolutionError::InvalidVerificationMethod,
+        )
     }
 }
