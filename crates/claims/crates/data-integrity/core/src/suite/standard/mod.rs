@@ -18,7 +18,7 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-use super::{ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification};
+use super::{ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification, TransformationOptions};
 
 // mod test_bbs;
 
@@ -55,12 +55,19 @@ pub trait StandardCryptographicSuite: Clone {
         &self,
         context: &C,
         unsecured_document: &T,
-        options: ProofConfigurationRef<'_, Self>,
+        proof_configuration: ProofConfigurationRef<'_, Self>,
+        transformation_options: Option<TransformationOptions<Self>>,
     ) -> Result<TransformedData<Self>, TransformationError>
     where
         Self::Transformation: TypedTransformationAlgorithm<Self, T, C>,
     {
-        Self::Transformation::transform(context, unsecured_document, options).await
+        Self::Transformation::transform(
+            context,
+            unsecured_document,
+            proof_configuration,
+            transformation_options,
+        )
+        .await
     }
 
     fn hash(
@@ -117,6 +124,7 @@ where
         signers: T,
         claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
+        transformation_options: TransformationOptions<Self>
     ) -> Result<Self::Signature, SignatureError> {
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
@@ -131,7 +139,12 @@ where
             )
             .await?;
 
-        let transformed = self.transform(context, claims, proof_configuration).await?;
+        let transformed = self.transform(
+            context,
+            claims,
+            proof_configuration,
+            Some(transformation_options)
+        ).await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;
 
@@ -171,7 +184,7 @@ where
         let proof_configuration = proof.configuration();
 
         let transformed = self
-            .transform(verifier, claims, proof_configuration)
+            .transform(verifier, claims, proof_configuration, None)
             .await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;

@@ -167,7 +167,7 @@ impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
     }
 }
 
-pub trait SigningMethod<S, A: Copy>: VerificationMethod {
+pub trait SigningMethod<S, A>: VerificationMethod {
     // fn sign(
     //     &self,
     //     secret: &S,

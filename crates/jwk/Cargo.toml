@@ -82,7 +82,7 @@ snarkvm-utilities = { version = "0.7.9", optional = true }
 snarkvm-parameters = { version = "0.7.9", optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"], optional = true }
+getrandom = { workspace = true, features = ["js"], optional = true }
 
 [dev-dependencies]
 hex.workspace = true

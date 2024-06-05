@@ -1,22 +1,19 @@
 //! Linked-Data types.
-mod context;
-
 use std::{borrow::Cow, hash::Hash};
 
-pub use context::*;
 use json_ld::expansion::Action;
 use json_ld::Expand;
 use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
 pub use json_ld;
-pub use json_ld::{
-    syntax, Direction, ExpandedDocument, Id, LangString, LenientLangTag, LoadError, Loader,
-    Nullable, ToRdfError,
-};
+pub use json_ld::*;
 use ssi_rdf::{
     generator, interpretation::WithGenerator, Interpretation, LdEnvironment, Vocabulary,
     VocabularyMut,
 };
+
+mod contexts;
+pub use contexts::*;
 
 /// Type that provides a JSON-LD document loader.
 pub trait JsonLdLoaderProvider {

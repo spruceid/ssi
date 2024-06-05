@@ -24,7 +24,7 @@ k256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 hkdf = { version = "0.8", optional = true }
 rand_old = { package = "rand", version = "0.7", optional = true }
-getrandom = { version = "0.2", optional = true } # Required for wasm targets.
+getrandom = { workspace = true, optional = true } # Required for wasm targets.
 sha2_old = { package = "sha2", version = "0.8", optional = true }
 keccak-hash = { version = "0.7", optional = true }
 ed25519-dalek = { workspace = true, optional = true }
@@ -42,7 +42,7 @@ pin-project.workspace = true
 hex.workspace = true
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"], optional = true }
+getrandom = { workspace = true, features = ["js"], optional = true }
 
 [package.metadata.docs.rs]
 all-features = true

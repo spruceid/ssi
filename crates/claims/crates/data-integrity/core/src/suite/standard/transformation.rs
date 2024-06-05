@@ -2,7 +2,10 @@ use linked_data::IntoQuadsError;
 use serde::Serialize;
 use ssi_claims_core::{ProofValidationError, SignatureError};
 
-use crate::{ConfigurationExpansionError, CryptographicSuite, ProofConfigurationRef};
+use crate::{
+    suite::TransformationOptions, ConfigurationExpansionError, CryptographicSuite,
+    ProofConfigurationRef,
+};
 
 use super::StandardCryptographicSuite;
 
@@ -64,7 +67,8 @@ pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T, C>:
     async fn transform(
         context: &C,
         data: &T,
-        options: ProofConfigurationRef<S>,
+        proof_configuration: ProofConfigurationRef<S>,
+        transformation_options: Option<TransformationOptions<S>>,
     ) -> Result<Self::Output, TransformationError>;
 }
 
@@ -81,6 +85,7 @@ impl<S: CryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, 
         _context: &C,
         data: &T,
         _options: ProofConfigurationRef<'_, S>,
+        _transformation_options: Option<TransformationOptions<S>>,
     ) -> Result<Self::Output, TransformationError> {
         json_syntax::to_value(data)
             .map_err(TransformationError::JsonSerialization)?
