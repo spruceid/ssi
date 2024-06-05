@@ -11,6 +11,8 @@ pub trait AnyLdEnvironment {
 
     type Interpretation: Interpretation;
 
+    fn as_ld_environment(&self) -> LdEnvironment<&Self::Vocabulary, &Self::Interpretation>;
+
     fn as_ld_environment_mut(
         &mut self,
     ) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation>;
@@ -103,6 +105,13 @@ impl Default for LdEnvironment {
 impl<V, I: Interpretation> AnyLdEnvironment for LdEnvironment<V, I> {
     type Vocabulary = V;
     type Interpretation = I;
+
+    fn as_ld_environment(&self) -> LdEnvironment<&Self::Vocabulary, &Self::Interpretation> {
+        LdEnvironment {
+            vocabulary: &self.vocabulary,
+            interpretation: &self.interpretation,
+        }
+    }
 
     fn as_ld_environment_mut(
         &mut self,

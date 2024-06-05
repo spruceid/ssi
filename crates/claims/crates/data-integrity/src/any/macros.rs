@@ -49,8 +49,8 @@ macro_rules! crypto_suites {
         #[allow(unused)]
         trait Project<S: ssi_data_integrity_core::CryptographicSuite>: ssi_data_integrity_core::CryptographicSuite {
             fn project_input_options(
-                options: ssi_data_integrity_core::suite::InputOptions<Self>
-            ) -> Result<ssi_data_integrity_core::suite::InputOptions<S>, ssi_data_integrity_core::suite::ConfigurationError>;
+                options: ssi_data_integrity_core::suite::InputProofOptions<Self>
+            ) -> Result<ssi_data_integrity_core::suite::InputProofOptions<S>, ssi_data_integrity_core::suite::ConfigurationError>;
 
             fn project_prepared_claims(
                 prepared_claims: &Self::PreparedClaims
@@ -143,6 +143,7 @@ macro_rules! crypto_suites {
                 signer: S,
                 claims: &T,
                 proof_configuration: ssi_data_integrity_core::ProofConfigurationRef<'_, Self>,
+                transformation_options: ssi_data_integrity_core::suite::TransformationOptions<Self>
             ) -> Result<Self::Signature, ssi_claims_core::SignatureError> {
                 match self {
                     $(
@@ -157,7 +158,8 @@ macro_rules! crypto_suites {
                                 resolver,
                                 signer,
                                 claims,
-                                Self::project_proof_configuration(proof_configuration)
+                                Self::project_proof_configuration(proof_configuration),
+                                transformation_options
                             ).await.map(AnySignature::$name)
                         },
                     )*
@@ -396,9 +398,15 @@ macro_rules! crypto_suites {
         #[allow(unused_variables)]
         impl ssi_data_integrity_core::suite::ConfigurationAlgorithm<AnySuite> for AnyConfigurationAlgorithm {
             type InputVerificationMethod = ssi_verification_methods::AnyMethod;
-            type InputSuiteOptions = crate::AnyInputSuiteOptions;
+            type InputProofOptions = crate::AnyInputSuiteOptions;
+            type InputSignatureOptions = ();
+            type TransformationOptions = ();
 
-            fn configure(suite: &AnySuite, options: ssi_data_integrity_core::suite::InputOptions<AnySuite>) -> Result<ssi_data_integrity_core::ProofConfiguration<AnySuite>, ssi_data_integrity_core::suite::ConfigurationError> {
+            fn configure(
+                suite: &AnySuite,
+                options: ssi_data_integrity_core::suite::InputProofOptions<AnySuite>,
+                signature_options: ()
+            ) -> Result<(ssi_data_integrity_core::ProofConfiguration<AnySuite>, ()), ssi_data_integrity_core::suite::ConfigurationError> {
                 match suite {
                     $(
                         $(#[cfg($($t)*)])?
@@ -407,22 +415,26 @@ macro_rules! crypto_suites {
                                 options
                             )?;
 
-                            let proof_configuration = <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure(
+                            let (proof_configuration, transformation_options) = <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure(
                                 &ssi_data_integrity_suites::$name,
-                                options
+                                options,
+                                signature_options
                             )?;
 
-                            Ok(proof_configuration.map(
+                            Ok((proof_configuration.map(
                                 |_| AnySuite::$name,
                                 |m| AnySuiteVerificationMethod::$name(m),
                                 |o| AnyProofOptions::$name(o)
-                            ))
+                            ), transformation_options))
                         },
                     )*
-                    AnySuite::Unknown(_) => options.map(
-                        |m| AnySuiteVerificationMethod::Unknown(m.into()),
-                        |_| AnyProofOptions::Unknown
-                    ).into_configuration(suite.clone())
+                    AnySuite::Unknown(_) => Ok((
+                        options.map(
+                            |m| AnySuiteVerificationMethod::Unknown(m.into()),
+                            |_| AnyProofOptions::Unknown
+                        ).into_configuration(suite.clone())?,
+                        ()
+                    ))
                 }
             }
         }

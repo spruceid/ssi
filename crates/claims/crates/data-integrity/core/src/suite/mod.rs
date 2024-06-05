@@ -60,9 +60,10 @@ pub trait CryptographicSuite: Clone {
     /// Generates a proof configuration from input options.
     fn configure(
         &self,
-        options: InputOptions<Self>,
-    ) -> Result<ProofConfiguration<Self>, ConfigurationError> {
-        Self::Configuration::configure(self, options)
+        proof_options: InputProofOptions<Self>,
+        signature_options: InputSignatureOptions<Self>,
+    ) -> Result<(ProofConfiguration<Self>, TransformationOptions<Self>), ConfigurationError> {
+        Self::Configuration::configure(self, proof_options, signature_options)
     }
 
     /// Generates a verifiable document secured with this cryptographic suite.
@@ -73,12 +74,13 @@ pub trait CryptographicSuite: Clone {
         unsecured_document: T,
         resolver: R,
         signer: S,
-        options: InputOptions<Self>,
+        proof_options: InputProofOptions<Self>,
+        signature_options: InputSignatureOptions<Self>,
     ) -> Result<DataIntegrity<T, Self>, SignatureError>
     where
         Self: CryptographicSuiteSigning<T, C, R, S>,
     {
-        let proof_configuration = self.configure(options)?;
+        let (proof_configuration, transformation_options) = self.configure(proof_options, signature_options)?;
         let proof_configuration_ref = proof_configuration.borrowed();
         let signature = self
             .generate_signature(
@@ -87,6 +89,7 @@ pub trait CryptographicSuite: Clone {
                 signer,
                 &unsecured_document,
                 proof_configuration_ref,
+                transformation_options
             )
             .await?;
 
@@ -101,17 +104,19 @@ pub trait CryptographicSuite: Clone {
         unsecured_document: T,
         resolver: R,
         signer: S,
-        options: InputOptions<Self>,
+        proof_options: InputProofOptions<Self>,
     ) -> Result<DataIntegrity<T, Self>, SignatureError>
     where
         Self: CryptographicSuiteSigning<T, SignatureEnvironment, R, S>,
+        InputSignatureOptions<Self>: Default,
     {
         self.sign_with(
             SignatureEnvironment::default(),
             unsecured_document,
             resolver,
             signer,
-            options,
+            proof_options,
+            Default::default()
         )
         .await
     }
