@@ -8,7 +8,7 @@ pub mod urdna2015;
 pub use expand::*;
 use rdf_types::{
     dataset::IndexedBTreeDataset,
-    interpretation::ReverseTermInterpretation,
+    interpretation::{ReverseTermInterpretation, WithGenerator},
     vocabulary::{ByRef, ExtractFromVocabulary, Predicate},
 };
 
@@ -18,6 +18,8 @@ pub use rdf_types::{
 };
 
 pub use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
+
+pub type LexicalInterpretation = WithGenerator<generator::Blank>;
 
 /// Interpreted RDF dataset with an entry point.
 pub struct DatasetWithEntryPoint<'a, V, I: Interpretation> {

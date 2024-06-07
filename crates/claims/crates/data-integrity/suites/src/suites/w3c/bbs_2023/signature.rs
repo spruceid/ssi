@@ -1,50 +1,15 @@
+use ssi_bbs::{bbs_public_key_from_multikey, Bbs};
 use ssi_claims_core::SignatureError;
 use ssi_data_integrity_core::{
     suite::standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm},
     ProofConfigurationRef,
 };
 use ssi_rdf::IntoNQuads;
-use ssi_verification_methods::{Multikey, SigningMethod};
+use ssi_verification_methods::{MultiMessageSigner, MultiSigner, Multikey};
 
-use crate::Bbs2023;
+use crate::{bbs_2023::Bbs2023SignatureDescription, Bbs2023};
 
 use super::{Bbs2023Signature, FeatureOption, HashData};
-
-pub enum Bbs {
-    Baseline {
-        header: [u8; 64],
-    },
-    Blind {
-        header: [u8; 64],
-        signer_blind: Option<u32>,
-    },
-    Pseudonym1 {
-        header: [u8; 64],
-        pid: u32,
-    },
-    Pseudonym2 {
-        header: [u8; 64],
-        commitment_with_proof: String,
-        signer_blind: Option<u32>,
-    },
-}
-
-pub trait MultiSigner<M, A> {
-    type MessageSigner: MultiMessageSigner<A>;
-
-    async fn for_verification_method(
-        &self,
-        method: &M,
-    ) -> Result<Self::MessageSigner, SignatureError>;
-}
-
-pub trait MultiMessageSigner<A> {
-    async fn multi_sign(
-        self,
-        algorithm: A,
-        messages: &[Vec<u8>],
-    ) -> Result<Vec<u8>, SignatureError>;
-}
 
 pub struct Bbs2023SignatureAlgorithm;
 
@@ -60,23 +25,24 @@ where
         verification_method: &Multikey,
         signer: T,
         prepared_claims: HashData,
-        proof_configuration: ProofConfigurationRef<'_, Bbs2023>,
+        _proof_configuration: ProofConfigurationRef<'_, Bbs2023>,
     ) -> Result<Self::Signature, SignatureError> {
         match prepared_claims {
             HashData::Base(hash_data) => {
                 // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-serialization-bbs-2023>
-                let feature_option = hash_data.transformed_document.feature_option;
+                let public_key = bbs_public_key_from_multikey(verification_method);
+                let feature_option = hash_data.transformed_document.options.feature_option;
                 let proof_hash = &hash_data.proof_hash;
-                let mandatory_pointers = &hash_data.transformed_document.mandatory_pointers;
+                let mandatory_pointers = &hash_data.transformed_document.options.mandatory_pointers;
                 let mandatory_hash = &hash_data.mandatory_hash;
                 let non_mandatory = &hash_data.transformed_document.non_mandatory;
-                let hmap_key = hash_data.transformed_document.hmac_key;
+                let hmac_key = hash_data.transformed_document.hmac_key;
 
                 let mut bbs_header = [0; 64];
                 bbs_header[..32].copy_from_slice(proof_hash);
                 bbs_header[32..].copy_from_slice(mandatory_hash);
 
-                let mut bbs_messages: Vec<_> = non_mandatory
+                let mut messages: Vec<_> = non_mandatory
                     .into_nquads_lines()
                     .into_iter()
                     .map(String::into_bytes)
@@ -84,61 +50,67 @@ where
 
                 let message_signer = signer.for_verification_method(verification_method).await?;
 
-                let bbs_signature = match feature_option {
-                    FeatureOption::Baseline => {
-                        message_signer
-                            .multi_sign(Bbs::Baseline { header: bbs_header }, &bbs_messages)
-                            .await?
-                    }
-                    FeatureOption::AnonymousHolderBinding => {
-                        message_signer
-                            .multi_sign(
-                                Bbs::Blind {
-                                    header: bbs_header,
-                                    signer_blind: None,
-                                },
-                                &bbs_messages,
-                            )
-                            .await?
-                    }
+                let (algorithm, description) = match feature_option {
+                    FeatureOption::Baseline => (
+                        Bbs::Baseline { header: bbs_header },
+                        Bbs2023SignatureDescription::Baseline,
+                    ),
+                    FeatureOption::AnonymousHolderBinding => (
+                        Bbs::Blind {
+                            header: bbs_header,
+                            commitment_with_proof: None,
+                            signer_blind: None,
+                        },
+                        Bbs2023SignatureDescription::AnonymousHolderBinding { signer_blind: None },
+                    ),
                     FeatureOption::PseudonymIssuerPid => {
-                        let mut pid_buffer = [0u8; 4];
-                        getrandom::getrandom(&mut pid_buffer);
-                        let pid = u32::from_ne_bytes(pid_buffer);
-                        message_signer
-                            .multi_sign(
-                                Bbs::Pseudonym1 {
-                                    header: bbs_header,
-                                    pid,
-                                },
-                                &bbs_messages,
-                            )
-                            .await?
+                        // See: <https://www.ietf.org/archive/id/draft-vasilis-bbs-per-verifier-linkability-00.html#section-4.1>
+                        let mut pid = [0u8; 32];
+                        getrandom::getrandom(&mut pid).map_err(SignatureError::other)?;
+
+                        messages.push(pid.to_vec());
+
+                        (
+                            Bbs::Baseline { header: bbs_header },
+                            Bbs2023SignatureDescription::PseudonymIssuerPid { pid },
+                        )
                     }
                     FeatureOption::PseudonymHiddenPid => {
-                        todo!()
+                        // See: <https://www.ietf.org/archive/id/draft-vasilis-bbs-per-verifier-linkability-00.html#section-4.1>
+                        let commitment_with_proof = hash_data
+                            .transformed_document
+                            .options
+                            .commitment_with_proof
+                            .clone()
+                            .ok_or_else(|| {
+                                SignatureError::missing_required_option("commitment_with_proof")
+                            })?;
+
+                        (
+                            Bbs::Blind {
+                                header: bbs_header,
+                                commitment_with_proof: Some(commitment_with_proof),
+                                signer_blind: None,
+                            },
+                            Bbs2023SignatureDescription::PseudonymHiddenPid { signer_blind: None },
+                        )
                     }
                 };
 
-                // Ok(Bbs2023Signature::new(description))
-                todo!()
+                let signature = message_signer.sign_multi(algorithm, &messages).await?;
+
+                Ok(Bbs2023Signature::encode(
+                    &signature,
+                    bbs_header,
+                    &public_key,
+                    hmac_key,
+                    &mandatory_pointers,
+                    description,
+                ))
             }
             HashData::Derived(_) => {
                 todo!()
             }
         }
-    }
-}
-
-struct BbsSecretKey;
-
-impl SigningMethod<BbsSecretKey, Bbs> for Multikey {
-    fn sign_bytes(
-        &self,
-        secret: &BbsSecretKey,
-        algorithm: Bbs,
-        bytes: &[u8],
-    ) -> Result<Vec<u8>, ssi_verification_methods::MessageSignatureError> {
-        todo!()
     }
 }

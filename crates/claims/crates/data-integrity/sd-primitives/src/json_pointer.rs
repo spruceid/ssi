@@ -1,10 +1,11 @@
-use std::{borrow::Cow, ops::Deref};
+use core::fmt;
+use std::{borrow::Cow, ops::Deref, str::FromStr};
 
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, thiserror::Error)]
 #[error("invalid JSON pointer `{0}`")]
-pub struct InvalidJsonPointer<T>(pub T);
+pub struct InvalidJsonPointer<T = String>(pub T);
 
 /// JSON Pointer.
 ///
@@ -36,29 +37,52 @@ impl JsonPointer {
         true
     }
 
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
-    pub fn split_first(&self) -> Option<(&ReferenceToken, &Self)> {
+    fn token_end(&self) -> Option<usize> {
         if self.is_empty() {
             None
         } else {
-            let after_sep = &self.0[1..];
-            let (token, rest) = after_sep.split_once('/').unwrap_or((after_sep, ""));
-            Some(unsafe {
-                (
-                    ReferenceToken::new_unchecked(token),
-                    Self::new_unchecked(rest),
-                )
-            })
+            let mut i = 1;
+
+            let bytes = self.0.as_bytes();
+            while i < bytes.len() {
+                if bytes[i] == b'/' {
+                    break;
+                }
+
+                i += 1
+            }
+
+            Some(i)
         }
+    }
+
+    pub fn split_first(&self) -> Option<(&ReferenceToken, &Self)> {
+        self.token_end().map(|i| unsafe {
+            (
+                ReferenceToken::new_unchecked(&self.0[1..i]),
+                Self::new_unchecked(&self.0[i..]),
+            )
+        })
     }
 
     pub fn iter(&self) -> JsonPointerIter {
         let mut tokens = self.0.split('/');
         tokens.next();
         JsonPointerIter(tokens)
+    }
+}
+
+impl fmt::Display for JsonPointer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -87,11 +111,35 @@ impl<'a> Iterator for JsonPointerIter<'a> {
 #[derive(Debug, Clone, Serialize)]
 pub struct JsonPointerBuf(String);
 
+impl JsonPointerBuf {
+    pub fn new(value: String) -> Result<Self, InvalidJsonPointer> {
+        if JsonPointer::validate(&value) {
+            Ok(Self(value))
+        } else {
+            Err(InvalidJsonPointer(value))
+        }
+    }
+}
+
 impl Deref for JsonPointerBuf {
     type Target = JsonPointer;
 
     fn deref(&self) -> &Self::Target {
         unsafe { JsonPointer::new_unchecked(&self.0) }
+    }
+}
+
+impl FromStr for JsonPointerBuf {
+    type Err = InvalidJsonPointer;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::new(s.to_owned())
+    }
+}
+
+impl fmt::Display for JsonPointerBuf {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -151,5 +199,11 @@ impl ReferenceToken {
 
             Some(i)
         }
+    }
+}
+
+impl fmt::Display for ReferenceToken {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
