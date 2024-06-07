@@ -40,6 +40,7 @@ pub enum JsonLdError {
 }
 
 #[repr(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompactJsonLd(pub json_syntax::Value);
 
 impl CompactJsonLd {
@@ -129,6 +130,14 @@ pub trait JsonLdObject {
     /// Returns the JSON-LD context attached to `self`.
     fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
         None
+    }
+}
+
+impl JsonLdObject for CompactJsonLd {
+    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+        json_syntax::from_value(self.0.as_object()?.get("@context").next()?.clone())
+            .map(Cow::Owned)
+            .ok()
     }
 }
 

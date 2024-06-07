@@ -6,6 +6,7 @@ use std::fmt;
 #[derive(Debug)]
 pub struct MissingChosenIssuer;
 
+use indexmap::IndexMap;
 use rdf_types::BlankId;
 use rdf_types::BlankIdBuf;
 use rdf_types::Id;
@@ -108,7 +109,7 @@ pub struct NormalizationState<'a> {
 pub struct IdentifierIssuer {
     pub identifier_prefix: String,
     pub identifier_counter: u64,
-    pub issued_identifiers_list: Vec<(BlankIdBuf, BlankIdBuf)>,
+    pub issued_identifiers: IndexMap<BlankIdBuf, BlankIdBuf>,
 }
 
 impl IdentifierIssuer {
@@ -116,15 +117,13 @@ impl IdentifierIssuer {
         Self {
             identifier_prefix: prefix,
             identifier_counter: 0,
-            issued_identifiers_list: Vec::new(),
+            issued_identifiers: IndexMap::new(),
         }
     }
     pub fn find_issued_identifier(&self, existing_identifier: &BlankId) -> Option<&BlankId> {
-        // TODO(optimize): index issued_identifiers_list by existing_identifier
-        self.issued_identifiers_list
-            .iter()
-            .find(|(_, existing_id)| existing_id == existing_identifier)
-            .map(|(issued_identifier, _)| issued_identifier.as_ref())
+        self.issued_identifiers
+            .get(existing_identifier)
+            .map(BlankIdBuf::as_blank_id_ref)
     }
 }
 
@@ -290,7 +289,7 @@ where
             for result in hash_path_list {
                 // 6.3.1
                 let identifier_issuer = result.issuer;
-                for (_, existing_identifier) in identifier_issuer.issued_identifiers_list {
+                for (existing_identifier, _) in identifier_issuer.issued_identifiers {
                     issue_identifier(
                         &mut normalization_state.canonical_issuer,
                         &existing_identifier,
@@ -311,6 +310,8 @@ pub struct NormalizedQuads<'a, Q> {
     normalization_state: NormalizationState<'a>,
 }
 
+pub type NormalizingSubstitution = IndexMap<BlankIdBuf, BlankIdBuf>;
+
 impl<'a, Q: Iterator<Item = LexicalQuadRef<'a>>> NormalizedQuads<'a, Q> {
     pub fn into_nquads_lines(self) -> Vec<String> {
         IntoNQuads::into_nquads_lines(self)
@@ -318,6 +319,11 @@ impl<'a, Q: Iterator<Item = LexicalQuadRef<'a>>> NormalizedQuads<'a, Q> {
 
     pub fn into_nquads(self) -> String {
         IntoNQuads::into_nquads(self)
+    }
+
+    pub fn into_substitution(mut self) -> NormalizingSubstitution {
+        (&mut self).last(); // make sure all the quads have been normalized.
+        self.normalization_state.canonical_issuer.issued_identifiers
     }
 }
 
@@ -360,8 +366,8 @@ pub fn issue_identifier(
     .unwrap();
     // 3
     identifier_issuer
-        .issued_identifiers_list
-        .push((issued_identifier.clone(), existing_identifier.to_owned()));
+        .issued_identifiers
+        .insert(existing_identifier.to_owned(), issued_identifier.clone());
     // 4
     identifier_issuer.identifier_counter += 1;
     // 5

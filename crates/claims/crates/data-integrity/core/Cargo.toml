@@ -36,7 +36,7 @@ futures.workspace = true
 self_cell = "1.0.1"
 contextual.workspace = true
 multibase.workspace = true
-digest = "0.10"
+digest.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

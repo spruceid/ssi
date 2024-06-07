@@ -145,8 +145,11 @@ serde_json = { workspace = true, optional = true }
 serde_jcs = { workspace = true, optional = true }
 
 # BBS
-bbs_plus = "0.20.0"
+ssi-di-sd-primitives.workspace = true
+ssi-bbs.workspace = true
 hmac = "0.12.1"
+serde_cbor = "0.11.2"
+# rand_chacha.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

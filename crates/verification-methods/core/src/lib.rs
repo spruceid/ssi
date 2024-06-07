@@ -168,18 +168,20 @@ impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
 }
 
 pub trait SigningMethod<S, A>: VerificationMethod {
-    // fn sign(
-    //     &self,
-    //     secret: &S,
-    //     algorithm: A,
-    //     bytes: &[u8],
-    // ) -> Result<Vec<u8>, MessageSignatureError>;
-
     fn sign_bytes(
         &self,
         secret: &S,
         algorithm: A,
         bytes: &[u8],
+    ) -> Result<Vec<u8>, MessageSignatureError>;
+}
+
+pub trait MultiSigningMethod<S, A> {
+    fn sign_bytes_multi(
+        &self,
+        secret: &S,
+        algorithm: A,
+        messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError>;
 }
 
