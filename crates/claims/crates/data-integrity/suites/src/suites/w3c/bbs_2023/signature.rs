@@ -114,3 +114,78 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use lazy_static::lazy_static;
+    use ssi_data_integrity_core::suite::standard::SignatureAlgorithm;
+    use ssi_di_sd_primitives::JsonPointerBuf;
+
+    use crate::bbs_2023::{
+        hashing::BaseHashData, transformation::TransformedBase, Bbs2023InputOptions, FeatureOption,
+        HashData, HmacKey,
+    };
+
+    use super::Bbs2023SignatureAlgorithm;
+
+    lazy_static! {
+        pub static ref MANDATORY_POINTERS: Vec<JsonPointerBuf> = vec![
+            "/issuer".parse().unwrap(),
+            "/credentialSubject/sailNumber".parse().unwrap(),
+            "/credentialSubject/sails/1".parse().unwrap(),
+            "/credentialSubject/boards/0/year".parse().unwrap(),
+            "/credentialSubject/sails/2".parse().unwrap()
+        ];
+    }
+
+    const PUBLIC_KEY_HEX: &str = "a4ef1afa3da575496f122b9b78b8c24761531a8a093206ae7c45b80759c168ba4f7a260f9c3367b6c019b4677841104b10665edbe70ba3ebe7d9cfbffbf71eb016f70abfbb163317f372697dc63efd21fc55764f63926a8f02eaea325a2a888f";
+    const SECRET_KEY_HEX: &str = "66d36e118832af4c5e28b2dfe1b9577857e57b042a33e06bdea37b811ed09ee0";
+    const HMAC_KEY_STRING: &str =
+        "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF";
+
+    fn test_base_proof_serialization() {
+        let mut proof_hash = [0; 32];
+        hex::decode_to_slice(
+            b"3a5bbf25d34d90b18c35cd2357be6a6f42301e94fc9e52f77e93b773c5614bdf",
+            &mut proof_hash,
+        )
+        .unwrap();
+
+        let mut mandatory_hash = [0; 32];
+        hex::decode_to_slice(
+            b"555de05f898817e31301bac187d0c3ff2b03e2cbdb4adb4d568c17de961f9a18",
+            &mut mandatory_hash,
+        )
+        .unwrap();
+
+        let mut hmac_key = HmacKey::default();
+        hex::decode_to_slice(HMAC_KEY_STRING.as_bytes(), &mut hmac_key).unwrap();
+
+        let mandatory = Vec::new();
+        let non_mandatory = Vec::new();
+
+        Bbs2023SignatureAlgorithm::sign(
+            verification_method,
+            signer,
+            &HashData::Base(BaseHashData {
+                transformed_document: TransformedBase {
+                    options: Bbs2023InputOptions {
+                        mandatory_pointers: MANDATORY_POINTERS.clone(),
+                        feature_option: FeatureOption::Baseline,
+                        commitment_with_proof: None,
+                        hmac_key: None,
+                    },
+                    mandatory,
+                    non_mandatory,
+                    hmac_key,
+                    canonical_configuration,
+                },
+                proof_hash,
+                mandatory_hash,
+            }),
+            proof_configuration,
+        );
+
+        todo!()
+    }
+}

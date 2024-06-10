@@ -53,6 +53,8 @@ pub struct Bbs2023InputOptions {
     pub feature_option: FeatureOption,
 
     pub commitment_with_proof: Option<Vec<u8>>,
+
+    pub hmac_key: Option<HmacKey>,
 }
 
 #[derive(Debug, Default, Clone, Copy)]

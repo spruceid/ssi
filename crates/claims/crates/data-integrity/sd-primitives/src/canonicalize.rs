@@ -35,10 +35,12 @@ pub fn label_replacement_canonicalize_nquads(
 
     let label_map = label_map_factory(&bnode_identifier_map);
 
-    let canonical_quads = quads
+    let mut canonical_quads: Vec<_> = quads
         .iter()
         .map(|quad| relabel_quad(&label_map, quad.as_lexical_quad_ref()))
         .collect();
+    canonical_quads.sort();
+    canonical_quads.dedup();
 
     (canonical_quads, label_map)
 }
