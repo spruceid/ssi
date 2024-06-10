@@ -176,7 +176,7 @@ pub trait SigningMethod<S, A>: VerificationMethod {
     ) -> Result<Vec<u8>, MessageSignatureError>;
 }
 
-pub trait MultiSigningMethod<S, A> {
+pub trait MultiSigningMethod<S, A>: VerificationMethod {
     fn sign_bytes_multi(
         &self,
         secret: &S,
@@ -196,9 +196,20 @@ impl<M: VerificationMethod, S> MethodWithSecret<M, S> {
     }
 }
 
-impl<A: Copy, M: SigningMethod<S, A>, S> MessageSigner<A> for MethodWithSecret<M, S> {
+impl<A, M: SigningMethod<S, A>, S> MessageSigner<A> for MethodWithSecret<M, S> {
     async fn sign(self, algorithm: A, message: &[u8]) -> Result<Vec<u8>, MessageSignatureError> {
         self.method.sign_bytes(&self.secret, algorithm, message)
+    }
+}
+
+impl<A, M: MultiSigningMethod<S, A>, S> MultiMessageSigner<A> for MethodWithSecret<M, S> {
+    async fn sign_multi(
+        self,
+        algorithm: A,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError> {
+        self.method
+            .sign_bytes_multi(&self.secret, algorithm, messages)
     }
 }
 

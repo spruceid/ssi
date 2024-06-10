@@ -203,7 +203,7 @@ pub trait Sidetree {
     /// Generate a new keypair ([KEY_ALGORITHM][ka])
     ///
     /// [ka]: https://identity.foundation/sidetree/spec/v1.0.0/#key-algorithm
-    fn generate_key() -> Result<JWK, KeyGenerationFailed>;
+    fn generate_key() -> JWK;
 
     /// Ensure that a keypair is valid for this Sidetree DID Method
     ///
@@ -336,8 +336,8 @@ pub trait Sidetree {
     ///
     /// [create]: https://identity.foundation/sidetree/spec/v1.0.0/#create
     fn create(patches: Vec<DIDStatePatch>) -> Result<(Operation, JWK, JWK), CreateError> {
-        let update_keypair = Self::generate_key()?;
-        let recovery_keypair = Self::generate_key()?;
+        let update_keypair = Self::generate_key();
+        let recovery_keypair = Self::generate_key();
         let update_pk = PublicKeyJwk::try_from(update_keypair.to_public())
             .map_err(|_| CreateError::InvalidUpdateKey)?;
         let recovery_pk = PublicKeyJwk::try_from(recovery_keypair.to_public())
@@ -464,10 +464,10 @@ pub trait Sidetree {
         recovery_key: &JWK,
         patches: Vec<DIDStatePatch>,
     ) -> Result<(Operation, JWK, JWK), RecoverError> {
-        let new_update_keypair = Self::generate_key()?;
+        let new_update_keypair = Self::generate_key();
         let new_update_pk = PublicKeyJwk::try_from(new_update_keypair.to_public()).unwrap();
 
-        let new_recovery_keypair = Self::generate_key()?;
+        let new_recovery_keypair = Self::generate_key();
         let new_recovery_pk = PublicKeyJwk::try_from(new_recovery_keypair.to_public()).unwrap();
 
         let recover_op = Self::recover_existing(
@@ -974,8 +974,8 @@ mod tests {
     struct Example;
 
     impl Sidetree for Example {
-        fn generate_key() -> Result<JWK, KeyGenerationFailed> {
-            JWK::generate_secp256k1().map_err(|_| KeyGenerationFailed)
+        fn generate_key() -> JWK {
+            JWK::generate_secp256k1()
         }
         fn validate_key(key: &JWK) -> bool {
             is_secp256k1(key)

@@ -119,6 +119,19 @@ impl JsonPointerBuf {
             Err(InvalidJsonPointer(value))
         }
     }
+
+    pub fn from_bytes(value: Vec<u8>) -> Result<Self, InvalidJsonPointer<Vec<u8>>> {
+        match String::from_utf8(value) {
+            Ok(value) => {
+                if JsonPointer::validate(&value) {
+                    Ok(Self(value))
+                } else {
+                    Err(InvalidJsonPointer(value.into_bytes()))
+                }
+            }
+            Err(err) => Err(InvalidJsonPointer(err.into_bytes())),
+        }
+    }
 }
 
 impl Deref for JsonPointerBuf {
