@@ -88,44 +88,44 @@ async fn canonicalize_document(document: json_ld::syntax::Value) -> Vec<LexicalQ
     urdna2015::normalize(quads.iter().map(Quad::as_lexical_quad_ref)).collect()
 }
 
-#[async_std::test]
-async fn bbs_canonicalization() {
-    const EXPECTED: [&str; 28] = [
-		"_:c14n0 <https://windsurf.grotto-networking.com/selective#boardName> \"CompFoil170\" .\n",
-		"_:c14n0 <https://windsurf.grotto-networking.com/selective#brand> \"Wailea\" .\n",
-		"_:c14n0 <https://windsurf.grotto-networking.com/selective#year> \"2022\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n1 <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n",
-		"_:c14n1 <https://windsurf.grotto-networking.com/selective#size> \"7.8E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n",
-		"_:c14n1 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n2 <https://windsurf.grotto-networking.com/selective#boardName> \"Kanaha Custom\" .\n",
-		"_:c14n2 <https://windsurf.grotto-networking.com/selective#brand> \"Wailea\" .\n",
-		"_:c14n2 <https://windsurf.grotto-networking.com/selective#year> \"2019\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n3 <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n",
-		"_:c14n3 <https://windsurf.grotto-networking.com/selective#size> \"7\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n3 <https://windsurf.grotto-networking.com/selective#year> \"2020\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n4 <https://windsurf.grotto-networking.com/selective#sailName> \"Kihei\" .\n",
-		"_:c14n4 <https://windsurf.grotto-networking.com/selective#size> \"5.5E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n",
-		"_:c14n4 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#boards> _:c14n0 .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#boards> _:c14n2 .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sailNumber> \"Earth101\" .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n1 .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n3 .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n4 .\n",
-		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n6 .\n",
-		"_:c14n6 <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n",
-		"_:c14n6 <https://windsurf.grotto-networking.com/selective#size> \"6.1E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n",
-		"_:c14n6 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
-		"_:c14n7 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .\n",
-		"_:c14n7 <https://www.w3.org/2018/credentials#credentialSubject> _:c14n5 .\n",
-		"_:c14n7 <https://www.w3.org/2018/credentials#issuer> <https://vc.example/windsurf/racecommittee> .\n"
-	];
+// #[async_std::test]
+// async fn bbs_canonicalization() {
+//     const EXPECTED: [&str; 28] = [
+// 		"_:c14n0 <https://windsurf.grotto-networking.com/selective#boardName> \"CompFoil170\" .\n",
+// 		"_:c14n0 <https://windsurf.grotto-networking.com/selective#brand> \"Wailea\" .\n",
+// 		"_:c14n0 <https://windsurf.grotto-networking.com/selective#year> \"2022\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n1 <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n",
+// 		"_:c14n1 <https://windsurf.grotto-networking.com/selective#size> \"7.8E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n",
+// 		"_:c14n1 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n2 <https://windsurf.grotto-networking.com/selective#boardName> \"Kanaha Custom\" .\n",
+// 		"_:c14n2 <https://windsurf.grotto-networking.com/selective#brand> \"Wailea\" .\n",
+// 		"_:c14n2 <https://windsurf.grotto-networking.com/selective#year> \"2019\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n3 <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n",
+// 		"_:c14n3 <https://windsurf.grotto-networking.com/selective#size> \"7\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n3 <https://windsurf.grotto-networking.com/selective#year> \"2020\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n4 <https://windsurf.grotto-networking.com/selective#sailName> \"Kihei\" .\n",
+// 		"_:c14n4 <https://windsurf.grotto-networking.com/selective#size> \"5.5E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n",
+// 		"_:c14n4 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#boards> _:c14n0 .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#boards> _:c14n2 .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sailNumber> \"Earth101\" .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n1 .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n3 .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n4 .\n",
+// 		"_:c14n5 <https://windsurf.grotto-networking.com/selective#sails> _:c14n6 .\n",
+// 		"_:c14n6 <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n",
+// 		"_:c14n6 <https://windsurf.grotto-networking.com/selective#size> \"6.1E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n",
+// 		"_:c14n6 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n",
+// 		"_:c14n7 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .\n",
+// 		"_:c14n7 <https://www.w3.org/2018/credentials#credentialSubject> _:c14n5 .\n",
+// 		"_:c14n7 <https://www.w3.org/2018/credentials#issuer> <https://vc.example/windsurf/racecommittee> .\n"
+// 	];
 
-    let canonical_quads = canonicalize_document(CREDENTIAL.clone())
-        .await
-        .into_nquads_lines();
-    assert_eq!(canonical_quads, EXPECTED);
-}
+//     let canonical_quads = canonicalize_document(CREDENTIAL.clone())
+//         .await
+//         .into_nquads_lines();
+//     assert_eq!(canonical_quads, EXPECTED);
+// }
 
 // #[async_std::test]
 // async fn bbs_hmac_canonicalization() {

@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     hash::Hash,
 };
 
@@ -70,14 +70,15 @@ where
     let mut groups = HashMap::new();
 
     for (name, selection_result) in selection {
-        let mut matching = HashMap::new();
-        let mut non_matching = HashMap::new();
+        let mut matching = BTreeMap::new();
+        let mut non_matching = BTreeMap::new();
 
         let selected_quads: HashSet<_> = selection_result.quads.into_iter().collect();
         // let selected_deskolemized_quads = selection_result.deskolemized_quads;
 
         for (i, nq) in quads.iter().enumerate() {
             if selected_quads.contains(nq) {
+                eprintln!("matching {i} => {nq} .");
                 matching.insert(i, nq.clone());
             } else {
                 non_matching.insert(i, nq.clone());
@@ -114,8 +115,8 @@ pub struct CanonicalizedAndGrouped<N> {
 }
 
 pub struct Group {
-    pub matching: HashMap<usize, LexicalQuad>,
-    pub non_matching: HashMap<usize, LexicalQuad>,
+    pub matching: BTreeMap<usize, LexicalQuad>,
+    pub non_matching: BTreeMap<usize, LexicalQuad>,
     // pub deskolemized_quads: Vec<LexicalQuad>,
 }
 
@@ -249,6 +250,63 @@ mod tests {
 		];
 
         assert_eq!(result.quads.into_nquads_lines(), EXPECTED_NQUADS);
-        // let group = result.groups.get(&Mandatory).unwrap();
+
+        let expected_mandatory = [
+            (0, "_:u2IE-HtO6PyHQsGnuqhO1mX6V7RkRREhF0d0sWZlxNOY <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .\n".to_string()),
+            (1, "_:u2IE-HtO6PyHQsGnuqhO1mX6V7RkRREhF0d0sWZlxNOY <https://www.w3.org/2018/credentials#credentialSubject> _:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 .\n".to_string()),
+            (2, "_:u2IE-HtO6PyHQsGnuqhO1mX6V7RkRREhF0d0sWZlxNOY <https://www.w3.org/2018/credentials#issuer> <https://vc.example/windsurf/racecommittee> .\n".to_string()),
+            (8, "_:u4YIOZn1MHES1Z4Ij2hWZG3R4dEYBqg5fHTyDEvYhC38 <https://windsurf.grotto-networking.com/selective#year> \"2022\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string()),
+            (9, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#boards> _:u4YIOZn1MHES1Z4Ij2hWZG3R4dEYBqg5fHTyDEvYhC38 .\n".to_string()),
+            (11, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#sailNumber> \"Earth101\" .\n".to_string()),
+            (14, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#sails> _:uk0AeXgJ4e6m1XsV5-xFud0L_1mUjZ9Mffhg5aZGTyDk .\n".to_string()),
+            (15, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#sails> _:ukR2991GJuy_Tkjem_x7pLVpS4C4GkZAcuGtiPhBfSSc .\n".to_string()),
+            (22, "_:uk0AeXgJ4e6m1XsV5-xFud0L_1mUjZ9Mffhg5aZGTyDk <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n".to_string()),
+            (23, "_:uk0AeXgJ4e6m1XsV5-xFud0L_1mUjZ9Mffhg5aZGTyDk <https://windsurf.grotto-networking.com/selective#size> \"6.1E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n".to_string()),
+            (24, "_:uk0AeXgJ4e6m1XsV5-xFud0L_1mUjZ9Mffhg5aZGTyDk <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string()),
+            (25, "_:ukR2991GJuy_Tkjem_x7pLVpS4C4GkZAcuGtiPhBfSSc <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n".to_string()),
+            (26, "_:ukR2991GJuy_Tkjem_x7pLVpS4C4GkZAcuGtiPhBfSSc <https://windsurf.grotto-networking.com/selective#size> \"7\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string()),
+            (27, "_:ukR2991GJuy_Tkjem_x7pLVpS4C4GkZAcuGtiPhBfSSc <https://windsurf.grotto-networking.com/selective#year> \"2020\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string())
+        ];
+
+        let mut mandatory: Vec<_> = result
+            .groups
+            .get(&Mandatory)
+            .unwrap()
+            .matching
+            .iter()
+            .map(|(i, quad)| (*i, format!("{quad} .\n")))
+            .collect();
+        mandatory.sort_by_key(|(i, _)| *i);
+
+        assert_eq!(mandatory, expected_mandatory);
+
+        let expected_non_mandatory = [
+            (3, "_:u3Lv2QpFgo-YAegc1cQQKWJFW2sEjQF6FfuZ0VEoMKHg <https://windsurf.grotto-networking.com/selective#sailName> \"Lahaina\" .\n".to_string()),
+            (4, "_:u3Lv2QpFgo-YAegc1cQQKWJFW2sEjQF6FfuZ0VEoMKHg <https://windsurf.grotto-networking.com/selective#size> \"7.8E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n".to_string()),
+            (5, "_:u3Lv2QpFgo-YAegc1cQQKWJFW2sEjQF6FfuZ0VEoMKHg <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string()),
+            (6, "_:u4YIOZn1MHES1Z4Ij2hWZG3R4dEYBqg5fHTyDEvYhC38 <https://windsurf.grotto-networking.com/selective#boardName> \"CompFoil170\" .\n".to_string()),
+            (7, "_:u4YIOZn1MHES1Z4Ij2hWZG3R4dEYBqg5fHTyDEvYhC38 <https://windsurf.grotto-networking.com/selective#brand> \"Wailea\" .\n".to_string()),
+            (10, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#boards> _:uVkUuBrlOaELGVQWJD4M_qW5bcKEHWGNbOrPA_qAOKKw .\n".to_string()),
+            (12, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#sails> _:u3Lv2QpFgo-YAegc1cQQKWJFW2sEjQF6FfuZ0VEoMKHg .\n".to_string()),
+            (13, "_:uQ-qOZUDlozRsGk46ux9gp9fjT28Fy3g3nctmMoqi_U0 <https://windsurf.grotto-networking.com/selective#sails> _:ufUWJRHQ9j1jmUKHLL8k6m0CZ8g4v73gOpaM5kL3ZACQ .\n".to_string()),
+            (16, "_:uVkUuBrlOaELGVQWJD4M_qW5bcKEHWGNbOrPA_qAOKKw <https://windsurf.grotto-networking.com/selective#boardName> \"Kanaha Custom\" .\n".to_string()),
+            (17, "_:uVkUuBrlOaELGVQWJD4M_qW5bcKEHWGNbOrPA_qAOKKw <https://windsurf.grotto-networking.com/selective#brand> \"Wailea\" .\n".to_string()),
+            (18, "_:uVkUuBrlOaELGVQWJD4M_qW5bcKEHWGNbOrPA_qAOKKw <https://windsurf.grotto-networking.com/selective#year> \"2019\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string()),
+            (19, "_:ufUWJRHQ9j1jmUKHLL8k6m0CZ8g4v73gOpaM5kL3ZACQ <https://windsurf.grotto-networking.com/selective#sailName> \"Kihei\" .\n".to_string()),
+            (20, "_:ufUWJRHQ9j1jmUKHLL8k6m0CZ8g4v73gOpaM5kL3ZACQ <https://windsurf.grotto-networking.com/selective#size> \"5.5E0\"^^<http://www.w3.org/2001/XMLSchema#double> .\n".to_string()),
+            (21, "_:ufUWJRHQ9j1jmUKHLL8k6m0CZ8g4v73gOpaM5kL3ZACQ <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n".to_string())
+        ];
+
+        let mut non_mandatory: Vec<_> = result
+            .groups
+            .get(&Mandatory)
+            .unwrap()
+            .non_matching
+            .iter()
+            .map(|(i, quad)| (*i, format!("{quad} .\n")))
+            .collect();
+        non_mandatory.sort_by_key(|(i, _)| *i);
+
+        assert_eq!(non_mandatory, expected_non_mandatory);
     }
 }

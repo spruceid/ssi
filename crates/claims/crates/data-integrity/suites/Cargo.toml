@@ -158,6 +158,7 @@ static-iref.workspace = true
 rand = "0.7"
 hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
+ssi-vc.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
