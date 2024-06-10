@@ -1,24 +1,21 @@
-use std::{borrow::Cow, hash::Hash, str::FromStr};
-
 use iref::{Iri, IriBuf, UriBuf};
-use rdf_types::{Interpretation, Vocabulary};
+use multibase::Base;
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
+use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
 use ssi_jwk::JWK;
-use ssi_multicodec::MultiEncodedBuf;
-use ssi_security::{Multibase, MultibaseBuf};
+use ssi_multicodec::{Codec, MultiCodec, MultiEncodedBuf};
+use ssi_security::MultibaseBuf;
 use ssi_verification_methods_core::{
-    JwkVerificationMethod, MessageSignatureError, SigningMethod, VerificationMethodSet, VerifyBytes,
+    MaybeJwkVerificationMethod, MessageSignatureError, SigningMethod, VerificationMethodSet, VerifyBytes
 };
 use static_iref::iri;
+use std::{borrow::Cow, hash::Hash};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
     VerificationMethod,
 };
-
-// /// IRI of the Multikey type.
-// pub const MULTIKEY_IRI: &Iri = iri!("https://w3id.org/security#Multikey");
 
 /// Multikey type name.
 pub const MULTIKEY_TYPE: &str = "Multikey";
@@ -56,7 +53,7 @@ pub struct Multikey {
     /// [MULTIBASE]: <https://github.com/multiformats/multibase>
     #[serde(rename = "publicKeyMultibase")]
     #[ld("sec:publicKeyMultibase")]
-    pub public_key: PublicKey,
+    pub public_key: MultibaseBuf,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -66,20 +63,75 @@ pub enum InvalidPublicKey {
 
     #[error(transparent)]
     Multicodec(#[from] ssi_multicodec::Error),
+}
 
-    #[error("unsupported key type: `{0}`")]
-    UnsupportedKeyType(String),
+impl From<InvalidPublicKey> for ProofValidationError {
+    fn from(_value: InvalidPublicKey) -> Self {
+        ProofValidationError::InvalidKey
+    }
+}
 
-    #[error(transparent)]
-    Jwk(#[from] ssi_jwk::Error),
+impl From<InvalidPublicKey> for MessageSignatureError {
+    fn from(_value: InvalidPublicKey) -> Self {
+        MessageSignatureError::InvalidPublicKey
+    }
+}
+
+impl From<InvalidPublicKey> for SignatureError {
+    fn from(_value: InvalidPublicKey) -> Self {
+        SignatureError::InvalidPublicKey
+    }
 }
 
 impl Multikey {
     pub const NAME: &'static str = MULTIKEY_TYPE;
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#Multikey");
 
-    pub fn public_key_jwk(&self) -> JWK {
-        self.public_key.to_jwk()
+    pub fn public_key_jwk(&self) -> Option<JWK> {
+        self.decode().ok()?.to_jwk()
+    }
+
+    pub fn decode(&self) -> Result<DecodedMultikey, InvalidPublicKey> {
+        let pk_multi_encoded = MultiEncodedBuf::new(self.public_key.decode()?.1)?;
+        pk_multi_encoded.decode().map_err(Into::into)
+    }
+
+    #[cfg(feature = "ed25519")]
+    pub fn generate_ed25519_key_pair(
+        id: IriBuf,
+        controller: UriBuf,
+        csprng: &mut (impl RngCore + CryptoRng),
+    ) -> (Self, ed25519_dalek::SigningKey) {
+        let key = ed25519_dalek::SigningKey::generate(csprng);
+        (
+            Self::from_public_key(id, controller, &key.verifying_key()),
+            key,
+        )
+    }
+
+    pub fn from_public_key<K: MultiCodec>(id: IriBuf, controller: UriBuf, public_key: &K) -> Self {
+        Self {
+            id,
+            controller,
+            public_key: MultibaseBuf::encode(Base::Base58Btc, &MultiEncodedBuf::encode(public_key)),
+        }
+    }
+}
+
+pub enum SecretKeyRef<'a> {
+    Ed25519(&'a ed25519_dalek::SigningKey),
+    Jwk(&'a JWK),
+}
+
+impl<'a> From<&'a ed25519_dalek::SigningKey> for SecretKeyRef<'a> {
+    fn from(value: &'a ed25519_dalek::SigningKey) -> Self {
+        Self::Ed25519(value)
+    }
+}
+
+impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
+    fn from(value: &'a JWK) -> Self {
+        Self::Jwk(value)
     }
 }
 
@@ -108,11 +160,36 @@ impl<A: Into<ssi_jwk::Algorithm>> VerifyBytes<A> for Multikey {
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
-        let key = self.public_key_jwk();
+        let key = self
+            .public_key_jwk()
+            .ok_or(ProofValidationError::UnknownKey)?;
         Ok(
             ssi_jws::verify_bytes(algorithm.into(), signing_bytes, &key, signature)
                 .map_err(|_| InvalidProof::Signature),
         )
+    }
+}
+
+#[cfg(feature = "ed25519")]
+impl VerifyBytes<ssi_jwk::algorithm::EdDSA> for Multikey {
+    fn verify_bytes(
+        &self,
+        _algorithm: ssi_jwk::algorithm::EdDSA,
+        signing_bytes: &[u8],
+        signature: &[u8],
+    ) -> Result<ProofValidity, ProofValidationError> {
+        #[allow(unreachable_patterns)]
+        match self.decode()? {
+            DecodedMultikey::Ed25519(public_key) => {
+                use ed25519_dalek::Verifier;
+                let signature = ed25519_dalek::Signature::try_from(signature)
+                    .map_err(|_| ProofValidationError::InvalidSignature)?;
+                Ok(public_key
+                    .verify(signing_bytes, &signature)
+                    .map_err(|_| InvalidProof::Signature))
+            }
+            _ => Err(ProofValidationError::InvalidKey),
+        }
     }
 }
 
@@ -156,9 +233,9 @@ impl TypedVerificationMethod for Multikey {
     }
 }
 
-impl JwkVerificationMethod for Multikey {
-    fn to_jwk(&self) -> Cow<JWK> {
-        Cow::Owned(self.public_key_jwk())
+impl MaybeJwkVerificationMethod for Multikey {
+    fn try_to_jwk(&self) -> Option<Cow<JWK>> {
+        self.public_key_jwk().map(Cow::Owned)
     }
 }
 
@@ -189,128 +266,70 @@ impl TryFrom<GenericVerificationMethod> for Multikey {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct PublicKey {
-    /// Multibase-encoded public key.
-    encoded: MultibaseBuf,
+#[non_exhaustive]
+pub enum DecodedMultikey {
+    #[cfg(feature = "ed25519")]
+    Ed25519(ed25519_dalek::VerifyingKey),
 
-    codec: u64,
+    #[cfg(feature = "secp256k1")]
+    Secp256k1(k256::PublicKey),
 
-    /// Decoded public key.
-    decoded: JWK,
+    #[cfg(feature = "secp256r1")]
+    P256(p256::PublicKey),
+
+    #[cfg(feature = "secp384r1")]
+    P384(p384::PublicKey),
+
+    #[cfg(feature = "bls12-381")]
+    Bls12_381(zkryptium::bbsplus::keys::BBSplusPublicKey),
 }
 
-impl PublicKey {
-    pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
-        let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
-
-        let (codec, pk_data) = pk_multi_encoded.parts();
-        let decoded = match codec {
+impl DecodedMultikey {
+    pub fn to_jwk(&self) -> Option<JWK> {
+        #[allow(unreachable_patterns)]
+        match self {
             #[cfg(feature = "ed25519")]
-            ssi_multicodec::ED25519_PUB => ssi_jwk::ed25519_parse(pk_data)?,
+            Self::Ed25519(key) => Some(key.clone().into()),
             #[cfg(feature = "secp256k1")]
-            ssi_multicodec::SECP256K1_PUB => ssi_jwk::secp256k1_parse(pk_data)?,
+            Self::Secp256k1(key) => Some(key.clone().into()),
             #[cfg(feature = "secp256r1")]
-            ssi_multicodec::P256_PUB => ssi_jwk::p256_parse(pk_data)?,
+            Self::P256(key) => Some(key.clone().into()),
             #[cfg(feature = "secp384r1")]
-            ssi_multicodec::P384_PUB => ssi_jwk::p384_parse(pk_data)?,
-            c => return Err(InvalidPublicKey::UnsupportedKeyType(format!("{c:#x}")))?,
-        };
-        Ok(Self {
-            encoded,
-            codec,
-            decoded,
-        })
-    }
-
-    pub fn codec(&self) -> u64 {
-        self.codec
-    }
-
-    pub fn encoded(&self) -> &Multibase {
-        &self.encoded
-    }
-
-    pub fn to_jwk(&self) -> JWK {
-        self.decoded.clone()
+            Self::P384(key) => Some(key.clone().into()),
+            _ => None,
+        }
     }
 }
 
-impl Serialize for PublicKey {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        self.encoded.serialize(serializer)
+impl MultiCodec for DecodedMultikey {
+    fn from_codec_and_bytes(codec: u64, bytes: &[u8]) -> Result<Self, ssi_multicodec::Error> {
+        match codec {
+            #[cfg(feature = "ed25519")]
+            ssi_multicodec::ED25519_PUB => Codec::from_bytes(bytes).map(Self::Ed25519),
+            #[cfg(feature = "secp256k1")]
+            ssi_multicodec::SECP256K1_PUB => Codec::from_bytes(bytes).map(Self::Secp256k1),
+            #[cfg(feature = "secp256r1")]
+            ssi_multicodec::P256_PUB => Codec::from_bytes(bytes).map(Self::P256),
+            #[cfg(feature = "secp384r1")]
+            ssi_multicodec::P384_PUB => Codec::from_bytes(bytes).map(Self::P384),
+            #[cfg(feature = "bls12-381")]
+            ssi_multicodec::BLS12_381_G2_PUB => Codec::from_bytes(bytes).map(Self::Bls12_381),
+            _ => Err(ssi_multicodec::Error::UnexpectedCodec(codec)),
+        }
     }
-}
 
-impl<'a> Deserialize<'a> for PublicKey {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        use serde::de::Error;
-        let encoded = MultibaseBuf::deserialize(deserializer)?;
-        Self::decode(encoded).map_err(D::Error::custom)
-    }
-}
-
-impl FromStr for PublicKey {
-    type Err = InvalidPublicKey;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::decode(MultibaseBuf::new(s.to_owned()))
-    }
-}
-
-impl PartialEq for PublicKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.decoded.eq(&other.decoded)
-    }
-}
-
-impl Eq for PublicKey {}
-
-impl Hash for PublicKey {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.encoded.hash(state)
-    }
-}
-
-impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataResource<I, V> for PublicKey
-where
-    MultibaseBuf: linked_data::LinkedDataResource<I, V>,
-{
-    fn interpretation(
-        &self,
-        vocabulary: &mut V,
-        interpretation: &mut I,
-    ) -> linked_data::ResourceInterpretation<I, V> {
-        self.encoded.interpretation(vocabulary, interpretation)
-    }
-}
-
-impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataSubject<I, V> for PublicKey
-where
-    MultibaseBuf: linked_data::LinkedDataSubject<I, V>,
-{
-    fn visit_subject<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::SubjectVisitor<I, V>,
-    {
-        self.encoded.visit_subject(serializer)
-    }
-}
-
-impl<I: Interpretation, V: Vocabulary> linked_data::LinkedDataPredicateObjects<I, V> for PublicKey
-where
-    MultibaseBuf: linked_data::LinkedDataPredicateObjects<I, V>,
-{
-    fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
-    where
-        S: linked_data::PredicateObjectsVisitor<I, V>,
-    {
-        self.encoded.visit_objects(visitor)
+    fn to_codec_and_bytes(&self) -> (u64, Cow<[u8]>) {
+        match self {
+            #[cfg(feature = "ed25519")]
+            Self::Ed25519(k) => k.to_codec_and_bytes(),
+            #[cfg(feature = "secp256k1")]
+            Self::Secp256k1(k) => k.to_codec_and_bytes(),
+            #[cfg(feature = "secp256r1")]
+            Self::P256(k) => k.to_codec_and_bytes(),
+            #[cfg(feature = "secp384r1")]
+            Self::P384(k) => k.to_codec_and_bytes(),
+            #[cfg(feature = "bls12-381")]
+            Self::Bls12_381(k) => k.to_codec_and_bytes(),
+        }
     }
 }

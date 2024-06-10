@@ -3,98 +3,68 @@ use std::{collections::HashMap, hash::Hash};
 use getrandom::getrandom;
 use hmac::{Hmac, Mac};
 use k256::sha2::Sha256;
-use rdf_types::{
-    BlankIdBuf, LexicalQuad
-};
-use ssi_data_integrity_core::{
-    suite::standard::{TransformationAlgorithm, TransformationError, TypedTransformationAlgorithm},
-    ProofConfigurationRef,
-};
+use rdf_types::BlankIdBuf;
+use ssi_data_integrity_core::suite::standard::TransformationError;
 use ssi_di_sd_primitives::{
     canonicalize::create_hmac_id_label_map_function, group::canonicalize_and_group,
 };
-use ssi_json_ld::{ContextLoaderEnvironment, Expandable, JsonLdNodeObject};
+use ssi_json_ld::{Expandable, JsonLdNodeObject, ExpandedDocument};
 use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
 
-use crate::Bbs2023;
+use crate::bbs_2023::{Bbs2023BaseInputOptions, HmacKey};
 
-use super::{Bbs2023InputOptions, HmacKey};
+use super::TransformedBase;
 
-pub struct Bbs2023Transformation;
-
-impl TransformationAlgorithm<Bbs2023> for Bbs2023Transformation {
-    type Output = Transformed;
-}
-
-impl<T, C> TypedTransformationAlgorithm<Bbs2023, T, C> for Bbs2023Transformation
+pub async fn base_proof_transformation<T>(
+    loader: &impl ssi_json_ld::Loader,
+    unsecured_document: &T,
+    canonical_configuration: Vec<String>,
+    transform_options: Bbs2023BaseInputOptions,
+) -> Result<TransformedBase, TransformationError>
 where
-    C: ContextLoaderEnvironment,
     T: JsonLdNodeObject + Expandable,
-    T::Expanded<LexicalInterpretation, ()>: Into<ssi_json_ld::ExpandedDocument>
+    T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>
 {
-    async fn transform(
-        context: &C,
-        unsecured_document: &T,
-        proof_configuration: ProofConfigurationRef<'_, Bbs2023>,
-        transformation_options: Option<Bbs2023InputOptions>,
-    ) -> Result<Self::Output, TransformationError> {
-        let canonical_configuration = proof_configuration
-            .expand(context, unsecured_document)
-            .await
-            .map_err(TransformationError::ProofConfigurationExpansion)?
-            .nquads_lines();
-
-        match transformation_options {
-            Some(transform_options) => {
-                // Base Proof Transformation algorithm.
-                // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-transformation-bbs-2023>
-                let hmac_key = match transform_options.hmac_key {
-                    Some(key) => key,
-                    None => {
-                        // Generate a random key
-                        let mut key = HmacKey::default();
-                        getrandom(&mut key).map_err(TransformationError::internal)?;
-                        key
-                    }
-                };
-
-                let mut hmac = Hmac::<Sha256>::new_from_slice(&hmac_key).unwrap();
-
-                let mut group_definitions = HashMap::new();
-                group_definitions.insert(Mandatory, transform_options.mandatory_pointers.clone());
-
-                let label_map_factory_function = create_shuffled_id_label_map_function(&mut hmac);
-
-                let mut groups = canonicalize_and_group(
-                    context.loader(),
-                    label_map_factory_function,
-                    group_definitions,
-                    unsecured_document,
-                )
-                .await
-                .map_err(TransformationError::internal)?
-                .groups;
-
-                let mandatory_group = groups.remove(&Mandatory).unwrap();
-                let mandatory = mandatory_group.matching.into_values().collect();
-                let non_mandatory = mandatory_group.non_matching.into_values().collect();
-
-                Ok(Transformed::Base(TransformedBase {
-                    options: transform_options,
-                    mandatory,
-                    non_mandatory,
-                    hmac_key,
-                    canonical_configuration,
-                }))
-            }
-            None => {
-                // createVerifyData, step 1, 3, 4
-                // canonicalize input document into N-Quads.
-                // Ok(Transformed::Derived(todo!()))
-                todo!()
-            }
+    // Base Proof Transformation algorithm.
+    // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-transformation-bbs-2023>
+    let hmac_key = match transform_options.hmac_key {
+        Some(key) => key,
+        None => {
+            // Generate a random key
+            let mut key = HmacKey::default();
+            getrandom(&mut key).map_err(TransformationError::internal)?;
+            key
         }
-    }
+    };
+
+    let mut hmac = Hmac::<Sha256>::new_from_slice(&hmac_key).unwrap();
+
+    let mut group_definitions = HashMap::new();
+    group_definitions.insert(Mandatory, transform_options.mandatory_pointers.clone());
+
+    let label_map_factory_function = create_shuffled_id_label_map_function(&mut hmac);
+
+    let mut groups = canonicalize_and_group(
+        loader,
+        label_map_factory_function,
+        group_definitions,
+        unsecured_document,
+    )
+    .await
+    .map_err(TransformationError::internal)?
+    .groups;
+
+    let mandatory_group = groups.remove(&Mandatory).unwrap();
+    let mandatory = mandatory_group.matching.into_values().collect();
+    let non_mandatory = mandatory_group.non_matching.into_values().collect();
+
+    Ok(TransformedBase {
+        options: transform_options,
+        mandatory,
+        non_mandatory,
+        hmac_key,
+        canonical_configuration,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -104,7 +74,7 @@ struct Mandatory;
 /// blank node identifiers.
 ///
 /// See: <https://www.w3.org/TR/vc-di-bbs/#createshuffledidlabelmapfunction>
-pub(crate) fn create_shuffled_id_label_map_function(
+pub fn create_shuffled_id_label_map_function(
     hmac: &mut Hmac<Sha256>,
 ) -> impl '_ + FnMut(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf> {
     |canonical_map| {
@@ -125,36 +95,6 @@ pub(crate) fn create_shuffled_id_label_map_function(
     }
 }
 
-pub enum Transformed {
-    Base(TransformedBase),
-    Derived(TransformedDerived),
-}
-
-impl Transformed {
-    pub fn into_base(self) -> Option<TransformedBase> {
-        match self {
-            Self::Base(b) => Some(b),
-            _ => None,
-        }
-    }
-}
-
-/// Result of the Base Proof Transformation algorithm.
-///
-/// See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-transformation-bbs-2023>
-pub struct TransformedBase {
-    pub options: Bbs2023InputOptions,
-    pub mandatory: Vec<LexicalQuad>,
-    pub non_mandatory: Vec<LexicalQuad>,
-    pub hmac_key: HmacKey,
-    pub canonical_configuration: Vec<String>,
-}
-
-pub struct TransformedDerived {
-    pub proof_hash: String,
-    pub nquads: Vec<LexicalQuad>,
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -166,17 +106,19 @@ mod tests {
         suite::standard::TypedTransformationAlgorithm, ProofConfiguration,
     };
     use ssi_di_sd_primitives::{group::canonicalize_and_group, JsonPointerBuf};
-    use ssi_json_ld::JsonLdEnvironment;
     use ssi_rdf::IntoNQuads;
     use ssi_vc::v2::syntax::JsonCredential;
     use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
     use crate::{
-        bbs_2023::{Bbs2023InputOptions, FeatureOption, HmacKey},
+        bbs_2023::{
+            Bbs2023BaseInputOptions, Bbs2023InputOptions, Bbs2023Transformation, FeatureOption,
+            HmacKey,
+        },
         Bbs2023,
     };
 
-    use super::{create_shuffled_id_label_map_function, Bbs2023Transformation, Mandatory};
+    use super::{create_shuffled_id_label_map_function, Mandatory};
 
     const HMAC_KEY_STRING: &str =
         "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF";
@@ -243,7 +185,7 @@ mod tests {
 
     #[async_std::test]
     async fn hmac_canonicalize_and_group() {
-        let mut context = JsonLdEnvironment::default();
+        let loader = ssi_json_ld::ContextLoader::default();
 
         let mut hmac_key = HmacKey::default();
         hex::decode_to_slice(HMAC_KEY_STRING.as_bytes(), &mut hmac_key).unwrap();
@@ -255,7 +197,7 @@ mod tests {
         let label_map_factory_function = create_shuffled_id_label_map_function(&mut hmac);
 
         let canonical = canonicalize_and_group(
-            &mut context,
+            &loader,
             label_map_factory_function,
             group_definitions,
             &*CREDENTIAL,
@@ -303,7 +245,7 @@ mod tests {
 
     #[async_std::test]
     async fn transform_test() {
-        let mut context = JsonLdEnvironment::default();
+        let context = ssi_claims_core::SignatureEnvironment::default();
 
         let proof_configuration = ProofConfiguration::new(
             Bbs2023,
@@ -317,15 +259,15 @@ mod tests {
         hex::decode_to_slice(HMAC_KEY_STRING.as_bytes(), &mut hmac_key).unwrap();
 
         let transformed = Bbs2023Transformation::transform(
-            &mut context,
+            &context,
             &*CREDENTIAL,
             proof_configuration.borrowed(),
-            Some(Bbs2023InputOptions {
+            Some(Bbs2023InputOptions::Base(Bbs2023BaseInputOptions {
                 mandatory_pointers: MANDATORY_POINTERS.clone(),
                 feature_option: FeatureOption::Baseline,
                 commitment_with_proof: None,
                 hmac_key: Some(hmac_key),
-            }),
+            })),
         )
         .await
         .unwrap()

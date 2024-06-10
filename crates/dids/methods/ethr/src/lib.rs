@@ -536,7 +536,7 @@ mod tests {
         assert!(vc_bad_issuer.verify(&verifier).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
-        let wrong_key = JWK::generate_secp256k1().unwrap();
+        let wrong_key = JWK::generate_secp256k1();
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = suite
             .sign(

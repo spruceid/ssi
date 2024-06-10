@@ -83,7 +83,7 @@ impl AnyMethod {
             Self::EcdsaSecp256r1VerificationKey2019(m) => Some(Cow::Owned(m.public_key_jwk())),
             Self::JsonWebKey2020(m) => Some(Cow::Borrowed(m.public_key_jwk())),
             #[cfg(feature = "ed25519")]
-            Self::Multikey(m) => Some(Cow::Owned(m.public_key_jwk())),
+            Self::Multikey(m) => m.public_key_jwk().map(Cow::Owned),
             #[cfg(all(feature = "tezos", feature = "ed25519"))]
             Self::Ed25519PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021(_) => None,
             #[cfg(all(feature = "tezos", feature = "secp256r1"))]

@@ -32,16 +32,6 @@ impl<'s, M: VerificationMethod, S: Signer<M>> Signer<M> for &'s S {
     }
 }
 
-pub trait MultiSigner<M, A> {
-    type MessageSigner: MultiMessageSigner<A>;
-
-    #[allow(async_fn_in_trait)]
-    async fn for_verification_method(
-        &self,
-        method: &M,
-    ) -> Result<Self::MessageSigner, SignatureError>;
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum MessageSignatureError {
     #[error("0")]
@@ -52,6 +42,9 @@ pub enum MessageSignatureError {
 
     #[error("invalid signer response")]
     InvalidResponse,
+
+    #[error("invalid public key")]
+    InvalidPublicKey,
 
     #[error("invalid secret key")]
     InvalidSecretKey,

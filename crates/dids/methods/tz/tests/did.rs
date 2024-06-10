@@ -318,7 +318,7 @@ async fn credential_prove_verify_did_tz2() {
     // 	use ssi_claims::{Credential, Issuer, LinkedDataProofOptions, URI};
 
     let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
-    let mut key = JWK::generate_secp256k1_from(&mut rng).unwrap();
+    let mut key = JWK::generate_secp256k1_from(&mut rng);
     // mark this key as being for use with key recovery
     key.algorithm = Some(Algorithm::ES256KR);
     let did = DIDTZ.generate(&key).unwrap();
@@ -359,7 +359,7 @@ async fn credential_prove_verify_did_tz2() {
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer =
-        SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng).unwrap()).into_local();
+        SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng)).into_local();
     let vc_wrong_key = suite
         .sign(
             vc.claims.clone(),

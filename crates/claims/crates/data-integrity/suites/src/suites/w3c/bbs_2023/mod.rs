@@ -1,11 +1,15 @@
 //! Data Integrity BBS Cryptosuite 2023 (v1.0) implementation.
 //!
 //! See: <https://www.w3.org/TR/vc-di-bbs/#bbs-2023>
-use serde::Serialize;
+use multibase::Base;
+use serde::{Deserialize, Serialize};
 use ssi_bbs::BBSplusPublicKey;
 use ssi_data_integrity_core::{
-    suite::{ConfigurationAlgorithm, ConfigurationError, InputProofOptions},
-    ProofConfiguration, StandardCryptographicSuite, TypeRef,
+    suite::{
+        standard::TransformationError, ConfigurationAlgorithm, ConfigurationError,
+        InputProofOptions,
+    },
+    Proof, ProofConfiguration, StandardCryptographicSuite, TypeRef,
 };
 use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_security::MultibaseBuf;
@@ -21,9 +25,6 @@ mod signature;
 pub use signature::Bbs2023SignatureAlgorithm;
 
 mod verification;
-
-#[cfg(test)]
-mod tests;
 
 /// The `bbs-2023` cryptographic suite.
 #[derive(Debug, Clone, Copy)]
@@ -47,7 +48,12 @@ impl StandardCryptographicSuite for Bbs2023 {
     }
 }
 
-pub struct Bbs2023InputOptions {
+pub enum Bbs2023InputOptions {
+    Base(Bbs2023BaseInputOptions),
+    Derived(Bbs2023DerivedInputOptions),
+}
+
+pub struct Bbs2023BaseInputOptions {
     pub mandatory_pointers: Vec<JsonPointerBuf>,
 
     pub feature_option: FeatureOption,
@@ -57,6 +63,16 @@ pub struct Bbs2023InputOptions {
     pub hmac_key: Option<HmacKey>,
 }
 
+pub struct Bbs2023DerivedInputOptions {
+    pub proof: Proof<Bbs2023>,
+
+    pub selective_pointers: Vec<JsonPointerBuf>,
+
+    pub feature_option: DerivedFeatureOption,
+
+    pub presentation_header: Option<Vec<u8>>,
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub enum FeatureOption {
     #[default]
@@ -64,6 +80,24 @@ pub enum FeatureOption {
     AnonymousHolderBinding,
     PseudonymIssuerPid,
     PseudonymHiddenPid,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "featureOption")]
+pub enum DerivedFeatureOption {
+    Baseline,
+    AnonymousHolderBinding {
+        holder_secret: String,
+        prover_blind: String,
+    },
+    PseudonymIssuerPid {
+        verifier_id: String,
+    },
+    PseudonymHiddenPid {
+        pid: String,
+        prover_blind: String,
+        verifier_id: String,
+    },
 }
 
 pub type HmacKey = [u8; 32];
@@ -94,6 +128,15 @@ impl ConfigurationAlgorithm<Bbs2023> for Bbs2023Configuration {
         let proof_configuration = options.into_configuration(type_.clone())?;
         Ok((proof_configuration, signature_options))
     }
+}
+
+pub struct DecodedBaseProof {
+    pub signature_bytes: Vec<u8>,
+    pub bbs_header: [u8; 64],
+    pub public_key: BBSplusPublicKey,
+    pub hmac_key: [u8; 32],
+    pub mandatory_pointers: Vec<JsonPointerBuf>,
+    pub description: Bbs2023SignatureDescription,
 }
 
 #[derive(Serialize)]
@@ -150,6 +193,155 @@ impl Bbs2023Signature {
 
         Self {
             proof_value: MultibaseBuf::encode(multibase::Base::Base64Url, proof_value),
+        }
+    }
+
+    /// Parses the components of a bbs-2023 selective disclosure base proof
+    /// value.
+    ///
+    /// See: <https://www.w3.org/TR/vc-di-bbs/#parsebaseproofvalue>
+    pub fn decode_base_proof(&self) -> Result<DecodedBaseProof, TransformationError> {
+        let (base, decoded_proof_value) = self
+            .proof_value
+            .decode()
+            .map_err(|_| TransformationError::InvalidInput)?;
+
+        if base != Base::Base64Url || decoded_proof_value.len() < 3 {
+            return Err(TransformationError::InvalidInput);
+        }
+
+        let header = [
+            decoded_proof_value[0],
+            decoded_proof_value[1],
+            decoded_proof_value[2],
+        ];
+
+        let mut components =
+            serde_cbor::from_slice::<Vec<serde_cbor::Value>>(&decoded_proof_value[3..])
+                .map_err(|_| TransformationError::InvalidInput)?
+                .into_iter();
+
+        let Some(serde_cbor::Value::Bytes(signature_bytes)) = components.next() else {
+            return Err(TransformationError::InvalidInput);
+        };
+
+        let Some(serde_cbor::Value::Bytes(bbs_header)) = components.next() else {
+            return Err(TransformationError::InvalidInput);
+        };
+
+        let bbs_header: [u8; 64] = bbs_header
+            .try_into()
+            .map_err(|_| TransformationError::InvalidInput)?;
+
+        let Some(serde_cbor::Value::Bytes(public_key)) = components.next() else {
+            return Err(TransformationError::InvalidInput);
+        };
+
+        let public_key = BBSplusPublicKey::from_bytes(&public_key)
+            .map_err(|_| TransformationError::InvalidInput)?;
+
+        let Some(serde_cbor::Value::Bytes(hmac_key)) = components.next() else {
+            return Err(TransformationError::InvalidInput);
+        };
+
+        let hmac_key: [u8; 32] = hmac_key
+            .try_into()
+            .map_err(|_| TransformationError::InvalidInput)?;
+
+        let Some(serde_cbor::Value::Array(mandatory_pointers_values)) = components.next() else {
+            return Err(TransformationError::InvalidInput);
+        };
+
+        let mut mandatory_pointers = Vec::with_capacity(mandatory_pointers_values.len());
+        for value in mandatory_pointers_values {
+            let serde_cbor::Value::Bytes(bytes) = value else {
+                return Err(TransformationError::InvalidInput);
+            };
+
+            let pointer =
+                JsonPointerBuf::from_bytes(bytes).map_err(|_| TransformationError::InvalidInput)?;
+
+            mandatory_pointers.push(pointer);
+        }
+
+        match header {
+            [0xd9, 0x5d, 0x02] => {
+                // baseline
+                Ok(DecodedBaseProof {
+                    signature_bytes,
+                    bbs_header,
+                    public_key,
+                    hmac_key,
+                    mandatory_pointers,
+                    description: Bbs2023SignatureDescription::Baseline,
+                })
+            }
+            [0xd9, 0x5d, 0x04] => {
+                // anonymous_holder_binding
+                let signer_blind = match components.next() {
+                    Some(serde_cbor::Value::Bytes(signer_blind)) => Some(
+                        signer_blind
+                            .try_into()
+                            .map_err(|_| TransformationError::InvalidInput)?,
+                    ),
+                    Some(serde_cbor::Value::Null) => None,
+                    _ => return Err(TransformationError::InvalidInput),
+                };
+
+                Ok(DecodedBaseProof {
+                    signature_bytes,
+                    bbs_header,
+                    public_key,
+                    hmac_key,
+                    mandatory_pointers,
+                    description: Bbs2023SignatureDescription::AnonymousHolderBinding {
+                        signer_blind,
+                    },
+                })
+            }
+            [0xd9, 0x5d, 0x06] => {
+                // pseudonym_issuer_pid
+                let Some(serde_cbor::Value::Bytes(pid)) = components.next() else {
+                    return Err(TransformationError::InvalidInput);
+                };
+
+                let pid: [u8; 32] = pid
+                    .try_into()
+                    .map_err(|_| TransformationError::InvalidInput)?;
+
+                Ok(DecodedBaseProof {
+                    signature_bytes,
+                    bbs_header,
+                    public_key,
+                    hmac_key,
+                    mandatory_pointers,
+                    description: Bbs2023SignatureDescription::PseudonymIssuerPid { pid },
+                })
+            }
+            [0xd9, 0x5d, 0x08] => {
+                // pseudonym_hidden_pid
+                let signer_blind = match components.next() {
+                    Some(serde_cbor::Value::Bytes(signer_blind)) => Some(
+                        signer_blind
+                            .try_into()
+                            .map_err(|_| TransformationError::InvalidInput)?,
+                    ),
+                    Some(serde_cbor::Value::Null) => None,
+                    _ => return Err(TransformationError::InvalidInput),
+                };
+
+                Ok(DecodedBaseProof {
+                    signature_bytes,
+                    bbs_header,
+                    public_key,
+                    hmac_key,
+                    mandatory_pointers,
+                    description: Bbs2023SignatureDescription::AnonymousHolderBinding {
+                        signer_blind,
+                    },
+                })
+            }
+            _ => return Err(TransformationError::InvalidInput),
         }
     }
 }

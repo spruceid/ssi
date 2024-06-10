@@ -9,6 +9,7 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-data-integrity/"
 
 [features]
+default = ["bbs"]
 ## Signature suites specified by the W3C.
 ##
 ## This includes:
@@ -91,6 +92,9 @@ solana = ["ssi-verification-methods/solana", "k256"]
 ##   - `Eip712Signature2021` (requires `eip712`)
 ethereum = ["serde_json"]
 
+## BBS cryptographic suites.
+bbs = ["ssi-verification-methods/bls12-381"]
+
 [dependencies]
 ssi-data-integrity-core.workspace = true
 ssi-verification-methods.workspace = true
@@ -159,6 +163,7 @@ rand = "0.7"
 hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
 ssi-vc.workspace = true
+nquads-syntax.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true

@@ -9,5 +9,5 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-bbs/"
 
 [dependencies]
-ssi-verification-methods = { workspace = true, features = ["ed25519"] }
+ssi-verification-methods = { workspace = true, features = ["ed25519", "bls12-381"] }
 zkryptium = "0.2.2"

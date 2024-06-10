@@ -1,4 +1,6 @@
-use ssi_verification_methods::{MessageSignatureError, MultiSigningMethod, Multikey};
+use ssi_verification_methods::{
+    multikey::DecodedMultikey, MessageSignatureError, MultiSigningMethod, Multikey,
+};
 use zkryptium::bbsplus::commitment::BlindFactor;
 pub use zkryptium::bbsplus::keys::{BBSplusPublicKey, BBSplusSecretKey};
 
@@ -11,10 +13,6 @@ pub enum Bbs {
         commitment_with_proof: Option<Vec<u8>>,
         signer_blind: Option<[u8; 32]>,
     },
-}
-
-pub fn bbs_public_key_from_multikey(multikey: &Multikey) -> BBSplusPublicKey {
-    todo!()
 }
 
 impl MultiSigningMethod<BBSplusSecretKey, Bbs> for Multikey {
@@ -32,7 +30,10 @@ impl MultiSigningMethod<BBSplusSecretKey, Bbs> for Multikey {
             },
         };
 
-        let pk = bbs_public_key_from_multikey(self);
+        let DecodedMultikey::Bls12_381(pk) = self.decode()? else {
+            return Err(MessageSignatureError::InvalidPublicKey);
+        };
+
         let signature = match algorithm {
             Bbs::Baseline { header } => Signature::<BBSplus<Bls12381Sha256>>::sign(
                 Some(messages),
