@@ -26,6 +26,23 @@ pub fn create_hmac_id_label_map_function(
     }
 }
 
+/// See: <https://www.w3.org/TR/vc-di-ecdsa/#createlabelmapfunction>
+pub fn create_label_map_function(
+    label_map: &HashMap<BlankIdBuf, BlankIdBuf>,
+) -> impl '_ + Fn(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf> {
+    |canonical_id_map| {
+        let mut bnode_id_map = HashMap::new();
+
+        for (key, value) in canonical_id_map {
+            if let Some(new_label) = label_map.get(value) {
+                bnode_id_map.insert(key.clone(), new_label.clone());
+            }
+        }
+
+        bnode_id_map
+    }
+}
+
 pub fn label_replacement_canonicalize_nquads(
     mut label_map_factory: impl FnMut(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf>,
     quads: &[LexicalQuad],
@@ -67,7 +84,10 @@ fn relabel_quad(label_map: &HashMap<BlankIdBuf, BlankIdBuf>, quad: LexicalQuadRe
 fn relabel_id(label_map: &HashMap<BlankIdBuf, BlankIdBuf>, id: Id<&Iri, &BlankId>) -> Id {
     match id {
         Id::Iri(i) => Id::Iri(i.to_owned()),
-        Id::Blank(b) => Id::Blank(label_map.get(b).unwrap().to_owned()),
+        Id::Blank(b) => Id::Blank(match label_map.get(b) {
+            Some(c) => c.clone(),
+            None => b.to_owned(),
+        }),
     }
 }
 

@@ -1,17 +1,47 @@
-use std::borrow::Cow;
-
+use crate::Bbs2023;
+use serde::Serialize;
 use ssi_bbs::Bbs;
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_data_integrity_core::{
     suite::standard::{SignatureAlgorithm, SignatureAndVerificationAlgorithm},
     ProofConfigurationRef,
 };
-use ssi_rdf::IntoNQuads;
-use ssi_verification_methods::{multikey::DecodedMultikey, MultiMessageSigner, Multikey, Signer};
+use ssi_security::MultibaseBuf;
+use ssi_verification_methods::{MultiMessageSigner, Multikey, Signer};
 
-use crate::{bbs_2023::Bbs2023SignatureDescription, Bbs2023};
+use super::HashData;
 
-use super::{Bbs2023Signature, FeatureOption, HashData};
+mod base;
+mod derived;
+
+pub struct InvalidBbs2023Signature;
+
+impl From<InvalidBbs2023Signature> for ProofValidationError {
+    fn from(_value: InvalidBbs2023Signature) -> Self {
+        ProofValidationError::InvalidSignature
+    }
+}
+
+pub struct UnsupportedBbs2023Signature;
+
+#[derive(Clone, Serialize)]
+pub struct Bbs2023Signature {
+    pub proof_value: MultibaseBuf,
+}
+
+impl AsRef<str> for Bbs2023Signature {
+    fn as_ref(&self) -> &str {
+        self.proof_value.as_str()
+    }
+}
+
+#[derive(Clone)]
+pub enum Bbs2023SignatureDescription {
+    Baseline,
+    AnonymousHolderBinding { signer_blind: Option<[u8; 32]> },
+    PseudonymIssuerPid { pid: [u8; 32] },
+    PseudonymHiddenPid { signer_blind: Option<[u8; 32]> },
+}
 
 pub struct Bbs2023SignatureAlgorithm;
 
@@ -32,93 +62,11 @@ where
     ) -> Result<Self::Signature, SignatureError> {
         match prepared_claims {
             HashData::Base(hash_data) => {
-                // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-serialization-bbs-2023>
-                let DecodedMultikey::Bls12_381(public_key) = verification_method.decode()? else {
-                    return Err(SignatureError::InvalidPublicKey);
-                };
-                let feature_option = hash_data.transformed_document.options.feature_option;
-                let proof_hash = &hash_data.proof_hash;
-                let mandatory_pointers = &hash_data.transformed_document.options.mandatory_pointers;
-                let mandatory_hash = &hash_data.mandatory_hash;
-                let non_mandatory = &hash_data.transformed_document.non_mandatory;
-                let hmac_key = hash_data.transformed_document.hmac_key;
-
-                let mut bbs_header = [0; 64];
-                bbs_header[..32].copy_from_slice(proof_hash);
-                bbs_header[32..].copy_from_slice(mandatory_hash);
-
-                let mut messages: Vec<_> = non_mandatory
-                    .into_nquads_lines()
-                    .into_iter()
-                    .map(String::into_bytes)
-                    .collect();
-
-                let message_signer = signer
-                    .for_method(Cow::Borrowed(verification_method))
-                    .await
-                    .ok_or(SignatureError::MissingSigner)?;
-
-                let (algorithm, description) = match feature_option {
-                    FeatureOption::Baseline => (
-                        Bbs::Baseline { header: bbs_header },
-                        Bbs2023SignatureDescription::Baseline,
-                    ),
-                    FeatureOption::AnonymousHolderBinding => (
-                        Bbs::Blind {
-                            header: bbs_header,
-                            commitment_with_proof: None,
-                            signer_blind: None,
-                        },
-                        Bbs2023SignatureDescription::AnonymousHolderBinding { signer_blind: None },
-                    ),
-                    FeatureOption::PseudonymIssuerPid => {
-                        // See: <https://www.ietf.org/archive/id/draft-vasilis-bbs-per-verifier-linkability-00.html#section-4.1>
-                        let mut pid = [0u8; 32];
-                        getrandom::getrandom(&mut pid).map_err(SignatureError::other)?;
-
-                        messages.push(pid.to_vec());
-
-                        (
-                            Bbs::Baseline { header: bbs_header },
-                            Bbs2023SignatureDescription::PseudonymIssuerPid { pid },
-                        )
-                    }
-                    FeatureOption::PseudonymHiddenPid => {
-                        // See: <https://www.ietf.org/archive/id/draft-vasilis-bbs-per-verifier-linkability-00.html#section-4.1>
-                        let commitment_with_proof = hash_data
-                            .transformed_document
-                            .options
-                            .commitment_with_proof
-                            .clone()
-                            .ok_or_else(|| {
-                                SignatureError::missing_required_option("commitment_with_proof")
-                            })?;
-
-                        (
-                            Bbs::Blind {
-                                header: bbs_header,
-                                commitment_with_proof: Some(commitment_with_proof),
-                                signer_blind: None,
-                            },
-                            Bbs2023SignatureDescription::PseudonymHiddenPid { signer_blind: None },
-                        )
-                    }
-                };
-
-                let signature = message_signer.sign_multi(algorithm, &messages).await?;
-
-                Ok(Bbs2023Signature::encode(
-                    &signature,
-                    bbs_header,
-                    &public_key,
-                    hmac_key,
-                    &mandatory_pointers,
-                    description,
-                ))
+                base::generate_base_proof(verification_method, signer, hash_data).await
             }
-            HashData::Derived(_) => {
-                todo!()
-            }
+            HashData::Derived(_) => Err(SignatureError::other(
+                "unable to sign derived claims without a base proof",
+            )),
         }
     }
 }
@@ -136,7 +84,7 @@ mod tests {
 
     use crate::{
         bbs_2023::{
-            hashing::BaseHashData, transformation::TransformedBase, Bbs2023BaseInputOptions,
+            hashing::BaseHashData, transformation::TransformedBase, Bbs2023InputOptions,
             FeatureOption, HashData, HmacKey,
         },
         Bbs2023,
@@ -257,7 +205,7 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
             signer,
             HashData::Base(BaseHashData {
                 transformed_document: TransformedBase {
-                    options: Bbs2023BaseInputOptions {
+                    options: Bbs2023InputOptions {
                         mandatory_pointers: MANDATORY_POINTERS.clone(),
                         feature_option: FeatureOption::Baseline,
                         commitment_with_proof: None,

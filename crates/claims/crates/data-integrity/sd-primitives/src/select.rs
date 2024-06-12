@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashMap};
 
-use ssi_json_ld::{syntax::Value, Print};
+use ssi_json_ld::syntax::Value;
 use rdf_types::{BlankId, BlankIdBuf, LexicalQuad};
 
 use crate::{
@@ -27,19 +27,10 @@ impl From<DanglingJsonPointer> for SelectError {
 pub async fn select_canonical_nquads(
     loader: &impl ssi_json_ld::Loader,
     urn_scheme: &str,
-    pointers: Vec<JsonPointerBuf>,
+    pointers: &[JsonPointerBuf],
     label_map: &HashMap<BlankIdBuf, BlankIdBuf>,
     skolemized_compact_document: &ssi_json_ld::syntax::Object,
 ) -> Result<CanonicalNquadsSelection, SelectError> {
-    eprintln!("select pointers");
-    for pointer in &pointers {
-        eprintln!("{pointer}")
-    }
-    eprintln!(
-        "in {}",
-        Value::Object(skolemized_compact_document.clone()).pretty_print()
-    );
-
     let selection_document = select_json_ld(pointers, skolemized_compact_document)?;
 
     let deskolemized_quads = match selection_document.clone() {
@@ -53,20 +44,20 @@ pub async fn select_canonical_nquads(
 
     Ok(CanonicalNquadsSelection {
         // selection_document,
-        // deskolemized_quads,
+        deskolemized_quads,
         quads,
     })
 }
 
 pub struct CanonicalNquadsSelection {
     // selection_document: Option<json_ld::syntax::Object>,
-    // deskolemized_quads: Vec<LexicalQuad>,
+    pub deskolemized_quads: Vec<LexicalQuad>,
     pub quads: Vec<LexicalQuad>,
 }
 
 /// See: <https://www.w3.org/TR/vc-di-ecdsa/#selectjsonld>
 pub fn select_json_ld(
-    pointers: Vec<JsonPointerBuf>,
+    pointers: &[JsonPointerBuf],
     document: &ssi_json_ld::syntax::Object,
 ) -> Result<Option<ssi_json_ld::syntax::Object>, DanglingJsonPointer> {
     if pointers.is_empty() {
