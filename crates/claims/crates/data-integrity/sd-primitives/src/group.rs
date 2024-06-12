@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     collections::{BTreeMap, HashMap, HashSet},
     hash::Hash,
 };
@@ -33,7 +34,7 @@ pub enum GroupError {
 pub async fn canonicalize_and_group<T, N>(
     loader: &impl ssi_json_ld::Loader,
     label_map_factory_function: impl FnMut(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf>,
-    group_definitions: HashMap<N, Vec<JsonPointerBuf>>,
+    group_definitions: HashMap<N, Cow<'_, [JsonPointerBuf]>>,
     document: &T,
 ) -> Result<CanonicalizedAndGrouped<N>, GroupError>
 where
@@ -59,7 +60,7 @@ where
             select_canonical_nquads(
                 loader,
                 &skolemize.urn_scheme,
-                pointers,
+                &pointers,
                 &label_map,
                 &skolemized_compact_document,
             )
@@ -74,7 +75,7 @@ where
         let mut non_matching = BTreeMap::new();
 
         let selected_quads: HashSet<_> = selection_result.quads.into_iter().collect();
-        // let selected_deskolemized_quads = selection_result.deskolemized_quads;
+        let selected_deskolemized_quads = selection_result.deskolemized_quads;
 
         for (i, nq) in quads.iter().enumerate() {
             if selected_quads.contains(nq) {
@@ -90,7 +91,7 @@ where
             Group {
                 matching,
                 non_matching,
-                // deskolemized_quads: selected_deskolemized_quads,
+                deskolemized_quads: selected_deskolemized_quads,
             },
         );
     }
@@ -99,7 +100,7 @@ where
         groups,
         // skolemized_expanded_document,
         // skolemized_compact_document,
-        // deskolemized_quads,
+        deskolemized_quads,
         label_map,
         quads,
     })
@@ -109,7 +110,7 @@ pub struct CanonicalizedAndGrouped<N> {
     pub groups: HashMap<N, Group>,
     // skolemized_expanded_document: json_ld::ExpandedDocument,
     // skolemized_compact_document: json_ld::syntax::Object,
-    // deskolemized_quads: Vec<LexicalQuad>,
+    deskolemized_quads: Vec<LexicalQuad>,
     pub label_map: HashMap<BlankIdBuf, BlankIdBuf>,
     pub quads: Vec<LexicalQuad>,
 }
@@ -117,12 +118,12 @@ pub struct CanonicalizedAndGrouped<N> {
 pub struct Group {
     pub matching: BTreeMap<usize, LexicalQuad>,
     pub non_matching: BTreeMap<usize, LexicalQuad>,
-    // pub deskolemized_quads: Vec<LexicalQuad>,
+    pub deskolemized_quads: Vec<LexicalQuad>,
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{borrow::Cow, collections::HashMap};
 
     use hmac::{Hmac, Mac};
     use lazy_static::lazy_static;
@@ -207,7 +208,7 @@ mod tests {
         let label_map_factory_function = create_hmac_id_label_map_function(&mut hmac);
 
         let mut group_definitions = HashMap::new();
-        group_definitions.insert(Mandatory, MANDATORY_POINTERS.clone());
+        group_definitions.insert(Mandatory, Cow::Borrowed(MANDATORY_POINTERS.as_slice()));
 
         let result = canonicalize_and_group(
             &loader,

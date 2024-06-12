@@ -40,6 +40,10 @@ impl TransformationError {
     pub fn internal(e: impl ToString) -> Self {
         Self::Internal(e.to_string())
     }
+
+    pub fn json_ld_expansion(e: impl ToString) -> Self {
+        Self::JsonLdExpansion(e.to_string())
+    }
 }
 
 impl From<TransformationError> for SignatureError {

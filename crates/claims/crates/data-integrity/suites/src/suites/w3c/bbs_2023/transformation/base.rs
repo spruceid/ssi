@@ -1,25 +1,22 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{borrow::Cow, collections::HashMap, hash::Hash};
 
 use getrandom::getrandom;
 use hmac::{Hmac, Mac};
 use k256::sha2::Sha256;
-use rdf_types::BlankIdBuf;
 use ssi_data_integrity_core::suite::standard::TransformationError;
-use ssi_di_sd_primitives::{
-    canonicalize::create_hmac_id_label_map_function, group::canonicalize_and_group,
-};
+use ssi_di_sd_primitives::group::canonicalize_and_group;
 use ssi_json_ld::{Expandable, JsonLdNodeObject, ExpandedDocument};
-use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
+use ssi_rdf::LexicalInterpretation;
 
-use crate::bbs_2023::{Bbs2023BaseInputOptions, HmacKey};
+use crate::bbs_2023::{Bbs2023InputOptions, HmacKey};
 
-use super::TransformedBase;
+use super::{create_shuffled_id_label_map_function, TransformedBase};
 
 pub async fn base_proof_transformation<T>(
     loader: &impl ssi_json_ld::Loader,
     unsecured_document: &T,
     canonical_configuration: Vec<String>,
-    transform_options: Bbs2023BaseInputOptions,
+    transform_options: Bbs2023InputOptions,
 ) -> Result<TransformedBase, TransformationError>
 where
     T: JsonLdNodeObject + Expandable,
@@ -40,7 +37,10 @@ where
     let mut hmac = Hmac::<Sha256>::new_from_slice(&hmac_key).unwrap();
 
     let mut group_definitions = HashMap::new();
-    group_definitions.insert(Mandatory, transform_options.mandatory_pointers.clone());
+    group_definitions.insert(
+        Mandatory,
+        Cow::Borrowed(transform_options.mandatory_pointers.as_slice()),
+    );
 
     let label_map_factory_function = create_shuffled_id_label_map_function(&mut hmac);
 
@@ -70,34 +70,9 @@ where
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Mandatory;
 
-/// Creates a label map factory function that uses an HMAC to shuffle canonical
-/// blank node identifiers.
-///
-/// See: <https://www.w3.org/TR/vc-di-bbs/#createshuffledidlabelmapfunction>
-pub fn create_shuffled_id_label_map_function(
-    hmac: &mut Hmac<Sha256>,
-) -> impl '_ + FnMut(&NormalizingSubstitution) -> HashMap<BlankIdBuf, BlankIdBuf> {
-    |canonical_map| {
-        let mut map = create_hmac_id_label_map_function(hmac)(canonical_map);
-
-        let mut hmac_ids: Vec<_> = map.values().cloned().collect();
-        hmac_ids.sort();
-
-        let mut bnode_keys: Vec<_> = map.keys().cloned().collect();
-        bnode_keys.sort();
-
-        for key in bnode_keys {
-            let i = hmac_ids.binary_search(&map[&key]).unwrap();
-            map.insert(key, BlankIdBuf::new(format!("_:b{}", i)).unwrap());
-        }
-
-        map
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{borrow::Cow, collections::HashMap};
 
     use hmac::{Hmac, Mac};
     use k256::sha2::Sha256;
@@ -111,10 +86,7 @@ mod tests {
     use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
     use crate::{
-        bbs_2023::{
-            Bbs2023BaseInputOptions, Bbs2023InputOptions, Bbs2023Transformation, FeatureOption,
-            HmacKey,
-        },
+        bbs_2023::{Bbs2023InputOptions, Bbs2023Transformation, FeatureOption, HmacKey},
         Bbs2023,
     };
 
@@ -192,7 +164,7 @@ mod tests {
         let mut hmac = Hmac::<Sha256>::new_from_slice(&hmac_key).unwrap();
 
         let mut group_definitions = HashMap::new();
-        group_definitions.insert(Mandatory, MANDATORY_POINTERS.clone());
+        group_definitions.insert(Mandatory, Cow::Borrowed(MANDATORY_POINTERS.as_slice()));
 
         let label_map_factory_function = create_shuffled_id_label_map_function(&mut hmac);
 
@@ -262,12 +234,12 @@ mod tests {
             &context,
             &*CREDENTIAL,
             proof_configuration.borrowed(),
-            Some(Bbs2023InputOptions::Base(Bbs2023BaseInputOptions {
+            Some(Bbs2023InputOptions {
                 mandatory_pointers: MANDATORY_POINTERS.clone(),
                 feature_option: FeatureOption::Baseline,
                 commitment_with_proof: None,
                 hmac_key: Some(hmac_key),
-            })),
+            }),
         )
         .await
         .unwrap()
