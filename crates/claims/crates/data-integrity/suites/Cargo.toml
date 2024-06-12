@@ -143,7 +143,7 @@ p256 = { workspace = true, optional = true, features = ["ecdsa"] }
 p384 = { workspace = true, optional = true, features = ["ecdsa"] }
 sha2 = { workspace = true, optional = true }
 
-# only needed by non LD suites and EIP-712.
+# only needed by non LD suites, EIP-712 and BBS.
 json-syntax = { workspace = true, features = ["canonicalize"] }
 serde_json = { workspace = true, optional = true }
 serde_jcs = { workspace = true, optional = true }
@@ -164,6 +164,8 @@ hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
 ssi-vc.workspace = true
 nquads-syntax.workspace = true
+serde_json.workspace = true
+json-syntax = { workspace = true, features = ["serde_json"] }
 
 [package.metadata.docs.rs]
 all-features = true

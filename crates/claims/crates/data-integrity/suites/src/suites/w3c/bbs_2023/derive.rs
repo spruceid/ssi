@@ -216,10 +216,11 @@ where
     let selective_match = &selective_group.matching;
     let mandatory_non_match = &mandatory_group.non_matching;
     let non_mandatory_indexes: Vec<_> = mandatory_non_match.keys().copied().collect();
-    let mut selective_indexes = Vec::with_capacity(mandatory_match.len());
+    let mut selective_indexes = Vec::with_capacity(mandatory_non_match.len());
     for i in selective_match.keys() {
-        let offset = non_mandatory_indexes.binary_search(i).unwrap();
-        selective_indexes.push(offset);
+        if let Ok(offset) = non_mandatory_indexes.binary_search(i) {
+            selective_indexes.push(offset);
+        }
     }
 
     let bbs_messages: Vec<_> = mandatory_non_match
@@ -287,4 +288,155 @@ enum Group {
     Mandatory,
     Selective,
     Combined,
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use json_syntax::{Parse, UnorderedPartialEq};
+    use lazy_static::lazy_static;
+    use rdf_types::BlankIdBuf;
+    use ssi_bbs::BBSplusPublicKey;
+    use ssi_data_integrity_core::DataIntegrity;
+    use ssi_di_sd_primitives::{select::select_json_ld, JsonPointerBuf};
+    use ssi_json_ld::JsonLdEnvironment;
+    use ssi_vc::v2::JsonCredential;
+    use ssi_verification_methods::Multikey;
+    use static_iref::{iri, uri};
+
+    use crate::{bbs_2023::Bbs2023Signature, Bbs2023};
+
+    use super::{create_disclosure_data, DerivedFeatureOption, DisclosureData};
+
+    const PUBLIC_KEY_HEX: &str = "a4ef1afa3da575496f122b9b78b8c24761531a8a093206ae7c45b80759c168ba4f7a260f9c3367b6c019b4677841104b10665edbe70ba3ebe7d9cfbffbf71eb016f70abfbb163317f372697dc63efd21fc55764f63926a8f02eaea325a2a888f";
+    const PRESENTATION_HEADER_HEX: &str = "113377aa";
+
+    // TODO this can't be used because the BBS API (based on zkryptium) does not
+    // allow providing a seed.
+    // const PSEUDO_RANDOM_SEED_HEX: &str = "332e313431353932363533353839373933323338343632363433333833323739";
+
+    const BBS_PROOF_HEX: &str = "85b72d74b55aae76e4f8e986387352f6d3e13f19387f5935a9f34c59aa3af77885501ef1dba67576bd24e6dab1b1c5b3891671112c26982c441d4f352e1bc8f5451127fbda2ad240d9a5d6933f455db741cc3e79d3281bc5b611118b363461f2b6a5ecdd423f6b76711680824665f50eec1f5cbaf219ee90e66ceac575146d1a8935f770be6d29a376b00e4e39a4fa7755ecf4eb42aa3babfd6e48bb23e91081f08d0d259b4029683d01c25378be3c61213a097750b8ce2a3c0915061a547405b3ce587d1d8299269fad29103509b3e53067f7b6078e9dc66a5112192aede3662e6dac5876d945fd05863fb249b0fca02e10ab5173650ef665e92c3ea72eaba94fca860cd6c639538e5156f8cbc3b4d222f7a11f837bb9e76ba54d58c1b4ac834ef338a3db4bf645b4622153c897f477255f40e4fcc7919348ae5bf9032a9f7c0876e47a6666ca9f178673ac7a41b864480d8e84c6655cd2f0e1866dedc467590a2ba76c28cb41f3d5582e0773b737914b8353fea4df918a022aa5aa92f490f0b3c2edf4a4d5538b8d07aa2530f118863e654eeaaac69c2c020509c24294c13bda721c73b8610bbce7e7030d1710dd5148731a5026c741d1da9e0693d32b90d09bb58a8e4a295a32fb27f654a03c31c56e6c3afb1aa3f2fa240f5095f31fe8b95f8179bc4408cf96713f3aec6a06409a6f1486a99d9923befdb274d3e04f6faa9bf316ce9a2c4f5e1bc6db031593323b";
+
+    lazy_static! {
+        static ref MANDATORY_POINTERS: [JsonPointerBuf; 5] = [
+            "/issuer".parse().unwrap(),
+            "/credentialSubject/sailNumber".parse().unwrap(),
+            "/credentialSubject/sails/1".parse().unwrap(),
+            "/credentialSubject/boards/0/year".parse().unwrap(),
+            "/credentialSubject/sails/2".parse().unwrap()
+        ];
+        static ref SELECTIVE_POINTERS: [JsonPointerBuf; 2] = [
+            "/credentialSubject/boards/0".parse().unwrap(),
+            "/credentialSubject/boards/1".parse().unwrap()
+        ];
+        static ref SIGNED_BASE_DOCUMENT: json_syntax::Object =
+            json_syntax::Value::parse_str(include_str!("tests/signed-base-document.jsonld"))
+                .unwrap()
+                .0
+                .into_object()
+                .unwrap();
+        static ref UNSIGNED_REVEAL_DOCUMENT: json_syntax::Object =
+            json_syntax::Value::parse_str(include_str!("tests/unsigned-reveal-document.jsonld"))
+                .unwrap()
+                .0
+                .into_object()
+                .unwrap();
+        static ref PUBLIC_KEY: BBSplusPublicKey =
+            BBSplusPublicKey::from_bytes(&hex::decode(PUBLIC_KEY_HEX).unwrap()).unwrap();
+        static ref PRESENTATION_HEADER: Vec<u8> = hex::decode(PRESENTATION_HEADER_HEX).unwrap();
+        static ref LABEL_MAP: HashMap<BlankIdBuf, BlankIdBuf> = [
+            ("_:c14n0".parse().unwrap(), "_:b2".parse().unwrap()),
+            ("_:c14n1".parse().unwrap(), "_:b4".parse().unwrap()),
+            ("_:c14n2".parse().unwrap(), "_:b3".parse().unwrap()),
+            ("_:c14n3".parse().unwrap(), "_:b7".parse().unwrap()),
+            ("_:c14n4".parse().unwrap(), "_:b6".parse().unwrap()),
+            ("_:c14n5".parse().unwrap(), "_:b0".parse().unwrap())
+        ]
+        .into_iter()
+        .collect();
+        static ref BBS_PROOF: Vec<u8> = hex::decode(BBS_PROOF_HEX).unwrap();
+    }
+
+    #[test]
+    fn reveal_document() {
+        let mut combined_pointers = MANDATORY_POINTERS.to_vec();
+        combined_pointers.extend(SELECTIVE_POINTERS.iter().cloned());
+
+        let mut document = SIGNED_BASE_DOCUMENT.clone();
+        document.remove("proof");
+
+        let reveal_document = select_json_ld(&combined_pointers, &document)
+            .unwrap()
+            .unwrap_or_default();
+
+        assert!(reveal_document.unordered_eq(&UNSIGNED_REVEAL_DOCUMENT))
+    }
+
+    #[async_std::test]
+    async fn disclosure_data() {
+        let signed_base: DataIntegrity<JsonCredential, Bbs2023> =
+            json_syntax::from_value(json_syntax::Value::Object(SIGNED_BASE_DOCUMENT.clone()))
+                .unwrap();
+
+        let verification_method = Multikey::from_public_key(
+            iri!("did:method:id").to_owned(),
+            uri!("did:method:controller").to_owned(),
+            &*PUBLIC_KEY,
+        );
+
+        let mut context = JsonLdEnvironment::default();
+
+        eprintln!(
+            "signature = {}",
+            signed_base.proofs.first().unwrap().signature.proof_value
+        );
+
+        let data = create_disclosure_data(
+            &mut context,
+            &signed_base.claims,
+            &verification_method,
+            &signed_base.proofs.first().unwrap().signature,
+            SELECTIVE_POINTERS.to_vec(),
+            Some(&PRESENTATION_HEADER),
+            &DerivedFeatureOption::Baseline,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            data.mandatory_indexes,
+            [0, 1, 2, 5, 6, 8, 9, 10, 14, 15, 16, 17, 18, 19]
+        );
+        assert_eq!(data.selective_indexes, [3, 4, 5, 8, 9, 10]);
+
+        // TODO this can't be tested because the BBS API (based on zkryptium)
+        // does not allow providing a seed.
+        // assert_eq!(data.bbs_proof, *BBS_PROOF);
+
+        assert_eq!(data.label_map, *LABEL_MAP);
+    }
+
+    #[test]
+    fn encode_derived() {
+        let data = DisclosureData {
+            bbs_proof: BBS_PROOF.clone(),
+            label_map: LABEL_MAP.clone(),
+            mandatory_indexes: [0, 1, 2, 5, 6, 8, 9, 10, 14, 15, 16, 17, 18, 19].to_vec(),
+            selective_indexes: [3, 4, 5, 8, 9, 10].to_vec(),
+            reveal_document: UNSIGNED_REVEAL_DOCUMENT.clone(),
+        };
+
+        let signature = Bbs2023Signature::encode_derived(
+            &data.bbs_proof,
+            &data.label_map,
+            &data.mandatory_indexes,
+            &data.selective_indexes,
+            Some(&PRESENTATION_HEADER),
+            &DerivedFeatureOption::Baseline,
+        )
+        .unwrap();
+
+        assert_eq!(signature.proof_value.as_str(), "u2V0DhVkCEIW3LXS1Wq525PjphjhzUvbT4T8ZOH9ZNanzTFmqOvd4hVAe8dumdXa9JObasbHFs4kWcREsJpgsRB1PNS4byPVFESf72irSQNml1pM_RV23Qcw-edMoG8W2ERGLNjRh8ral7N1CP2t2cRaAgkZl9Q7sH1y68hnukOZs6sV1FG0aiTX3cL5tKaN2sA5OOaT6d1Xs9OtCqjur_W5IuyPpEIHwjQ0lm0ApaD0BwlN4vjxhIToJd1C4zio8CRUGGlR0BbPOWH0dgpkmn60pEDUJs-UwZ_e2B46dxmpREhkq7eNmLm2sWHbZRf0Fhj-ySbD8oC4Qq1FzZQ72ZeksPqcuq6lPyoYM1sY5U45RVvjLw7TSIvehH4N7uedrpU1YwbSsg07zOKPbS_ZFtGIhU8iX9HclX0Dk_MeRk0iuW_kDKp98CHbkemZmyp8XhnOsekG4ZEgNjoTGZVzS8OGGbe3EZ1kKK6dsKMtB89VYLgdztzeRS4NT_qTfkYoCKqWqkvSQ8LPC7fSk1VOLjQeqJTDxGIY-ZU7qqsacLAIFCcJClME72nIcc7hhC7zn5wMNFxDdUUhzGlAmx0HR2p4Gk9MrkNCbtYqOSilaMvsn9lSgPDHFbmw6-xqj8vokD1CV8x_ouV-BebxECM-WcT867GoGQJpvFIapnZkjvv2ydNPgT2-qm_MWzposT14bxtsDFZMyO6YAAgEEAgMDBwQGBQCOAAECBQYICQoODxAREhOGAwQFCAkKRBEzd6o");
+    }
 }

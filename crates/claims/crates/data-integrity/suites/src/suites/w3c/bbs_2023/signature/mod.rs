@@ -1,5 +1,5 @@
 use crate::Bbs2023;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ssi_bbs::Bbs;
 use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_data_integrity_core::{
@@ -22,9 +22,12 @@ impl From<InvalidBbs2023Signature> for ProofValidationError {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+#[error("unsupported bbs-2023 signature type")]
 pub struct UnsupportedBbs2023Signature;
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Bbs2023Signature {
     pub proof_value: MultibaseBuf,
 }

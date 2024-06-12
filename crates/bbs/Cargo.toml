@@ -10,5 +10,5 @@ documentation = "https://docs.rs/ssi-bbs/"
 
 [dependencies]
 ssi-claims-core.workspace = true
-ssi-verification-methods = { workspace = true, features = ["ed25519", "bls12-381"] }
+ssi-verification-methods = { workspace = true, features = ["bls12-381"] }
 zkryptium = "0.2.2"

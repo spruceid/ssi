@@ -11,6 +11,7 @@ use ssi_rdf::{
     generator, interpretation::WithGenerator, Interpretation, LdEnvironment, Vocabulary,
     VocabularyMut,
 };
+use serde::{Deserialize, Serialize};
 
 mod contexts;
 pub use contexts::*;
@@ -40,7 +41,8 @@ pub enum JsonLdError {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct CompactJsonLd(pub json_syntax::Value);
 
 impl CompactJsonLd {
