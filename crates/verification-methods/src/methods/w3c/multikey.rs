@@ -1,6 +1,5 @@
 use iref::{Iri, IriBuf, UriBuf};
 use multibase::Base;
-use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
 use ssi_jwk::JWK;
@@ -103,7 +102,7 @@ impl Multikey {
     pub fn generate_ed25519_key_pair(
         id: IriBuf,
         controller: UriBuf,
-        csprng: &mut (impl RngCore + CryptoRng),
+        csprng: &mut (impl rand_core::RngCore + rand_core::CryptoRng),
     ) -> (Self, ed25519_dalek::SigningKey) {
         let key = ed25519_dalek::SigningKey::generate(csprng);
         (
@@ -155,10 +154,12 @@ impl Multikey {
 }
 
 pub enum SecretKeyRef<'a> {
+    #[cfg(feature = "ed25519")]
     Ed25519(&'a ed25519_dalek::SigningKey),
     Jwk(&'a JWK),
 }
 
+#[cfg(feature = "ed25519")]
 impl<'a> From<&'a ed25519_dalek::SigningKey> for SecretKeyRef<'a> {
     fn from(value: &'a ed25519_dalek::SigningKey) -> Self {
         Self::Ed25519(value)
@@ -206,6 +207,7 @@ impl VerifyBytes<ssi_jwk::Algorithm> for Multikey {
     }
 }
 
+#[cfg(feature = "ed25519")]
 impl VerifyBytes<ssi_jwk::algorithm::EdDSA> for Multikey {
     fn verify_bytes(
         &self,
@@ -240,6 +242,7 @@ impl SigningMethod<JWK, ssi_jwk::Algorithm> for Multikey {
     }
 }
 
+#[cfg(feature = "ed25519")]
 impl SigningMethod<ed25519_dalek::SigningKey, ssi_jwk::algorithm::EdDSA> for Multikey {
     fn sign_bytes(
         &self,

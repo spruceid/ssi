@@ -1,11 +1,13 @@
 //! Data Integrity BBS Cryptosuite 2023 (v1.0) implementation.
 //!
 //! See: <https://www.w3.org/TR/vc-di-bbs/#bbs-2023>
+use ssi_claims_core::DefaultEnvironment;
 use ssi_data_integrity_core::{
     suite::{ConfigurationAlgorithm, ConfigurationError, InputProofOptions},
-    ProofConfiguration, StandardCryptographicSuite, TypeRef,
+    ProofConfiguration, StandardCryptographicSuite, Type, TypeRef, UnsupportedProofSuite,
 };
 use ssi_di_sd_primitives::JsonPointerBuf;
+use ssi_json_ld::JsonLdEnvironment;
 use ssi_verification_methods::Multikey;
 
 pub(crate) mod transformation;
@@ -42,6 +44,21 @@ impl StandardCryptographicSuite for Bbs2023 {
     fn type_(&self) -> TypeRef {
         TypeRef::DataIntegrityProof("bbs-2023")
     }
+}
+
+impl TryFrom<Type> for Bbs2023 {
+    type Error = UnsupportedProofSuite;
+
+    fn try_from(value: Type) -> Result<Self, Self::Error> {
+        match value {
+            Type::DataIntegrityProof(c) if c == "bbs-2023" => Ok(Self),
+            ty => Err(UnsupportedProofSuite::Compact(ty)),
+        }
+    }
+}
+
+impl DefaultEnvironment for Bbs2023 {
+    type Environment = JsonLdEnvironment;
 }
 
 #[derive(Clone)]

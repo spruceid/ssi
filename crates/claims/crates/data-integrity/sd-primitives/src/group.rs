@@ -79,7 +79,6 @@ where
 
         for (i, nq) in quads.iter().enumerate() {
             if selected_quads.contains(nq) {
-                eprintln!("matching {i} => {nq} .");
                 matching.insert(i, nq.clone());
             } else {
                 non_matching.insert(i, nq.clone());
@@ -100,7 +99,7 @@ where
         groups,
         // skolemized_expanded_document,
         // skolemized_compact_document,
-        deskolemized_quads,
+        // deskolemized_quads,
         label_map,
         quads,
     })
@@ -110,7 +109,7 @@ pub struct CanonicalizedAndGrouped<N> {
     pub groups: HashMap<N, Group>,
     // skolemized_expanded_document: json_ld::ExpandedDocument,
     // skolemized_compact_document: json_ld::syntax::Object,
-    deskolemized_quads: Vec<LexicalQuad>,
+    // deskolemized_quads: Vec<LexicalQuad>,
     pub label_map: HashMap<BlankIdBuf, BlankIdBuf>,
     pub quads: Vec<LexicalQuad>,
 }

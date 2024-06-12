@@ -1,4 +1,4 @@
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use iref::{Iri, IriBuf};
 use ssi_claims_core::{ProofValidationError, SignatureError};
@@ -164,6 +164,26 @@ impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
         options: ResolutionOptions,
     ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
         T::resolve_verification_method_with(self, issuer, method, options).await
+    }
+}
+
+impl<M: VerificationMethod> VerificationMethodResolver for HashMap<IriBuf, M> {
+    type Method = M;
+
+    async fn resolve_verification_method_with(
+        &self,
+        _issuer: Option<&Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+        _options: ResolutionOptions,
+    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+        match method {
+            Some(ReferenceOrOwnedRef::Owned(method)) => Ok(Cow::Owned(method.clone())),
+            Some(ReferenceOrOwnedRef::Reference(iri)) => match self.get(iri) {
+                Some(method) => Ok(Cow::Borrowed(method)),
+                None => Err(VerificationMethodResolutionError::UnknownKey),
+            },
+            None => Err(VerificationMethodResolutionError::MissingVerificationMethod),
+        }
     }
 }
 

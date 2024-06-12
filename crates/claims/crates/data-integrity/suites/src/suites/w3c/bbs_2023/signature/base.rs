@@ -209,12 +209,13 @@ impl Bbs2023Signature {
         };
 
         let mut mandatory_pointers = Vec::with_capacity(mandatory_pointers_values.len());
+
         for value in mandatory_pointers_values {
-            let serde_cbor::Value::Bytes(bytes) = value else {
+            let serde_cbor::Value::Text(text) = value else {
                 return Err(InvalidBbs2023Signature);
             };
 
-            let pointer = JsonPointerBuf::from_bytes(bytes).map_err(|_| InvalidBbs2023Signature)?;
+            let pointer = JsonPointerBuf::new(text).map_err(|_| InvalidBbs2023Signature)?;
 
             mandatory_pointers.push(pointer);
         }

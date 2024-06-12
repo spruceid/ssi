@@ -90,6 +90,7 @@ pub struct TypedObject {
 
 pub(crate) mod value_or_array {
     use serde::{Deserialize, Serialize};
+    use ssi_core::OneOrMany;
 
     pub fn serialize<T: Serialize, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -101,20 +102,13 @@ pub(crate) mod value_or_array {
         }
     }
 
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum SingleOrArray<T> {
-        Array(Vec<T>),
-        Single(T),
-    }
-
     pub fn deserialize<'de, T: Deserialize<'de>, D>(deserializer: D) -> Result<Vec<T>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        match SingleOrArray::deserialize(deserializer)? {
-            SingleOrArray::Array(v) => Ok(v),
-            SingleOrArray::Single(t) => Ok(vec![t]),
+        match OneOrMany::deserialize(deserializer)? {
+            OneOrMany::Many(v) => Ok(v),
+            OneOrMany::One(t) => Ok(vec![t]),
         }
     }
 }
