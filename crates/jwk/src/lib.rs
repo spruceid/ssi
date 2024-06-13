@@ -314,9 +314,7 @@ impl JWK {
     }
 
     #[cfg(feature = "secp256k1")]
-    pub fn generate_secp256k1_from(
-        rng: &mut (impl rand::CryptoRng + rand::RngCore),
-    ) -> JWK {
+    pub fn generate_secp256k1_from(rng: &mut (impl rand::CryptoRng + rand::RngCore)) -> JWK {
         let secret_key = k256::SecretKey::random(rng);
         let sk_bytes = zeroize::Zeroizing::new(secret_key.to_bytes().to_vec());
         let public_key = secret_key.public_key();

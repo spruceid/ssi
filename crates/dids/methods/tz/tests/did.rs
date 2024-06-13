@@ -358,8 +358,7 @@ async fn credential_prove_verify_did_tz2() {
     assert!(vc_bad_issuer.verify(&params).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
-    let wrong_signer =
-        SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng)).into_local();
+    let wrong_signer = SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng)).into_local();
     let vc_wrong_key = suite
         .sign(
             vc.claims.clone(),

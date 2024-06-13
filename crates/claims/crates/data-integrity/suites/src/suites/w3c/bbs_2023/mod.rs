@@ -25,6 +25,9 @@ pub use derive::*;
 
 mod verification;
 
+#[cfg(test)]
+mod tests;
+
 /// The `bbs-2023` cryptographic suite.
 #[derive(Debug, Clone, Copy)]
 pub struct Bbs2023;

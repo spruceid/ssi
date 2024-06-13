@@ -24,9 +24,9 @@ impl JsonPointer {
     }
 
     /// Converts the given string into a JSON pointer without validation.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// The input string *must* be a valid JSON pointer.
     pub unsafe fn new_unchecked(s: &str) -> &Self {
         std::mem::transmute(s)
@@ -171,9 +171,9 @@ pub struct ReferenceToken(str);
 impl ReferenceToken {
     /// Converts the given string into a JSON pointer reference token without
     /// validation.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// The input string *must* be a valid JSON pointer reference token.
     pub unsafe fn new_unchecked(s: &str) -> &Self {
         std::mem::transmute(s)

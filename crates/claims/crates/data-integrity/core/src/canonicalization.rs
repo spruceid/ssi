@@ -6,7 +6,10 @@ use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
 
 use crate::{
     hashing::ConcatOutputSize,
-    suite::{standard::{self, HashingAlgorithm, TransformationAlgorithm, TransformationError}, TransformationOptions},
+    suite::{
+        standard::{self, HashingAlgorithm, TransformationAlgorithm, TransformationError},
+        TransformationOptions,
+    },
     CryptographicSuite, ProofConfigurationRef, SerializeCryptographicSuite,
     StandardCryptographicSuite,
 };

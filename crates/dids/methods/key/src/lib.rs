@@ -44,13 +44,19 @@ impl DIDKey {
             Params::OKP(ref params) => match &params.curve[..] {
                 "Ed25519" => multibase::encode(
                     multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode_bytes(ssi_multicodec::ED25519_PUB, &params.public_key.0)
-                        .into_bytes(),
+                    MultiEncodedBuf::encode_bytes(
+                        ssi_multicodec::ED25519_PUB,
+                        &params.public_key.0,
+                    )
+                    .into_bytes(),
                 ),
                 "Bls12381G2" => multibase::encode(
                     multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode_bytes(ssi_multicodec::BLS12_381_G2_PUB, &params.public_key.0)
-                        .into_bytes(),
+                    MultiEncodedBuf::encode_bytes(
+                        ssi_multicodec::BLS12_381_G2_PUB,
+                        &params.public_key.0,
+                    )
+                    .into_bytes(),
                 ),
                 _ => return Err(GenerateError::UnsupportedCurve(params.curve.clone())),
             },

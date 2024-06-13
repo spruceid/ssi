@@ -18,7 +18,10 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-use super::{ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification, TransformationOptions};
+use super::{
+    ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification,
+    TransformationOptions,
+};
 
 // mod test_bbs;
 
@@ -124,7 +127,7 @@ where
         signers: T,
         claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
-        transformation_options: TransformationOptions<Self>
+        transformation_options: TransformationOptions<Self>,
     ) -> Result<Self::Signature, SignatureError> {
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),

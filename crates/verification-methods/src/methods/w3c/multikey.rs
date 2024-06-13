@@ -6,7 +6,8 @@ use ssi_jwk::JWK;
 use ssi_multicodec::{Codec, MultiCodec, MultiEncodedBuf};
 use ssi_security::MultibaseBuf;
 use ssi_verification_methods_core::{
-    MaybeJwkVerificationMethod, MessageSignatureError, SigningMethod, VerificationMethodSet, VerifyBytes
+    MaybeJwkVerificationMethod, MessageSignatureError, SigningMethod, VerificationMethodSet,
+    VerifyBytes,
 };
 use static_iref::iri;
 use std::{borrow::Cow, hash::Hash};

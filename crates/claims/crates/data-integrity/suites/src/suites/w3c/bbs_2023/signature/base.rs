@@ -295,7 +295,7 @@ impl Bbs2023Signature {
                     },
                 })
             }
-            _ => Err(InvalidBbs2023Signature)
+            _ => Err(InvalidBbs2023Signature),
         }
     }
 }

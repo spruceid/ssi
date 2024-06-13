@@ -1,11 +1,10 @@
 use iref::IriBuf;
-use ssi_json_ld::{
-    context_processing::{Process, ProcessedOwned}, syntax::Value, Compact, ExpandedDocument, JsonLdProcessor, RemoteDocument
-};
 use linked_data::IntoQuadsError;
-use rdf_types::{
-    generator,
-    BlankId, BlankIdBuf, Id, LexicalQuad, Term,
+use rdf_types::{generator, BlankId, BlankIdBuf, Id, LexicalQuad, Term};
+use ssi_json_ld::{
+    context_processing::{Process, ProcessedOwned},
+    syntax::Value,
+    Compact, ExpandedDocument, JsonLdProcessor, RemoteDocument,
 };
 use ssi_json_ld::{Expandable, JsonLdObject};
 use ssi_rdf::LexicalInterpretation;
@@ -154,12 +153,14 @@ impl Skolemize {
         T: JsonLdObject + Expandable,
         T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>,
     {
-        let expanded = document
+        let mut expanded = document
             .expand(loader)
             .await
-            .map_err(SkolemError::json_ld_expansion)?;
+            .map_err(SkolemError::json_ld_expansion)?
+            .into();
+        expanded.canonicalize();
 
-        let skolemized_expanded_document = self.expanded_document(expanded.into());
+        let skolemized_expanded_document = self.expanded_document(expanded);
 
         let processed_context: ProcessedOwned<IriBuf, BlankIdBuf> = match document.json_ld_context()
         {
@@ -197,12 +198,8 @@ impl Skolemize {
             |i| i,
             |id| match id {
                 ssi_json_ld::Id::Valid(id) => match id {
-                    Id::Blank(b) => {
-                        ssi_json_ld::Id::Valid(Id::Iri(self.blank_id(&b)))
-                    }
-                    Id::Iri(i) => {
-                        ssi_json_ld::Id::Valid(Id::Iri(i))
-                    }
+                    Id::Blank(b) => ssi_json_ld::Id::Valid(Id::Iri(self.blank_id(&b))),
+                    Id::Iri(i) => ssi_json_ld::Id::Valid(Id::Iri(i)),
                 },
                 ssi_json_ld::Id::Invalid(s) => ssi_json_ld::Id::Invalid(s),
             },

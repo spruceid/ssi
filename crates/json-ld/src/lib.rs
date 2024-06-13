@@ -7,11 +7,11 @@ use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
 pub use json_ld;
 pub use json_ld::*;
+use serde::{Deserialize, Serialize};
 use ssi_rdf::{
     generator, interpretation::WithGenerator, Interpretation, LdEnvironment, Vocabulary,
     VocabularyMut,
 };
-use serde::{Deserialize, Serialize};
 
 mod contexts;
 pub use contexts::*;

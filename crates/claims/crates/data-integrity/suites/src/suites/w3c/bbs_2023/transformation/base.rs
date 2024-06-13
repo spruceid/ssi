@@ -5,7 +5,7 @@ use hmac::{Hmac, Mac};
 use k256::sha2::Sha256;
 use ssi_data_integrity_core::suite::standard::TransformationError;
 use ssi_di_sd_primitives::group::canonicalize_and_group;
-use ssi_json_ld::{Expandable, JsonLdNodeObject, ExpandedDocument};
+use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
 use ssi_rdf::LexicalInterpretation;
 
 use crate::bbs_2023::{Bbs2023InputOptions, HmacKey};
@@ -20,7 +20,7 @@ pub async fn base_proof_transformation<T>(
 ) -> Result<TransformedBase, TransformationError>
 where
     T: JsonLdNodeObject + Expandable,
-    T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>
+    T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>,
 {
     // Base Proof Transformation algorithm.
     // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-transformation-bbs-2023>
@@ -76,13 +76,11 @@ mod tests {
 
     use hmac::{Hmac, Mac};
     use k256::sha2::Sha256;
-    use lazy_static::lazy_static;
     use ssi_data_integrity_core::{
         suite::standard::TypedTransformationAlgorithm, ProofConfiguration,
     };
     use ssi_di_sd_primitives::{group::canonicalize_and_group, JsonPointerBuf};
     use ssi_rdf::IntoNQuads;
-    use ssi_vc::v2::syntax::JsonCredential;
     use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
     use crate::{
@@ -90,70 +88,7 @@ mod tests {
         Bbs2023,
     };
 
-    use super::{create_shuffled_id_label_map_function, Mandatory};
-
-    const HMAC_KEY_STRING: &str =
-        "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF";
-
-    lazy_static! {
-        pub static ref CREDENTIAL: JsonCredential = json_syntax::from_value(json_syntax::json!({
-            "@context": [
-              "https://www.w3.org/ns/credentials/v2",
-              {
-                "@vocab": "https://windsurf.grotto-networking.com/selective#"
-              }
-            ],
-            "type": [
-              "VerifiableCredential"
-            ],
-            "issuer": "https://vc.example/windsurf/racecommittee",
-            "credentialSubject": {
-              "sailNumber": "Earth101",
-              "sails": [
-                {
-                  "size": 5.5,
-                  "sailName": "Kihei",
-                  "year": 2023
-                },
-                {
-                  "size": 6.1,
-                  "sailName": "Lahaina",
-                  "year": 2023
-                },
-                {
-                  "size": 7.0,
-                  "sailName": "Lahaina",
-                  "year": 2020
-                },
-                {
-                  "size": 7.8,
-                  "sailName": "Lahaina",
-                  "year": 2023
-                }
-              ],
-              "boards": [
-                {
-                  "boardName": "CompFoil170",
-                  "brand": "Wailea",
-                  "year": 2022
-                },
-                {
-                  "boardName": "Kanaha Custom",
-                  "brand": "Wailea",
-                  "year": 2019
-                }
-              ]
-            }
-        }))
-        .unwrap();
-        pub static ref MANDATORY_POINTERS: Vec<JsonPointerBuf> = vec![
-            "/issuer".parse().unwrap(),
-            "/credentialSubject/sailNumber".parse().unwrap(),
-            "/credentialSubject/sails/1".parse().unwrap(),
-            "/credentialSubject/boards/0/year".parse().unwrap(),
-            "/credentialSubject/sails/2".parse().unwrap()
-        ];
-    }
+    use super::{super::super::tests::*, create_shuffled_id_label_map_function, Mandatory};
 
     #[async_std::test]
     async fn hmac_canonicalize_and_group() {
@@ -172,7 +107,7 @@ mod tests {
             &loader,
             label_map_factory_function,
             group_definitions,
-            &*CREDENTIAL,
+            &*UNSIGNED_BASE_DOCUMENT,
         )
         .await
         .unwrap();
@@ -228,7 +163,7 @@ mod tests {
 
         let transformed = Bbs2023Transformation::transform(
             &context,
-            &*CREDENTIAL,
+            &*UNSIGNED_BASE_DOCUMENT,
             proof_configuration.borrowed(),
             Some(Bbs2023InputOptions {
                 mandatory_pointers: MANDATORY_POINTERS.clone(),

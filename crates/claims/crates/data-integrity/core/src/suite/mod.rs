@@ -80,7 +80,8 @@ pub trait CryptographicSuite: Clone {
     where
         Self: CryptographicSuiteSigning<T, C, R, S>,
     {
-        let (proof_configuration, transformation_options) = self.configure(proof_options, signature_options)?;
+        let (proof_configuration, transformation_options) =
+            self.configure(proof_options, signature_options)?;
         let proof_configuration_ref = proof_configuration.borrowed();
         let signature = self
             .generate_signature(
@@ -89,7 +90,7 @@ pub trait CryptographicSuite: Clone {
                 signer,
                 &unsecured_document,
                 proof_configuration_ref,
-                transformation_options
+                transformation_options,
             )
             .await?;
 
@@ -116,7 +117,7 @@ pub trait CryptographicSuite: Clone {
             resolver,
             signer,
             proof_options,
-            Default::default()
+            Default::default(),
         )
         .await
     }

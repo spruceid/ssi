@@ -120,26 +120,15 @@ fn create_verify_data3<'a>(
 
 #[cfg(test)]
 mod tests {
-    use iref::Iri;
-    use lazy_static::lazy_static;
-    use ssi_bbs::BBSplusPublicKey;
     use ssi_claims_core::VerifiableClaims;
     use ssi_data_integrity_core::DataIntegrity;
-    use ssi_vc::v2::JsonCredential;
     use ssi_verification_methods::Multikey;
-    use static_iref::{iri, uri};
+    use static_iref::uri;
     use std::collections::HashMap;
 
     use crate::Bbs2023;
 
-    const PUBLIC_KEY_HEX: &str = "a4ef1afa3da575496f122b9b78b8c24761531a8a093206ae7c45b80759c168ba4f7a260f9c3367b6c019b4677841104b10665edbe70ba3ebe7d9cfbffbf71eb016f70abfbb163317f372697dc63efd21fc55764f63926a8f02eaea325a2a888f";
-
-    const VERIFICATION_METHOD_IRI: &Iri = iri!("did:key:zUC7DerdEmfZ8f4pFajXgGwJoMkV1ofMTmEG5UoNvnWiPiLuGKNeqgRpLH2TV4Xe5mJ2cXV76gRN7LFQwapF1VFu6x2yrr5ci1mXqC1WNUrnHnLgvfZfMH7h6xP6qsf9EKRQrPQ#zUC7DerdEmfZ8f4pFajXgGwJoMkV1ofMTmEG5UoNvnWiPiLuGKNeqgRpLH2TV4Xe5mJ2cXV76gRN7LFQwapF1VFu6x2yrr5ci1mXqC1WNUrnHnLgvfZfMH7h6xP6qsf9EKRQrPQ");
-
-    lazy_static! {
-        static ref PUBLIC_KEY: BBSplusPublicKey =
-            BBSplusPublicKey::from_bytes(&hex::decode(PUBLIC_KEY_HEX).unwrap()).unwrap();
-    }
+    use super::super::tests::*;
 
     #[async_std::test]
     async fn verify() {
