@@ -182,6 +182,7 @@ impl CryptosuiteStr {
         bytes.iter().all(u8::is_ascii)
     }
 
+    /// Converts the given string into a cryptographic suite identifier.
     pub fn new(s: &str) -> Result<&Self, InvalidCryptosuiteString<&str>> {
         if Self::validate(s.as_bytes()) {
             Ok(unsafe { Self::new_unchecked(s) })
@@ -190,6 +191,12 @@ impl CryptosuiteStr {
         }
     }
 
+    /// Converts the given string into a cryptographic suite identifier without
+    /// validation.
+    /// 
+    /// # Safety
+    /// 
+    /// The input string *must* be a valid cryptographic suite identifier.
     pub unsafe fn new_unchecked(s: &str) -> &Self {
         std::mem::transmute(s)
     }
@@ -235,6 +242,7 @@ impl fmt::Display for CryptosuiteStr {
 pub struct CryptosuiteString(String);
 
 impl CryptosuiteString {
+    /// Converts the given string into an owned cryptographic suite identifier.
     pub fn new(s: String) -> Result<Self, InvalidCryptosuiteString> {
         if CryptosuiteStr::validate(s.as_bytes()) {
             Ok(Self(s))
@@ -243,6 +251,12 @@ impl CryptosuiteString {
         }
     }
 
+    /// Converts the given string into an owned cryptographic suite identifier
+    /// without validation.
+    /// 
+    /// # Safety
+    /// 
+    /// The input string *must* be a valid cryptographic suite identifier.
     pub unsafe fn new_unchecked(s: String) -> Self {
         Self(s)
     }
@@ -256,7 +270,7 @@ impl Deref for CryptosuiteString {
     type Target = CryptosuiteStr;
 
     fn deref(&self) -> &CryptosuiteStr {
-        &self.as_cryptosuite_str()
+        self.as_cryptosuite_str()
     }
 }
 

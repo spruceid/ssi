@@ -237,7 +237,7 @@ where
             &pk,
             &decoded_base_proof.signature_bytes,
             &decoded_base_proof.bbs_header,
-            presentation_header.as_deref(),
+            presentation_header,
             &bbs_messages,
             &selective_indexes,
         )?,
@@ -386,11 +386,6 @@ mod tests {
         );
 
         let mut context = JsonLdEnvironment::default();
-
-        eprintln!(
-            "signature = {}",
-            signed_base.proofs.first().unwrap().signature.proof_value
-        );
 
         let data = create_disclosure_data(
             &mut context,

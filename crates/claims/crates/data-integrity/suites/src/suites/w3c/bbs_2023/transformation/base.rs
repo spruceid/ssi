@@ -208,10 +208,6 @@ mod tests {
             "_:b7 <https://windsurf.grotto-networking.com/selective#year> \"2020\"^^<http://www.w3.org/2001/XMLSchema#integer> .\n"
         ];
 
-        for quad in &canonical.quads {
-            eprintln!("{quad} .");
-        }
-
         assert_eq!(canonical.quads.into_nquads_lines(), EXPECTED_NQUADS)
     }
 

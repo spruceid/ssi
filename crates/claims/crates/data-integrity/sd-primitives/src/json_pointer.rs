@@ -14,6 +14,7 @@ pub struct InvalidJsonPointer<T = String>(pub T);
 pub struct JsonPointer(str);
 
 impl JsonPointer {
+    /// Converts the given string into a JSON pointer.
     pub fn new(s: &str) -> Result<&Self, InvalidJsonPointer<&str>> {
         if Self::validate(s) {
             Ok(unsafe { Self::new_unchecked(s) })
@@ -22,6 +23,11 @@ impl JsonPointer {
         }
     }
 
+    /// Converts the given string into a JSON pointer without validation.
+    /// 
+    /// # Safety
+    /// 
+    /// The input string *must* be a valid JSON pointer.
     pub unsafe fn new_unchecked(s: &str) -> &Self {
         std::mem::transmute(s)
     }
@@ -112,6 +118,7 @@ impl<'a> Iterator for JsonPointerIter<'a> {
 pub struct JsonPointerBuf(String);
 
 impl JsonPointerBuf {
+    /// Converts the given string into an owned JSON pointer.
     pub fn new(value: String) -> Result<Self, InvalidJsonPointer> {
         if JsonPointer::validate(&value) {
             Ok(Self(value))
@@ -120,6 +127,7 @@ impl JsonPointerBuf {
         }
     }
 
+    /// Converts the given byte string into an owned JSON pointer.
     pub fn from_bytes(value: Vec<u8>) -> Result<Self, InvalidJsonPointer<Vec<u8>>> {
         match String::from_utf8(value) {
             Ok(value) => {
@@ -161,6 +169,12 @@ impl fmt::Display for JsonPointerBuf {
 pub struct ReferenceToken(str);
 
 impl ReferenceToken {
+    /// Converts the given string into a JSON pointer reference token without
+    /// validation.
+    /// 
+    /// # Safety
+    /// 
+    /// The input string *must* be a valid JSON pointer reference token.
     pub unsafe fn new_unchecked(s: &str) -> &Self {
         std::mem::transmute(s)
     }
