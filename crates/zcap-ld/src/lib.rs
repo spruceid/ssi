@@ -181,12 +181,12 @@ impl<C, P> Delegation<C, P> {
 
         suite
             .sign_with(
-                environment, 
+                environment,
                 self,
                 resolver,
                 signer,
                 proof_configuration,
-                Default::default()
+                Default::default(),
             )
             .await
     }

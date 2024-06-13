@@ -193,9 +193,9 @@ impl CryptosuiteStr {
 
     /// Converts the given string into a cryptographic suite identifier without
     /// validation.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// The input string *must* be a valid cryptographic suite identifier.
     pub unsafe fn new_unchecked(s: &str) -> &Self {
         std::mem::transmute(s)
@@ -253,9 +253,9 @@ impl CryptosuiteString {
 
     /// Converts the given string into an owned cryptographic suite identifier
     /// without validation.
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// The input string *must* be a valid cryptographic suite identifier.
     pub unsafe fn new_unchecked(s: String) -> Self {
         Self(s)

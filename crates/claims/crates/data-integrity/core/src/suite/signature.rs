@@ -12,6 +12,6 @@ pub trait CryptographicSuiteSigning<T, C, R, S>: CryptographicSuite {
         signer: S,
         claims: &T,
         proof_configuration: ProofConfigurationRef<'_, Self>,
-        transformation_options: TransformationOptions<Self>
+        transformation_options: TransformationOptions<Self>,
     ) -> Result<Self::Signature, SignatureError>;
 }

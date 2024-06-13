@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
-use ssi_json_ld::syntax::Value;
 use rdf_types::{BlankId, BlankIdBuf, LexicalQuad};
+use ssi_json_ld::syntax::Value;
 
 use crate::{
     canonicalize::relabel_quads,

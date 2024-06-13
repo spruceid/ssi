@@ -9,7 +9,7 @@ use ssi_data_integrity_core::{
     ProofConfigurationRef,
 };
 use ssi_di_sd_primitives::canonicalize::create_hmac_id_label_map_function;
-use ssi_json_ld::{Expandable, JsonLdNodeObject, ExpandedDocument, ContextLoaderEnvironment};
+use ssi_json_ld::{ContextLoaderEnvironment, Expandable, ExpandedDocument, JsonLdNodeObject};
 use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
 use std::collections::HashMap;
 
@@ -49,11 +49,13 @@ where
             )
             .await
             .map(Transformed::Base),
-            None => {
-                derived::create_verify_data1(context.loader(), unsecured_document, canonical_configuration)
-                    .await
-                    .map(Transformed::Derived)
-            }
+            None => derived::create_verify_data1(
+                context.loader(),
+                unsecured_document,
+                canonical_configuration,
+            )
+            .await
+            .map(Transformed::Derived),
         }
     }
 }

@@ -18,7 +18,10 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-use super::{ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification, TransformationOptions};
+use super::{
+    ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification,
+    TransformationOptions,
+};
 
 // mod test_bbs;
 
@@ -119,14 +122,16 @@ where
         signers: T,
         claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
-        transformation_options: TransformationOptions<Self>
+        transformation_options: TransformationOptions<Self>,
     ) -> Result<Self::Signature, SignatureError> {
-        let transformed = self.transform(
-            context,
-            claims,
-            proof_configuration,
-            Some(transformation_options)
-        ).await?;
+        let transformed = self
+            .transform(
+                context,
+                claims,
+                proof_configuration,
+                Some(transformation_options),
+            )
+            .await?;
 
         let hashed = self.hash(transformed, proof_configuration)?;
 
@@ -168,12 +173,9 @@ where
     ) -> Result<ProofValidity, ProofValidationError> {
         let proof_configuration = proof.configuration();
 
-        let transformed = self.transform(
-            context,
-            claims,
-            proof_configuration,
-            None
-        ).await?;
+        let transformed = self
+            .transform(context, claims, proof_configuration, None)
+            .await?;
 
         let hashed = self.hash(transformed, proof_configuration)?;
 

@@ -76,14 +76,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use iref::Iri;
-    use lazy_static::lazy_static;
     use nquads_syntax::Parse;
-    use ssi_bbs::{BBSplusPublicKey, BBSplusSecretKey};
     use ssi_data_integrity_core::{suite::standard::SignatureAlgorithm, ProofConfiguration};
-    use ssi_di_sd_primitives::JsonPointerBuf;
     use ssi_verification_methods::{Multikey, ProofPurpose, ReferenceOrOwned, SingleSecretSigner};
-    use static_iref::{iri, uri};
+    use static_iref::uri;
 
     use crate::{
         bbs_2023::{
@@ -93,24 +89,7 @@ mod tests {
         Bbs2023,
     };
 
-    use super::Bbs2023SignatureAlgorithm;
-
-    lazy_static! {
-        pub static ref MANDATORY_POINTERS: Vec<JsonPointerBuf> = vec![
-            "/issuer".parse().unwrap(),
-            "/credentialSubject/sailNumber".parse().unwrap(),
-            "/credentialSubject/sails/1".parse().unwrap(),
-            "/credentialSubject/boards/0/year".parse().unwrap(),
-            "/credentialSubject/sails/2".parse().unwrap()
-        ];
-    }
-
-    const PUBLIC_KEY_HEX: &str = "a4ef1afa3da575496f122b9b78b8c24761531a8a093206ae7c45b80759c168ba4f7a260f9c3367b6c019b4677841104b10665edbe70ba3ebe7d9cfbffbf71eb016f70abfbb163317f372697dc63efd21fc55764f63926a8f02eaea325a2a888f";
-    const SECRET_KEY_HEX: &str = "66d36e118832af4c5e28b2dfe1b9577857e57b042a33e06bdea37b811ed09ee0";
-    const HMAC_KEY_STRING: &str =
-        "00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF";
-
-    const DID: &Iri = iri!("did:key:zUC7DerdEmfZ8f4pFajXgGwJoMkV1ofMTmEG5UoNvnWiPiLuGKNeqgRpLH2TV4Xe5mJ2cXV76gRN7LFQwapF1VFu6x2yrr5ci1mXqC1WNUrnHnLgvfZfMH7h6xP6qsf9EKRQrPQ#zUC7DerdEmfZ8f4pFajXgGwJoMkV1ofMTmEG5UoNvnWiPiLuGKNeqgRpLH2TV4Xe5mJ2cXV76gRN7LFQwapF1VFu6x2yrr5ci1mXqC1WNUrnHnLgvfZfMH7h6xP6qsf9EKRQrPQ");
+    use super::{super::tests::*, Bbs2023SignatureAlgorithm};
 
     const MANDATORY: &str =
 "_:b0 <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <https://www.w3.org/2018/credentials#VerifiableCredential> .
@@ -178,15 +157,13 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
             .map(|q| nquads_syntax::strip_quad(q.0))
             .collect();
 
-        let (public_key, secret_key) = key_pair();
-
         let verification_method = Multikey::from_public_key(
-            DID.to_owned(),
+            VERIFICATION_METHOD_IRI.to_owned(),
             uri!("did:method:test").to_owned(),
-            &public_key,
+            &*PUBLIC_KEY,
         );
 
-        let signer = SingleSecretSigner::new(secret_key);
+        let signer = SingleSecretSigner::new(SECRET_KEY.clone());
 
         let canonical_configuration = vec![
             "_:c14n0 <http://purl.org/dc/terms/created> \"2023-08-15T23:36:38Z\"^^<http://www.w3.org/2001/XMLSchema#dateTime> .\n".to_string(),
@@ -228,12 +205,5 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
         .unwrap();
 
         assert_eq!(signature.proof_value.as_str(), "u2V0ChVhQhruAY3aNS3CPmmWCHub-Qms9T2_lwsXJpfgMqlc_2MIMvfF4Jv5OGmJAcLpfIB2SAqD861WELqnmGnKnqgSJFDf8Nfarnvi_jsMATMRslFhYQDpbvyXTTZCxjDXNI1e-am9CMB6U_J5S936Tt3PFYUvfVV3gX4mIF-MTAbrBh9DD_ysD4svbSttNVowX3pYfmhhYYKTvGvo9pXVJbxIrm3i4wkdhUxqKCTIGrnxFuAdZwWi6T3omD5wzZ7bAGbRneEEQSxBmXtvnC6Pr59nPv_v3HrAW9wq_uxYzF_NyaX3GPv0h_FV2T2OSao8C6uoyWiqIj1ggABEiM0RVZneImaq7zN3u_wARIjNEVWZ3iJmqu8zd7v-FZy9pc3N1ZXJ4HS9jcmVkZW50aWFsU3ViamVjdC9zYWlsTnVtYmVyeBovY3JlZGVudGlhbFN1YmplY3Qvc2FpbHMvMXggL2NyZWRlbnRpYWxTdWJqZWN0L2JvYXJkcy8wL3llYXJ4Gi9jcmVkZW50aWFsU3ViamVjdC9zYWlscy8y")
-    }
-
-    fn key_pair() -> (BBSplusPublicKey, BBSplusSecretKey) {
-        (
-            BBSplusPublicKey::from_bytes(&hex::decode(PUBLIC_KEY_HEX).unwrap()).unwrap(),
-            BBSplusSecretKey::from_bytes(&hex::decode(SECRET_KEY_HEX).unwrap()).unwrap(),
-        )
     }
 }
