@@ -164,8 +164,7 @@ hashbrown = "0.13.0"
 iref = { workspace = true, features = ["hashbrown"] }
 ssi-vc.workspace = true
 nquads-syntax.workspace = true
-serde_json.workspace = true
-json-syntax = { workspace = true, features = ["serde_json"] }
+serde_json = { workspace = true, features = ["arbitrary_precision"] }
 
 [package.metadata.docs.rs]
 all-features = true

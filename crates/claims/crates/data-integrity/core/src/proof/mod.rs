@@ -392,7 +392,6 @@ impl<'de, S: DeserializeCryptographicSuite<'de>> Deserialize<'de> for Proofs<S> 
     where
         D: serde::Deserializer<'de>,
     {
-        eprintln!("start deserializing proofs");
         match OneOrMany::<Proof<S>>::deserialize(deserializer)? {
             OneOrMany::One(proof) => Ok(Self(vec![proof])),
             OneOrMany::Many(proofs) => Ok(Self(proofs)),
