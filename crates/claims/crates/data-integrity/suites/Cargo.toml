@@ -9,7 +9,6 @@ repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-data-integrity/"
 
 [features]
-default = ["bbs"]
 ## Signature suites specified by the W3C.
 ##
 ## This includes:
