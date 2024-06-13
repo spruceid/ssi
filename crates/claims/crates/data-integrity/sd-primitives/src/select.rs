@@ -70,7 +70,7 @@ pub fn select_json_ld(
     }
 
     for pointer in pointers {
-        document.select(&pointer, &mut selection_document)?;
+        document.select(pointer, &mut selection_document)?;
     }
 
     Ok(Some(selection_document.into_dense()))
@@ -141,7 +141,7 @@ impl SparseValue {
 pub struct SparseArray(BTreeMap<usize, SparseValue>);
 
 impl SparseArray {
-    pub fn from_dense(value: &Vec<Value>) -> Self {
+    pub fn from_dense(value: &[Value]) -> Self {
         Self(
             value
                 .iter()
@@ -156,11 +156,7 @@ impl SparseArray {
         i: usize,
         f: impl FnOnce() -> SparseValue,
     ) -> &mut SparseValue {
-        if !self.0.contains_key(&i) {
-            self.0.insert(i, f());
-        }
-
-        self.0.get_mut(&i).unwrap()
+        self.0.entry(i).or_insert_with(f)
     }
 
     pub fn into_dense(self) -> Vec<Value> {
@@ -239,7 +235,6 @@ impl Select for Value {
                 if pointer.is_empty() {
                     Ok(())
                 } else {
-                    eprintln!("tail pointer = {pointer}");
                     Err(DanglingJsonPointer)
                 }
             }
@@ -257,7 +252,6 @@ impl Select for Vec<Value> {
     ) -> Result<(), DanglingJsonPointer> {
         match pointer.split_first() {
             Some((token, rest)) => {
-                eprintln!("array token = {token}");
                 let i = token.as_array_index().ok_or(DanglingJsonPointer)?;
                 let a_item = self.get(i).ok_or(DanglingJsonPointer)?;
                 let b_item =
@@ -282,7 +276,6 @@ impl Select for ssi_json_ld::syntax::Object {
     ) -> Result<(), DanglingJsonPointer> {
         match pointer.split_first() {
             Some((token, rest)) => {
-                eprintln!("object token = {token}");
                 let key = token.to_str();
                 let a_item = self.get(key.as_ref()).next().ok_or(DanglingJsonPointer)?;
                 let b_item =

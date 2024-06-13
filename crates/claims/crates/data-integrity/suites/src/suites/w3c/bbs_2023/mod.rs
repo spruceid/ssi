@@ -107,7 +107,7 @@ impl ConfigurationAlgorithm<Bbs2023> for Bbs2023Configuration {
         options: InputProofOptions<Bbs2023>,
         signature_options: Bbs2023InputOptions,
     ) -> Result<(ProofConfiguration<Bbs2023>, Bbs2023InputOptions), ConfigurationError> {
-        let proof_configuration = options.into_configuration(type_.clone())?;
+        let proof_configuration = options.into_configuration(*type_)?;
         Ok((proof_configuration, signature_options))
     }
 }

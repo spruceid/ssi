@@ -99,7 +99,7 @@ where
         bbs_header,
         &public_key,
         hmac_key,
-        &mandatory_pointers,
+        mandatory_pointers,
         description,
     ))
 }
@@ -295,7 +295,7 @@ impl Bbs2023Signature {
                     },
                 })
             }
-            _ => return Err(InvalidBbs2023Signature),
+            _ => Err(InvalidBbs2023Signature)
         }
     }
 }

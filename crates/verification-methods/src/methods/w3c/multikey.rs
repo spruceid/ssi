@@ -112,7 +112,7 @@ impl Multikey {
         Self {
             id,
             controller,
-            public_key: MultibaseBuf::encode(Base::Base58Btc, &MultiEncodedBuf::encode(public_key)),
+            public_key: MultibaseBuf::encode(Base::Base58Btc, MultiEncodedBuf::encode(public_key)),
         }
     }
 }
@@ -290,13 +290,13 @@ impl DecodedMultikey {
         #[allow(unreachable_patterns)]
         match self {
             #[cfg(feature = "ed25519")]
-            Self::Ed25519(key) => Some(key.clone().into()),
+            Self::Ed25519(key) => Some((*key).into()),
             #[cfg(feature = "secp256k1")]
-            Self::Secp256k1(key) => Some(key.clone().into()),
+            Self::Secp256k1(key) => Some((*key).into()),
             #[cfg(feature = "secp256r1")]
-            Self::P256(key) => Some(key.clone().into()),
+            Self::P256(key) => Some((*key).into()),
             #[cfg(feature = "secp384r1")]
-            Self::P384(key) => Some(key.clone().into()),
+            Self::P384(key) => Some((*key).into()),
             _ => None,
         }
     }

@@ -17,7 +17,7 @@ pub fn create_hmac_id_label_map_function(
                 let digest = hmac.finalize_reset().into_bytes();
                 let b64_url_digest = BlankIdBuf::new(format!(
                     "_:u{}",
-                    base64::encode_config(&digest, base64::URL_SAFE_NO_PAD)
+                    base64::encode_config(digest, base64::URL_SAFE_NO_PAD)
                 ))
                 .unwrap();
                 (key.clone(), b64_url_digest)
