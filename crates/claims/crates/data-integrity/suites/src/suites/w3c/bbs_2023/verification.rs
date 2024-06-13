@@ -156,6 +156,6 @@ mod tests {
         methods.insert(VERIFICATION_METHOD_IRI.to_owned(), verification_method);
 
         let vc = document.into_verifiable().await.unwrap();
-        vc.verify(&methods).await.unwrap().unwrap();
+        assert!(vc.verify(&methods).await.unwrap().is_ok())
     }
 }

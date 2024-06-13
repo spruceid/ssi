@@ -8,7 +8,7 @@
 //! proof.
 use crate::{
     suite::bounds::{OptionsOf, SignatureOf, VerificationMethodOf},
-    DeserializeCryptographicSuite, Proof, Type,
+    CryptosuiteString, DeserializeCryptographicSuite, Proof, Type,
 };
 use serde::{
     de::{DeserializeSeed, MapAccess},
@@ -131,8 +131,6 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
         let mut cryptosuite = None;
         let mut data_integrity_proof = false;
 
-        eprintln!("start deserializing proof type");
-
         while let Some(key) = map.next_key::<TypeField>()? {
             match key {
                 TypeField::Type => {
@@ -141,7 +139,6 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                     if name == "DataIntegrityProof" {
                         match cryptosuite.take() {
                             Some(c) => {
-                                eprintln!("success");
                                 return Proof::<T>::deserialize_with_type(
                                     Type::DataIntegrityProof(c),
                                     ReplayMap::new(keep, map),
@@ -152,7 +149,6 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                             }
                         }
                     } else {
-                        eprintln!("success");
                         return Proof::<T>::deserialize_with_type(
                             Type::Other(name),
                             ReplayMap::new(keep, map),
@@ -160,9 +156,8 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                     }
                 }
                 TypeField::Cryptosuite => {
-                    let name = map.next_value::<String>()?;
+                    let name = map.next_value::<CryptosuiteString>()?;
                     if data_integrity_proof {
-                        eprintln!("success");
                         return Proof::<T>::deserialize_with_type(
                             Type::DataIntegrityProof(name),
                             ReplayMap::new(keep, map),
@@ -176,8 +171,6 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                 }
             }
         }
-
-        eprintln!("failure");
 
         Err(serde::de::Error::custom("missing type"))
     }

@@ -4,7 +4,8 @@
 use ssi_claims_core::DefaultEnvironment;
 use ssi_data_integrity_core::{
     suite::{ConfigurationAlgorithm, ConfigurationError, InputProofOptions},
-    ProofConfiguration, StandardCryptographicSuite, Type, TypeRef, UnsupportedProofSuite,
+    CryptosuiteStr, ProofConfiguration, StandardCryptographicSuite, Type, TypeRef,
+    UnsupportedProofSuite,
 };
 use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_json_ld::JsonLdEnvironment;
@@ -42,7 +43,7 @@ impl StandardCryptographicSuite for Bbs2023 {
     type SignatureAlgorithm = Bbs2023SignatureAlgorithm;
 
     fn type_(&self) -> TypeRef {
-        TypeRef::DataIntegrityProof("bbs-2023")
+        TypeRef::DataIntegrityProof(CryptosuiteStr::new("bbs-2023").unwrap())
     }
 }
 
