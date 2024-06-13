@@ -93,6 +93,9 @@ solana = ["ssi-data-integrity-suites/solana"]
 ##   - `Eip712Signature2021` (requires `eip712`)
 ethereum = ["ssi-data-integrity-suites/ethereum"]
 
+## BBS cryptographic suites.
+bbs = ["ssi-data-integrity-suites/bbs"]
+
 [dependencies]
 ssi-data-integrity-core.workspace = true
 ssi-data-integrity-suites.workspace = true

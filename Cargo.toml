@@ -199,7 +199,7 @@ ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip", "ssi-dids/eip"]
 ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-dids/ripemd-160"]
 
 ## Enable bbs.
-bbs = ["ssi-crypto/bbs"]
+bbs = ["ssi-crypto/bbs", "ssi-claims/bbs"]
 
 ## Use the Ring crate for crypto operations
 ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
