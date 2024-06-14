@@ -21,7 +21,7 @@ where
 {
     type Method = M;
 
-    async fn resolve_verification_method(
+    async fn resolve_verification_method_with(
         &self,
         issuer: Option<&iref::Iri>,
         method: Option<ssi_verification_methods::ReferenceOrOwnedRef<'_, Self::Method>>,
@@ -39,7 +39,11 @@ where
 
         let any_method = self
             .0
-            .resolve_verification_method(issuer, method.as_ref().map(|m| m.borrowed()), options)
+            .resolve_verification_method_with(
+                issuer,
+                method.as_ref().map(|m| m.borrowed()),
+                options,
+            )
             .await?
             .into_owned();
         any_method.try_into().map(Cow::Owned).map_err(

@@ -92,7 +92,7 @@ where
 {
     type Method = M;
 
-    async fn resolve_verification_method(
+    async fn resolve_verification_method_with(
         &self,
         _issuer: Option<&iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'_, M>>,
@@ -169,7 +169,7 @@ where
         };
 
         let options = ssi_verification_methods_core::ResolutionOptions::default();
-        self.resolve_verification_method(None, vm, options)
+        self.resolve_verification_method_with(None, vm, options)
             .await?
             .try_to_jwk()
             .map(Cow::into_owned)

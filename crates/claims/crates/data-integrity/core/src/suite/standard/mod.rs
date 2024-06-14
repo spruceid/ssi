@@ -120,7 +120,7 @@ where
 
         // Resolve the verification method.
         let method = resolver
-            .resolve_verification_method(
+            .resolve_verification_method_with(
                 None,
                 Some(proof_configuration.verification_method),
                 options,
@@ -154,7 +154,7 @@ where
 
         // Resolve the verification method.
         let method = verifier
-            .resolve_verification_method(None, Some(proof.verification_method), options)
+            .resolve_verification_method_with(None, Some(proof.verification_method), options)
             .await?;
 
         S::SignatureAlgorithm::verify(&method, prepared_claims, proof)

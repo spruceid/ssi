@@ -260,7 +260,7 @@ impl ControllerProvider for Keyring {
 impl VerificationMethodResolver for Keyring {
     type Method = Ed25519VerificationKey2020;
 
-    async fn resolve_verification_method(
+    async fn resolve_verification_method_with(
         &self,
         _issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Ed25519VerificationKey2020>>,

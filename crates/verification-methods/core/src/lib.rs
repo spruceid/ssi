@@ -119,7 +119,7 @@ impl VerificationMethodTypeSet for &'static [&'static str] {
     }
 
     fn pick(&self) -> Option<&str> {
-        self.first().map(|&t| t)
+        self.first().copied()
     }
 }
 
@@ -135,24 +135,35 @@ pub trait VerificationMethodResolver {
 
     /// Resolve the verification method reference.
     #[allow(async_fn_in_trait)]
-    async fn resolve_verification_method(
+    async fn resolve_verification_method_with(
         &self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
         options: ResolutionOptions,
     ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError>;
+
+    /// Resolve the verification method reference with the default options.
+    #[allow(async_fn_in_trait)]
+    async fn resolve_verification_method(
+        &self,
+        issuer: Option<&Iri>,
+        method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+    ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError> {
+        self.resolve_verification_method_with(issuer, method, Default::default())
+            .await
+    }
 }
 
 impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
     type Method = T::Method;
 
-    async fn resolve_verification_method(
+    async fn resolve_verification_method_with(
         &self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, T::Method>>,
         options: ResolutionOptions,
     ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
-        T::resolve_verification_method(self, issuer, method, options).await
+        T::resolve_verification_method_with(self, issuer, method, options).await
     }
 }
 
