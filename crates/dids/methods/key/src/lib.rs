@@ -341,7 +341,6 @@ impl VerificationMethodType {
                 );
                 Some(ContextEntry::Definition(definition))
             }
-            #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019 => {
                 let mut definition = Definition::new();
                 definition.bindings.insert(
