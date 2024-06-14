@@ -7,7 +7,9 @@ use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError, VerifyBytes};
+use ssi_verification_methods_core::{
+    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
+};
 use static_iref::iri;
 
 use crate::{
@@ -94,6 +96,14 @@ impl VerificationMethod for Ed25519VerificationKey2018 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for Ed25519VerificationKey2018 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

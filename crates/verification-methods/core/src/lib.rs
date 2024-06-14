@@ -92,6 +92,43 @@ impl From<VerificationMethodResolutionError> for SignatureError {
     }
 }
 
+pub trait VerificationMethodSet: VerificationMethod {
+    type TypeSet: VerificationMethodTypeSet;
+
+    fn type_set() -> Self::TypeSet;
+}
+
+pub trait VerificationMethodTypeSet: 'static + Send + Sync {
+    fn pick(&self) -> Option<&str>;
+    fn contains(&self, ty: &str) -> bool;
+}
+
+impl VerificationMethodTypeSet for &'static str {
+    fn contains(&self, ty: &str) -> bool {
+        ty == *self
+    }
+
+    fn pick(&self) -> Option<&str> {
+        Some(self)
+    }
+}
+
+impl VerificationMethodTypeSet for &'static [&'static str] {
+    fn contains(&self, ty: &str) -> bool {
+        self.iter().any(|&t| t == ty)
+    }
+
+    fn pick(&self) -> Option<&str> {
+        self.first().map(|&t| t)
+    }
+}
+
+#[derive(Default)]
+pub struct ResolutionOptions {
+    /// Accepted verification method types.
+    pub accept: Option<Box<dyn VerificationMethodTypeSet>>,
+}
+
 pub trait VerificationMethodResolver {
     /// Verification method type.
     type Method: Clone;
@@ -102,6 +139,7 @@ pub trait VerificationMethodResolver {
         &self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Self::Method>>,
+        options: ResolutionOptions,
     ) -> Result<Cow<Self::Method>, VerificationMethodResolutionError>;
 }
 
@@ -112,8 +150,9 @@ impl<'t, T: VerificationMethodResolver> VerificationMethodResolver for &'t T {
         &self,
         issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, T::Method>>,
+        options: ResolutionOptions,
     ) -> Result<Cow<T::Method>, VerificationMethodResolutionError> {
-        T::resolve_verification_method(self, issuer, method).await
+        T::resolve_verification_method(self, issuer, method, options).await
     }
 }
 

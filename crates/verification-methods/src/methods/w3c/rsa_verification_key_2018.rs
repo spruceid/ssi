@@ -4,7 +4,9 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError};
+use ssi_verification_methods_core::{
+    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet,
+};
 use static_iref::iri;
 
 use crate::{
@@ -94,6 +96,14 @@ impl VerificationMethod for RsaVerificationKey2018 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for RsaVerificationKey2018 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

@@ -9,7 +9,9 @@ use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError, VerifyBytes};
+use ssi_verification_methods_core::{
+    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
+};
 use static_iref::iri;
 
 use crate::{
@@ -164,6 +166,14 @@ impl VerificationMethod for Multikey {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for Multikey {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

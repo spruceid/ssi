@@ -2,7 +2,7 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::{algorithm::AnyBlake2b, JWK};
-use ssi_verification_methods_core::MessageSignatureError;
+use ssi_verification_methods_core::{MessageSignatureError, VerificationMethodSet};
 use static_iref::iri;
 use std::{collections::BTreeMap, hash::Hash};
 
@@ -191,6 +191,14 @@ impl VerificationMethod for TezosMethod2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for TezosMethod2021 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

@@ -234,3 +234,17 @@ impl<'a> serde::Serialize for JsonLdTypes<'a> {
         seq.end()
     }
 }
+
+pub struct WithContext<T> {
+    pub context: Option<json_ld::syntax::Context>,
+    pub value: T,
+}
+
+impl<T> WithContext<T> {
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> WithContext<U> {
+        WithContext {
+            context: self.context,
+            value: f(self.value),
+        }
+    }
+}

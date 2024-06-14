@@ -7,7 +7,7 @@ use std::hash::Hash;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, MessageSignatureError,
-    TypedVerificationMethod, VerificationMethod,
+    TypedVerificationMethod, VerificationMethod, VerificationMethodSet,
 };
 
 // pub const ALEO_METHOD_2021_IRI: &Iri = iri!("https://w3id.org/security#AleoMethod2021");
@@ -93,6 +93,14 @@ impl VerificationMethod for AleoMethod2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for AleoMethod2021 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

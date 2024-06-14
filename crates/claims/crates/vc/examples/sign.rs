@@ -264,6 +264,7 @@ impl VerificationMethodResolver for Keyring {
         &self,
         _issuer: Option<&Iri>,
         method: Option<ReferenceOrOwnedRef<'_, Ed25519VerificationKey2020>>,
+        _options: ssi_verification_methods::ResolutionOptions,
     ) -> Result<Cow<Ed25519VerificationKey2020>, VerificationMethodResolutionError> {
         match method {
             Some(ReferenceOrOwnedRef::Owned(_key)) => {

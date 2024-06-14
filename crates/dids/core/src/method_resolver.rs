@@ -96,13 +96,22 @@ where
         &self,
         _issuer: Option<&iref::Iri>,
         method: Option<ReferenceOrOwnedRef<'_, M>>,
+        options: ssi_verification_methods_core::ResolutionOptions,
     ) -> Result<Cow<M>, VerificationMethodResolutionError> {
+        let mut deref_options = self.options.clone();
+
+        if let Some(set) = options.accept {
+            if let Some(ty) = set.pick() {
+                deref_options.parameters.public_key_format = Some(ty.to_owned());
+            }
+        }
+
         match method {
             Some(method) => {
                 if method.id().scheme().as_str() == "did" {
                     match DIDURL::new(method.id().as_bytes()) {
                         Ok(url) => {
-                            match self.resolver.dereference(url).await {
+                            match self.resolver.dereference_with(url, deref_options).await {
                                 Ok(deref) => match deref.content.into_verification_method() {
                                     Ok(any_method) => {
                                         Ok(Cow::Owned(M::try_from(any_method.into())?))
@@ -159,7 +168,8 @@ where
             None => None,
         };
 
-        self.resolve_verification_method(None, vm)
+        let options = ssi_verification_methods_core::ResolutionOptions::default();
+        self.resolve_verification_method(None, vm, options)
             .await?
             .try_to_jwk()
             .map(Cow::into_owned)

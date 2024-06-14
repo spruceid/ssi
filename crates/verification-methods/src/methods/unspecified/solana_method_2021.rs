@@ -9,7 +9,7 @@ use static_iref::iri;
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
-    VerificationMethod,
+    VerificationMethod, VerificationMethodSet,
 };
 
 pub const SOLANA_METHOD_2021_TYPE: &str = "SolanaMethod2021";
@@ -89,6 +89,14 @@ impl VerificationMethod for SolanaMethod2021 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for SolanaMethod2021 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

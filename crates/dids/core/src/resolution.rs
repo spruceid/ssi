@@ -194,11 +194,25 @@ pub trait DIDResolver {
         &'a self,
         primary_did_url: &'a PrimaryDIDURL,
     ) -> Result<DerefOutput<PrimaryContent>, DerefError> {
+        self.dereference_primary_with(primary_did_url, Options::default())
+            .await
+    }
+
+    /// Dereference a DID URL to retrieve the primary content.
+    ///
+    /// See: <https://www.w3.org/TR/did-core/#did-url-dereferencing>
+    /// See: <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm>
+    #[allow(async_fn_in_trait)]
+    async fn dereference_primary_with<'a>(
+        &'a self,
+        primary_did_url: &'a PrimaryDIDURL,
+        mut resolve_options: Options,
+    ) -> Result<DerefOutput<PrimaryContent>, DerefError> {
         // 2
-        let resolve_options: Options = match primary_did_url.query() {
+        resolve_options.extend(match primary_did_url.query() {
             Some(query) => serde_urlencoded::from_str(query.as_str()).unwrap(),
             None => Options::default(),
-        };
+        });
 
         let parameters = resolve_options.parameters.clone();
 
@@ -232,9 +246,15 @@ pub trait DIDResolver {
     /// See: <https://www.w3.org/TR/did-core/#did-url-dereferencing>
     /// See: <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm>
     #[allow(async_fn_in_trait)]
-    async fn dereference<'a>(&'a self, did_url: &'a DIDURL) -> Result<DerefOutput, DerefError> {
+    async fn dereference_with<'a>(
+        &'a self,
+        did_url: &'a DIDURL,
+        options: Options,
+    ) -> Result<DerefOutput, DerefError> {
         let (primary_did_url, fragment) = did_url.without_fragment();
-        let primary_deref_output = self.dereference_primary(primary_did_url).await?;
+        let primary_deref_output = self
+            .dereference_primary_with(primary_did_url, options)
+            .await?;
         // 4
         match fragment {
             Some(fragment) => {
@@ -242,6 +262,15 @@ pub trait DIDResolver {
             }
             None => Ok(primary_deref_output.cast()),
         }
+    }
+
+    /// Dereference a DID URL.
+    ///
+    /// See: <https://www.w3.org/TR/did-core/#did-url-dereferencing>
+    /// See: <https://w3c-ccg.github.io/did-resolution/#dereferencing-algorithm>
+    #[allow(async_fn_in_trait)]
+    async fn dereference<'a>(&'a self, did_url: &'a DIDURL) -> Result<DerefOutput, DerefError> {
+        self.dereference_with(did_url, Options::default()).await
     }
 
     fn with_options<M>(self, options: Options) -> VerificationMethodDIDResolver<Self, M>
@@ -352,6 +381,16 @@ pub struct Options {
     pub parameters: Parameters,
 }
 
+impl Options {
+    pub fn extend(&mut self, other: Self) {
+        if let Some(value) = other.accept {
+            self.accept = Some(value)
+        }
+
+        self.parameters.extend(other.parameters)
+    }
+}
+
 /// DID parameters.
 ///
 /// As specified in DID Core and/or in [DID Specification Registries][1].
@@ -386,9 +425,45 @@ pub struct Parameters {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hl: Option<String>, // TODO must be an ASCII string.
 
+    /// Expected public key format (non-standard option).
+    ///
+    /// Defined by <https://w3c-ccg.github.io/did-method-key>.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_key_format: Option<String>,
+
     /// Additional parameters.
     #[serde(flatten)]
     pub additional: BTreeMap<String, Parameter>,
+}
+
+impl Parameters {
+    pub fn extend(&mut self, other: Self) {
+        if let Some(value) = other.service {
+            self.service = Some(value)
+        }
+
+        if let Some(value) = other.relative_ref {
+            self.relative_ref = Some(value)
+        }
+
+        if let Some(value) = other.version_id {
+            self.version_id = Some(value)
+        }
+
+        if let Some(value) = other.version_time {
+            self.version_time = Some(value)
+        }
+
+        if let Some(value) = other.hl {
+            self.hl = Some(value)
+        }
+
+        if let Some(value) = other.public_key_format {
+            self.public_key_format = Some(value)
+        }
+
+        self.additional.extend(other.additional);
+    }
 }
 
 /// Arbitrary DID parameter.

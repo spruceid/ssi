@@ -4,7 +4,9 @@ use iref::{Iri, IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_verification_methods_core::{MessageSignatureError, VerifyBytesWithRecoveryJwk};
+use ssi_verification_methods_core::{
+    MessageSignatureError, VerificationMethodSet, VerifyBytesWithRecoveryJwk,
+};
 use static_iref::iri;
 
 use crate::{
@@ -71,6 +73,14 @@ impl VerificationMethod for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded20
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for P256PublicKeyBLAKE2BDigestSize20Base58CheckEncoded2021 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use ssi_caips::caip10::BlockchainAccountIdVerifyError;
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::MessageSignatureError;
+use ssi_verification_methods_core::{MessageSignatureError, VerificationMethodSet};
 use static_iref::iri;
 
 use crate::{
@@ -144,6 +144,14 @@ impl VerificationMethod for Eip712Method2021 {
 
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for Eip712Method2021 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

@@ -133,9 +133,6 @@ pub enum Error {
     /// Unexpected length for publicKeyMultibase
     #[error("Unexpected length for publicKeyMultibase")]
     MultibaseKeyLength(usize, usize),
-    /// Unexpected multibase (multicodec) key prefix multicodec
-    #[error("Unexpected multibase (multicodec) key prefix multicodec")]
-    MultibaseKeyPrefix,
     /// Error parsing or producing multibase
     #[error(transparent)]
     Multibase(#[from] multibase::Error),

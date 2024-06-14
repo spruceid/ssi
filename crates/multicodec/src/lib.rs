@@ -105,6 +105,12 @@ impl MultiEncodedBuf {
     pub fn as_multi_encoded(&self) -> &MultiEncoded {
         unsafe { MultiEncoded::new_unchecked(&self.0) }
     }
+
+    /// Returns the raw bytes, including the codec prefix.
+    #[inline(always)]
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
+    }
 }
 
 impl Deref for MultiEncodedBuf {

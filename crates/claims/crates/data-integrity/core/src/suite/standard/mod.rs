@@ -2,7 +2,7 @@
 use std::borrow::Cow;
 
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
-use ssi_verification_methods_core::{Signer, VerificationMethod, VerificationMethodResolver};
+use ssi_verification_methods_core::{Signer, VerificationMethodResolver, VerificationMethodSet};
 
 use crate::{CryptographicSuite, ProofConfigurationRef, ProofRef, TypeRef};
 
@@ -42,7 +42,7 @@ pub trait StandardCryptographicSuite: Clone {
     type Hashing: HashingAlgorithm<Self>;
 
     /// Verification method.
-    type VerificationMethod: VerificationMethod;
+    type VerificationMethod: VerificationMethodSet;
 
     /// Signature (and verification) algorithm.
     type SignatureAlgorithm: SignatureAndVerificationAlgorithm + VerificationAlgorithm<Self>;
@@ -114,9 +114,17 @@ where
         prepared_claims: &Self::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, Self>,
     ) -> Result<Self::Signature, SignatureError> {
+        let options = ssi_verification_methods_core::ResolutionOptions {
+            accept: Some(Box::new(Self::VerificationMethod::type_set())),
+        };
+
         // Resolve the verification method.
         let method = resolver
-            .resolve_verification_method(None, Some(proof_configuration.verification_method))
+            .resolve_verification_method(
+                None,
+                Some(proof_configuration.verification_method),
+                options,
+            )
             .await?;
 
         // Find a signer for this verification method.
@@ -140,9 +148,13 @@ where
         prepared_claims: &Self::PreparedClaims,
         proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, ProofValidationError> {
+        let options = ssi_verification_methods_core::ResolutionOptions {
+            accept: Some(Box::new(Self::VerificationMethod::type_set())),
+        };
+
         // Resolve the verification method.
         let method = verifier
-            .resolve_verification_method(None, Some(proof.verification_method))
+            .resolve_verification_method(None, Some(proof.verification_method), options)
             .await?;
 
         S::SignatureAlgorithm::verify(&method, prepared_claims, proof)

@@ -64,6 +64,19 @@ macro_rules! verification_method_union {
 			),*
 		}
 
+		impl $crate::VerificationMethodSet for $name {
+			type TypeSet = &'static [&'static str];
+
+			fn type_set() -> Self::TypeSet {
+				&[
+					$(
+						$(#[$meta])*
+						$variant::NAME
+					),*
+				]
+			}
+		}
+
 		#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 		$vis enum $kind {
 			$(
@@ -210,6 +223,19 @@ macro_rules! complete_verification_method_union {
 				$variant($variant),
 			)*
 			Unknown(GenericVerificationMethod)
+		}
+
+		impl $crate::VerificationMethodSet for $name {
+			type TypeSet = &'static [&'static str];
+
+			fn type_set() -> Self::TypeSet {
+				&[
+					$(
+						$(#[$meta])*
+						$variant::NAME
+					),*
+				]
+			}
 		}
 
 		#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

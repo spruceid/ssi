@@ -6,7 +6,9 @@ use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::JWK;
-use ssi_verification_methods_core::{JwkVerificationMethod, MessageSignatureError, VerifyBytes};
+use ssi_verification_methods_core::{
+    JwkVerificationMethod, MessageSignatureError, VerificationMethodSet, VerifyBytes,
+};
 use static_iref::iri;
 
 use crate::{
@@ -121,6 +123,14 @@ impl VerificationMethod for EcdsaSecp256k1VerificationKey2019 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for EcdsaSecp256k1VerificationKey2019 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

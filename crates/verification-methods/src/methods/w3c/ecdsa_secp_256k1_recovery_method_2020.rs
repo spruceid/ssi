@@ -4,7 +4,7 @@ use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
 use ssi_jwk::{algorithm::ES256KR, JWK};
-use ssi_verification_methods_core::{MessageSignatureError, VerifyBytes};
+use ssi_verification_methods_core::{MessageSignatureError, VerificationMethodSet, VerifyBytes};
 use static_iref::iri;
 use std::{borrow::Cow, hash::Hash, str::FromStr};
 
@@ -56,6 +56,14 @@ impl VerificationMethod for EcdsaSecp256k1RecoveryMethod2020 {
     /// Returns an URI to the key controller.
     fn controller(&self) -> Option<&Iri> {
         Some(self.controller.as_iri())
+    }
+}
+
+impl VerificationMethodSet for EcdsaSecp256k1RecoveryMethod2020 {
+    type TypeSet = &'static str;
+
+    fn type_set() -> Self::TypeSet {
+        Self::NAME
     }
 }
 

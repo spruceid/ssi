@@ -1,6 +1,7 @@
-use std::collections::BTreeMap;
-
-use iref::Iri;
+//! The did:key Method v0.7.
+//!
+//! See: <https://w3c-ccg.github.io/did-method-key>
+use multibase::Base;
 use ssi_dids_core::{
     document::{
         self,
@@ -11,30 +12,10 @@ use ssi_dids_core::{
     resolution::{self, DIDMethodResolver, Error},
     DIDBuf, DIDMethod, DIDURLBuf, Document,
 };
-use static_iref::iri;
-
-mod json_ld_context;
-use json_ld_context::*;
 use ssi_jwk::JWK;
-
-const DID_KEY_ED25519_PREFIX: [u8; 2] = [0xed, 0x01];
-const DID_KEY_SECP256K1_PREFIX: [u8; 2] = [0xe7, 0x01];
-const DID_KEY_BLS12381_G2_PREFIX: [u8; 2] = [0xeb, 0x01];
-const DID_KEY_P256_PREFIX: [u8; 2] = [0x80, 0x24];
-const DID_KEY_P384_PREFIX: [u8; 2] = [0x81, 0x24];
-const DID_KEY_RSA_PREFIX: [u8; 2] = [0x85, 0x24];
-
-#[derive(Debug, thiserror::Error)]
-pub enum Unsupported {
-    #[error("did:key type secp256k1 not supported")]
-    Secp256k1,
-
-    #[error("did:key type P-256 not supported")]
-    P256,
-
-    #[error("did:key type P-384 not supported")]
-    P384,
-}
+use ssi_multicodec::MultiEncodedBuf;
+use static_iref::{iri, iri_ref};
+use std::collections::BTreeMap;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GenerateError {
@@ -51,6 +32,9 @@ pub enum GenerateError {
     InvalidInputKey,
 }
 
+/// The did:key Method v0.7.
+///
+/// See: <https://w3c-ccg.github.io/did-method-key>
 pub struct DIDKey;
 
 impl DIDKey {
@@ -60,15 +44,13 @@ impl DIDKey {
             Params::OKP(ref params) => match &params.curve[..] {
                 "Ed25519" => multibase::encode(
                     multibase::Base::Base58Btc,
-                    [DID_KEY_ED25519_PREFIX.to_vec(), params.public_key.0.clone()].concat(),
+                    MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, &params.public_key.0)
+                        .into_bytes(),
                 ),
                 "Bls12381G2" => multibase::encode(
                     multibase::Base::Base58Btc,
-                    [
-                        DID_KEY_BLS12381_G2_PREFIX.to_vec(),
-                        params.public_key.0.clone(),
-                    ]
-                    .concat(),
+                    MultiEncodedBuf::encode(ssi_multicodec::BLS12_381_G2_PUB, &params.public_key.0)
+                        .into_bytes(),
                 ),
                 _ => return Err(GenerateError::UnsupportedCurve(params.curve.clone())),
             },
@@ -89,11 +71,11 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            [
-                                DID_KEY_SECP256K1_PREFIX.to_vec(),
-                                pk.to_encoded_point(true).as_bytes().to_vec(),
-                            ]
-                            .concat(),
+                            MultiEncodedBuf::encode(
+                                ssi_multicodec::SECP256K1_PUB,
+                                pk.to_encoded_point(true).as_bytes(),
+                            )
+                            .into_bytes(),
                         )
                     }
                     #[cfg(feature = "secp256r1")]
@@ -106,11 +88,11 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            [
-                                DID_KEY_P256_PREFIX.to_vec(),
-                                pk.to_encoded_point(true).as_bytes().to_vec(),
-                            ]
-                            .concat(),
+                            MultiEncodedBuf::encode(
+                                ssi_multicodec::P256_PUB,
+                                pk.to_encoded_point(true).as_bytes(),
+                            )
+                            .into_bytes(),
                         )
                     }
                     #[cfg(feature = "secp384r1")]
@@ -122,7 +104,8 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            [DID_KEY_P384_PREFIX.to_vec(), pk_bytes].concat(),
+                            MultiEncodedBuf::encode(ssi_multicodec::P384_PUB, &pk_bytes)
+                                .into_bytes(),
                         )
                     }
                     _ => return Err(GenerateError::UnsupportedCurve(curve.to_owned())),
@@ -133,7 +116,7 @@ impl DIDKey {
                     .map_err(|_| GenerateError::InvalidInputKey)?;
                 multibase::encode(
                     multibase::Base::Base58Btc,
-                    [DID_KEY_RSA_PREFIX.to_vec(), der.to_vec()].concat(),
+                    MultiEncodedBuf::encode(ssi_multicodec::RSA_PUB, &der).into_bytes(),
                 )
             }
             _ => return Err(GenerateError::UnsupportedKeyType),
@@ -158,10 +141,19 @@ impl DIDMethodResolver for DIDKey {
         let (_base, data) =
             multibase::decode(id).map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))?;
 
-        let (public_key, vm_type) = build_public_key(id, &data)?;
+        let multi_encoded = MultiEncodedBuf::new(data)
+            .map_err(|_| Error::InvalidMethodSpecificId(id.to_owned()))?;
 
-        let mut json_ld_context = JsonLdContext::default();
-        json_ld_context.add_verification_method_type(vm_type);
+        let vm_type = match options.parameters.public_key_format {
+            Some(name) => VerificationMethodType::from_name(&name).ok_or_else(|| {
+                Error::Internal(format!(
+                    "verification method type `{name}` unsupported by did:key"
+                ))
+            })?,
+            None => VerificationMethodType::Multikey,
+        };
+
+        let public_key = vm_type.decode(id, multi_encoded)?;
 
         let vm_didurl = DIDURLBuf::from_string(format!("{did}#{id}")).unwrap();
 
@@ -182,13 +174,18 @@ impl DIDMethodResolver for DIDKey {
             .assertion_method
             .push(ValueOrReference::Reference(vm_didurl.into()));
 
+        let mut json_ld_context = Vec::new();
+        if let Some(context) = vm_type.context_entry() {
+            json_ld_context.push(context)
+        }
+
         let content_type = options.accept.unwrap_or(MediaType::JsonLd);
         let represented = doc.into_representation(representation::Options::from_media_type(
             content_type,
             move || representation::json_ld::Options {
                 context: representation::json_ld::Context::array(
                     representation::json_ld::DIDContext::V1,
-                    json_ld_context.into_entries(),
+                    json_ld_context,
                 ),
             },
         ));
@@ -203,7 +200,10 @@ impl DIDMethodResolver for DIDKey {
 
 #[derive(Debug, Clone, Copy)]
 pub enum VerificationMethodType {
+    Multikey,
+    Ed25519VerificationKey2020,
     Ed25519VerificationKey2018,
+    #[cfg(feature = "secp256k1")]
     EcdsaSecp256k1VerificationKey2019,
     EcdsaSecp256r1VerificationKey2019,
     JsonWebKey2020,
@@ -211,9 +211,26 @@ pub enum VerificationMethodType {
 }
 
 impl VerificationMethodType {
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "Multikey" => Some(Self::Multikey),
+            "Ed25519VerificationKey2020" => Some(Self::Ed25519VerificationKey2020),
+            "Ed25519VerificationKey2018" => Some(Self::Ed25519VerificationKey2018),
+            #[cfg(feature = "secp256k1")]
+            "EcdsaSecp256k1VerificationKey2019" => Some(Self::EcdsaSecp256k1VerificationKey2019),
+            "EcdsaSecp256r1VerificationKey2019" => Some(Self::EcdsaSecp256r1VerificationKey2019),
+            "JsonWebKey2020" => Some(Self::JsonWebKey2020),
+            "Bls12381G2Key2020" => Some(Self::Bls12381G2Key2020),
+            _ => None,
+        }
+    }
+
     pub fn name(&self) -> &'static str {
         match self {
+            Self::Multikey => "Multikey",
+            Self::Ed25519VerificationKey2020 => "Ed25519VerificationKey2020",
             Self::Ed25519VerificationKey2018 => "Ed25519VerificationKey2018",
+            #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019 => "EcdsaSecp256k1VerificationKey2019",
             Self::EcdsaSecp256r1VerificationKey2019 => "EcdsaSecp256r1VerificationKey2019",
             Self::JsonWebKey2020 => "JsonWebKey2020",
@@ -221,19 +238,165 @@ impl VerificationMethodType {
         }
     }
 
-    pub fn iri(&self) -> &'static Iri {
+    pub fn decode(&self, id: &str, encoded: MultiEncodedBuf) -> Result<PublicKey, Error> {
         match self {
-            Self::Ed25519VerificationKey2018 => {
-                iri!("https://w3id.org/security#Ed25519VerificationKey2018")
+            Self::Multikey => {
+                let multibase_encoded = multibase::encode(Base::Base58Btc, encoded.as_bytes());
+                Ok(PublicKey::Multibase(multibase_encoded))
             }
+            Self::Ed25519VerificationKey2020 => match encoded.codec() {
+                ssi_multicodec::ED25519_PUB => {
+                    let multibase_encoded = multibase::encode(Base::Base58Btc, encoded.as_bytes());
+                    Ok(PublicKey::Multibase(multibase_encoded))
+                }
+                _ => Err(Error::internal("did:key is not ED25519 as required by method type `Ed25519VerificationKey2020`")),
+            }
+            Self::Ed25519VerificationKey2018 => match encoded.codec() {
+                ssi_multicodec::ED25519_PUB => {
+                    let key = bs58::encode(encoded.data()).into_string();
+                    Ok(PublicKey::Base58(key))
+                }
+                _ => Err(Error::internal("did:key is not ED25519 as required by method type `Ed25519VerificationKey2018`")),
+            }
+            #[cfg(feature = "secp256k1")]
+            Self::EcdsaSecp256k1VerificationKey2019 => match encoded.codec() {
+                ssi_multicodec::SECP256K1_PUB => {
+                    match ssi_jwk::secp256k1_parse(encoded.data()) {
+                        Ok(jwk) => Ok(PublicKey::Jwk(Box::new(jwk))),
+                        Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
+                    }
+                }
+                _ => Err(Error::internal("did:key is not SECP256K1 as required by method type `EcdsaSecp256k1VerificationKey2019`")),
+            }
+            Self::EcdsaSecp256r1VerificationKey2019 => match encoded.codec() {
+                ssi_multicodec::P256_PUB => {
+                    let multibase_encoded = multibase::encode(Base::Base58Btc, encoded.as_bytes());
+                    Ok(PublicKey::Multibase(multibase_encoded))
+                }
+                _ => Err(Error::internal("did:key is not P256 as required by method type `EcdsaSecp256r1VerificationKey2019`")),
+            }
+            Self::JsonWebKey2020 => {
+                let key = JWK::from_multicodec(&encoded)
+                    .map_err(Error::internal)?;
+                Ok(PublicKey::Jwk(Box::new(key)))
+            }
+            Self::Bls12381G2Key2020 => match encoded.codec() {
+                ssi_multicodec::BLS12_381_G2_PUB => {
+                    let jwk = JWK::from(ssi_jwk::Params::OKP(ssi_jwk::OctetParams {
+                        curve: "Bls12381G2".to_string(),
+                        public_key: ssi_jwk::Base64urlUInt(encoded.data().to_vec()),
+                        private_key: None,
+                    }));
+                    // https://datatracker.ietf.org/doc/html/draft-denhartog-pairing-curves-jose-cose-00#section-3.1.3
+                    // FIXME: This should be a base 58 key according to the spec.
+                    Ok(PublicKey::Jwk(Box::new(jwk)))
+                }
+                _ => Err(Error::internal("did:key is not BLS12_381_G2 as required by method type `Bls12381G2Key2020`")),
+            }
+        }
+    }
+
+    pub fn context_entry(&self) -> Option<ssi_json_ld::syntax::ContextEntry> {
+        use ssi_json_ld::syntax::{
+            context::{
+                term_definition::{Expanded, Id, Type, TypeKeyword},
+                Definition, TermDefinition,
+            },
+            ContextEntry, Nullable,
+        };
+        match self {
+            Self::Multikey => Some(ContextEntry::IriRef(
+                iri_ref!("https://w3id.org/security/multikey/v1").to_owned(),
+            )),
+            Self::Ed25519VerificationKey2020 => Some(ContextEntry::IriRef(
+                iri_ref!("https://w3id.org/security/suites/ed25519-2020/v1").to_owned(),
+            )),
+            Self::Ed25519VerificationKey2018 => Some(ContextEntry::IriRef(
+                iri_ref!("https://w3id.org/security/suites/ed25519-2018/v1").to_owned(),
+            )),
+            #[cfg(feature = "secp256k1")]
             Self::EcdsaSecp256k1VerificationKey2019 => {
-                iri!("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019")
+                let mut definition = Definition::new();
+                definition.bindings.insert(
+                    "EcdsaSecp256k1VerificationKey2019".into(),
+                    TermDefinition::Simple(
+                        iri!("https://w3id.org/security#EcdsaSecp256k1VerificationKey2019")
+                            .to_owned()
+                            .into(),
+                    )
+                    .into(),
+                );
+                definition.bindings.insert(
+                    "publicKeyJwk".into(),
+                    TermDefinition::Expanded(Box::new(Expanded {
+                        id: Some(Nullable::Some(Id::Term(
+                            iri!("https://w3id.org/security#publicKeyJwk")
+                                .to_owned()
+                                .into_string(),
+                        ))),
+                        type_: Some(Nullable::Some(Type::Keyword(TypeKeyword::Json))),
+                        ..Default::default()
+                    }))
+                    .into(),
+                );
+                Some(ContextEntry::Definition(definition))
             }
+            #[cfg(feature = "secp256r1")]
             Self::EcdsaSecp256r1VerificationKey2019 => {
-                iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019")
+                let mut definition = Definition::new();
+                definition.bindings.insert(
+                    "EcdsaSecp256r1VerificationKey2019".into(),
+                    TermDefinition::Simple(
+                        iri!("https://w3id.org/security#EcdsaSecp256r1VerificationKey2019")
+                            .to_owned()
+                            .into(),
+                    )
+                    .into(),
+                );
+                definition.bindings.insert(
+                    "publicKeyMultibase".into(),
+                    TermDefinition::Expanded(Box::new(Expanded {
+                        id: Some(Nullable::Some(Id::Term(
+                            iri!("https://w3id.org/security#publicMultibase")
+                                .to_owned()
+                                .into_string(),
+                        ))),
+                        type_: Some(Nullable::Some(Type::Keyword(TypeKeyword::Json))),
+                        ..Default::default()
+                    }))
+                    .into(),
+                );
+                Some(ContextEntry::Definition(definition))
             }
-            Self::JsonWebKey2020 => iri!("https://w3id.org/security#JsonWebKey2020"),
-            Self::Bls12381G2Key2020 => iri!("https://w3id.org/security#Bls12381G2Key2020"),
+            Self::JsonWebKey2020 => Some(ContextEntry::IriRef(
+                iri_ref!("https://w3id.org/security/suites/jws-2020/v1").to_owned(),
+            )),
+            Self::Bls12381G2Key2020 => {
+                let mut definition = Definition::new();
+                definition.bindings.insert(
+                    "Bls12381G2Key2020".into(),
+                    TermDefinition::Simple(
+                        iri!("https://w3id.org/security#Bls12381G2Key2020")
+                            .to_owned()
+                            .into(),
+                    )
+                    .into(),
+                );
+                definition.bindings.insert(
+                    "publicKeyJwk".into(),
+                    TermDefinition::Expanded(Box::new(Expanded {
+                        id: Some(Nullable::Some(Id::Term(
+                            iri!("https://w3id.org/security#publicKeyJwk")
+                                .to_owned()
+                                .into_string(),
+                        ))),
+                        type_: Some(Nullable::Some(Type::Keyword(TypeKeyword::Json))),
+                        ..Default::default()
+                    }))
+                    .into(),
+                );
+                Some(ContextEntry::Definition(definition))
+            }
         }
     }
 }
@@ -279,114 +442,10 @@ pub enum PublicKey {
     Multibase(String),
 }
 
-fn build_public_key(id: &str, data: &[u8]) -> Result<(PublicKey, VerificationMethodType), Error> {
-    use ssi_jwk::{Base64urlUInt, OctetParams, Params};
-
-    if data.len() < 2 {
-        return Err(Error::InvalidMethodSpecificId(id.to_owned()));
-    }
-
-    if data[0] == DID_KEY_ED25519_PREFIX[0] && data[1] == DID_KEY_ED25519_PREFIX[1] {
-        if data.len() - 2 != 32 {
-            return Err(Error::InvalidMethodSpecificId(id.to_owned()));
-        }
-
-        // let jwk = JWK {
-        //     params: Params::OKP(OctetParams {
-        //         curve: "Ed25519".to_string(),
-        //         public_key: Base64urlUInt(data[2..].to_vec()),
-        //         private_key: None,
-        //     }),
-        //     public_key_use: None,
-        //     key_operations: None,
-        //     algorithm: None,
-        //     key_id: None,
-        //     x509_url: None,
-        //     x509_certificate_chain: None,
-        //     x509_thumbprint_sha1: None,
-        //     x509_thumbprint_sha256: None,
-        // };
-
-        let key = bs58::encode(&data[2..]).into_string();
-
-        Ok((
-            PublicKey::Base58(key),
-            VerificationMethodType::Ed25519VerificationKey2018,
-        ))
-    } else if data[0] == DID_KEY_SECP256K1_PREFIX[0] && data[1] == DID_KEY_SECP256K1_PREFIX[1] {
-        if data.len() - 2 != 33 {
-            return Err(Error::InvalidMethodSpecificId(id.to_owned()));
-        }
-
-        #[cfg(feature = "secp256k1")]
-        match ssi_jwk::secp256k1_parse(&data[2..]) {
-            Ok(jwk) => Ok((
-                PublicKey::Jwk(Box::new(jwk)),
-                VerificationMethodType::EcdsaSecp256k1VerificationKey2019,
-            )),
-            Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
-        }
-        #[cfg(not(feature = "secp256k1"))]
-        Err(Error::internal(Unsupported::Secp256k1))
-    } else if data[0] == DID_KEY_P256_PREFIX[0] && data[1] == DID_KEY_P256_PREFIX[1] {
-        #[cfg(feature = "secp256r1")]
-        {
-            let encoded_key =
-                ssi_multicodec::MultiEncodedBuf::encode(ssi_multicodec::P256_PUB, &data[2..]);
-            let multibase_key =
-                multibase::encode(multibase::Base::Base58Btc, encoded_key.as_bytes());
-
-            Ok((
-                PublicKey::Multibase(multibase_key),
-                VerificationMethodType::EcdsaSecp256r1VerificationKey2019,
-            ))
-        }
-        #[cfg(not(feature = "secp256r1"))]
-        return Err(Error::internal(Unsupported::P256));
-    } else if data[0] == DID_KEY_P384_PREFIX[0] && data[1] == DID_KEY_P384_PREFIX[1] {
-        #[cfg(feature = "secp384r1")]
-        match ssi_jwk::p384_parse(&data[2..]) {
-            Ok(jwk) => Ok((
-                PublicKey::Jwk(Box::new(jwk)),
-                VerificationMethodType::JsonWebKey2020,
-            )),
-            Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
-        }
-        #[cfg(not(feature = "secp384r1"))]
-        Err(Error::internal(Unsupported::P384))
-    } else if data[0] == DID_KEY_RSA_PREFIX[0] && data[1] == DID_KEY_RSA_PREFIX[1] {
-        match ssi_jwk::rsa_x509_pub_parse(&data[2..]) {
-            Ok(jwk) => Ok((
-                PublicKey::Jwk(Box::new(jwk)),
-                VerificationMethodType::JsonWebKey2020,
-            )),
-            Err(_) => Err(Error::InvalidMethodSpecificId(id.to_owned())),
-        }
-    } else if data[0] == DID_KEY_BLS12381_G2_PREFIX[0] && data[1] == DID_KEY_BLS12381_G2_PREFIX[1] {
-        if data.len() - 2 != 96 {
-            return Err(Error::InvalidMethodSpecificId(id.to_owned()));
-        }
-
-        let jwk = JWK::from(Params::OKP(OctetParams {
-            curve: "Bls12381G2".to_string(),
-            public_key: Base64urlUInt(data[2..].to_vec()),
-            private_key: None,
-        }));
-
-        // https://datatracker.ietf.org/doc/html/draft-denhartog-pairing-curves-jose-cose-00#section-3.1.3
-        // FIXME: This should be a base 58 key according to the spec.
-        Ok((
-            PublicKey::Jwk(Box::new(jwk)),
-            VerificationMethodType::Bls12381G2Key2020,
-        ))
-    } else {
-        Err(Error::NotFound)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use rand_chacha::rand_core::SeedableRng;
+    use resolution::Parameters;
     use ssi_claims::{
         data_integrity::{AnyInputContext, AnyInputSuiteOptions, AnySuite},
         vc::JsonCredential,
@@ -408,6 +467,27 @@ mod tests {
         let did_url = DIDURL::new(b"did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH").unwrap();
         let output = DIDKey.dereference(did_url).await.unwrap();
         let vm = output.content.into_verification_method().unwrap();
+        eprintln!("vm = {}", serde_json::to_string_pretty(&vm).unwrap());
+        vm.properties.get("publicKeyMultibase").unwrap();
+    }
+
+    #[async_std::test]
+    async fn from_did_key_with_format() {
+        let did_url = DIDURL::new(b"did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH#z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH").unwrap();
+        let output = DIDKey
+            .dereference_with(
+                did_url,
+                Options {
+                    accept: None,
+                    parameters: Parameters {
+                        public_key_format: Some("Ed25519VerificationKey2018".to_string()),
+                        ..Default::default()
+                    },
+                },
+            )
+            .await
+            .unwrap();
+        let vm = output.content.into_verification_method().unwrap();
         vm.properties.get("publicKeyBase58").unwrap();
     }
 
@@ -415,10 +495,22 @@ mod tests {
     #[cfg(feature = "secp256k1")]
     async fn from_did_key_secp256k1() {
         let did = did!("did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme");
-        DIDKey.resolve_with(did, Options::default()).await.unwrap();
+        DIDKey.resolve(did).await.unwrap();
 
         let did_url = DIDURL::new(b"did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme#zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme").unwrap();
-        let output = DIDKey.dereference(did_url).await.unwrap();
+        let output = DIDKey
+            .dereference_with(
+                did_url,
+                Options {
+                    accept: None,
+                    parameters: Parameters {
+                        public_key_format: Some("EcdsaSecp256k1VerificationKey2019".to_string()),
+                        ..Default::default()
+                    },
+                },
+            )
+            .await
+            .unwrap();
         let mut vm = output.content.into_verification_method().unwrap();
         let key: JWK =
             serde_json::from_value(vm.properties.remove("publicKeyJwk").unwrap()).unwrap();
@@ -433,10 +525,22 @@ mod tests {
     async fn from_did_key_p256() {
         // https://w3c-ccg.github.io/did-method-key/#p-256
         let did = did!("did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169");
-        DIDKey.resolve_with(did, Options::default()).await.unwrap();
+        DIDKey.resolve(did).await.unwrap();
 
         let did_url = DIDURL::new(b"did:key:zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169#zDnaerDaTF5BXEavCrfRZEk316dpbLsfPDZ3WJ5hRTPFU2169").unwrap();
-        let output = DIDKey.dereference(did_url).await.unwrap();
+        let output = DIDKey
+            .dereference_with(
+                did_url,
+                Options {
+                    accept: None,
+                    parameters: Parameters {
+                        public_key_format: Some("EcdsaSecp256r1VerificationKey2019".to_string()),
+                        ..Default::default()
+                    },
+                },
+            )
+            .await
+            .unwrap();
         let vm = output.content.into_verification_method().unwrap();
         let multibase_key = vm
             .properties
@@ -469,10 +573,22 @@ mod tests {
     async fn from_did_key_bls() {
         // https://w3c-ccg.github.io/did-method-key/#bls-12381
         let did = did!("did:key:zUC7K4ndUaGZgV7Cp2yJy6JtMoUHY6u7tkcSYUvPrEidqBmLCTLmi6d5WvwnUqejscAkERJ3bfjEiSYtdPkRSE8kSa11hFBr4sTgnbZ95SJj19PN2jdvJjyzpSZgxkyyxNnBNnY");
-        DIDKey.resolve_with(did, Options::default()).await.unwrap();
+        DIDKey.resolve(did).await.unwrap();
 
         let did_url = DIDURL::new(b"did:key:zUC7K4ndUaGZgV7Cp2yJy6JtMoUHY6u7tkcSYUvPrEidqBmLCTLmi6d5WvwnUqejscAkERJ3bfjEiSYtdPkRSE8kSa11hFBr4sTgnbZ95SJj19PN2jdvJjyzpSZgxkyyxNnBNnY#zUC7K4ndUaGZgV7Cp2yJy6JtMoUHY6u7tkcSYUvPrEidqBmLCTLmi6d5WvwnUqejscAkERJ3bfjEiSYtdPkRSE8kSa11hFBr4sTgnbZ95SJj19PN2jdvJjyzpSZgxkyyxNnBNnY").unwrap();
-        let output = DIDKey.dereference(did_url).await.unwrap();
+        let output = DIDKey
+            .dereference_with(
+                did_url,
+                Options {
+                    accept: None,
+                    parameters: Parameters {
+                        public_key_format: Some("Bls12381G2Key2020".to_string()),
+                        ..Default::default()
+                    },
+                },
+            )
+            .await
+            .unwrap();
         let mut vm = output.content.into_verification_method().unwrap();
         let key: JWK =
             serde_json::from_value(vm.properties.remove("publicKeyJwk").unwrap()).unwrap();
@@ -496,10 +612,22 @@ mod tests {
     #[async_std::test]
     async fn from_did_key_rsa() {
         let did = did!("did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i");
-        DIDKey.resolve_with(did, Options::default()).await.unwrap();
+        DIDKey.resolve(did).await.unwrap();
 
         let vm = DIDURL::new(b"did:key:z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i#z4MXj1wBzi9jUstyPMS4jQqB6KdJaiatPkAtVtGc6bQEQEEsKTic4G7Rou3iBf9vPmT5dbkm9qsZsuVNjq8HCuW1w24nhBFGkRE4cd2Uf2tfrB3N7h4mnyPp1BF3ZttHTYv3DLUPi1zMdkULiow3M1GfXkoC6DoxDUm1jmN6GBj22SjVsr6dxezRVQc7aj9TxE7JLbMH1wh5X3kA58H3DFW8rnYMakFGbca5CB2Jf6CnGQZmL7o5uJAdTwXfy2iiiyPxXEGerMhHwhjTA1mKYobyk2CpeEcmvynADfNZ5MBvcCS7m3XkFCMNUYBS9NQ3fze6vMSUPsNa6GVYmKx2x6JrdEjCk3qRMMmyjnjCMfR4pXbRMZa3i").unwrap();
-        let output = DIDKey.dereference(vm).await.unwrap();
+        let output = DIDKey
+            .dereference_with(
+                vm,
+                Options {
+                    accept: None,
+                    parameters: Parameters {
+                        public_key_format: Some("JsonWebKey2020".to_string()),
+                        ..Default::default()
+                    },
+                },
+            )
+            .await
+            .unwrap();
         let mut vm = output.content.into_verification_method().unwrap();
         let key: JWK =
             serde_json::from_value(vm.properties.remove("publicKeyJwk").unwrap()).unwrap();
