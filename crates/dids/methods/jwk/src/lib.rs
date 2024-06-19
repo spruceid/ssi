@@ -146,14 +146,16 @@ impl DIDJWK {
     /// assert_eq!(did, "did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9");
     /// ```
     pub fn generate(key: &JWK) -> DIDBuf {
-        let normalized = serde_jcs::to_string(key).unwrap();
+        let key = key.to_public();
+        let normalized = serde_jcs::to_string(&key).unwrap();
         let method_id = multibase::Base::Base64Url.encode(normalized);
         DIDBuf::new(format!("did:jwk:{method_id}").into_bytes()).unwrap()
     }
 
     /// Generates a JWK DID URL referring to the given key.
     pub fn generate_url(key: &JWK) -> DIDURLBuf {
-        let normalized = serde_jcs::to_string(key).unwrap();
+        let key = key.to_public();
+        let normalized = serde_jcs::to_string(&key).unwrap();
         let method_id = multibase::Base::Base64Url.encode(normalized);
         DIDURLBuf::new(format!("did:jwk:{method_id}#0").into_bytes()).unwrap()
     }
@@ -232,7 +234,22 @@ mod tests {
     use ssi_dids_core::{resolution, DIDResolver};
 
     #[async_std::test]
-    #[cfg(feature = "secp256r1")]
+    async fn p256_roundtrip() {
+        let jwk = JWK::generate_p256();
+        let did_url = DIDJWK::generate_url(&jwk);
+        let resolved = DIDJWK.dereference(&did_url).await.unwrap();
+
+        let vm: JsonWebKey2020Ref = resolved
+            .content
+            .as_verification_method()
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        assert_eq!(*vm.public_key, jwk.to_public());
+    }
+
+    #[async_std::test]
     async fn from_p256() {
         let did_url = DIDURL::new(b"did:jwk:eyJjcnYiOiJQLTI1NiIsImt0eSI6IkVDIiwieCI6ImFjYklRaXVNczNpOF91c3pFakoydHBUdFJNNEVVM3l6OTFQSDZDZEgyVjAiLCJ5IjoiX0tjeUxqOXZXTXB0bm1LdG00NkdxRHo4d2Y3NEk1TEtncmwyR3pIM25TRSJ9#0").unwrap();
         let resolved = DIDJWK.dereference(did_url).await.unwrap();
@@ -259,7 +276,6 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "secp256r1")]
     async fn to_p256() {
         let jwk: ssi_jwk::JWK = serde_json::from_value(serde_json::json!({
             "crv": "P-256",
@@ -345,25 +361,14 @@ mod tests {
     }
 
     #[async_std::test]
-    #[cfg(feature = "ed25519")]
     async fn deny_private_key() {
         let jwk = JWK::generate_ed25519().unwrap();
         let json = serde_jcs::to_string(&jwk).unwrap();
-        let did = DIDBuf::new(
-            format!("did:jwk:{}", multibase::Base::Base64Url.encode(&json)).into_bytes(),
-        )
-        .unwrap();
-
-        let resolved = DIDJWK
-            .resolve(&did, resolution::Options::default())
-            .await
-            .unwrap();
-        let result: Result<JsonWebKey2020Ref, InvalidJsonWebKey2020> = resolved
-            .document
-            .verification_method
-            .first()
-            .unwrap()
-            .try_into();
-        assert!(matches!(result, Err(InvalidJsonWebKey2020::PrivateKey)))
+        let json_encoded = multibase::Base::Base64Url.encode(&json);
+        let did = DIDBuf::new(format!("did:jwk:{}", json_encoded).into_bytes()).unwrap();
+        assert!(matches!(
+            DIDJWK.resolve(&did).await.unwrap_err(),
+            Error::InvalidMethodSpecificId(_)
+        ),);
     }
 }
