@@ -42,7 +42,7 @@ pub enum Error {
     #[error(transparent)]
     InvalidData(InvalidData),
 
-    #[error("invalid method specific identifier")]
+    #[error("invalid method specific identifier: {0}")]
     InvalidMethodSpecificId(String),
 
     #[error("invalid options")]
