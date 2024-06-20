@@ -447,6 +447,7 @@ mod tests {
     use resolution::Parameters;
     use ssi_claims::{
         data_integrity::{AnyInputContext, AnyInputSuiteOptions, AnySuite},
+        jws::JWSVerifier,
         vc::JsonCredential,
         Verifiable,
     };
@@ -454,6 +455,7 @@ mod tests {
     use ssi_dids_core::{
         did, resolution::Options, DIDResolver, VerificationMethodDIDResolver, DIDURL,
     };
+    use ssi_verification_methods::AnyMethod;
     use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned, SingleSecretSigner};
     use static_iref::uri;
 
@@ -829,5 +831,45 @@ mod tests {
             .unwrap();
         // It should fail.
         assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_err());
+    }
+
+    async fn fetch_jwk(jwk: JWK) {
+        let did = DIDKey::generate(&jwk).unwrap();
+        let resolver: VerificationMethodDIDResolver<_, AnyMethod> =
+            VerificationMethodDIDResolver::new(DIDKey);
+        let vm = DIDKey
+            .resolve_into_any_verification_method(&did)
+            .await
+            .unwrap()
+            .unwrap();
+        let public_jwk = resolver.fetch_public_jwk(Some(&vm.id)).await.unwrap();
+        assert_eq!(*public_jwk, jwk.to_public());
+    }
+
+    #[async_std::test]
+    async fn fetch_jwk_ed25519() {
+        let jwk = JWK::generate_ed25519().unwrap();
+        fetch_jwk(jwk).await;
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "secp256k1")]
+    async fn fetch_jwk_secp256k1() {
+        let jwk = JWK::generate_secp256k1().unwrap();
+        fetch_jwk(jwk).await;
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "secp256r1")]
+    async fn fetch_jwk_secp256r1() {
+        let jwk = JWK::generate_p256();
+        fetch_jwk(jwk).await;
+    }
+
+    #[async_std::test]
+    #[cfg(feature = "secp384r1")]
+    async fn fetch_jwk_secp384r1() {
+        let jwk = JWK::generate_p384().unwrap();
+        fetch_jwk(jwk).await;
     }
 }

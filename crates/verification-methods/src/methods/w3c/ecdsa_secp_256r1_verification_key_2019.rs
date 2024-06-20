@@ -203,9 +203,17 @@ impl TryFrom<GenericVerificationMethod> for EcdsaSecp256r1VerificationKey2019 {
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
-                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
+                .ok_or_else(|| {
+                    InvalidVerificationMethod::invalid_property(
+                        "publicKeyMultibase is not a string",
+                    )
+                })?
                 .parse()
-                .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?,
+                .map_err(|e| {
+                    InvalidVerificationMethod::invalid_property(&format!(
+                        "publicKeyMultibase parsing failed because: {e}"
+                    ))
+                })?,
         })
     }
 }

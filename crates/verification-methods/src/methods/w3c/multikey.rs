@@ -1,8 +1,6 @@
 use std::{borrow::Cow, hash::Hash, str::FromStr};
 
-use ed25519_dalek::Signer;
 use iref::{Iri, IriBuf, UriBuf};
-use rand_core::{CryptoRng, RngCore};
 use rdf_types::{Interpretation, Vocabulary};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity};
@@ -69,11 +67,11 @@ pub enum InvalidPublicKey {
     #[error(transparent)]
     Multicodec(#[from] ssi_multicodec::Error),
 
-    #[error("invalid key type")]
-    InvalidKeyType,
+    #[error("unsupported key type: `{0}`")]
+    UnsupportedKeyType(String),
 
     #[error(transparent)]
-    Ed25519(#[from] ed25519_dalek::SignatureError),
+    Jwk(#[from] ssi_jwk::Error),
 }
 
 impl Multikey {
@@ -84,51 +82,22 @@ impl Multikey {
         self.public_key.to_jwk()
     }
 
-    pub fn generate_key_pair(
-        id: IriBuf,
-        controller: UriBuf,
-        csprng: &mut (impl RngCore + CryptoRng),
-    ) -> (Self, ed25519_dalek::SigningKey) {
-        let key = ed25519_dalek::SigningKey::generate(csprng);
-        (
-            Self::from_public_key(id, controller, key.verifying_key()),
-            key,
-        )
-    }
-
-    pub fn from_public_key(
-        id: IriBuf,
-        controller: UriBuf,
-        public_key: ed25519_dalek::VerifyingKey,
-    ) -> Self {
-        Self {
-            id,
-            controller,
-            public_key: PublicKey::encode(public_key),
-        }
-    }
-
-    pub fn sign_bytes<'a>(
+    pub fn sign_bytes(
         &self,
-        secret_key: impl Into<SecretKeyRef<'a>>,
+        secret_key: &JWK,
         signing_bytes: &[u8],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        match secret_key.into() {
-            SecretKeyRef::Ed25519(key_pair) => {
-                let signature = key_pair.sign(signing_bytes);
-                Ok(signature.to_bytes().to_vec())
-            }
-            SecretKeyRef::Jwk(secret_key) => {
-                let algorithm = ssi_jwk::Algorithm::EdDSA;
-                let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
-                if !algorithm.is_compatible_with(key_algorithm) {
-                    return Err(MessageSignatureError::InvalidSecretKey);
-                }
-
-                ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
-                    .map_err(|_| MessageSignatureError::InvalidSecretKey)
-            }
+        let algorithm = self
+            .public_key
+            .decoded
+            .algorithm
+            .ok_or(MessageSignatureError::MissingAlgorithm)?;
+        let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
+        if !algorithm.is_compatible_with(key_algorithm) {
+            return Err(MessageSignatureError::InvalidSecretKey);
         }
+        ssi_jws::sign_bytes(algorithm, signing_bytes, secret_key)
+            .map_err(|_| MessageSignatureError::InvalidSecretKey)
     }
 
     pub fn verify_bytes(
@@ -136,26 +105,18 @@ impl Multikey {
         signing_bytes: &[u8],
         signature: &[u8],
     ) -> Result<ProofValidity, ProofValidationError> {
-        let signature = ed25519_dalek::Signature::try_from(signature)
-            .map_err(|_| ProofValidationError::InvalidSignature)?;
-        Ok(self.public_key.verify(signing_bytes, &signature))
-    }
-}
-
-pub enum SecretKeyRef<'a> {
-    Ed25519(&'a ed25519_dalek::SigningKey),
-    Jwk(&'a JWK),
-}
-
-impl<'a> From<&'a ed25519_dalek::SigningKey> for SecretKeyRef<'a> {
-    fn from(value: &'a ed25519_dalek::SigningKey) -> Self {
-        Self::Ed25519(value)
-    }
-}
-
-impl<'a> From<&'a JWK> for SecretKeyRef<'a> {
-    fn from(value: &'a JWK) -> Self {
-        Self::Jwk(value)
+        let algorithm = self
+            .public_key
+            .decoded
+            .algorithm
+            .ok_or(ProofValidationError::MissingAlgorithm)?;
+        Ok(ssi_jws::verify_bytes(
+            algorithm,
+            signing_bytes,
+            &self.public_key.decoded,
+            signature,
+        )
+        .map_err(|_| InvalidProof::Signature))
     }
 }
 
@@ -220,9 +181,17 @@ impl TryFrom<GenericVerificationMethod> for Multikey {
                 .get("publicKeyMultibase")
                 .ok_or_else(|| InvalidVerificationMethod::missing_property("publicKeyMultibase"))?
                 .as_str()
-                .ok_or_else(|| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?
+                .ok_or_else(|| {
+                    InvalidVerificationMethod::invalid_property(
+                        "publicKeyMultibase is not a string",
+                    )
+                })?
                 .parse()
-                .map_err(|_| InvalidVerificationMethod::invalid_property("publicKeyMultibase"))?,
+                .map_err(|e| {
+                    InvalidVerificationMethod::invalid_property(&format!(
+                        "publicKeyMultibase parsing failed because: {e}"
+                    ))
+                })?,
         })
     }
 }
@@ -233,49 +202,34 @@ pub struct PublicKey {
     encoded: MultibaseBuf,
 
     /// Decoded public key.
-    decoded: ed25519_dalek::VerifyingKey,
+    decoded: JWK,
 }
 
 impl PublicKey {
-    pub fn encode(decoded: ed25519_dalek::VerifyingKey) -> Self {
-        let multi_encoded =
-            MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
-
-        Self {
-            encoded: MultibaseBuf::encode(multibase::Base::Base58Btc, multi_encoded.as_bytes()),
-            decoded,
-        }
-    }
-
     pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
         let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
 
         let (pk_codec, pk_data) = pk_multi_encoded.parts();
-        if pk_codec == ssi_multicodec::ED25519_PUB {
-            let decoded = ed25519_dalek::VerifyingKey::try_from(pk_data)?;
-            Ok(Self { encoded, decoded })
-        } else {
-            Err(InvalidPublicKey::InvalidKeyType)
-        }
+        let decoded = match pk_codec {
+            #[cfg(feature = "ed25519")]
+            ssi_multicodec::ED25519_PUB => ssi_jwk::ed25519_parse(pk_data)?,
+            #[cfg(feature = "secp256k1")]
+            ssi_multicodec::SECP256K1_PUB => ssi_jwk::secp256k1_parse(pk_data)?,
+            #[cfg(feature = "secp256r1")]
+            ssi_multicodec::P256_PUB => ssi_jwk::p256_parse(pk_data)?,
+            #[cfg(feature = "secp384r1")]
+            ssi_multicodec::P384_PUB => ssi_jwk::p384_parse(pk_data)?,
+            c => return Err(InvalidPublicKey::UnsupportedKeyType(format!("{c:#x}")))?,
+        };
+        Ok(Self { encoded, decoded })
     }
 
     pub fn encoded(&self) -> &Multibase {
         &self.encoded
     }
 
-    pub fn decoded(&self) -> &ed25519_dalek::VerifyingKey {
-        &self.decoded
-    }
-
     pub fn to_jwk(&self) -> JWK {
-        self.decoded.into()
-    }
-
-    pub fn verify(&self, data: &[u8], signature: &ed25519_dalek::Signature) -> ProofValidity {
-        use ed25519_dalek::Verifier;
-        self.decoded
-            .verify(data, signature)
-            .map_err(|_| InvalidProof::Signature)
+        self.decoded.clone()
     }
 }
 
