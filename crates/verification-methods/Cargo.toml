@@ -1,0 +1,78 @@
+[package]
+name = "ssi-verification-methods"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verification methods implementation for ssi"
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-verification-methods/"
+
+[features]
+default = ["ed25519", "rsa", "secp256k1", "secp256r1", "secp384r1", "tezos", "eip712", "solana"]
+
+## enable RSA keys
+rsa = []
+
+## enable ed25519 keys
+ed25519 = ["ed25519-dalek", "rand_core", "ssi-jws/ed25519"]
+
+## enable secp256k1 keys
+secp256k1 = ["k256", "sha2", "ssi-jws/secp256k1"]
+
+## enable secp256r1 (p256) keys
+secp256r1 = ["p256", "ssi-jws/secp256r1"]
+
+## enable secp384r1 (p384) keys
+secp384r1 = ["p384", "ssi-jws/secp384r1"]
+
+tezos = ["ssi-tzkey", "ssi-caips/tezos"]
+
+eip712 = ["ssi-eip712", "sha3"]
+
+## Enable aleo keys.
+##
+## Not compatible with WASM targets.
+aleo = ["ssi-caips/aleo"]
+
+solana = []
+
+[dependencies]
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-security.workspace = true
+ssi-caips.workspace = true
+ssi-claims-core.workspace = true
+ssi-verification-methods-core.workspace = true
+ssi-tzkey = { workspace = true, optional = true }
+ssi-eip712 = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+json-syntax = { workspace = true, features = ["serde"] }
+async-trait.workspace = true
+iref = { workspace = true, features = ["serde"] }
+static-iref.workspace = true
+rdf-types.workspace = true
+thiserror.workspace = true
+json-ld.workspace = true
+# treeldr-rust-prelude.workspace = true
+linked-data = { workspace = true, features = ["derive"] }
+ssi-multicodec.workspace = true
+multibase.workspace = true
+hex.workspace = true
+derivative.workspace = true
+educe.workspace = true
+pin-project.workspace = true
+futures = "0.3.28"
+
+ed25519-dalek = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+sha3 = { workspace = true, optional = true }
+k256 = { workspace = true, optional = true, features = ["ecdsa", "sha256"] }
+p256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p384 = { workspace = true, optional = true, features = ["ecdsa"] }
+
+# rand_core_0_5 = { version = "0.5", optional = true, package = "rand_core" }
+rand_core = { version = "0.6.4", optional = true }

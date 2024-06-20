@@ -1,0 +1,28 @@
+[package]
+name = "ssi-verification-methods-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Core traits and types for verification methods in ssi"
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-verification-methods/"
+
+[dependencies]
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-claims-core.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+iref = { workspace = true, features = ["serde"] }
+static-iref.workspace = true
+rdf-types.workspace = true
+thiserror.workspace = true
+json-ld.workspace = true
+linked-data = { workspace = true, features = ["derive"] }
+educe.workspace = true
+multibase.workspace = true
+bs58.workspace = true
+hex.workspace = true

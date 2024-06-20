@@ -1,0 +1,79 @@
+[package]
+name = "ssi-claims"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verifiable Claims for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-claims/"
+
+[features]
+# Enables signature suites specified by the W3C.
+w3c = ["ssi-data-integrity/w3c"]
+
+# Enables signature suites specified by DIF.
+dif = ["ssi-data-integrity/dif"]
+
+# Enables signature suites based on ED25519:
+# - `Ed25519Signature2018`
+# - `Ed25519Signature2020`
+# - `EdDsa2022`
+ed25519 = ["ssi-jws/ed25519", "ssi-data-integrity/ed25519", "ssi-verification-methods/ed25519"]
+
+# Enables signature suites based on secp256k1:
+# - `EcdsaSecp256k1Signature2019`
+secp256k1 = ["ssi-jws/secp256k1", "ssi-data-integrity/secp256k1", "ssi-verification-methods/secp256k1"]
+
+# Enables signature suites based on secp256r1:
+# - `EcdsaSecp256r1Signature2019`
+secp256r1 = ["ssi-jws/secp256r1", "ssi-data-integrity/secp256r1", "ssi-verification-methods/secp256r1"]
+
+# Enables `RsaSignature2018`
+rsa = ["ssi-jws/rsa", "ssi-data-integrity/rsa", "ssi-verification-methods/rsa"]
+
+# Enables all the tezos signatures suites:
+# - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
+# - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021`
+# - `TezosJcsSignature2021`
+# - `TezosSignature2021`
+tezos = ["ssi-jws/tezos", "ssi-data-integrity/tezos"]
+
+# Enables `AleoSignature2021`
+aleo = ["ssi-jwk/aleo", "ssi-jws/aleo", "ssi-data-integrity/aleo", "ssi-verification-methods/aleo"]
+
+# Enables `Eip712Signature2021`
+eip712 = ["ssi-eip712", "ssi-data-integrity/eip712", "ssi-vc/eip712"]
+
+# Enables `SolanaSignature2021`
+solana = ["ssi-data-integrity/solana", "ssi-verification-methods/solana"]
+
+# Enables `EthereumPersonalSignature2021`
+ethereum = ["ssi-jws/eip", "ssi-data-integrity/ethereum"]
+
+[dependencies]
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-verification-methods.workspace = true
+ssi-claims-core.workspace = true
+ssi-jws.workspace = true
+ssi-jwt.workspace = true
+ssi-sd-jwt.workspace = true
+ssi-vc.workspace = true
+ssi-data-integrity.workspace = true
+ssi-dids-core.workspace = true
+ssi-eip712 = { workspace = true, optional = true }
+ssi-json-ld.workspace = true
+ssi-security.workspace = true
+pin-project.workspace = true
+thiserror.workspace = true
+iref.workspace = true
+rdf-types.workspace = true
+linked-data.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+json-syntax.workspace = true
+json-ld.workspace = true
+locspan.workspace = true
+educe.workspace = true

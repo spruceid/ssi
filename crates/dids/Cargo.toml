@@ -1,0 +1,36 @@
+[package]
+name = "ssi-dids"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "DID methods of the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-dids/"
+
+[features]
+default = ["http", "secp256k1", "secp256r1", "ripemd-160", "eip", "tezos"]
+
+example = ["ssi-dids-core/example"]
+http = ["ssi-dids-core/http"]
+
+secp256k1 = ["did-method-key/secp256k1"]
+secp256r1 = ["did-method-key/secp256r1"]
+secp384r1 = ["did-method-key/secp384r1"]
+ripemd-160 = ["did-pkh/ripemd-160"]
+eip = ["did-pkh/eip"]
+tezos = ["did-pkh/tezos"]
+aleo = ["did-pkh/aleo"]
+solana = ["did-pkh/solana"]
+
+[dependencies]
+ssi-jwk.workspace = true
+ssi-dids-core.workspace = true
+did-ethr.workspace = true
+did-ion.workspace = true
+did-jwk.workspace = true
+did-method-key.workspace = true
+did-pkh.workspace = true
+did-tz.workspace = true
+did-web.workspace = true
+thiserror.workspace = true

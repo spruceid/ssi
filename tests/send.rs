@@ -1,0 +1,58 @@
+//! When too many lifetime requirements are added to async fns in traits, the
+//! compiler may get confused, triggering this issue:
+//! <https://github.com/rust-lang/rust/issues/100013>
+//! This test ensures that the Rust compiler is able to prove that the
+//! `CryptographicSuite::sign` returns a future that is `Send` without
+//! triggering the issue.
+use serde::{Deserialize, Serialize};
+use ssi::{
+    claims::{
+        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
+        vc::SpecializedJsonCredential,
+    },
+    dids::{DIDResolver, DIDJWK},
+    verification_methods::SingleSecretSigner,
+    JWK,
+};
+use static_iref::uri;
+use std::future::Future;
+
+fn assert_send(f: impl Send + Future) {
+    drop(f)
+}
+
+#[test]
+fn data_integrity_sign_is_send() {
+    let credential = SpecializedJsonCredential::<Claims>::new(
+        Some(uri!("https://example.org/#CredentialId").to_owned()), // id
+        uri!("https://example.org/#Issuer").to_owned().into(),      // issuer
+        xsd_types::DateTime::now(),                                 // issuance date
+        vec![],
+    );
+
+    let key = JWK::generate_p256(); // requires the `p256` feature.
+    let did = DIDJWK::generate_url(&key.to_public());
+    let vm_resolver = DIDJWK.with_default_options();
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
+    let verification_method = did.into_iri().into();
+
+    let cryptosuite = AnySuite::pick(&key, Some(&verification_method))
+        .expect("could not find appropriate cryptosuite");
+
+    assert_send(cryptosuite.sign(
+        credential,
+        AnyInputContext::default(),
+        &vm_resolver,
+        &signer,
+        ProofOptions::from_method(verification_method),
+    ))
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Claims {
+    #[serde(rename = "https://example.org/#name")]
+    name: String,
+
+    #[serde(rename = "https://example.org/#email")]
+    email: String,
+}

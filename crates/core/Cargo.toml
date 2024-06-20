@@ -1,0 +1,15 @@
+[package]
+name = "ssi-core"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Core types and traits for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-core/"
+
+[dependencies]
+thiserror.workspace = true
+async-trait.workspace = true
+serde = { workspace = true, features = ["derive"] }
+pin-project.workspace = true

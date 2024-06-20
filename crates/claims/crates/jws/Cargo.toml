@@ -1,0 +1,75 @@
+[package]
+name = "ssi-jws"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of JWS for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-jws/"
+
+[features]
+default = ["secp256k1", "secp256r1", "ed25519", "rsa"]
+
+## Enable secp256k1 signatures.
+secp256k1 = ["ssi-jwk/secp256k1", "k256", "ssi-crypto/secp256k1", "blake2", "dep:sha2", "dep:sha3"]
+
+## Enable secp256r1 (p256) signatures.
+secp256r1 = ["ssi-jwk/secp256r1", "p256", "blake2"]
+
+## Enable secp384r1 (p384) signatures.
+secp384r1 = ["ssi-jwk/secp384r1", "p384"]
+
+## Enable ed25519 (EdDSA) signatures.
+ed25519 = ["ssi-jwk/ed25519", "ed25519-dalek", "rand", "blake2"]
+
+## Enable RSA signatures.
+rsa = ["ssi-jwk/rsa", "dep:rsa", "dep:sha2", "rand"]
+
+## Enable aleo ecosystem signatures.
+aleo = ["ssi-jwk/aleo"]
+
+## Enable ethereum style signatures.
+eip = ["ssi-jwk/eip", "ssi-crypto/keccak", "k256", "secp256k1"]
+
+## Enable tezos style signatures.
+tezos = ["ssi-jwk/tezos", "secp256k1", "secp256r1", "ed25519"]
+
+## Use the Ring crate for crypto operations.
+ring = ["ssi-jwk/ring", "dep:ring", "rand", "blake2"]
+
+[dependencies]
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64.workspace = true
+k256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p384 = { workspace = true, optional = true, features = ["ecdsa"] }
+blake2 = { workspace = true, optional = true }
+ed25519-dalek = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+sha3 = { workspace = true, optional = true }
+rsa = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
+ring = { version = "0.16", optional = true }
+iref.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+linked-data.workspace = true
+hex.workspace = true
+ssi-core.workspace = true
+ssi-claims-core.workspace = true
+
+[dev-dependencies]
+async-std.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+clear_on_drop = "0.2.4"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+clear_on_drop = { version = "0.2.4", features = ["no_cc"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

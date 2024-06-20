@@ -1,6 +1,6 @@
 [package]
 name = "ssi"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Spruce Systems, Inc."]
 edition = "2021"
 license = "Apache-2.0"
@@ -8,101 +8,228 @@ description = "Core library for Verifiable Credentials and Decentralized Identif
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi/"
 keywords = ["ssi", "did", "vc", "vp", "jsonld"]
+rust-version = "1.77"
 
-exclude = ["json-ld-api/*", "json-ld-normalization/*", "vc-test-suite/*"]
+[workspace]
+members = [
+  "crates/*",
+  "crates/verification-methods/core",
+  "crates/dids/core",
+  "crates/dids/methods/*",
+  "crates/claims/core",
+  "crates/claims/crates/*",
+  "crates/claims/crates/data-integrity/core",
+  "crates/claims/crates/data-integrity/suites"
+]
+
+[workspace.dependencies]
+ssi-core = { path = "./crates/core", version = "0.2", default-features = false }
+ssi-multicodec = { path = "./crates/multicodec", version = "0.2", default-features = false }
+ssi-crypto = { path = "./crates/crypto", version = "0.2", default-features = false }
+ssi-verification-methods-core = { path = "./crates/verification-methods/core", version = "0.1", default-features = false }
+ssi-verification-methods = { path = "./crates/verification-methods", version = "0.1", default-features = false }
+ssi-jwk = { path = "./crates/jwk", version = "0.2", default-features = false }
+ssi-tzkey = { path = "./crates/tzkey", version = "0.2", default-features = false }
+ssi-eip712 = { path = "./crates/eip712", version = "0.1", default-features = false }
+ssi-rdf = { path = "./crates/rdf", version = "0.1", default-features = false }
+ssi-contexts = { path = "./crates/contexts", version = "0.1.5", default-features = false }
+ssi-json-ld = { path = "./crates/json-ld", version = "0.3", default-features = false }
+ssi-security = { path = "./crates/security", version = "0.1", default-features = false }
+ssi-caips = { path = "./crates/caips", version = "0.2", default-features = false }
+ssi-ucan = { path = "./crates/ucan", version = "0.2", default-features = false }
+ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.2", default-features = false }
+ssi-ssh = { path = "./crates/ssh", version = "0.2", default-features = false }
+
+# Verifiable Claims
+ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-features = false }
+ssi-jws = { path = "./crates/claims/crates/jws", version = "0.2", default-features = false }
+ssi-jwt = { path = "./crates/claims/crates/jwt", version = "0.2", default-features = false }
+ssi-sd-jwt = { path = "./crates/claims/crates/sd-jwt", version = "0.2", default-features = false }
+ssi-vc = { path = "./crates/claims/crates/vc", version = "0.3", default-features = false }
+ssi-data-integrity-core = { path = "./crates/claims/crates/data-integrity/core", version = "0.1", default-features = false }
+ssi-data-integrity-suites = { path = "./crates/claims/crates/data-integrity/suites", version = "0.1", default-features = false }
+ssi-data-integrity = { path = "./crates/claims/crates/data-integrity", version = "0.1", default-features = false }
+ssi-claims = { path = "./crates/claims", version = "0.1", default-features = false }
+
+# DID methods
+ssi-dids-core = { path = "./crates/dids/core", version = "0.1", default-features = false }
+did-ethr = { path = "./crates/dids/methods/ethr", version = "0.3", default-features = false }
+did-ion = { path = "./crates/dids/methods/ion", version = "0.3", default-features = false }
+did-jwk = { path = "./crates/dids/methods/jwk", version = "0.2", default-features = false }
+did-method-key = { path = "./crates/dids/methods/key", version = "0.3", default-features = false }
+did-pkh = { path = "./crates/dids/methods/pkh", version = "0.3", default-features = false }
+did-tz = { path = "./crates/dids/methods/tz", version = "0.3", default-features = false }
+did-web = { path = "./crates/dids/methods/web", version = "0.3", default-features = false }
+ssi-dids = { path = "./crates/dids", version = "0.2", default-features = false }
+
+# crypto
+k256 = "0.13.1"
+p256 = "0.13.2"
+p384 = "0.13.0"
+ed25519-dalek = "2.0"
+blake2 = "0.10"
+sha2 = "0.10.0"
+sha3 = "0.10.8"
+rsa = "0.6"
+
+# other common dependencies
+async-std = "1.9"
+async-trait = "0.1.68"
+thiserror = "1.0.40"
+chrono = "0.4.24"
+iref = "3.1.2"
+static-iref = "3.0"
+rdf-types = "0.22.3"
+xsd-types = "0.9.2"
+locspan = "0.8"
+json-syntax = "0.12.2"
+nquads-syntax = "0.19"
+multibase = "0.9.1"
+json-ld = "0.16"
+serde = "1.0"
+serde_json = { version = "1.0", features = ["arbitrary_precision"] }
+serde_jcs = "0.1.0"
+bs58 = "0.4"
+base64 = "0.12"
+hex = "0.4.3"
+derivative = "2.2.0"
+educe = "0.4.22"
+pin-project = "1.1.3"
+futures = "0.3.28"
+linked-data = "0.1.2"
+rand = "0.8"
+rand_chacha = "0.3.1"
+contextual = "0.1.6"
+lazy_static = "1.4.0"
 
 [features]
-default = ["w3c", "ripemd-160", "eip", "tezos"]
+default = ["w3c", "rsa", "ed25519", "secp256k1", "secp256r1", "ripemd-160", "eip712"]
 
-w3c = ["ssi-ldp/w3c", "secp256k1", "ed25519", "secp256r1", "rsa"]
-## enable secp256k1 signatures
-secp256k1 = ["ssi-ldp/secp256k1"]
-## enable secp256r1 (p256) signatures
-secp256r1 = ["ssi-ldp/secp256r1"]
-## enable secp384r1 (p384) signatures
-secp384r1 = ["ssi-ldp/secp384r1"]
-## enable ed25519 (EdDSA) signatures
-ed25519 = ["ssi-ldp/ed25519", "ssi-jwk/ed25519", "ssi-jws/ed25519"]
-## enable RSA signatures
-rsa = ["ssi-ldp/rsa"]
-## enable ripemd hashes
-ripemd-160 = ["ssi-jwk/ripemd-160"]
-## enable bbs
+## Signature suites specified by the W3C.
+## 
+## This will enable the following Data-Integrity suites:
+##   - `JsonWebSignature2020`
+##   - `RsaSignature2018` (requires `rsa`)
+##   - `Ed25519Signature2018` (requires `ed25519`)
+##   - `Ed25519Signature2020` (requires `ed25519`)
+##   - `EdDsa2022` (requires `ed25519`)
+##   - `EcdsaSecp256k1Signature2019` (requires `secp256k1`)
+##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+##   - `EthereumEip712Signature2021` (requires `eip712`)
+w3c = ["ssi-claims/w3c"]
+
+## Signature suites specified by the Decentralized Identify Foundation (DIF).
+##
+## This includes:
+##   - `EcdsaSecp256k1RecoverySignature2020` (requires `secp256k1`)
+dif = ["ssi-claims/dif"]
+
+## Signature suites based on ED25519 (EdDSA).
+##
+## This includes:
+##   - `Ed25519Signature2018` (requires `w3c`)
+##   - `Ed25519Signature2020` (requires `w3c`)
+##   - `EdDsa2022` (requires `w3c`)
+ed25519 = ["ssi-claims/ed25519"]
+
+## Signature suites based on secp256k1.
+##
+## This includes:
+##   - `EcdsaSecp256k1Signature2019` (requires `w3c`)
+##   - `EcdsaSecp256k1RecoverySignature2020` (requires `dif`)
+secp256k1 = ["ssi-claims/secp256k1", "ssi-dids/secp256k1"]
+
+## Signature suites based on secp256r1.
+##
+## This includes:
+##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+secp256r1 = ["ssi-claims/secp256r1", "ssi-dids/secp256r1"]
+
+## Enable secp384r1 keys.
+secp384r1 = ["ssi-jwk/secp384r1", "ssi-verification-methods/secp384r1", "ssi-dids/secp384r1"]
+
+## Signature suites based on RSA.
+##
+## This includes:
+##   - `RsaSignature2018` (requires `w3c`)
+rsa = ["ssi-claims/rsa"]
+
+## Tezos signatures suites.
+##
+## This includes:
+##   - `TezosJcsSignature2021`
+##   - `TezosSignature2021`
+##   - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `ed25519`)
+##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
+tezos = ["ssi-claims/tezos", "ssi-caips/tezos", "ssi-dids/tezos"]
+
+## Enables `AleoSignature2021`.
+aleo = ["ssi-claims/aleo", "ssi-caips/aleo", "ssi-dids/aleo"]
+
+## Signature suites based on Ethereum EIP-712.
+## 
+## This includes:
+##   - `Eip712Signature2021` (requires `ethereum`).
+##   - `EthereumEip712Signature2021` (requires `w3c`)
+eip712 = ["ssi-claims/eip712"]
+
+# Enables `SolanaSignature2021`
+solana = ["ssi-claims/solana", "ssi-dids/solana"]
+
+## Ethereum signature suites.
+##
+## This includes:
+##   - `EthereumPersonalSignature2021`
+##   - `Eip712Signature2021` (requires `eip712`)
+ethereum = ["ssi-claims/ethereum", "ssi-jwk/eip", "ssi-dids/eip"]
+
+## Enable ripemd hashes.
+ripemd-160 = ["ssi-jwk/ripemd-160", "ssi-dids/ripemd-160"]
+
+## Enable bbs.
 bbs = ["ssi-crypto/bbs"]
-
-## enable aleo ecosystem signatures
-aleo = ["ssi-ldp/aleo", "ssi-caips/aleo", "ssi-jws/aleo"]
-## enable ethereum style signatures
-eip = ["ssi-caips/eip", "ssi-jwk/eip", "ssi-ldp/eip", "ssi-crypto/keccak"]
-## enable tezos style signatures
-tezos = ["ssi-caips/tezos", "ssi-jwk/tezos", "ssi-jws/tezos", "ssi-ldp/tezos"]
-## enable LDPs from the Solana Ecosystem
-solana = ["ssi-ldp/solana"]
 
 ## Use the Ring crate for crypto operations
 ring = ["ssi-jwk/ring", "ssi-jws/ring", "ssi-crypto/ring"]
 
+## Enable DID resolution tests using [hyper](https://crates.io/crates/hyper) and [tokio](https://crates.io/crates/tokio).
 http-did = ["ssi-dids/http"]
-example-http-issuer = ["ssi-ldp/example-http-issuer"]
 
-# Backward compatibility features
-ed25519-dalek = ["ed25519"]
-keccak = ["eip"]
-sha = ["rsa"]
+# ## Enable resolving example HTTPS Verifiable credential Issuer URL, for [VC Test Suite](https://github.com/w3c/vc-test-suite/).
+# example-http-issuer = ["ssi-ldp/example-http-issuer"]
+
+## Enable example DIDs.
+example = ["ssi-dids/example"]
 
 [dependencies]
-ssi-jwk = { path = "./ssi-jwk", version = "0.1.1", default-features = false }
-ssi-json-ld = { path = "./ssi-json-ld", version = "0.2.2", default-features = false }
-ssi-core = { path = "./ssi-core", version = "0.1" }
-ssi-dids = { path = "./ssi-dids", version = "0.1" }
-ssi-crypto = { path = "./ssi-crypto", version = "0.1", default-features = false }
-ssi-jws = { path = "./ssi-jws", version = "0.1", default-features = false }
-ssi-jwt = { path = "./ssi-jwt", version = "0.1", default-features = false }
-ssi-tzkey = { path = "./ssi-tzkey", version = "0.1", default-features = false }
-ssi-ldp = { path = "./ssi-ldp", version = "0.3.0", default-features = false }
-ssi-ssh = { path = "./ssi-ssh", version = "0.1", default-features = false }
-ssi-ucan = { path = "./ssi-ucan", version = "0.1" }
-ssi-vc = { path = "./ssi-vc", version = "0.2.0" }
-ssi-zcap-ld = { path = "./ssi-zcap-ld", version = "0.1.2" }
-ssi-caips = { path = "./ssi-caips", version = "0.1", default-features = false }
-ssi-sd-jwt = { path = "./ssi-sd-jwt", version = "0.1" }
-
-[workspace]
-members = [
-  "did-tezos",
-  "did-jwk",
-  "did-key",
-  "did-web",
-  "did-ethr",
-  "did-sol",
-  "did-pkh",
-  "did-onion",
-  "did-ion",
-  "did-webkey",
-  "vc-test",
-  "did-test",
-  "ssi-caips",
-  "ssi-jwk",
-  "ssi-core",
-  "ssi-crypto",
-  "ssi-json-ld",
-  "ssi-dids",
-  "ssi-jws",
-  "ssi-jwt",
-  "ssi-sd-jwt",
-  "ssi-tzkey",
-  "ssi-ssh",
-  "ssi-ldp",
-  "ssi-ucan",
-  "ssi-vc",
-  "ssi-zcap-ld"
-]
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
+ssi-security.workspace = true
+ssi-claims.workspace = true
+ssi-verification-methods.workspace = true
+ssi-dids.workspace = true
+ssi-eip712.workspace = true
+ssi-caips.workspace = true
+ssi-ucan.workspace = true
+ssi-zcap-ld.workspace = true
+ssi-multicodec.workspace = true
+ssi-ssh.workspace = true
+xsd-types.workspace = true # public reexport
+document-features = "0.2"
 
 [dev-dependencies]
-async-std = { version = "1.9", features = ["attributes"] }
+async-std = { workspace = true, features = ["attributes"] }
 uuid = { version = "0.8", features = ["v4", "serde"] }
-serde_json = "1.0"
-ssi-dids = { path = "./ssi-dids", version = "0.1", features = ["example"] }
+iref.workspace = true
+static-iref.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+json-syntax.workspace = true
+ssi-dids = { workspace = true, features = ["example"] }
 
 [package.metadata.docs.rs]
 all-features = true
@@ -114,46 +241,3 @@ sign-tag = true
 tag-prefix = "{{crate_name}}/"
 tag-message = "Release {{crate_name}} version {{version}}."
 pre-release-commit-message = "Release"
-
-# $git-cliff --config Cargo.toml > CHANGELOG.md
-[workspace.metadata.git-cliff.changelog]
-header = """
-# Changelog
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-"""
-body = """
-{% if version %}\
-    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
-{% else %}\
-    ## [Unreleased]
-{% endif %}\
-{% for group, commits in commits | group_by(attribute="group") %}
-    ### {{ group | upper_first }}\
-    {% for commit in commits %}
-        - [{{ commit.id | truncate(length=7, end="") }}] {{ commit.message }}\
-    {% endfor %}
-{% endfor %}\n
-"""
-trim = true
-[workspace.metadata.git-cliff.git]
-commit_preprocessors = [
-  { pattern = "\\n.*", replace = ""},
-]
-conventional_commits = false
-filter_unconventional = false
-commit_parsers = [
-  { message = "^[aA]dd( |ed)", group = "Added"},
-  { message = "^[fF]ix", group = "Fixed"},
-  { message = "^[cC]hange", group = "Changed"},
-  { message = "^[mM]ove", group = "Changed"},
-  { message = "^[rR]estructure", group = "Changed"},
-  { message = "^[rR]efactor", group = "Changed"},
-  { message = "^[rR]emove", group = "Removed"},
-  { message = ".*", group = "Other"},
-]
-# filter_commits = false
-tag_pattern = "v[0-9]*"

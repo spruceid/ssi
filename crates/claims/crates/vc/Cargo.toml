@@ -1,0 +1,62 @@
+[package]
+name = "ssi-vc"
+version = "0.3.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verifiable Credentials Data Model v1.1 for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-claims/"
+
+[features]
+eip712 = ["ssi-data-integrity/eip712"]
+
+[dependencies]
+iref.workspace = true
+rdf-types.workspace = true
+xsd-types.workspace = true
+static-iref.workspace = true
+chrono.workspace = true
+serde = { workspace = true, features = ["derive"] }
+linked-data.workspace = true
+serde_json.workspace = true
+json-syntax.workspace = true
+json-ld.workspace = true
+ssi-core.workspace = true
+ssi-jwt.workspace = true
+ssi-claims-core.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
+thiserror.workspace = true
+educe.workspace = true
+
+# for revocation/status lists.
+base64.workspace = true
+bitvec = "0.20"
+flate2 = "1.0"
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+ssi-verification-methods.workspace = true
+ssi-dids-core.workspace = true
+ssi-data-integrity.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies.reqwest]
+version = "0.11"
+features = ["json", "native-tls-vendored"]
+
+[dev-dependencies]
+ssi-verification-methods.workspace = true
+ssi-jwk.workspace = true
+async-std = { version = "1.9", features = ["attributes"] }
+static-iref.workspace = true
+rand = "0.7"
+rand_chacha.workspace = true
+hashbrown = "0.13.0"
+iref = { workspace = true, features = ["hashbrown"] }
+xsd-types.workspace = true
+chrono.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+
+[[example]]
+name = "sign"
+required-features = ["ssi-data-integrity/w3c", "ssi-data-integrity/ed25519"]

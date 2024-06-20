@@ -1,0 +1,44 @@
+[package]
+name = "ssi-data-integrity-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verifiable Credential Data Integrity 1.0 core implementation for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-data-integrity/"
+
+[dependencies]
+ssi-verification-methods-core.workspace = true
+rdf-types.workspace = true
+xsd-types = { workspace = true, features = ["serde"] }
+linked-data = { workspace = true, features = ["derive"] }
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
+ssi-claims-core = { workspace = true, features = ["serde"] }
+ssi-security.workspace = true
+chrono.workspace = true
+iref.workspace = true
+thiserror.workspace = true
+static-iref.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
+locspan.workspace = true
+hex.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+json-syntax.workspace = true
+derivative.workspace = true
+educe.workspace = true
+futures.workspace = true
+self_cell = "1.0.1"
+contextual.workspace = true
+multibase.workspace = true
+digest = "0.10"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

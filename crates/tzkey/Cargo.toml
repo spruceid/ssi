@@ -1,0 +1,20 @@
+[package]
+name = "ssi-tzkey"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of Tezos related functions for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-tzkey/"
+
+[dependencies]
+ssi-jwk = { workspace = true, features = ["tezos"]}
+ssi-jws = { workspace = true, features = ["tezos"] }
+ed25519-dalek.workspace = true
+thiserror.workspace = true
+bs58 = { workspace = true, features = ["check"] }
+
+[dev-dependencies]
+serde_json.workspace = true
+hex.workspace = true

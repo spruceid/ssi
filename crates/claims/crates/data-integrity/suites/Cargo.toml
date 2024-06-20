@@ -1,0 +1,147 @@
+[package]
+name = "ssi-data-integrity-suites"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Verifiable Credential Data Integrity 1.0 cryptosuites for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-data-integrity/"
+
+[features]
+## Signature suites specified by the W3C.
+##
+## This includes:
+##   - `JsonWebSignature2020`
+##   - `RsaSignature2018` (requires `rsa`)
+##   - `Ed25519Signature2018` (requires `ed25519`)
+##   - `Ed25519Signature2020` (requires `ed25519`)
+##   - `EdDsa2022` (requires `ed25519`)
+##   - `EcdsaSecp256k1Signature2019` (requires `secp256k1`)
+##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+##   - `EthereumEip712Signature2021` (requires `eip712`)
+w3c = ["k256"]
+
+## Signature suites specified by the Decentralized Identify Foundation (DIF).
+##
+## This includes:
+##   - `EcdsaSecp256k1RecoverySignature2020` (requires `secp256k1`)
+dif = []
+
+## Signature suites based on ED25519.
+##
+## This includes:
+##   - `Ed25519Signature2018` (requires `w3c`)
+##   - `Ed25519Signature2020` (requires `w3c`)
+##   - `EdDsa2022` (requires `w3c`)
+ed25519 = ["ssi-verification-methods/ed25519"]
+
+## Signature suites based on secp256k1.
+##
+## This includes:
+##   - `EcdsaSecp256k1Signature2019` (requires `w3c`)
+##   - `EcdsaSecp256k1RecoverySignature2020` (requires `dif`)
+secp256k1 = ["ssi-verification-methods/secp256k1", "k256"]
+
+## Signature suites based on secp256r1.
+##
+## This includes:
+##   - `EcdsaSecp256r1Signature2019` (requires `secp256r1`)
+secp256r1 = ["ssi-verification-methods/secp256r1", "p256"]
+
+## Signature suites based on RSA.
+##
+## This includes:
+##   - `RsaSignature2018` (requires `w3c`)
+rsa = ["ssi-verification-methods/rsa"]
+
+## Tezos signatures suites.
+##
+## This includes:
+##   - `TezosJcsSignature2021`
+##   - `TezosSignature2021`
+##   - `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `ed25519`)
+##   - `P256BLAKE2BDigestSize20Base58CheckEncodedSignature2021` (requires `secp256r1`)
+tezos = ["serde_json", "serde_jcs", "ssi-tzkey", "bs58", "ssi-verification-methods/tezos"]
+
+## Enables `AleoSignature2021`.
+aleo = ["ssi-jwk/aleo", "ssi-verification-methods/aleo", "k256"]
+
+## Signature suites based on Ethereum EIP-712.
+## 
+## This includes:
+##   - `Eip712Signature2021` (requires `ethereum`).
+##   - `EthereumEip712Signature2021` (requires `w3c`)
+eip712 = ["ssi-jws/eip", "serde_json", "ssi-verification-methods/eip712"]
+
+# Enables `SolanaSignature2021`
+solana = ["ssi-verification-methods/solana", "k256"]
+
+## Ethereum signature suites.
+##
+## This includes:
+##   - `EthereumPersonalSignature2021`
+##   - `Eip712Signature2021` (requires `eip712`)
+ethereum = ["serde_json"]
+
+[dependencies]
+ssi-data-integrity-core.workspace = true
+ssi-verification-methods.workspace = true
+async-trait.workspace = true
+rdf-types.workspace = true
+xsd-types = { workspace = true, features = ["serde"] }
+# treeldr-rust-prelude.workspace = true
+linked-data = { workspace = true, features = ["derive"] }
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-jwk.workspace = true
+ssi-jws.workspace = true
+ssi-rdf.workspace = true
+ssi-json-ld.workspace = true
+ssi-contexts.workspace = true
+ssi-claims-core.workspace = true
+ssi-security.workspace = true
+ssi-tzkey = { workspace = true, optional = true }
+ssi-eip712.workspace = true
+ssi-caips.workspace = true
+chrono.workspace = true
+multibase.workspace = true
+iref.workspace = true
+thiserror.workspace = true
+static-iref.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
+locspan.workspace = true
+hex.workspace = true
+serde = { workspace = true, features = ["derive"] }
+pin-project.workspace = true
+derivative.workspace = true
+educe.workspace = true
+futures.workspace = true
+self_cell = "1.0.1"
+contextual.workspace = true
+lazy_static.workspace = true
+
+bs58 = { workspace = true, optional = true }
+base64.workspace = true
+
+# ed25519-dalek = { workspace = true, optional = true }
+k256 = { workspace = true, optional = true, features = ["ecdsa", "sha256"] }
+p256 = { workspace = true, optional = true, features = ["ecdsa"] }
+p384 = { workspace = true, optional = true, features = ["ecdsa"] }
+sha2 = { workspace = true, optional = true }
+
+# only needed by non LD suites and EIP-712.
+json-syntax = { workspace = true, features = ["canonicalize"] }
+serde_json = { workspace = true, optional = true }
+serde_jcs = { workspace = true, optional = true }
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
+static-iref.workspace = true
+rand = "0.7"
+hashbrown = "0.13.0"
+iref = { workspace = true, features = ["hashbrown"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

@@ -1,0 +1,22 @@
+[package]
+name = "ssi-rdf"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Resource Description Framework (RDF) utilities for the `ssi` library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-rdf/"
+
+[dependencies]
+iref.workspace = true
+rdf-types.workspace = true
+ssi-crypto.workspace = true
+linked-data.workspace = true
+serde.workspace = true
+combination = "0.1"
+
+[dev-dependencies]
+locspan.workspace = true
+nquads-syntax.workspace = true
+difference = "2.0"

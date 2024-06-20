@@ -1,0 +1,72 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1"
+  ],
+  "type": [
+    "VerifiableCredential"
+  ],
+  "credentialSubject": {
+    "id": "_:1"
+  },
+  "issuer": "did:pkh:eth:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758",
+  "issuanceDate": "2021-06-16T20:55:45.850Z",
+  "proof": {
+    "@context": {
+      "Eip712Method2021": "https://w3id.org/security#Eip712Method2021",
+      "Eip712Signature2021": {
+        "@id": "https://w3id.org/security#Eip712Signature2021",
+        "@context": {
+          "@protected": true,
+          "@version": 1.1,
+          "id": "@id",
+          "type": "@type",
+          "challenge": "https://w3id.org/security#challenge",
+          "created": {
+            "@id": "http://purl.org/dc/terms/created",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "domain": "https://w3id.org/security#domain",
+          "expires": {
+            "@id": "https://w3id.org/security#expiration",
+            "@type": "http://www.w3.org/2001/XMLSchema#dateTime"
+          },
+          "nonce": "https://w3id.org/security#nonce",
+          "proofPurpose": {
+            "@id": "https://w3id.org/security#proofPurpose",
+            "@type": "@vocab",
+            "@context": {
+              "@protected": true,
+              "@version": 1.1,
+              "id": "@id",
+              "type": "@type",
+              "assertionMethod": {
+                "@id": "https://w3id.org/security#assertionMethod",
+                "@type": "@id",
+                "@container": "@set"
+              },
+              "authentication": {
+                "@id": "https://w3id.org/security#authenticationMethod",
+                "@type": "@id",
+                "@container": "@set"
+              }
+            }
+          },
+          "proofValue": "https://w3id.org/security#proofValue",
+          "verificationMethod": {
+            "@id": "https://w3id.org/security#verificationMethod",
+            "@type": "@id"
+          },
+          "publicKeyJwk": {
+            "@id": "https://w3id.org/security#publicKeyJwk",
+            "@type": "@json"
+          }
+        }
+      }
+    },
+    "type": "Eip712Signature2021",
+    "created": "2021-06-16T20:55:45.850Z",
+    "verificationMethod": "did:pkh:eth:0x2fbf1be19d90a29aea9363f4ef0b6bf1c4ff0758#Recovery2020",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "0x0e969e465756dcb17a354ba3c88740b14b8f672602d208bb476458663d6797f315e35dd9fadc7547653c74fa3626bb06cd6d0ba358bcfb59d2581ba350f150e31b"
+  }
+}

@@ -1,0 +1,34 @@
+[package]
+name = "ssi-json-ld"
+version = "0.3.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "JSON-LD-related definitions for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-json-ld/"
+
+[dependencies]
+thiserror.workspace = true
+async-std = { version = "1.9", features = ["attributes"] }
+json-ld.workspace = true
+iref.workspace = true
+static-iref.workspace = true
+rdf-types.workspace = true
+xsd-types.workspace = true
+locspan.workspace = true
+json-syntax.workspace = true
+linked-data.workspace = true
+futures = "0.3"
+lazy_static = "1.4"
+combination = "0.1"
+ssi-contexts.workspace = true
+ssi-crypto.workspace = true
+ssi-rdf.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+difference = "2.0"
+nquads-syntax.workspace = true
+serde_json.workspace = true
+tokio = { version = "1.27.0", features = ["rt", "macros"] }

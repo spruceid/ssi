@@ -1,0 +1,56 @@
+[package]
+name = "ssi-dids-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Core types and traits for DIDs for the ssi library."
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-dids-core/"
+
+[features]
+http = ["reqwest", "percent-encoding"]
+example = []
+
+[dependencies]
+ssi-core.workspace = true
+ssi-crypto.workspace = true
+ssi-verification-methods-core.workspace = true
+ssi-claims-core.workspace = true
+ssi-jws.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+serde_urlencoded = "0.7"
+async-trait.workspace = true
+thiserror.workspace = true
+iref = { workspace = true, features = ["serde"] }
+static-iref.workspace = true
+pin-project.workspace = true
+json-ld = { workspace = true, features = ["serde"] }
+
+# for registration
+ssi-jwk.workspace = true
+
+# for the `http` feature.
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"], optional = true }
+percent-encoding = { version = "2.1", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies.reqwest]
+version = "0.11"
+features = ["json", "native-tls-vendored"]
+
+[dev-dependencies]
+async-std = { version = "1.9", features = ["attributes"] }
+tokio = { version = "1.15", features = ["macros"] }
+futures = "0.3"
+hyper = { version = "0.14", features = [
+    "server",
+    "client",
+    "http1",
+    "stream",
+] }
+ssi-jwk = { workspace = true, default-features = false, features = ["secp256k1", "ed25519"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

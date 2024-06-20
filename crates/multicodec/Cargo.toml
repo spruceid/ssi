@@ -1,0 +1,16 @@
+[package]
+name = "ssi-multicodec"
+version = "0.2.0"
+edition = "2021"
+authors = ["Spruce Systems, Inc."]
+license = "Apache-2.0"
+description = "Implementation of the Multicodec specification for the ssi library"
+repository = "https://github.com/spruceid/ssi/"
+documentation = "https://docs.rs/ssi-multicodec/"
+
+[dependencies]
+unsigned-varint = { version = "0.7.1", features = ["std"] }
+
+[build-dependencies]
+csv = "1.2.2"
+thiserror.workspace = true

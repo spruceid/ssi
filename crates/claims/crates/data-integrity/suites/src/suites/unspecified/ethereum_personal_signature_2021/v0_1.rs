@@ -1,0 +1,44 @@
+use super::{EthereumWalletSigning, VerificationMethod, EPSIG_CONTEXT};
+use ssi_data_integrity_core::{
+    canonicalization::{CanonicalizeClaimsAndConfiguration, ConcatCanonicalClaimsAndConfiguration},
+    suite::AddProofContext,
+    StandardCryptographicSuite, TypeRef,
+};
+use static_iref::iri;
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct EthereumPersonalSignature2021v0_1;
+
+impl EthereumPersonalSignature2021v0_1 {
+    pub const NAME: &'static str = "EthereumPersonalSignature2021";
+
+    pub const IRI: &'static iref::Iri =
+        iri!("https://demo.spruceid.com/ld/epsig/EthereumPersonalSignature2021");
+}
+
+impl StandardCryptographicSuite for EthereumPersonalSignature2021v0_1 {
+    type Configuration = AddProofContext<EthereumPersonalSignature2021v0_1Context>;
+
+    type Transformation = CanonicalizeClaimsAndConfiguration;
+
+    type Hashing = ConcatCanonicalClaimsAndConfiguration;
+
+    type VerificationMethod = VerificationMethod;
+
+    type SignatureAlgorithm = EthereumWalletSigning;
+
+    type ProofOptions = ();
+
+    fn type_(&self) -> TypeRef {
+        TypeRef::Other(Self::NAME)
+    }
+}
+
+#[derive(Default)]
+pub struct EthereumPersonalSignature2021v0_1Context;
+
+impl From<EthereumPersonalSignature2021v0_1Context> for json_ld::syntax::Context {
+    fn from(_: EthereumPersonalSignature2021v0_1Context) -> Self {
+        json_ld::syntax::Context::One(EPSIG_CONTEXT.clone())
+    }
+}
