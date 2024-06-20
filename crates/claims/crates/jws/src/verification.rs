@@ -37,6 +37,25 @@ pub trait JWSVerifier {
     }
 }
 
+impl<'a, T: JWSVerifier> JWSVerifier for &'a T {
+    async fn fetch_public_jwk(
+        &self,
+        key_id: Option<&str>,
+    ) -> Result<Cow<JWK>, ProofValidationError> {
+        T::fetch_public_jwk(*self, key_id).await
+    }
+
+    async fn verify(
+        &self,
+        signing_bytes: &[u8],
+        signature: &[u8],
+        key_id: Option<&str>,
+        algorithm: Algorithm,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        T::verify(*self, signing_bytes, signature, key_id, algorithm).await
+    }
+}
+
 impl JWSVerifier for JWK {
     async fn fetch_public_jwk(
         &self,
