@@ -316,6 +316,11 @@ impl BitString {
         }
     }
 
+    /// Decompress a bit-string using DEFLATE ([RFC1951]) with the ZLIB
+    /// ([RFC1950]) data format.
+    ///
+    /// [RFC1951]: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#RFC1951>
+    /// [RFC1950]: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#RFC1950>
     pub fn from_compressed_bytes(
         status_size: StatusSize,
         bytes: &[u8],
@@ -328,19 +333,22 @@ impl BitString {
         Ok(Self::from_parts(status_size, buffer))
     }
 
+    /// Returns the status bit-size.
     pub fn status_size(&self) -> StatusSize {
         self.status_size
     }
 
+    /// Checks if the list is empty.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
+    /// Returns the length of the list (number of statuses).
     pub fn len(&self) -> usize {
         self.len
     }
 
-    /// Returns `i`-th status in the list.
+    /// Returns `index`-th status in the list.
     pub fn get(&self, index: usize) -> Option<u8> {
         if index < self.len {
             let (a, b) = self.status_size.offset_of(index);
@@ -350,6 +358,10 @@ impl BitString {
         }
     }
 
+    /// Sets the value at the given index.
+    ///
+    /// Returns the previous value, or an `Overflow` error if either the index
+    /// is out of bounds or the value is too large.
     pub fn set(&mut self, index: usize, value: u8) -> Result<u8, Overflow> {
         if index >= self.len {
             return Err(Overflow::Index(index));
@@ -371,6 +383,10 @@ impl BitString {
         Ok(old_value)
     }
 
+    /// Push a new value into the bit-string.
+    ///
+    /// Returns the index of the newly inserted value in the list,
+    /// or an error if the value is too large w.r.t. `status_size`.
     pub fn push(&mut self, value: u8) -> Result<usize, Overflow> {
         let status_mask = self.status_size.status_mask();
         let masked_value = value & status_mask;
@@ -392,10 +408,16 @@ impl BitString {
         Ok(a)
     }
 
+    /// Returns this bit-string as a byte slice.
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
     }
 
+    /// Compress the bit-string using DEFLATE ([RFC1951]) with the ZLIB
+    /// ([RFC1950]) data format.
+    ///
+    /// [RFC1951]: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#RFC1951>
+    /// [RFC1950]: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#RFC1950>
     pub fn to_compressed_bytes(&self, compression: Compression) -> Vec<u8> {
         let mut buffer = Vec::new();
 
@@ -408,6 +430,7 @@ impl BitString {
         buffer
     }
 
+    /// Returns an iterator over all the statuses stored in this bit-string.
     pub fn iter(&self) -> BitStringIter {
         BitStringIter {
             bit_string: self,
@@ -415,6 +438,8 @@ impl BitString {
         }
     }
 
+    /// Consumes the bit-string and returns the status size and underlying
+    /// byte array.
     pub fn into_parts(self) -> (StatusSize, Vec<u8>) {
         (self.status_size, self.bytes)
     }

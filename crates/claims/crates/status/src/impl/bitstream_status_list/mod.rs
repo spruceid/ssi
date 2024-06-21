@@ -183,6 +183,7 @@ pub struct BitString {
 }
 
 impl BitString {
+    /// Creates a new empty bit-string.
     pub fn new(status_size: StatusSize) -> Self {
         Self {
             status_size,
@@ -191,6 +192,7 @@ impl BitString {
         }
     }
 
+    /// Creates a bit-string from a byte array and status size.
     pub fn from_bytes(status_size: StatusSize, bytes: Vec<u8>) -> Self {
         let len = bytes.len() * 8usize / status_size.0 as usize;
         Self {
@@ -200,10 +202,12 @@ impl BitString {
         }
     }
 
+    /// Checks if the list is empty.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
 
+    /// Returns the length of the list (number of statuses).
     pub fn len(&self) -> usize {
         self.len
     }
@@ -273,10 +277,10 @@ impl BitString {
         Ok(old_value)
     }
 
-    /// Push a new value into the bitstring.
+    /// Push a new value into the bit-string.
     ///
-    /// Returns the index of the newly inserted value in the list.
-    /// Only the low `status_size` bits will be pushed to the list.
+    /// Returns the index of the newly inserted value in the list,
+    /// or an error if the value is too large w.r.t. `status_size`.
     pub fn push(&mut self, value: u8) -> Result<usize, Overflow> {
         let masked_value = value & self.status_size.mask();
         if masked_value != value {
@@ -303,6 +307,7 @@ impl BitString {
         Ok(index)
     }
 
+    /// Returns an iterator over all the statuses stored in this bit-string.
     pub fn iter(&self) -> BitStringIter {
         BitStringIter {
             bit_string: self,
@@ -310,6 +315,7 @@ impl BitString {
         }
     }
 
+    /// Encodes the bit-string.
     pub fn encode(&self) -> EncodedList {
         EncodedList::encode(&self.bytes)
     }
