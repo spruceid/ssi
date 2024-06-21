@@ -1,6 +1,7 @@
 //! JWT encoding of a Status Lists.
 use std::borrow::Cow;
 
+use flate2::Compression;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{Proof, Validate};
@@ -42,7 +43,7 @@ pub fn decode_status_list_jwt(mut claims: impl ClaimSet) -> Result<StatusList, D
         .try_remove::<JsonStatusList>()
         .map_err(DecodeError::claim)?
         .ok_or(DecodeError::MissingStatusList)?
-        .decode()?;
+        .decode(None)?;
 
     Ok(StatusList::new(bit_string, ttl))
 }
@@ -169,16 +170,17 @@ pub struct JsonStatusList {
 }
 
 impl JsonStatusList {
-    pub fn encode(bit_string: &BitString) -> Self {
+    pub fn encode(bit_string: &BitString, compression: Compression) -> Self {
+        let bytes = bit_string.to_compressed_bytes(compression);
         Self {
             bits: bit_string.status_size(),
-            lst: base64::encode_config(bit_string.as_bytes(), base64::URL_SAFE),
+            lst: base64::encode_config(bytes, base64::URL_SAFE),
         }
     }
 
-    pub fn decode(&self) -> Result<BitString, DecodeError> {
+    pub fn decode(&self, limit: Option<u64>) -> Result<BitString, DecodeError> {
         let bytes = base64::decode_config(&self.lst, base64::URL_SAFE)?;
-        Ok(BitString::from_parts(self.bits, bytes))
+        Ok(BitString::from_compressed_bytes(self.bits, &bytes, limit)?)
     }
 }
 

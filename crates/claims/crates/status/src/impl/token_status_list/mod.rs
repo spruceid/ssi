@@ -8,9 +8,13 @@
 //! Token status lists are themselves encoded as JWTs or CWTs.
 //!
 //! See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html>
+use flate2::{bufread::ZlibDecoder, write::ZlibEncoder, Compression};
 use iref::Uri;
 use serde::Serialize;
-use std::time::Duration;
+use std::{
+    io::{self, Read, Write},
+    time::Duration,
+};
 
 pub mod cbor;
 pub mod json;
@@ -118,6 +122,9 @@ pub enum DecodeError {
 
     #[error("invalid base64: {0}")]
     Base64(#[from] base64::DecodeError),
+
+    #[error("ZLIB decompression: {0}")]
+    Zlib(#[from] io::Error),
 }
 
 impl DecodeError {
@@ -254,6 +261,11 @@ pub struct BitString {
 }
 
 impl BitString {
+    /// Default maximum bitstring size allowed by the `from_compressed_bytes` function.
+    ///
+    /// 16MB.
+    pub const DEFAULT_LIMIT: u64 = 16 * 1024 * 1024;
+
     /// Creates a new status list with the given status size.
     pub fn new(status_size: StatusSize) -> Self {
         Self {
@@ -281,6 +293,18 @@ impl BitString {
             bytes: data,
             len,
         }
+    }
+
+    pub fn from_compressed_bytes(
+        status_size: StatusSize,
+        bytes: &[u8],
+        limit: Option<u64>,
+    ) -> Result<Self, io::Error> {
+        let limit = limit.unwrap_or(Self::DEFAULT_LIMIT);
+        let mut decoder = ZlibDecoder::new(bytes).take(limit);
+        let mut buffer = Vec::new();
+        decoder.read_to_end(&mut buffer)?;
+        Ok(Self::from_parts(status_size, buffer))
     }
 
     pub fn status_size(&self) -> StatusSize {
@@ -349,6 +373,18 @@ impl BitString {
 
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
+    }
+
+    pub fn to_compressed_bytes(&self, compression: Compression) -> Vec<u8> {
+        let mut buffer = Vec::new();
+
+        {
+            let mut encoder = ZlibEncoder::new(&mut buffer, compression);
+
+            encoder.write_all(&self.bytes).unwrap();
+        }
+
+        buffer
     }
 
     pub fn iter(&self) -> BitStringIter {
@@ -485,6 +521,7 @@ impl<'a> StatusMapEntry for AnyStatusListReference<'a> {
 
 #[cfg(test)]
 mod tests {
+    use flate2::Compression;
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
     use super::{json::JsonStatusList, BitString, StatusSize};
@@ -512,8 +549,8 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(seed);
         let (values, bit_string) = random_bit_string(&mut rng, status_size, len);
 
-        let encoded = JsonStatusList::encode(&bit_string);
-        let decoded = encoded.decode().unwrap();
+        let encoded = JsonStatusList::encode(&bit_string, Compression::fast());
+        let decoded = encoded.decode(None).unwrap();
 
         assert!(decoded.len() >= len);
 
