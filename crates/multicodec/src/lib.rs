@@ -21,7 +21,7 @@ impl MultiEncoded {
     #[inline(always)]
     pub fn new(bytes: &[u8]) -> Result<&Self, Error> {
         unsigned_varint::decode::u64(bytes)?;
-        Ok(unsafe { std::mem::transmute(bytes) })
+        Ok(unsafe { std::mem::transmute::<&[u8], &Self>(bytes) })
     }
 
     /// Creates a new multi-encoded slice from the given `bytes` without

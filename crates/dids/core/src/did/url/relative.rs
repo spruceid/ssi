@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{ops::Deref, usize};
+use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
@@ -34,7 +34,7 @@ impl RelativeDIDURL {
                 // SAFETY: DID is a transparent wrapper over `[u8]`,
                 //         and we just checked that `data` is a relative DID
                 //         URL.
-                std::mem::transmute(data)
+                std::mem::transmute::<&[u8], &Self>(data)
             }),
             Err(e) => Err(InvalidRelativeDIDURL(data, e)),
         }
@@ -49,7 +49,7 @@ impl RelativeDIDURL {
     pub unsafe fn new_unchecked(data: &[u8]) -> &Self {
         // SAFETY: DID URL is a transparent wrapper over `[u8]`,
         //         but we didn't check if it is actually a relative DID URL.
-        std::mem::transmute(data)
+        std::mem::transmute::<&[u8], &Self>(data)
     }
 
     /// Returns the relative DID URL as a string.

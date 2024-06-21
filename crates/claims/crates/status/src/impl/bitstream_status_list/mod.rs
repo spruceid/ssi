@@ -9,7 +9,7 @@ use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use std::{hash::Hash, time::Duration};
 
-use crate::StatusMap;
+use crate::{Overflow, StatusMap};
 
 mod syntax;
 pub use syntax::*;
@@ -208,62 +208,99 @@ impl BitString {
         self.len
     }
 
+    /// Returns the value stored in the list at the given index.
     pub fn get(&self, index: usize) -> Option<u8> {
+        if index >= self.len {
+            return None;
+        }
+
         let offset = self.status_size.offset_of(index);
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
+
+        Some(self.get_at(offset.byte, high_shift, low_shift))
+    }
+
+    fn get_at(&self, byte_offset: usize, high_shift: i32, low_shift: Option<u32>) -> u8 {
         let high = self
             .bytes
-            .get(offset.byte)?
+            .get(byte_offset)
+            .unwrap()
             .overflowing_signed_shr(high_shift)
             .0;
+
         let low = match low_shift {
             Some(low_shift) => {
                 self.bytes
-                    .get(offset.byte + 1)?
+                    .get(byte_offset + 1)
+                    .unwrap()
                     .overflowing_shr(low_shift)
                     .0
             }
             None => 0,
         };
-        Some((high | low) & self.status_size.mask())
+
+        (high | low) & self.status_size.mask()
     }
 
-    pub fn set(&mut self, index: usize, value: u8) {
+    /// Sets the value at the given index.
+    ///
+    /// Returns the previous value, or an `Overflow` error if either the index
+    /// is out of bounds or the value is too large.
+    pub fn set(&mut self, index: usize, value: u8) -> Result<u8, Overflow> {
+        if index >= self.len {
+            return Err(Overflow::Index(index));
+        }
+
         let mask = self.status_size.mask();
-        let value = value & mask;
+        let masked_value = value & mask;
+        if masked_value != value {
+            return Err(Overflow::Value(value));
+        }
+
         let offset = self.status_size.offset_of(index);
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
 
+        let old_value = self.get_at(offset.byte, high_shift, low_shift);
+
         self.bytes[offset.byte] &= !mask.overflowing_signed_shl(high_shift).0; // clear high
-        self.bytes[offset.byte] |= value.overflowing_signed_shl(high_shift).0; // set high
+        self.bytes[offset.byte] |= masked_value.overflowing_signed_shl(high_shift).0; // set high
         if let Some(low_shift) = low_shift {
             self.bytes[offset.byte + 1] &= !mask.overflowing_shl(low_shift).0; // clear low
-            self.bytes[offset.byte + 1] |= value.overflowing_shl(low_shift).0; // set low
+            self.bytes[offset.byte + 1] |= masked_value.overflowing_shl(low_shift).0;
+            // set low
         }
+
+        Ok(old_value)
     }
 
     /// Push a new value into the bitstring.
     ///
+    /// Returns the index of the newly inserted value in the list.
     /// Only the low `status_size` bits will be pushed to the list.
-    pub fn push(&mut self, value: u8) -> usize {
-        let value = value & self.status_size.mask();
+    pub fn push(&mut self, value: u8) -> Result<usize, Overflow> {
+        let masked_value = value & self.status_size.mask();
+        if masked_value != value {
+            return Err(Overflow::Value(value));
+        }
+
         let index = self.len;
         let offset = self.status_size.offset_of(index);
 
         let (high_shift, low_shift) = offset.left_shift(self.status_size);
 
         if offset.byte == self.bytes.len() {
-            self.bytes.push(value.overflowing_signed_shl(high_shift).0);
+            self.bytes
+                .push(masked_value.overflowing_signed_shl(high_shift).0);
         } else {
-            self.bytes[offset.byte] |= value.overflowing_signed_shl(high_shift).0
+            self.bytes[offset.byte] |= masked_value.overflowing_signed_shl(high_shift).0
         }
 
         if let Some(low_shift) = low_shift {
-            self.bytes.push(value.overflowing_shl(low_shift).0);
+            self.bytes.push(masked_value.overflowing_shl(low_shift).0);
         }
 
         self.len += 1;
-        index
+        Ok(index)
     }
 
     pub fn iter(&self) -> BitStringIter {
@@ -335,11 +372,11 @@ impl StatusList {
         self.bit_string.get(index)
     }
 
-    pub fn set(&mut self, index: usize, value: u8) {
+    pub fn set(&mut self, index: usize, value: u8) -> Result<u8, Overflow> {
         self.bit_string.set(index, value)
     }
 
-    pub fn push(&mut self, value: u8) -> usize {
+    pub fn push(&mut self, value: u8) -> Result<usize, Overflow> {
         self.bit_string.push(value)
     }
 
@@ -412,7 +449,7 @@ mod tests {
 
         let mut bit_string = BitString::new(status_size);
         for &s in &values {
-            bit_string.push(s);
+            bit_string.push(s).unwrap();
         }
 
         (values, bit_string)
@@ -439,7 +476,7 @@ mod tests {
         for _ in 0..len {
             let i = (rng.next_u32() as usize) % len;
             let value = (rng.next_u32() & 0xff) as u8 & status_size.mask();
-            bit_string.set(i, value);
+            bit_string.set(i, value).unwrap();
             values[i] = value;
         }
 

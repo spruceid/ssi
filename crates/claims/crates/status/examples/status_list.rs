@@ -16,7 +16,7 @@
 use clap::{Parser, Subcommand};
 use core::fmt;
 use iref::UriBuf;
-use ssi_data_integrity::{AnyInputContext, AnySuite, ProofConfiguration};
+use ssi_data_integrity::{AnyInputContext, AnySuite, ProofOptions};
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
 use ssi_status::{
@@ -156,7 +156,7 @@ async fn create_bitstream_status_list(
     );
 
     for v in list {
-        status_list.push(v.0);
+        status_list.push(v.0).unwrap();
     }
 
     let credential = bitstream_status_list::BitstringStatusListCredential::new(
@@ -170,14 +170,14 @@ async fn create_bitstream_status_list(
 
     match key {
         Some(path) => {
-            use ssi_data_integrity::CryptographicSuiteInput;
+            use ssi_data_integrity::CryptographicSuite;
             let jwk = read_jwk(&path)?;
             let did = DIDJWK::generate_url(&jwk.to_public());
             let resolver = VerificationMethodDIDResolver::new(DIDJWK);
-            let signer = SingleSecretSigner::new(jwk.clone());
+            let signer = SingleSecretSigner::new(jwk.clone()).into_local();
             let verification_method = ReferenceOrOwned::Reference(did.into());
             let suite = AnySuite::pick(&jwk, Some(&verification_method)).unwrap();
-            let params = ProofConfiguration::from_method(verification_method);
+            let params = ProofOptions::from_method(verification_method);
             let vc = suite
                 .sign(
                     credential,

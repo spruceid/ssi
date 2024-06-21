@@ -238,6 +238,7 @@ impl VerificationMethodType {
         }
     }
 
+    #[allow(unused_variables)]
     pub fn decode(&self, id: &str, encoded: MultiEncodedBuf) -> Result<PublicKey, Error> {
         match self {
             Self::Multikey => {

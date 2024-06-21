@@ -20,7 +20,8 @@ use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier};
 use ssi_jwt::{ClaimSet, JWTClaims, ToDecodedJWT};
 
 use crate::{
-    EncodedStatusMap, FromBytes, FromBytesOptions, StatusMap, StatusMapEntry, StatusMapEntrySet,
+    EncodedStatusMap, FromBytes, FromBytesOptions, Overflow, StatusMap, StatusMapEntry,
+    StatusMapEntrySet,
 };
 
 /// Token Status List, serialized as a JWT or CWT.
@@ -267,7 +268,7 @@ impl BitString {
     pub fn with_capacity(status_size: StatusSize, capacity: usize) -> Self {
         Self {
             status_size,
-            bytes: Vec::with_capacity(capacity / status_size.status_per_byte()),
+            bytes: Vec::with_capacity(capacity.div_ceil(status_size.status_per_byte())),
             len: 0,
         }
     }
@@ -286,6 +287,14 @@ impl BitString {
         self.status_size
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
     /// Returns `i`-th status in the list.
     pub fn get(&self, index: usize) -> Option<u8> {
         if index < self.len {
@@ -296,10 +305,46 @@ impl BitString {
         }
     }
 
-    pub fn set(&mut self, index: usize, value: u8) {
+    pub fn set(&mut self, index: usize, value: u8) -> Result<u8, Overflow> {
+        if index >= self.len {
+            return Err(Overflow::Index(index));
+        }
+
+        let status_mask = self.status_size.status_mask();
+        let masked_value = value & status_mask;
+
+        if masked_value != value {
+            return Err(Overflow::Value(value));
+        }
+
         let (a, b) = self.status_size.offset_of(index);
-        self.bytes[a] &= !self.status_size.status_mask() << b; // clear
-        self.bytes[a] |= (value & self.status_size.status_mask()) << b; // set
+
+        let old_value = (self.bytes[a] >> b) & status_mask;
+        self.bytes[a] &= !(status_mask << b); // clear
+        self.bytes[a] |= masked_value << b; // set
+
+        Ok(old_value)
+    }
+
+    pub fn push(&mut self, value: u8) -> Result<usize, Overflow> {
+        let status_mask = self.status_size.status_mask();
+        let masked_value = value & status_mask;
+
+        if masked_value != value {
+            return Err(Overflow::Value(value));
+        }
+
+        let index = self.len;
+        self.len += 1;
+        let (a, b) = self.status_size.offset_of(index);
+
+        if a == self.bytes.len() {
+            self.bytes.push(masked_value << b)
+        } else {
+            self.bytes[a] |= masked_value << b
+        }
+
+        Ok(a)
     }
 
     pub fn as_bytes(&self) -> &[u8] {
@@ -434,6 +479,152 @@ impl<'a> StatusMapEntry for AnyStatusListReference<'a> {
     fn status_list_url(&self) -> &Uri {
         match self {
             Self::Json(e) => e.status_list_url(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand::{rngs::StdRng, RngCore, SeedableRng};
+
+    use super::{json::JsonStatusList, BitString, StatusSize};
+
+    fn random_bit_string(
+        rng: &mut StdRng,
+        status_size: StatusSize,
+        len: usize,
+    ) -> (Vec<u8>, BitString) {
+        let mut values = Vec::with_capacity(len);
+
+        for _ in 0..len {
+            values.push((rng.next_u32() & 0xff) as u8 & status_size.status_mask())
+        }
+
+        let mut bit_string = BitString::new(status_size);
+        for &s in &values {
+            bit_string.push(s).unwrap();
+        }
+
+        (values, bit_string)
+    }
+
+    fn randomized_roundtrip(seed: u64, status_size: StatusSize, len: usize) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let (values, bit_string) = random_bit_string(&mut rng, status_size, len);
+
+        let encoded = JsonStatusList::encode(&bit_string);
+        let decoded = encoded.decode().unwrap();
+
+        assert!(decoded.len() >= len);
+
+        for i in 0..len {
+            assert_eq!(decoded.get(i), Some(values[i]))
+        }
+    }
+
+    fn randomized_write(seed: u64, status_size: StatusSize, len: usize) {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let (mut values, mut bit_string) = random_bit_string(&mut rng, status_size, len);
+
+        for _ in 0..len {
+            let i = (rng.next_u32() as usize) % len;
+            let value = (rng.next_u32() & 0xff) as u8 & status_size.status_mask();
+            bit_string.set(i, value).unwrap();
+            values[i] = value;
+        }
+
+        for i in 0..len {
+            assert_eq!(bit_string.get(i), Some(values[i]))
+        }
+    }
+
+    #[test]
+    fn randomized_roundtrip_1bit() {
+        for i in 0..10 {
+            randomized_roundtrip(i, 1u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 1u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 1u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_write_1bits() {
+        for i in 0..10 {
+            randomized_write(i, 1u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 1u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 1u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_roundtrip_2bits() {
+        for i in 0..10 {
+            randomized_roundtrip(i, 2u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 2u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 2u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_write_2bits() {
+        for i in 0..10 {
+            randomized_write(i, 2u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 2u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 2u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_roundtrip_4bits() {
+        for i in 0..10 {
+            randomized_roundtrip(i, 4u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 4u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_roundtrip(i, 4u8.try_into().unwrap(), 1000);
+        }
+    }
+
+    #[test]
+    fn randomized_write_4bits() {
+        for i in 0..10 {
+            randomized_write(i, 4u8.try_into().unwrap(), 10);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 4u8.try_into().unwrap(), 100);
+        }
+
+        for i in 0..10 {
+            randomized_write(i, 4u8.try_into().unwrap(), 1000);
         }
     }
 }

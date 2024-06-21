@@ -44,7 +44,7 @@ impl DID {
             Ok(()) => Ok(unsafe {
                 // SAFETY: DID is a transparent wrapper over `[u8]`,
                 //         and we just checked that `data` is a DID.
-                std::mem::transmute(bytes)
+                std::mem::transmute::<&[u8], &Self>(bytes)
             }),
             Err(e) => Err(InvalidDID(data, e)),
         }
