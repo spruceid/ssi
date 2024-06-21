@@ -28,6 +28,27 @@ use crate::{
     StatusMapEntrySet,
 };
 
+/// Status value describing a Token that is valid, correct or legal.
+///
+/// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#section-7.1>
+pub const VALID: u8 = 0;
+
+/// Status value describing a Token that is revoked, annulled, taken back,
+/// recalled or cancelled.
+///
+/// This state is irreversible.
+///
+/// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#section-7.1>
+pub const INVALID: u8 = 1;
+
+/// Status value describing a Token that is temporarily invalid, hanging,
+/// debarred from privilege.
+///
+/// This state is reversible.
+///
+/// See: <https://www.ietf.org/archive/id/draft-ietf-oauth-status-list-02.html#section-7.1>
+pub const SUSPENDED: u8 = 2;
+
 /// Token Status List, serialized as a JWT or CWT.
 pub enum StatusListToken {
     Jwt(StatusListJwt),
