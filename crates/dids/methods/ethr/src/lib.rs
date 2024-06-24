@@ -377,8 +377,8 @@ mod tests {
     use serde_json::json;
     use ssi_claims::{
         data_integrity::{
-            signing::AlterSignature, AnyInputContext, AnyInputSuiteOptions, AnySuite,
-            CryptographicSuite, ProofOptions,
+            signing::AlterSignature, AnyInputSuiteOptions, AnySuite, CryptographicSuite,
+            ProofOptions,
         },
         vc::{JsonCredential, JsonPresentation},
         VerifiableClaims,
@@ -511,16 +511,9 @@ mod tests {
         );
 
         eprintln!("vm {:?}", issue_options.verification_method);
-        let mut context = AnyInputContext::default();
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
-            .sign(
-                &mut context,
-                cred.clone(),
-                &didethr,
-                &signer,
-                issue_options.clone(),
-            )
+            .sign(cred.clone(), &didethr, &signer, issue_options.clone())
             .await
             .unwrap();
         println!(
@@ -532,29 +525,20 @@ mod tests {
         } else {
             assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
-        assert!(vc
-            .verify_with(&mut context, &didethr)
-            .await
-            .unwrap()
-            .is_ok());
+        assert!(vc.verify(&didethr).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
 
         // It should fail.
-        assert!(vc_bad_issuer
-            .verify_with(&mut context, &didethr)
-            .await
-            .unwrap()
-            .is_err());
+        assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_key = JWK::generate_secp256k1().unwrap();
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = suite
             .sign(
-                &mut AnyInputContext::default(),
                 cred,
                 &didethr,
                 &wrong_signer,
@@ -567,11 +551,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(vc_wrong_key
-            .verify_with(&mut context, &didethr)
-            .await
-            .unwrap()
-            .is_err());
+        assert!(vc_wrong_key.verify(&didethr).await.unwrap().is_err());
 
         // Make it into a VP
         let presentation = JsonPresentation::new(
@@ -588,27 +568,17 @@ mod tests {
         );
 
         let vp = suite
-            .sign(
-                &mut context,
-                presentation,
-                &didethr,
-                &signer,
-                vp_issue_options,
-            )
+            .sign(presentation, &didethr, &signer, vp_issue_options)
             .await
             .unwrap();
 
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        assert!(vp
-            .verify_with(&mut context, &didethr)
-            .await
-            .unwrap()
-            .is_ok());
+        assert!(vp.verify(&didethr).await.unwrap().is_ok());
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
         vp_fuzzed.proofs.first_mut().unwrap().signature.alter();
-        let vp_fuzzed_result = vp_fuzzed.verify_with(&mut context, &didethr).await;
+        let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // test that holder is verified
@@ -616,11 +586,7 @@ mod tests {
         vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
 
         // It should fail.
-        assert!(vp_bad_holder
-            .verify_with(&mut context, &didethr)
-            .await
-            .unwrap()
-            .is_err());
+        assert!(vp_bad_holder.verify(&didethr).await.unwrap().is_err());
     }
 
     #[tokio::test]
@@ -629,11 +595,6 @@ mod tests {
         let vc = ssi_claims::vc::any_credential_from_json_str(include_str!("../tests/vc.jsonld"))
             .unwrap();
         // eprintln!("vc {:?}", vc);
-        let mut context = AnyInputContext::default();
-        assert!(vc
-            .verify_with(&mut context, &didethr)
-            .await
-            .unwrap()
-            .is_ok())
+        assert!(vc.verify(&didethr).await.unwrap().is_ok())
     }
 }

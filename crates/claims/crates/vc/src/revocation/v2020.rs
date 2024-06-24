@@ -6,8 +6,8 @@ use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::VerifiableClaims;
-use ssi_data_integrity::{AnyDataIntegrity, AnyInputContext};
-use ssi_json_ld::{ContextLoader, REVOCATION_LIST_2020_V1_CONTEXT};
+use ssi_data_integrity::AnyDataIntegrity;
+use ssi_json_ld::REVOCATION_LIST_2020_V1_CONTEXT;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 use static_iref::iri;
 use std::collections::BTreeMap;
@@ -110,7 +110,6 @@ impl CredentialStatus for RevocationList2020Status {
         &self,
         credential: &AnyDataIntegrity<JsonCredential>,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
-        context_loader: &mut ContextLoader,
     ) -> Result<StatusCheck, StatusCheckError> {
         use bitvec::prelude::*;
 
@@ -152,12 +151,7 @@ impl CredentialStatus for RevocationList2020Status {
             )));
         }
 
-        let vc_result = revocation_list_credential
-            .verify_with(
-                &mut AnyInputContext::from_ld_context_loader(context_loader),
-                resolver,
-            )
-            .await?;
+        let vc_result = revocation_list_credential.verify(resolver).await?;
 
         if let Err(e) = vc_result {
             return Ok(StatusCheck::Invalid(Reason::CredentialVerification(e)));

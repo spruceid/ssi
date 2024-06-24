@@ -10,8 +10,14 @@ use rdf_types::{
     dataset::IndexedBTreeDataset,
     interpretation::ReverseTermInterpretation,
     vocabulary::{ByRef, ExtractFromVocabulary, Predicate},
-    Interpretation, LexicalQuad, Vocabulary,
 };
+
+pub use rdf_types::{
+    generator, Interpretation, InterpretationMut, LexicalQuad, LexicalQuadRef, Vocabulary,
+    VocabularyMut,
+};
+
+pub use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
 
 /// Interpreted RDF dataset with an entry point.
 pub struct DatasetWithEntryPoint<'a, V, I: Interpretation> {

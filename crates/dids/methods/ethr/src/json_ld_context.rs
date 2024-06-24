@@ -1,6 +1,6 @@
 use ssi_dids_core::{
     document::representation,
-    json_ld::{
+    ssi_json_ld::{
         syntax::context::{
             term_definition::{Expanded, Id, Type, TypeKeyword},
             Definition, TermDefinition,

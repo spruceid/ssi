@@ -10,8 +10,8 @@ use ssi_verification_methods::JsonWebKey2020;
 use static_iref::{iri, iri_ref};
 
 lazy_static! {
-    static ref W3ID_JWS2020_V1_CONTEXT: json_ld::syntax::ContextEntry = {
-        json_ld::syntax::ContextEntry::IriRef(
+    static ref W3ID_JWS2020_V1_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
+        ssi_json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://w3id.org/security/suites/jws-2020/v1").to_owned(),
         )
     };
@@ -20,9 +20,9 @@ lazy_static! {
 #[derive(Default)]
 pub struct Jws2020v1Context;
 
-impl From<Jws2020v1Context> for json_ld::syntax::Context {
+impl From<Jws2020v1Context> for ssi_json_ld::syntax::Context {
     fn from(_: Jws2020v1Context) -> Self {
-        json_ld::syntax::Context::One(W3ID_JWS2020_V1_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(W3ID_JWS2020_V1_CONTEXT.clone())
     }
 }
 

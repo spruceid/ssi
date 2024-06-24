@@ -43,29 +43,6 @@ impl TypedData {
     }
 }
 
-// #[derive(Debug, thiserror::Error)]
-// pub enum ProofGenerationError {
-//     #[error("Unable to generate types: {0}")]
-//     TypesGeneration(#[from] TypesGenerationError),
-// }
-
-// // Generate eip712Domain proof property, using [generate_types].
-// pub fn generate_proof_info(doc: &EIP712Value) -> Result<ProofInfo, ProofGenerationError> {
-//     // Default primaryType to Document for consistency with generate_types.
-//     let primary_type = StructName::from("Document");
-//     let types = generate_types(doc, Some(primary_type.clone()))?;
-//     let domain = EIP712Value::Struct(HashMap::default());
-//     let eip712_domain = eip712sig_default_domain();
-//     Ok(ProofInfo {
-//         types_or_uri: TypesOrURI::Object(Types {
-//             eip712_domain,
-//             types,
-//         }),
-//         primary_type,
-//         domain,
-//     })
-// }
-
 pub(crate) fn bytes_from_hex(s: &str) -> Option<Vec<u8>> {
     s.strip_prefix("0x")
         .and_then(|hex_str| hex::decode(hex_str).ok())

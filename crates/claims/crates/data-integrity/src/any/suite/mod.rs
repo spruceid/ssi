@@ -1,11 +1,7 @@
-use ssi_claims_core::DefaultEnvironment;
-
-// mod requirements;
-
 mod unknown;
 pub use unknown::*;
 
-use crate::{macros, AnyInputContext};
+use crate::macros;
 
 mod pick;
 
@@ -96,10 +92,6 @@ macros::crypto_suites! {
 
     #[cfg(all(feature = "ethereum", feature = "secp256k1"))]
     ethereum_personal_signature_2021_v0_1: EthereumPersonalSignature2021v0_1
-}
-
-impl DefaultEnvironment for AnySuite {
-    type Environment = AnyInputContext;
 }
 
 impl AnyProofOptions {

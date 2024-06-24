@@ -7,8 +7,8 @@ use ssi_dids_core::{
         verification_method::DIDVerificationMethod,
         VerificationRelationships,
     },
-    json_ld::syntax::ContextEntry,
     resolution::{DIDMethodResolver, Error, Metadata, Options, Output},
+    ssi_json_ld::syntax::ContextEntry,
     DIDBuf, DIDMethod, DIDURLBuf, Document, RelativeDIDURLBuf, DID, DIDURL,
 };
 use ssi_jwk::JWK;

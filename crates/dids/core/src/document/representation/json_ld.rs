@@ -1,7 +1,7 @@
 use serde::{ser::SerializeSeq, Deserialize, Serialize};
 use std::{ops::Deref, str::FromStr};
 
-pub use json_ld::syntax::{context, ContextEntry};
+pub use ssi_json_ld::syntax::{context, ContextEntry};
 
 use crate::Document;
 

@@ -69,7 +69,7 @@ pub struct AddProofContext<C>(PhantomData<C>);
 
 impl<C, S: CryptographicSuite + Default> ConfigurationAlgorithm<S> for AddProofContext<C>
 where
-    C: Default + Into<json_ld::syntax::Context>,
+    C: Default + Into<ssi_json_ld::syntax::Context>,
 {
     type InputVerificationMethod = S::VerificationMethod;
     type InputSuiteOptions = S::ProofOptions;

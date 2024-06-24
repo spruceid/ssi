@@ -25,7 +25,6 @@ chrono.workspace = true
 iref.workspace = true
 thiserror.workspace = true
 static-iref.workspace = true
-json-ld = { workspace = true, features = ["serde"] }
 locspan.workspace = true
 hex.workspace = true
 serde = { workspace = true, features = ["derive"] }

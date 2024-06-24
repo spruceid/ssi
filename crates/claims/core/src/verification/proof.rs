@@ -119,7 +119,7 @@ pub trait ValidateProof<T, E, V> {
     #[allow(async_fn_in_trait)]
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a mut E,
+        environment: &'a E,
         claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError>;
@@ -128,7 +128,7 @@ pub trait ValidateProof<T, E, V> {
 impl<T, E, V, P: ValidateProof<T, E, V>> ValidateProof<T, E, V> for Vec<P> {
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a mut E,
+        environment: &'a E,
         claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError> {

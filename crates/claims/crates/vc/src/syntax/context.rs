@@ -2,8 +2,8 @@ use std::{borrow::Borrow, marker::PhantomData};
 
 use educe::Educe;
 use iref::{Iri, IriRef, IriRefBuf};
-use json_ld::syntax::ContextEntry;
 use serde::{Deserialize, Serialize};
+use ssi_json_ld::syntax::ContextEntry;
 
 use crate::V1;
 
@@ -16,15 +16,15 @@ use crate::V1;
 #[derive(Educe, Serialize)] // FIXME serializing a single entry as a string breaks Tezos JCS cryptosuite.
 #[educe(Debug, Clone)]
 #[serde(transparent, bound = "")]
-pub struct Context<V = V1>(json_ld::syntax::Context, PhantomData<V>);
+pub struct Context<V = V1>(ssi_json_ld::syntax::Context, PhantomData<V>);
 
 impl<V: RequiredContextSet> Default for Context<V> {
     fn default() -> Self {
         Self(
-            json_ld::syntax::Context::Many(
+            ssi_json_ld::syntax::Context::Many(
                 V::CONTEXT_IRIS
                     .iter()
-                    .map(|&i| json_ld::syntax::ContextEntry::IriRef(i.as_iri_ref().to_owned()))
+                    .map(|&i| ssi_json_ld::syntax::ContextEntry::IriRef(i.as_iri_ref().to_owned()))
                     .collect(),
             ),
             PhantomData,
@@ -39,23 +39,23 @@ impl<V> Context<V> {
 
     pub fn contains_iri_ref(&self, iri_ref: &IriRef) -> bool {
         match &self.0 {
-            json_ld::syntax::Context::One(ContextEntry::IriRef(i)) => i == iri_ref,
-            json_ld::syntax::Context::One(_) => false,
-            json_ld::syntax::Context::Many(entries) => entries
+            ssi_json_ld::syntax::Context::One(ContextEntry::IriRef(i)) => i == iri_ref,
+            ssi_json_ld::syntax::Context::One(_) => false,
+            ssi_json_ld::syntax::Context::Many(entries) => entries
                 .iter()
                 .any(|e| matches!(e, ContextEntry::IriRef(i) if i == iri_ref)),
         }
     }
 }
 
-impl<V> AsRef<json_ld::syntax::Context> for Context<V> {
-    fn as_ref(&self) -> &json_ld::syntax::Context {
+impl<V> AsRef<ssi_json_ld::syntax::Context> for Context<V> {
+    fn as_ref(&self) -> &ssi_json_ld::syntax::Context {
         &self.0
     }
 }
 
-impl<V> Borrow<json_ld::syntax::Context> for Context<V> {
-    fn borrow(&self) -> &json_ld::syntax::Context {
+impl<V> Borrow<ssi_json_ld::syntax::Context> for Context<V> {
+    fn borrow(&self) -> &ssi_json_ld::syntax::Context {
         &self.0
     }
 }
@@ -89,7 +89,7 @@ impl<'de, V: RequiredContextSet> Deserialize<'de> for Context<V> {
                             )))
                         } else {
                             Ok(Context(
-                                json_ld::syntax::Context::Many(contexts),
+                                ssi_json_ld::syntax::Context::Many(contexts),
                                 PhantomData,
                             ))
                         }
@@ -130,7 +130,7 @@ impl<'de, V: RequiredContextSet> Deserialize<'de> for Context<V> {
                     )))
                 } else {
                     Ok(Context(
-                        json_ld::syntax::Context::Many(contexts),
+                        ssi_json_ld::syntax::Context::Many(contexts),
                         PhantomData,
                     ))
                 }

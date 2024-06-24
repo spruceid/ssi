@@ -26,7 +26,7 @@ pub use super::{Signature, TZJCSVM_CONTEXT};
 pub const TZ_JCS_PROOF_CONTEXT_STR: &str = include_str!("tzjcsvm-2021-v1.jsonld");
 
 lazy_static! {
-    pub static ref TZ_JCS_PROOF_CONTEXT: json_ld::syntax::Context =
+    pub static ref TZ_JCS_PROOF_CONTEXT: ssi_json_ld::syntax::Context =
         serde_json::from_str(TZ_JCS_PROOF_CONTEXT_STR).unwrap();
 }
 

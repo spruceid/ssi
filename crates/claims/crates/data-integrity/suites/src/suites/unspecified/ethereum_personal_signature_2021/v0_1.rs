@@ -37,8 +37,8 @@ impl StandardCryptographicSuite for EthereumPersonalSignature2021v0_1 {
 #[derive(Default)]
 pub struct EthereumPersonalSignature2021v0_1Context;
 
-impl From<EthereumPersonalSignature2021v0_1Context> for json_ld::syntax::Context {
+impl From<EthereumPersonalSignature2021v0_1Context> for ssi_json_ld::syntax::Context {
     fn from(_: EthereumPersonalSignature2021v0_1Context) -> Self {
-        json_ld::syntax::Context::One(EPSIG_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(EPSIG_CONTEXT.clone())
     }
 }

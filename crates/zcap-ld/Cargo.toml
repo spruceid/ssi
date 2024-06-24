@@ -20,7 +20,6 @@ rdf-types.workspace = true
 ssi-jwk = { workspace = true, features = ["ed25519"] }
 ssi-core.workspace = true
 ssi-dids-core.workspace = true
-json-ld.workspace = true
 ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 ssi-claims.workspace = true

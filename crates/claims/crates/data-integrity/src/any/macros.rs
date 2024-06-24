@@ -126,20 +126,11 @@ macro_rules! crypto_suites {
         )*
 
         #[allow(unused_variables)]
-        impl<T, C, V, I, L, R, S> ssi_data_integrity_core::suite::CryptographicSuiteSigning<T, C, R, S> for AnySuite
+        impl<T, C, R, S> ssi_data_integrity_core::suite::CryptographicSuiteSigning<T, C, R, S> for AnySuite
         where
-            C: ssi_json_ld::AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>
-                + ssi_data_integrity_suites::eip712::TypesProvider,
-            V: rdf_types::VocabularyMut,
-            V::Iri: Clone + Eq + std::hash::Hash + linked_data::LinkedDataSubject<I, V> + linked_data::LinkedDataResource<I, V>,
-            V::BlankId: Clone + Eq + std::hash::Hash + linked_data::LinkedDataSubject<I, V> + linked_data::LinkedDataResource<I, V>,
-            I: rdf_types::InterpretationMut<V>
-                + rdf_types::interpretation::ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
-            I::Resource: Clone,
-            L: json_ld::Loader<V::Iri>,
-            L::Error: std::fmt::Display,
-            T: serde::Serialize + ssi_rdf::Expandable<C> + ssi_json_ld::JsonLdNodeObject,
-            T::Expanded: linked_data::LinkedData<I, V>,
+            C: ssi_json_ld::ContextLoaderEnvironment
+                + ssi_eip712::Eip712TypesEnvironment,
+            T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
             //
             R: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
             S: ssi_verification_methods::Signer<ssi_verification_methods::AnyMethod>,
@@ -147,7 +138,7 @@ macro_rules! crypto_suites {
         {
             async fn generate_signature(
                 &self,
-                context: &mut C,
+                context: &C,
                 resolver: R,
                 signer: S,
                 claims: &T,
@@ -178,26 +169,17 @@ macro_rules! crypto_suites {
         }
 
         #[allow(unused_variables)]
-        impl<T, C, V, I, L, F> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, C, F> for AnySuite
+        impl<T, C, F> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, C, F> for AnySuite
         where
-            C: ssi_json_ld::AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>
-                + ssi_data_integrity_suites::eip712::TypesProvider,
-            V: rdf_types::VocabularyMut,
-            V::Iri: Clone + Eq + std::hash::Hash + linked_data::LinkedDataSubject<I, V> + linked_data::LinkedDataResource<I, V>,
-            V::BlankId: Clone + Eq + std::hash::Hash + linked_data::LinkedDataSubject<I, V> + linked_data::LinkedDataResource<I, V>,
-            I: rdf_types::InterpretationMut<V>
-                + rdf_types::interpretation::ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
-            I::Resource: Clone,
-            L: json_ld::Loader<V::Iri>,
-            L::Error: std::fmt::Display,
-            T: serde::Serialize + ssi_rdf::Expandable<C> + ssi_json_ld::JsonLdNodeObject,
-            T::Expanded: linked_data::LinkedData<I, V>,
+            C: ssi_json_ld::ContextLoaderEnvironment
+                + ssi_eip712::Eip712TypesEnvironment,
+            T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
             //
             F: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
         {
             async fn verify_proof(
                 &self,
-                environment: &mut C,
+                environment: &C,
                 verifier: &F,
                 claims: &T,
                 proof: ssi_data_integrity_core::ProofRef<'_, Self>,

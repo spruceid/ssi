@@ -53,7 +53,7 @@ pub trait StandardCryptographicSuite: Clone {
     #[allow(async_fn_in_trait)]
     async fn transform<T, C>(
         &self,
-        context: &mut C,
+        context: &C,
         unsecured_document: &T,
         options: ProofConfigurationRef<'_, Self>,
     ) -> Result<TransformedData<Self>, TransformationError>
@@ -107,7 +107,7 @@ where
 {
     async fn generate_signature(
         &self,
-        context: &mut E,
+        context: &E,
         resolver: R,
         signers: T,
         claims: &C,
@@ -148,7 +148,7 @@ where
 {
     async fn verify_proof(
         &self,
-        context: &mut E,
+        context: &E,
         verifier: &V,
         claims: &C,
         proof: ProofRef<'_, Self>,

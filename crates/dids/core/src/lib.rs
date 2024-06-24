@@ -22,7 +22,7 @@ pub use document::Document;
 pub use method_resolver::VerificationMethodDIDResolver;
 pub use resolution::{DIDMethodResolver, DIDResolver, StaticDIDResolver};
 
-pub use json_ld;
+pub use ssi_json_ld;
 
 /// URI [required](https://www.w3.org/TR/did-core/#production-0) as the first value of the `@context` property for a DID Document in JSON-LD representation.
 pub const JSON_LD_CONTEXT_IRI: &Iri = iri!("https://www.w3.org/ns/did/v1");

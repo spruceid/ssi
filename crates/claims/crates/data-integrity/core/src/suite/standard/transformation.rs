@@ -62,7 +62,7 @@ pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T, C>:
 {
     #[allow(async_fn_in_trait)]
     async fn transform(
-        context: &mut C,
+        context: &C,
         data: &T,
         options: ProofConfigurationRef<S>,
     ) -> Result<Self::Output, TransformationError>;
@@ -78,7 +78,7 @@ impl<S: CryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, 
     for JsonObjectTransformation
 {
     async fn transform(
-        _context: &mut C,
+        _context: &C,
         data: &T,
         _options: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Output, TransformationError> {

@@ -1,18 +1,16 @@
 //! This example shows how to verify a Data-Integrity Verifiable Credential.
-use std::fs;
-
+use ssi_claims::VerifiableClaims;
 use ssi_dids::{DIDResolver, StaticDIDResolver, VerificationMethodDIDResolver};
 use ssi_verification_methods::AnyMethod;
+use std::fs;
 
 #[async_std::main]
 async fn main() {
     // Load the credential textual representation from the file system.
     let credential_content = fs::read_to_string("examples/files/vc.jsonld").unwrap();
 
-    // All of the above can be done with the following helper function.
-    let vc = ssi::claims::vc::any_credential_from_json_str(&credential_content)
-        .await
-        .unwrap();
+    // Parse the VC.
+    let vc = ssi::claims::vc::any_credential_from_json_str(&credential_content).unwrap();
 
     // Prepare our verifier.
     let verifier = create_verifier();

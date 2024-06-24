@@ -74,6 +74,5 @@ linked-data.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 json-syntax.workspace = true
-json-ld.workspace = true
 locspan.workspace = true
 educe.workspace = true

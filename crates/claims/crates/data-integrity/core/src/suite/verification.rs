@@ -6,7 +6,7 @@ pub trait CryptographicSuiteVerification<T, C, V>: CryptographicSuite {
     #[allow(async_fn_in_trait)]
     async fn verify_proof(
         &self,
-        context: &mut C,
+        context: &C,
         verifier: &V,
         claims: &T,
         proof: ProofRef<'_, Self>,

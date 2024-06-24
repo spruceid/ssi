@@ -1,4 +1,6 @@
-use ssi_claims_core::{ProofPreparationError, ProofValidationError, SignatureError};
+use ssi_claims_core::{
+    ProofPreparationError, ProofValidationError, SignatureEnvironment, SignatureError,
+};
 use ssi_verification_methods_core::VerificationMethod;
 
 mod signature;
@@ -65,9 +67,9 @@ pub trait CryptographicSuite: Clone {
 
     /// Generates a verifiable document secured with this cryptographic suite.
     #[allow(async_fn_in_trait)]
-    async fn sign<T, C, R, S>(
+    async fn sign_with<T, C, R, S>(
         &self,
-        context: &mut C,
+        context: C,
         unsecured_document: T,
         resolver: R,
         signer: S,
@@ -80,7 +82,7 @@ pub trait CryptographicSuite: Clone {
         let proof_configuration_ref = proof_configuration.borrowed();
         let signature = self
             .generate_signature(
-                context,
+                &context,
                 resolver,
                 signer,
                 &unsecured_document,
@@ -90,6 +92,28 @@ pub trait CryptographicSuite: Clone {
 
         let proof = proof_configuration.into_proof(signature);
         Ok(DataIntegrity::new(unsecured_document, proof.into()))
+    }
+
+    /// Generates a verifiable document secured with this cryptographic suite.
+    #[allow(async_fn_in_trait)]
+    async fn sign<T, R, S>(
+        &self,
+        unsecured_document: T,
+        resolver: R,
+        signer: S,
+        options: InputOptions<Self>,
+    ) -> Result<DataIntegrity<T, Self>, SignatureError>
+    where
+        Self: CryptographicSuiteSigning<T, SignatureEnvironment, R, S>,
+    {
+        self.sign_with(
+            SignatureEnvironment::default(),
+            unsecured_document,
+            resolver,
+            signer,
+            options,
+        )
+        .await
     }
 }
 

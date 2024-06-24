@@ -1,10 +1,50 @@
 use std::{collections::BTreeMap, fmt, num::ParseIntError, str::FromStr};
 
+use iref::Uri;
 use serde::{Deserialize, Serialize};
 
 use crate::Value;
 
 pub type StructName = String;
+
+/// Errors that can occur while fetching remote EIP712 type definitions.
+#[derive(Debug, thiserror::Error)]
+pub enum TypesFetchError {
+    /// Error for applications that do not support remote types.
+    ///
+    /// This is the error always returned by the `()` implementation of
+    /// `TypesProvider`.
+    #[error("remote EIP712 types are not supported")]
+    Unsupported,
+}
+
+/// Type providing remote EIP712 type definitions from an URI.
+///
+/// A default implementation is provided for the `()` type that always return
+/// `TypesFetchError::Unsupported`.
+pub trait TypesProvider {
+    /// Fetches the type definitions located behind the given `uri`.
+    ///
+    /// This is an asynchronous function returning a `Self::Fetch` future that
+    /// resolves into ether the EIP712 [`Types`] or an error
+    /// of type `TypesFetchError`.
+    #[allow(async_fn_in_trait)]
+    async fn fetch_types(&self, uri: &Uri) -> Result<Types, TypesFetchError>;
+}
+
+/// Simple EIP712 loader implementation that always return
+/// `TypesFetchError::Unsupported`.
+impl TypesProvider for () {
+    async fn fetch_types(&self, _uri: &Uri) -> Result<Types, TypesFetchError> {
+        Err(TypesFetchError::Unsupported)
+    }
+}
+
+pub trait Eip712TypesEnvironment {
+    type Provider: TypesProvider;
+
+    fn eip712_types(&self) -> &Self::Provider;
+}
 
 /// EIP-712 types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]

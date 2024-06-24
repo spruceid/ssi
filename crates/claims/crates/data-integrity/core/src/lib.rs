@@ -17,7 +17,7 @@ use educe::Educe;
 pub use options::ProofOptions;
 pub use proof::*;
 use serde::Serialize;
-use ssi_claims_core::{DefaultEnvironment, VerifiableClaims};
+use ssi_claims_core::VerifiableClaims;
 pub use suite::{
     CloneCryptographicSuite, CryptographicSuite, DebugCryptographicSuite,
     DeserializeCryptographicSuite, SerializeCryptographicSuite, StandardCryptographicSuite,
@@ -70,8 +70,4 @@ impl<T, S: CryptographicSuite> VerifiableClaims for DataIntegrity<T, S> {
     fn proof(&self) -> &Self::Proof {
         &self.proofs
     }
-}
-
-impl<T, S: CryptographicSuite + DefaultEnvironment> DefaultEnvironment for DataIntegrity<T, S> {
-    type Environment = S::Environment;
 }

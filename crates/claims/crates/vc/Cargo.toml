@@ -21,7 +21,6 @@ serde = { workspace = true, features = ["derive"] }
 linked-data.workspace = true
 serde_json.workspace = true
 json-syntax.workspace = true
-json-ld.workspace = true
 ssi-core.workspace = true
 ssi-jwt.workspace = true
 ssi-claims-core.workspace = true

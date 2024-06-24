@@ -30,6 +30,8 @@ ssi-core.workspace = true
 educe.workspace = true
 thiserror.workspace = true
 chrono.workspace = true
+ssi-json-ld.workspace = true
+ssi-eip712.workspace = true
 
 serde = { workspace = true, optional = true }
 linked-data = { workspace = true, optional = true }

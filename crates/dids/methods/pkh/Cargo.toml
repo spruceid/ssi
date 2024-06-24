@@ -49,7 +49,6 @@ ssi-jws.workspace = true
 rdf-types.workspace = true
 xsd-types.workspace = true
 linked-data.workspace = true
-json-ld.workspace = true
 json-syntax.workspace = true
 locspan.workspace = true
 tokio = { version = "1.0", features = ["macros", "rt"] }

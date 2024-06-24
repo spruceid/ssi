@@ -37,7 +37,7 @@ pub use reference::*;
 pub struct Proof<S: CryptographicSuite> {
     /// Proof context.
     #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<json_ld::syntax::Context>,
+    pub context: Option<ssi_json_ld::syntax::Context>,
 
     /// Proof type.
     ///
@@ -149,7 +149,7 @@ impl<T: CryptographicSuite> Proof<T> {
         }
     }
 
-    pub fn with_context(self, context: json_ld::syntax::Context) -> Self {
+    pub fn with_context(self, context: ssi_json_ld::syntax::Context) -> Self {
         Self {
             context: Some(context),
             ..self
@@ -224,7 +224,7 @@ where
 {
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a mut E,
+        environment: &'a E,
         claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -331,7 +331,7 @@ where
 {
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a mut E,
+        environment: &'a E,
         claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError> {

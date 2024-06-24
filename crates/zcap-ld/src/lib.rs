@@ -13,14 +13,15 @@ use serde_json::Value;
 use ssi_claims::{
     data_integrity::{
         suite::{CryptographicSuiteSigning, InputOptions},
-        AnyDataIntegrity, AnyInputContext, AnyProofs, AnySignatureAlgorithm, AnySuite,
-        CryptographicSuite, Proofs,
-        DataIntegrity, Proof
+        AnyDataIntegrity, AnyProofs, AnySignatureAlgorithm, AnySuite, CryptographicSuite,
+        DataIntegrity, Proof, Proofs,
     },
     vc::{Context, RequiredContext},
-    ClaimsValidity, InvalidClaims, SignatureError, Validate, VerifiableClaims,
+    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims, SignatureError,
+    Validate, VerificationEnvironment,
 };
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject};
+use ssi_json_ld::{ContextLoaderEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
+use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
 use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationMethodResolver};
 use ssi_verification_methods::{MessageSigner, Signer};
 use static_iref::iri;
@@ -94,10 +95,7 @@ impl<C, P> Delegation<C, P> {
         }
     }
 
-    pub fn validate(
-        &self,
-        proofs: &Proofs<AnySuite>,
-    ) -> Result<(), DelegationValidationError> {
+    pub fn validate(&self, proofs: &Proofs<AnySuite>) -> Result<(), DelegationValidationError> {
         for proof in proofs.iter() {
             if proof.configuration().proof_purpose != ProofPurpose::CapabilityDelegation {
                 return Err(DelegationValidationError::InvalidProofPurpose);
@@ -149,7 +147,7 @@ impl<C, P> Delegation<C, P> {
     {
         self.sign_with(
             suite,
-            AnyInputContext::default(),
+            VerificationEnvironment::default(),
             resolver,
             signer,
             proof_configuration,
@@ -162,7 +160,7 @@ impl<C, P> Delegation<C, P> {
     pub async fn sign_with<D, E, R, S>(
         self,
         suite: D,
-        mut environment: E,
+        environment: E,
         resolver: R,
         signer: S,
         mut proof_configuration: InputOptions<D>,
@@ -181,13 +179,73 @@ impl<C, P> Delegation<C, P> {
         }
 
         suite
-            .sign(&mut environment, self, resolver, signer, proof_configuration)
+            .sign_with(environment, self, resolver, signer, proof_configuration)
             .await
     }
 }
 
+pub trait TargetCapabilityEnvironment {
+    type Caveat;
+    type AdditionalProperties;
+
+    fn target_capability(&self) -> &Delegation<Self::Caveat, Self::AdditionalProperties>;
+}
+
+pub struct EnvironmentDelegation<'a, E, C, S>(E, &'a Delegation<C, S>);
+
+impl<'a, E, C, S> TargetCapabilityEnvironment for EnvironmentDelegation<'a, E, C, S> {
+    type Caveat = C;
+    type AdditionalProperties = S;
+
+    fn target_capability(&self) -> &Delegation<C, S> {
+        self.1
+    }
+}
+
+impl<'a, E: ContextLoaderEnvironment, C, S> ContextLoaderEnvironment
+    for EnvironmentDelegation<'a, E, C, S>
+{
+    type Loader = E::Loader;
+
+    fn loader(&self) -> &Self::Loader {
+        self.0.loader()
+    }
+}
+
+impl<'a, E: Eip712TypesEnvironment, C, S> Eip712TypesEnvironment
+    for EnvironmentDelegation<'a, E, C, S>
+{
+    type Provider = E::Provider;
+
+    fn eip712_types(&self) -> &Self::Provider {
+        self.0.eip712_types()
+    }
+}
+
+impl<'a, E: DateTimeEnvironment, C, S> DateTimeEnvironment for EnvironmentDelegation<'a, E, C, S> {
+    fn date_time(&self) -> ssi_claims::chrono::DateTime<ssi_claims::chrono::Utc> {
+        self.0.date_time()
+    }
+}
+
+pub trait WithCapabilityChain: Sized {
+    fn with_target_capability<C, S>(
+        self,
+        delegation: &Delegation<C, S>,
+    ) -> EnvironmentDelegation<Self, C, S>;
+}
+
+impl<E> WithCapabilityChain for E {
+    fn with_target_capability<C, S>(
+        self,
+        delegation: &Delegation<C, S>,
+    ) -> EnvironmentDelegation<Self, C, S> {
+        EnvironmentDelegation(self, delegation)
+    }
+}
+
 impl<C, P> JsonLdObject for Delegation<C, P> {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
@@ -200,25 +258,35 @@ impl<C, S, E> Validate<E, AnyProofs> for Delegation<C, S> {
     }
 }
 
-impl<C, P, E, V, L> ssi_rdf::Expandable<E> for Delegation<C, P>
+impl<C, P> ssi_json_ld::Expandable for Delegation<C, P>
 where
     C: Serialize,
     P: Serialize,
-    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash,
-    V::BlankId: Clone + Eq + Hash,
-    L: json_ld::Loader<V::Iri>,
-    L::Error: std::fmt::Display,
 {
-    type Error = JsonLdError<L::Error>;
+    type Error = JsonLdError;
 
-    // type Resource = I::Resource;
-    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
-    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         let json = json_syntax::to_value(self).unwrap();
-        ssi_json_ld::CompactJsonLd(json).expand(environment).await
+        ssi_json_ld::CompactJsonLd(json)
+            .expand_with(ld, loader)
+            .await
     }
 }
 
@@ -287,13 +355,7 @@ impl<P> Invocation<P> {
             .insert("capability".into(), json_syntax::to_value(target).unwrap());
 
         suite
-            .sign(
-                &mut AnyInputContext::default(),
-                self,
-                resolver,
-                signer,
-                proof_configuration,
-            )
+            .sign(self, resolver, signer, proof_configuration)
             .await
     }
 
@@ -316,64 +378,53 @@ impl<P> Invocation<P> {
 }
 
 impl<P> JsonLdObject for Invocation<P> {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
 impl<P> JsonLdNodeObject for Invocation<P> {}
 
-impl<P, E, V, L> ssi_rdf::Expandable<E> for Invocation<P>
+impl<P> ssi_json_ld::Expandable for Invocation<P>
 where
     P: Serialize,
-    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash,
-    V::BlankId: Clone + Eq + Hash,
-    L: json_ld::Loader<V::Iri>,
-    L::Error: std::fmt::Display,
 {
-    type Error = JsonLdError<L::Error>;
+    type Error = JsonLdError;
 
-    // type Resource = I::Resource;
-    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
-    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         let json = json_syntax::to_value(self).unwrap();
-        ssi_json_ld::CompactJsonLd(json).expand(environment).await
+        ssi_json_ld::CompactJsonLd(json)
+            .expand_with(ld, loader)
+            .await
     }
 }
 
-impl<S, C, Q> Validate<Delegation<C, Q>, AnyProofs> for Invocation<S> {
-    fn validate(
-        &self,
-        target_capability: &Delegation<C, Q>,
-        proofs: &Proofs<AnySuite>,
-    ) -> ClaimsValidity {
-        self.validate(target_capability, proofs)
+impl<E, S> Validate<E, AnyProofs> for Invocation<S>
+where
+    E: TargetCapabilityEnvironment,
+{
+    fn validate(&self, env: &E, proofs: &Proofs<AnySuite>) -> ClaimsValidity {
+        self.validate(env.target_capability(), proofs)
             .map_err(InvalidClaims::other)
     }
 }
-
-// impl<P> VerifiableInvocation<P> {
-
-//     #[allow(unused, unreachable_code)]
-//     pub async fn verify<C, Q>(
-//         &self,
-//         // TODO make this a list for delegation chains
-//         target_capability: &Delegation<C, Q>,
-//         verifier: &impl VerificationMethodResolver<Method = AnyMethod>,
-//     ) -> Result<Verification, InvocationVerificationError>
-//     where
-//         P: Clone + Serialize,
-//     {
-//         let vc = self
-//             .clone()
-//             .into_verifiable_claims(target_capability)
-//             .await?;
-//         vc.verify(verifier).await.map_err(Into::into)
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
@@ -501,13 +552,14 @@ mod tests {
             .await
             .unwrap();
 
-        let mut context = AnyInputContext::default();
-
         // happy path
-        assert!(signed_del.verify_with(&mut context, &dk).await.unwrap().is_ok());
+        assert!(signed_del.verify(&dk).await.unwrap().is_ok());
 
         assert!(signed_inv
-            .verify_with(&dk, &signed_del.claims)
+            .verify_with(
+                &dk,
+                VerificationEnvironment::default().with_target_capability(&signed_del.claims)
+            )
             .await
             .unwrap()
             .is_ok());
@@ -526,7 +578,10 @@ mod tests {
         // invalid proof for data
         assert!(bad_sig_del.verify(&dk).await.unwrap().is_err());
         assert!(bad_sig_inv
-            .verify_with(&dk, &signed_del.claims)
+            .verify_with(
+                &dk,
+                VerificationEnvironment::default().with_target_capability(&signed_del.claims)
+            )
             .await
             .unwrap()
             .is_err());
@@ -547,7 +602,10 @@ mod tests {
             .await
             .unwrap();
         assert!(signed_inv
-            .verify_with(&dk, &signed_wrong_del.claims)
+            .verify_with(
+                &dk,
+                VerificationEnvironment::default().with_target_capability(&signed_wrong_del.claims)
+            )
             .await
             .unwrap()
             .is_err());

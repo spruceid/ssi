@@ -13,7 +13,7 @@ use crate::{
 pub struct ProofConfigurationRef<'a, S: CryptographicSuite> {
     /// Proof context.
     #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<&'a json_ld::syntax::Context>,
+    pub context: Option<&'a ssi_json_ld::syntax::Context>,
 
     /// Proof type.
     #[serde(flatten, serialize_with = "S::serialize_type")]
@@ -133,7 +133,7 @@ impl<'a, S: CryptographicSuite> ProofConfigurationRef<'a, S> {
 pub struct ProofConfigurationRefWithoutOptions<'a, S: CryptographicSuite> {
     /// Proof context.
     #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<&'a json_ld::syntax::Context>,
+    pub context: Option<&'a ssi_json_ld::syntax::Context>,
 
     /// Proof type.
     #[serde(flatten, serialize_with = "S::serialize_type")]

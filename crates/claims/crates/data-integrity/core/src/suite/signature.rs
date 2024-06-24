@@ -7,7 +7,7 @@ pub trait CryptographicSuiteSigning<T, C, R, S>: CryptographicSuite {
     #[allow(async_fn_in_trait)]
     async fn generate_signature(
         &self,
-        context: &mut C,
+        context: &C,
         resolver: R,
         signer: S,
         claims: &T,

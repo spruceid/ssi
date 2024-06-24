@@ -1,19 +1,19 @@
-use core::fmt;
-use std::{borrow::Cow, hash::Hash};
-
 use ::linked_data::{LinkedDataResource, LinkedDataSubject};
 use iref::IriBuf;
+use linked_data::LinkedData;
 use rdf_types::{
     dataset::{BTreeGraph, IndexedBTreeDataset, PatternMatchingDataset},
-    interpretation::ReverseTermInterpretation,
+    interpretation::{ReverseTermInterpretation, WithGenerator},
     vocabulary::IriVocabulary,
-    Id, Interpretation, InterpretationMut, LexicalQuad, Quad, Term, Triple, VocabularyMut,
+    Id, InterpretationMut, LexicalQuad, Quad, Term, Triple, Vocabulary, VocabularyMut,
 };
 use serde::Serialize;
 use ssi_json_ld::{
-    AnyJsonLdEnvironment, CompactJsonLd, JsonLdNodeObject, JsonLdObject, JsonLdTypes,
+    CompactJsonLd, ContextLoaderEnvironment, Expandable, ExpandedDocument, JsonLdError,
+    JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader,
 };
-use ssi_rdf::{urdna2015, AnyLdEnvironment, Expandable, IntoNQuads};
+use ssi_rdf::{urdna2015, Interpretation, IntoNQuads, LdEnvironment};
+use std::{borrow::Cow, hash::Hash};
 
 use crate::{suite::SerializeCryptographicSuite, CryptographicSuite, ProofConfigurationRef};
 
@@ -31,56 +31,23 @@ impl<'a, S: CryptographicSuite> ProofConfigurationRef<'a, S> {
 
     pub async fn expand(
         self,
-        environment: &mut impl ConfigurationExpandingEnvironment,
+        environment: &impl ContextLoaderEnvironment,
         document: &impl JsonLdNodeObject,
     ) -> Result<ExpandedProofConfiguration, ConfigurationExpansionError>
     where
         S: SerializeCryptographicSuite,
     {
-        environment.expand_configuration(document, self).await
-    }
-}
-
-/// Any environment able to expand a proof configuration.
-///
-/// This trait only exists to alias all the trait bounds required for its
-/// unique implementation.
-pub trait ConfigurationExpandingEnvironment {
-    #[allow(async_fn_in_trait)]
-    async fn expand_configuration<S: SerializeCryptographicSuite>(
-        &mut self,
-        document: &impl JsonLdNodeObject,
-        proof_configuration: ProofConfigurationRef<'_, S>,
-    ) -> Result<ExpandedProofConfiguration, ConfigurationExpansionError>;
-}
-
-impl<E, V, I, L> ConfigurationExpandingEnvironment for E
-where
-    E: AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
-    V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
-    I: InterpretationMut<V>
-        + ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
-    I::Resource: Clone,
-    L: json_ld::Loader<V::Iri>,
-    L::Error: fmt::Display,
-{
-    async fn expand_configuration<S: SerializeCryptographicSuite>(
-        &mut self,
-        document: &impl JsonLdNodeObject,
-        proof_configuration: ProofConfigurationRef<'_, S>,
-    ) -> Result<ExpandedProofConfiguration, ConfigurationExpansionError> {
-        let embedded = proof_configuration.embed(document);
-        let expanded = embedded.expand(self).await?;
-        expanded.extract(self)
+        let embedded = self.embed(document);
+        let expanded = embedded.expand(environment.loader()).await?;
+        let mut interpretation = WithGenerator::new((), ssi_rdf::generator::Blank::new());
+        expanded.extract(&mut (), &mut interpretation)
     }
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigurationExpansionError {
     #[error("JSON-LD expansion failed: {0}")]
-    Expansion(String),
+    Expansion(#[from] JsonLdError),
 
     #[error(transparent)]
     IntoQuads(#[from] ::linked_data::IntoQuadsError),
@@ -101,17 +68,11 @@ pub enum ConfigurationExpansionError {
     InvalidContext,
 }
 
-impl<E: fmt::Display> From<ssi_json_ld::JsonLdError<E>> for ConfigurationExpansionError {
-    fn from(value: ssi_json_ld::JsonLdError<E>) -> Self {
-        Self::Expansion(value.to_string())
-    }
-}
-
 #[derive(Serialize)]
 #[serde(bound = "S: SerializeCryptographicSuite")]
 pub struct EmbeddedProofConfigurationRef<'d, 'a, S: CryptographicSuite> {
     #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
-    context: Option<Cow<'d, json_ld::syntax::Context>>,
+    context: Option<Cow<'d, ssi_json_ld::syntax::Context>>,
 
     #[serde(rename = "type", skip_serializing_if = "JsonLdTypes::is_empty")]
     type_: JsonLdTypes<'d>,
@@ -120,7 +81,7 @@ pub struct EmbeddedProofConfigurationRef<'d, 'a, S: CryptographicSuite> {
 }
 
 impl<'d, 'a, S: CryptographicSuite> JsonLdObject for EmbeddedProofConfigurationRef<'d, 'a, S> {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         self.context.as_deref().map(Cow::Borrowed)
     }
 }
@@ -131,54 +92,60 @@ impl<'d, 'a, S: CryptographicSuite> JsonLdNodeObject for EmbeddedProofConfigurat
     }
 }
 
-impl<'d, 'a, S: SerializeCryptographicSuite, E, V, L> Expandable<E>
+impl<'d, 'a, S: SerializeCryptographicSuite> Expandable
     for EmbeddedProofConfigurationRef<'d, 'a, S>
-where
-    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash,
-    V::BlankId: Clone + Eq + Hash,
-    L: json_ld::Loader<V::Iri>,
-    L::Error: fmt::Display,
 {
     type Error = ConfigurationExpansionError;
-    type Expanded = ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>;
+    type Expanded<I, V> = ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
-    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         let json = json_syntax::to_value(self).unwrap();
         Ok(ExpandedEmbeddedProofConfiguration(
-            CompactJsonLd(json).expand(environment).await?,
+            CompactJsonLd(json).expand_with(ld, loader).await?,
         ))
     }
 }
 
-pub struct ExpandedEmbeddedProofConfiguration<I, B>(json_ld::ExpandedDocument<I, B>);
+pub struct ExpandedEmbeddedProofConfiguration<I, B>(ssi_json_ld::ExpandedDocument<I, B>);
 
 impl<I, B> ExpandedEmbeddedProofConfiguration<I, B>
 where
     I: Clone + Eq + Hash,
     B: Clone + Eq + Hash,
 {
-    pub fn extract<E, V>(
+    pub fn extract<V, R>(
         self,
-        environment: &mut E,
+        vocabulary: &mut V,
+        interpretation: &mut R,
     ) -> Result<ExpandedProofConfiguration, ConfigurationExpansionError>
     where
-        E: AnyLdEnvironment<Vocabulary = V>,
-        E::Interpretation: InterpretationMut<V>
+        R: InterpretationMut<V>
             + ReverseTermInterpretation<Iri = I, BlankId = B, Literal = V::Literal>,
-        <E::Interpretation as Interpretation>::Resource: Clone,
+        R::Resource: Clone,
         V: VocabularyMut<Iri = I, BlankId = B>,
-        I: LinkedDataResource<E::Interpretation, V> + LinkedDataSubject<E::Interpretation, V>,
-        B: LinkedDataResource<E::Interpretation, V> + LinkedDataSubject<E::Interpretation, V>,
+        I: LinkedDataResource<R, V> + LinkedDataSubject<R, V>,
+        B: LinkedDataResource<R, V> + LinkedDataSubject<R, V>,
     {
         match self.0.into_main_node() {
             Some(node) => {
-                let env = environment.as_ld_environment_mut();
-
                 // Get the proof type IRI.
-                let proof_prop = json_ld::Id::iri(
-                    env.vocabulary
+                let proof_prop = ssi_json_ld::Id::iri(
+                    vocabulary
                         .get(ssi_security::PROOF)
                         .ok_or(ConfigurationExpansionError::MissingProof)?,
                 );
@@ -188,8 +155,8 @@ where
                             Some(proof_graph) => match proof_graph.first() {
                                 Some(proof) => match proof.as_node() {
                                     Some(proof) => match proof.types() {
-                                        [json_ld::Id::Valid(Id::Iri(iri))] => {
-                                            Ok(env.vocabulary.iri(iri).unwrap().to_owned())
+                                        [ssi_json_ld::Id::Valid(Id::Iri(iri))] => {
+                                            Ok(vocabulary.iri(iri).unwrap().to_owned())
                                         }
                                         _ => Err(ConfigurationExpansionError::InvalidProofType),
                                     },
@@ -205,8 +172,8 @@ where
                 }?;
 
                 let (subject, quads) = ::linked_data::to_lexical_subject_quads_with(
-                    env.vocabulary,
-                    env.interpretation,
+                    vocabulary,
+                    interpretation,
                     None,
                     &node,
                 )?;
@@ -236,6 +203,19 @@ where
             }
             None => Err(ConfigurationExpansionError::InvalidContext),
         }
+    }
+}
+
+impl<I: Interpretation, V: Vocabulary> LinkedData<I, V>
+    for ExpandedEmbeddedProofConfiguration<V::Iri, V::BlankId>
+where
+    ExpandedDocument<V::Iri, V::BlankId>: LinkedData<I, V>,
+{
+    fn visit<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::Visitor<I, V>,
+    {
+        self.0.visit(visitor)
     }
 }
 

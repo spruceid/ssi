@@ -1,5 +1,3 @@
-use iref::Uri;
-
 mod hashing;
 pub use hashing::Eip712Hashing;
 
@@ -81,38 +79,5 @@ impl Input {
 
     pub fn default_primary_type() -> ssi_eip712::StructName {
         "Document".into()
-    }
-}
-
-/// Errors that can occur while fetching remote EIP712 type definitions.
-#[derive(Debug, thiserror::Error)]
-pub enum TypesFetchError {
-    /// Error for applications that do not support remote types.
-    ///
-    /// This is the error always returned by the `()` implementation of
-    /// `TypesProvider`.
-    #[error("remote EIP712 types are not supported")]
-    Unsupported,
-}
-
-/// Type providing remote EIP712 type definitions from an URI.
-///
-/// A default implementation is provided for the `()` type that always return
-/// `TypesFetchError::Unsupported`.
-pub trait TypesProvider {
-    /// Fetches the type definitions located behind the given `uri`.
-    ///
-    /// This is an asynchronous function returning a `Self::Fetch` future that
-    /// resolves into ether the EIP712 [`Types`](ssi_eip712::Types) or an error
-    /// of type `TypesFetchError`.
-    #[allow(async_fn_in_trait)]
-    async fn fetch_types(&self, uri: &Uri) -> Result<ssi_eip712::Types, TypesFetchError>;
-}
-
-/// Simple EIP712 loader implementation that always return
-/// `TypesFetchError::Unsupported`.
-impl TypesProvider for () {
-    async fn fetch_types(&self, _uri: &Uri) -> Result<ssi_eip712::Types, TypesFetchError> {
-        Err(TypesFetchError::Unsupported)
     }
 }

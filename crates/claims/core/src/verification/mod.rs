@@ -42,28 +42,28 @@ pub trait VerifiableClaims {
     #[allow(async_fn_in_trait)]
     async fn verify<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
     where
-        Self::Claims: Validate<ValidationEnvironment, Self::Proof>,
-        Self::Proof: ValidateProof<Self::Claims, ValidationEnvironment, V>,
+        Self::Claims: Validate<VerificationEnvironment, Self::Proof>,
+        Self::Proof: ValidateProof<Self::Claims, VerificationEnvironment, V>,
     {
-        let mut env = ValidationEnvironment::default();
-        self.verify_with(&mut env, verifier).await
+        self.verify_with(verifier, VerificationEnvironment::default())
+            .await
     }
 
     /// Validates the claims and verify them against the proof.
     #[allow(async_fn_in_trait)]
     async fn verify_with<V, E>(
         &self,
-        env: &mut E,
         verifier: &V,
+        env: E,
     ) -> Result<Verification, ProofValidationError>
     where
         Self::Claims: Validate<E, Self::Proof>,
         Self::Proof: ValidateProof<Self::Claims, E, V>,
     {
-        match self.claims().validate(env, self.proof()) {
+        match self.claims().validate(&env, self.proof()) {
             Ok(_) => self
                 .proof()
-                .validate_proof(env, self.claims(), verifier)
+                .validate_proof(&env, self.claims(), verifier)
                 .await
                 .map(|r| r.map_err(Invalid::Proof)),
             Err(e) => {
@@ -72,10 +72,6 @@ pub trait VerifiableClaims {
             }
         }
     }
-}
-
-pub trait DefaultEnvironment {
-    type Environment: Default;
 }
 
 /// Proof bundling trait.

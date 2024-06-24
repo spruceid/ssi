@@ -23,7 +23,7 @@ pub use reference::*;
 #[serde(rename_all = "camelCase", bound = "S: SerializeCryptographicSuite")]
 pub struct ProofConfiguration<S: CryptographicSuite> {
     #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<json_ld::syntax::Context>,
+    pub context: Option<ssi_json_ld::syntax::Context>,
 
     /// Proof type.
     #[serde(flatten, serialize_with = "S::serialize_type")]
