@@ -5,7 +5,7 @@ pub mod token_status_list;
 pub use flate2::Compression;
 
 /// Status list overflow.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum Overflow {
     /// Value is too large.
     #[error("value `{0}` is too large")]

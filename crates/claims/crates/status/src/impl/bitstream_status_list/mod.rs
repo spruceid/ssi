@@ -440,6 +440,8 @@ impl StatusMap for StatusList {
 mod tests {
     use rand::{rngs::StdRng, RngCore, SeedableRng};
 
+    use crate::Overflow;
+
     use super::{BitString, StatusSize};
 
     fn random_bit_string(
@@ -579,5 +581,20 @@ mod tests {
         for i in 0..10 {
             randomized_write(i, 7u8.try_into().unwrap(), 1000);
         }
+    }
+
+    #[test]
+    fn overflows() {
+        let mut rng = StdRng::seed_from_u64(0);
+        let (_, mut bitstring) = random_bit_string(&mut rng, 1u8.try_into().unwrap(), 15);
+
+        // Out of bounds.
+        assert!(bitstring.get(15).is_none());
+
+        // Out of bounds (even if there are enough bytes in the list).
+        assert_eq!(bitstring.set(15, 0), Err(Overflow::Index(15)));
+
+        // Too many bits.
+        assert_eq!(bitstring.set(14, 2), Err(Overflow::Value(2)));
     }
 }
