@@ -110,7 +110,7 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(ssi_multicodec::P384_PUB, &pk_bytes)
+                            MultiEncodedBuf::encode_bytes(ssi_multicodec::P384_PUB, &pk_bytes)
                                 .into_bytes(),
                         )
                     }

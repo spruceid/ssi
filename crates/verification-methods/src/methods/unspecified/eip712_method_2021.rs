@@ -111,12 +111,9 @@ impl Eip712Method2021 {
 
         // Check the signing key.
         let jwk = JWK {
-            params: ssi_jwk::Params::EC(
-                ssi_jwk::ECParams::try_from(
-                    &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes()).unwrap(),
-                )
-                .unwrap(),
-            ),
+            params: ssi_jwk::Params::EC(ssi_jwk::ECParams::from(
+                &k256::PublicKey::from_sec1_bytes(&recovered_key.to_sec1_bytes()).unwrap(),
+            )),
             public_key_use: None,
             key_operations: None,
             algorithm: None,
