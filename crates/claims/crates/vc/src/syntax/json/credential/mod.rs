@@ -1,7 +1,7 @@
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Proof, Validate};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use xsd_types::DateTime;
@@ -154,11 +154,11 @@ impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T, E, P: Proof> Validate<E, P> for SpecializedJsonCredential<S, C, T>
+impl<S, C, T, E, P> Validate<E, P> for SpecializedJsonCredential<S, C, T>
 where
     E: DateTimeEnvironment,
 {
-    fn validate(&self, env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+    fn validate(&self, env: &E, _proof: &P) -> ClaimsValidity {
         crate::Credential::validate_credential(self, env)
     }
 }

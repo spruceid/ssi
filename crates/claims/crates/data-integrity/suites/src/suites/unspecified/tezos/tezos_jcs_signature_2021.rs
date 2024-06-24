@@ -150,7 +150,7 @@ where
     async fn sign(
         verification_method: &<TezosJcsSignature2021 as CryptographicSuite>::VerificationMethod,
         signer: T,
-        prepared_claims: &Vec<u8>,
+        prepared_claims: Vec<u8>,
         proof_configuration: ProofConfigurationRef<'_, TezosJcsSignature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         let public_key_jwk = proof_configuration
@@ -164,7 +164,7 @@ where
             Ok(key) => {
                 Signature::sign(
                     verification_method.public_key.as_jwk().or(key.as_ref()),
-                    prepared_claims,
+                    &prepared_claims,
                     signer,
                 )
                 .await
@@ -177,7 +177,7 @@ where
 impl VerificationAlgorithm<TezosJcsSignature2021> for TezosJcsSignatureAlgorithm {
     fn verify(
         method: &TezosMethod2021,
-        prepared_claims: &Vec<u8>,
+        prepared_claims: Vec<u8>,
         proof: ProofRef<TezosJcsSignature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let public_key_jwk = proof
@@ -191,7 +191,7 @@ impl VerificationAlgorithm<TezosJcsSignature2021> for TezosJcsSignatureAlgorithm
         method
             .verify_bytes(
                 public_key_jwk.as_ref(),
-                prepared_claims,
+                &prepared_claims,
                 algorithm,
                 &signature_bytes,
             )

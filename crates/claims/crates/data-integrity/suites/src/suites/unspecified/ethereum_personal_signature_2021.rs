@@ -113,7 +113,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         _proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         let proof_value_bytes = signer
@@ -136,7 +136,7 @@ where
 {
     fn verify(
         method: &S::VerificationMethod,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let message = EthereumWallet::prepare_message(prepared_claims.as_ref());

@@ -143,9 +143,7 @@ impl CredentialStatus for RevocationList2020Status {
         let credential_data = load_resource(&self.revocation_list_credential).await?;
         let revocation_list_credential = serde_json::from_slice::<
             AnyDataIntegrity<RevocationList2020Credential>,
-        >(&credential_data)?
-        .into_verifiable_with(AnyInputContext::from_ld_context_loader(context_loader))
-        .await?;
+        >(&credential_data)?;
 
         if credential.issuer.id() != revocation_list_credential.issuer.id() {
             return Ok(StatusCheck::Invalid(Reason::IssuerMismatch(
@@ -154,7 +152,12 @@ impl CredentialStatus for RevocationList2020Status {
             )));
         }
 
-        let vc_result = revocation_list_credential.verify(resolver).await?;
+        let vc_result = revocation_list_credential
+            .verify_with(
+                &mut AnyInputContext::from_ld_context_loader(context_loader),
+                resolver,
+            )
+            .await?;
 
         if let Err(e) = vc_result {
             return Ok(StatusCheck::Invalid(Reason::CredentialVerification(e)));

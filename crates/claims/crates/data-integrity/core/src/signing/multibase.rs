@@ -87,7 +87,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         let algorithm = A::select_algorithm(verification_method, proof_configuration.options)
@@ -110,7 +110,7 @@ where
 {
     fn verify(
         verification_method: &S::VerificationMethod,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let algorithm = A::select_algorithm(verification_method, proof.options)

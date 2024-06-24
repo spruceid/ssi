@@ -323,7 +323,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         _proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         // ssi_jwk::algorithm::AnyESKeccakK
@@ -343,7 +343,7 @@ where
 {
     fn verify(
         method: &<S as CryptographicSuite>::VerificationMethod,
-        prepared_claims: &<S as CryptographicSuite>::PreparedClaims,
+        prepared_claims: <S as CryptographicSuite>::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = proof.signature.decode()?;

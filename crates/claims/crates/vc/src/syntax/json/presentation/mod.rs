@@ -4,7 +4,7 @@ use crate::{Context, Credential};
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, Proof, Validate};
+use ssi_claims_core::{ClaimsValidity, Validate};
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
 
 use super::{super::value_or_array, SpecializedJsonCredential};
@@ -87,8 +87,8 @@ impl<C> JsonLdNodeObject for JsonPresentation<C> {
     }
 }
 
-impl<C, E, P: Proof> Validate<E, P> for JsonPresentation<C> {
-    fn validate(&self, _: &E, _: &P::Prepared) -> ClaimsValidity {
+impl<C, E, P> Validate<E, P> for JsonPresentation<C> {
+    fn validate(&self, _: &E, _: &P) -> ClaimsValidity {
         Ok(())
     }
 }

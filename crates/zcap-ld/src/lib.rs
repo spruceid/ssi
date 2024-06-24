@@ -12,12 +12,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims::{
     data_integrity::{
-        suite::{CryptographicSuiteInstance, CryptographicSuiteSigning, InputOptions},
+        suite::{CryptographicSuiteSigning, InputOptions},
         AnyDataIntegrity, AnyInputContext, AnyProofs, AnySignatureAlgorithm, AnySuite,
-        CryptographicSuite, PreparedProof, PreparedProofs, Proofs,
+        CryptographicSuite, Proofs,
+        DataIntegrity, Proof
     },
     vc::{Context, RequiredContext},
-    ClaimsValidity, InvalidClaims, SignatureError, Validate, Verifiable,
+    ClaimsValidity, InvalidClaims, SignatureError, Validate, VerifiableClaims,
 };
 use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject};
 use ssi_verification_methods::{AnyMethod, ProofPurpose, VerificationMethodResolver};
@@ -95,7 +96,7 @@ impl<C, P> Delegation<C, P> {
 
     pub fn validate(
         &self,
-        proofs: &PreparedProofs<AnySuite>,
+        proofs: &Proofs<AnySuite>,
     ) -> Result<(), DelegationValidationError> {
         for proof in proofs.iter() {
             if proof.configuration().proof_purpose != ProofPurpose::CapabilityDelegation {
@@ -108,7 +109,7 @@ impl<C, P> Delegation<C, P> {
 
     pub fn validate_invocation_proof(
         &self,
-        proof: &PreparedProof<AnySuite>,
+        proof: &Proof<AnySuite>,
     ) -> Result<(), InvocationValidationError> {
         let id: &Uri = proof
             .extra_properties
@@ -139,7 +140,7 @@ impl<C, P> Delegation<C, P> {
         signer: S,
         proof_configuration: InputOptions<AnySuite>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Self, AnyProofs>, SignatureError>
+    ) -> Result<DataIntegrity<Self, AnySuite>, SignatureError>
     where
         C: Serialize,
         P: Serialize,
@@ -161,14 +162,14 @@ impl<C, P> Delegation<C, P> {
     pub async fn sign_with<D, E, R, S>(
         self,
         suite: D,
-        environment: E,
+        mut environment: E,
         resolver: R,
         signer: S,
         mut proof_configuration: InputOptions<D>,
         capability_chain: &[&str],
-    ) -> Result<Verifiable<Self, Proofs<D>>, SignatureError>
+    ) -> Result<DataIntegrity<Self, D>, SignatureError>
     where
-        D: CryptographicSuiteInstance<Self, E> + CryptographicSuiteSigning<R, S>,
+        D: CryptographicSuiteSigning<Self, E, R, S>,
     {
         proof_configuration.extra_properties.insert(
             "capabilityChain".into(),
@@ -180,7 +181,7 @@ impl<C, P> Delegation<C, P> {
         }
 
         suite
-            .sign(self, environment, resolver, signer, proof_configuration)
+            .sign(&mut environment, self, resolver, signer, proof_configuration)
             .await
     }
 }
@@ -194,7 +195,7 @@ impl<C, P> JsonLdObject for Delegation<C, P> {
 impl<C, P> JsonLdNodeObject for Delegation<C, P> {}
 
 impl<C, S, E> Validate<E, AnyProofs> for Delegation<C, S> {
-    fn validate(&self, _: &E, proofs: &PreparedProofs<AnySuite>) -> ClaimsValidity {
+    fn validate(&self, _: &E, proofs: &Proofs<AnySuite>) -> ClaimsValidity {
         self.validate(proofs).map_err(InvalidClaims::other)
     }
 }
@@ -285,24 +286,22 @@ impl<P> Invocation<P> {
             .extra_properties
             .insert("capability".into(), json_syntax::to_value(target).unwrap());
 
-        Ok(Verifiable::unprepare(
-            suite
-                .sign(
-                    self,
-                    AnyInputContext::default(),
-                    resolver,
-                    signer,
-                    proof_configuration,
-                )
-                .await?,
-        ))
+        suite
+            .sign(
+                &mut AnyInputContext::default(),
+                self,
+                resolver,
+                signer,
+                proof_configuration,
+            )
+            .await
     }
 
     pub fn validate<C, Q>(
         &self,
         // TODO make this a list for delegation chains
         target_capability: &Delegation<C, Q>,
-        proofs: &PreparedProofs<AnySuite>,
+        proofs: &Proofs<AnySuite>,
     ) -> Result<(), InvocationValidationError> {
         for proof in proofs.iter() {
             if proof.configuration().proof_purpose != ProofPurpose::CapabilityInvocation {
@@ -349,7 +348,7 @@ impl<S, C, Q> Validate<Delegation<C, Q>, AnyProofs> for Invocation<S> {
     fn validate(
         &self,
         target_capability: &Delegation<C, Q>,
-        proofs: &PreparedProofs<AnySuite>,
+        proofs: &Proofs<AnySuite>,
     ) -> ClaimsValidity {
         self.validate(target_capability, proofs)
             .map_err(InvalidClaims::other)
@@ -379,7 +378,7 @@ impl<S, C, Q> Validate<Delegation<C, Q>, AnyProofs> for Invocation<S> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_claims::{UnprepareProof, VerifiableClaims};
+    use ssi_claims::VerifiableClaims;
     use ssi_data_integrity::DataIntegrity;
     use ssi_dids_core::{example::ExampleDIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
@@ -500,13 +499,12 @@ mod tests {
                 &signed_del.id,
             )
             .await
-            .unwrap()
-            .into_verifiable()
-            .await
             .unwrap();
 
+        let mut context = AnyInputContext::default();
+
         // happy path
-        assert!(signed_del.verify(&dk).await.unwrap().is_ok());
+        assert!(signed_del.verify_with(&mut context, &dk).await.unwrap().is_ok());
 
         assert!(signed_inv
             .verify_with(&dk, &signed_del.claims)
@@ -519,19 +517,11 @@ mod tests {
                 invoker: Some(uri!("did:someone_else").to_owned()),
                 ..signed_del.claims.clone()
             },
-            signed_del.proof.clone().unprepare(),
-        )
-        .into_verifiable()
-        .await
-        .unwrap();
-        let bad_sig_inv = signed_inv
-            .clone()
-            .tamper(AnyInputContext::default(), |mut inv| {
-                inv.id = uri!("urn:different_id").to_owned();
-                inv
-            })
-            .await
-            .unwrap();
+            signed_del.proofs.clone(),
+        );
+
+        let mut bad_sig_inv = signed_inv.clone();
+        bad_sig_inv.id = uri!("urn:different_id").to_owned();
 
         // invalid proof for data
         assert!(bad_sig_del.verify(&dk).await.unwrap().is_err());

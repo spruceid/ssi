@@ -168,9 +168,7 @@ impl CredentialStatus for StatusList2021Entry {
 
         let credential_data = load_resource(&self.status_list_credential).await?;
         let status_list_credential =
-            serde_json::from_slice::<AnyDataIntegrity<StatusList2021Credential>>(&credential_data)?
-                .into_verifiable_with(AnyInputContext::from_ld_context_loader(context_loader))
-                .await?;
+            serde_json::from_slice::<AnyDataIntegrity<StatusList2021Credential>>(&credential_data)?;
 
         if credential.issuer.id() != status_list_credential.issuer.id() {
             return Ok(StatusCheck::Invalid(Reason::IssuerMismatch(
@@ -179,7 +177,12 @@ impl CredentialStatus for StatusList2021Entry {
             )));
         }
 
-        let vc_result = status_list_credential.verify(resolver).await?;
+        let vc_result = status_list_credential
+            .verify_with(
+                &mut AnyInputContext::from_ld_context_loader(context_loader),
+                resolver,
+            )
+            .await?;
 
         if let Err(e) = vc_result {
             return Ok(StatusCheck::Invalid(Reason::CredentialVerification(e)));

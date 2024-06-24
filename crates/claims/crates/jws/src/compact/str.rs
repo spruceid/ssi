@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{ops::Deref, str::FromStr};
 
-use crate::{CompactJWS, DecodeError, DecodedJWS, Header, InvalidCompactJWS};
+use crate::{CompactJWS, DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidCompactJWS};
 
 /// JWS in UTF-8 compact serialized form.
 ///
@@ -221,9 +221,10 @@ impl CompactJWSString {
     /// be verified.
     pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
         let decoded = self.decode()?.into_owned();
+        let signing_bytes = self.into_signing_bytes().into_bytes();
         Ok(DecodedJWS::new(
-            self.into_signing_bytes().into_bytes(),
-            decoded,
+            DecodedSigningBytes::new(signing_bytes, decoded.header, decoded.payload),
+            decoded.signature,
         ))
     }
 }

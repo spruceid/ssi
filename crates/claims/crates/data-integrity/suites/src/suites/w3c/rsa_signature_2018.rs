@@ -75,11 +75,11 @@ where
     async fn sign(
         _verification_method: &RsaVerificationKey2018,
         signer: T,
-        prepared_claims: &[u8; 64],
+        prepared_claims: [u8; 64],
         _proof_configuration: ProofConfigurationRef<'_, RsaSignature2018>,
     ) -> Result<Signature, SignatureError> {
         let signature = signer
-            .sign(ssi_jwk::algorithm::RS256, prepared_claims)
+            .sign(ssi_jwk::algorithm::RS256, &prepared_claims)
             .await?;
 
         Ok(Signature {
@@ -91,13 +91,13 @@ where
 impl VerificationAlgorithm<RsaSignature2018> for RsaSignatureAlgorithm {
     fn verify(
         method: &RsaVerificationKey2018,
-        prepared_claims: &[u8; 64],
+        prepared_claims: [u8; 64],
         proof: ProofRef<RsaSignature2018>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature = base64::decode(&proof.signature.signature_value)
             .map_err(|_| ProofValidationError::InvalidSignature)?;
         method
-            .verify_bytes(prepared_claims, &signature)
+            .verify_bytes(&prepared_claims, &signature)
             .map(Into::into)
     }
 }

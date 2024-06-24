@@ -3,6 +3,7 @@ use rdf_types::{
     interpretation::{self, WithGenerator},
     vocabulary::IriVocabulary,
 };
+use ssi_claims_core::DateTimeEnvironment;
 use ssi_json_ld::{AnyJsonLdEnvironment, ContextLoader, JsonLdEnvironment};
 use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
 
@@ -111,5 +112,11 @@ impl Default
             },
             loader: (),
         }
+    }
+}
+
+impl<E, L> DateTimeEnvironment for AnyInputContext<E, L> {
+    fn date_time(&self) -> chrono::DateTime<chrono::Utc> {
+        chrono::Utc::now()
     }
 }

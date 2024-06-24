@@ -1,6 +1,6 @@
 use linked_data::IntoQuadsError;
 use serde::Serialize;
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 
 use crate::{ConfigurationExpansionError, CryptographicSuite, ProofConfigurationRef};
 
@@ -40,6 +40,12 @@ impl TransformationError {
 }
 
 impl From<TransformationError> for SignatureError {
+    fn from(value: TransformationError) -> Self {
+        Self::other(value)
+    }
+}
+
+impl From<TransformationError> for ProofValidationError {
     fn from(value: TransformationError) -> Self {
         Self::other(value)
     }

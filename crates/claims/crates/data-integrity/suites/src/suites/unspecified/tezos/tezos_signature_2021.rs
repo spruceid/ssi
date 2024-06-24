@@ -109,7 +109,7 @@ where
     async fn sign(
         verification_method: &<TezosSignature2021 as CryptographicSuite>::VerificationMethod,
         signer: T,
-        prepared_claims: &Vec<u8>,
+        prepared_claims: Vec<u8>,
         proof_configuration: ProofConfigurationRef<'_, TezosSignature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         // AnyBlake2b
@@ -118,7 +118,7 @@ where
                 .public_key
                 .as_jwk()
                 .or(proof_configuration.options.public_key_jwk.as_deref()),
-            prepared_claims,
+            &prepared_claims,
             signer,
         )
         .await
@@ -128,7 +128,7 @@ where
 impl VerificationAlgorithm<TezosSignature2021> for TezosSignatureAlgorithm {
     fn verify(
         method: &TezosMethod2021,
-        prepared_claims: &Vec<u8>,
+        prepared_claims: Vec<u8>,
         proof: ProofRef<TezosSignature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
         // AnyBlake2b
@@ -136,7 +136,7 @@ impl VerificationAlgorithm<TezosSignature2021> for TezosSignatureAlgorithm {
         method
             .verify_bytes(
                 proof.options.public_key_jwk.as_deref(),
-                prepared_claims,
+                &prepared_claims,
                 algorithm,
                 &signature_bytes,
             )

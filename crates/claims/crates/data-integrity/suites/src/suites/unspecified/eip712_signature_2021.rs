@@ -258,7 +258,7 @@ where
     async fn sign(
         verification_method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
         signer: T,
-        prepared_claims: &<Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
+        prepared_claims: <Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
         _proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         Eip712Signature::sign(
@@ -273,7 +273,7 @@ where
 impl VerificationAlgorithm<Eip712Signature2021> for Eip712SignatureAlgorithm {
     fn verify(
         method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
-        prepared_claims: &<Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
+        prepared_claims: <Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
         proof: ssi_data_integrity_core::ProofRef<Eip712Signature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = proof.signature.decode()?;

@@ -381,7 +381,7 @@ mod tests {
             CryptographicSuite, ProofOptions,
         },
         vc::{JsonCredential, JsonPresentation},
-        Verifiable,
+        VerifiableClaims,
     };
     use ssi_dids_core::{did, DIDResolver};
     use ssi_jwk::JWK;
@@ -511,11 +511,12 @@ mod tests {
         );
 
         eprintln!("vm {:?}", issue_options.verification_method);
+        let mut context = AnyInputContext::default();
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
             .sign(
+                &mut context,
                 cred.clone(),
-                AnyInputContext::default(),
                 &didethr,
                 &signer,
                 issue_options.clone(),
@@ -524,33 +525,37 @@ mod tests {
             .unwrap();
         println!(
             "proof: {}",
-            serde_json::to_string_pretty(&vc.proof).unwrap()
+            serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
         if eip712 {
-            assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
+            assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "0xd3f4a049551fd25c7fb0789c7303be63265e8ade2630747de3807710382bbb7a25b0407e9f858a771782c35b4f487f4337341e9a4375a073730bda643895964e1b")
         } else {
-            assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
+            assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
-        assert!(vc.verify(&didethr).await.unwrap().is_ok());
+        assert!(vc
+            .verify_with(&mut context, &didethr)
+            .await
+            .unwrap()
+            .is_ok());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
+
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_err());
+        assert!(vc_bad_issuer
+            .verify_with(&mut context, &didethr)
+            .await
+            .unwrap()
+            .is_err());
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_key = JWK::generate_secp256k1().unwrap();
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = suite
             .sign(
+                &mut AnyInputContext::default(),
                 cred,
-                AnyInputContext::default(),
                 &didethr,
                 &wrong_signer,
                 ProofOptions {
@@ -562,7 +567,11 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(vc_wrong_key.verify(&didethr).await.unwrap().is_err());
+        assert!(vc_wrong_key
+            .verify_with(&mut context, &didethr)
+            .await
+            .unwrap()
+            .is_err());
 
         // Make it into a VP
         let presentation = JsonPresentation::new(
@@ -580,8 +589,8 @@ mod tests {
 
         let vp = suite
             .sign(
+                &mut context,
                 presentation,
-                AnyInputContext::default(),
                 &didethr,
                 &signer,
                 vp_issue_options,
@@ -590,32 +599,41 @@ mod tests {
             .unwrap();
 
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        assert!(vp.verify(&didethr).await.unwrap().is_ok());
+        assert!(vp
+            .verify_with(&mut context, &didethr)
+            .await
+            .unwrap()
+            .is_ok());
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        vp_fuzzed.proof.first_mut().unwrap().signature.alter();
-        let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
+        vp_fuzzed.proofs.first_mut().unwrap().signature.alter();
+        let vp_fuzzed_result = vp_fuzzed.verify_with(&mut context, &didethr).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // test that holder is verified
-        let vp_bad_holder = Verifiable::tamper(vp, AnyInputContext::default(), |mut pres| {
-            pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
-            pres
-        })
-        .await
-        .unwrap();
+        let mut vp_bad_holder = vp;
+        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
+
         // It should fail.
-        assert!(vp_bad_holder.verify(&didethr).await.unwrap().is_err());
+        assert!(vp_bad_holder
+            .verify_with(&mut context, &didethr)
+            .await
+            .unwrap()
+            .is_err());
     }
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
         let didethr = DIDEthr.with_default_options();
         let vc = ssi_claims::vc::any_credential_from_json_str(include_str!("../tests/vc.jsonld"))
-            .await
             .unwrap();
         // eprintln!("vc {:?}", vc);
-        assert!(vc.verify(&didethr).await.unwrap().is_ok())
+        let mut context = AnyInputContext::default();
+        assert!(vc
+            .verify_with(&mut context, &didethr)
+            .await
+            .unwrap()
+            .is_ok())
     }
 }

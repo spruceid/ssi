@@ -3,8 +3,6 @@ use std::borrow::Cow;
 
 use chrono::{DateTime, Utc};
 
-use crate::Proof;
-
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {
     #[error("missing issuance date")]
@@ -48,31 +46,31 @@ pub type ClaimsValidity = Result<(), InvalidClaims>;
 ///
 /// The `validate` function is also provided with the proof, as some claim type
 /// require information from the proof to be validated.
-pub trait Validate<E, P: Proof> {
+pub trait Validate<E, P> {
     /// Validates the claims.
-    fn validate(&self, env: &E, proof: &P::Prepared) -> ClaimsValidity;
+    fn validate(&self, env: &E, proof: &P) -> ClaimsValidity;
 }
 
-impl<E, P: Proof> Validate<E, P> for () {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<E, P> Validate<E, P> for () {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E, P: Proof> Validate<E, P> for [u8] {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<E, P> Validate<E, P> for [u8] {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E, P: Proof> Validate<E, P> for Vec<u8> {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<E, P> Validate<E, P> for Vec<u8> {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<'a, E, P: Proof, T: ?Sized + ToOwned + Validate<E, P>> Validate<E, P> for Cow<'a, T> {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<'a, E, P, T: ?Sized + ToOwned + Validate<E, P>> Validate<E, P> for Cow<'a, T> {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }

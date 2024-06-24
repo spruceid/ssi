@@ -450,7 +450,7 @@ mod tests {
         data_integrity::{AnyInputContext, AnyInputSuiteOptions, AnySuite},
         jws::JWSVerifier,
         vc::JsonCredential,
-        Verifiable,
+        VerifiableClaims,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
     use ssi_dids_core::{
@@ -679,34 +679,29 @@ mod tests {
             ProofPurpose::Assertion,
             AnyInputSuiteOptions::default(),
         );
+        let mut context = AnyInputContext::default();
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &didkey,
-                &signer,
-                issue_options,
-            )
+            .sign(&mut context, cred, &didkey, &signer, issue_options)
             .await
             .unwrap();
         println!(
             "proof: {}",
-            serde_json::to_string_pretty(&vc.proof).unwrap()
+            serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
-        assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
-        assert!(vc.verify(&didkey).await.unwrap().is_ok());
+        assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
+        assert!(vc.verify_with(&mut context, &didkey).await.unwrap().is_ok());
 
         // test that issuer is verified
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
+
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_err());
+        assert!(vc_bad_issuer
+            .verify_with(&mut context, &didkey)
+            .await
+            .unwrap()
+            .is_err());
     }
 
     #[async_std::test]
@@ -742,34 +737,29 @@ mod tests {
             ProofPurpose::Assertion,
             AnyInputSuiteOptions::default(),
         );
+        let mut context = AnyInputContext::default();
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &didkey,
-                &signer,
-                issue_options,
-            )
+            .sign(&mut context, cred, &didkey, &signer, issue_options)
             .await
             .unwrap();
         println!(
             "proof: {}",
-            serde_json::to_string_pretty(&vc.proof).unwrap()
+            serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
-        assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
-        assert!(vc.verify(&didkey).await.unwrap().is_ok());
+        assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
+        assert!(vc.verify_with(&mut context, &didkey).await.unwrap().is_ok());
 
         // test that issuer is verified
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
+
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_err());
+        assert!(vc_bad_issuer
+            .verify_with(&mut context, &didkey)
+            .await
+            .unwrap()
+            .is_err());
     }
 
     #[async_std::test]
@@ -805,33 +795,28 @@ mod tests {
             ProofPurpose::Assertion,
             AnyInputSuiteOptions::default(),
         );
+        let mut context = AnyInputContext::default();
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &didkey,
-                &signer,
-                issue_options,
-            )
+            .sign(&mut context, cred, &didkey, &signer, issue_options)
             .await
             .unwrap();
         println!(
             "proof: {}",
-            serde_json::to_string_pretty(&vc.proof).unwrap()
+            serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
-        assert!(vc.verify(&didkey).await.unwrap().is_ok());
+        assert!(vc.verify_with(&mut context, &didkey).await.unwrap().is_ok());
 
         // test that issuer is verified
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
+
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didkey).await.unwrap().is_err());
+        assert!(vc_bad_issuer
+            .verify_with(&mut context, &didkey)
+            .await
+            .unwrap()
+            .is_err());
     }
 
     async fn fetch_jwk(jwk: JWK) {

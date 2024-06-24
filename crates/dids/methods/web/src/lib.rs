@@ -139,7 +139,7 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
         vc::JsonCredential,
-        Verifiable,
+        VerifiableClaims,
     };
     use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
@@ -269,35 +269,29 @@ mod tests {
             ProofPurpose::Assertion,
             Default::default(),
         );
+        let mut context = AnyInputContext::default();
         let signer = SingleSecretSigner::new(key).into_local();
         let vc = suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &didweb,
-                &signer,
-                issue_options,
-            )
+            .sign(&mut context, cred, &didweb, &signer, issue_options)
             .await
             .unwrap();
 
         println!(
             "proof: {}",
-            serde_json::to_string_pretty(&vc.proof).unwrap()
+            serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
-        assert_eq!(vc.proof.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
-        assert!(vc.verify(&didweb).await.unwrap().is_ok());
+        assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
+        assert!(vc.verify_with(&mut context, &didweb).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didweb).await.unwrap().is_err());
+        assert!(vc_bad_issuer
+            .verify_with(&mut context, &didweb)
+            .await
+            .unwrap()
+            .is_err());
 
         PROXY.with(|proxy| {
             proxy.replace(None);

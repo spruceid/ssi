@@ -237,7 +237,10 @@ where
     }
 }
 
-pub trait DeserializeCryptographicSuiteOwned: for<'de> DeserializeCryptographicSuite<'de> {}
+pub trait DeserializeCryptographicSuiteOwned:
+    CryptographicSuite + for<'de> DeserializeCryptographicSuite<'de>
+{
+}
 
 impl<S> DeserializeCryptographicSuiteOwned for S where S: for<'de> DeserializeCryptographicSuite<'de>
 {}

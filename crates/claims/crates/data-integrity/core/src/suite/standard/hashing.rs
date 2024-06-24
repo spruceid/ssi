@@ -1,4 +1,4 @@
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{ProofValidationError, SignatureError};
 
 use crate::ProofConfigurationRef;
 
@@ -17,6 +17,12 @@ pub enum HashingError {
 }
 
 impl From<HashingError> for SignatureError {
+    fn from(value: HashingError) -> Self {
+        Self::other(value)
+    }
+}
+
+impl From<HashingError> for ProofValidationError {
     fn from(value: HashingError) -> Self {
         Self::other(value)
     }

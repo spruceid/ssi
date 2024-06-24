@@ -11,7 +11,7 @@ pub trait SignatureAlgorithm<S: CryptographicSuite, T>: SignatureAndVerification
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError>;
 }

@@ -8,10 +8,9 @@ use ssi_claims::{
         CryptographicSuite, DataIntegrity, ProofOptions as SuiteOptions,
     },
     vc::{JsonCredential, JsonPresentation},
-    Verifiable,
+    VerifiableClaims,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
-use ssi_json_ld::JsonLdEnvironment;
 use ssi_jwk::JWK;
 use ssi_jws::CompactJWSString;
 use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
@@ -218,7 +217,7 @@ async fn credential_prove_verify_did_tz1() {
     )));
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
-    let cred = DataIntegrity::new(
+    let vc = DataIntegrity::new(
         JsonCredential::new(
             None,
             did.clone().into_uri().into(),
@@ -243,42 +242,38 @@ async fn credential_prove_verify_did_tz1() {
         ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())].into()
     );
 
-    let vc = Verifiable::new_with(cred, JsonLdEnvironment::default())
-        .await
-        .unwrap();
-
     // FIXME: this cannot work because the VC is wrong!
     // `Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021` expects an
     // EdBlake2b signature, but the provided signature is EdDsa.
     // assert_eq!(vc.verify(&didtz).await.unwrap(), Ok(()));
 
     // test that issuer property is used for verification
-    let _vc_bad_issuer =
-        Verifiable::tamper(vc.clone(), JsonLdEnvironment::default(), |mut cred| {
-            cred.issuer = uri!("did:example:bad").to_owned().into();
-            cred
-        })
-        .await
-        .unwrap();
+    let mut _vc_bad_issuer = vc.clone();
+    _vc_bad_issuer.issuer = uri!("did:example:bad").to_owned().into();
 
     // FIXME: this cannot work because the VC is wrong! See above.
     // assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
+    let mut context = AnyInputContext::default();
     let wrong_signer = SingleSecretSigner::new(JWK::generate_ed25519().unwrap());
     let vc_wrong_key =
     ssi_claims::data_integrity::suites::Ed25519BLAKE2BDigestSize20Base58CheckEncodedSignature2021.sign(
+        &mut context,
         vc.claims.clone(),
-        JsonLdEnvironment::default(),
         &didtz,
         &wrong_signer,
-        vc.proof.first().unwrap().configuration().to_owned().into_options()
+        vc.proofs.first().unwrap().configuration().to_owned().into_options()
     )
     .await
     .unwrap();
-    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_wrong_key
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 
-    let presentation = DataIntegrity::new(
+    let vp = DataIntegrity::new(
         JsonPresentation::new(
             Some(uri!("http://example.org/presentations/3731").to_owned()),
             Some(did.into()),
@@ -300,10 +295,6 @@ async fn credential_prove_verify_did_tz1() {
         ).with_context(ssi_claims::data_integrity::suites::tezos::TZ_CONTEXT.clone().into())].into()
     );
 
-    let vp = Verifiable::new_with(presentation, JsonLdEnvironment::default())
-        .await
-        .unwrap();
-
     println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
 
     // FIXME: this cannot work because the VP is wrong! See above.
@@ -311,18 +302,16 @@ async fn credential_prove_verify_did_tz1() {
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof.first_mut().unwrap().signature.jws =
-        CompactJWSString::from_string(format!("x{}", vp1.proof.first_mut().unwrap().signature.jws))
-            .unwrap();
-    assert!(vp1.verify(&didtz).await.is_err());
+    vp1.proofs.first_mut().unwrap().signature.jws = CompactJWSString::from_string(format!(
+        "x{}",
+        vp1.proofs.first_mut().unwrap().signature.jws
+    ))
+    .unwrap();
+    assert!(vp1.verify_with(&mut context, &didtz).await.is_err());
 
     // test that holder is verified
-    let _vp2 = Verifiable::tamper(vp.clone(), JsonLdEnvironment::default(), |mut pres| {
-        pres.holder = Some(did!("did:example:bad").to_owned().into());
-        pres
-    })
-    .await
-    .unwrap();
+    let mut _vp2 = vp.clone();
+    _vp2.holder = Some(did!("did:example:bad").to_owned().into());
 
     // FIXME: this cannot work because the VP is wrong! See above.
     // assert!(vp2.verify(&didtz).await.unwrap().is_err());
@@ -359,39 +348,34 @@ async fn credential_prove_verify_did_tz2() {
         ProofPurpose::Assertion,
         Default::default(),
     );
+    let mut context = AnyInputContext::default();
     let suite = AnySuite::pick(&key, vc_issue_options.verification_method.as_ref()).unwrap();
     let vc = suite
-        .sign(
-            cred,
-            AnyInputContext::default(),
-            &didtz,
-            &signer,
-            vc_issue_options,
-        )
+        .sign(&mut context, cred, &didtz, &signer, vc_issue_options)
         .await
         .unwrap();
-    println!("{}", serde_json::to_string_pretty(&vc.proof).unwrap());
-    assert!(vc.verify(&didtz).await.unwrap().is_ok());
+    println!("{}", serde_json::to_string_pretty(&vc.proofs).unwrap());
+    assert!(vc.verify_with(&mut context, &didtz).await.unwrap().is_ok());
 
     // Test that issuer property is used for verification.
-    let vc_bad_issuer = Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-        cred.issuer = uri!("did:example:bad").to_owned().into();
-        cred
-    })
-    .await
-    .unwrap();
-    assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
+    let mut vc_bad_issuer = vc.clone();
+    vc_bad_issuer.issuer = uri!("did:example:bad").to_owned().into();
+    assert!(vc_bad_issuer
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer =
         SingleSecretSigner::new(JWK::generate_secp256k1_from(&mut rng).unwrap()).into_local();
     let vc_wrong_key = suite
         .sign(
+            &mut context,
             vc.claims.clone(),
-            AnyInputContext::default(),
             &didtz,
             &wrong_signer,
-            vc.proof
+            vc.proofs
                 .first()
                 .unwrap()
                 .configuration()
@@ -401,7 +385,11 @@ async fn credential_prove_verify_did_tz2() {
         )
         .await
         .unwrap();
-    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_wrong_key
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
@@ -420,30 +408,30 @@ async fn credential_prove_verify_did_tz2() {
     let suite = AnySuite::pick(&key, vp_issue_options.verification_method.as_ref()).unwrap();
     let vp = suite
         .sign(
+            &mut context,
             presentation,
-            AnyInputContext::default(),
             &didtz,
             &signer,
             vp_issue_options,
         )
         .await
         .unwrap();
-    println!("VP: {}", serde_json::to_string_pretty(&vp.proof).unwrap());
-    assert!(vp.verify(&didtz).await.unwrap().is_ok());
+    println!("VP: {}", serde_json::to_string_pretty(&vp.proofs).unwrap());
+    assert!(vp.verify_with(&mut context, &didtz).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof.first_mut().unwrap().signature.alter();
-    assert!(vp1.verify(&didtz).await.is_err());
+    vp1.proofs.first_mut().unwrap().signature.alter();
+    assert!(vp1.verify_with(&mut context, &didtz).await.is_err());
 
     // test that holder is verified
-    let vp2 = Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-        pres.holder = Some(did!("did:example:bad").to_owned().into());
-        pres
-    })
-    .await
-    .unwrap();
-    assert!(vp2.verify(&didtz).await.unwrap().is_err());
+    let mut vp2 = vp.clone();
+    vp2.holder = Some(did!("did:example:bad").to_owned().into());
+    assert!(vp2
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 }
 
 #[tokio::test]
@@ -477,39 +465,34 @@ async fn credential_prove_verify_did_tz3() {
             .with_public_key(key.to_public())
             .unwrap(),
     );
+    let mut context = AnyInputContext::default();
     let suite = AnySuite::pick(&key, vc_issue_options.verification_method.as_ref()).unwrap();
     eprintln!("suite {suite:?}");
     let vc = suite
-        .sign(
-            cred,
-            AnyInputContext::default(),
-            &didtz,
-            &signer,
-            vc_issue_options,
-        )
+        .sign(&mut context, cred, &didtz, &signer, vc_issue_options)
         .await
         .unwrap();
-    println!("{}", serde_json::to_string_pretty(&vc.proof).unwrap());
-    assert!(vc.verify(&didtz).await.unwrap().is_ok());
+    println!("{}", serde_json::to_string_pretty(&vc.proofs).unwrap());
+    assert!(vc.verify_with(&mut context, &didtz).await.unwrap().is_ok());
 
     // Test that issuer property is used for verification.
-    let vc_bad_issuer = Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-        cred.issuer = uri!("did:example:bad").to_owned().into();
-        cred
-    })
-    .await
-    .unwrap();
-    assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
+    let mut vc_bad_issuer = vc.clone();
+    vc_bad_issuer.issuer = uri!("did:example:bad").to_owned().into();
+    assert!(vc_bad_issuer
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer = SingleSecretSigner::new(JWK::generate_p256_from(&mut rng)).into_local();
     let vc_wrong_key = suite
         .sign(
+            &mut context,
             vc.claims.clone(),
-            AnyInputContext::default(),
             &didtz,
             &wrong_signer,
-            vc.proof
+            vc.proofs
                 .first()
                 .unwrap()
                 .configuration()
@@ -519,7 +502,11 @@ async fn credential_prove_verify_did_tz3() {
         )
         .await
         .unwrap();
-    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_wrong_key
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
@@ -540,28 +527,28 @@ async fn credential_prove_verify_did_tz3() {
     let suite = AnySuite::pick(&key, vp_issue_options.verification_method.as_ref()).unwrap();
     let vp = suite
         .sign(
+            &mut context,
             presentation,
-            AnyInputContext::default(),
             &didtz,
             &signer,
             vp_issue_options,
         )
         .await
         .unwrap();
-    println!("VP: {}", serde_json::to_string_pretty(&vp.proof).unwrap());
-    assert!(vp.verify(&didtz).await.unwrap().is_ok());
+    println!("VP: {}", serde_json::to_string_pretty(&vp.proofs).unwrap());
+    assert!(vp.verify_with(&mut context, &didtz).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
-    vp1.proof.first_mut().unwrap().signature.alter();
-    assert!(vp1.verify(&didtz).await.is_err());
+    vp1.proofs.first_mut().unwrap().signature.alter();
+    assert!(vp1.verify_with(&mut context, &didtz).await.is_err());
 
     // test that holder is verified
-    let vp2 = Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-        pres.holder = Some(did!("did:example:bad").to_owned().into());
-        pres
-    })
-    .await
-    .unwrap();
-    assert!(vp2.verify(&didtz).await.unwrap().is_err());
+    let mut vp2 = vp.clone();
+    vp2.holder = Some(did!("did:example:bad").to_owned().into());
+    assert!(vp2
+        .verify_with(&mut context, &didtz)
+        .await
+        .unwrap()
+        .is_err());
 }
