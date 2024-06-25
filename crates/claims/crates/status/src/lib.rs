@@ -5,8 +5,6 @@ use iref::Uri;
 pub use r#impl::*;
 pub mod client;
 
-pub type BoxedError = Box<dyn Send + std::error::Error>;
-
 pub trait EncodedStatusMap {
     type Decoded: StatusMap;
     type DecodeError: std::error::Error;
