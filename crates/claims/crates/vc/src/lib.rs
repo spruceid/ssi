@@ -11,3 +11,5 @@ pub mod datatype;
 pub mod syntax;
 pub mod v1;
 pub mod v2;
+
+pub use syntax::{AnyJsonCredential, AnyJsonPresentation, AnySpecializedJsonCredential};

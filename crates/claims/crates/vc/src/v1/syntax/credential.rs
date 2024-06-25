@@ -174,6 +174,12 @@ where
     }
 }
 
+impl<S, C, T> crate::MaybeIdentified for SpecializedJsonCredential<S, C, T> {
+    fn id(&self) -> Option<&Uri> {
+        self.id.as_deref()
+    }
+}
+
 impl<S, C, T> crate::v1::Credential for SpecializedJsonCredential<S, C, T> {
     type Subject = S;
     type Issuer = IdOr<IdentifiedObject>;

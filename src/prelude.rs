@@ -4,6 +4,7 @@ pub use crate::{
             AnyDataIntegrity, AnySuite, CryptographicSuite, DataIntegrity, ProofConfiguration,
             ProofOptions,
         },
+        vc::syntax::{AnyJsonCredential, AnyJsonPresentation},
         CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload, JWTClaims,
     },
     dids::{DIDResolver, DIDJWK},

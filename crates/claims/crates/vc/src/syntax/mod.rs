@@ -1,10 +1,14 @@
 mod context;
+mod credential;
+mod presentation;
 mod types;
 
 use std::collections::BTreeMap;
 
 pub use context::*;
+pub use credential::*;
 use iref::{Uri, UriBuf};
+pub use presentation::*;
 use serde::{Deserialize, Serialize};
 pub use types::*;
 
