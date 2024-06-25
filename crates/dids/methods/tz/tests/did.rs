@@ -217,7 +217,7 @@ async fn credential_prove_verify_did_tz1() {
     )));
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
-    let vc = DataIntegrity::new(
+    let vc = DataIntegrity::<JsonCredential, _>::new(
         JsonCredential::new(
             None,
             did.clone().into_uri().into(),

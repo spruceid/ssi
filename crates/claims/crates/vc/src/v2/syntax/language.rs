@@ -1,5 +1,5 @@
 use crate::v2::LanguageValue;
-use json_ld::LangString;
+use ssi_json_ld::LangString;
 
 /// International string.
 pub enum InternationalString {

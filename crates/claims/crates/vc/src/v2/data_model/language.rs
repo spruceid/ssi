@@ -1,4 +1,4 @@
-use json_ld::{syntax::LangTag, Direction, LangString, LenientLangTag};
+use ssi_json_ld::{syntax::LangTag, Direction, LangString, LenientLangTag};
 
 pub struct LanguageValue<'a> {
     pub value: &'a str,

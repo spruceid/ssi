@@ -10,7 +10,10 @@ use rdf_types::interpretation::WithGenerator;
 use rdf_types::{Vocabulary, VocabularyMut};
 
 pub use json_ld;
-pub use json_ld::{syntax, ExpandedDocument, Id, LoadError, Loader, Nullable, ToRdfError};
+pub use json_ld::{
+    syntax, Direction, ExpandedDocument, Id, LangString, LenientLangTag, LoadError, Loader,
+    Nullable, ToRdfError,
+};
 use ssi_rdf::{generator, Interpretation, LdEnvironment};
 
 /// Environment that provides a JSON-LD context loader.
