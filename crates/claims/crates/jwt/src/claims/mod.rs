@@ -22,6 +22,8 @@ pub trait Claim: 'static + Clone + Serialize + DeserializeOwned {
 pub trait ClaimSet {
     type Error: fmt::Display;
 
+    fn contains<C: Claim>(&self) -> bool;
+
     fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error>;
 
     fn try_set<C: Claim>(&mut self, claim: C) -> Result<Result<(), C>, Self::Error>;

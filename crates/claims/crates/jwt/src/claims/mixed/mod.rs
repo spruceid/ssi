@@ -39,6 +39,10 @@ impl<T> JWTClaims<T> {
 impl<T: ClaimSet> ClaimSet for JWTClaims<T> {
     type Error = T::Error;
 
+    fn contains<C: Claim>(&self) -> bool {
+        ClaimSet::contains::<C>(&self.registered) || self.private.contains::<C>()
+    }
+
     fn try_get<C: Claim>(&self) -> Result<Option<Cow<C>>, Self::Error> {
         match InfallibleClaimSet::get(&self.registered) {
             Some(claim) => Ok(Some(claim)),

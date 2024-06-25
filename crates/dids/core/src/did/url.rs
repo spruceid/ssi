@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{borrow::Borrow, ops::Deref, str::FromStr, usize};
+use std::{borrow::Borrow, ops::Deref, str::FromStr};
 
 use crate::DIDBuf;
 
@@ -41,7 +41,7 @@ impl DIDURL {
             Ok(()) => Ok(unsafe {
                 // SAFETY: DID is a transparent wrapper over `[u8]`,
                 //         and we just checked that `data` is a DID URL.
-                std::mem::transmute(data)
+                std::mem::transmute::<&[u8], &Self>(data)
             }),
             Err(e) => Err(InvalidDIDURL(data, e)),
         }
@@ -56,7 +56,7 @@ impl DIDURL {
     pub unsafe fn new_unchecked(data: &[u8]) -> &Self {
         // SAFETY: DID URL is a transparent wrapper over `[u8]`,
         //         but we didn't check if it is actually a DID URL.
-        std::mem::transmute(data)
+        std::mem::transmute::<&[u8], &Self>(data)
     }
 
     pub fn as_iri(&self) -> &Iri {

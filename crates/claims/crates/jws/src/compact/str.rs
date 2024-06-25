@@ -21,7 +21,7 @@ impl CompactJWSStr {
 
     pub fn from_string(data: &str) -> Result<&Self, InvalidCompactJWS<&str>> {
         let inner = CompactJWS::new(data.as_bytes()).map_err(|_| InvalidCompactJWS(data))?;
-        Ok(unsafe { std::mem::transmute(inner) })
+        Ok(unsafe { std::mem::transmute::<&CompactJWS, &Self>(inner) })
     }
 
     /// Creates a new compact JWS without checking the data.
