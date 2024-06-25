@@ -4,13 +4,14 @@ use iref::UriBuf;
 use rdf_types::{Interpretation, Vocabulary, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
-    VerifiableClaims,
-    ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, InvalidClaims, Validate, ValidateProof, VerificationEnvironment
+    ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, InvalidClaims, Validate,
+    ValidateProof, VerifiableClaims, VerificationEnvironment,
 };
-use ssi_data_integrity::{ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject}, AnyProofs, AnySuite};
-use ssi_json_ld::{
-    CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader
+use ssi_data_integrity::{
+    ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject},
+    AnyProofs, AnySuite,
 };
+use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
 use ssi_vc::{
     json::{JsonCredentialTypes, RequiredCredentialType},
@@ -111,7 +112,8 @@ impl Expandable for BitstringStatusListCredential {
         I: Interpretation,
         V: VocabularyMut,
         V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
-        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V> {
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         CompactJsonLd(ssi_json_ld::syntax::to_value(self).unwrap())
             .expand_with(ld, loader)
             .await
@@ -232,8 +234,7 @@ where
             //     todo!()
             // }
             "application/vc+ld+json" => {
-                let vc =
-                    ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
+                let vc = ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
 
                 if !options.allow_unsecured || !vc.proofs.is_empty() {
                     vc.verify(verifier).await??;

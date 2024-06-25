@@ -1,6 +1,8 @@
 use std::{borrow::Cow, collections::BTreeMap};
 
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, Validate};
+use ssi_claims_core::{
+    ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, Validate,
+};
 
 use crate::{Claim, ClaimSet};
 

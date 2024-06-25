@@ -179,12 +179,7 @@ async fn create_bitstream_status_list(
             let suite = AnySuite::pick(&jwk, Some(&verification_method)).unwrap();
             let params = ProofOptions::from_method(verification_method);
             let vc = suite
-                .sign(
-                    credential,
-                    &resolver,
-                    &signer,
-                    params,
-                )
+                .sign(credential, &resolver, &signer, params)
                 .await
                 .unwrap();
 

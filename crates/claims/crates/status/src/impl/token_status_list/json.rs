@@ -144,7 +144,11 @@ impl<E, P> Validate<E, P> for StatusListJwtPrivateClaims {
 }
 
 impl<E> ValidateJWSHeader<E> for StatusListJwtPrivateClaims {
-    fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ssi_claims_core::ClaimsValidity {
+    fn validate_jws_header(
+        &self,
+        _env: &E,
+        _header: &ssi_jws::Header,
+    ) -> ssi_claims_core::ClaimsValidity {
         Ok(())
     }
 }

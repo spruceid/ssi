@@ -1,6 +1,7 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
 use ssi_claims_core::{
-    ClaimsValidity, DefaultVerificationEnvironment, InvalidProof, ProofValidationError, ProofValidity, Validate, ValidateProof, VerifiableClaims
+    ClaimsValidity, DefaultVerificationEnvironment, InvalidProof, ProofValidationError,
+    ProofValidity, Validate, ValidateProof, VerifiableClaims,
 };
 use ssi_jwk::{Algorithm, JWK};
 use std::{

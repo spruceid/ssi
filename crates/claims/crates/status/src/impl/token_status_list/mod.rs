@@ -514,7 +514,8 @@ impl<V: JWSVerifier> FromBytes<V> for AnyStatusListEntrySet {
                 jwt.verify(verifier).await??;
 
                 Ok(Self::Json(
-                    jwt.signing_bytes.payload
+                    jwt.signing_bytes
+                        .payload
                         .try_get::<json::Status>()?
                         .ok_or(EntrySetFromBytesError::MissingStatus)?
                         .into_owned(),
