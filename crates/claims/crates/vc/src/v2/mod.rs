@@ -9,7 +9,7 @@ mod data_model;
 pub mod syntax;
 
 pub use data_model::*;
-pub use syntax::{Context, JsonCredential, JsonCredentialTypes};
+pub use syntax::{Context, JsonCredential, JsonCredentialTypes, SpecializedJsonCredential};
 
 /// JSON-LD context IRI.
 pub const CREDENTIALS_V2_CONTEXT_IRI: &Iri =

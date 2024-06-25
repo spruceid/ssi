@@ -487,7 +487,7 @@ mod tests {
         let did = DIDEthr::generate(&key).unwrap();
         eprintln!("did: {}", did);
 
-        let cred: JsonCredential = JsonCredential::new(
+        let cred = JsonCredential::new(
             None,
             did.clone().into_uri().into(),
             "2021-02-18T20:23:13Z".parse().unwrap(),

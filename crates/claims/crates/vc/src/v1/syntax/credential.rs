@@ -29,13 +29,22 @@ impl TypeSerializationPolicy for CredentialType {
 
 pub type JsonCredentialTypes<T = ()> = Types<CredentialType, T>;
 
-/// Specialized JSON Credential.
+/// JSON Credential, without required context nor type.
+///
+/// If you care about required context and/or type, use the
+/// [`SpecializedJsonCredential`] type directly.
+pub type JsonCredential<S = json_syntax::Value> = SpecializedJsonCredential<S>;
+
+/// Specialized JSON Credential with custom required context and type.
+///
+/// If you don't care about required context and/or type, you can use the
+/// [`JsonCredential`] type alias instead.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(bound(
     serialize = "S: Serialize",
     deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct JsonCredential<S = json_syntax::Value, C = (), T = ()> {
+pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,
@@ -118,7 +127,8 @@ pub struct JsonCredential<S = json_syntax::Value, C = (), T = ()> {
     pub additional_properties: BTreeMap<String, json_syntax::Value>,
 }
 
-impl<S, C: RequiredContextList, T: RequiredTypeSet> JsonCredential<S, C, T> {
+impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S, C, T> {
+    /// Creates a new credential.
     pub fn new(
         id: Option<UriBuf>,
         issuer: IdOr<IdentifiedObject>,
@@ -143,19 +153,19 @@ impl<S, C: RequiredContextList, T: RequiredTypeSet> JsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T> JsonLdObject for JsonCredential<S, C, T> {
+impl<S, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
-impl<S, C, T> JsonLdNodeObject for JsonCredential<S, C, T> {
+impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
     fn json_ld_type(&self) -> JsonLdTypes {
         self.types.to_json_ld_types()
     }
 }
 
-impl<S, C, T, E, P> Validate<E, P> for JsonCredential<S, C, T>
+impl<S, C, T, E, P> Validate<E, P> for SpecializedJsonCredential<S, C, T>
 where
     E: DateTimeEnvironment,
 {
@@ -164,7 +174,7 @@ where
     }
 }
 
-impl<S, C, T> crate::v1::Credential for JsonCredential<S, C, T> {
+impl<S, C, T> crate::v1::Credential for SpecializedJsonCredential<S, C, T> {
     type Subject = S;
     type Issuer = IdOr<IdentifiedObject>;
     type Status = IdentifiedTypedObject;
@@ -218,7 +228,7 @@ impl<S, C, T> crate::v1::Credential for JsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T> ssi_json_ld::Expandable for JsonCredential<S, C, T>
+impl<S, C, T> ssi_json_ld::Expandable for SpecializedJsonCredential<S, C, T>
 where
     S: Serialize,
 {

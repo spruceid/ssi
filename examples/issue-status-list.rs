@@ -2,8 +2,9 @@
 // cargo run --example issue-status-list > tests/statusList.json
 use ssi::{
     claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
+        data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::v1::revocation::{StatusList2021, StatusList2021Credential, StatusList2021Subject},
+        VerifiableClaims,
     },
     jwk::JWK,
     verification_methods::SingleSecretSigner,

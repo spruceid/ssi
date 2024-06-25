@@ -20,7 +20,7 @@ pub trait ToJwtClaims {
     fn to_jwt_claims(&self) -> Result<RegisteredClaims, Self::Error>;
 }
 
-impl<S> FromJwtClaims for DataIntegrity<super::JsonCredential, S>
+impl<S> FromJwtClaims for DataIntegrity<super::SpecializedJsonCredential, S>
 where
     S: CryptographicSuite + TryFrom<ssi_data_integrity::Type>,
     S::VerificationMethod: DeserializeOwned,
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<S: CryptographicSuite> ToJwtClaims for DataIntegrity<super::JsonCredential, S>
+impl<S: CryptographicSuite> ToJwtClaims for DataIntegrity<super::SpecializedJsonCredential, S>
 where
     S::VerificationMethod: Serialize,
     S::ProofOptions: Serialize,
@@ -55,7 +55,7 @@ where
     }
 }
 
-impl ToJwtClaims for super::JsonCredential {
+impl ToJwtClaims for super::SpecializedJsonCredential {
     type Error = JwtVcEncodeError;
 
     /// Encodes this credential into the claims of a JWT following the standard

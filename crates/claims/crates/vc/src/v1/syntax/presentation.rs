@@ -10,7 +10,7 @@ use ssi_claims_core::{ClaimsValidity, Validate};
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment};
 
-use super::JsonCredential;
+use super::SpecializedJsonCredential;
 
 pub const VERIFIABLE_PRESENTATION_TYPE: &str = "VerifiablePresentation";
 
@@ -32,7 +32,7 @@ pub type JsonPresentationTypes<T = ()> = Types<PresentationType, T>;
     serialize = "C: serde::Serialize",
     deserialize = "C: serde::Deserialize<'de>"
 ))]
-pub struct JsonPresentation<C = JsonCredential> {
+pub struct JsonPresentation<C = SpecializedJsonCredential> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context,

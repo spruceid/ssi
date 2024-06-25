@@ -49,7 +49,7 @@ pub use ssi_data_integrity as data_integrity;
 #[educe(Debug(bound("S: DebugCryptographicSuite")))]
 pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     /// JSON-like verifiable credential.
-    Credential(DataIntegrity<vc::v1::JsonCredential, S>),
+    Credential(DataIntegrity<vc::v1::SpecializedJsonCredential, S>),
 
     /// JSON Web Signature.
     Jws(jws::CompactJWSString),

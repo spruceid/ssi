@@ -18,7 +18,7 @@ mod v2021;
 pub use v2020::*;
 pub use v2021::*;
 
-use super::JsonCredential;
+use super::SpecializedJsonCredential;
 
 /// Minimum length of a revocation list bit-string.
 ///
@@ -232,7 +232,7 @@ pub trait CredentialStatus {
     #[allow(async_fn_in_trait)]
     async fn check(
         &self,
-        credential: &AnyDataIntegrity<JsonCredential>,
+        credential: &AnyDataIntegrity<SpecializedJsonCredential>,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
     ) -> Result<StatusCheck, StatusCheckError>;
 }

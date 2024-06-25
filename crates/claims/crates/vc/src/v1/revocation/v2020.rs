@@ -16,7 +16,7 @@ use crate::{
     syntax::RequiredType,
     v1::{
         revocation::{load_resource, Reason, StatusCheckError},
-        JsonCredential, RequiredContext,
+        RequiredContext, SpecializedJsonCredential,
     },
 };
 
@@ -55,7 +55,7 @@ impl RequiredType for RevocationList2020CredentialType {
 /// Verifiable Credential of type RevocationList2020Credential.
 ///
 /// <https://w3c-ccg.github.io/vc-status-rl-2020/#revocationlist2020credential>
-pub type RevocationList2020Credential = JsonCredential<
+pub type RevocationList2020Credential = SpecializedJsonCredential<
     RevocationList2020Subject,
     RevocationList2020Context,
     RevocationList2020CredentialType,
@@ -110,7 +110,7 @@ impl CredentialStatus for RevocationList2020Status {
     /// [1]: https://w3c-ccg.github.io/vc-status-rl-2020/#validate-algorithm
     async fn check(
         &self,
-        credential: &AnyDataIntegrity<JsonCredential>,
+        credential: &AnyDataIntegrity<SpecializedJsonCredential>,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
     ) -> Result<StatusCheck, StatusCheckError> {
         use bitvec::prelude::*;

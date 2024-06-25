@@ -249,7 +249,7 @@ mod tests {
             proxy.replace(Some(url));
         });
 
-        let cred: JsonCredential = JsonCredential::new(
+        let cred = JsonCredential::new(
             None,
             did!("did:web:localhost").to_owned().into_uri().into(),
             "2021-01-26T16:57:27Z".parse().unwrap(),

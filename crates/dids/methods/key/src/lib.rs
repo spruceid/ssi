@@ -655,7 +655,7 @@ mod tests {
         let key = JWK::generate_ed25519_from(&mut rng).unwrap();
         let did = DIDKey::generate(&key).unwrap();
 
-        let cred: JsonCredential = JsonCredential::new(
+        let cred = JsonCredential::new(
             Some(uri!("http://example.org/credentials/3731").to_owned()),
             did.clone().into_uri().into(),
             "2020-08-19T21:41:50Z".parse().unwrap(),
@@ -708,7 +708,7 @@ mod tests {
         let key = JWK::generate_secp256k1_from(&mut rng).unwrap();
         let did = DIDKey::generate(&key).unwrap();
 
-        let cred: JsonCredential = JsonCredential::new(
+        let cred = JsonCredential::new(
             None,
             did.clone().into_uri().into(),
             "2021-02-18T20:17:46Z".parse().unwrap(),
@@ -761,7 +761,7 @@ mod tests {
         let key = JWK::generate_p256_from(&mut rng);
         let did = DIDKey::generate(&key).unwrap();
 
-        let cred: JsonCredential = JsonCredential::new(
+        let cred = JsonCredential::new(
             None,
             did.clone().into_uri().into(),
             "2021-02-18T20:17:46Z".parse().unwrap(),

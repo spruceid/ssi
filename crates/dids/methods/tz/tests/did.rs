@@ -217,7 +217,7 @@ async fn credential_prove_verify_did_tz1() {
     )));
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
-    let vc = DataIntegrity::<JsonCredential, _>::new(
+    let vc = DataIntegrity::new(
         JsonCredential::new(
             None,
             did.clone().into_uri().into(),
@@ -322,7 +322,7 @@ async fn credential_prove_verify_did_tz2() {
     key.algorithm = Some(Algorithm::ES256KR);
     let did = DIDTZ.generate(&key).unwrap();
 
-    let cred: JsonCredential = JsonCredential::new(
+    let cred = JsonCredential::new(
         None,
         did.clone().into_uri().into(),
         "2021-02-18T20:23:13Z".parse().unwrap(),
@@ -417,7 +417,7 @@ async fn credential_prove_verify_did_tz3() {
     key.algorithm = Some(Algorithm::ESBlake2b);
     let did = DIDTZ.generate(&key).unwrap();
 
-    let cred: JsonCredential = JsonCredential::new(
+    let cred = JsonCredential::new(
         None,
         did.clone().into_uri().into(),
         "2021-03-04T14:18:21Z".parse().unwrap(),
