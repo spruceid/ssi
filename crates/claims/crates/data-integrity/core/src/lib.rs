@@ -6,6 +6,7 @@ use std::ops::{Deref, DerefMut};
 pub mod canonicalization;
 mod de;
 mod decode;
+mod document;
 pub mod hashing;
 mod options;
 mod proof;
@@ -23,6 +24,7 @@ pub use suite::{
     DeserializeCryptographicSuite, SerializeCryptographicSuite, StandardCryptographicSuite,
 };
 
+pub use document::*;
 #[doc(hidden)]
 pub use ssi_rdf;
 

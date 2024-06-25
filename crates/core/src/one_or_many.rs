@@ -56,6 +56,13 @@ impl<T> OneOrMany<T> {
         }
     }
 
+    pub fn as_slice(&self) -> &[T] {
+        match self {
+            Self::One(t) => std::slice::from_ref(t),
+            Self::Many(l) => l.as_slice(),
+        }
+    }
+
     pub fn first(&self) -> Option<&T> {
         match self {
             Self::One(value) => Some(value),
