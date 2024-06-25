@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use ssi::{
     claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
+        data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::SpecializedJsonCredential,
     },
     dids::{DIDResolver, DIDJWK},
@@ -41,7 +41,6 @@ fn data_integrity_sign_is_send() {
 
     assert_send(cryptosuite.sign(
         credential,
-        AnyInputContext::default(),
         &vm_resolver,
         &signer,
         ProofOptions::from_method(verification_method),

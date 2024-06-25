@@ -1,6 +1,8 @@
 use serde::Serialize;
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Proof, Validate};
-use ssi_jws::JWSPayload;
+use ssi_claims_core::{
+    ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, Validate,
+};
+use ssi_jws::{JWSPayload, ValidateJWSHeader};
 use std::borrow::Cow;
 
 use super::{Claim, InfallibleClaimSet, RegisteredClaims};
@@ -75,12 +77,25 @@ impl<T: Serialize> JWSPayload for JWTClaims<T> {
     }
 }
 
-impl<T: ClaimSet + Validate<E, P>, E, P: Proof> Validate<E, P> for JWTClaims<T>
+impl<T, E> ValidateJWSHeader<E> for JWTClaims<T> {
+    fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ClaimsValidity {
+        Ok(())
+    }
+}
+
+impl<T: ClaimSet + Validate<E, P>, E, P> Validate<E, P> for JWTClaims<T>
 where
     E: DateTimeEnvironment,
 {
-    fn validate(&self, env: &E, proof: &P::Prepared) -> ClaimsValidity {
+    fn validate(&self, env: &E, proof: &P) -> ClaimsValidity {
         Validate::<E, P>::validate(&self.registered, env, proof)?;
         self.private.validate(env, proof)
     }
+}
+
+impl<T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for JWTClaims<T>
+where
+    T::Environment: DateTimeEnvironment,
+{
+    type Environment = T::Environment;
 }

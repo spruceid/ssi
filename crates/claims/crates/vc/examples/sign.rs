@@ -1,10 +1,12 @@
 //! This example shows how to sign and verify a custom credential type crafted
 //! with TreeLDR, using the `Ed25519Signature2020` cryptographic suite.
 use iref::{Iri, IriBuf, Uri, UriBuf};
+use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rand_chacha::rand_core::SeedableRng;
-use ssi_claims_core::Proof;
+use ssi_claims_core::VerifiableClaims;
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuite, ProofOptions};
-use ssi_rdf::Expandable;
+use ssi_json_ld::{Expandable, Loader};
+use ssi_rdf::{Interpretation, LdEnvironment, VocabularyMut};
 use ssi_verification_methods::{
     Controller, ControllerError, ControllerProvider, Ed25519VerificationKey2020, MethodWithSecret,
     ProofPurpose, ProofPurposes, ReferenceOrOwnedRef, Signer, VerificationMethod,
@@ -37,7 +39,7 @@ pub struct Credential {
 }
 
 impl ssi_json_ld::JsonLdObject for Credential {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
@@ -48,11 +50,11 @@ impl ssi_json_ld::JsonLdNodeObject for Credential {
     }
 }
 
-impl<E, P: Proof> ssi_claims_core::Validate<E, P> for Credential
+impl<E, P> ssi_claims_core::Validate<E, P> for Credential
 where
     E: ssi_claims_core::DateTimeEnvironment,
 {
-    fn validate(&self, env: &E, _proof: &P::Prepared) -> ssi_claims_core::ClaimsValidity {
+    fn validate(&self, env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
         ssi_vc::Credential::validate_credential(self, env)
     }
 }
@@ -79,11 +81,26 @@ impl ssi_vc::Credential for Credential {
     }
 }
 
-impl<E> Expandable<E> for Credential {
+impl Expandable for Credential {
     type Error = std::convert::Infallible;
-    type Expanded = Self;
+    type Expanded<I, V> = Self
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
-    async fn expand(&self, _environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+    async fn expand_with<I, V>(
+        &self,
+        _ld: &mut LdEnvironment<V, I>,
+        _loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         Ok(self.clone())
     }
 }
@@ -148,15 +165,9 @@ async fn main() {
         (),
     );
 
-    // We use the Linked-Data-based cryptographic suite `Ed25519Signature2020`.
-    // Linked-Data means that our credential will be projected into an RDF
-    // dataset. We define here the vocabulary and interpretation for the RDF
-    // dataset.
-    let rdf = ssi_json_ld::JsonLdEnvironment::default();
-
     // Sign the credential.
     let verifiable_credential = Ed25519Signature2020
-        .sign(credential, rdf, &keyring, &keyring, proof_options.clone())
+        .sign(credential, &keyring, &keyring, proof_options.clone())
         .await
         .expect("signing failed");
 

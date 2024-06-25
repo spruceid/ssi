@@ -86,7 +86,7 @@
 //! let vc = any_credential_from_json_str(
 //!   &std::fs::read_to_string("examples/files/vc.jsonld")
 //!   .expect("unable to load VC")
-//! ).await.expect("invalid VC");
+//! ).expect("invalid VC");
 //!
 //! // Setup a verification method resolver, in charge of retrieving the
 //! // public key used to sign the JWT.
@@ -205,7 +205,6 @@
 //!
 //! let vc = cryptosuite.sign(
 //!   credential,
-//!   AnyInputContext::default(),
 //!   &vm_resolver,
 //!   &signer,
 //!   ProofOptions::from_method(verification_method)

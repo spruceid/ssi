@@ -18,10 +18,7 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-use super::{
-    ClaimsPreparationError, ConfigurationAlgorithm, CryptographicSuiteInstance,
-    CryptographicSuiteSigning, CryptographicSuiteVerification,
-};
+use super::{ConfigurationAlgorithm, CryptographicSuiteSigning, CryptographicSuiteVerification};
 
 // mod test_bbs;
 
@@ -56,7 +53,7 @@ pub trait StandardCryptographicSuite: Clone {
     #[allow(async_fn_in_trait)]
     async fn transform<T, C>(
         &self,
-        context: &mut C,
+        context: &C,
         unsecured_document: &T,
         options: ProofConfigurationRef<'_, Self>,
     ) -> Result<TransformedData<Self>, TransformationError>
@@ -101,19 +98,25 @@ impl<S: StandardCryptographicSuite> CryptographicSuite for S {
     }
 }
 
-impl<S: StandardCryptographicSuite, R, T> CryptographicSuiteSigning<R, T> for S
+impl<C, E, R, T, S: StandardCryptographicSuite> CryptographicSuiteSigning<C, E, R, T> for S
 where
     R: VerificationMethodResolver<Method = Self::VerificationMethod>,
     T: Signer<<Self as StandardCryptographicSuite>::VerificationMethod>,
+    S::Transformation: TypedTransformationAlgorithm<Self, C, E>,
     S::SignatureAlgorithm: SignatureAlgorithm<S, T::MessageSigner>,
 {
-    async fn sign_prepared_claims(
+    async fn generate_signature(
         &self,
+        context: &E,
         resolver: R,
         signers: T,
-        prepared_claims: &Self::PreparedClaims,
+        claims: &C,
         proof_configuration: ProofConfigurationRef<'_, Self>,
     ) -> Result<Self::Signature, SignatureError> {
+        let transformed = self.transform(context, claims, proof_configuration).await?;
+
+        let hashed = self.hash(transformed, proof_configuration)?;
+
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
         };
@@ -133,21 +136,29 @@ where
             .await
             .ok_or(SignatureError::MissingSigner)?;
 
-        S::SignatureAlgorithm::sign(&method, signer, prepared_claims, proof_configuration).await
+        S::SignatureAlgorithm::sign(&method, signer, hashed, proof_configuration).await
     }
 }
 
-impl<S: StandardCryptographicSuite, V> CryptographicSuiteVerification<V> for S
+impl<S: StandardCryptographicSuite, C, E, V> CryptographicSuiteVerification<C, E, V> for S
 where
     V: VerificationMethodResolver<Method = S::VerificationMethod>,
+    S::Transformation: TypedTransformationAlgorithm<Self, C, E>,
     S::SignatureAlgorithm: VerificationAlgorithm<S>,
 {
-    async fn verify_prepared_claims(
+    async fn verify_proof(
         &self,
+        context: &E,
         verifier: &V,
-        prepared_claims: &Self::PreparedClaims,
+        claims: &C,
         proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, ProofValidationError> {
+        let proof_configuration = proof.configuration();
+
+        let transformed = self.transform(context, claims, proof_configuration).await?;
+
+        let hashed = self.hash(transformed, proof_configuration)?;
+
         let options = ssi_verification_methods_core::ResolutionOptions {
             accept: Some(Box::new(Self::VerificationMethod::type_set())),
         };
@@ -157,27 +168,6 @@ where
             .resolve_verification_method_with(None, Some(proof.verification_method), options)
             .await?;
 
-        S::SignatureAlgorithm::verify(&method, prepared_claims, proof)
-    }
-}
-
-impl<S: StandardCryptographicSuite, T, C> CryptographicSuiteInstance<T, C> for S
-where
-    S::Transformation: TypedTransformationAlgorithm<S, T, C>,
-{
-    async fn prepare_claims(
-        &self,
-        context: &mut C,
-        unsecured_document: &T,
-        proof_configuration: ProofConfigurationRef<'_, Self>,
-    ) -> Result<Self::PreparedClaims, ClaimsPreparationError> {
-        // Transform unsecured document.
-        let transformed = self
-            .transform(context, unsecured_document, proof_configuration)
-            .await?;
-
-        // Hashing.
-        self.hash(transformed, proof_configuration)
-            .map_err(Into::into)
+        S::SignatureAlgorithm::verify(&method, hashed, proof)
     }
 }

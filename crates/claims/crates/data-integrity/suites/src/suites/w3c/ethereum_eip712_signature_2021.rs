@@ -15,7 +15,7 @@ use ssi_data_integrity_core::{
     CryptographicSuite, ProofConfigurationRef, ProofRef, SerializeCryptographicSuite,
     StandardCryptographicSuite, TypeRef,
 };
-use ssi_eip712::Value;
+use ssi_eip712::{Eip712TypesEnvironment, TypesProvider, Value};
 use ssi_jwk::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
@@ -28,11 +28,11 @@ use static_iref::{iri, iri_ref};
 pub mod v0_1;
 pub use v0_1::EthereumEip712Signature2021v0_1;
 
-use crate::eip712::{Eip712Hashing, Eip712Signature, Input, TypesOrURI, TypesProvider};
+use crate::eip712::{Eip712Hashing, Eip712Signature, Input, TypesOrURI};
 
 lazy_static! {
-    static ref PROOF_CONTEXT: json_ld::syntax::ContextEntry = {
-        json_ld::syntax::ContextEntry::IriRef(
+    static ref PROOF_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
+        ssi_json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://w3id.org/security/suites/eip712sig-2021/v1").to_owned(),
         )
     };
@@ -41,9 +41,9 @@ lazy_static! {
 #[derive(Default)]
 pub struct Eip712Sig2021v1Context;
 
-impl From<Eip712Sig2021v1Context> for json_ld::syntax::Context {
+impl From<Eip712Sig2021v1Context> for ssi_json_ld::syntax::Context {
     fn from(_: Eip712Sig2021v1Context) -> Self {
-        json_ld::syntax::Context::One(PROOF_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(PROOF_CONTEXT.clone())
     }
 }
 
@@ -269,10 +269,10 @@ where
     S: SerializeCryptographicSuite,
     S::ProofOptions: AnyEip712Options,
     T: Serialize,
-    C: TypesProvider,
+    C: Eip712TypesEnvironment,
 {
     async fn transform(
-        context: &mut C,
+        context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Output, ssi_data_integrity_core::suite::standard::TransformationError> {
@@ -280,6 +280,7 @@ where
             Some(TypesOrURI::Object(types)) => Some(types.clone()),
             Some(TypesOrURI::URI(uri)) => Some(
                 context
+                    .eip712_types()
                     .fetch_types(uri)
                     .await
                     .map_err(TransformationError::internal)?,
@@ -323,7 +324,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         _proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         // ssi_jwk::algorithm::AnyESKeccakK
@@ -343,7 +344,7 @@ where
 {
     fn verify(
         method: &<S as CryptographicSuite>::VerificationMethod,
-        prepared_claims: &<S as CryptographicSuite>::PreparedClaims,
+        prepared_claims: <S as CryptographicSuite>::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = proof.signature.decode()?;

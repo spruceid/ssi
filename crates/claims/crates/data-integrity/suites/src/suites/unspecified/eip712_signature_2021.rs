@@ -1,12 +1,6 @@
 //! EIP-712 Signature 2021 implementation.
 use crate::eip712::{Eip712Hashing, Eip712Signature};
-use linked_data::LinkedData;
-use rdf_types::{
-    interpretation::{
-        ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseLiteralInterpretation,
-    },
-    InterpretationMut, LexicalQuad, Quad, Vocabulary,
-};
+use rdf_types::{LexicalQuad, Quad};
 use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
 use ssi_data_integrity_core::{
     suite::{
@@ -16,11 +10,10 @@ use ssi_data_integrity_core::{
         },
         AddProofContext,
     },
-    ConfigurationExpandingEnvironment, CryptographicSuite, ProofConfigurationRef,
-    StandardCryptographicSuite, TypeRef,
+    CryptographicSuite, ProofConfigurationRef, StandardCryptographicSuite, TypeRef,
 };
-use ssi_json_ld::JsonLdNodeObject;
-use ssi_rdf::{AnyLdEnvironment, Expandable, NQuadsStatement};
+use ssi_json_ld::{ContextLoaderEnvironment, Expandable, JsonLdNodeObject};
+use ssi_rdf::{AnyLdEnvironment, LdEnvironment, NQuadsStatement};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
     verification_method_union, AnyMethod, EcdsaSecp256k1RecoveryMethod2020,
@@ -29,7 +22,7 @@ use ssi_verification_methods::{
 use static_iref::iri;
 
 lazy_static::lazy_static! {
-    pub static ref EIP712VM_CONTEXT: json_ld::syntax::ContextEntry = {
+    pub static ref EIP712VM_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         let context_str = ssi_contexts::EIP712VM;
         serde_json::from_str(context_str).unwrap()
     };
@@ -38,9 +31,9 @@ lazy_static::lazy_static! {
 #[derive(Default)]
 pub struct Eip712VmContext;
 
-impl From<Eip712VmContext> for json_ld::syntax::Context {
+impl From<Eip712VmContext> for ssi_json_ld::syntax::Context {
     fn from(_: Eip712VmContext) -> Self {
-        json_ld::syntax::Context::One(EIP712VM_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(EIP712VM_CONTEXT.clone())
     }
 }
 
@@ -110,28 +103,24 @@ impl TransformationAlgorithm<Eip712Signature2021> for Eip712Transformation {
     type Output = ssi_eip712::TypedData;
 }
 
-impl<T, C, V, I> TypedTransformationAlgorithm<Eip712Signature2021, T, C> for Eip712Transformation
+impl<T, C> TypedTransformationAlgorithm<Eip712Signature2021, T, C> for Eip712Transformation
 where
-    T: Expandable<C> + JsonLdNodeObject,
-    T::Expanded: LinkedData<I, V>,
-    C: AnyLdEnvironment<Vocabulary = V, Interpretation = I> + ConfigurationExpandingEnvironment,
-    V: Vocabulary,
-    I: InterpretationMut<V>
-        + ReverseIriInterpretation<Iri = V::Iri>
-        + ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + ReverseLiteralInterpretation<Literal = V::Literal>,
+    T: Expandable + JsonLdNodeObject,
+    C: ContextLoaderEnvironment,
 {
     async fn transform(
-        context: &mut C,
+        context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
     ) -> Result<ssi_eip712::TypedData, TransformationError> {
+        let mut ld = LdEnvironment::default();
+
         let expanded = data
-            .expand(context)
+            .expand_with(&mut ld, context.loader())
             .await
             .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?;
 
-        let claims = context
+        let claims = ld
             .canonical_quads_of(&expanded)
             .map_err(TransformationError::JsonLdDeserialization)?;
 
@@ -258,7 +247,7 @@ where
     async fn sign(
         verification_method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
         signer: T,
-        prepared_claims: &<Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
+        prepared_claims: <Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
         _proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         Eip712Signature::sign(
@@ -273,7 +262,7 @@ where
 impl VerificationAlgorithm<Eip712Signature2021> for Eip712SignatureAlgorithm {
     fn verify(
         method: &<Eip712Signature2021 as CryptographicSuite>::VerificationMethod,
-        prepared_claims: &<Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
+        prepared_claims: <Eip712Signature2021 as CryptographicSuite>::PreparedClaims,
         proof: ssi_data_integrity_core::ProofRef<Eip712Signature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let signature_bytes = proof.signature.decode()?;

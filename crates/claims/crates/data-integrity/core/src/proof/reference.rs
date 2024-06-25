@@ -5,7 +5,7 @@ use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwnedRef};
 use crate::{CryptographicSuite, ProofConfigurationRef};
 
 pub struct ProofRef<'a, S: CryptographicSuite> {
-    pub context: Option<&'a json_ld::syntax::Context>,
+    pub context: Option<&'a ssi_json_ld::syntax::Context>,
 
     pub type_: &'a S,
 

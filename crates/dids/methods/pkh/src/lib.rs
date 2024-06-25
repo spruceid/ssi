@@ -747,7 +747,7 @@ impl DIDPKH {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_claims::{data_integrity::AnyInputContext, Verifiable};
+    use ssi_claims::VerifiableClaims;
     use ssi_dids_core::{did, resolution::ErrorKind, DIDResolver, VerificationMethodDIDResolver};
 
     #[cfg(all(feature = "eip", feature = "tezos"))]
@@ -999,46 +999,30 @@ mod tests {
         eprintln!("key: {key}");
         eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
-            .sign(
-                cred.clone(),
-                AnyInputContext::default(),
-                &didpkh,
-                &signer,
-                issue_options.clone(),
-            )
+            .sign(cred.clone(), &didpkh, &signer, issue_options.clone())
             .await
             .unwrap();
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         assert!(vc.verify(&didpkh).await.unwrap().is_ok());
 
         // Test that issuer property is used for verification.
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
+
         // It should fail.
         assert!(vc_bad_issuer.verify(&didpkh).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = proof_suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &didpkh,
-                &wrong_signer,
-                issue_options,
-            )
+            .sign(cred, &didpkh, &wrong_signer, issue_options)
             .await
             .unwrap();
         assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_err());
 
         // Mess with proof signature to make verify fail.
         let mut vc_fuzzed = vc.clone();
-        vc_fuzzed.proof.first_mut().unwrap().signature.alter();
+        vc_fuzzed.proofs.first_mut().unwrap().signature.alter();
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
@@ -1064,13 +1048,7 @@ mod tests {
             serde_json::to_string_pretty(&presentation).unwrap()
         );
         let vp = proof_suite
-            .sign(
-                presentation,
-                AnyInputContext::default(),
-                &didpkh,
-                &signer,
-                vp_issue_options,
-            )
+            .sign(presentation, &didpkh, &signer, vp_issue_options)
             .await
             .unwrap();
 
@@ -1079,18 +1057,14 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        vp_fuzzed.proof.first_mut().unwrap().signature.alter();
+        vp_fuzzed.proofs.first_mut().unwrap().signature.alter();
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Test that holder is verified.
-        let vp_bad_holder =
-            Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-                pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
-                pres
-            })
-            .await
-            .unwrap();
+        let mut vp_bad_holder = vp.clone();
+        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
+
         // It should fail.
         assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_err());
     }
@@ -1109,6 +1083,7 @@ mod tests {
                 signing::AlterSignature, AnyInputSuiteOptions, CryptographicSuite, ProofOptions,
             },
             vc::{JsonCredential, JsonPresentation},
+            VerifiableClaims,
         };
         use ssi_verification_methods_core::{ProofPurpose, SingleSecretSigner};
         use static_iref::uri;
@@ -1140,45 +1115,28 @@ mod tests {
         eprintln!("key: {key}");
         eprintln!("suite: {proof_suite:?}");
         let vc = proof_suite
-            .sign(
-                cred.clone(),
-                AnyInputContext::default(),
-                &didpkh,
-                &signer,
-                issue_options.clone(),
-            )
+            .sign(cred.clone(), &didpkh, &signer, issue_options.clone())
             .await
             .unwrap();
         println!("VC: {}", serde_json::to_string_pretty(&vc).unwrap());
         assert!(vc.verify(&didpkh).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
-        let vc_bad_issuer =
-            Verifiable::tamper(vc.clone(), AnyInputContext::default(), |mut cred| {
-                cred.issuer = uri!("did:pkh:example:bad").to_owned().into();
-                cred
-            })
-            .await
-            .unwrap();
+        let mut vc_bad_issuer = vc.clone();
+        vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
         assert!(!vc_bad_issuer.verify(&didpkh).await.unwrap().is_ok());
 
         // Check that proof JWK must match proof verificationMethod.
         let wrong_signer = SingleSecretSigner::new(wrong_key.clone()).into_local();
         let vc_wrong_key = proof_suite
-            .sign(
-                cred,
-                AnyInputContext::default(),
-                &didpkh,
-                &wrong_signer,
-                issue_options,
-            )
+            .sign(cred, &didpkh, &wrong_signer, issue_options)
             .await
             .unwrap();
         assert!(vc_wrong_key.verify(&didpkh).await.unwrap().is_err());
 
         // Mess with proof signature to make verify fail
         let mut vc_fuzzed = vc.clone();
-        vc_fuzzed.proof.first_mut().unwrap().signature.alter();
+        vc_fuzzed.proofs.first_mut().unwrap().signature.alter();
         let vc_fuzzed_result = vc_fuzzed.verify(&didpkh).await;
         assert!(vc_fuzzed_result.is_err() || vc_fuzzed_result.is_ok_and(|v| v.is_err()));
 
@@ -1197,13 +1155,7 @@ mod tests {
         );
 
         let vp = proof_suite
-            .sign(
-                presentation,
-                AnyInputContext::default(),
-                &didpkh,
-                &signer,
-                vp_issue_options,
-            )
+            .sign(presentation, &didpkh, &signer, vp_issue_options)
             .await
             .unwrap();
 
@@ -1212,18 +1164,13 @@ mod tests {
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
-        vp_fuzzed.proof.first_mut().unwrap().signature.alter();
+        vp_fuzzed.proofs.first_mut().unwrap().signature.alter();
         let vp_fuzzed_result = vp_fuzzed.verify(&didpkh).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // Test that holder is verified.
-        let vp_bad_holder =
-            Verifiable::tamper(vp.clone(), AnyInputContext::default(), |mut pres| {
-                pres.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
-                pres
-            })
-            .await
-            .unwrap();
+        let mut vp_bad_holder = vp.clone();
+        vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
         // It should fail.
         assert!(vp_bad_holder.verify(&didpkh).await.unwrap().is_err());
     }
@@ -1556,9 +1503,7 @@ mod tests {
         eprintln!("test verify vc `{name}`");
         eprintln!("input: {vc_str}");
 
-        let vc = ssi_claims::vc::any_credential_from_json_str(vc_str)
-            .await
-            .unwrap();
+        let vc = ssi_claims::vc::any_credential_from_json_str(vc_str).unwrap();
 
         let didpkh = VerificationMethodDIDResolver::new(DIDPKH);
         let verification_result = vc.verify(&didpkh).await.unwrap();
@@ -1567,51 +1512,38 @@ mod tests {
         // // assert_eq!(verification_result.warnings.len(), num_warnings); // TODO warnings
 
         // Negative test: tamper with the VC and watch verification fail.
-        let bad_vc = Verifiable::tamper_with_proofs(
-            vc.clone(),
-            AnyInputContext::default(),
-            |mut cred| {
-                cred.additional_properties
-                    .insert("http://example.org/foo".into(), "bar".into());
-                cred
-            },
-            |mut proofs| {
-                for proof in &mut proofs {
-                    // Add the `foo` field to the EIP712 VC schema if necessary.
-                    // This is required so hashing can succeed.
-                    if let Some(eip712) = proof.options.eip712_mut() {
-                        if let Some(
-                            ssi_claims::data_integrity::suites::eip712::TypesOrURI::Object(types),
-                        ) = &mut eip712.types
-                        {
-                            let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
-                            vc_schema.push(ssi_eip712::MemberVariable::new(
-                                "http://example.org/foo".to_owned(),
-                                ssi_eip712::TypeRef::String,
-                            ));
-                        }
-                    }
-
-                    // Same as above but for the legacy EIP712 cryptosuite (v0.1).
-                    if let Some(eip712) = proof.options.eip712_v0_1_mut() {
-                        if let Some(
-                            ssi_claims::data_integrity::suites::eip712::TypesOrURI::Object(types),
-                        ) = &mut eip712.message_schema
-                        {
-                            let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
-                            vc_schema.push(ssi_eip712::MemberVariable::new(
-                                "http://example.org/foo".to_owned(),
-                                ssi_eip712::TypeRef::String,
-                            ));
-                        }
-                    }
+        let mut bad_vc = vc.clone();
+        bad_vc
+            .additional_properties
+            .insert("http://example.org/foo".into(), "bar".into());
+        for proof in &mut bad_vc.proofs {
+            // Add the `foo` field to the EIP712 VC schema if necessary.
+            // This is required so hashing can succeed.
+            if let Some(eip712) = proof.options.eip712_mut() {
+                if let Some(ssi_claims::data_integrity::suites::eip712::TypesOrURI::Object(types)) =
+                    &mut eip712.types
+                {
+                    let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
+                    vc_schema.push(ssi_eip712::MemberVariable::new(
+                        "http://example.org/foo".to_owned(),
+                        ssi_eip712::TypeRef::String,
+                    ));
                 }
+            }
 
-                proofs
-            },
-        )
-        .await
-        .unwrap();
+            // Same as above but for the legacy EIP712 cryptosuite (v0.1).
+            if let Some(eip712) = proof.options.eip712_v0_1_mut() {
+                if let Some(ssi_claims::data_integrity::suites::eip712::TypesOrURI::Object(types)) =
+                    &mut eip712.message_schema
+                {
+                    let vc_schema = types.types.get_mut("VerifiableCredential").unwrap();
+                    vc_schema.push(ssi_eip712::MemberVariable::new(
+                        "http://example.org/foo".to_owned(),
+                        ssi_eip712::TypeRef::String,
+                    ));
+                }
+            }
+        }
 
         let verification_result = bad_vc.verify(&didpkh).await.unwrap();
         assert!(verification_result.is_err());

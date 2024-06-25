@@ -2,10 +2,11 @@
 // cargo run --example issue-revocation-list > tests/revocationList.json
 use ssi::{
     claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
+        data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::revocation::{
             RevocationList2020, RevocationList2020Credential, RevocationList2020Subject,
         },
+        VerifiableClaims,
     },
     jwk::JWK,
     verification_methods::SingleSecretSigner,
@@ -36,16 +37,7 @@ async fn main() {
     let params = ProofOptions::from_method_and_options(verification_method, Default::default());
 
     let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
-    let vc = suite
-        .sign(
-            rl_vc,
-            AnyInputContext::default(),
-            &resolver,
-            &signer,
-            params,
-        )
-        .await
-        .unwrap();
+    let vc = suite.sign(rl_vc, &resolver, &signer, params).await.unwrap();
 
     assert!(vc.verify(&resolver).await.unwrap().is_ok());
 

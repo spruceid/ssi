@@ -1,17 +1,12 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use async_std::sync::RwLock;
 use iref::{Iri, IriBuf};
-pub use json_ld::{syntax, Options, RemoteDocumentReference};
-use json_ld::{syntax::TryFromJson, Loader, RemoteContext, RemoteContextReference, RemoteDocument};
+use json_ld::{
+    syntax::TryFromJson, LoadError, Loader, RemoteContext, RemoteContextReference, RemoteDocument,
+};
+pub use json_ld::{Options, RemoteDocumentReference};
 use json_syntax::Parse;
-use rdf_types::vocabulary::IriVocabularyMut;
 use static_iref::iri;
+use std::collections::HashMap;
 use thiserror::Error;
-
-/// Error raised by the `json_to_dataset` function.
-pub type ToRdfError<E = UnknownContext> = json_ld::ToRdfError<E>;
 
 pub const CREDENTIALS_V1_CONTEXT: &Iri = iri!("https://www.w3.org/2018/credentials/v1");
 pub const CREDENTIALS_V2_CONTEXT: &Iri = iri!("https://www.w3.org/ns/credentials/v2");
@@ -236,23 +231,14 @@ macro_rules! iri_match {
 /// Error raised when an unknown context is loaded with [`StaticLoader`] or
 /// [`ContextLoader`].
 #[derive(thiserror::Error, Debug)]
-#[error("Unknown context: {0}")]
-pub struct UnknownContext(pub IriBuf);
+#[error("Unknown context")]
+pub struct UnknownContext;
 
 #[derive(Clone)]
 pub struct StaticLoader;
 
-impl Loader<IriBuf> for StaticLoader {
-    type Error = UnknownContext;
-
-    async fn load_with<V>(
-        &mut self,
-        _vocabulary: &mut V,
-        url: IriBuf,
-    ) -> json_ld::LoadingResult<IriBuf, Self::Error>
-    where
-        V: IriVocabularyMut<Iri = IriBuf>,
-    {
+impl Loader for StaticLoader {
+    async fn load(&self, url: &Iri) -> json_ld::LoadingResult {
         iri_match! {
             match url {
                 CREDENTIALS_V1_CONTEXT => Ok(CREDENTIALS_V1_CONTEXT_DOCUMENT.clone()),
@@ -308,7 +294,7 @@ impl Loader<IriBuf> for StaticLoader {
                 JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT => {
                     Ok(JFF_VC_EDU_PLUGFEST_2022_2_CONTEXT_DOCUMENT.clone())
                 },
-                _ as iri => Err(UnknownContext(iri))
+                _ as iri => Err(LoadError::new(iri.to_owned(), UnknownContext))
             }
         }
     }
@@ -320,10 +306,11 @@ pub type ContextMap = HashMap<IriBuf, RemoteDocument>;
 pub struct ContextLoader {
     // Specifies if StaticLoader is meant to be checked first.
     static_loader: Option<StaticLoader>,
+
     // This map holds the optional, additional context objects.  This is where any app-specific context
     // objects would go.  The Arc<RwLock<_>> is necessary because json_ld::Loader trait unfortunately
     // has a method that uses `&mut self`.
-    context_map: Option<Arc<RwLock<ContextMap>>>,
+    context_map: Option<ContextMap>,
 }
 
 impl std::fmt::Debug for ContextLoader {
@@ -388,7 +375,7 @@ impl ContextLoader {
                 },
             )
             .collect::<Result<HashMap<IriBuf, RemoteDocument>, FromContextMapError>>()?;
-        self.context_map = Some(Arc::new(RwLock::new(context_map)));
+        self.context_map = Some(context_map);
         Ok(self)
     }
 }
@@ -403,25 +390,16 @@ impl std::default::Default for ContextLoader {
     }
 }
 
-impl Loader<IriBuf> for ContextLoader {
-    type Error = UnknownContext;
-
-    async fn load_with<V>(
-        &mut self,
-        _vocabulary: &mut V,
-        url: IriBuf,
-    ) -> json_ld::LoadingResult<IriBuf, Self::Error>
-    where
-        V: IriVocabularyMut<Iri = IriBuf>,
-    {
-        let url = match &mut self.static_loader {
+impl Loader for ContextLoader {
+    async fn load(&self, url: &Iri) -> json_ld::LoadingResult {
+        let url = match &self.static_loader {
             Some(static_loader) => {
                 match static_loader.load(url).await {
                     Ok(x) => {
                         // The url was present in `StaticLoader`.
                         return Ok(x);
                     }
-                    Err(UnknownContext(url)) => {
+                    Err(_) => {
                         // This is ok, the url just wasn't found in
                         // `StaticLoader`. Fall through to
                         // `self.context_map`.
@@ -433,15 +411,13 @@ impl Loader<IriBuf> for ContextLoader {
         };
 
         // If we fell through, then try `self.context_map`.
-        if let Some(context_map) = &mut self.context_map {
+        if let Some(context_map) = &self.context_map {
             context_map
-                .read()
-                .await
-                .get(&url)
+                .get(url)
                 .cloned()
-                .ok_or(UnknownContext(url))
+                .ok_or_else(|| LoadError::new(url.to_owned(), UnknownContext))
         } else {
-            Err(UnknownContext(url))
+            Err(LoadError::new(url.to_owned(), UnknownContext))
         }
     }
 }
@@ -472,7 +448,7 @@ mod test {
 
     #[tokio::test]
     async fn context_loader() {
-        let mut cl = ContextLoader::default().with_context_map_from([(
+        let cl = ContextLoader::default().with_context_map_from([(
             "https://w3id.org/age/v1".to_string(),
             serde_json::to_string(&json!({
               "@context": {

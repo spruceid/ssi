@@ -61,7 +61,7 @@ where
     ) -> Result<ProofValidity, ProofValidationError> {
         self.proof()
             .suite()
-            .verify_prepared_claims(verifier, self.hash(), self.proof().borrowed())
+            .verify_proof(verifier, self.hash(), self.proof().borrowed())
             .await
     }
 }

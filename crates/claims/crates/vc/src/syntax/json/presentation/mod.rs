@@ -2,10 +2,12 @@ use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
 use crate::{Context, Credential};
 use iref::{Uri, UriBuf};
+use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, Proof, Validate};
-use ssi_json_ld::{AnyJsonLdEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
+use ssi_claims_core::{ClaimsValidity, Validate};
+use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
+use ssi_rdf::{Interpretation, LdEnvironment};
 
 use super::{super::value_or_array, SpecializedJsonCredential};
 
@@ -76,7 +78,7 @@ impl<C> JsonPresentation<C> {
 }
 
 impl<C> JsonLdObject for JsonPresentation<C> {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
@@ -87,8 +89,8 @@ impl<C> JsonLdNodeObject for JsonPresentation<C> {
     }
 }
 
-impl<C, E, P: Proof> Validate<E, P> for JsonPresentation<C> {
-    fn validate(&self, _: &E, _: &P::Prepared) -> ClaimsValidity {
+impl<C, E, P> Validate<E, P> for JsonPresentation<C> {
+    fn validate(&self, _: &E, _: &P) -> ClaimsValidity {
         Ok(())
     }
 }
@@ -116,22 +118,31 @@ impl<C: Credential> crate::Presentation for JsonPresentation<C> {
     }
 }
 
-impl<V, L, E, C> ssi_rdf::Expandable<E> for JsonPresentation<C>
+impl<C> ssi_json_ld::Expandable for JsonPresentation<C>
 where
-    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash,
-    V::BlankId: Clone + Eq + Hash,
-    L: json_ld::Loader<V::Iri>,
     C: Serialize,
-    L::Error: std::fmt::Display,
 {
-    type Error = JsonLdError<L::Error>;
+    type Error = JsonLdError;
 
-    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+    type Expanded<I, V> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
-    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         let json = ssi_json_ld::CompactJsonLd(json_syntax::to_value(self).unwrap());
-        json.expand(environment).await
+        json.expand_with(ld, loader).await
     }
 }

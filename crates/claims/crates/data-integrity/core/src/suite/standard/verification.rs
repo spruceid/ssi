@@ -5,7 +5,7 @@ use crate::{CryptographicSuite, ProofRef};
 pub trait VerificationAlgorithm<S: CryptographicSuite> {
     fn verify(
         method: &S::VerificationMethod,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError>;
 }

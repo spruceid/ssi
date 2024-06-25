@@ -1,14 +1,13 @@
 use crate::suite::bounds::{OptionsRefOf, SignatureRefOf, VerificationMethodRefOf};
-use crate::suite::{CryptographicSuiteInstance, SerializeCryptographicSuite};
+use crate::suite::{CryptographicSuiteVerification, SerializeCryptographicSuite};
 use crate::{
     CloneCryptographicSuite, CryptographicSuite, DataIntegrity, DebugCryptographicSuite,
     DeserializeCryptographicSuite,
 };
 use educe::Educe;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{AttachProof, ProofPreparationError};
+use ssi_claims_core::{AttachProof, ProofValidationError, ProofValidity};
 use ssi_core::{one_or_many::OneOrManyRef, OneOrMany};
-use ssi_json_ld::JsonLdNodeObject;
 use ssi_verification_methods_core::{ProofPurpose, ReferenceOrOwned};
 use std::collections::BTreeMap;
 use std::{
@@ -20,12 +19,12 @@ use std::{
 mod de;
 
 mod configuration;
-mod prepared;
+// mod prepared;
 mod reference;
 mod r#type;
 
 pub use configuration::*;
-pub use prepared::*;
+// pub use prepared::*;
 pub use r#type::*;
 pub use reference::*;
 
@@ -38,7 +37,7 @@ pub use reference::*;
 pub struct Proof<S: CryptographicSuite> {
     /// Proof context.
     #[serde(rename = "@context", default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<json_ld::syntax::Context>,
+    pub context: Option<ssi_json_ld::syntax::Context>,
 
     /// Proof type.
     ///
@@ -150,7 +149,7 @@ impl<T: CryptographicSuite> Proof<T> {
         }
     }
 
-    pub fn with_context(self, context: json_ld::syntax::Context) -> Self {
+    pub fn with_context(self, context: ssi_json_ld::syntax::Context) -> Self {
         Self {
             context: Some(context),
             ..self
@@ -219,30 +218,19 @@ impl<S: DebugCryptographicSuite> fmt::Debug for Proof<S> {
     }
 }
 
-impl<S: CryptographicSuite> ssi_claims_core::Proof for Proof<S> {
-    type Prepared = PreparedProof<S>;
-}
-
-impl<T, E, S> ssi_claims_core::PrepareWith<T, E> for Proof<S>
+impl<S: CryptographicSuite, T, E, V> ssi_claims_core::ValidateProof<T, E, V> for Proof<S>
 where
-    T: JsonLdNodeObject,
-    S: CryptographicSuiteInstance<T, E>,
+    S: CryptographicSuiteVerification<T, E, V>,
 {
-    /// Creates a new data integrity credential from the given input data.
-    ///
-    /// This will transform and hash the input data using the cryptographic
-    /// suite's transformation and hashing algorithms.
-    async fn prepare_with(
-        self,
-        value: &T,
-        environment: &mut E,
-    ) -> Result<Self::Prepared, ProofPreparationError> {
-        let hash = self
-            .type_
-            .prepare_claims(environment, value, self.configuration())
-            .await?;
-
-        Ok(PreparedProof::new(self, hash))
+    async fn validate_proof<'a>(
+        &'a self,
+        environment: &'a E,
+        claims: &'a T,
+        verifier: &'a V,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.suite()
+            .verify_proof(environment, verifier, claims, self.borrowed())
+            .await
     }
 }
 
@@ -337,6 +325,20 @@ impl<S: CryptographicSuite> From<Vec<Proof<S>>> for Proofs<S> {
     }
 }
 
+impl<S: CryptographicSuite, T, E, V> ssi_claims_core::ValidateProof<T, E, V> for Proofs<S>
+where
+    S: CryptographicSuiteVerification<T, E, V>,
+{
+    async fn validate_proof<'a>(
+        &'a self,
+        environment: &'a E,
+        claims: &'a T,
+        verifier: &'a V,
+    ) -> Result<ProofValidity, ProofValidationError> {
+        self.0.validate_proof(environment, claims, verifier).await
+    }
+}
+
 impl<T, S: CryptographicSuite> AttachProof<T> for Proofs<S> {
     type Attached = DataIntegrity<T, S>;
 
@@ -396,26 +398,5 @@ impl<'de, S: DeserializeCryptographicSuite<'de>> Deserialize<'de> for Proofs<S> 
             OneOrMany::One(proof) => Ok(Self(vec![proof])),
             OneOrMany::Many(proofs) => Ok(Self(proofs)),
         }
-    }
-}
-
-impl<S: CryptographicSuite> ssi_claims_core::Proof for Proofs<S> {
-    type Prepared = PreparedProofs<S>;
-}
-
-impl<T, E, S> ssi_claims_core::PrepareWith<T, E> for Proofs<S>
-where
-    T: JsonLdNodeObject,
-    S: CryptographicSuiteInstance<T, E>,
-{
-    async fn prepare_with(
-        self,
-        claims: &T,
-        environment: &mut E,
-    ) -> Result<Self::Prepared, ProofPreparationError> {
-        self.0
-            .prepare_with(claims, environment)
-            .await
-            .map(PreparedProofs)
     }
 }

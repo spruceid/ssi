@@ -45,11 +45,7 @@ pub trait ToDecodedJWT {
         &self,
         verifier: &impl JWSVerifier,
     ) -> Result<Verification, ProofValidationError> {
-        self.to_decoded_jwt()?
-            .into_verifiable()
-            .await?
-            .verify(verifier)
-            .await
+        self.to_decoded_jwt()?.verify(verifier).await
     }
 }
 

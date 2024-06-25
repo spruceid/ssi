@@ -56,8 +56,6 @@ iref = { workspace = true, features = ["serde"] }
 static-iref.workspace = true
 rdf-types.workspace = true
 thiserror.workspace = true
-json-ld.workspace = true
-# treeldr-rust-prelude.workspace = true
 linked-data = { workspace = true, features = ["derive"] }
 ssi-multicodec.workspace = true
 multibase.workspace = true

@@ -22,7 +22,7 @@ mod v0_1;
 pub use v0_1::*;
 
 lazy_static::lazy_static! {
-    pub static ref EPSIG_CONTEXT: json_ld::syntax::ContextEntry = {
+    pub static ref EPSIG_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         let context_str = ssi_contexts::EPSIG_V0_1;
         serde_json::from_str(context_str).unwrap()
     };
@@ -62,9 +62,9 @@ impl StandardCryptographicSuite for EthereumPersonalSignature2021 {
 #[derive(Default)]
 pub struct EthereumPersonalSignature2021Context;
 
-impl From<EthereumPersonalSignature2021Context> for json_ld::syntax::Context {
+impl From<EthereumPersonalSignature2021Context> for ssi_json_ld::syntax::Context {
     fn from(_: EthereumPersonalSignature2021Context) -> Self {
-        json_ld::syntax::Context::One(EPSIG_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(EPSIG_CONTEXT.clone())
     }
 }
 
@@ -113,7 +113,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         _proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         let proof_value_bytes = signer
@@ -136,7 +136,7 @@ where
 {
     fn verify(
         method: &S::VerificationMethod,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let message = EthereumWallet::prepare_message(prepared_claims.as_ref());

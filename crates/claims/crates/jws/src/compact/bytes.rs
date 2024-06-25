@@ -1,6 +1,8 @@
-use crate::{DecodeError, DecodedJWS, Header, InvalidHeader, JWSVerifier, JWS};
+use crate::{
+    DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader, JWSVerifier, JWS,
+};
 pub use base64::DecodeError as Base64DecodeError;
-use ssi_claims_core::{ProofValidationError, Verification};
+use ssi_claims_core::{ProofValidationError, VerifiableClaims, Verification};
 use std::{borrow::Cow, ops::Deref};
 
 /// JWS in compact serialized form.
@@ -123,15 +125,22 @@ impl CompactJWS {
         let header = self.decode_header().map_err(DecodeError::Header)?;
         let payload = self.decode_payload(&header).map_err(DecodeError::Payload)?;
         let signature = self.decode_signature().map_err(DecodeError::Signature)?;
-        Ok(JWS::new(header, payload, signature))
+        Ok(JWS::new(header, payload, signature.into()))
     }
 
     /// Decodes the entire JWS while preserving the signing bytes so they can
     /// be verified.
     pub fn to_decoded(&self) -> Result<DecodedJWS<Cow<[u8]>>, DecodeError> {
+        let signing_bytes = self.signing_bytes().to_owned();
+        let jws = self.decode()?;
+
         Ok(DecodedJWS::new(
-            self.signing_bytes().to_owned(),
-            self.decode()?,
+            DecodedSigningBytes {
+                bytes: signing_bytes,
+                header: jws.header,
+                payload: jws.payload,
+            },
+            jws.signature,
         ))
     }
 
@@ -160,10 +169,8 @@ impl CompactJWS {
         &self,
         verifier: &impl JWSVerifier,
     ) -> Result<Verification, ProofValidationError> {
-        use ssi_claims_core::Verifiable;
         let jws = self.to_decoded().unwrap();
-        let verifiable = Verifiable::new(jws).await.unwrap();
-        verifiable.verify(verifier).await
+        jws.verify(verifier).await
     }
 }
 
@@ -233,7 +240,11 @@ impl CompactJWSBuf {
     /// be verified.
     pub fn into_decoded(self) -> Result<DecodedJWS<Vec<u8>>, DecodeError> {
         let decoded = self.decode()?.into_owned();
-        Ok(DecodedJWS::new(self.into_signing_bytes(), decoded))
+        let signing_bytes = self.into_signing_bytes();
+        Ok(DecodedJWS::new(
+            DecodedSigningBytes::new(signing_bytes, decoded.header, decoded.payload),
+            decoded.signature,
+        ))
     }
 }
 

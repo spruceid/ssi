@@ -31,17 +31,17 @@ const P2SIG_PREFIX: [u8; 4] = [54, 240, 44, 52];
 
 lazy_static::lazy_static! {
     /// JSON-LD context for Linked Data Proofs based on Tezos addresses
-    pub static ref TZ_CONTEXT: json_ld::syntax::ContextEntry = {
+    pub static ref TZ_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         let context_str = ssi_contexts::TZ_V2;
         serde_json::from_str(context_str).unwrap()
     };
 
-    pub static ref TZVM_CONTEXT: json_ld::syntax::ContextEntry = {
+    pub static ref TZVM_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         let context_str = ssi_contexts::TZVM_V1;
         serde_json::from_str(context_str).unwrap()
     };
 
-    pub static ref TZJCSVM_CONTEXT: json_ld::syntax::ContextEntry = {
+    pub static ref TZJCSVM_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
         let context_str = ssi_contexts::TZJCSVM_V1;
         serde_json::from_str(context_str).unwrap()
     };
@@ -50,27 +50,27 @@ lazy_static::lazy_static! {
 #[derive(Default)]
 pub struct TezosV2Context;
 
-impl From<TezosV2Context> for json_ld::syntax::Context {
+impl From<TezosV2Context> for ssi_json_ld::syntax::Context {
     fn from(_: TezosV2Context) -> Self {
-        json_ld::syntax::Context::One(TZ_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(TZ_CONTEXT.clone())
     }
 }
 
 #[derive(Default)]
 pub struct TezosJcsVmV1Context;
 
-impl From<TezosJcsVmV1Context> for json_ld::syntax::Context {
+impl From<TezosJcsVmV1Context> for ssi_json_ld::syntax::Context {
     fn from(_: TezosJcsVmV1Context) -> Self {
-        json_ld::syntax::Context::One(TZJCSVM_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(TZJCSVM_CONTEXT.clone())
     }
 }
 
 #[derive(Default)]
 pub struct TezosVmV1Context;
 
-impl From<TezosVmV1Context> for json_ld::syntax::Context {
+impl From<TezosVmV1Context> for ssi_json_ld::syntax::Context {
     fn from(_: TezosVmV1Context) -> Self {
-        json_ld::syntax::Context::One(TZVM_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(TZVM_CONTEXT.clone())
     }
 }
 

@@ -89,7 +89,7 @@ where
     async fn sign(
         _verification_method: &SolanaMethod2021,
         _signer: T,
-        _prepared_claims: &[u8; 64],
+        _prepared_claims: [u8; 64],
         _proof_configuration: ProofConfigurationRef<'_, SolanaSignature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         todo!()
@@ -99,10 +99,10 @@ where
 impl VerificationAlgorithm<SolanaSignature2021> for SolanaSignatureAlgorithm {
     fn verify(
         method: &SolanaMethod2021,
-        prepared_claims: &[u8; 64],
+        prepared_claims: [u8; 64],
         proof: ProofRef<SolanaSignature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let tx = LocalSolanaTransaction::with_message(prepared_claims);
+        let tx = LocalSolanaTransaction::with_message(&prepared_claims);
         let signing_bytes = tx.to_bytes();
 
         let signature_bytes = Base58Btc::decode_signature(proof.signature.proof_value.as_bytes())

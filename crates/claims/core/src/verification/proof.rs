@@ -107,86 +107,8 @@ impl From<std::convert::Infallible> for ProofValidationError {
 
 pub type ProofValidity = Result<(), InvalidProof>;
 
-/// Proof type.
-pub trait Proof {
-    /// Prepared proof type.
-    ///
-    /// A prepared proof also contains any information derived from the claims
-    /// and/or unprepared proof required for the verification.
-    /// Examples of information may be:
-    ///   - a hash of the claims;
-    ///   - JSON-LD expansion of the proof;
-    ///   - canonical form of the claims;
-    ///   - etc.
-    type Prepared;
-}
-
-/// A list of proofs is also a proof.
-impl<P: Proof> Proof for Vec<P> {
-    type Prepared = Vec<P::Prepared>;
-}
-
-/// Proof that can be prepared to verify `T` claims.
-///
-/// Preparation consists in computing any information derived from the claims
-/// and/or proof required for verification.
-/// Examples of information may be:
-///   - a hash of the claims;
-///   - JSON-LD expansion of the proof;
-///   - canonical form of the claims;
-///   - etc.
-///
-/// An environment of type `E` is provided with all the data required for the
-/// preparation. For instance, JSON-LD proofs will require a JSON-LD document
-/// loader to fetch remote JSON-LD contexts.
-pub trait PrepareWith<T, E = ()>: Proof {
-    /// Prepare this proof to verify the given claims.
-    #[allow(async_fn_in_trait)]
-    async fn prepare_with(
-        self,
-        claims: &T,
-        environment: &mut E,
-    ) -> Result<Self::Prepared, ProofPreparationError>;
-}
-
-impl<T, E, P: PrepareWith<T, E>> PrepareWith<T, E> for Vec<P> {
-    async fn prepare_with(
-        self,
-        claims: &T,
-        environment: &mut E,
-    ) -> Result<Self::Prepared, ProofPreparationError> {
-        let mut prepared = Vec::with_capacity(self.len());
-
-        for p in self {
-            prepared.push(p.prepare_with(claims, environment).await?)
-        }
-
-        Ok(prepared)
-    }
-}
-
-/// Reverse proof preparation.
-///
-/// Provides a method to strip a proof from its preparation data.
-/// This is the inverse of [`PrepareWith`].
-pub trait UnprepareProof {
-    /// Unprepared proof.
-    type Unprepared: Proof<Prepared = Self>;
-
-    /// Reverses the proof preparation.
-    fn unprepare(self) -> Self::Unprepared;
-}
-
-impl<P: UnprepareProof> UnprepareProof for Vec<P> {
-    type Unprepared = Vec<P::Unprepared>;
-
-    fn unprepare(self) -> Self::Unprepared {
-        self.into_iter().map(P::unprepare).collect()
-    }
-}
-
 /// Proof that can be validated against `T` claims with a verifier of type `V`.
-pub trait ValidateProof<T, V> {
+pub trait ValidateProof<T, E, V> {
     /// Validates the input claim's proof using the given verifier.
     ///
     /// The returned value is a nested `Result`.
@@ -197,14 +119,16 @@ pub trait ValidateProof<T, V> {
     #[allow(async_fn_in_trait)]
     async fn validate_proof<'a>(
         &'a self,
+        environment: &'a E,
         claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError>;
 }
 
-impl<T, V, P: ValidateProof<T, V>> ValidateProof<T, V> for Vec<P> {
+impl<T, E, V, P: ValidateProof<T, E, V>> ValidateProof<T, E, V> for Vec<P> {
     async fn validate_proof<'a>(
         &'a self,
+        environment: &'a E,
         claims: &'a T,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError> {
@@ -213,7 +137,7 @@ impl<T, V, P: ValidateProof<T, V>> ValidateProof<T, V> for Vec<P> {
             Ok(Err(InvalidProof::Missing))
         } else {
             for p in self {
-                if let Err(e) = p.validate_proof(claims, verifier).await? {
+                if let Err(e) = p.validate_proof(environment, claims, verifier).await? {
                     return Ok(Err(e));
                 }
             }

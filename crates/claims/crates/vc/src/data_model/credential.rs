@@ -1,7 +1,6 @@
 use iref::Uri;
-use ssi_claims_core::{
-    ClaimsValidity, DateTimeEnvironment, InvalidClaims, Proof, Verifiable, VerifiableClaims,
-};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims, VerifiableClaims};
+use ssi_data_integrity::{CryptographicSuite, DataIntegrity};
 use xsd_types::DateTime;
 
 use super::{CredentialStatus, Evidence, Issuer, RefreshService, TermsOfUse};
@@ -164,7 +163,7 @@ pub trait VerifiableCredential: Credential + VerifiableClaims {}
 
 impl<T: Credential + VerifiableClaims> VerifiableCredential for T {}
 
-impl<T: Credential, P: Proof> Credential for Verifiable<T, P> {
+impl<T: Credential, S: CryptographicSuite> Credential for DataIntegrity<T, S> {
     type Subject = T::Subject;
     type Issuer = T::Issuer;
     type Status = T::Status;

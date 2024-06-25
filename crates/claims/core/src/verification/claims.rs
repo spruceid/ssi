@@ -1,9 +1,9 @@
+use chrono::{DateTime, Utc};
 use core::fmt;
 use std::borrow::Cow;
 
-use chrono::{DateTime, Utc};
-
-use crate::Proof;
+pub use ssi_eip712::Eip712TypesEnvironment;
+pub use ssi_json_ld::ContextLoaderEnvironment;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {
@@ -48,31 +48,31 @@ pub type ClaimsValidity = Result<(), InvalidClaims>;
 ///
 /// The `validate` function is also provided with the proof, as some claim type
 /// require information from the proof to be validated.
-pub trait Validate<E, P: Proof> {
+pub trait Validate<E, P> {
     /// Validates the claims.
-    fn validate(&self, env: &E, proof: &P::Prepared) -> ClaimsValidity;
+    fn validate(&self, env: &E, proof: &P) -> ClaimsValidity;
 }
 
-impl<E, P: Proof> Validate<E, P> for () {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<E, P> Validate<E, P> for () {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E, P: Proof> Validate<E, P> for [u8] {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<E, P> Validate<E, P> for [u8] {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<E, P: Proof> Validate<E, P> for Vec<u8> {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<E, P> Validate<E, P> for Vec<u8> {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
 
-impl<'a, E, P: Proof, T: ?Sized + ToOwned + Validate<E, P>> Validate<E, P> for Cow<'a, T> {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+impl<'a, E, P, T: ?Sized + ToOwned + Validate<E, P>> Validate<E, P> for Cow<'a, T> {
+    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }
@@ -85,27 +85,89 @@ pub trait DateTimeEnvironment {
     fn date_time(&self) -> DateTime<Utc>;
 }
 
-/// Validation environment.
+impl DateTimeEnvironment for () {
+    fn date_time(&self) -> DateTime<Utc> {
+        Utc::now()
+    }
+}
+
+/// Verifiable claims with a preferred default verification environment.
+pub trait DefaultVerificationEnvironment {
+    type Environment: Default;
+}
+
+impl DefaultVerificationEnvironment for () {
+    type Environment = ();
+}
+
+impl DefaultVerificationEnvironment for [u8] {
+    type Environment = ();
+}
+
+impl DefaultVerificationEnvironment for Vec<u8> {
+    type Environment = ();
+}
+
+impl<'a> DefaultVerificationEnvironment for Cow<'a, [u8]> {
+    type Environment = ();
+}
+
+impl<'a, T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for &'a T {
+    type Environment = T::Environment;
+}
+
+/// Verification environment.
 ///
 /// This is a common environment implementation expected to work with most
 /// claims.
 ///
 /// It is possible to define a custom environment type, as long it implements
-/// the accessor traits required for validation such as [`DateTimeEnvironment`].
-pub struct ValidationEnvironment {
+/// the accessor traits required for verification such as
+/// [`DateTimeEnvironment`].
+pub struct VerificationEnvironment<JsonLdLoader = ssi_json_ld::ContextLoader, Eip712Loader = ()> {
     pub date_time: DateTime<Utc>,
+
+    pub json_ld_loader: JsonLdLoader,
+
+    pub eip712_loader: Eip712Loader,
 }
 
-impl Default for ValidationEnvironment {
+impl Default for VerificationEnvironment {
     fn default() -> Self {
         Self {
             date_time: Utc::now(),
+            json_ld_loader: ssi_json_ld::ContextLoader::default(),
+            eip712_loader: (),
         }
     }
 }
 
-impl DateTimeEnvironment for ValidationEnvironment {
+impl DateTimeEnvironment for VerificationEnvironment {
     fn date_time(&self) -> DateTime<Utc> {
         self.date_time
+    }
+}
+
+impl<JsonLdLoader, Eip712Loader> ContextLoaderEnvironment
+    for VerificationEnvironment<JsonLdLoader, Eip712Loader>
+where
+    JsonLdLoader: ssi_json_ld::Loader,
+{
+    type Loader = JsonLdLoader;
+
+    fn loader(&self) -> &Self::Loader {
+        &self.json_ld_loader
+    }
+}
+
+impl<JsonLdLoader, Eip712Loader> Eip712TypesEnvironment
+    for VerificationEnvironment<JsonLdLoader, Eip712Loader>
+where
+    Eip712Loader: ssi_eip712::TypesProvider,
+{
+    type Provider = Eip712Loader;
+
+    fn eip712_types(&self) -> &Self::Provider {
+        &self.eip712_loader
     }
 }

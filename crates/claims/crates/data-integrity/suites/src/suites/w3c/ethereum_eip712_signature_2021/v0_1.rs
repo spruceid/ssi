@@ -11,8 +11,8 @@ use super::{
 };
 
 lazy_static! {
-    static ref PROOF_CONTEXT: json_ld::syntax::ContextEntry = {
-        json_ld::syntax::ContextEntry::IriRef(
+    static ref PROOF_CONTEXT: ssi_json_ld::syntax::ContextEntry = {
+        ssi_json_ld::syntax::ContextEntry::IriRef(
             iri_ref!("https://demo.spruceid.com/ld/eip712sig-2021/v0.1.jsonld").to_owned(),
         )
     };
@@ -21,9 +21,9 @@ lazy_static! {
 #[derive(Default)]
 pub struct Eip712Sig2021v0_1Context;
 
-impl From<Eip712Sig2021v0_1Context> for json_ld::syntax::Context {
+impl From<Eip712Sig2021v0_1Context> for ssi_json_ld::syntax::Context {
     fn from(_: Eip712Sig2021v0_1Context) -> Self {
-        json_ld::syntax::Context::One(PROOF_CONTEXT.clone())
+        ssi_json_ld::syntax::Context::One(PROOF_CONTEXT.clone())
     }
 }
 

@@ -106,14 +106,12 @@ impl<V: JWSVerifier> FromBytes<V> for StatusListToken {
                 use ssi_claims_core::VerifiableClaims;
                 let jwt = CompactJWS::new(bytes)
                     .map_err(InvalidCompactJWS::into_owned)?
-                    .to_decoded_custom_jwt::<json::StatusListJwtPrivateClaims>()?
-                    .into_verifiable()
-                    .await?;
+                    .to_decoded_custom_jwt::<json::StatusListJwtPrivateClaims>()?;
 
-                match jwt.header.type_.as_deref() {
+                match jwt.signing_bytes.header.type_.as_deref() {
                     Some("statuslist+jwt") => {
                         jwt.verify(verifier).await??;
-                        Ok(Self::Jwt(jwt.into_parts().0.payload))
+                        Ok(Self::Jwt(jwt.signing_bytes.payload))
                     }
                     Some(other) => Err(FromBytesError::UnexpectedJWSType(other.to_owned())),
                     None => Err(FromBytesError::MissingJWSType),
@@ -512,13 +510,12 @@ impl<V: JWSVerifier> FromBytes<V> for AnyStatusListEntrySet {
                 use ssi_claims_core::VerifiableClaims;
                 let jwt = CompactJWS::new(bytes)
                     .map_err(InvalidCompactJWS::into_owned)?
-                    .to_decoded_jwt()?
-                    .into_verifiable()
-                    .await?;
+                    .to_decoded_jwt()?;
                 jwt.verify(verifier).await??;
 
                 Ok(Self::Json(
-                    jwt.payload
+                    jwt.signing_bytes
+                        .payload
                         .try_get::<json::Status>()?
                         .ok_or(EntrySetFromBytesError::MissingStatus)?
                         .into_owned(),

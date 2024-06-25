@@ -9,7 +9,6 @@ use iref::{IriBuf, UriBuf};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{ProofPreparationError, ProofValidationError};
 use ssi_data_integrity::AnyDataIntegrity;
-use ssi_json_ld::ContextLoader;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 use thiserror::Error;
 
@@ -235,7 +234,6 @@ pub trait CredentialStatus {
         &self,
         credential: &AnyDataIntegrity<JsonCredential>,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
-        context_loader: &mut ContextLoader,
     ) -> Result<StatusCheck, StatusCheckError>;
 }
 

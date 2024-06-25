@@ -86,7 +86,6 @@ locspan = "0.8"
 json-syntax = "0.12.2"
 nquads-syntax = "0.19"
 multibase = "0.9.1"
-json-ld = "0.16"
 serde = "1.0"
 serde_json = { version = "1.0", features = ["arbitrary_precision"] }
 serde_jcs = "0.1.0"

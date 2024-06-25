@@ -1,21 +1,14 @@
 use digest::Digest;
 use std::marker::PhantomData;
 
-use linked_data::LinkedData;
-use rdf_types::{
-    interpretation::{
-        ReverseBlankIdInterpretation, ReverseIriInterpretation, ReverseLiteralInterpretation,
-    },
-    InterpretationMut, Vocabulary,
-};
-use ssi_json_ld::JsonLdNodeObject;
-use ssi_rdf::{AnyLdEnvironment, Expandable};
+use ssi_json_ld::{ContextLoaderEnvironment, Expandable, JsonLdNodeObject};
+use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
 
 use crate::{
     hashing::ConcatOutputSize,
     suite::standard::{self, HashingAlgorithm, TransformationAlgorithm, TransformationError},
-    ConfigurationExpandingEnvironment, CryptographicSuite, ProofConfigurationRef,
-    SerializeCryptographicSuite, StandardCryptographicSuite,
+    CryptographicSuite, ProofConfigurationRef, SerializeCryptographicSuite,
+    StandardCryptographicSuite,
 };
 
 /// Canonical claims and configuration.
@@ -33,31 +26,26 @@ impl<S: CryptographicSuite> standard::TransformationAlgorithm<S>
     type Output = CanonicalClaimsAndConfiguration;
 }
 
-impl<S, T, C, I, V> standard::TypedTransformationAlgorithm<S, T, C>
-    for CanonicalizeClaimsAndConfiguration
+impl<S, T, C> standard::TypedTransformationAlgorithm<S, T, C> for CanonicalizeClaimsAndConfiguration
 where
     S: SerializeCryptographicSuite,
-    T: Expandable<C> + JsonLdNodeObject,
-    T::Expanded: LinkedData<I, V>,
-    C: AnyLdEnvironment<Vocabulary = V, Interpretation = I> + ConfigurationExpandingEnvironment,
-    V: Vocabulary,
-    I: InterpretationMut<V>
-        + ReverseIriInterpretation<Iri = V::Iri>
-        + ReverseBlankIdInterpretation<BlankId = V::BlankId>
-        + ReverseLiteralInterpretation<Literal = V::Literal>,
+    T: JsonLdNodeObject + Expandable,
+    C: ContextLoaderEnvironment,
 {
     async fn transform(
-        context: &mut C,
+        context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Output, TransformationError> {
+        let mut ld = LdEnvironment::default();
+
         let expanded = data
-            .expand(context)
+            .expand_with(&mut ld, context.loader())
             .await
             .map_err(|e| TransformationError::JsonLdExpansion(e.to_string()))?;
 
         Ok(CanonicalClaimsAndConfiguration {
-            claims: context
+            claims: ld
                 .canonical_form_of(&expanded)
                 .map_err(TransformationError::JsonLdDeserialization)?,
             configuration: proof_configuration

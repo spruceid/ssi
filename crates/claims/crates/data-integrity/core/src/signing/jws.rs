@@ -2,7 +2,7 @@ use std::{borrow::Cow, marker::PhantomData};
 
 use ssi_claims_core::{ProofValidationError, SignatureError};
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{CompactJWSString, JWS};
+use ssi_jws::{CompactJWSString, JWSSignature, JWS};
 use ssi_verification_methods_core::{MessageSigner, VerifyBytes, VerifyBytesWithRecoveryJwk};
 
 use crate::{
@@ -39,7 +39,7 @@ impl JwsSignature {
     pub fn decode(
         &self,
         message: &[u8],
-    ) -> Result<(Vec<u8>, Vec<u8>, Algorithm), ProofValidationError> {
+    ) -> Result<(Vec<u8>, JWSSignature, Algorithm), ProofValidationError> {
         let JWS {
             header, signature, ..
         } = self
@@ -92,7 +92,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         JwsSignature::sign_detached(
@@ -115,7 +115,7 @@ where
 {
     fn verify(
         method: &S::VerificationMethod,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
         let JWS {
@@ -154,7 +154,7 @@ where
     async fn sign(
         verification_method: &S::VerificationMethod,
         signer: T,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
         JwsSignature::sign_detached(
@@ -178,7 +178,7 @@ where
 {
     fn verify(
         verification_method: &S::VerificationMethod,
-        prepared_claims: &S::PreparedClaims,
+        prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
         eprintln!("payload: {:?}", prepared_claims.as_ref());

@@ -3,13 +3,14 @@ use ssi_claims_core::SignatureError;
 
 use super::CryptographicSuite;
 
-pub trait CryptographicSuiteSigning<R, S>: CryptographicSuite {
+pub trait CryptographicSuiteSigning<T, C, R, S>: CryptographicSuite {
     #[allow(async_fn_in_trait)]
-    async fn sign_prepared_claims(
+    async fn generate_signature(
         &self,
+        context: &C,
         resolver: R,
         signer: S,
-        prepared_claims: &Self::PreparedClaims,
+        claims: &T,
         proof_configuration: ProofConfigurationRef<'_, Self>,
     ) -> Result<Self::Signature, SignatureError>;
 }

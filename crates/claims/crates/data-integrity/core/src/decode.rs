@@ -1,11 +1,8 @@
 use serde::de::DeserializeOwned;
-use ssi_claims_core::{ProofPreparationError, Verifiable, VerifiableClaims};
+use ssi_claims_core::ProofPreparationError;
 use ssi_json_ld::JsonLdNodeObject;
 
-use crate::{
-    suite::{CryptographicSuiteInstance, DeserializeCryptographicSuiteOwned},
-    DataIntegrity, Proofs,
-};
+use crate::{suite::DeserializeCryptographicSuiteOwned, DataIntegrity};
 
 #[derive(Debug, thiserror::Error)]
 pub enum DecodeError {
@@ -18,29 +15,20 @@ pub enum DecodeError {
 
 /// Decodes a Data-Integrity credential or presentation from its JSON binary
 /// representation.
-pub async fn from_json_slice<T, S, E>(
-    json: &[u8],
-    environment: E,
-) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
+pub fn from_json_slice<T, S>(json: &[u8]) -> Result<DataIntegrity<T, S>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
-    S: DeserializeCryptographicSuiteOwned + CryptographicSuiteInstance<T, E>,
+    S: DeserializeCryptographicSuiteOwned,
 {
-    serde_json::from_slice::<DataIntegrity<T, S>>(json)?
-        .into_verifiable_with(environment)
-        .await
-        .map_err(Into::into)
+    serde_json::from_slice::<DataIntegrity<T, S>>(json).map_err(Into::into)
 }
 
 /// Decodes a Data-Integrity credential or presentation from its JSON textual
 /// representation.
-pub async fn from_json_str<T, S, E>(
-    json: &str,
-    environment: E,
-) -> Result<Verifiable<T, Proofs<S>>, DecodeError>
+pub fn from_json_str<T, S>(json: &str) -> Result<DataIntegrity<T, S>, DecodeError>
 where
     T: DeserializeOwned + JsonLdNodeObject,
-    S: DeserializeCryptographicSuiteOwned + CryptographicSuiteInstance<T, E>,
+    S: DeserializeCryptographicSuiteOwned,
 {
-    from_json_slice(json.as_bytes(), environment).await
+    from_json_slice(json.as_bytes())
 }

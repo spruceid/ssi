@@ -106,11 +106,11 @@ pub struct JWS<T = Vec<u8>> {
     pub payload: T,
 
     /// Signature.
-    pub signature: Vec<u8>,
+    pub signature: JWSSignature,
 }
 
 impl<T> JWS<T> {
-    pub fn new(header: Header, payload: T, signature: Vec<u8>) -> Self {
+    pub fn new(header: Header, payload: T, signature: JWSSignature) -> Self {
         Self {
             header,
             payload,
@@ -146,37 +146,57 @@ impl<'a, T: ?Sized + ToOwned> JWS<Cow<'a, T>> {
 /// JWS with its signing bytes.
 #[derive(Clone, PartialEq, Eq)]
 pub struct DecodedJWS<T = Vec<u8>> {
-    pub signing_bytes: Vec<u8>,
-    pub decoded: JWS<T>,
+    pub signing_bytes: DecodedSigningBytes<T>,
+    pub signature: JWSSignature,
 }
 
 impl<T> DecodedJWS<T> {
-    pub fn new(signing_bytes: Vec<u8>, decoded: JWS<T>) -> Self {
+    pub fn new(signing_bytes: DecodedSigningBytes<T>, signature: JWSSignature) -> Self {
         Self {
             signing_bytes,
-            decoded,
+            signature,
         }
     }
 
     pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedJWS<U> {
-        DecodedJWS::new(self.signing_bytes, self.decoded.map(f))
+        DecodedJWS::new(self.signing_bytes.map(f), self.signature)
     }
 
     pub fn try_map<U, E>(self, f: impl FnOnce(T) -> Result<U, E>) -> Result<DecodedJWS<U>, E> {
         Ok(DecodedJWS::new(
-            self.signing_bytes,
-            self.decoded.try_map(f)?,
+            self.signing_bytes.try_map(f)?,
+            self.signature,
         ))
+    }
+
+    pub fn into_jws(self) -> JWS<T> {
+        JWS::new(
+            self.signing_bytes.header,
+            self.signing_bytes.payload,
+            self.signature,
+        )
+    }
+
+    pub fn into_jws_and_signing_bytes(self) -> (JWS<T>, Vec<u8>) {
+        (
+            JWS::new(
+                self.signing_bytes.header,
+                self.signing_bytes.payload,
+                self.signature,
+            ),
+            self.signing_bytes.bytes,
+        )
     }
 }
 
 impl<'a, T: ?Sized + ToOwned> DecodedJWS<Cow<'a, T>> {
     pub fn into_owned(self) -> DecodedJWS<T::Owned> {
-        DecodedJWS::new(self.signing_bytes, self.decoded.into_owned())
+        DecodedJWS::new(self.signing_bytes.into_owned(), self.signature)
     }
 }
 
 /// JWS decoded signing bytes.
+#[derive(Clone, PartialEq, Eq)]
 pub struct DecodedSigningBytes<T = Vec<u8>> {
     /// Encoded bytes.
     pub bytes: Vec<u8>,
@@ -186,6 +206,41 @@ pub struct DecodedSigningBytes<T = Vec<u8>> {
 
     /// Decoded payload.
     pub payload: T,
+}
+
+impl<T> DecodedSigningBytes<T> {
+    pub fn new(bytes: Vec<u8>, header: Header, payload: T) -> Self {
+        Self {
+            bytes,
+            header,
+            payload,
+        }
+    }
+
+    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> DecodedSigningBytes<U> {
+        DecodedSigningBytes {
+            bytes: self.bytes,
+            header: self.header,
+            payload: f(self.payload),
+        }
+    }
+
+    pub fn try_map<U, E>(
+        self,
+        f: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<DecodedSigningBytes<U>, E> {
+        Ok(DecodedSigningBytes {
+            bytes: self.bytes,
+            header: self.header,
+            payload: f(self.payload)?,
+        })
+    }
+}
+
+impl<'a, T: ?Sized + ToOwned> DecodedSigningBytes<Cow<'a, T>> {
+    pub fn into_owned(self) -> DecodedSigningBytes<T::Owned> {
+        self.map(Cow::into_owned)
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -968,18 +1023,16 @@ pub fn decode_jws_parts(
     }
     let signing_input = [header_b64.as_bytes(), b".", payload_enc].concat();
     Ok(DecodedJWS::new(
-        signing_input,
-        JWS::new(header, payload, signature),
+        DecodedSigningBytes::new(signing_input, header, payload),
+        signature.into(),
     ))
 }
 
 /// Verify a JWS with detached payload. Returns the JWS header on success.
 pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Header, Error> {
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
-    let DecodedJWS {
-        signing_bytes,
-        decoded: jws,
-    } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    let (jws, signing_bytes) =
+        decode_jws_parts(header_b64, payload_enc, signature_b64)?.into_jws_and_signing_bytes();
     verify_bytes(jws.header.algorithm, &signing_bytes, key, &jws.signature)?;
     Ok(jws.header)
 }
@@ -987,10 +1040,8 @@ pub fn detached_verify(jws: &str, payload_enc: &[u8], key: &JWK) -> Result<Heade
 /// Recover a JWK from a JWS and payload, if the algorithm supports that (such as [ES256K-R](https://github.com/decentralized-identity/EcdsaSecp256k1RecoverySignature2020#es256k-r)).
 pub fn detached_recover(jws: &str, payload_enc: &[u8]) -> Result<(Header, JWK), Error> {
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
-    let DecodedJWS {
-        signing_bytes,
-        decoded: jws,
-    } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    let (jws, signing_bytes) =
+        decode_jws_parts(header_b64, payload_enc, signature_b64)?.into_jws_and_signing_bytes();
     let key = recover(jws.header.algorithm, &signing_bytes, &jws.signature)?;
     Ok((jws.header, key))
 }
@@ -1000,10 +1051,8 @@ pub fn detached_recover_legacy_keccak_es256kr(
     payload_enc: &[u8],
 ) -> Result<(Header, JWK), Error> {
     let (header_b64, signature_b64) = split_detached_jws(jws)?;
-    let DecodedJWS {
-        signing_bytes,
-        decoded: mut jws,
-    } = decode_jws_parts(header_b64, payload_enc, signature_b64)?;
+    let (mut jws, signing_bytes) =
+        decode_jws_parts(header_b64, payload_enc, signature_b64)?.into_jws_and_signing_bytes();
     // Allow ESKeccakK-R misimplementation of ES256K-R, for legacy reasons.
     if jws.header.algorithm != Algorithm::ES256KR {
         return Err(Error::AlgorithmMismatch);
@@ -1015,20 +1064,15 @@ pub fn detached_recover_legacy_keccak_es256kr(
 
 pub fn decode_verify(jws: &str, key: &JWK) -> Result<(Header, Vec<u8>), Error> {
     let (header_b64, payload_enc, signature_b64) = split_jws(jws)?;
-    let DecodedJWS {
-        signing_bytes,
-        decoded: jws,
-    } = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?;
+    let (jws, signing_bytes) = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?
+        .into_jws_and_signing_bytes();
     verify_bytes(jws.header.algorithm, &signing_bytes, key, &jws.signature)?;
     Ok((jws.header, jws.payload))
 }
 
 pub fn decode_unverified(jws: &str) -> Result<(Header, Vec<u8>), Error> {
     let (header_b64, payload_enc, signature_b64) = split_jws(jws)?;
-    let DecodedJWS {
-        signing_bytes: _,
-        decoded: jws,
-    } = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?;
+    let jws = decode_jws_parts(header_b64, payload_enc.as_bytes(), signature_b64)?.into_jws();
     Ok((jws.header, jws.payload))
 }
 

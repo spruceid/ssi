@@ -1,5 +1,5 @@
 use ssi_claims_core::{
-    ProofPreparationError, ProofValidationError, ProofValidity, SignatureError, Verifiable,
+    ProofPreparationError, ProofValidationError, SignatureEnvironment, SignatureError,
 };
 use ssi_verification_methods_core::VerificationMethod;
 
@@ -9,9 +9,7 @@ pub use signature::*;
 mod verification;
 pub use verification::*;
 
-use crate::{
-    PreparedProof, Proof, ProofConfiguration, ProofConfigurationRef, ProofRef, Proofs, TypeRef,
-};
+use crate::{DataIntegrity, ProofConfiguration, TypeRef};
 
 mod configuration;
 pub use configuration::*;
@@ -69,89 +67,112 @@ pub trait CryptographicSuite: Clone {
 
     /// Generates a verifiable document secured with this cryptographic suite.
     #[allow(async_fn_in_trait)]
-    async fn sign<T, C, R, S>(
+    async fn sign_with<T, C, R, S>(
+        &self,
+        context: C,
+        unsecured_document: T,
+        resolver: R,
+        signer: S,
+        options: InputOptions<Self>,
+    ) -> Result<DataIntegrity<T, Self>, SignatureError>
+    where
+        Self: CryptographicSuiteSigning<T, C, R, S>,
+    {
+        let proof_configuration = self.configure(options)?;
+        let proof_configuration_ref = proof_configuration.borrowed();
+        let signature = self
+            .generate_signature(
+                &context,
+                resolver,
+                signer,
+                &unsecured_document,
+                proof_configuration_ref,
+            )
+            .await?;
+
+        let proof = proof_configuration.into_proof(signature);
+        Ok(DataIntegrity::new(unsecured_document, proof.into()))
+    }
+
+    /// Generates a verifiable document secured with this cryptographic suite.
+    #[allow(async_fn_in_trait)]
+    async fn sign<T, R, S>(
         &self,
         unsecured_document: T,
-        mut context: C,
         resolver: R,
         signer: S,
         options: InputOptions<Self>,
-    ) -> Result<Verifiable<T, Proofs<Self>>, SignatureError>
+    ) -> Result<DataIntegrity<T, Self>, SignatureError>
     where
-        Self: CryptographicSuiteInstance<T, C> + CryptographicSuiteSigning<R, S>,
+        Self: CryptographicSuiteSigning<T, SignatureEnvironment, R, S>,
     {
-        let proof_configuration = self.configure(options)?;
-        let proof_configuration_ref = proof_configuration.borrowed();
-        let prepared_claims = self
-            .prepare_claims(&mut context, &unsecured_document, proof_configuration_ref)
-            .await?;
-        let signature = self
-            .sign_prepared_claims(resolver, signer, &prepared_claims, proof_configuration_ref)
-            .await?;
-        let proof = proof_configuration.into_proof(signature);
-        Ok(Verifiable::from_parts(
+        self.sign_with(
+            SignatureEnvironment::default(),
             unsecured_document,
-            PreparedProof::new(proof, prepared_claims).into(),
-        ))
+            resolver,
+            signer,
+            options,
+        )
+        .await
     }
 }
 
-/// Cryptographic suite instance.
-///
-/// See: <https://www.w3.org/TR/vc-data-integrity/#dfn-data-integrity-cryptographic-suite-instance>
-pub trait CryptographicSuiteInstance<T, C = ()>: CryptographicSuite {
-    /// Prepare the input claims for signing or verification.
-    #[allow(async_fn_in_trait)]
-    async fn prepare_claims(
-        &self,
-        context: &mut C,
-        unsecured_document: &T,
-        proof_configuration: ProofConfigurationRef<Self>,
-    ) -> Result<Self::PreparedClaims, ClaimsPreparationError>;
+// /// Cryptographic suite instance.
+// ///
+// /// See: <https://www.w3.org/TR/vc-data-integrity/#dfn-data-integrity-cryptographic-suite-instance>
+// pub trait CryptographicSuiteInstance<T, C = ()>: CryptographicSuite {
+//     /// Prepare the input claims for signing or verification.
+//     #[allow(async_fn_in_trait)]
+//     async fn prepare_claims(
+//         &self,
+//         context: &mut C,
+//         unsecured_document: &T,
+//         proof_configuration: ProofConfigurationRef<Self>,
+//     ) -> Result<Self::PreparedClaims, ClaimsPreparationError>;
 
-    /// Create a proof by signing the given unsecured document.
-    #[allow(async_fn_in_trait)]
-    async fn create_proof<R, S>(
-        &self,
-        context: &mut C,
-        resolver: R,
-        signer: S,
-        unsecured_document: &T,
-        options: InputOptions<Self>,
-    ) -> Result<Proof<Self>, SignatureError>
-    where
-        Self: CryptographicSuiteSigning<R, S>,
-    {
-        let proof_configuration = self.configure(options)?;
-        let proof_configuration_ref = proof_configuration.borrowed();
-        let prepared_claims = self
-            .prepare_claims(context, unsecured_document, proof_configuration_ref)
-            .await?;
-        let signature = self
-            .sign_prepared_claims(resolver, signer, &prepared_claims, proof_configuration_ref)
-            .await?;
-        Ok(proof_configuration.into_proof(signature))
-    }
+//     /// Create a proof by signing the given unsecured document.
+//     #[allow(async_fn_in_trait)]
+//     async fn create_proof<R, S>(
+//         &self,
+//         context: &mut C,
+//         resolver: R,
+//         signer: S,
+//         unsecured_document: &T,
+//         options: InputOptions<Self>,
+//     ) -> Result<Proof<Self>, SignatureError>
+//     where
+//         Self: CryptographicSuiteSigning<R, S>,
+//     {
+//         let proof_configuration = self.configure(options)?;
+//         let proof_configuration_ref = proof_configuration.borrowed();
+//         let prepared_claims = self
+//             .prepare_claims(context, unsecured_document, proof_configuration_ref)
+//             .await?;
+//         let signature = self
+//             .sign_prepared_claims(resolver, signer, &prepared_claims, proof_configuration_ref)
+//             .await?;
+//         Ok(proof_configuration.into_proof(signature))
+//     }
 
-    /// Verify a proof of the given unsecured document.
-    #[allow(async_fn_in_trait)]
-    async fn verify_proof<V>(
-        &self,
-        context: &mut C,
-        verifier: &V,
-        unsecured_document: &T,
-        proof: ProofRef<'_, Self>,
-    ) -> Result<ProofValidity, ProofValidationError>
-    where
-        Self: CryptographicSuiteVerification<V>,
-    {
-        let prepared_claims = self
-            .prepare_claims(context, unsecured_document, proof.configuration())
-            .await?;
-        self.verify_prepared_claims(verifier, &prepared_claims, proof)
-            .await
-    }
-}
+//     /// Verify a proof of the given unsecured document.
+//     #[allow(async_fn_in_trait)]
+//     async fn verify_proof<V>(
+//         &self,
+//         context: &mut C,
+//         verifier: &V,
+//         unsecured_document: &T,
+//         proof: ProofRef<'_, Self>,
+//     ) -> Result<ProofValidity, ProofValidationError>
+//     where
+//         Self: CryptographicSuiteVerification<V>,
+//     {
+//         let prepared_claims = self
+//             .prepare_claims(context, unsecured_document, proof.configuration())
+//             .await?;
+//         self.verify_prepared_claims(verifier, &prepared_claims, proof)
+//             .await
+//     }
+// }
 
 #[derive(Debug, thiserror::Error)]
 pub enum ClaimsPreparationError {

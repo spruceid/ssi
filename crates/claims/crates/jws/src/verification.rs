@@ -1,10 +1,38 @@
-use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error};
+use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
 use ssi_claims_core::{
-    DefaultEnvironment, ExtractProof, InvalidProof, PrepareWith, Proof, ProofPreparationError,
-    ProofValidationError, ProofValidity, Validate, ValidateProof, VerifiableClaims,
+    ClaimsValidity, DefaultVerificationEnvironment, InvalidProof, ProofValidationError,
+    ProofValidity, Validate, ValidateProof, VerifiableClaims,
 };
 use ssi_jwk::{Algorithm, JWK};
-use std::borrow::Cow;
+use std::{
+    borrow::{Borrow, Cow},
+    ops::Deref,
+};
+
+pub trait ValidateJWSHeader<E> {
+    fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity;
+}
+
+impl<E> ValidateJWSHeader<E> for [u8] {
+    fn validate_jws_header(&self, _env: &E, _header: &Header) -> ClaimsValidity {
+        Ok(())
+    }
+}
+
+impl<'a, E, T: ?Sized + ToOwned + ValidateJWSHeader<E>> ValidateJWSHeader<E> for Cow<'a, T> {
+    fn validate_jws_header(&self, env: &E, header: &Header) -> ClaimsValidity {
+        self.as_ref().validate_jws_header(env, header)
+    }
+}
+
+impl<E, T: Validate<E, JWSSignature> + ValidateJWSHeader<E>> Validate<E, JWSSignature>
+    for DecodedSigningBytes<T>
+{
+    fn validate(&self, env: &E, proof: &JWSSignature) -> ClaimsValidity {
+        self.payload.validate_jws_header(env, &self.header)?;
+        self.payload.validate(env, proof)
+    }
+}
 
 /// JWS verifier.
 ///
@@ -65,56 +93,75 @@ impl JWSVerifier for JWK {
     }
 }
 
-/// Signing bytes are valid if the decoded payload is valid.
-impl<E, P: Proof, T: Validate<E, P>> Validate<E, P> for DecodedSigningBytes<T> {
-    fn validate(&self, env: &E, proof: &P::Prepared) -> ssi_claims_core::ClaimsValidity {
-        self.payload.validate(env, proof)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JWSSignature(Vec<u8>);
+
+impl JWSSignature {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.0
     }
 }
 
-pub struct Signature(Vec<u8>);
-
-impl<T> VerifiableClaims for DecodedJWS<T> {
-    type Proof = Signature;
+impl From<Vec<u8>> for JWSSignature {
+    fn from(value: Vec<u8>) -> Self {
+        Self(value)
+    }
 }
 
-impl<T> DefaultEnvironment for DecodedJWS<T> {
+impl From<JWSSignature> for Vec<u8> {
+    fn from(value: JWSSignature) -> Self {
+        value.into_bytes()
+    }
+}
+
+impl Deref for JWSSignature {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for JWSSignature {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl Borrow<[u8]> for JWSSignature {
+    fn borrow(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<T> VerifiableClaims for DecodedJWS<T> {
+    type Claims = DecodedSigningBytes<T>;
+    type Proof = JWSSignature;
+
+    fn claims(&self) -> &Self::Claims {
+        &self.signing_bytes
+    }
+
+    fn proof(&self) -> &Self::Proof {
+        &self.signature
+    }
+}
+
+impl<T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for DecodedJWS<T> {
     type Environment = ();
 }
 
-impl<T> ExtractProof for DecodedJWS<T> {
-    type Proofless = DecodedSigningBytes<T>;
-
-    fn extract_proof(self) -> (Self::Proofless, Self::Proof) {
-        let signing_bytes = DecodedSigningBytes {
-            bytes: self.signing_bytes,
-            header: self.decoded.header,
-            payload: self.decoded.payload,
-        };
-
-        let signature = Signature(self.decoded.signature);
-
-        (signing_bytes, signature)
-    }
-}
-
-impl Proof for Signature {
-    type Prepared = Self;
-}
-
-impl<T> PrepareWith<DecodedSigningBytes<T>> for Signature {
-    async fn prepare_with(
-        self,
-        _claims: &DecodedSigningBytes<T>,
-        _environment: &mut (),
-    ) -> Result<Self::Prepared, ProofPreparationError> {
-        Ok(self)
-    }
-}
-
-impl<T, V: JWSVerifier> ValidateProof<DecodedSigningBytes<T>, V> for Signature {
+impl<T, E, V> ValidateProof<DecodedSigningBytes<T>, E, V> for JWSSignature
+where
+    V: JWSVerifier,
+{
     async fn validate_proof<'a>(
         &'a self,
+        _environment: &'a E,
         claims: &'a DecodedSigningBytes<T>,
         verifier: &'a V,
     ) -> Result<ProofValidity, ProofValidationError> {

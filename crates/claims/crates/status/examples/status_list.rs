@@ -16,7 +16,7 @@
 use clap::{Parser, Subcommand};
 use core::fmt;
 use iref::UriBuf;
-use ssi_data_integrity::{AnyInputContext, AnySuite, ProofOptions};
+use ssi_data_integrity::{AnySuite, ProofOptions};
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
 use ssi_status::{
@@ -179,13 +179,7 @@ async fn create_bitstream_status_list(
             let suite = AnySuite::pick(&jwk, Some(&verification_method)).unwrap();
             let params = ProofOptions::from_method(verification_method);
             let vc = suite
-                .sign(
-                    credential,
-                    AnyInputContext::default(),
-                    &resolver,
-                    &signer,
-                    params,
-                )
+                .sign(credential, &resolver, &signer, params)
                 .await
                 .unwrap();
 

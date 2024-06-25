@@ -4,7 +4,8 @@ use std::borrow::Cow;
 use flate2::Compression;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{Proof, Validate};
+use ssi_claims_core::{DefaultVerificationEnvironment, Validate};
+use ssi_jws::ValidateJWSHeader;
 use ssi_jwt::{match_claim_type, AnyClaims, Claim, ClaimSet, IssuedAt, Issuer, JWTClaims, Subject};
 
 use crate::{
@@ -136,10 +137,24 @@ impl ClaimSet for StatusListJwtPrivateClaims {
     }
 }
 
-impl<E, P: Proof> Validate<E, P> for StatusListJwtPrivateClaims {
-    fn validate(&self, _env: &E, _proof: &P::Prepared) -> ssi_claims_core::ClaimsValidity {
+impl<E, P> Validate<E, P> for StatusListJwtPrivateClaims {
+    fn validate(&self, _env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
         Ok(())
     }
+}
+
+impl<E> ValidateJWSHeader<E> for StatusListJwtPrivateClaims {
+    fn validate_jws_header(
+        &self,
+        _env: &E,
+        _header: &ssi_jws::Header,
+    ) -> ssi_claims_core::ClaimsValidity {
+        Ok(())
+    }
+}
+
+impl DefaultVerificationEnvironment for StatusListJwtPrivateClaims {
+    type Environment = ();
 }
 
 /// Time to live JWT claim.

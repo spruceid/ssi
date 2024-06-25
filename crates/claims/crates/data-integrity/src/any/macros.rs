@@ -126,58 +126,22 @@ macro_rules! crypto_suites {
         )*
 
         #[allow(unused_variables)]
-        impl<T, C, V, I, L> ssi_data_integrity_core::suite::CryptographicSuiteInstance<T, C> for AnySuite
+        impl<T, C, R, S> ssi_data_integrity_core::suite::CryptographicSuiteSigning<T, C, R, S> for AnySuite
         where
-            C: ssi_json_ld::AnyJsonLdEnvironment<Vocabulary = V, Interpretation = I, Loader = L>
-                + ssi_data_integrity_suites::eip712::TypesProvider,
-            V: rdf_types::VocabularyMut,
-            V::Iri: Clone + Eq + std::hash::Hash + linked_data::LinkedDataSubject<I, V> + linked_data::LinkedDataResource<I, V>,
-            V::BlankId: Clone + Eq + std::hash::Hash + linked_data::LinkedDataSubject<I, V> + linked_data::LinkedDataResource<I, V>,
-            I: rdf_types::InterpretationMut<V>
-                + rdf_types::interpretation::ReverseTermInterpretation<Iri = V::Iri, BlankId = V::BlankId, Literal = V::Literal>,
-            I::Resource: Clone,
-            L: json_ld::Loader<V::Iri>,
-            L::Error: std::fmt::Display,
-            T: serde::Serialize + ssi_rdf::Expandable<C> + ssi_json_ld::JsonLdNodeObject,
-            T::Expanded: linked_data::LinkedData<I, V>
-        {
-            async fn prepare_claims(
-                &self,
-                context: &mut C,
-                unsecured_document: &T,
-                proof_configuration: ssi_data_integrity_core::ProofConfigurationRef<'_, Self>,
-            ) -> Result<Self::PreparedClaims, ssi_data_integrity_core::suite::ClaimsPreparationError> {
-                match self {
-                    $(
-                        $(#[cfg($($t)*)])?
-                        Self::$name => {
-                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteInstance<T, C>>::prepare_claims(
-                                &ssi_data_integrity_suites::$name,
-                                context,
-                                unsecured_document,
-                                Self::project_proof_configuration(proof_configuration)
-                            ).await.map(AnyPreparedClaims::$name)
-                        },
-                    )*
-                    Self::Unknown(_) => {
-                        Ok(AnyPreparedClaims::Unknown)
-                    }
-                }
-            }
-        }
-
-        #[allow(unused_variables)]
-        impl<R, S> ssi_data_integrity_core::suite::CryptographicSuiteSigning<R, S> for AnySuite
-        where
+            C: ssi_json_ld::ContextLoaderEnvironment
+                + ssi_eip712::Eip712TypesEnvironment,
+            T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
+            //
             R: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
             S: ssi_verification_methods::Signer<ssi_verification_methods::AnyMethod>,
             S::MessageSigner: ssi_verification_methods::MessageSigner<crate::AnySignatureAlgorithm>
         {
-            async fn sign_prepared_claims(
+            async fn generate_signature(
                 &self,
+                context: &C,
                 resolver: R,
                 signer: S,
-                prepared_claims: &AnyPreparedClaims,
+                claims: &T,
                 proof_configuration: ssi_data_integrity_core::ProofConfigurationRef<'_, Self>,
             ) -> Result<Self::Signature, ssi_claims_core::SignatureError> {
                 match self {
@@ -187,11 +151,12 @@ macro_rules! crypto_suites {
                             let signer = crate::AnySigner(signer);
                             let resolver = crate::AnyResolver::<_, <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuite>::VerificationMethod>::new(resolver);
 
-                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteSigning<_, _>>::sign_prepared_claims(
+                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteSigning<_, _, _, _>>::generate_signature(
                                 &ssi_data_integrity_suites::$name,
+                                context,
                                 resolver,
                                 signer,
-                                <Self as Project<ssi_data_integrity_suites::$name>>::project_prepared_claims(prepared_claims),
+                                claims,
                                 Self::project_proof_configuration(proof_configuration)
                             ).await.map(AnySignature::$name)
                         },
@@ -204,14 +169,19 @@ macro_rules! crypto_suites {
         }
 
         #[allow(unused_variables)]
-        impl<V> ssi_data_integrity_core::suite::CryptographicSuiteVerification<V> for AnySuite
+        impl<T, C, F> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, C, F> for AnySuite
         where
-            V: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
+            C: ssi_json_ld::ContextLoaderEnvironment
+                + ssi_eip712::Eip712TypesEnvironment,
+            T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
+            //
+            F: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
         {
-            async fn verify_prepared_claims(
+            async fn verify_proof(
                 &self,
-                verifier: &V,
-                prepared_claims: &AnyPreparedClaims,
+                environment: &C,
+                verifier: &F,
+                claims: &T,
                 proof: ssi_data_integrity_core::ProofRef<'_, Self>,
             ) -> Result<ssi_claims_core::ProofValidity, ssi_claims_core::ProofValidationError> {
                 match self {
@@ -220,10 +190,11 @@ macro_rules! crypto_suites {
                         Self::$name => {
                             let verifier = crate::AnyResolver::<_, <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuite>::VerificationMethod>::new(verifier);
 
-                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteVerification<_>>::verify_prepared_claims(
+                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteVerification<_, _, _>>::verify_proof(
                                 &ssi_data_integrity_suites::$name,
+                                environment,
                                 &verifier,
-                                <Self as Project<ssi_data_integrity_suites::$name>>::project_prepared_claims(prepared_claims),
+                                claims,
                                 Self::project_proof(proof)
                             ).await
                         },

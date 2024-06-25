@@ -4,99 +4,29 @@ mod context;
 use std::{borrow::Cow, hash::Hash};
 
 pub use context::*;
-use json_ld::{Expand, Loader};
-use rdf_types::{
-    generator, interpretation::WithGenerator, vocabulary::IriVocabulary, Interpretation,
-    VocabularyMut,
-};
-use ssi_rdf::{AnyLdEnvironment, Expandable, LdEnvironment};
+use json_ld::Expand;
+use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
+use rdf_types::interpretation::WithGenerator;
+use rdf_types::{Vocabulary, VocabularyMut};
 
-pub trait AnyJsonLdEnvironment: AnyLdEnvironment
-where
-    Self::Vocabulary: IriVocabulary,
-{
-    type Loader: Loader<<Self::Vocabulary as IriVocabulary>::Iri>;
+pub use json_ld;
+pub use json_ld::{syntax, ExpandedDocument, Id, LoadError, Loader, Nullable, ToRdfError};
+use ssi_rdf::{generator, Interpretation, LdEnvironment};
 
-    fn as_json_ld_environment_mut(
-        &mut self,
-    ) -> JsonLdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation, &mut Self::Loader>;
+/// Environment that provides a JSON-LD context loader.
+pub trait ContextLoaderEnvironment {
+    type Loader: json_ld::Loader;
+
+    fn loader(&self) -> &Self::Loader;
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum JsonLdError<E> {
+pub enum JsonLdError {
     #[error("expansion error: {0}")]
-    Expansion(#[from] json_ld::expansion::Error<E>),
+    Expansion(#[from] json_ld::expansion::Error),
 
     #[error("interpretation error: {0}")]
     Interpretation(#[from] linked_data::IntoQuadsError),
-}
-
-pub struct JsonLdEnvironment<V = (), I = WithGenerator<generator::Blank>, L = ContextLoader> {
-    /// Vocabulary.
-    pub vocabulary: V,
-
-    /// Interpretation.
-    pub interpretation: I,
-
-    /// Document loader.
-    pub loader: L,
-}
-
-impl<V, I, L> JsonLdEnvironment<V, I, L> {
-    pub fn new(vocabulary: V, interpretation: I, loader: L) -> Self {
-        Self {
-            vocabulary,
-            interpretation,
-            loader,
-        }
-    }
-}
-
-impl<V: IriVocabulary, I: Interpretation, L> AnyLdEnvironment for JsonLdEnvironment<V, I, L> {
-    type Vocabulary = V;
-    type Interpretation = I;
-
-    fn as_ld_environment_mut(
-        &mut self,
-    ) -> LdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation> {
-        LdEnvironment {
-            vocabulary: &mut self.vocabulary,
-            interpretation: &mut self.interpretation,
-        }
-    }
-}
-
-impl<V: IriVocabulary, I: Interpretation, L: Loader<V::Iri>> AnyJsonLdEnvironment
-    for JsonLdEnvironment<V, I, L>
-{
-    type Loader = L;
-
-    fn as_json_ld_environment_mut(
-        &mut self,
-    ) -> JsonLdEnvironment<&mut Self::Vocabulary, &mut Self::Interpretation, &mut Self::Loader>
-    {
-        JsonLdEnvironment {
-            vocabulary: &mut self.vocabulary,
-            interpretation: &mut self.interpretation,
-            loader: &mut self.loader,
-        }
-    }
-}
-
-impl<L> JsonLdEnvironment<(), WithGenerator<generator::Blank>, L> {
-    pub fn from_loader(loader: L) -> Self {
-        Self {
-            vocabulary: (),
-            interpretation: WithGenerator::new((), generator::Blank::new()),
-            loader,
-        }
-    }
-}
-
-impl Default for JsonLdEnvironment {
-    fn default() -> Self {
-        Self::from_loader(ContextLoader::default())
-    }
 }
 
 #[repr(transparent)]
@@ -108,30 +38,66 @@ impl CompactJsonLd {
     }
 }
 
-impl<V, L, E> Expandable<E> for CompactJsonLd
-where
-    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash,
-    V::BlankId: Clone + Eq + Hash,
-    L: json_ld::Loader<V::Iri>,
-    L::Error: std::fmt::Display,
-{
-    type Error = JsonLdError<L::Error>;
+/// JSON-LD-Expandable value.
+pub trait Expandable: Sized {
+    type Error: std::fmt::Display;
 
-    // type Resource = I::Resource;
-    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+    type Expanded<I: Interpretation, V: Vocabulary>: LinkedData<I, V>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
-    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
-        let environment = environment.as_json_ld_environment_mut();
+    #[allow(async_fn_in_trait)]
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
 
+    #[allow(async_fn_in_trait)]
+    async fn expand(
+        &self,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<WithGenerator<generator::Blank>, ()>, Self::Error> {
+        let mut ld = LdEnvironment::default();
+        self.expand_with(&mut ld, loader).await
+    }
+}
+
+impl Expandable for CompactJsonLd {
+    type Error = JsonLdError;
+    type Expanded<I, V> = json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
+
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
         let expanded = self
             .0
             .expand_full(
-                environment.vocabulary,
+                &mut ld.vocabulary,
                 Default::default(),
                 None,
-                environment.loader,
+                loader,
                 json_ld::expansion::Options {
                     policy: json_ld::expansion::Policy::Strict,
                     ..Default::default()

@@ -21,7 +21,7 @@ use ssi_dids_core::{
     DIDBuf, DIDResolver, DIDURLBuf, Document,
 };
 use ssi_jwk::{Algorithm, JWK};
-use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header};
+use ssi_jws::{decode_jws_parts, sign_bytes, split_jws, verify_bytes, Header, JWSSignature};
 use ssi_jwt::NumericDate;
 use ssi_verification_methods::{GenericVerificationMethod, InvalidVerificationMethod};
 use std::{
@@ -35,7 +35,7 @@ use std::{
 pub struct Ucan<F = JsonValue, A = JsonValue> {
     pub header: Header,
     pub payload: Payload<F, A>,
-    pub signature: Vec<u8>,
+    pub signature: JWSSignature,
     // unfortunately this matters for sig verification
     // we have to keep track of how this ucan was created
     // alternatively we could have 2 different types?
@@ -120,19 +120,19 @@ impl<F, A> Ucan<F, A> {
     {
         let parts = split_jws(jwt).and_then(|(h, p, s)| decode_jws_parts(h, p.as_bytes(), s))?;
         let (payload, codec): (Payload<F, A>, UcanCodec) =
-            match serde_json::from_slice(&parts.decoded.payload) {
+            match serde_json::from_slice(&parts.signing_bytes.payload) {
                 Ok(p) => Ok((p, UcanCodec::Raw(jwt.to_string()))),
-                Err(e) => match DagJsonCodec.decode(&parts.decoded.payload) {
+                Err(e) => match DagJsonCodec.decode(&parts.signing_bytes.payload) {
                     Ok(p) => Ok((p, UcanCodec::DagJson)),
                     Err(_) => Err(e),
                 },
             }?;
 
-        if parts.decoded.header.type_.as_deref() != Some("JWT") {
+        if parts.signing_bytes.header.type_.as_deref() != Some("JWT") {
             return Err(Error::MissingUCANHeaderField("type: JWT"));
         }
 
-        match parts.decoded.header.additional_parameters.get("ucv") {
+        match parts.signing_bytes.header.additional_parameters.get("ucv") {
             Some(JsonValue::String(v)) if v == "0.9.0" => (),
             _ => return Err(Error::MissingUCANHeaderField("ucv: 0.9.0")),
         }
@@ -142,9 +142,9 @@ impl<F, A> Ucan<F, A> {
         }
 
         Ok(Self {
-            header: parts.decoded.header,
+            header: parts.signing_bytes.header,
             payload,
-            signature: parts.decoded.signature,
+            signature: parts.signature,
             codec,
         })
     }
@@ -313,7 +313,8 @@ impl<F, A> Payload<F, A> {
             .join(".")
             .as_bytes(),
             key,
-        )?;
+        )?
+        .into();
 
         Ok(Ucan {
             header,
@@ -643,7 +644,7 @@ mod ipld_encoding {
             Self {
                 header: u.header,
                 payload: u.payload.into(),
-                signature: u.signature,
+                signature: u.signature.into(),
                 codec: UcanCodec::DagJson,
             }
         }

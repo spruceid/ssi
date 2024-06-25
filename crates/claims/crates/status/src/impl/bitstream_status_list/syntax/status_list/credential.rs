@@ -1,16 +1,18 @@
 use std::{borrow::Cow, collections::HashMap, hash::Hash, io};
 
 use iref::UriBuf;
-use rdf_types::VocabularyMut;
+use rdf_types::{Interpretation, Vocabulary, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
-    ClaimsValidity, DateTimeEnvironment, InvalidClaims, Proof, Validate, ValidateProof, Verifiable,
+    ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, InvalidClaims, Validate,
+    ValidateProof, VerifiableClaims, VerificationEnvironment,
 };
-use ssi_data_integrity::{ssi_rdf::Expandable, AnyInputContext, AnyProofs};
-use ssi_json_ld::{
-    AnyJsonLdEnvironment, CompactJsonLd, JsonLdError, JsonLdNodeObject, JsonLdObject,
+use ssi_data_integrity::{
+    ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject},
+    AnyProofs, AnySuite,
 };
-use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier};
+use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
+use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
 use ssi_vc::{
     json::{JsonCredentialTypes, RequiredCredentialType},
     Context, V2,
@@ -79,7 +81,7 @@ impl BitstringStatusListCredential {
 }
 
 impl JsonLdObject for BitstringStatusListCredential {
-    fn json_ld_context(&self) -> Option<Cow<json_ld::syntax::Context>> {
+    fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
@@ -90,30 +92,39 @@ impl JsonLdNodeObject for BitstringStatusListCredential {
     }
 }
 
-impl<V, E, L> Expandable<E> for BitstringStatusListCredential
-where
-    E: AnyJsonLdEnvironment<Vocabulary = V, Loader = L>,
-    V: VocabularyMut,
-    V::Iri: Clone + Eq + Hash,
-    V::BlankId: Clone + Eq + Hash,
-    L: json_ld::Loader<V::Iri>,
-    L::Error: std::fmt::Display,
-{
-    type Error = JsonLdError<L::Error>;
-    type Expanded = json_ld::ExpandedDocument<V::Iri, V::BlankId>;
+impl Expandable for BitstringStatusListCredential {
+    type Error = JsonLdError;
 
-    async fn expand(&self, environment: &mut E) -> Result<Self::Expanded, Self::Error> {
-        CompactJsonLd(json_syntax::to_value(self).unwrap())
-            .expand(environment)
+    type Expanded<I: Interpretation, V: Vocabulary> = ssi_json_ld::ExpandedDocument<V::Iri, V::BlankId>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: LinkedDataResource<I, V> + LinkedDataSubject<I, V>;
+
+    #[allow(async_fn_in_trait)]
+    async fn expand_with<I, V>(
+        &self,
+        ld: &mut LdEnvironment<V, I>,
+        loader: &impl Loader,
+    ) -> Result<Self::Expanded<I, V>, Self::Error>
+    where
+        I: Interpretation,
+        V: VocabularyMut,
+        V::Iri: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+        V::BlankId: Clone + Eq + Hash + LinkedDataResource<I, V> + LinkedDataSubject<I, V>,
+    {
+        CompactJsonLd(ssi_json_ld::syntax::to_value(self).unwrap())
+            .expand_with(ld, loader)
             .await
     }
 }
 
-impl<E, P: Proof> Validate<E, P> for BitstringStatusListCredential
+impl<E, P> Validate<E, P> for BitstringStatusListCredential
 where
     E: DateTimeEnvironment,
 {
-    fn validate(&self, env: &E, _proof: &P::Prepared) -> ClaimsValidity {
+    fn validate(&self, env: &E, _proof: &P) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
         let now = env.date_time();
 
@@ -137,6 +148,16 @@ where
 
         Ok(())
     }
+}
+
+impl<E> ValidateJWSHeader<E> for BitstringStatusListCredential {
+    fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ClaimsValidity {
+        Ok(())
+    }
+}
+
+impl DefaultVerificationEnvironment for BitstringStatusListCredential {
+    type Environment = ();
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -187,7 +208,7 @@ pub enum FromBytesError {
 impl<V> FromBytes<V> for BitstringStatusListCredential
 where
     V: JWSVerifier,
-    <AnyProofs as Proof>::Prepared: ValidateProof<Self, V>,
+    AnyProofs: ValidateProof<Self, VerificationEnvironment, V>,
 {
     type Error = FromBytesError;
 
@@ -199,31 +220,27 @@ where
     ) -> Result<Self, Self::Error> {
         match media_type {
             "application/vc+ld+json+jwt" => {
-                use ssi_claims_core::VerifiableClaims;
                 let jws = CompactJWS::new(bytes)
                     .map_err(InvalidCompactJWS::into_owned)?
                     .to_decoded()?
-                    .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?
-                    .into_verifiable()
-                    .await?;
+                    .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
                 jws.verify(verifier).await??;
-                Ok(jws.into_parts().0.payload)
+                Ok(jws.signing_bytes.payload)
             }
-            "application/vc+ld+json+sd-jwt" => {
-                todo!()
-            }
-            "application/vc+ld+json+cose" => {
-                todo!()
-            }
+            // "application/vc+ld+json+sd-jwt" => {
+            //     todo!()
+            // }
+            // "application/vc+ld+json+cose" => {
+            //     todo!()
+            // }
             "application/vc+ld+json" => {
-                let vc: Verifiable<Self, AnyProofs> =
-                    ssi_data_integrity::from_json_slice(bytes, AnyInputContext::default()).await?;
+                let vc = ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
 
-                if !options.allow_unsecured || !vc.proof.is_empty() {
+                if !options.allow_unsecured || !vc.proofs.is_empty() {
                     vc.verify(verifier).await??;
                 }
 
-                Ok(vc.into_parts().0)
+                Ok(vc.claims)
             }
             other => Err(FromBytesError::UnexpectedMediaType(other.to_owned())),
         }

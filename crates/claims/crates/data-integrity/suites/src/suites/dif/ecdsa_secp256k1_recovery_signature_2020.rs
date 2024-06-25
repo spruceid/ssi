@@ -42,7 +42,7 @@ impl StandardCryptographicSuite for EcdsaSecp256k1RecoverySignature2020 {
 #[derive(Default)]
 pub struct Secp256k1Recovery2020v2Context;
 
-impl From<Secp256k1Recovery2020v2Context> for json_ld::syntax::Context {
+impl From<Secp256k1Recovery2020v2Context> for ssi_json_ld::syntax::Context {
     fn from(_: Secp256k1Recovery2020v2Context) -> Self {
         iri!("https://w3id.org/security/suites/secp256k1recovery-2020/v2").into()
     }

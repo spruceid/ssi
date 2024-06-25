@@ -14,13 +14,13 @@ ssi-crypto.workspace = true
 ssi-claims-core.workspace = true
 ssi-jwk.workspace = true
 ssi-jws.workspace = true
+ssi-json-ld.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 iref = { workspace = true, features = ["serde"] }
 static-iref.workspace = true
 rdf-types.workspace = true
 thiserror.workspace = true
-json-ld.workspace = true
 linked-data = { workspace = true, features = ["derive"] }
 educe.workspace = true
 multibase.workspace = true

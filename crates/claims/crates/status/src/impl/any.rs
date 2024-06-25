@@ -1,5 +1,5 @@
 use iref::Uri;
-use ssi_claims_core::{Proof, ValidateProof};
+use ssi_claims_core::{ValidateProof, VerificationEnvironment};
 use ssi_data_integrity::AnyProofs;
 use ssi_jws::JWSVerifier;
 
@@ -42,7 +42,7 @@ pub enum FromBytesError {
 impl<V> FromBytes<V> for AnyStatusMap
 where
     V: JWSVerifier,
-    <AnyProofs as Proof>::Prepared: ValidateProof<BitstringStatusListCredential, V>,
+    AnyProofs: ValidateProof<BitstringStatusListCredential, VerificationEnvironment, V>,
 {
     type Error = FromBytesError;
 
@@ -179,7 +179,7 @@ pub enum AnyEntrySet {
 impl<V> FromBytes<V> for AnyEntrySet
 where
     V: JWSVerifier,
-    <AnyProofs as Proof>::Prepared: ValidateProof<BitstringStatusListEntrySetCredential, V>,
+    AnyProofs: ValidateProof<BitstringStatusListEntrySetCredential, VerificationEnvironment, V>,
 {
     type Error = EntrySetFromBytesError;
 

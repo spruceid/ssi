@@ -4,9 +4,10 @@
 
 use serde_json::json;
 use ssi_claims::{
-    data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
+    data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     jws::JWSPayload,
     vc::ToJwtClaims,
+    VerifiableClaims,
 };
 use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;
@@ -39,10 +40,7 @@ async fn main() {
                 ProofOptions::from_method_and_options(verification_method, Default::default());
 
             let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
-            let vc = suite
-                .sign(vc, AnyInputContext::default(), &resolver, &signer, params)
-                .await
-                .unwrap();
+            let vc = suite.sign(vc, &resolver, &signer, params).await.unwrap();
 
             let result = vc.verify(&resolver).await.expect("verification failed");
             if !result.is_ok() {

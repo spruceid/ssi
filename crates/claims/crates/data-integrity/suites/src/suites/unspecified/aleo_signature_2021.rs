@@ -99,7 +99,7 @@ where
     async fn sign(
         _verification_method: &VerificationMethod,
         _signer: T,
-        _prepared_claims: &[u8; 64],
+        _prepared_claims: [u8; 64],
         _proof_configuration: ProofConfigurationRef<'_, AleoSignature2021>,
     ) -> Result<Self::Signature, SignatureError> {
         // ssi_jws::sign_bytes(algorithm, data, key)
@@ -113,7 +113,7 @@ where
 impl VerificationAlgorithm<AleoSignature2021> for AleoSignatureAlgorithm {
     fn verify(
         method: &VerificationMethod,
-        prepared_claims: &[u8; 64],
+        prepared_claims: [u8; 64],
         proof: ProofRef<AleoSignature2021>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let (_, signature_bytes) = multibase::decode(&proof.signature.proof_value)
@@ -130,7 +130,7 @@ impl VerificationAlgorithm<AleoSignature2021> for AleoSignatureAlgorithm {
         }
 
         let result = ssi_jwk::aleo::verify(
-            prepared_claims,
+            &prepared_claims,
             &account_id.account_address,
             &signature_bytes,
         );

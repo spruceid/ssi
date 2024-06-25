@@ -2,12 +2,13 @@ use super::CryptographicSuite;
 use crate::ProofRef;
 use ssi_claims_core::{ProofValidationError, ProofValidity};
 
-pub trait CryptographicSuiteVerification<V>: CryptographicSuite {
+pub trait CryptographicSuiteVerification<T, C, V>: CryptographicSuite {
     #[allow(async_fn_in_trait)]
-    async fn verify_prepared_claims(
+    async fn verify_proof(
         &self,
+        context: &C,
         verifier: &V,
-        prepared_claims: &Self::PreparedClaims,
+        claims: &T,
         proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, ProofValidationError>;
 }

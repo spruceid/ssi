@@ -24,53 +24,55 @@ pub use claims::*;
 mod proof;
 pub use proof::*;
 
-use crate::Verifiable;
-
 /// Verifiable Claims.
 ///
 /// Set of claims bundled with a proof.
 pub trait VerifiableClaims {
+    /// Claims type.
+    type Claims;
+
     /// Proof type.
     type Proof;
 
+    fn claims(&self) -> &Self::Claims;
+
+    fn proof(&self) -> &Self::Proof;
+
+    /// Validates the claims and verify them against the proof.
     #[allow(async_fn_in_trait)]
-    async fn into_verifiable(
-        self,
-    ) -> Result<Verifiable<Self::Proofless, Self::Proof>, ProofPreparationError>
+    async fn verify<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
     where
-        Self: ExtractProof + DefaultEnvironment,
-        Self::Proof: PrepareWith<Self::Proofless, Self::Environment>,
+        Self: DefaultVerificationEnvironment,
+        Self::Claims: Validate<Self::Environment, Self::Proof>,
+        Self::Proof: ValidateProof<Self::Claims, Self::Environment, V>,
     {
-        Verifiable::new(self).await
+        self.verify_with(verifier, Self::Environment::default())
+            .await
     }
 
+    /// Validates the claims and verify them against the proof.
     #[allow(async_fn_in_trait)]
-    async fn into_verifiable_with<T, E>(
-        self,
+    async fn verify_with<V, E>(
+        &self,
+        verifier: &V,
         env: E,
-    ) -> Result<Verifiable<T, Self::Proof>, ProofPreparationError>
+    ) -> Result<Verification, ProofValidationError>
     where
-        Self: ExtractProof<Proofless = T>,
-        Self::Proof: PrepareWith<T, E>,
+        Self::Claims: Validate<E, Self::Proof>,
+        Self::Proof: ValidateProof<Self::Claims, E, V>,
     {
-        Verifiable::new_with(self, env).await
+        match self.claims().validate(&env, self.proof()) {
+            Ok(_) => self
+                .proof()
+                .validate_proof(&env, self.claims(), verifier)
+                .await
+                .map(|r| r.map_err(Invalid::Proof)),
+            Err(e) => {
+                // Claims are not valid on their own.
+                Ok(Err(Invalid::Claims(e)))
+            }
+        }
     }
-}
-
-pub trait DefaultEnvironment {
-    type Environment: Default;
-}
-
-/// Proof extraction trait.
-///
-/// Implemented by credential and presentation types that can be separated from
-/// their proof value(s).
-pub trait ExtractProof: Sized + VerifiableClaims {
-    /// Set of claims without the proof.
-    type Proofless;
-
-    /// Separates the set of claims from the proof.
-    fn extract_proof(self) -> (Self::Proofless, Self::Proof);
 }
 
 /// Proof bundling trait.

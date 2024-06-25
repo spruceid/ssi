@@ -11,8 +11,9 @@
 // cat examples/files/vc.jwt | cargo run --example present jwt jwt | save examples/files/vp-jwtvc.jwt
 use ssi::{
     claims::{
-        data_integrity::{AnyInputContext, AnySuite, CryptographicSuite, ProofOptions},
+        data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         jws::{CompactJWSString, JWSPayload},
+        VerifiableClaims,
     },
     verification_methods::{ProofPurpose, SingleSecretSigner},
 };
@@ -73,10 +74,7 @@ async fn main() {
             params.challenge = Some("example".to_owned());
 
             let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
-            let vp = suite
-                .sign(vp, AnyInputContext::default(), &resolver, &signer, params)
-                .await
-                .unwrap();
+            let vp = suite.sign(vp, &resolver, &signer, params).await.unwrap();
 
             let result = vp.verify(&resolver).await.expect("verification failed");
             if !result.is_ok() {
