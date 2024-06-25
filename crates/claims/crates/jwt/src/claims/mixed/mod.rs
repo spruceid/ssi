@@ -1,5 +1,5 @@
 use serde::Serialize;
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
+use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, Validate};
 use ssi_jws::{JWSPayload, ValidateJWSHeader};
 use std::borrow::Cow;
 
@@ -89,4 +89,11 @@ where
         Validate::<E, P>::validate(&self.registered, env, proof)?;
         self.private.validate(env, proof)
     }
+}
+
+impl<T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for JWTClaims<T>
+where 
+    T::Environment: DateTimeEnvironment
+{
+    type Environment = T::Environment;
 }

@@ -1,7 +1,6 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
 use ssi_claims_core::{
-    ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, Validate, ValidateProof,
-    VerifiableClaims,
+    ClaimsValidity, DefaultVerificationEnvironment, InvalidProof, ProofValidationError, ProofValidity, Validate, ValidateProof, VerifiableClaims
 };
 use ssi_jwk::{Algorithm, JWK};
 use std::{
@@ -149,6 +148,10 @@ impl<T> VerifiableClaims for DecodedJWS<T> {
     fn proof(&self) -> &Self::Proof {
         &self.signature
     }
+}
+
+impl<T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for DecodedJWS<T> {
+    type Environment = ();
 }
 
 impl<T, E, V> ValidateProof<DecodedSigningBytes<T>, E, V> for JWSSignature

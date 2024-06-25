@@ -85,6 +85,37 @@ pub trait DateTimeEnvironment {
     fn date_time(&self) -> DateTime<Utc>;
 }
 
+impl DateTimeEnvironment for () {
+    fn date_time(&self) -> DateTime<Utc> {
+        Utc::now()
+    }
+}
+
+/// Verifiable claims with a preferred default verification environment.
+pub trait DefaultVerificationEnvironment {
+    type Environment: Default;
+}
+
+impl DefaultVerificationEnvironment for () {
+    type Environment = ();
+}
+
+impl DefaultVerificationEnvironment for [u8] {
+    type Environment = ();
+}
+
+impl DefaultVerificationEnvironment for Vec<u8> {
+    type Environment = ();
+}
+
+impl<'a> DefaultVerificationEnvironment for Cow<'a, [u8]> {
+    type Environment = ();
+}
+
+impl<'a, T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for &'a T {
+    type Environment = T::Environment;
+}
+
 /// Verification environment.
 ///
 /// This is a common environment implementation expected to work with most

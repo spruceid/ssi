@@ -42,10 +42,11 @@ pub trait VerifiableClaims {
     #[allow(async_fn_in_trait)]
     async fn verify<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
     where
-        Self::Claims: Validate<VerificationEnvironment, Self::Proof>,
-        Self::Proof: ValidateProof<Self::Claims, VerificationEnvironment, V>,
+        Self: DefaultVerificationEnvironment,
+        Self::Claims: Validate<Self::Environment, Self::Proof>,
+        Self::Proof: ValidateProof<Self::Claims, Self::Environment, V>,
     {
-        self.verify_with(verifier, VerificationEnvironment::default())
+        self.verify_with(verifier, Self::Environment::default())
             .await
     }
 
