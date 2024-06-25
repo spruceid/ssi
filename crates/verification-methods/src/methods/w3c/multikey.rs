@@ -90,9 +90,9 @@ impl Multikey {
         let algorithm = self
             .public_key
             .decoded
-            .algorithm
+            .get_algorithm()
             .ok_or(MessageSignatureError::MissingAlgorithm)?;
-        let key_algorithm = secret_key.algorithm.unwrap_or(algorithm);
+        let key_algorithm = secret_key.get_algorithm().unwrap_or(algorithm);
         if !algorithm.is_compatible_with(key_algorithm) {
             return Err(MessageSignatureError::InvalidSecretKey);
         }
@@ -108,7 +108,7 @@ impl Multikey {
         let algorithm = self
             .public_key
             .decoded
-            .algorithm
+            .get_algorithm()
             .ok_or(ProofValidationError::MissingAlgorithm)?;
         Ok(ssi_jws::verify_bytes(
             algorithm,
