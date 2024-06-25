@@ -17,8 +17,8 @@ use ssi_claims::{
         DataIntegrity, Proof, Proofs,
     },
     vc::syntax::{Context, RequiredContext},
-    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims, SignatureError,
-    Validate,
+    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims,
+    SignatureEnvironment, SignatureError, Validate,
 };
 use ssi_json_ld::{ContextLoaderEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
@@ -145,8 +145,9 @@ impl<C, P> Delegation<C, P> {
         S: Signer<AnyMethod>,
         S::MessageSigner: MessageSigner<AnySignatureAlgorithm>,
     {
-        self.sign(
+        self.sign_with(
             suite,
+            SignatureEnvironment::default(),
             resolver,
             signer,
             proof_configuration,

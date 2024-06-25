@@ -6,6 +6,7 @@ pub use crate::{
         },
         vc::syntax::{AnyJsonCredential, AnyJsonPresentation},
         CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload, JWTClaims,
+        VerifiableClaims,
     },
     dids::{DIDResolver, DIDJWK},
     verification_methods::{AnyJwkMethod, AnyMethod, SingleSecretSigner},
