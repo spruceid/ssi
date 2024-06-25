@@ -181,8 +181,6 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ssi_claims_core::ProofValidity, ProofValidationError> {
-        eprintln!("payload: {:?}", prepared_claims.as_ref());
-
         let JWS {
             header, signature, ..
         } = proof

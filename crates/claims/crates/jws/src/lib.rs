@@ -580,9 +580,7 @@ pub fn verify_bytes_warnable(
     signature: &[u8],
 ) -> Result<VerificationWarnings, Error> {
     let mut warnings = VerificationWarnings::default();
-    eprintln!("verify with algorithm: {algorithm}");
     if let Some(key_algorithm) = key.algorithm {
-        eprintln!("key algorithm: {key_algorithm}");
         if key_algorithm != algorithm
             && !(key_algorithm == Algorithm::EdDSA && algorithm == Algorithm::EdBlake2b)
             && !(key_algorithm == Algorithm::ES256 && algorithm == Algorithm::ESBlake2b)
@@ -638,12 +636,9 @@ pub fn verify_bytes_warnable(
                 return Err(ssi_jwk::Error::CurveNotImplemented(okp.curve.to_string()).into());
             }
             let hash = match algorithm {
-                Algorithm::EdBlake2b => {
-                    eprintln!("verifying EdBlake2b");
-                    <blake2::Blake2b<U32> as Digest>::new_with_prefix(data)
-                        .finalize()
-                        .to_vec()
-                }
+                Algorithm::EdBlake2b => <blake2::Blake2b<U32> as Digest>::new_with_prefix(data)
+                    .finalize()
+                    .to_vec(),
                 _ => data.to_vec(),
             };
             #[cfg(feature = "ring")]
