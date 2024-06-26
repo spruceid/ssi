@@ -71,6 +71,7 @@ where
     fn hash(
         input: standard::TransformedData<S>,
         _proof_configuration: ProofConfigurationRef<S>,
+        _verification_method: &S::VerificationMethod,
     ) -> Result<Self::Output, standard::HashingError> {
         let proof_configuration_hash = input
             .configuration
@@ -103,6 +104,7 @@ where
     fn hash(
         input: standard::TransformedData<S>,
         _proof_configuration: ProofConfigurationRef<S>,
+        _verification_method: &S::VerificationMethod,
     ) -> Result<Self::Output, standard::HashingError> {
         let mut result = String::new();
 

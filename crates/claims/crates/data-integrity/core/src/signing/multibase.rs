@@ -90,8 +90,7 @@ where
         prepared_claims: S::PreparedClaims,
         proof_configuration: ProofConfigurationRef<'_, S>,
     ) -> Result<Self::Signature, SignatureError> {
-        let algorithm = A::select_algorithm(verification_method, proof_configuration.options)
-            .ok_or(SignatureError::MissingAlgorithm)?;
+        let algorithm = A::select_algorithm(verification_method, proof_configuration.options)?;
 
         Ok(MultibaseSignature::new(
             signer.sign(algorithm, prepared_claims.as_ref()).await?,
@@ -113,8 +112,7 @@ where
         prepared_claims: S::PreparedClaims,
         proof: ProofRef<S>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        let algorithm = A::select_algorithm(verification_method, proof.options)
-            .ok_or(ProofValidationError::MissingAlgorithm)?;
+        let algorithm = A::select_algorithm(verification_method, proof.options)?;
 
         let (_, signature_bytes) = proof.signature.decode()?; // Should we check the base?
         verification_method.verify_bytes(algorithm, prepared_claims.as_ref(), &signature_bytes)
