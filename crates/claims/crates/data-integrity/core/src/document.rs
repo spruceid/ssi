@@ -14,8 +14,8 @@ use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubje
 /// Verifiable Credentials).
 ///
 /// Note that this type represents an *unsecured* document.
-/// The type for any Data-Integrity-secured document is
-/// [`DataIntegrity<DataIntegrityDocument>`](crate::DataIntegrity).
+/// The type for any Data-Integrity-secured document (with the cryptosuite `S`)
+/// is [`DataIntegrity<DataIntegrityDocument, S>`](crate::DataIntegrity).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataIntegrityDocument {
     #[serde(rename = "@context", skip_serializing_if = "Option::is_none")]
