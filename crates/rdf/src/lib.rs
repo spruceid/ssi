@@ -13,8 +13,8 @@ use rdf_types::{
 };
 
 pub use rdf_types::{
-    generator, Interpretation, InterpretationMut, LexicalQuad, LexicalQuadRef, Vocabulary,
-    VocabularyMut,
+    generator, interpretation, vocabulary, Interpretation, InterpretationMut, LexicalQuad,
+    LexicalQuadRef, Vocabulary, VocabularyMut,
 };
 
 pub use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};

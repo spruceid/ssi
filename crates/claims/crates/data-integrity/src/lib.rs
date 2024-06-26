@@ -11,4 +11,4 @@ pub type AnyProof = Proof<AnySuite>;
 pub type AnyProofs = Proofs<AnySuite>;
 
 /// Data-Integrity-secured claims with any cryptographic suite.
-pub type AnyDataIntegrity<T> = DataIntegrity<T, AnySuite>;
+pub type AnyDataIntegrity<T = DataIntegrityDocument> = DataIntegrity<T, AnySuite>;

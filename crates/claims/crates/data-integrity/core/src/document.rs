@@ -12,6 +12,10 @@ use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubje
 /// The only assumption made by this type is that the JSON-LD `@type` attribute
 /// is aliased to `type`, which is common practice (for instance with
 /// Verifiable Credentials).
+///
+/// Note that this type represents an *unsecured* document.
+/// The type for any Data-Integrity-secured document is
+/// [`DataIntegrity<DataIntegrityDocument>`](crate::DataIntegrity).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DataIntegrityDocument {
     #[serde(rename = "@context", skip_serializing_if = "Option::is_none")]

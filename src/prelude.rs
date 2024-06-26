@@ -1,8 +1,8 @@
 pub use crate::{
     claims::{
         data_integrity::{
-            AnyDataIntegrity, AnySuite, CryptographicSuite, DataIntegrity, ProofConfiguration,
-            ProofOptions,
+            AnyDataIntegrity, AnySuite, CryptographicSuite, DataIntegrity, DataIntegrityDocument,
+            ProofConfiguration, ProofOptions,
         },
         vc::syntax::{AnyJsonCredential, AnyJsonPresentation},
         CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload, JWTClaims,
