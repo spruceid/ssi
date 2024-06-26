@@ -116,6 +116,7 @@ impl HashingAlgorithm<TezosJcsSignature2021> for TezosJcsHashingAlgorithm {
     fn hash(
         mut object: json_syntax::Object,
         proof_configuration: ProofConfigurationRef<TezosJcsSignature2021>,
+        _verification_method: &TezosMethod2021,
     ) -> Result<Self::Output, HashingError> {
         let json_proof_configuration = json_syntax::to_value(ProofConfigurationRef {
             context: Some(&TZ_JCS_PROOF_CONTEXT),
