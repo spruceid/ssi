@@ -31,11 +31,6 @@ pub use ssi_sd_jwt as sd_jwt;
 /// See: <https://www.w3.org/TR/vc-data-model>
 pub use ssi_vc as vc;
 
-pub use vc::{
-    Credential, JsonCredential, JsonPresentation, Presentation, SpecializedJsonCredential,
-    VerifiableCredential, VerifiablePresentation,
-};
-
 /// Data-Integrity Proofs.
 ///
 /// See: <https://www.w3.org/TR/vc-data-integrity>
@@ -54,7 +49,7 @@ pub use ssi_data_integrity as data_integrity;
 #[educe(Debug(bound("S: DebugCryptographicSuite")))]
 pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     /// JSON-like verifiable credential.
-    Credential(DataIntegrity<vc::JsonCredential, S>),
+    Credential(DataIntegrity<vc::v1::SpecializedJsonCredential, S>),
 
     /// JSON Web Signature.
     Jws(jws::CompactJWSString),
@@ -73,7 +68,7 @@ pub enum JsonCredentialOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
 #[educe(Debug(bound("S: DebugCryptographicSuite")))]
 pub enum JsonPresentationOrJws<S: CryptographicSuite = data_integrity::AnySuite> {
     /// JSON-like verifiable presentation.
-    Presentation(DataIntegrity<vc::JsonPresentation, S>),
+    Presentation(DataIntegrity<vc::v1::JsonPresentation, S>),
 
     /// JSON Web Signature.
     Jws(jws::CompactJWSString),

@@ -1,13 +1,12 @@
 pub use crate::{
     claims::{
         data_integrity::{
-            AnyDataIntegrity, AnySuite, CryptographicSuite, DataIntegrity, ProofConfiguration,
-            ProofOptions,
+            AnyDataIntegrity, AnySuite, CryptographicSuite, DataIntegrity, DataIntegrityDocument,
+            ProofConfiguration, ProofOptions,
         },
-        vc::{any_credential_from_json_slice, any_credential_from_json_str},
+        vc::syntax::{AnyJsonCredential, AnyJsonPresentation},
         CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload, JWTClaims,
-        JsonCredential, JsonPresentation, SpecializedJsonCredential, VerifiableClaims,
-        VerificationEnvironment,
+        VerifiableClaims,
     },
     dids::{DIDResolver, DIDJWK},
     verification_methods::{AnyJwkMethod, AnyMethod, SingleSecretSigner},

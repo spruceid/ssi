@@ -13,7 +13,7 @@ use ssi_data_integrity::{
 };
 use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
-use ssi_vc::{json::JsonCredentialTypes, Context, V2};
+use ssi_vc::v2::{syntax::JsonCredentialTypes, Context};
 use ssi_verification_methods::ssi_core::OneOrMany;
 
 use crate::{
@@ -27,7 +27,7 @@ use super::BitstringStatusListEntry;
 pub struct BitstringStatusListEntrySetCredential {
     /// JSON-LD context.
     #[serde(rename = "@context")]
-    pub context: Context<V2>,
+    pub context: Context,
 
     /// Credential identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -138,7 +138,7 @@ impl DIDMethodResolver for DIDWeb {
 mod tests {
     use ssi_claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-        vc::JsonCredential,
+        vc::v1::JsonCredential,
         VerifiableClaims,
     };
     use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};

@@ -14,8 +14,8 @@ use ssi_data_integrity::{
 use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
 use ssi_vc::{
-    json::{JsonCredentialTypes, RequiredCredentialType},
-    Context, V2,
+    syntax::RequiredType,
+    v2::syntax::{Context, JsonCredentialTypes},
 };
 
 use crate::{EncodedStatusMap, FromBytes, FromBytesOptions};
@@ -27,8 +27,8 @@ pub const BITSTRING_STATUS_LIST_CREDENTIAL_TYPE: &str = "BitstringStatusListCred
 #[derive(Debug, Clone, Copy)]
 pub struct BitstringStatusListCredentialType;
 
-impl RequiredCredentialType for BitstringStatusListCredentialType {
-    const REQUIRED_CREDENTIAL_TYPE: &'static str = BITSTRING_STATUS_LIST_CREDENTIAL_TYPE;
+impl RequiredType for BitstringStatusListCredentialType {
+    const REQUIRED_TYPE: &'static str = BITSTRING_STATUS_LIST_CREDENTIAL_TYPE;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,7 +36,7 @@ impl RequiredCredentialType for BitstringStatusListCredentialType {
 pub struct BitstringStatusListCredential {
     /// JSON-LD context.
     #[serde(rename = "@context")]
-    pub context: Context<V2>,
+    pub context: Context,
 
     /// Credential identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]

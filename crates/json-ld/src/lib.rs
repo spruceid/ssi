@@ -6,12 +6,16 @@ use std::{borrow::Cow, hash::Hash};
 pub use context::*;
 use json_ld::Expand;
 use linked_data::{LinkedData, LinkedDataResource, LinkedDataSubject};
-use rdf_types::interpretation::WithGenerator;
-use rdf_types::{Vocabulary, VocabularyMut};
 
 pub use json_ld;
-pub use json_ld::{syntax, ExpandedDocument, Id, LoadError, Loader, Nullable, ToRdfError};
-use ssi_rdf::{generator, Interpretation, LdEnvironment};
+pub use json_ld::{
+    syntax, Direction, ExpandedDocument, Id, LangString, LenientLangTag, LoadError, Loader,
+    Nullable, ToRdfError,
+};
+use ssi_rdf::{
+    generator, interpretation::WithGenerator, Interpretation, LdEnvironment, Vocabulary,
+    VocabularyMut,
+};
 
 /// Environment that provides a JSON-LD context loader.
 pub trait ContextLoaderEnvironment {

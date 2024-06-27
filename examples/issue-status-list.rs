@@ -3,7 +3,7 @@
 use ssi::{
     claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
-        vc::revocation::{StatusList2021, StatusList2021Credential, StatusList2021Subject},
+        vc::v1::revocation::{StatusList2021, StatusList2021Credential, StatusList2021Subject},
         VerifiableClaims,
     },
     jwk::JWK,

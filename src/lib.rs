@@ -83,7 +83,7 @@
 //! # async fn main() {
 //! use ssi::prelude::*;
 //!
-//! let vc = any_credential_from_json_str(
+//! let vc = ssi::claims::vc::v1::data_integrity::any_credential_from_json_str(
 //!   &std::fs::read_to_string("examples/files/vc.jsonld")
 //!   .expect("unable to load VC")
 //! ).expect("invalid VC");
@@ -173,7 +173,7 @@
 //!   email: String
 //! }
 //!
-//! let credential = SpecializedJsonCredential::<MyCredentialSubject>::new(
+//! let credential = ssi::claims::vc::v1::JsonCredential::<MyCredentialSubject>::new(
 //!   Some(uri!("https://example.org/#CredentialId").to_owned()), // id
 //!   uri!("https://example.org/#Issuer").to_owned().into(), // issuer
 //!   DateTime::now(), // issuance date

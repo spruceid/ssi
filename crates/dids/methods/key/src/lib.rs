@@ -449,7 +449,7 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnyInputSuiteOptions, AnySuite},
         jws::JWSVerifier,
-        vc::JsonCredential,
+        vc::v1::JsonCredential,
         VerifiableClaims,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
