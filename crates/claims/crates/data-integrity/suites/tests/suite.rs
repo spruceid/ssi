@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 use hashbrown::HashMap;
 use iref::UriBuf;
 use serde::{de::DeserializeOwned, Deserialize};
-use ssi_claims_core::SignatureError;
+use ssi_claims_core::{SignatureError, VerifiableClaims};
 use ssi_data_integrity_core::{CryptographicSuite, DataIntegrityDocument, ProofOptions};
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
@@ -221,7 +221,7 @@ async fn test_ecdsa_rdfc_2019() {
         .await
         .unwrap();
 
-    let output = serde_json::to_value(vc).unwrap();
+    let output = serde_json::to_value(&vc).unwrap();
 
     eprintln!(
         "output   = {}",
@@ -233,4 +233,6 @@ async fn test_ecdsa_rdfc_2019() {
     );
 
     assert_eq!(output, expected_output);
+
+    assert!(vc.verify(&keys).await.unwrap().is_ok());
 }
