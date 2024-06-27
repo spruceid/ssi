@@ -54,7 +54,7 @@ secp256r1 = ["ssi-verification-methods/secp256r1", "p256"]
 ##
 ## This includes:
 ##   - `EcdsaRdfc2019`
-secp384r1 = ["ssi-verification-methods/secp384r1"]
+secp384r1 = ["ssi-verification-methods/secp384r1", "p384"]
 
 ## Signature suites based on RSA.
 ##
@@ -144,6 +144,7 @@ serde_jcs = { workspace = true, optional = true }
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }
+serde_json.workspace = true
 static-iref.workspace = true
 rand = "0.7"
 hashbrown = "0.13.0"
