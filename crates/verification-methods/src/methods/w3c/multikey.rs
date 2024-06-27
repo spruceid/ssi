@@ -332,6 +332,8 @@ impl MultiCodec for DecodedMultikey {
             Self::P384(k) => k.to_codec_and_bytes(),
             #[cfg(feature = "bls12-381")]
             Self::Bls12_381(k) => k.to_codec_and_bytes(),
+            #[allow(unreachable_patterns)]
+            _ => unreachable!(), // references are always considered inhabited.
         }
     }
 }
