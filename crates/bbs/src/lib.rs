@@ -75,13 +75,7 @@ impl MultiSigningMethod<BBSplusSecretKey, Bbs> for Multikey {
         algorithm: Bbs,
         messages: &[Vec<u8>],
     ) -> Result<Vec<u8>, MessageSignatureError> {
-        use zkryptium::{
-            bbsplus::ciphersuites::Bls12381Sha256,
-            schemes::{
-                algorithms::BBSplus,
-                generics::{BlindSignature, Signature},
-            },
-        };
+        use zkryptium::schemes::generics::{BlindSignature, Signature};
 
         let DecodedMultikey::Bls12_381(pk) = self.decode()? else {
             return Err(MessageSignatureError::InvalidPublicKey);
