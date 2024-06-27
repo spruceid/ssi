@@ -79,7 +79,7 @@ mod tests {
     use ssi_data_integrity_core::{
         suite::standard::TypedTransformationAlgorithm, ProofConfiguration,
     };
-    use ssi_di_sd_primitives::{group::canonicalize_and_group, JsonPointerBuf};
+    use ssi_di_sd_primitives::group::canonicalize_and_group;
     use ssi_rdf::IntoNQuads;
     use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
