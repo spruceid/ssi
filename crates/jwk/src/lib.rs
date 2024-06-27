@@ -952,6 +952,7 @@ pub fn secp256k1_parse(data: &[u8]) -> Result<JWK, Error> {
     Ok(pk.into())
 }
 
+#[cfg(feature = "secp256k1")]
 impl From<k256::PublicKey> for JWK {
     fn from(value: k256::PublicKey) -> Self {
         JWK {

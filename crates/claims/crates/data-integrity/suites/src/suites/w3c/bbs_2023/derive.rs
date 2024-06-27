@@ -293,7 +293,6 @@ mod tests {
     use json_syntax::UnorderedPartialEq;
     use ssi_data_integrity_core::DataIntegrity;
     use ssi_di_sd_primitives::select::select_json_ld;
-    use ssi_json_ld::JsonLdEnvironment;
     use ssi_verification_methods::Multikey;
     use static_iref::{iri, uri};
 
@@ -328,10 +327,10 @@ mod tests {
             &*PUBLIC_KEY,
         );
 
-        let mut context = JsonLdEnvironment::default();
+        let loader = ssi_json_ld::ContextLoader::default();
 
         let data = create_disclosure_data(
-            &mut context,
+            &loader,
             &signed_base.claims,
             &verification_method,
             &signed_base.proofs.first().unwrap().signature,
