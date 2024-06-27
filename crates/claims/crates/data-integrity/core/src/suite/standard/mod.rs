@@ -138,7 +138,7 @@ where
         // Find a signer for this verification method.
         let signer = signers
             .for_method(Cow::Borrowed(&method))
-            .await
+            .await?
             .ok_or(SignatureError::MissingSigner)?;
 
         S::SignatureAlgorithm::sign(&method, signer, hashed, proof_configuration).await

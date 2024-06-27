@@ -15,13 +15,19 @@ pub trait Signer<M: VerificationMethod> {
     type MessageSigner;
 
     #[allow(async_fn_in_trait)]
-    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner>;
+    async fn for_method(
+        &self,
+        method: Cow<'_, M>,
+    ) -> Result<Option<Self::MessageSigner>, SignatureError>;
 }
 
 impl<'s, M: VerificationMethod, S: Signer<M>> Signer<M> for &'s S {
     type MessageSigner = S::MessageSigner;
 
-    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner> {
+    async fn for_method(
+        &self,
+        method: Cow<'_, M>,
+    ) -> Result<Option<Self::MessageSigner>, SignatureError> {
         S::for_method(*self, method).await
     }
 }
