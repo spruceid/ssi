@@ -22,7 +22,7 @@ async fn main() {
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     // DID resolver.
-    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
     let verifier = Verifier::from_resolver(&resolver);
 
     let mut rl = RevocationList2020::default();

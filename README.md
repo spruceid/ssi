@@ -62,7 +62,7 @@ let jwt = CompactJWSString::from_string(
 // public key used to sign the JWT.
 // Here we use the example `ExampleDIDResolver` resolver, enabled with the
 // `example` feature.
-let vm_resolver = ExampleDIDResolver::default().with_default_options::<AnyJwkMethod>();
+let vm_resolver = ExampleDIDResolver::default().into_vm_resolver::<AnyJwkMethod>();
 
 // Verify the JWT.
 assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok())
@@ -89,7 +89,7 @@ let vc = ssi::claims::vc::v1::data_integrity::any_credential_from_json_str(
 
 // Setup a verification method resolver, in charge of retrieving the
 // public key used to sign the JWT.
-let vm_resolver = ExampleDIDResolver::default().with_default_options();
+let vm_resolver = ExampleDIDResolver::default().into_vm_resolver();
 
 assert!(vc.verify(&vm_resolver).await.expect("verification failed").is_ok());
 ```
@@ -133,7 +133,7 @@ let jwt = claims.sign(&key).await.expect("signature failed");
 
 // Create a verification method resolver, which will be in charge of
 // decoding the DID back into a public key.
-let vm_resolver = DIDJWK.with_default_options::<AnyJwkMethod>();
+let vm_resolver = DIDJWK.into_vm_resolver::<AnyJwkMethod>();
 
 // Verify the JWT.
 assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok());
@@ -181,7 +181,7 @@ let did = DIDJWK::generate_url(&key.to_public());
 
 // Create a verification method resolver, which will be in charge of
 // decoding the DID back into a public key.
-let vm_resolver = DIDJWK.with_default_options();
+let vm_resolver = DIDJWK.into_vm_resolver();
 
 // Create a signer from the secret key.
 // Here we use the simple `SingleSecretSigner` signer type which always uses

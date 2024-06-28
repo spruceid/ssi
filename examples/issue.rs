@@ -17,7 +17,7 @@ async fn issue(proof_format: &str) {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
     let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     key.key_id = Some("did:example:foo#key1".to_string());
-    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
     let verifier = Verifier::from_resolver(&resolver);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 

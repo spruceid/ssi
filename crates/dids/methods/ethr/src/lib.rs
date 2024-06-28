@@ -473,7 +473,7 @@ mod tests {
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
-        let didethr = DIDEthr.with_default_options();
+        let didethr = DIDEthr.into_vm_resolver();
         let verifier = Verifier::from_resolver(&didethr);
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
@@ -592,7 +592,7 @@ mod tests {
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
-        let didethr = DIDEthr.with_default_options();
+        let didethr = DIDEthr.into_vm_resolver();
         let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(include_str!(
             "../tests/vc.jsonld"
         ))

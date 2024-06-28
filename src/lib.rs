@@ -58,7 +58,7 @@
 //! // public key used to sign the JWT.
 //! // Here we use the example `ExampleDIDResolver` resolver, enabled with the
 //! // `example` feature.
-//! let vm_resolver = ExampleDIDResolver::default().with_default_options::<AnyJwkMethod>();
+//! let vm_resolver = ExampleDIDResolver::default().into_vm_resolver::<AnyJwkMethod>();
 //!
 //! // Create a verifier from our verification method resolver.
 //! let verifier = Verifier::from_resolver(vm_resolver);
@@ -93,7 +93,7 @@
 //!
 //! // Setup a verification method resolver, in charge of retrieving the
 //! // public key used to sign the JWT.
-//! let vm_resolver = ExampleDIDResolver::default().with_default_options();
+//! let vm_resolver = ExampleDIDResolver::default().into_vm_resolver();
 //!
 //! // Create a verifier from our verification method resolver.
 //! let verifier = Verifier::from_resolver(vm_resolver);
@@ -143,7 +143,7 @@
 //!
 //! // Create a verification method resolver, which will be in charge of
 //! // decoding the DID back into a public key.
-//! let vm_resolver = DIDJWK.with_default_options::<AnyJwkMethod>();
+//! let vm_resolver = DIDJWK.into_vm_resolver::<AnyJwkMethod>();
 //!
 //! // Create a verifier from our verification method resolver.
 //! let verifier = Verifier::from_resolver(vm_resolver);
@@ -198,7 +198,7 @@
 //!
 //! // Create a verification method resolver, which will be in charge of
 //! // decoding the DID back into a public key.
-//! let vm_resolver = DIDJWK.with_default_options();
+//! let vm_resolver = DIDJWK.into_vm_resolver();
 //!
 //! // Create a signer from the secret key.
 //! // Here we use the simple `SingleSecretSigner` signer type which always uses

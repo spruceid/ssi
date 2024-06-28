@@ -50,7 +50,7 @@ async fn verify(proof_format_in: &str, proof_format_out: &str, input_vc: &str) {
     let key_str = include_str!("../tests/ed25519-2020-10-18.json");
     let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     key.key_id = Some("did:example:foo#key2".to_string());
-    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
     let verifier = Verifier::from_resolver(&resolver);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 

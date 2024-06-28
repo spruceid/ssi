@@ -35,7 +35,7 @@ fn create_verifier() -> Verifier<VerificationMethodDIDResolver<StaticDIDResolver
 
     // Turn the DID resolver into a verification method resolver by setting
     // resolution options.
-    let resolver = did_resolver.with_default_options();
+    let resolver = did_resolver.into_vm_resolver();
 
     // Create a verifier using the verification method resolver.
     Verifier::from_resolver(resolver)
