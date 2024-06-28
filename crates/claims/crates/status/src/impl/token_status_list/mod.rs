@@ -11,6 +11,7 @@
 use flate2::{bufread::ZlibDecoder, write::ZlibEncoder, Compression};
 use iref::Uri;
 use serde::Serialize;
+use ssi_claims_core::{DateTimeEnvironment, ResolverEnvironment};
 use std::{
     io::{self, Read, Write},
     time::Duration,
@@ -20,7 +21,8 @@ pub mod cbor;
 pub mod json;
 
 pub use json::StatusListJwt;
-use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier};
+use ssi_jwk::JWKResolver;
+use ssi_jws::{CompactJWS, InvalidCompactJWS};
 use ssi_jwt::{ClaimSet, JWTClaims, ToDecodedJWT};
 
 use crate::{
@@ -92,7 +94,11 @@ pub enum FromBytesError {
     Rejected(#[from] ssi_claims_core::Invalid),
 }
 
-impl<V: JWSVerifier> FromBytes<V> for StatusListToken {
+impl<V> FromBytes<V> for StatusListToken
+where
+    V: ResolverEnvironment + DateTimeEnvironment,
+    V::Resolver: JWKResolver,
+{
     type Error = FromBytesError;
 
     async fn from_bytes_with(
@@ -487,7 +493,11 @@ pub enum AnyStatusListEntrySet {
     Json(json::Status),
 }
 
-impl<V: JWSVerifier> FromBytes<V> for AnyStatusListEntrySet {
+impl<V> FromBytes<V> for AnyStatusListEntrySet
+where
+    V: ResolverEnvironment + DateTimeEnvironment,
+    V::Resolver: JWKResolver,
+{
     type Error = EntrySetFromBytesError;
 
     async fn from_bytes_with(

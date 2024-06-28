@@ -4,19 +4,24 @@ use iref::UriBuf;
 use rdf_types::{Interpretation, Vocabulary, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
-    ClaimsValidity, DateTimeEnvironment, DefaultVerificationEnvironment, InvalidClaims, Validate,
-    ValidateProof, VerifiableClaims, VerificationEnvironment,
+    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims,
+    ResolverEnvironment, ValidateClaims, VerifiableClaims,
 };
 use ssi_data_integrity::{
     ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject},
-    AnyProofs, AnySuite,
+    AnySuite,
 };
-use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
-use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
+use ssi_json_ld::{
+    CompactJsonLd, ContextLoaderEnvironment, Expandable, JsonLdError, JsonLdNodeObject,
+    JsonLdObject, Loader,
+};
+use ssi_jwk::JWKResolver;
+use ssi_jws::{CompactJWS, InvalidCompactJWS, ValidateJWSHeader};
 use ssi_vc::{
     syntax::RequiredType,
     v2::syntax::{Context, JsonCredentialTypes},
 };
+use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 
 use crate::{EncodedStatusMap, FromBytes, FromBytesOptions};
 
@@ -120,11 +125,11 @@ impl Expandable for BitstringStatusListCredential {
     }
 }
 
-impl<E, P> Validate<E, P> for BitstringStatusListCredential
+impl<E, P> ValidateClaims<E, P> for BitstringStatusListCredential
 where
     E: DateTimeEnvironment,
 {
-    fn validate(&self, env: &E, _proof: &P) -> ClaimsValidity {
+    fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
         let now = env.date_time();
 
@@ -154,10 +159,6 @@ impl<E> ValidateJWSHeader<E> for BitstringStatusListCredential {
     fn validate_jws_header(&self, _env: &E, _header: &ssi_jws::Header) -> ClaimsValidity {
         Ok(())
     }
-}
-
-impl DefaultVerificationEnvironment for BitstringStatusListCredential {
-    type Environment = ();
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -207,8 +208,11 @@ pub enum FromBytesError {
 
 impl<V> FromBytes<V> for BitstringStatusListCredential
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<Self, VerificationEnvironment, V>,
+    V: ResolverEnvironment
+        + DateTimeEnvironment
+        + ContextLoaderEnvironment
+        + Eip712TypesEnvironment,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = FromBytesError;
 

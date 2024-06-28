@@ -60,8 +60,11 @@
 //! // `example` feature.
 //! let vm_resolver = ExampleDIDResolver::default().with_default_options::<AnyJwkMethod>();
 //!
+//! // Create a verifier from our verification method resolver.
+//! let verifier = Verifier::from_resolver(vm_resolver);
+//!
 //! // Verify the JWT.
-//! assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok())
+//! assert!(jwt.verify(&verifier).await.expect("verification failed").is_ok())
 //! # }
 //! ```
 //!
@@ -92,7 +95,10 @@
 //! // public key used to sign the JWT.
 //! let vm_resolver = ExampleDIDResolver::default().with_default_options();
 //!
-//! assert!(vc.verify(&vm_resolver).await.expect("verification failed").is_ok());
+//! // Create a verifier from our verification method resolver.
+//! let verifier = Verifier::from_resolver(vm_resolver);
+//!
+//! assert!(vc.verify(&verifier).await.expect("verification failed").is_ok());
 //! # }
 //! ```
 //!
@@ -139,8 +145,11 @@
 //! // decoding the DID back into a public key.
 //! let vm_resolver = DIDJWK.with_default_options::<AnyJwkMethod>();
 //!
+//! // Create a verifier from our verification method resolver.
+//! let verifier = Verifier::from_resolver(vm_resolver);
+//!
 //! // Verify the JWT.
-//! assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok());
+//! assert!(jwt.verify(&verifier).await.expect("verification failed").is_ok());
 //!
 //! // Print the JWT.
 //! println!("{jwt}")

@@ -24,6 +24,14 @@ pub trait ContextLoaderEnvironment {
     fn loader(&self) -> &Self::Loader;
 }
 
+impl<'a, E: ContextLoaderEnvironment> ContextLoaderEnvironment for &'a E {
+    type Loader = E::Loader;
+
+    fn loader(&self) -> &Self::Loader {
+        E::loader(*self)
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum JsonLdError {
     #[error("expansion error: {0}")]

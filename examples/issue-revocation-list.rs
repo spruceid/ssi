@@ -11,6 +11,7 @@ use ssi::{
     jwk::JWK,
     verification_methods::SingleSecretSigner,
 };
+use ssi_claims::Verifier;
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
@@ -22,6 +23,7 @@ async fn main() {
 
     // DID resolver.
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
+    let verifier = Verifier::from_resolver(&resolver);
 
     let mut rl = RevocationList2020::default();
     rl.set_status(1, true).unwrap();
@@ -39,7 +41,7 @@ async fn main() {
     let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
     let vc = suite.sign(rl_vc, &resolver, &signer, params).await.unwrap();
 
-    assert!(vc.verify(&resolver).await.unwrap().is_ok());
+    assert!(vc.verify(verifier).await.unwrap().is_ok());
 
     let stdout_writer = std::io::BufWriter::new(std::io::stdout());
     serde_json::to_writer_pretty(stdout_writer, &vc).unwrap();

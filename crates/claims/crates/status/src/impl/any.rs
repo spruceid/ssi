@@ -1,7 +1,8 @@
 use iref::Uri;
-use ssi_claims_core::{ValidateProof, VerificationEnvironment};
-use ssi_data_integrity::AnyProofs;
-use ssi_jws::JWSVerifier;
+use ssi_claims_core::{DateTimeEnvironment, Eip712TypesEnvironment, ResolverEnvironment};
+use ssi_json_ld::ContextLoaderEnvironment;
+use ssi_jwk::JWKResolver;
+use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 
 use crate::{
     bitstream_status_list::{
@@ -41,8 +42,11 @@ pub enum FromBytesError {
 
 impl<V> FromBytes<V> for AnyStatusMap
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<BitstringStatusListCredential, VerificationEnvironment, V>,
+    V: ResolverEnvironment
+        + DateTimeEnvironment
+        + ContextLoaderEnvironment
+        + Eip712TypesEnvironment,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = FromBytesError;
 
@@ -178,8 +182,11 @@ pub enum AnyEntrySet {
 
 impl<V> FromBytes<V> for AnyEntrySet
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<BitstringStatusListEntrySetCredential, VerificationEnvironment, V>,
+    V: ResolverEnvironment
+        + DateTimeEnvironment
+        + ContextLoaderEnvironment
+        + Eip712TypesEnvironment,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = EntrySetFromBytesError;
 

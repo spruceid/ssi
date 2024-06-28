@@ -40,10 +40,24 @@ impl TypesProvider for () {
     }
 }
 
+impl<'a, T: TypesProvider> TypesProvider for &'a T {
+    async fn fetch_types(&self, uri: &Uri) -> Result<Types, TypesFetchError> {
+        T::fetch_types(*self, uri).await
+    }
+}
+
 pub trait Eip712TypesEnvironment {
     type Provider: TypesProvider;
 
     fn eip712_types(&self) -> &Self::Provider;
+}
+
+impl<'a, E: Eip712TypesEnvironment> Eip712TypesEnvironment for &'a E {
+    type Provider = E::Provider;
+
+    fn eip712_types(&self) -> &Self::Provider {
+        E::eip712_types(*self)
+    }
 }
 
 /// EIP-712 types

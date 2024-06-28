@@ -4,17 +4,21 @@ use iref::UriBuf;
 use rdf_types::{Interpretation, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
-    ClaimsValidity, DefaultVerificationEnvironment, Validate, ValidateProof, VerifiableClaims,
-    VerificationEnvironment,
+    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, ResolverEnvironment,
+    ValidateClaims, VerifiableClaims,
 };
 use ssi_data_integrity::{
     ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject},
-    AnyProofs, AnySuite,
+    AnySuite,
 };
-use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
-use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
+use ssi_json_ld::{
+    CompactJsonLd, ContextLoaderEnvironment, Expandable, JsonLdError, JsonLdNodeObject,
+    JsonLdObject, Loader,
+};
+use ssi_jwk::JWKResolver;
+use ssi_jws::{CompactJWS, InvalidCompactJWS, ValidateJWSHeader};
 use ssi_vc::v2::{syntax::JsonCredentialTypes, Context};
-use ssi_verification_methods::ssi_core::OneOrMany;
+use ssi_verification_methods::{ssi_core::OneOrMany, AnyMethod, VerificationMethodResolver};
 
 use crate::{
     bitstream_status_list::FromBytesError, FromBytes, FromBytesOptions, StatusMapEntrySet,
@@ -91,8 +95,8 @@ impl Expandable for BitstringStatusListEntrySetCredential {
     }
 }
 
-impl<E, P> Validate<E, P> for BitstringStatusListEntrySetCredential {
-    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
+impl<E, P> ValidateClaims<E, P> for BitstringStatusListEntrySetCredential {
+    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
         Ok(())
     }
@@ -104,14 +108,13 @@ impl<E> ValidateJWSHeader<E> for BitstringStatusListEntrySetCredential {
     }
 }
 
-impl DefaultVerificationEnvironment for BitstringStatusListEntrySetCredential {
-    type Environment = ();
-}
-
 impl<V> FromBytes<V> for BitstringStatusListEntrySetCredential
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<Self, VerificationEnvironment, V>,
+    V: ResolverEnvironment
+        + DateTimeEnvironment
+        + ContextLoaderEnvironment
+        + Eip712TypesEnvironment,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = FromBytesError;
 

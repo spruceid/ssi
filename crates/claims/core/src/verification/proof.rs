@@ -108,7 +108,7 @@ impl From<std::convert::Infallible> for ProofValidationError {
 pub type ProofValidity = Result<(), InvalidProof>;
 
 /// Proof that can be validated against `T` claims with a verifier of type `V`.
-pub trait ValidateProof<T, E, V> {
+pub trait ValidateProof<V, T> {
     /// Validates the input claim's proof using the given verifier.
     ///
     /// The returned value is a nested `Result`.
@@ -119,25 +119,23 @@ pub trait ValidateProof<T, E, V> {
     #[allow(async_fn_in_trait)]
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a E,
-        claims: &'a T,
         verifier: &'a V,
+        claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError>;
 }
 
-impl<T, E, V, P: ValidateProof<T, E, V>> ValidateProof<T, E, V> for Vec<P> {
+impl<V, T, P: ValidateProof<V, T>> ValidateProof<V, T> for Vec<P> {
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a E,
-        claims: &'a T,
         verifier: &'a V,
+        claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError> {
         if self.is_empty() {
             // No proof.
             Ok(Err(InvalidProof::Missing))
         } else {
             for p in self {
-                if let Err(e) = p.validate_proof(environment, claims, verifier).await? {
+                if let Err(e) = p.validate_proof(verifier, claims).await? {
                     return Ok(Err(e));
                 }
             }

@@ -7,7 +7,7 @@ use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     jws::JWSPayload,
     vc::v1::ToJwtClaims,
-    VerifiableClaims,
+    VerifiableClaims, Verifier,
 };
 use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;
@@ -18,6 +18,7 @@ async fn issue(proof_format: &str) {
     let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     key.key_id = Some("did:example:foo#key1".to_string());
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
+    let verifier = Verifier::from_resolver(&resolver);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc: ssi::claims::vc::v1::SpecializedJsonCredential = serde_json::from_value(json!({
@@ -41,7 +42,7 @@ async fn issue(proof_format: &str) {
             let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
             let vc = suite.sign(vc, &resolver, &signer, params).await.unwrap();
 
-            let result = vc.verify(&resolver).await.expect("verification failed");
+            let result = vc.verify(verifier).await.expect("verification failed");
             if result.is_err() {
                 panic!("verify failed");
             }
@@ -52,7 +53,7 @@ async fn issue(proof_format: &str) {
         "jwt" => {
             let jwt = vc.to_jwt_claims().unwrap().sign(&key).await.unwrap();
 
-            let result = jwt.verify(&resolver).await.expect("verification failed");
+            let result = jwt.verify(verifier).await.expect("verification failed");
             if result.is_err() {
                 panic!("verify failed");
             }

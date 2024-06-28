@@ -11,6 +11,7 @@ use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims::{
+    chrono::{DateTime, Utc},
     data_integrity::{
         suite::{CryptographicSuiteSigning, InputOptions},
         AnyDataIntegrity, AnyProofs, AnySignatureAlgorithm, AnySuite, CryptographicSuite,
@@ -18,7 +19,7 @@ use ssi_claims::{
     },
     vc::syntax::{Context, RequiredContext},
     ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims,
-    SignatureEnvironment, SignatureError, Validate,
+    ResolverEnvironment, SignatureEnvironment, SignatureError, ValidateClaims, Verifier,
 };
 use ssi_json_ld::{ContextLoaderEnvironment, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
@@ -191,56 +192,96 @@ pub trait TargetCapabilityEnvironment {
     fn target_capability(&self) -> &Delegation<Self::Caveat, Self::AdditionalProperties>;
 }
 
-pub struct EnvironmentDelegation<'a, E, C, S>(E, &'a Delegation<C, S>);
+impl<'a, E: TargetCapabilityEnvironment> TargetCapabilityEnvironment for &'a E {
+    type Caveat = E::Caveat;
+    type AdditionalProperties = E::AdditionalProperties;
 
-impl<'a, E, C, S> TargetCapabilityEnvironment for EnvironmentDelegation<'a, E, C, S> {
+    fn target_capability(&self) -> &Delegation<Self::Caveat, Self::AdditionalProperties> {
+        E::target_capability(*self)
+    }
+}
+
+pub struct InvocationVerifier<'a, C, S, R, L1 = ssi_json_ld::ContextLoader, L2 = ()> {
+    pub resolver: R,
+    pub json_ld_loader: L1,
+    pub eip712_types_loader: L2,
+    pub date_time: DateTime<Utc>,
+    pub delegation: &'a Delegation<C, S>,
+}
+
+impl<'a, C, S, R> InvocationVerifier<'a, C, S, R> {
+    pub fn from_resolver(resolver: R, delegation: &'a Delegation<C, S>) -> Self {
+        Self::from_verifier(Verifier::from_resolver(resolver), delegation)
+    }
+}
+
+impl<'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, R, L1, L2> {
+    pub fn from_verifier(verifier: Verifier<R, L1, L2>, delegation: &'a Delegation<C, S>) -> Self {
+        Self {
+            resolver: verifier.resolver,
+            json_ld_loader: verifier.json_ld_loader,
+            eip712_types_loader: verifier.eip712_types_loader,
+            date_time: verifier.date_time,
+            delegation,
+        }
+    }
+}
+
+impl<'v, 'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, &'v R, &'v L1, &'v L2> {
+    pub fn from_verifier_ref(
+        verifier: &'v Verifier<R, L1, L2>,
+        delegation: &'a Delegation<C, S>,
+    ) -> Self {
+        Self {
+            resolver: &verifier.resolver,
+            json_ld_loader: &verifier.json_ld_loader,
+            eip712_types_loader: &verifier.eip712_types_loader,
+            date_time: verifier.date_time,
+            delegation,
+        }
+    }
+}
+
+impl<'a, C, S, R, L1, L2> DateTimeEnvironment for InvocationVerifier<'a, C, S, R, L1, L2> {
+    fn date_time(&self) -> DateTime<Utc> {
+        self.date_time
+    }
+}
+
+impl<'a, C, S, R, L1, L2> ResolverEnvironment for InvocationVerifier<'a, C, S, R, L1, L2> {
+    type Resolver = R;
+
+    fn resolver(&self) -> &Self::Resolver {
+        &self.resolver
+    }
+}
+
+impl<'a, C, S, R, L1: ssi_json_ld::Loader, L2> ContextLoaderEnvironment
+    for InvocationVerifier<'a, C, S, R, L1, L2>
+{
+    type Loader = L1;
+
+    fn loader(&self) -> &Self::Loader {
+        &self.json_ld_loader
+    }
+}
+
+impl<'a, C, S, R, L1, L2: ssi_eip712::TypesProvider> Eip712TypesEnvironment
+    for InvocationVerifier<'a, C, S, R, L1, L2>
+{
+    type Provider = L2;
+
+    fn eip712_types(&self) -> &Self::Provider {
+        &self.eip712_types_loader
+    }
+}
+
+impl<'a, C, S, R, L1, L2> TargetCapabilityEnvironment for InvocationVerifier<'a, C, S, R, L1, L2> {
     type Caveat = C;
     type AdditionalProperties = S;
 
-    fn target_capability(&self) -> &Delegation<C, S> {
-        self.1
-    }
-}
-
-impl<'a, E: ContextLoaderEnvironment, C, S> ContextLoaderEnvironment
-    for EnvironmentDelegation<'a, E, C, S>
-{
-    type Loader = E::Loader;
-
-    fn loader(&self) -> &Self::Loader {
-        self.0.loader()
-    }
-}
-
-impl<'a, E: Eip712TypesEnvironment, C, S> Eip712TypesEnvironment
-    for EnvironmentDelegation<'a, E, C, S>
-{
-    type Provider = E::Provider;
-
-    fn eip712_types(&self) -> &Self::Provider {
-        self.0.eip712_types()
-    }
-}
-
-impl<'a, E: DateTimeEnvironment, C, S> DateTimeEnvironment for EnvironmentDelegation<'a, E, C, S> {
-    fn date_time(&self) -> ssi_claims::chrono::DateTime<ssi_claims::chrono::Utc> {
-        self.0.date_time()
-    }
-}
-
-pub trait WithCapabilityChain: Sized {
-    fn with_target_capability<C, S>(
-        self,
-        delegation: &Delegation<C, S>,
-    ) -> EnvironmentDelegation<Self, C, S>;
-}
-
-impl<E> WithCapabilityChain for E {
-    fn with_target_capability<C, S>(
-        self,
-        delegation: &Delegation<C, S>,
-    ) -> EnvironmentDelegation<Self, C, S> {
-        EnvironmentDelegation(self, delegation)
+    fn target_capability(&self) -> &Delegation<Self::Caveat, Self::AdditionalProperties> {
+        self.delegation
     }
 }
 
@@ -252,8 +293,8 @@ impl<C, P> JsonLdObject for Delegation<C, P> {
 
 impl<C, P> JsonLdNodeObject for Delegation<C, P> {}
 
-impl<C, S, E> Validate<E, AnyProofs> for Delegation<C, S> {
-    fn validate(&self, _: &E, proofs: &Proofs<AnySuite>) -> ClaimsValidity {
+impl<C, S, E> ValidateClaims<E, AnyProofs> for Delegation<C, S> {
+    fn validate_claims(&self, _: &E, proofs: &AnyProofs) -> ClaimsValidity {
         self.validate(proofs).map_err(InvalidClaims::other)
     }
 }
@@ -416,11 +457,11 @@ where
     }
 }
 
-impl<E, S> Validate<E, AnyProofs> for Invocation<S>
+impl<E, S> ValidateClaims<E, AnyProofs> for Invocation<S>
 where
     E: TargetCapabilityEnvironment,
 {
-    fn validate(&self, env: &E, proofs: &Proofs<AnySuite>) -> ClaimsValidity {
+    fn validate_claims(&self, env: &E, proofs: &AnyProofs) -> ClaimsValidity {
         self.validate(env.target_capability(), proofs)
             .map_err(InvalidClaims::other)
     }
@@ -429,7 +470,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ssi_claims::{VerifiableClaims, VerificationEnvironment};
+    use ssi_claims::{VerifiableClaims, Verifier};
     use ssi_data_integrity::DataIntegrity;
     use ssi_dids_core::{example::ExampleDIDResolver, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
@@ -486,6 +527,7 @@ mod tests {
         use ssi_data_integrity::ProofOptions;
 
         let dk = VerificationMethodDIDResolver::new(ExampleDIDResolver::new());
+        let verifier = Verifier::from_resolver(&dk);
 
         let alice_did = "did:example:foo";
         let alice_vm = UriBuf::new(format!("{}#key2", alice_did).into_bytes()).unwrap();
@@ -553,13 +595,13 @@ mod tests {
             .unwrap();
 
         // happy path
-        assert!(signed_del.verify(&dk).await.unwrap().is_ok());
+        assert!(signed_del.verify(&verifier).await.unwrap().is_ok());
 
         assert!(signed_inv
-            .verify_with(
-                &dk,
-                VerificationEnvironment::default().with_target_capability(&signed_del.claims)
-            )
+            .verify(InvocationVerifier::from_verifier_ref(
+                &verifier,
+                &signed_del.claims
+            ))
             .await
             .unwrap()
             .is_ok());
@@ -576,12 +618,12 @@ mod tests {
         bad_sig_inv.id = uri!("urn:different_id").to_owned();
 
         // invalid proof for data
-        assert!(bad_sig_del.verify(&dk).await.unwrap().is_err());
+        assert!(bad_sig_del.verify(&verifier).await.unwrap().is_err());
         assert!(bad_sig_inv
-            .verify_with(
-                &dk,
-                VerificationEnvironment::default().with_target_capability(&signed_del.claims)
-            )
+            .verify(InvocationVerifier::from_verifier_ref(
+                &verifier,
+                &signed_del.claims
+            ))
             .await
             .unwrap()
             .is_err());
@@ -602,10 +644,10 @@ mod tests {
             .await
             .unwrap();
         assert!(signed_inv
-            .verify_with(
-                &dk,
-                VerificationEnvironment::default().with_target_capability(&signed_wrong_del.claims)
-            )
+            .verify(InvocationVerifier::from_verifier_ref(
+                &verifier,
+                &signed_wrong_del.claims
+            ))
             .await
             .unwrap()
             .is_err());

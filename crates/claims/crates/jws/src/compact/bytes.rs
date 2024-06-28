@@ -1,8 +1,7 @@
-use crate::{
-    DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader, JWSVerifier, JWS,
-};
+use crate::{DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader, JWS};
 pub use base64::DecodeError as Base64DecodeError;
-use ssi_claims_core::{ProofValidationError, VerifiableClaims, Verification};
+use ssi_claims_core::{ProofValidationError, ResolverEnvironment, VerifiableClaims, Verification};
+use ssi_jwk::JWKResolver;
 use std::{borrow::Cow, ops::Deref};
 
 /// JWS in compact serialized form.
@@ -165,10 +164,11 @@ impl CompactJWS {
     /// To perform a more precise verification, first decode the JWS with]
     /// [`Self::to_decoded`], then parse the payload manually before using
     /// [`ssi_claims_core::Verifiable`] to actually perform the verification.
-    pub async fn verify(
-        &self,
-        verifier: &impl JWSVerifier,
-    ) -> Result<Verification, ProofValidationError> {
+    pub async fn verify<V>(&self, verifier: V) -> Result<Verification, ProofValidationError>
+    where
+        V: ResolverEnvironment,
+        V::Resolver: JWKResolver,
+    {
         let jws = self.to_decoded().unwrap();
         jws.verify(verifier).await
     }
