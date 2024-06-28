@@ -13,10 +13,10 @@ use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;
 use static_iref::iri;
 
-#[async_std::main]
-async fn main() {
+async fn issue(proof_format: &str) {
     let key_str = include_str!("../tests/rsa2048-2020-08-25.json");
-    let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
+    let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
+    key.key_id = Some("did:example:foo#key1".to_string());
     let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
@@ -33,8 +33,7 @@ async fn main() {
 
     let verification_method = iri!("did:example:foo#key1").into();
 
-    let proof_format = std::env::args().nth(1);
-    match &proof_format.unwrap()[..] {
+    match proof_format {
         "ldp" => {
             let params =
                 ProofOptions::from_method_and_options(verification_method, Default::default());
@@ -43,7 +42,7 @@ async fn main() {
             let vc = suite.sign(vc, &resolver, &signer, params).await.unwrap();
 
             let result = vc.verify(&resolver).await.expect("verification failed");
-            if !result.is_ok() {
+            if result.is_err() {
                 panic!("verify failed");
             }
 
@@ -54,12 +53,33 @@ async fn main() {
             let jwt = vc.to_jwt_claims().unwrap().sign(&key).await.unwrap();
 
             let result = jwt.verify(&resolver).await.expect("verification failed");
-            if !result.is_ok() {
+            if result.is_err() {
                 panic!("verify failed");
             }
 
             print!("{}", jwt);
         }
         format => panic!("unknown proof format: {}", format),
+    }
+}
+
+#[async_std::main]
+async fn main() {
+    let proof_format = std::env::args().nth(1);
+    issue(&proof_format.unwrap()[..]).await;
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[async_std::test]
+    async fn ldp() {
+        issue("ldp").await;
+    }
+
+    #[async_std::test]
+    async fn jwt() {
+        issue("jwt").await;
     }
 }
