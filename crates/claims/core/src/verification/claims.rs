@@ -142,7 +142,9 @@ impl Default for VerificationEnvironment {
     }
 }
 
-impl DateTimeEnvironment for VerificationEnvironment {
+impl<JsonLdLoader, Eip712Loader> DateTimeEnvironment
+    for VerificationEnvironment<JsonLdLoader, Eip712Loader>
+{
     fn date_time(&self) -> DateTime<Utc> {
         self.date_time
     }
