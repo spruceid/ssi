@@ -20,7 +20,7 @@ use ssi::{
 use ssi_claims::{
     data_integrity::AnyDataIntegrity,
     vc::{v1::ToJwtClaims, AnyJsonCredential},
-    Verifier
+    Verifier,
 };
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
