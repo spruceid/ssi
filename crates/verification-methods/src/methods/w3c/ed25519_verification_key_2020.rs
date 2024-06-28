@@ -269,7 +269,7 @@ pub struct PublicKey {
 impl PublicKey {
     pub fn encode(decoded: ed25519_dalek::VerifyingKey) -> Self {
         let multi_encoded =
-            MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
+            MultiEncodedBuf::encode_bytes(ssi_multicodec::ED25519_PUB, decoded.as_bytes());
 
         Self {
             encoded: MultibaseBuf::encode(multibase::Base::Base58Btc, multi_encoded.as_bytes()),

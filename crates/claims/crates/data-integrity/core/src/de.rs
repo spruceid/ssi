@@ -33,22 +33,41 @@ where
     where
         A: serde::de::MapAccess<'de>,
     {
-        let mut proofs = Proofs::default();
-        let claims = T::deserialize(Deserializer {
+        let mut deserializer = Deserializer {
             inner: map,
-            proofs: &mut proofs,
-        })?;
+            proofs: Proofs::default(),
+            de: PhantomData,
+        };
+
+        let claims = T::deserialize(&mut deserializer)?;
+        let proofs = deserializer.into_proofs()?;
 
         Ok(DataIntegrity { claims, proofs })
     }
 }
 
-struct Deserializer<'a, D, S: CryptographicSuite> {
+struct Deserializer<'de, D, S: CryptographicSuite> {
     inner: D,
-    proofs: &'a mut Proofs<S>,
+    proofs: Proofs<S>,
+    de: PhantomData<&'de ()>,
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::de::MapAccess<'de> for Deserializer<'a, D, S>
+impl<'de, D: serde::de::MapAccess<'de>, S: DeserializeCryptographicSuite<'de>>
+    Deserializer<'de, D, S>
+{
+    fn into_proofs(mut self) -> Result<Proofs<S>, D::Error> {
+        while let Some(key) = self.inner.next_key::<String>()? {
+            if key == "proof" {
+                let proofs: Proofs<S> = self.inner.next_value()?;
+                self.proofs.extend(proofs)
+            }
+        }
+
+        Ok(self.proofs)
+    }
+}
+
+impl<'de, D: serde::de::MapAccess<'de>, S> serde::de::MapAccess<'de> for Deserializer<'de, D, S>
 where
     S: DeserializeCryptographicSuite<'de>,
 {
@@ -82,7 +101,8 @@ where
     }
 }
 
-impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de> for Deserializer<'a, D, S>
+impl<'a, 'de, D: serde::de::MapAccess<'de>, S> serde::Deserializer<'de>
+    for &'a mut Deserializer<'de, D, S>
 where
     S: DeserializeCryptographicSuite<'de>,
 {

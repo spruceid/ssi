@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ssi_claims::{
     data_integrity::{
-        suite::{CryptographicSuiteSigning, InputOptions},
+        suite::{CryptographicSuiteSigning, InputProofOptions, InputSignatureOptions},
         AnyDataIntegrity, AnyProofs, AnySignatureAlgorithm, AnySuite, CryptographicSuite,
         DataIntegrity, Proof, Proofs,
     },
@@ -136,7 +136,7 @@ impl<C, P> Delegation<C, P> {
         suite: AnySuite,
         resolver: &impl VerificationMethodResolver<Method = AnyMethod>,
         signer: S,
-        proof_configuration: InputOptions<AnySuite>,
+        proof_configuration: InputProofOptions<AnySuite>,
         capability_chain: &[&str],
     ) -> Result<DataIntegrity<Self, AnySuite>, SignatureError>
     where
@@ -163,11 +163,12 @@ impl<C, P> Delegation<C, P> {
         environment: E,
         resolver: R,
         signer: S,
-        mut proof_configuration: InputOptions<D>,
+        mut proof_configuration: InputProofOptions<D>,
         capability_chain: &[&str],
     ) -> Result<DataIntegrity<Self, D>, SignatureError>
     where
         D: CryptographicSuiteSigning<Self, E, R, S>,
+        InputSignatureOptions<D>: Default,
     {
         proof_configuration.extra_properties.insert(
             "capabilityChain".into(),
@@ -179,7 +180,14 @@ impl<C, P> Delegation<C, P> {
         }
 
         suite
-            .sign_with(environment, self, resolver, signer, proof_configuration)
+            .sign_with(
+                environment,
+                self,
+                resolver,
+                signer,
+                proof_configuration,
+                Default::default(),
+            )
             .await
     }
 }
@@ -342,7 +350,7 @@ impl<P> Invocation<P> {
         suite: AnySuite,
         resolver: impl VerificationMethodResolver<Method = AnyMethod>,
         signer: S,
-        mut proof_configuration: InputOptions<AnySuite>,
+        mut proof_configuration: InputProofOptions<AnySuite>,
         target: &Uri,
     ) -> Result<AnyDataIntegrity<Invocation<P>>, SignatureError>
     where

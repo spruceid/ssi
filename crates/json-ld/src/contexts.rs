@@ -2,7 +2,6 @@ use iref::{Iri, IriBuf};
 use json_ld::{
     syntax::TryFromJson, LoadError, Loader, RemoteContext, RemoteContextReference, RemoteDocument,
 };
-pub use json_ld::{Options, RemoteDocumentReference};
 use json_syntax::Parse;
 use static_iref::iri;
 use std::collections::HashMap;

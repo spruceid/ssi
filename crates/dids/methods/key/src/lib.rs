@@ -44,13 +44,19 @@ impl DIDKey {
             Params::OKP(ref params) => match &params.curve[..] {
                 "Ed25519" => multibase::encode(
                     multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode(ssi_multicodec::ED25519_PUB, &params.public_key.0)
-                        .into_bytes(),
+                    MultiEncodedBuf::encode_bytes(
+                        ssi_multicodec::ED25519_PUB,
+                        &params.public_key.0,
+                    )
+                    .into_bytes(),
                 ),
                 "Bls12381G2" => multibase::encode(
                     multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode(ssi_multicodec::BLS12_381_G2_PUB, &params.public_key.0)
-                        .into_bytes(),
+                    MultiEncodedBuf::encode_bytes(
+                        ssi_multicodec::BLS12_381_G2_PUB,
+                        &params.public_key.0,
+                    )
+                    .into_bytes(),
                 ),
                 _ => return Err(GenerateError::UnsupportedCurve(params.curve.clone())),
             },
@@ -71,7 +77,7 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(
+                            MultiEncodedBuf::encode_bytes(
                                 ssi_multicodec::SECP256K1_PUB,
                                 pk.to_encoded_point(true).as_bytes(),
                             )
@@ -88,7 +94,7 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(
+                            MultiEncodedBuf::encode_bytes(
                                 ssi_multicodec::P256_PUB,
                                 pk.to_encoded_point(true).as_bytes(),
                             )
@@ -104,7 +110,7 @@ impl DIDKey {
 
                         multibase::encode(
                             multibase::Base::Base58Btc,
-                            MultiEncodedBuf::encode(ssi_multicodec::P384_PUB, &pk_bytes)
+                            MultiEncodedBuf::encode_bytes(ssi_multicodec::P384_PUB, &pk_bytes)
                                 .into_bytes(),
                         )
                     }
@@ -116,7 +122,7 @@ impl DIDKey {
                     .map_err(|_| GenerateError::InvalidInputKey)?;
                 multibase::encode(
                     multibase::Base::Base58Btc,
-                    MultiEncodedBuf::encode(ssi_multicodec::RSA_PUB, &der).into_bytes(),
+                    MultiEncodedBuf::encode_bytes(ssi_multicodec::RSA_PUB, &der).into_bytes(),
                 )
             }
             _ => return Err(GenerateError::UnsupportedKeyType),
@@ -705,7 +711,7 @@ mod tests {
         let didkey = VerificationMethodDIDResolver::new(DIDKey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
-        let key = JWK::generate_secp256k1_from(&mut rng).unwrap();
+        let key = JWK::generate_secp256k1_from(&mut rng);
         let did = DIDKey::generate(&key).unwrap();
 
         let cred = JsonCredential::new(
@@ -826,7 +832,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp256k1")]
     async fn fetch_jwk_secp256k1() {
-        let jwk = JWK::generate_secp256k1().unwrap();
+        let jwk = JWK::generate_secp256k1();
         fetch_jwk(jwk).await;
     }
 
@@ -840,7 +846,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp384r1")]
     async fn fetch_jwk_secp384r1() {
-        let jwk = JWK::generate_p384().unwrap();
+        let jwk = JWK::generate_p384();
         fetch_jwk(jwk).await;
     }
 }

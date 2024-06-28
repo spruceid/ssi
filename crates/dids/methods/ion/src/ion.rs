@@ -1,13 +1,13 @@
 use ssi_jwk::{Algorithm, JWK};
 
-use crate::sidetree::{KeyGenerationFailed, Sidetree};
+use crate::sidetree::Sidetree;
 
 #[derive(Default, Clone)]
 pub struct ION;
 
 impl Sidetree for ION {
-    fn generate_key() -> Result<JWK, KeyGenerationFailed> {
-        JWK::generate_secp256k1().map_err(|_| KeyGenerationFailed)
+    fn generate_key() -> JWK {
+        JWK::generate_secp256k1()
     }
 
     fn validate_key(key: &JWK) -> bool {

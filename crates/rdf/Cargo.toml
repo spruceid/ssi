@@ -14,6 +14,7 @@ rdf-types.workspace = true
 ssi-crypto.workspace = true
 linked-data.workspace = true
 serde.workspace = true
+indexmap.workspace = true
 combination = "0.1"
 
 [dev-dependencies]

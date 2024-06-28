@@ -281,17 +281,7 @@ impl PublicKeyHex {
     }
 
     pub fn to_jwk(&self) -> JWK {
-        JWK {
-            params: ssi_jwk::Params::EC(ssi_jwk::ECParams::try_from(&self.decoded).unwrap()),
-            public_key_use: None,
-            key_operations: None,
-            algorithm: None,
-            key_id: None,
-            x509_url: None,
-            x509_certificate_chain: None,
-            x509_thumbprint_sha1: None,
-            x509_thumbprint_sha256: None,
-        }
+        self.decoded.into()
     }
 }
 

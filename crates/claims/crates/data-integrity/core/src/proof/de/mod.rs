@@ -8,7 +8,7 @@
 //! proof.
 use crate::{
     suite::bounds::{OptionsOf, SignatureOf, VerificationMethodOf},
-    DeserializeCryptographicSuite, Proof, Type,
+    CryptosuiteString, DeserializeCryptographicSuite, Proof, Type,
 };
 use serde::{
     de::{DeserializeSeed, MapAccess},
@@ -156,7 +156,7 @@ impl<'de, T: DeserializeCryptographicSuite<'de>> serde::de::Visitor<'de> for Pro
                     }
                 }
                 TypeField::Cryptosuite => {
-                    let name = map.next_value::<String>()?;
+                    let name = map.next_value::<CryptosuiteString>()?;
                     if data_integrity_proof {
                         return Proof::<T>::deserialize_with_type(
                             Type::DataIntegrityProof(name),

@@ -8,8 +8,23 @@ description = "Implementation of the Multicodec specification for the ssi librar
 repository = "https://github.com/spruceid/ssi/"
 documentation = "https://docs.rs/ssi-multicodec/"
 
+[features]
+ed25519 = ["ed25519-dalek", "k256", "p256", "p384"]
+k256 = ["dep:k256"]
+p256 = ["dep:p256"]
+p384 = ["dep:p384"]
+bls12-381 = ["zkryptium"]
+
 [dependencies]
 unsigned-varint = { version = "0.7.1", features = ["std"] }
+thiserror.workspace = true
+
+# Codecs
+ed25519-dalek = { workspace = true, optional = true }
+k256 = { workspace = true, optional = true }
+p256 = { workspace = true, optional = true }
+p384 = { workspace = true, optional = true }
+zkryptium = { version = "0.2.2", optional = true }
 
 [build-dependencies]
 csv = "1.2.2"

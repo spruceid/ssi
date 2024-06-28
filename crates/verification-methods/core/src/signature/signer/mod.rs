@@ -37,6 +37,9 @@ pub enum MessageSignatureError {
     #[error("invalid signer response")]
     InvalidResponse,
 
+    #[error("invalid public key")]
+    InvalidPublicKey,
+
     #[error("invalid secret key")]
     InvalidSecretKey,
 
@@ -94,6 +97,15 @@ impl<A: Into<ssi_jwk::Algorithm>> MessageSigner<A> for JWK {
         ssi_jws::sign_bytes(algorithm.into(), message, &self)
             .map_err(MessageSignatureError::signature_failed)
     }
+}
+
+pub trait MultiMessageSigner<A> {
+    #[allow(async_fn_in_trait)]
+    async fn sign_multi(
+        self,
+        algorithm: A,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<u8>, MessageSignatureError>;
 }
 
 pub struct MessageSignerAdapter<S, A> {

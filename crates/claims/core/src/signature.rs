@@ -26,6 +26,9 @@ pub enum SignatureError {
     #[error("claims: {0}")]
     Claims(String),
 
+    #[error("missing required option `{0}`")]
+    MissingRequiredOption(String),
+
     #[error("missing signer")]
     MissingSigner,
 
@@ -42,6 +45,10 @@ pub enum SignatureError {
 impl SignatureError {
     pub fn other(e: impl fmt::Display) -> Self {
         Self::Other(e.to_string())
+    }
+
+    pub fn missing_required_option(name: &str) -> Self {
+        Self::MissingRequiredOption(name.to_string())
     }
 }
 
