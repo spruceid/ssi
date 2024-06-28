@@ -19,41 +19,24 @@ use ssi::{
 };
 use ssi_claims::{
     data_integrity::AnyDataIntegrity,
-    vc::v1::{SpecializedJsonCredential, ToJwtClaims},
+    vc::{v1::ToJwtClaims, AnyJsonCredential},
 };
 use ssi_dids::DIDResolver;
 use static_iref::{iri, uri};
 
-#[async_std::main]
-async fn main() {
-    let mut args = std::env::args().skip(1);
-    let proof_format_in = args.next().unwrap();
-    let proof_format_out = args.next().unwrap();
-
-    let key_str = include_str!("../tests/ed25519-2020-10-18.json");
-    let key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
-    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
-    let signer = SingleSecretSigner::new(key.clone()).into_local();
-
-    let mut reader = std::io::BufReader::new(std::io::stdin());
-    let vc = match &proof_format_in[..] {
+async fn verify(proof_format_in: &str, proof_format_out: &str, input_vc: &str) {
+    let vc = match proof_format_in {
         "ldp" => {
-            let vc_ldp: AnyDataIntegrity<SpecializedJsonCredential> =
-                serde_json::from_reader(reader).unwrap();
+            let vc_ldp: AnyDataIntegrity<AnyJsonCredential> =
+                serde_json::from_str(input_vc).unwrap();
             ssi::claims::JsonCredentialOrJws::Credential(vc_ldp)
         }
-        "jwt" => {
-            use std::io::Read;
-            let mut buffer = Vec::new();
-            reader.read_to_end(&mut buffer).unwrap();
-
-            match CompactJWSString::new(buffer) {
-                Ok(vc_jwt) => ssi::claims::JsonCredentialOrJws::Jws(vc_jwt),
-                Err(_) => {
-                    panic!("Input must be a compact JWT");
-                }
+        "jwt" => match CompactJWSString::from_string(input_vc.to_string()) {
+            Ok(vc_jwt) => ssi::claims::JsonCredentialOrJws::Jws(vc_jwt),
+            Err(_) => {
+                panic!("Input must be a compact JWT");
             }
-        }
+        },
         format => panic!("unknown input proof format: {}", format),
     };
 
@@ -63,6 +46,12 @@ async fn main() {
         vec![vc],
     );
 
+    let key_str = include_str!("../tests/ed25519-2020-10-18.json");
+    let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
+    key.key_id = Some("did:example:foo#key2".to_string());
+    let resolver = ssi::dids::example::ExampleDIDResolver::default().with_default_options();
+    let signer = SingleSecretSigner::new(key.clone()).into_local();
+
     // let mut proof_options = ssi::vc::LinkedDataProofOptions::default();
     // let verification_method = "did:example:foo#key2".to_string();
     // proof_options.verification_method = Some(ssi::vc::URI::String(verification_method));
@@ -70,7 +59,7 @@ async fn main() {
     // proof_options.challenge = Some("example".to_string());
     let verification_method = iri!("did:example:foo#key2").into();
 
-    match &proof_format_out[..] {
+    match proof_format_out {
         "ldp" => {
             let mut params = ProofOptions::from_method(verification_method);
 
@@ -81,7 +70,7 @@ async fn main() {
             let vp = suite.sign(vp, &resolver, &signer, params).await.unwrap();
 
             let result = vp.verify(&resolver).await.expect("verification failed");
-            if !result.is_ok() {
+            if result.is_err() {
                 panic!("verify failed");
             }
 
@@ -92,12 +81,47 @@ async fn main() {
             let jwt = vp.to_jwt_claims().unwrap().sign(&key).await.unwrap();
 
             let result = jwt.verify(&resolver).await.expect("verification failed");
-            if !result.is_ok() {
+            if result.is_err() {
                 panic!("verify failed");
             }
 
             print!("{}", jwt);
         }
         format => panic!("unknown output proof format: {}", format),
+    }
+}
+
+#[async_std::main]
+async fn main() {
+    let mut args = std::env::args().skip(1);
+    let proof_format_in = args.next().unwrap();
+    let proof_format_out = args.next().unwrap();
+
+    let input_vc = std::io::read_to_string(std::io::stdin()).unwrap();
+    verify(&proof_format_in[..], &proof_format_out[..], &input_vc).await;
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[async_std::test]
+    async fn ldp_ldp() {
+        verify("ldp", "ldp", include_str!("files/vc.jsonld")).await;
+    }
+
+    #[async_std::test]
+    async fn ldp_jwt() {
+        verify("ldp", "jwt", include_str!("files/vc.jsonld")).await;
+    }
+
+    #[async_std::test]
+    async fn jwt_ldp() {
+        verify("jwt", "ldp", include_str!("files/vc.jwt")).await;
+    }
+
+    #[async_std::test]
+    async fn jwt_jwt() {
+        verify("jwt", "jwt", include_str!("files/vc.jwt")).await;
     }
 }
