@@ -4,6 +4,8 @@
 //! This test ensures that the Rust compiler is able to prove that the
 //! `CryptographicSuite::sign` returns a future that is `Send` without
 //! triggering the issue.
+mod vcdm_v1_sign;
+
 use serde::{Deserialize, Serialize};
 use ssi::{
     claims::{
