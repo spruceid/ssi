@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 
 use ssi_claims_core::SignatureError;
+use ssi_json_ld::syntax::Context;
 
 use crate::{CryptographicSuite, ProofConfiguration, ProofOptions};
 
@@ -79,7 +80,12 @@ where
         options: ProofOptions<S::VerificationMethod, S::ProofOptions>,
     ) -> Result<ProofConfiguration<S>, ConfigurationError> {
         let mut result = options.into_configuration(suite.clone())?;
-        result.context = Some(C::default().into());
+        result.context = match result.context {
+            None => Some(C::default().into()),
+            Some(c) => Some(Context::Many(
+                c.into_iter().chain(C::default().into()).collect(),
+            )),
+        };
         Ok(result)
     }
 }
