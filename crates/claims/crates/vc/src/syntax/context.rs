@@ -1,7 +1,7 @@
 use std::{borrow::Borrow, marker::PhantomData};
 
 use educe::Educe;
-use iref::{Iri, IriRef, IriRefBuf};
+use iref::{Iri, IriBuf, IriRef};
 use serde::{Deserialize, Serialize};
 use ssi_json_ld::syntax::ContextEntry;
 
@@ -22,15 +22,13 @@ impl<V: RequiredContext, T: RequiredContextList> Default for Context<V, T> {
     fn default() -> Self {
         Self(
             ssi_json_ld::syntax::Context::Many(
-                std::iter::once(ssi_json_ld::syntax::ContextEntry::IriRef(
-                    V::CONTEXT_IRI.as_iri_ref().to_owned(),
-                ))
-                .chain(
-                    T::CONTEXT_IRIS.iter().map(|&i| {
-                        ssi_json_ld::syntax::ContextEntry::IriRef(i.as_iri_ref().to_owned())
-                    }),
-                )
-                .collect(),
+                std::iter::once(ContextEntry::IriRef(V::CONTEXT_IRI.as_iri_ref().to_owned()))
+                    .chain(
+                        T::CONTEXT_IRIS
+                            .iter()
+                            .map(|&i| ContextEntry::IriRef(i.as_iri_ref().to_owned())),
+                    )
+                    .collect(),
             ),
             PhantomData,
         )
@@ -38,10 +36,20 @@ impl<V: RequiredContext, T: RequiredContextList> Default for Context<V, T> {
 }
 
 impl<V, T> Context<V, T> {
+    /// Checks if this context contains the given entry.
+    pub fn contains(&self, entry: &ContextEntry) -> bool {
+        match &self.0 {
+            ssi_json_ld::syntax::Context::One(e) => e == entry,
+            ssi_json_ld::syntax::Context::Many(entries) => entries.iter().any(|e| e == entry),
+        }
+    }
+
+    /// Checks if this context contains the given IRI entry.
     pub fn contains_iri(&self, iri: &Iri) -> bool {
         self.contains_iri_ref(iri.as_iri_ref())
     }
 
+    /// Checks if this context contains the given IRI reference entry.
     pub fn contains_iri_ref(&self, iri_ref: &IriRef) -> bool {
         match &self.0 {
             ssi_json_ld::syntax::Context::One(ContextEntry::IriRef(i)) => i == iri_ref,
@@ -49,6 +57,59 @@ impl<V, T> Context<V, T> {
             ssi_json_ld::syntax::Context::Many(entries) => entries
                 .iter()
                 .any(|e| matches!(e, ContextEntry::IriRef(i) if i == iri_ref)),
+        }
+    }
+
+    /// Returns an iterator over the context entries.
+    pub fn iter(&self) -> std::slice::Iter<ContextEntry> {
+        self.0.iter()
+    }
+
+    /// Inserts the given entry in the context.
+    ///
+    /// Appends the entry at the end unless it is already present.
+    ///
+    /// Returns `true` if the entry was not already present.
+    /// Returns `false` if the entry was already present in the context, in
+    /// which case it is not added a second time.
+    pub fn insert(&mut self, entry: ContextEntry) -> bool {
+        if self.contains(&entry) {
+            false
+        } else {
+            let mut entries = match std::mem::take(&mut self.0) {
+                ssi_json_ld::syntax::Context::One(e) => vec![e],
+                ssi_json_ld::syntax::Context::Many(entries) => entries,
+            };
+
+            entries.push(entry);
+            self.0 = ssi_json_ld::syntax::Context::Many(entries);
+            true
+        }
+    }
+}
+
+impl<'a, V, T> IntoIterator for &'a Context<V, T> {
+    type Item = &'a ContextEntry;
+    type IntoIter = std::slice::Iter<'a, ContextEntry>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<V, T> IntoIterator for Context<V, T> {
+    type Item = ContextEntry;
+    type IntoIter = ssi_json_ld::syntax::context::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<V, T> Extend<ContextEntry> for Context<V, T> {
+    fn extend<E: IntoIterator<Item = ContextEntry>>(&mut self, iter: E) {
+        for entry in iter {
+            self.insert(entry);
         }
     }
 }
@@ -65,113 +126,77 @@ impl<V, T> Borrow<ssi_json_ld::syntax::Context> for Context<V, T> {
     }
 }
 
+impl<V, T> From<Context<V, T>> for ssi_json_ld::syntax::Context {
+    fn from(value: Context<V, T>) -> Self {
+        value.0
+    }
+}
+
+/// Error that can occur while converting an arbitrary JSON-LD context into a
+/// VCDM context.
+#[derive(Debug, thiserror::Error)]
+pub enum InvalidContext {
+    #[error("unexpected context entry (expected `{0}`)")]
+    UnexpectedContext(IriBuf, ContextEntry),
+
+    #[error("missing required context entry `{0}`")]
+    MissingRequiredContext(IriBuf),
+}
+
+impl<V: RequiredContext, T: RequiredContextList> TryFrom<ssi_json_ld::syntax::Context>
+    for Context<V, T>
+{
+    type Error = InvalidContext;
+
+    fn try_from(value: ssi_json_ld::syntax::Context) -> Result<Self, Self::Error> {
+        let entries = match value {
+            ssi_json_ld::syntax::Context::One(entry) => vec![entry],
+            ssi_json_ld::syntax::Context::Many(entries) => entries,
+        };
+
+        match entries.split_first() {
+            Some((ContextEntry::IriRef(iri), rest)) if iri == V::CONTEXT_IRI => {
+                let mut expected = T::CONTEXT_IRIS.iter();
+                let mut rest = rest.iter();
+                loop {
+                    match (expected.next(), rest.next()) {
+                        (Some(e), Some(ContextEntry::IriRef(f))) if *e == f => (),
+                        (Some(e), Some(f)) => {
+                            break Err(InvalidContext::UnexpectedContext(
+                                (*e).to_owned(),
+                                f.clone(),
+                            ))
+                        }
+                        (Some(e), None) => {
+                            break Err(InvalidContext::MissingRequiredContext((*e).to_owned()))
+                        }
+                        _ => {
+                            break Ok(Self(
+                                ssi_json_ld::syntax::Context::Many(entries),
+                                PhantomData,
+                            ))
+                        }
+                    }
+                }
+            }
+            Some((other, _)) => Err(InvalidContext::UnexpectedContext(
+                V::CONTEXT_IRI.to_owned(),
+                other.clone(),
+            )),
+            None => Err(InvalidContext::MissingRequiredContext(
+                V::CONTEXT_IRI.to_owned(),
+            )),
+        }
+    }
+}
+
 impl<'de, V: RequiredContext, T: RequiredContextList> Deserialize<'de> for Context<V, T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor<V, E>(PhantomData<(V, E)>);
-
-        impl<'de, V: RequiredContext, T: RequiredContextList> serde::de::Visitor<'de> for Visitor<V, T> {
-            type Value = Context<V, T>;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "presentation types")
-            }
-
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                match IriRefBuf::new(v.to_owned()) {
-                    Ok(v) => {
-                        if v == V::CONTEXT_IRI {
-                            let contexts = vec![ContextEntry::IriRef(v)];
-
-                            for &required in T::CONTEXT_IRIS {
-                                if required != V::CONTEXT_IRI {
-                                    return Err(E::custom(format!(
-                                        "expected required context `{}`",
-                                        required
-                                    )));
-                                }
-                            }
-
-                            Ok(Context(
-                                ssi_json_ld::syntax::Context::Many(contexts),
-                                PhantomData,
-                            ))
-                        } else {
-                            Err(E::custom(format!(
-                                "expected required context `{}`",
-                                V::CONTEXT_IRI
-                            )))
-                        }
-                    }
-                    Err(e) => Err(E::custom(format!("invalid context IRI `{v}`: {e}"))),
-                }
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::SeqAccess<'de>,
-            {
-                let mut contexts = Vec::new();
-
-                match seq.next_element()? {
-                    Some(entry) => match &entry {
-                        ContextEntry::IriRef(iri) if iri == V::CONTEXT_IRI => contexts.push(entry),
-                        _ => {
-                            return Err(<A::Error as serde::de::Error>::custom(format!(
-                                "missing required context `{}`",
-                                V::CONTEXT_IRI
-                            )))
-                        }
-                    },
-                    None => {
-                        return Err(<A::Error as serde::de::Error>::custom(format!(
-                            "missing required context `{}`",
-                            V::CONTEXT_IRI
-                        )))
-                    }
-                }
-
-                while let Some(entry) = seq.next_element()? {
-                    let i = contexts.len() - 1;
-
-                    if i < T::CONTEXT_IRIS.len() {
-                        let required_iri = T::CONTEXT_IRIS[i];
-
-                        match &entry {
-                            ContextEntry::IriRef(iri) if iri == required_iri.as_iri_ref() => {}
-                            _ => {
-                                return Err(<A::Error as serde::de::Error>::custom(format!(
-                                    "missing required context `{}`",
-                                    required_iri
-                                )))
-                            }
-                        }
-                    }
-
-                    contexts.push(entry)
-                }
-
-                if contexts.len() - 1 < T::CONTEXT_IRIS.len() {
-                    let required_iri = T::CONTEXT_IRIS[contexts.len() - 1];
-                    Err(<A::Error as serde::de::Error>::custom(format!(
-                        "missing required context `{}`",
-                        required_iri
-                    )))
-                } else {
-                    Ok(Context(
-                        ssi_json_ld::syntax::Context::Many(contexts),
-                        PhantomData,
-                    ))
-                }
-            }
-        }
-
-        deserializer.deserialize_any(Visitor(PhantomData))
+        let context = ssi_json_ld::syntax::Context::deserialize(deserializer)?;
+        context.try_into().map_err(serde::de::Error::custom)
     }
 }
 
