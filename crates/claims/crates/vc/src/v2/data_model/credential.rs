@@ -138,7 +138,7 @@ pub trait Credential: MaybeIdentified {
     /// [`valid_until`](Credential::valid_until) value *must* express a datetime
     /// that is temporally the same or later than the datetime expressed by the
     /// `valid_from` value.
-    ///  
+    ///
     /// See: <https://www.w3.org/TR/vc-data-model-2.0/#validity-period>
     fn valid_until(&self) -> Option<DateTimeStamp> {
         None
@@ -178,7 +178,7 @@ pub trait Credential: MaybeIdentified {
         &[]
     }
 
-    fn evidences(&self) -> &[Self::Evidence] {
+    fn evidence(&self) -> &[Self::Evidence] {
         &[]
     }
 

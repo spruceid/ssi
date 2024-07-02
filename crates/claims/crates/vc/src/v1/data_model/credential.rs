@@ -106,11 +106,11 @@ pub trait Credential {
         &[]
     }
 
-    /// Evidences.
+    /// Evidence.
     ///
     /// Can be included by an issuer to provide the verifier with additional
     /// supporting information in a verifiable credential.
-    fn evidences(&self) -> &[Self::Evidence] {
+    fn evidence(&self) -> &[Self::Evidence] {
         &[]
     }
 
@@ -207,8 +207,8 @@ impl<T: Credential, S: CryptographicSuite> Credential for DataIntegrity<T, S> {
         T::terms_of_use(&self.claims)
     }
 
-    fn evidences(&self) -> &[Self::Evidence] {
-        T::evidences(&self.claims)
+    fn evidence(&self) -> &[Self::Evidence] {
+        T::evidence(&self.claims)
     }
 
     fn credential_schemas(&self) -> &[Self::Schema] {
