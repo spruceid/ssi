@@ -340,9 +340,10 @@ macro_rules! complete_verification_method_union {
 				type Error = $crate::InvalidVerificationMethod;
 
 				fn try_from(value: $name) -> Result<Self, Self::Error> {
+					use ssi_verification_methods_core::VerificationMethodSet;
 					match value {
 						$name::$variant(m) => Ok(m),
-						other => Err($crate::InvalidVerificationMethod::invalid_type_name(other.type_().name()))
+						other => Err($crate::InvalidVerificationMethod::invalid_type_name(other.type_().name(), Self::type_set()))
 					}
 				}
 			}

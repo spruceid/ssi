@@ -227,7 +227,10 @@ impl TryFrom<GenericVerificationMethod> for TezosMethod2021 {
                 public_key: PublicKey::from_generic(&value.properties)?,
             })
         } else {
-            Err(InvalidVerificationMethod::invalid_type_name(&value.type_))
+            Err(InvalidVerificationMethod::invalid_type_name(
+                &value.type_,
+                TEZOS_METHOD_2021_TYPE,
+            ))
         }
     }
 }

@@ -226,8 +226,8 @@ pub enum InvalidVerificationMethod {
     #[error("invalid verification method type IRI `{0}`")]
     InvalidTypeIri(IriBuf),
 
-    #[error("invalid verification method type name `{0}`")]
-    InvalidTypeName(String),
+    #[error("invalid verification method type name `{0}`, expected `{1}`")]
+    InvalidTypeName(String, String),
 
     #[error("missing verification method required property `{0}`")]
     MissingProperty(String),
@@ -247,8 +247,8 @@ impl InvalidVerificationMethod {
         Self::InvalidTypeIri(iri.to_owned())
     }
 
-    pub fn invalid_type_name(name: &str) -> Self {
-        Self::InvalidTypeName(name.to_owned())
+    pub fn invalid_type_name(name: &str, expected: &str) -> Self {
+        Self::InvalidTypeName(name.to_owned(), expected.to_owned())
     }
 
     pub fn missing_property(name: &str) -> Self {
