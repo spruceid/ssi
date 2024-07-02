@@ -2,10 +2,7 @@ use std::ops::Deref;
 
 pub use unsigned_varint::decode::Error;
 
-#[rustfmt::skip]
-mod table;
-
-pub use table::*;
+include!(concat!(env!("OUT_DIR"), "/table.rs"));
 
 /// Multi-encoded byte slice.
 pub struct MultiEncoded([u8]);

@@ -1,8 +1,9 @@
-use std::{fs, io, io::Write, path::Path};
+use std::{env, fs, io, io::Write, path::Path};
 
 fn main() {
     println!("cargo:rerun-if-changed=src/table.csv");
-    if let Err(e) = generate_codecs("src/table.csv", "src/table.rs") {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    if let Err(e) = generate_codecs("src/table.csv", Path::new(&out_dir).join("table.rs")) {
         eprintln!("unable to generate codecs: {e}");
         std::process::exit(1);
     }
