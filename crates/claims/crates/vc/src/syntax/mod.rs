@@ -48,6 +48,7 @@ pub struct IdentifiedObject {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MaybeIdentifiedObject {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<UriBuf>,
 
     #[serde(flatten)]
@@ -69,6 +70,7 @@ pub struct IdentifiedTypedObject {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MaybeIdentifiedTypedObject {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<UriBuf>,
 
     #[serde(rename = "type", with = "value_or_array")]
