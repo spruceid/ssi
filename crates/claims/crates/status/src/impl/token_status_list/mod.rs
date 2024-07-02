@@ -294,6 +294,54 @@ impl BitString {
         }
     }
 
+    /// Creates a new status list of the given length, using `f` to initialize
+    /// every status.
+    ///
+    /// The `f` function is called with the index of the initialized status.
+    pub fn new_with(
+        status_size: StatusSize,
+        len: usize,
+        mut f: impl FnMut(usize) -> u8,
+    ) -> Result<Self, Overflow> {
+        let mut result = Self::with_capacity(status_size, len);
+
+        for i in 0..len {
+            result.push(f(i))?;
+        }
+
+        Ok(result)
+    }
+
+    /// Creates a new status list of the given length, setting every status
+    /// to the same value.
+    pub fn new_with_value(
+        status_size: StatusSize,
+        len: usize,
+        value: u8,
+    ) -> Result<Self, Overflow> {
+        Self::new_with(status_size, len, |_| value)
+    }
+
+    /// Creates a new status list of the given length, setting every status
+    /// to 0.
+    ///
+    /// This is an alias for [`Self::new_valid`].
+    pub fn new_zeroed(status_size: StatusSize, len: usize) -> Self {
+        Self::new_valid(status_size, len)
+    }
+
+    /// Creates a new status list of the given length, setting every status
+    /// to [`VALID`].
+    pub fn new_valid(status_size: StatusSize, len: usize) -> Self {
+        Self::new_with_value(status_size, len, VALID).unwrap() // `VALID` cannot overflow.
+    }
+
+    /// Creates a new status list of the given length, setting every status
+    /// to [`INVALID`].
+    pub fn new_invalid(status_size: StatusSize, len: usize) -> Self {
+        Self::new_with_value(status_size, len, INVALID).unwrap() // `INVALID` cannot overflow.
+    }
+
     /// Creates a new status list with the given status size and capacity
     /// (in number of statuses).
     pub fn with_capacity(status_size: StatusSize, capacity: usize) -> Self {
