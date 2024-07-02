@@ -98,14 +98,13 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
     )]
     pub terms_of_use: Vec<MaybeIdentifiedTypedObject>,
 
-    /// Evidences.
-    #[serde(rename = "evidence")]
+    /// Evidence.
     #[serde(
         with = "value_or_array",
         default,
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub evidences: Vec<MaybeIdentifiedTypedObject>,
+    pub evidence: Vec<MaybeIdentifiedTypedObject>,
 
     #[serde(rename = "credentialSchema")]
     #[serde(
@@ -145,7 +144,7 @@ impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S,
             expiration_date: None,
             credential_status: Vec::new(),
             terms_of_use: Vec::new(),
-            evidences: Vec::new(),
+            evidence: Vec::new(),
             credential_schema: Vec::new(),
             refresh_services: Vec::new(),
             additional_properties: BTreeMap::new(),
@@ -225,8 +224,8 @@ impl<S, C, T> crate::v1::Credential for SpecializedJsonCredential<S, C, T> {
         &self.terms_of_use
     }
 
-    fn evidences(&self) -> &[Self::Evidence] {
-        &self.evidences
+    fn evidence(&self) -> &[Self::Evidence] {
+        &self.evidence
     }
 
     fn credential_schemas(&self) -> &[Self::Schema] {
