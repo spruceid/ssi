@@ -1,5 +1,7 @@
 use std::{borrow::Cow, sync::Arc};
 
+use ssi_claims_core::SignatureError;
+
 use crate::{local::LocalSigner, MethodWithSecret, Signer, VerificationMethod};
 
 /// Simple signer implementation that always uses the given secret to sign
@@ -32,10 +34,13 @@ impl<S> SingleSecretSigner<S> {
 impl<M: VerificationMethod, S> Signer<M> for SingleSecretSigner<S> {
     type MessageSigner = MethodWithSecret<M, S>;
 
-    async fn for_method(&self, method: Cow<'_, M>) -> Option<Self::MessageSigner> {
-        Some(MethodWithSecret::new(
+    async fn for_method(
+        &self,
+        method: Cow<'_, M>,
+    ) -> Result<Option<Self::MessageSigner>, SignatureError> {
+        Ok(Some(MethodWithSecret::new(
             method.into_owned(),
             self.secret.clone(),
-        ))
+        )))
     }
 }

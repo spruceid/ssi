@@ -141,6 +141,7 @@ impl<S: CryptographicSuite> ProofConfiguration<S> {
 
     pub fn into_options(self) -> ProofOptions<S::VerificationMethod, S::ProofOptions> {
         ProofOptions {
+            context: self.context,
             created: self.created,
             verification_method: Some(self.verification_method),
             proof_purpose: self.proof_purpose,

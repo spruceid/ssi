@@ -10,7 +10,7 @@ use linked_data::{
     LinkedDataSubject, RdfLiteral,
 };
 use serde::{Deserialize, Serialize};
-use std::{ops::Deref, str::FromStr};
+use std::{borrow::Borrow, ops::Deref, str::FromStr};
 
 pub use multibase::{Base, Error};
 
@@ -104,6 +104,18 @@ impl MultibaseBuf {
 
     pub fn as_multibase(&self) -> &Multibase {
         Multibase::new(self.0.as_str())
+    }
+}
+
+impl Borrow<str> for MultibaseBuf {
+    fn borrow(&self) -> &str {
+        self.as_str()
+    }
+}
+
+impl Borrow<Multibase> for MultibaseBuf {
+    fn borrow(&self) -> &Multibase {
+        self.as_multibase()
     }
 }
 

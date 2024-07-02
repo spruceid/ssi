@@ -201,6 +201,8 @@ pub struct PublicKey {
     /// Multibase-encoded public key.
     encoded: MultibaseBuf,
 
+    codec: u64,
+
     /// Decoded public key.
     decoded: JWK,
 }
@@ -209,8 +211,8 @@ impl PublicKey {
     pub fn decode(encoded: MultibaseBuf) -> Result<Self, InvalidPublicKey> {
         let pk_multi_encoded = MultiEncodedBuf::new(encoded.decode()?.1)?;
 
-        let (pk_codec, pk_data) = pk_multi_encoded.parts();
-        let decoded = match pk_codec {
+        let (codec, pk_data) = pk_multi_encoded.parts();
+        let decoded = match codec {
             #[cfg(feature = "ed25519")]
             ssi_multicodec::ED25519_PUB => ssi_jwk::ed25519_parse(pk_data)?,
             #[cfg(feature = "secp256k1")]
@@ -221,7 +223,15 @@ impl PublicKey {
             ssi_multicodec::P384_PUB => ssi_jwk::p384_parse(pk_data)?,
             c => return Err(InvalidPublicKey::UnsupportedKeyType(format!("{c:#x}")))?,
         };
-        Ok(Self { encoded, decoded })
+        Ok(Self {
+            encoded,
+            codec,
+            decoded,
+        })
+    }
+
+    pub fn codec(&self) -> u64 {
+        self.codec
     }
 
     pub fn encoded(&self) -> &Multibase {

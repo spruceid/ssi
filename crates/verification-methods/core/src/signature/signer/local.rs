@@ -1,5 +1,7 @@
 use std::ops::Deref;
 
+use ssi_claims_core::SignatureError;
+
 use crate::{
     protocol::WithProtocol, MessageSignatureError, MessageSigner, SignatureProtocol, Signer,
     VerificationMethod,
@@ -10,8 +12,11 @@ pub struct LocalSigner<S>(pub S);
 impl<M: VerificationMethod, S: Signer<M>> Signer<M> for LocalSigner<S> {
     type MessageSigner = LocalMessageSigner<S::MessageSigner>;
 
-    async fn for_method(&self, method: std::borrow::Cow<'_, M>) -> Option<Self::MessageSigner> {
-        self.0.for_method(method).await.map(LocalMessageSigner)
+    async fn for_method(
+        &self,
+        method: std::borrow::Cow<'_, M>,
+    ) -> Result<Option<Self::MessageSigner>, SignatureError> {
+        Ok(self.0.for_method(method).await?.map(LocalMessageSigner))
     }
 }
 

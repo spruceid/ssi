@@ -14,6 +14,9 @@ pub enum HashingError {
 
     #[error("message is too long")]
     TooLong,
+
+    #[error("invalid key")]
+    InvalidKey,
 }
 
 impl From<HashingError> for SignatureError {
@@ -35,5 +38,6 @@ pub trait HashingAlgorithm<S: StandardCryptographicSuite> {
     fn hash(
         input: TransformedData<S>,
         proof_configuration: ProofConfigurationRef<S>,
+        verification_method: &S::VerificationMethod,
     ) -> Result<Self::Output, HashingError>;
 }

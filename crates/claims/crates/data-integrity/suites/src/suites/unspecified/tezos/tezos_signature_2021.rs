@@ -76,6 +76,7 @@ impl HashingAlgorithm<TezosSignature2021> for EncodeTezosMessage {
     fn hash(
         input: CanonicalClaimsAndConfiguration,
         _proof_configuration: ProofConfigurationRef<TezosSignature2021>,
+        _verification_method: &TezosMethod2021,
     ) -> Result<Vec<u8>, HashingError> {
         let mut message = '\n'.to_string();
 
