@@ -48,7 +48,11 @@ pub struct IdentifiedObject {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MaybeIdentifiedObject {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "not_null",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub id: Option<UriBuf>,
 
     #[serde(flatten)]
@@ -70,7 +74,11 @@ pub struct IdentifiedTypedObject {
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MaybeIdentifiedTypedObject {
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "not_null",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub id: Option<UriBuf>,
 
     #[serde(rename = "type", with = "value_or_array")]
@@ -118,5 +126,44 @@ pub(crate) mod value_or_array {
             SingleOrArray::Array(v) => Ok(v),
             SingleOrArray::Single(t) => Ok(vec![t]),
         }
+    }
+}
+
+/// Deserialize an `Option::Some`, without accepting `None` (null) as a value.
+///
+/// Combined with `#[serde(default)]` this allows a field to be either present
+/// and not `null`, or absent. But this will raise an error if the field is
+/// present but `null`.
+pub(crate) fn not_null<'de, T: Deserialize<'de>, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    T::deserialize(deserializer).map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MaybeIdentifiedObject;
+    use serde_json::json;
+
+    #[test]
+    fn deserialize_id_not_null_1() {
+        assert!(serde_json::from_value::<MaybeIdentifiedObject>(json!({
+            "id": null
+        }))
+        .is_err())
+    }
+
+    #[test]
+    fn deserialize_id_not_null_2() {
+        assert!(serde_json::from_value::<MaybeIdentifiedObject>(json!({})).is_ok())
+    }
+
+    #[test]
+    fn deserialize_id_not_null_3() {
+        assert!(serde_json::from_value::<MaybeIdentifiedObject>(json!({
+            "id": "http://example.org/#id"
+        }))
+        .is_ok())
     }
 }

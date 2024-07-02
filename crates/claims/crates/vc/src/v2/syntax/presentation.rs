@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
-use crate::syntax::{value_or_array, IdOr, IdentifiedObject};
+use crate::syntax::{not_null, value_or_array, IdOr, IdentifiedObject};
 use crate::v2::{Context, Credential};
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
@@ -27,7 +27,11 @@ pub struct JsonPresentation<C = JsonCredential> {
     pub context: Context,
 
     /// Presentation identifier.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "not_null",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub id: Option<UriBuf>,
 
     /// Presentation type.

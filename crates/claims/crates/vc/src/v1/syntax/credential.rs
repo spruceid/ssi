@@ -9,8 +9,9 @@ use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use xsd_types::DateTime;
 
 use crate::syntax::{
-    value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject, MaybeIdentifiedTypedObject,
-    RequiredContextList, RequiredType, RequiredTypeSet, TypeSerializationPolicy, Types,
+    not_null, value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject,
+    MaybeIdentifiedTypedObject, RequiredContextList, RequiredType, RequiredTypeSet,
+    TypeSerializationPolicy, Types,
 };
 
 use super::Context;
@@ -50,7 +51,11 @@ pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
     pub context: Context<C>,
 
     /// Credential identifier.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "not_null",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub id: Option<UriBuf>,
 
     /// Credential type.

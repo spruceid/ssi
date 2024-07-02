@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
-use crate::syntax::{value_or_array, RequiredType, TypeSerializationPolicy, Types};
+use crate::syntax::{not_null, value_or_array, RequiredType, TypeSerializationPolicy, Types};
 use crate::v1::{Context, Credential};
 use iref::{Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
@@ -38,7 +38,11 @@ pub struct JsonPresentation<C = SpecializedJsonCredential> {
     pub context: Context,
 
     /// Presentation identifier.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "not_null",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub id: Option<UriBuf>,
 
     /// Presentation type.
