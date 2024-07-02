@@ -1,7 +1,7 @@
 //! Cryptographic suites.
 use std::borrow::Cow;
 
-use ssi_claims_core::{ProofValidationError, ProofValidity, ResolverEnvironment, SignatureError};
+use ssi_claims_core::{ProofValidationError, ProofValidity, ResolverProvider, SignatureError};
 use ssi_verification_methods_core::{Signer, VerificationMethodResolver, VerificationMethodSet};
 
 use crate::{CryptographicSuite, ProofConfigurationRef, ProofRef, TypeRef};
@@ -142,7 +142,7 @@ where
 
 impl<S: StandardCryptographicSuite, C, V> CryptographicSuiteVerification<C, V> for S
 where
-    V: ResolverEnvironment,
+    V: ResolverProvider,
     V::Resolver: VerificationMethodResolver<Method = S::VerificationMethod>,
     S::Transformation: TypedTransformationAlgorithm<Self, C, V>,
     S::SignatureAlgorithm: VerificationAlgorithm<S>,

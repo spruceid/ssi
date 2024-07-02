@@ -7,7 +7,7 @@ use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     jws::JWSPayload,
     vc::v1::ToJwtClaims,
-    VerifiableClaims, Verifier,
+    VerificationParameters,
 };
 use ssi_dids::DIDResolver;
 use ssi_verification_methods::SingleSecretSigner;
@@ -18,7 +18,7 @@ async fn issue(proof_format: &str) {
     let mut key: ssi::jwk::JWK = serde_json::from_str(key_str).unwrap();
     key.key_id = Some("did:example:foo#key1".to_string());
     let resolver = ssi::dids::example::ExampleDIDResolver::default().into_vm_resolver();
-    let verifier = Verifier::from_resolver(&resolver);
+    let params = VerificationParameters::from_resolver(&resolver);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc: ssi::claims::vc::v1::SpecializedJsonCredential = serde_json::from_value(json!({
@@ -36,13 +36,13 @@ async fn issue(proof_format: &str) {
 
     match proof_format {
         "ldp" => {
-            let params =
+            let options =
                 ProofOptions::from_method_and_options(verification_method, Default::default());
 
-            let suite = AnySuite::pick(&key, params.verification_method.as_ref()).unwrap();
-            let vc = suite.sign(vc, &resolver, &signer, params).await.unwrap();
+            let suite = AnySuite::pick(&key, options.verification_method.as_ref()).unwrap();
+            let vc = suite.sign(vc, &resolver, &signer, options).await.unwrap();
 
-            let result = vc.verify(verifier).await.expect("verification failed");
+            let result = vc.verify(params).await.expect("verification failed");
             if result.is_err() {
                 panic!("verify failed");
             }
@@ -53,7 +53,7 @@ async fn issue(proof_format: &str) {
         "jwt" => {
             let jwt = vc.to_jwt_claims().unwrap().sign(&key).await.unwrap();
 
-            let result = jwt.verify(verifier).await.expect("verification failed");
+            let result = jwt.verify(params).await.expect("verification failed");
             if result.is_err() {
                 panic!("verify failed");
             }

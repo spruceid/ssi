@@ -449,7 +449,7 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnyInputSuiteOptions, AnySuite},
         vc::v1::JsonCredential,
-        VerifiableClaims, Verifier,
+        VerificationParameters,
     };
     use ssi_data_integrity::{CryptographicSuite, ProofOptions as SuiteOptions};
     use ssi_dids_core::{
@@ -648,7 +648,7 @@ mod tests {
     #[async_std::test]
     async fn credential_prove_verify_did_key_ed25519() {
         let didkey = VerificationMethodDIDResolver::new(DIDKey);
-        let verifier = Verifier::from_resolver(&didkey);
+        let params = VerificationParameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_ed25519_from(&mut rng).unwrap();
@@ -688,21 +688,21 @@ mod tests {
             serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
         assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..o4SzDo1RBQqdK49OPdmfVRVh68xCTNEmb7hq39IVqISkelld6t6Aatg4PCXKpopIXmX8RCCF4BwrO8ERg1YFBg");
-        assert!(vc.verify(&verifier).await.unwrap().is_ok());
+        assert!(vc.verify(&params).await.unwrap().is_ok());
 
         // test that issuer is verified
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
 
         // It should fail.
-        assert!(vc_bad_issuer.verify(&verifier).await.unwrap().is_err());
+        assert!(vc_bad_issuer.verify(&params).await.unwrap().is_err());
     }
 
     #[async_std::test]
     #[cfg(feature = "secp256k1")]
     async fn credential_prove_verify_did_key_secp256k1() {
         let didkey = VerificationMethodDIDResolver::new(DIDKey);
-        let verifier = Verifier::from_resolver(&didkey);
+        let params = VerificationParameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_secp256k1_from(&mut rng).unwrap();
@@ -742,21 +742,21 @@ mod tests {
             serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
         assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NksiLCJjcml0IjpbImI2NCJdLCJiNjQiOmZhbHNlfQ..jTUkFd_eYI72Y8j2OS5LRLhlc3gZn-gVsb76soi3FuJ5gWrbOb0W2CW6D-sjEsCuLkvSOfYd8Y8hB9pyeeZ2TQ");
-        assert!(vc.verify(&verifier).await.unwrap().is_ok());
+        assert!(vc.verify(&params).await.unwrap().is_ok());
 
         // test that issuer is verified
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
 
         // It should fail.
-        assert!(vc_bad_issuer.verify(verifier).await.unwrap().is_err());
+        assert!(vc_bad_issuer.verify(params).await.unwrap().is_err());
     }
 
     #[async_std::test]
     #[cfg(feature = "secp256r1")]
     async fn credential_prove_verify_did_key_p256() {
         let didkey = VerificationMethodDIDResolver::new(DIDKey);
-        let verifier = Verifier::from_resolver(&didkey);
+        let params = VerificationParameters::from_resolver(&didkey);
 
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(2);
         let key = JWK::generate_p256_from(&mut rng);
@@ -795,14 +795,14 @@ mod tests {
             "proof: {}",
             serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
-        assert!(vc.verify(&verifier).await.unwrap().is_ok());
+        assert!(vc.verify(&params).await.unwrap().is_ok());
 
         // test that issuer is verified
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
 
         // It should fail.
-        assert!(vc_bad_issuer.verify(verifier).await.unwrap().is_err());
+        assert!(vc_bad_issuer.verify(params).await.unwrap().is_err());
     }
 
     async fn fetch_jwk(jwk: JWK) {

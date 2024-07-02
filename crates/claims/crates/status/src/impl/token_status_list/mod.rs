@@ -11,7 +11,7 @@
 use flate2::{bufread::ZlibDecoder, write::ZlibEncoder, Compression};
 use iref::Uri;
 use serde::Serialize;
-use ssi_claims_core::{DateTimeEnvironment, ResolverEnvironment};
+use ssi_claims_core::{DateTimeProvider, ResolverProvider};
 use std::{
     io::{self, Read, Write},
     time::Duration,
@@ -96,7 +96,7 @@ pub enum FromBytesError {
 
 impl<V> FromBytes<V> for StatusListToken
 where
-    V: ResolverEnvironment + DateTimeEnvironment,
+    V: ResolverProvider + DateTimeProvider,
     V::Resolver: JWKResolver,
 {
     type Error = FromBytesError;
@@ -109,7 +109,6 @@ where
     ) -> Result<Self, Self::Error> {
         match media_type {
             "statuslist+jwt" => {
-                use ssi_claims_core::VerifiableClaims;
                 let jwt = CompactJWS::new(bytes)
                     .map_err(InvalidCompactJWS::into_owned)?
                     .to_decoded_custom_jwt::<json::StatusListJwtPrivateClaims>()?;
@@ -495,7 +494,7 @@ pub enum AnyStatusListEntrySet {
 
 impl<V> FromBytes<V> for AnyStatusListEntrySet
 where
-    V: ResolverEnvironment + DateTimeEnvironment,
+    V: ResolverProvider + DateTimeProvider,
     V::Resolver: JWKResolver,
 {
     type Error = EntrySetFromBytesError;
@@ -517,7 +516,6 @@ where
                 ))
             }
             "application/jwt" => {
-                use ssi_claims_core::VerifiableClaims;
                 let jwt = CompactJWS::new(bytes)
                     .map_err(InvalidCompactJWS::into_owned)?
                     .to_decoded_jwt()?;

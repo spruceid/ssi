@@ -2,8 +2,8 @@ use chrono::{DateTime, Utc};
 use core::fmt;
 use std::borrow::Cow;
 
-pub use ssi_eip712::Eip712TypesEnvironment;
-pub use ssi_json_ld::ContextLoaderEnvironment;
+pub use ssi_eip712::Eip712TypesLoaderProvider;
+pub use ssi_json_ld::JsonLdLoaderProvider;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum InvalidClaims {

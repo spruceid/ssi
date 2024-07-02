@@ -1,5 +1,5 @@
 use serde::Serialize;
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, ValidateClaims};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 use ssi_jws::{JWSPayload, ValidateJWSHeader};
 use std::borrow::Cow;
 
@@ -83,7 +83,7 @@ impl<T, E> ValidateJWSHeader<E> for JWTClaims<T> {
 
 impl<P, T: ClaimSet + ValidateClaims<E, P>, E> ValidateClaims<E, P> for JWTClaims<T>
 where
-    E: DateTimeEnvironment,
+    E: DateTimeProvider,
 {
     fn validate_claims(&self, env: &E, proof: &P) -> ClaimsValidity {
         self.registered.validate_claims(env, proof)?;

@@ -1,5 +1,5 @@
 //! This example shows how to verify a Data-Integrity Verifiable Credential.
-use ssi_claims::{VerifiableClaims, Verifier};
+use ssi_claims::VerificationParameters;
 use ssi_dids::{DIDResolver, StaticDIDResolver, VerificationMethodDIDResolver};
 use ssi_verification_methods::AnyMethod;
 use std::fs;
@@ -21,7 +21,8 @@ async fn main() {
     println!("Success!")
 }
 
-fn create_verifier() -> Verifier<VerificationMethodDIDResolver<StaticDIDResolver, AnyMethod>> {
+fn create_verifier(
+) -> VerificationParameters<VerificationMethodDIDResolver<StaticDIDResolver, AnyMethod>> {
     // Create a static DID resolver that resolves `did:example:foo` into a
     // static DID document.
     let mut did_resolver = ssi::dids::StaticDIDResolver::new();
@@ -38,5 +39,5 @@ fn create_verifier() -> Verifier<VerificationMethodDIDResolver<StaticDIDResolver
     let resolver = did_resolver.into_vm_resolver();
 
     // Create a verifier using the verification method resolver.
-    Verifier::from_resolver(resolver)
+    VerificationParameters::from_resolver(resolver)
 }

@@ -3,7 +3,7 @@ use std::{borrow::Cow, hash::Hash};
 use iref::Uri;
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, ValidateClaims};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject, Vocabulary};
 
@@ -54,7 +54,7 @@ impl<S, C, T> JsonLdNodeObject for AnySpecializedJsonCredential<S, C, T> {
 
 impl<S, C, T, E, P> ValidateClaims<E, P> for AnySpecializedJsonCredential<S, C, T>
 where
-    E: DateTimeEnvironment,
+    E: DateTimeProvider,
 {
     fn validate_claims(&self, env: &E, proof: &P) -> ClaimsValidity {
         match self {

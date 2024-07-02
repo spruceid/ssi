@@ -16,7 +16,7 @@
 use clap::{Parser, Subcommand};
 use core::fmt;
 use iref::UriBuf;
-use ssi_claims_core::Verifier;
+use ssi_claims_core::VerificationParameters;
 use ssi_data_integrity::{AnySuite, ProofOptions};
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_jwk::JWK;
@@ -119,7 +119,9 @@ impl Command {
                     Err(e) => return Err(Error::ReadFile(source, e)),
                 };
 
-                let verifier = Verifier::from_resolver(VerificationMethodDIDResolver::new(DIDJWK));
+                let verifier = VerificationParameters::from_resolver(
+                    VerificationMethodDIDResolver::new(DIDJWK),
+                );
                 let status_list = AnyStatusMap::from_bytes_with(
                     &bytes,
                     &media_type,

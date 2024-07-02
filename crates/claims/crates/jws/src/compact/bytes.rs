@@ -1,6 +1,6 @@
 use crate::{DecodeError, DecodedJWS, DecodedSigningBytes, Header, InvalidHeader, JWS};
 pub use base64::DecodeError as Base64DecodeError;
-use ssi_claims_core::{ProofValidationError, ResolverEnvironment, VerifiableClaims, Verification};
+use ssi_claims_core::{ProofValidationError, ResolverProvider, Verification};
 use ssi_jwk::JWKResolver;
 use std::{borrow::Cow, ops::Deref};
 
@@ -164,13 +164,33 @@ impl CompactJWS {
     /// To perform a more precise verification, first decode the JWS with]
     /// [`Self::to_decoded`], then parse the payload manually before using
     /// [`ssi_claims_core::Verifiable`] to actually perform the verification.
-    pub async fn verify<V>(&self, verifier: V) -> Result<Verification, ProofValidationError>
+    ///
+    /// The `params` argument provides all the verification parameters required
+    /// to validate the claims and proof.
+    ///
+    /// # What verification parameters should I use?
+    ///
+    /// Any type that providing a `JWKResolver` through the `ResolverProvider`
+    /// trait will be fine. Notable implementors are:
+    /// - [`VerificationParameters`](ssi_claims_core::VerificationParameters):
+    /// A good default providing many other common verification parameters that
+    /// are not necessary here.
+    /// - [`JWK`](ssi_jwk::JWK): allows you to put a JWK as `params`, which
+    /// will resolve into itself. Can be useful if you don't need key resolution
+    /// because you know in advance what key was used to sign the JWS.
+    ///
+    /// # Passing the parameters by reference
+    ///
+    /// If the validation traits are implemented for `P`, they will be
+    /// implemented for `&P` as well. This means the parameters can be passed
+    /// by move *or* by reference.
+    pub async fn verify<V>(&self, params: V) -> Result<Verification, ProofValidationError>
     where
-        V: ResolverEnvironment,
+        V: ResolverProvider,
         V::Resolver: JWKResolver,
     {
         let jws = self.to_decoded().unwrap();
-        jws.verify(verifier).await
+        jws.verify(params).await
     }
 }
 

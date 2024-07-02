@@ -381,7 +381,7 @@ mod tests {
             ProofOptions,
         },
         vc::v1::{JsonCredential, JsonPresentation},
-        VerifiableClaims, Verifier,
+        VerificationParameters,
     };
     use ssi_dids_core::{did, DIDResolver};
     use ssi_jwk::JWK;
@@ -474,7 +474,7 @@ mod tests {
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
         let didethr = DIDEthr.into_vm_resolver();
-        let verifier = Verifier::from_resolver(&didethr);
+        let verifier = VerificationParameters::from_resolver(&didethr);
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
             "kty": "EC",
@@ -599,7 +599,7 @@ mod tests {
         .unwrap();
         // eprintln!("vc {:?}", vc);
         assert!(vc
-            .verify(Verifier::from_resolver(didethr))
+            .verify(VerificationParameters::from_resolver(didethr))
             .await
             .unwrap()
             .is_ok())

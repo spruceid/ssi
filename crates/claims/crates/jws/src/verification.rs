@@ -1,6 +1,6 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
 use ssi_claims_core::{
-    ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverEnvironment,
+    ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
     ValidateClaims, ValidateProof, VerifiableClaims,
 };
 use ssi_jwk::JWKResolver;
@@ -94,7 +94,7 @@ impl<T> VerifiableClaims for DecodedJWS<T> {
 
 impl<V, T> ValidateProof<V, DecodedSigningBytes<T>> for JWSSignature
 where
-    V: ResolverEnvironment,
+    V: ResolverProvider,
     V::Resolver: JWKResolver,
 {
     async fn validate_proof<'a>(

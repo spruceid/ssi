@@ -128,8 +128,8 @@ macro_rules! crypto_suites {
         #[allow(unused_variables)]
         impl<T, C, R, S> ssi_data_integrity_core::suite::CryptographicSuiteSigning<T, C, R, S> for AnySuite
         where
-            C: ssi_json_ld::ContextLoaderEnvironment
-                + ssi_eip712::Eip712TypesEnvironment,
+            C: ssi_json_ld::JsonLdLoaderProvider
+                + ssi_eip712::Eip712TypesLoaderProvider,
             T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
             //
             R: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
@@ -172,7 +172,7 @@ macro_rules! crypto_suites {
         impl<T, V> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, V> for AnySuite
         where
             T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
-            V: ssi_claims_core::ResolverEnvironment + ssi_json_ld::ContextLoaderEnvironment + ssi_eip712::Eip712TypesEnvironment,
+            V: ssi_claims_core::ResolverProvider + ssi_json_ld::JsonLdLoaderProvider + ssi_eip712::Eip712TypesLoaderProvider,
             V::Resolver: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
         {
             async fn verify_proof(

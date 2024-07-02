@@ -1,7 +1,7 @@
 mod unknown;
-use ssi_claims_core::ResolverEnvironment;
-use ssi_eip712::Eip712TypesEnvironment;
-use ssi_json_ld::ContextLoaderEnvironment;
+use ssi_claims_core::ResolverProvider;
+use ssi_eip712::Eip712TypesLoaderProvider;
+use ssi_json_ld::JsonLdLoaderProvider;
 pub use unknown::*;
 
 use crate::{macros, AnyResolver};
@@ -147,7 +147,7 @@ pub struct AnyVerifier<R, M, L1, L2> {
     eip712_loader: L2,
 }
 
-impl<R, M, L1, L2> ResolverEnvironment for AnyVerifier<R, M, L1, L2> {
+impl<R, M, L1, L2> ResolverProvider for AnyVerifier<R, M, L1, L2> {
     type Resolver = AnyResolver<R, M>;
 
     fn resolver(&self) -> &Self::Resolver {
@@ -155,7 +155,7 @@ impl<R, M, L1, L2> ResolverEnvironment for AnyVerifier<R, M, L1, L2> {
     }
 }
 
-impl<R, M, L1: ssi_json_ld::Loader, L2> ContextLoaderEnvironment for AnyVerifier<R, M, L1, L2> {
+impl<R, M, L1: ssi_json_ld::Loader, L2> JsonLdLoaderProvider for AnyVerifier<R, M, L1, L2> {
     type Loader = L1;
 
     fn loader(&self) -> &Self::Loader {
@@ -163,10 +163,12 @@ impl<R, M, L1: ssi_json_ld::Loader, L2> ContextLoaderEnvironment for AnyVerifier
     }
 }
 
-impl<R, M, L1, L2: ssi_eip712::TypesProvider> Eip712TypesEnvironment for AnyVerifier<R, M, L1, L2> {
-    type Provider = L2;
+impl<R, M, L1, L2: ssi_eip712::TypesLoader> Eip712TypesLoaderProvider
+    for AnyVerifier<R, M, L1, L2>
+{
+    type Loader = L2;
 
-    fn eip712_types(&self) -> &Self::Provider {
+    fn eip712_types(&self) -> &Self::Loader {
         &self.eip712_loader
     }
 }

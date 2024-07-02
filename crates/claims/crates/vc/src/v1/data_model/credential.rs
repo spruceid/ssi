@@ -1,5 +1,5 @@
 use iref::{Iri, Uri};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims, VerifiableClaims};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, InvalidClaims, VerifiableClaims};
 use ssi_data_integrity::{CryptographicSuite, DataIntegrity};
 use static_iref::iri;
 use xsd_types::DateTime;
@@ -132,7 +132,7 @@ pub trait Credential {
     /// verified.
     fn validate_credential<E>(&self, env: &E) -> ClaimsValidity
     where
-        E: DateTimeEnvironment,
+        E: DateTimeProvider,
     {
         let now = env.date_time();
 

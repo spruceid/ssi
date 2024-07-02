@@ -17,14 +17,14 @@ use ssi_rdf::{
     VocabularyMut,
 };
 
-/// Environment that provides a JSON-LD context loader.
-pub trait ContextLoaderEnvironment {
+/// Type that provides a JSON-LD document loader.
+pub trait JsonLdLoaderProvider {
     type Loader: json_ld::Loader;
 
     fn loader(&self) -> &Self::Loader;
 }
 
-impl<'a, E: ContextLoaderEnvironment> ContextLoaderEnvironment for &'a E {
+impl<'a, E: JsonLdLoaderProvider> JsonLdLoaderProvider for &'a E {
     type Loader = E::Loader;
 
     fn loader(&self) -> &Self::Loader {

@@ -16,6 +16,12 @@ pub struct VerificationMethodDIDResolver<T, M> {
     method: PhantomData<M>,
 }
 
+impl<T: Default, M> Default for VerificationMethodDIDResolver<T, M> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 impl<T, M> VerificationMethodDIDResolver<T, M> {
     pub fn new(resolver: T) -> Self {
         Self {

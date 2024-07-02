@@ -4,16 +4,16 @@ use iref::UriBuf;
 use rdf_types::{Interpretation, Vocabulary, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
-    ClaimsValidity, DateTimeEnvironment, Eip712TypesEnvironment, InvalidClaims,
-    ResolverEnvironment, ValidateClaims, VerifiableClaims,
+    ClaimsValidity, DateTimeProvider, Eip712TypesLoaderProvider, InvalidClaims, ResolverProvider,
+    ValidateClaims,
 };
 use ssi_data_integrity::{
     ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject},
     AnySuite,
 };
 use ssi_json_ld::{
-    CompactJsonLd, ContextLoaderEnvironment, Expandable, JsonLdError, JsonLdNodeObject,
-    JsonLdObject, Loader,
+    CompactJsonLd, Expandable, JsonLdError, JsonLdLoaderProvider, JsonLdNodeObject, JsonLdObject,
+    Loader,
 };
 use ssi_jwk::JWKResolver;
 use ssi_jws::{CompactJWS, InvalidCompactJWS, ValidateJWSHeader};
@@ -127,7 +127,7 @@ impl Expandable for BitstringStatusListCredential {
 
 impl<E, P> ValidateClaims<E, P> for BitstringStatusListCredential
 where
-    E: DateTimeEnvironment,
+    E: DateTimeProvider,
 {
     fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
@@ -208,10 +208,7 @@ pub enum FromBytesError {
 
 impl<V> FromBytes<V> for BitstringStatusListCredential
 where
-    V: ResolverEnvironment
-        + DateTimeEnvironment
-        + ContextLoaderEnvironment
-        + Eip712TypesEnvironment,
+    V: ResolverProvider + DateTimeProvider + JsonLdLoaderProvider + Eip712TypesLoaderProvider,
     V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = FromBytesError;
@@ -219,7 +216,7 @@ where
     async fn from_bytes_with(
         bytes: &[u8],
         media_type: &str,
-        verifier: &V,
+        params: &V,
         options: FromBytesOptions,
     ) -> Result<Self, Self::Error> {
         match media_type {
@@ -228,7 +225,7 @@ where
                     .map_err(InvalidCompactJWS::into_owned)?
                     .to_decoded()?
                     .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
-                jws.verify(verifier).await??;
+                jws.verify(params).await??;
                 Ok(jws.signing_bytes.payload)
             }
             // "application/vc+ld+json+sd-jwt" => {
@@ -241,7 +238,7 @@ where
                 let vc = ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
 
                 if !options.allow_unsecured || !vc.proofs.is_empty() {
-                    vc.verify(verifier).await??;
+                    vc.verify(params).await??;
                 }
 
                 Ok(vc.claims)

@@ -9,7 +9,7 @@ use rdf_types::{
 };
 use serde::Serialize;
 use ssi_json_ld::{
-    CompactJsonLd, ContextLoaderEnvironment, Expandable, ExpandedDocument, JsonLdError,
+    CompactJsonLd, Expandable, ExpandedDocument, JsonLdError, JsonLdLoaderProvider,
     JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader,
 };
 use ssi_rdf::{urdna2015, Interpretation, IntoNQuads, LdEnvironment};
@@ -31,7 +31,7 @@ impl<'a, S: CryptographicSuite> ProofConfigurationRef<'a, S> {
 
     pub async fn expand(
         self,
-        environment: &impl ContextLoaderEnvironment,
+        environment: &impl JsonLdLoaderProvider,
         document: &impl JsonLdNodeObject,
     ) -> Result<ExpandedProofConfiguration, ConfigurationExpansionError>
     where

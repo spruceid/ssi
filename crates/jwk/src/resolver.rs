@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use crate::JWK;
 use ssi_claims_core::{
     chrono::{DateTime, Utc},
-    DateTimeEnvironment, ProofValidationError, ResolverEnvironment,
+    DateTimeProvider, ProofValidationError, ResolverProvider,
 };
 
 /// JWK resolver.
@@ -38,7 +38,7 @@ impl JWKResolver for JWK {
     }
 }
 
-impl ResolverEnvironment for JWK {
+impl ResolverProvider for JWK {
     type Resolver = Self;
 
     fn resolver(&self) -> &Self::Resolver {
@@ -46,7 +46,7 @@ impl ResolverEnvironment for JWK {
     }
 }
 
-impl DateTimeEnvironment for JWK {
+impl DateTimeProvider for JWK {
     fn date_time(&self) -> DateTime<Utc> {
         Utc::now()
     }

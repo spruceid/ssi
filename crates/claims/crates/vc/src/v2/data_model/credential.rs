@@ -1,5 +1,5 @@
 use iref::Uri;
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, InvalidClaims};
 use xsd_types::DateTimeStamp;
 
 use super::{InternationalString, RelatedResource};
@@ -193,7 +193,7 @@ pub trait Credential: MaybeIdentified {
     /// verified.
     fn validate_credential<E>(&self, env: &E) -> ClaimsValidity
     where
-        E: DateTimeEnvironment,
+        E: DateTimeProvider,
     {
         let now = env.date_time();
 
