@@ -170,7 +170,10 @@ impl TryFrom<AnyMethod> for VerificationMethod {
                 Ok(Self::BlockchainVerificationMethod2021(m))
             }
             m => Err(InvalidVerificationMethod::invalid_type_name(
-                ssi_verification_methods::TypedVerificationMethod::type_(&m),
+                ssi_verification_methods::TypedVerificationMethod::type_(
+                    &m,
+                    "AleoMethod2021 or BlockchainVerificationMethod2021",
+                ),
             )),
         }
     }
