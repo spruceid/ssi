@@ -4,17 +4,20 @@ use iref::UriBuf;
 use rdf_types::{Interpretation, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{
-    ClaimsValidity, DefaultVerificationEnvironment, Validate, ValidateProof, VerifiableClaims,
-    VerificationEnvironment,
+    ClaimsValidity, DateTimeProvider, Eip712TypesLoaderProvider, ResolverProvider, ValidateClaims,
 };
 use ssi_data_integrity::{
     ssi_rdf::{LdEnvironment, LinkedDataResource, LinkedDataSubject},
-    AnyProofs, AnySuite,
+    AnySuite,
 };
-use ssi_json_ld::{CompactJsonLd, Expandable, JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
-use ssi_jws::{CompactJWS, InvalidCompactJWS, JWSVerifier, ValidateJWSHeader};
+use ssi_json_ld::{
+    CompactJsonLd, Expandable, JsonLdError, JsonLdLoaderProvider, JsonLdNodeObject, JsonLdObject,
+    Loader,
+};
+use ssi_jwk::JWKResolver;
+use ssi_jws::{CompactJWS, InvalidCompactJWS, ValidateJWSHeader};
 use ssi_vc::v2::{syntax::JsonCredentialTypes, Context};
-use ssi_verification_methods::ssi_core::OneOrMany;
+use ssi_verification_methods::{ssi_core::OneOrMany, AnyMethod, VerificationMethodResolver};
 
 use crate::{
     bitstream_status_list::FromBytesError, FromBytes, FromBytesOptions, StatusMapEntrySet,
@@ -91,8 +94,8 @@ impl Expandable for BitstringStatusListEntrySetCredential {
     }
 }
 
-impl<E, P> Validate<E, P> for BitstringStatusListEntrySetCredential {
-    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
+impl<E, P> ValidateClaims<E, P> for BitstringStatusListEntrySetCredential {
+    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         // TODO use `ssi`'s own VC DM v2.0 validation function once it's implemented.
         Ok(())
     }
@@ -104,21 +107,17 @@ impl<E> ValidateJWSHeader<E> for BitstringStatusListEntrySetCredential {
     }
 }
 
-impl DefaultVerificationEnvironment for BitstringStatusListEntrySetCredential {
-    type Environment = ();
-}
-
 impl<V> FromBytes<V> for BitstringStatusListEntrySetCredential
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<Self, VerificationEnvironment, V>,
+    V: ResolverProvider + DateTimeProvider + JsonLdLoaderProvider + Eip712TypesLoaderProvider,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = FromBytesError;
 
     async fn from_bytes_with(
         bytes: &[u8],
         media_type: &str,
-        verifier: &V,
+        params: &V,
         options: FromBytesOptions,
     ) -> Result<Self, Self::Error> {
         match media_type {
@@ -127,7 +126,7 @@ where
                     .map_err(InvalidCompactJWS::into_owned)?
                     .to_decoded()?
                     .try_map::<Self, _>(|bytes| serde_json::from_slice(&bytes))?;
-                jws.verify(verifier).await??;
+                jws.verify(params).await??;
                 Ok(jws.signing_bytes.payload)
             }
             // "application/vc+ld+json+sd-jwt" => {
@@ -140,7 +139,7 @@ where
                 let vc = ssi_data_integrity::from_json_slice::<Self, AnySuite>(bytes)?;
 
                 if !options.allow_unsecured || !vc.proofs.is_empty() {
-                    vc.verify(verifier).await??;
+                    vc.verify(params).await??;
                 }
 
                 Ok(vc.claims)

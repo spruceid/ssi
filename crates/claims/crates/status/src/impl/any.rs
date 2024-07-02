@@ -1,7 +1,8 @@
 use iref::Uri;
-use ssi_claims_core::{ValidateProof, VerificationEnvironment};
-use ssi_data_integrity::AnyProofs;
-use ssi_jws::JWSVerifier;
+use ssi_claims_core::{DateTimeProvider, Eip712TypesLoaderProvider, ResolverProvider};
+use ssi_json_ld::JsonLdLoaderProvider;
+use ssi_jwk::JWKResolver;
+use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
 
 use crate::{
     bitstream_status_list::{
@@ -41,8 +42,8 @@ pub enum FromBytesError {
 
 impl<V> FromBytes<V> for AnyStatusMap
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<BitstringStatusListCredential, VerificationEnvironment, V>,
+    V: ResolverProvider + DateTimeProvider + JsonLdLoaderProvider + Eip712TypesLoaderProvider,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = FromBytesError;
 
@@ -178,21 +179,21 @@ pub enum AnyEntrySet {
 
 impl<V> FromBytes<V> for AnyEntrySet
 where
-    V: JWSVerifier,
-    AnyProofs: ValidateProof<BitstringStatusListEntrySetCredential, VerificationEnvironment, V>,
+    V: ResolverProvider + DateTimeProvider + JsonLdLoaderProvider + Eip712TypesLoaderProvider,
+    V::Resolver: JWKResolver + VerificationMethodResolver<Method = AnyMethod>,
 {
     type Error = EntrySetFromBytesError;
 
     async fn from_bytes_with(
         bytes: &[u8],
         media_type: &str,
-        verifier: &V,
+        params: &V,
         options: FromBytesOptions,
     ) -> Result<Self, Self::Error> {
         match media_type {
             "application/json" | "application/jwt" | "application/cbor" | "application/cwt" => {
                 token_status_list::AnyStatusListEntrySet::from_bytes_with(
-                    bytes, media_type, verifier, options,
+                    bytes, media_type, params, options,
                 )
                 .await
                 .map(Self::TokenStatusList)
@@ -203,7 +204,7 @@ where
             | "application/vc+ld+json+cose"
             | "application/vc+ld+json" => {
                 bitstream_status_list::BitstringStatusListEntrySetCredential::from_bytes_with(
-                    bytes, media_type, verifier, options,
+                    bytes, media_type, params, options,
                 )
                 .await
                 .map(Self::BitstringStatusList)

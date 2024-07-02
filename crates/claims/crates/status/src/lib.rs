@@ -31,7 +31,7 @@ pub trait FromBytes<V>: Sized {
     async fn from_bytes_with(
         bytes: &[u8],
         media_type: &str,
-        verifier: &V,
+        verification_params: &V,
         options: FromBytesOptions,
     ) -> Result<Self, Self::Error>;
 

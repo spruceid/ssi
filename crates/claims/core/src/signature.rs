@@ -1,7 +1,7 @@
 use core::fmt;
 
-use ssi_eip712::Eip712TypesEnvironment;
-use ssi_json_ld::ContextLoaderEnvironment;
+use ssi_eip712::Eip712TypesLoaderProvider;
+use ssi_json_ld::JsonLdLoaderProvider;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SignatureError {
@@ -73,7 +73,7 @@ impl Default for SignatureEnvironment {
     }
 }
 
-impl<JsonLdLoader, Eip712Loader> ContextLoaderEnvironment
+impl<JsonLdLoader, Eip712Loader> JsonLdLoaderProvider
     for SignatureEnvironment<JsonLdLoader, Eip712Loader>
 where
     JsonLdLoader: ssi_json_ld::Loader,
@@ -85,14 +85,14 @@ where
     }
 }
 
-impl<JsonLdLoader, Eip712Loader> Eip712TypesEnvironment
+impl<JsonLdLoader, Eip712Loader> Eip712TypesLoaderProvider
     for SignatureEnvironment<JsonLdLoader, Eip712Loader>
 where
-    Eip712Loader: ssi_eip712::TypesProvider,
+    Eip712Loader: ssi_eip712::TypesLoader,
 {
-    type Provider = Eip712Loader;
+    type Loader = Eip712Loader;
 
-    fn eip712_types(&self) -> &Self::Provider {
+    fn eip712_types(&self) -> &Self::Loader {
         &self.eip712_loader
     }
 }

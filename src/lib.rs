@@ -58,10 +58,13 @@
 //! // public key used to sign the JWT.
 //! // Here we use the example `ExampleDIDResolver` resolver, enabled with the
 //! // `example` feature.
-//! let vm_resolver = ExampleDIDResolver::default().with_default_options::<AnyJwkMethod>();
+//! let vm_resolver = ExampleDIDResolver::default().into_vm_resolver::<AnyJwkMethod>();
+//!
+//! // Setup the verification parameters.
+//! let params = VerificationParameters::from_resolver(vm_resolver);
 //!
 //! // Verify the JWT.
-//! assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok())
+//! assert!(jwt.verify(&params).await.expect("verification failed").is_ok())
 //! # }
 //! ```
 //!
@@ -90,9 +93,12 @@
 //!
 //! // Setup a verification method resolver, in charge of retrieving the
 //! // public key used to sign the JWT.
-//! let vm_resolver = ExampleDIDResolver::default().with_default_options();
+//! let vm_resolver = ExampleDIDResolver::default().into_vm_resolver();
 //!
-//! assert!(vc.verify(&vm_resolver).await.expect("verification failed").is_ok());
+//! // Setup the verification parameters.
+//! let params = VerificationParameters::from_resolver(vm_resolver);
+//!
+//! assert!(vc.verify(&params).await.expect("verification failed").is_ok());
 //! # }
 //! ```
 //!
@@ -137,10 +143,13 @@
 //!
 //! // Create a verification method resolver, which will be in charge of
 //! // decoding the DID back into a public key.
-//! let vm_resolver = DIDJWK.with_default_options::<AnyJwkMethod>();
+//! let vm_resolver = DIDJWK.into_vm_resolver::<AnyJwkMethod>();
+//!
+//! // Setup the verification parameters.
+//! let params = VerificationParameters::from_resolver(vm_resolver);
 //!
 //! // Verify the JWT.
-//! assert!(jwt.verify(&vm_resolver).await.expect("verification failed").is_ok());
+//! assert!(jwt.verify(&params).await.expect("verification failed").is_ok());
 //!
 //! // Print the JWT.
 //! println!("{jwt}")
@@ -189,7 +198,7 @@
 //!
 //! // Create a verification method resolver, which will be in charge of
 //! // decoding the DID back into a public key.
-//! let vm_resolver = DIDJWK.with_default_options();
+//! let vm_resolver = DIDJWK.into_vm_resolver();
 //!
 //! // Create a signer from the secret key.
 //! // Here we use the simple `SingleSecretSigner` signer type which always uses
@@ -265,6 +274,18 @@ pub use ssi_security as security;
 /// Includes Verifiable Credentials and Data-Integrity Proofs.
 #[doc(inline)]
 pub use ssi_claims as claims;
+
+/// Default verification parameters type.
+///
+/// This type can be used as parameters of the
+/// [`claims::VerifiableClaims::verify`] function for most claims and signature
+/// types. It provides sensible defaults for common parameters:
+///   - A DID resolver with support for various DID methods,
+///   - A JSON-LD document loader recognizing popular JSON-LD contexts,
+///   - the current date and time.
+pub type DefaultVerificationParameters = claims::VerificationParameters<
+    dids::VerificationMethodDIDResolver<dids::AnyDidMethod, verification_methods::AnyMethod>,
+>;
 
 /// Verification Methods.
 #[doc(inline)]

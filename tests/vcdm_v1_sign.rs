@@ -3,7 +3,7 @@ use ssi::JWK;
 use ssi_claims::{
     data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
     vc::v1::JsonCredential,
-    VerifiableClaims,
+    VerificationParameters,
 };
 use ssi_dids::{AnyDidMethod, VerificationMethodDIDResolver};
 use ssi_verification_methods::{AnyMethod, SingleSecretSigner};
@@ -43,5 +43,9 @@ async fn ed25519_signature_2020() {
         )
         .await
         .unwrap();
-    signed_vc.verify(&resolver).await.unwrap().unwrap();
+    signed_vc
+        .verify(VerificationParameters::from_resolver(resolver))
+        .await
+        .unwrap()
+        .unwrap();
 }

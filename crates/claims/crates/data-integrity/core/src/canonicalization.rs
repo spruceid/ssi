@@ -1,7 +1,7 @@
 use digest::Digest;
 use std::marker::PhantomData;
 
-use ssi_json_ld::{ContextLoaderEnvironment, Expandable, JsonLdNodeObject};
+use ssi_json_ld::{Expandable, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::{AnyLdEnvironment, LdEnvironment};
 
 use crate::{
@@ -30,7 +30,7 @@ impl<S, T, C> standard::TypedTransformationAlgorithm<S, T, C> for CanonicalizeCl
 where
     S: SerializeCryptographicSuite,
     T: JsonLdNodeObject + Expandable,
-    C: ContextLoaderEnvironment,
+    C: JsonLdLoaderProvider,
 {
     async fn transform(
         context: &C,

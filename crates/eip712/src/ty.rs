@@ -22,7 +22,7 @@ pub enum TypesFetchError {
 ///
 /// A default implementation is provided for the `()` type that always return
 /// `TypesFetchError::Unsupported`.
-pub trait TypesProvider {
+pub trait TypesLoader {
     /// Fetches the type definitions located behind the given `uri`.
     ///
     /// This is an asynchronous function returning a `Self::Fetch` future that
@@ -34,16 +34,30 @@ pub trait TypesProvider {
 
 /// Simple EIP712 loader implementation that always return
 /// `TypesFetchError::Unsupported`.
-impl TypesProvider for () {
+impl TypesLoader for () {
     async fn fetch_types(&self, _uri: &Uri) -> Result<Types, TypesFetchError> {
         Err(TypesFetchError::Unsupported)
     }
 }
 
-pub trait Eip712TypesEnvironment {
-    type Provider: TypesProvider;
+impl<'a, T: TypesLoader> TypesLoader for &'a T {
+    async fn fetch_types(&self, uri: &Uri) -> Result<Types, TypesFetchError> {
+        T::fetch_types(*self, uri).await
+    }
+}
 
-    fn eip712_types(&self) -> &Self::Provider;
+pub trait Eip712TypesLoaderProvider {
+    type Loader: TypesLoader;
+
+    fn eip712_types(&self) -> &Self::Loader;
+}
+
+impl<'a, E: Eip712TypesLoaderProvider> Eip712TypesLoaderProvider for &'a E {
+    type Loader = E::Loader;
+
+    fn eip712_types(&self) -> &Self::Loader {
+        E::eip712_types(*self)
+    }
 }
 
 /// EIP-712 types

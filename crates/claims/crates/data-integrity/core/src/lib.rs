@@ -18,7 +18,9 @@ use educe::Educe;
 pub use options::ProofOptions;
 pub use proof::*;
 use serde::Serialize;
-use ssi_claims_core::{DefaultVerificationEnvironment, VerifiableClaims, VerificationEnvironment};
+use ssi_claims_core::{
+    ProofValidationError, ValidateClaims, ValidateProof, VerifiableClaims, Verification,
+};
 pub use suite::{
     CloneCryptographicSuite, CryptographicSuite, DebugCryptographicSuite,
     DeserializeCryptographicSuite, SerializeCryptographicSuite, StandardCryptographicSuite,
@@ -42,10 +44,54 @@ pub struct DataIntegrity<T, S: CryptographicSuite> {
 }
 
 impl<T, S: CryptographicSuite> DataIntegrity<T, S> {
+    /// Create new Data-Integrity-secured claims by providing the proofs.
     pub fn new(claims: T, proofs: Proofs<S>) -> Self {
         Self { claims, proofs }
     }
+
+    /// Verify the claims and proofs.
+    ///
+    /// The `params` argument provides all the verification parameters required
+    /// to validate the claims and proof.
+    ///
+    /// # What verification parameters should I use?
+    ///
+    /// It really depends on the claims type `T` and cryptosuite type `S`,
+    /// but the `ssi::claims::VerificationParameters` type is a good starting
+    /// point that should work most of the time.
+    ///
+    /// # Passing the parameters by reference
+    ///
+    /// If the validation traits are implemented for `P`, they will be
+    /// implemented for `&P` as well. This means the parameters can be passed
+    /// by move *or* by reference.
+    pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
+    where
+        T: ValidateClaims<P, Proofs<S>>,
+        Proofs<S>: ValidateProof<P, T>,
+    {
+        VerifiableClaims::verify(self, params).await
+    }
 }
+
+// impl<T, S: CryptographicSuite> DataIntegrity<T, S>
+// where
+//     T: ValidateClaims<VerificationParameters, Proofs<S>>,
+//     Proofs<S>: ValidateProof<VerificationParameters, T>,
+// {
+//     /// Verify the claims and proofs with the default verification parameters.
+//     ///
+//     /// This function should be available for most claims and cryptosuite.
+//     /// If you need to customize the verification parameters, such as
+//     /// changing the verification date and time or the JSON-LD context loader,
+//     /// use the [`Self::verify_with`] method.
+//     ///
+//     /// See the [`VerificationParameters`] type for more information about the
+//     /// default verification parameters.
+//     pub async fn verify(&self) -> Result<Verification, ProofValidationError> {
+//         VerifiableClaims::verify(self, VerificationParameters::default()).await
+//     }
+// }
 
 impl<T, S: CryptographicSuite> Deref for DataIntegrity<T, S> {
     type Target = T;
@@ -72,8 +118,4 @@ impl<T, S: CryptographicSuite> VerifiableClaims for DataIntegrity<T, S> {
     fn proof(&self) -> &Self::Proof {
         &self.proofs
     }
-}
-
-impl<T, S: CryptographicSuite> DefaultVerificationEnvironment for DataIntegrity<T, S> {
-    type Environment = VerificationEnvironment;
 }

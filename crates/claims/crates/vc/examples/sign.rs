@@ -3,7 +3,7 @@
 use iref::{Iri, IriBuf, Uri, UriBuf};
 use linked_data::{LinkedDataResource, LinkedDataSubject};
 use rand_chacha::rand_core::SeedableRng;
-use ssi_claims_core::VerifiableClaims;
+use ssi_claims_core::VerificationParameters;
 use ssi_data_integrity::{suites::Ed25519Signature2020, CryptographicSuite, ProofOptions};
 use ssi_json_ld::{Expandable, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, VocabularyMut};
@@ -50,11 +50,11 @@ impl ssi_json_ld::JsonLdNodeObject for Credential {
     }
 }
 
-impl<E, P> ssi_claims_core::Validate<E, P> for Credential
+impl<E, P> ssi_claims_core::ValidateClaims<E, P> for Credential
 where
-    E: ssi_claims_core::DateTimeEnvironment,
+    E: ssi_claims_core::DateTimeProvider,
 {
-    fn validate(&self, env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
+    fn validate_claims(&self, env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
         ssi_vc::v1::Credential::validate_credential(self, env)
     }
 }
@@ -173,7 +173,7 @@ async fn main() {
 
     // Verify the generated verifiable credential.
     verifiable_credential
-        .verify(&keyring)
+        .verify(VerificationParameters::from_resolver(keyring))
         .await
         .expect("verification failed")
         .expect("invalid proof");

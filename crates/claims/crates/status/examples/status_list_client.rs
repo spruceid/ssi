@@ -24,6 +24,7 @@
 //! ```
 use clap::Parser;
 use core::fmt;
+use ssi_claims_core::VerificationParameters;
 use ssi_dids::{VerificationMethodDIDResolver, DIDJWK};
 use ssi_status::{
     any::{AnyEntrySet, AnyStatusMap},
@@ -95,7 +96,8 @@ async fn run(args: Args) -> Result<(), Error> {
         Err(e) => return Err(Error::ReadFile(input, e)),
     };
 
-    let verifier = VerificationMethodDIDResolver::new(DIDJWK);
+    let verifier =
+        VerificationParameters::from_resolver(VerificationMethodDIDResolver::new(DIDJWK));
 
     let entry_set = AnyEntrySet::from_bytes(&bytes, &args.media_type, &verifier)
         .await

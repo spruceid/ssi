@@ -11,7 +11,7 @@ pub use matching::*;
 mod any;
 pub use any::*;
 use serde::{de::DeserializeOwned, Serialize};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, InvalidClaims};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, InvalidClaims};
 
 /// JWT claim.
 pub trait Claim: 'static + Clone + Serialize + DeserializeOwned {
@@ -32,7 +32,7 @@ pub trait ClaimSet {
 
     fn validate_registered_claims<E>(&self, env: &E) -> ClaimsValidity
     where
-        E: DateTimeEnvironment,
+        E: DateTimeProvider,
     {
         let now = env.date_time();
 

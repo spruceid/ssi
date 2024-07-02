@@ -8,7 +8,7 @@ use crate::syntax::{
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
 use xsd_types::DateTimeStamp;
@@ -152,11 +152,11 @@ impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T, E, P> Validate<E, P> for SpecializedJsonCredential<S, C, T>
+impl<S, C, T, E, P> ValidateClaims<E, P> for SpecializedJsonCredential<S, C, T>
 where
-    E: DateTimeEnvironment,
+    E: DateTimeProvider,
 {
-    fn validate(&self, env: &E, _proof: &P) -> ClaimsValidity {
+    fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
         crate::v2::Credential::validate_credential(self, env)
     }
 }

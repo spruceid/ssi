@@ -6,12 +6,12 @@ pub use crate::{
         },
         vc::syntax::{AnyJsonCredential, AnyJsonPresentation},
         CompactJWS, CompactJWSBuf, CompactJWSStr, CompactJWSString, JWSPayload, JWTClaims,
-        VerifiableClaims,
+        VerificationParameters,
     },
     dids::{DIDResolver, DIDJWK},
     verification_methods::{AnyJwkMethod, AnyMethod, SingleSecretSigner},
     xsd_types::DateTime,
-    JWK,
+    DefaultVerificationParameters, JWK,
 };
 
 #[cfg(feature = "example")]

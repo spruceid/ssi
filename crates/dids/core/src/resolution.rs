@@ -273,14 +273,27 @@ pub trait DIDResolver {
         self.dereference_with(did_url, Options::default()).await
     }
 
-    fn with_options<M>(self, options: Options) -> VerificationMethodDIDResolver<Self, M>
+    /// Turns this DID resolver into a verification method resolver.
+    ///
+    /// To resolve a verification method, the output resolver will first
+    /// resolve the DID using the given `options` then pull the referenced
+    /// method from the DID document.
+    fn into_vm_resolver_with<M>(self, options: Options) -> VerificationMethodDIDResolver<Self, M>
     where
         Self: Sized,
     {
         VerificationMethodDIDResolver::new_with_options(self, options)
     }
 
-    fn with_default_options<M>(self) -> VerificationMethodDIDResolver<Self, M>
+    /// Turns this DID resolver into a verification method resolver.
+    ///
+    /// To resolve a verification method, the output resolver will first
+    /// resolve the DID then pull the referenced method from the DID document.
+    ///
+    /// This is equivalent to calling
+    /// [`into_vm_resolver_with`](DIDResolver::into_vm_resolver_with)
+    /// with the default options.
+    fn into_vm_resolver<M>(self) -> VerificationMethodDIDResolver<Self, M>
     where
         Self: Sized,
     {

@@ -1,7 +1,10 @@
 mod unknown;
+use ssi_claims_core::ResolverProvider;
+use ssi_eip712::Eip712TypesLoaderProvider;
+use ssi_json_ld::JsonLdLoaderProvider;
 pub use unknown::*;
 
-use crate::macros;
+use crate::{macros, AnyResolver};
 
 mod pick;
 
@@ -135,5 +138,37 @@ impl AnyProofOptions {
             Self::EthereumEip712Signature2021v0_1(o) => o.eip712.as_mut(),
             _ => None,
         }
+    }
+}
+
+pub struct AnyVerifier<R, M, L1, L2> {
+    resolver: AnyResolver<R, M>,
+    json_ld_loader: L1,
+    eip712_loader: L2,
+}
+
+impl<R, M, L1, L2> ResolverProvider for AnyVerifier<R, M, L1, L2> {
+    type Resolver = AnyResolver<R, M>;
+
+    fn resolver(&self) -> &Self::Resolver {
+        &self.resolver
+    }
+}
+
+impl<R, M, L1: ssi_json_ld::Loader, L2> JsonLdLoaderProvider for AnyVerifier<R, M, L1, L2> {
+    type Loader = L1;
+
+    fn loader(&self) -> &Self::Loader {
+        &self.json_ld_loader
+    }
+}
+
+impl<R, M, L1, L2: ssi_eip712::TypesLoader> Eip712TypesLoaderProvider
+    for AnyVerifier<R, M, L1, L2>
+{
+    type Loader = L2;
+
+    fn eip712_types(&self) -> &Self::Loader {
+        &self.eip712_loader
     }
 }
