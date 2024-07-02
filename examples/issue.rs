@@ -43,8 +43,8 @@ async fn issue(proof_format: &str) {
             let vc = suite.sign(vc, &resolver, &signer, options).await.unwrap();
 
             let result = vc.verify(params).await.expect("verification failed");
-            if result.is_err() {
-                panic!("verify failed");
+            if let Err(e) = result {
+                panic!("verify failed: {e}");
             }
 
             let stdout_writer = std::io::BufWriter::new(std::io::stdout());
@@ -54,8 +54,8 @@ async fn issue(proof_format: &str) {
             let jwt = vc.to_jwt_claims().unwrap().sign(&key).await.unwrap();
 
             let result = jwt.verify(params).await.expect("verification failed");
-            if result.is_err() {
-                panic!("verify failed");
+            if let Err(e) = result {
+                panic!("verify failed: {e}");
             }
 
             print!("{}", jwt);

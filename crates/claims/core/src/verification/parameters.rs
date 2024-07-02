@@ -30,7 +30,9 @@ pub struct VerificationParameters<R, L1 = ssi_json_ld::ContextLoader, L2 = ()> {
     pub eip712_types_loader: L2,
 
     /// Date-time.
-    pub date_time: DateTime<Utc>,
+    ///
+    /// If `None`, the current date time is used.
+    pub date_time: Option<DateTime<Utc>>,
 }
 
 impl<R> VerificationParameters<R> {
@@ -39,14 +41,14 @@ impl<R> VerificationParameters<R> {
             resolver,
             json_ld_loader: ssi_json_ld::ContextLoader::default(),
             eip712_types_loader: (),
-            date_time: Utc::now(),
+            date_time: None,
         }
     }
 }
 
 impl<R, L1, L2> VerificationParameters<R, L1, L2> {
     pub fn with_date_time(mut self, date_time: DateTime<Utc>) -> Self {
-        self.date_time = date_time;
+        self.date_time = Some(date_time);
         self
     }
 
@@ -97,6 +99,6 @@ impl<R, L1, L2: ssi_eip712::TypesLoader> Eip712TypesLoaderProvider
 
 impl<R, L1, L2> DateTimeProvider for VerificationParameters<R, L1, L2> {
     fn date_time(&self) -> DateTime<Utc> {
-        self.date_time
+        self.date_time.unwrap_or_else(Utc::now)
     }
 }

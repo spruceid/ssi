@@ -205,7 +205,7 @@ pub struct InvocationVerifier<'a, C, S, R, L1 = ssi_json_ld::ContextLoader, L2 =
     pub resolver: R,
     pub json_ld_loader: L1,
     pub eip712_types_loader: L2,
-    pub date_time: DateTime<Utc>,
+    pub date_time: Option<DateTime<Utc>>,
     pub delegation: &'a Delegation<C, S>,
 }
 
@@ -247,7 +247,7 @@ impl<'v, 'a, R, L1, L2, C, S> InvocationVerifier<'a, C, S, &'v R, &'v L1, &'v L2
 
 impl<'a, C, S, R, L1, L2> DateTimeProvider for InvocationVerifier<'a, C, S, R, L1, L2> {
     fn date_time(&self) -> DateTime<Utc> {
-        self.date_time
+        self.date_time.unwrap_or_else(Utc::now)
     }
 }
 
