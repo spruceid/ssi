@@ -150,7 +150,10 @@ impl TryFrom<GenericVerificationMethod>
                     })?,
             })
         } else {
-            Err(InvalidVerificationMethod::invalid_type_name(&value.type_))
+            Err(InvalidVerificationMethod::invalid_type_name(
+                &value.type_,
+                ED25519_PUBLIC_KEY_BLAKE2B_DIGEST_SIZE20_BASE58_CHECK_ENCODED_2021_TYPE,
+            ))
         }
     }
 }
