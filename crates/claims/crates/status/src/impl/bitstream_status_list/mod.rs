@@ -192,6 +192,50 @@ impl BitString {
         }
     }
 
+    /// Creates a new bit-string of the given length, using `f` to initialize
+    /// every status.
+    ///
+    /// The `f` function is called with the index of the initialized status.
+    pub fn new_with(
+        status_size: StatusSize,
+        len: usize,
+        mut f: impl FnMut(usize) -> u8,
+    ) -> Result<Self, Overflow> {
+        let mut result = Self::with_capacity(status_size, len);
+
+        for i in 0..len {
+            result.push(f(i))?;
+        }
+
+        Ok(result)
+    }
+
+    /// Creates a new bit-string of the given length, setting every status
+    /// to the same value.
+    pub fn new_with_value(
+        status_size: StatusSize,
+        len: usize,
+        value: u8,
+    ) -> Result<Self, Overflow> {
+        Self::new_with(status_size, len, |_| value)
+    }
+
+    /// Creates a new bit-string of the given length, setting every status
+    /// to 0.
+    pub fn new_zeroed(status_size: StatusSize, len: usize) -> Self {
+        Self::new_with_value(status_size, len, 0).unwrap() // 0 cannot overflow.
+    }
+
+    /// Creates a new bit-string with the given status size and capacity
+    /// (in number of statuses).
+    pub fn with_capacity(status_size: StatusSize, capacity: usize) -> Self {
+        Self {
+            status_size,
+            bytes: Vec::with_capacity((capacity * status_size.0 as usize).div_ceil(8)),
+            len: 0,
+        }
+    }
+
     /// Creates a bit-string from a byte array and status size.
     pub fn from_bytes(status_size: StatusSize, bytes: Vec<u8>) -> Self {
         let len = bytes.len() * 8usize / status_size.0 as usize;
