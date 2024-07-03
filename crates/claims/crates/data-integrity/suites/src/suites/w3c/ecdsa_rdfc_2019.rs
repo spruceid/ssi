@@ -59,10 +59,6 @@ impl HashingAlgorithm<EcdsaRdfc2019> for EcdsaRdfc2019HashingAlgorithm {
         proof_configuration: ProofConfigurationRef<EcdsaRdfc2019>,
         verification_method: &Multikey,
     ) -> Result<Self::Output, HashingError> {
-        for line in &input.configuration {
-            eprint!("{line}")
-        }
-
         match verification_method.public_key.codec() {
             ssi_multicodec::P256_PUB => HashCanonicalClaimsAndConfiguration::<Sha256>::hash(
                 input,
