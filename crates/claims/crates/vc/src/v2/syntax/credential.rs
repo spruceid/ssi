@@ -3,7 +3,7 @@ use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 use super::{Context, InternationalString, RelatedResource};
 use crate::syntax::{
     not_null, value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject,
-    MaybeIdentifiedTypedObject, RequiredContextList, RequiredTypeSet, TypedObject,
+    MaybeIdentifiedTypedObject, NonEmptyObject, RequiredContextList, RequiredTypeSet, TypedObject,
 };
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
@@ -19,7 +19,7 @@ pub use crate::v1::syntax::{CredentialType, JsonCredentialTypes, VERIFIABLE_CRED
 ///
 /// If you care about required context and/or type, use the
 /// [`SpecializedJsonCredential`] type directly.
-pub type JsonCredential<S = json_syntax::Value> = SpecializedJsonCredential<S>;
+pub type JsonCredential<S = NonEmptyObject> = SpecializedJsonCredential<S>;
 
 /// Specialized JSON Credential with custom required context and type.
 ///
@@ -30,7 +30,7 @@ pub type JsonCredential<S = json_syntax::Value> = SpecializedJsonCredential<S>;
     serialize = "S: Serialize",
     deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
+pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,
