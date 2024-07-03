@@ -5,6 +5,7 @@
 //! `CryptographicSuite::sign` returns a future that is `Send` without
 //! triggering the issue.
 mod vcdm_v1_sign;
+mod vcdm_v2_sign;
 
 use serde::{Deserialize, Serialize};
 use ssi::{
