@@ -123,63 +123,6 @@ pub trait CryptographicSuite: Clone {
     }
 }
 
-// /// Cryptographic suite instance.
-// ///
-// /// See: <https://www.w3.org/TR/vc-data-integrity/#dfn-data-integrity-cryptographic-suite-instance>
-// pub trait CryptographicSuiteInstance<T, C = ()>: CryptographicSuite {
-//     /// Prepare the input claims for signing or verification.
-//     #[allow(async_fn_in_trait)]
-//     async fn prepare_claims(
-//         &self,
-//         context: &mut C,
-//         unsecured_document: &T,
-//         proof_configuration: ProofConfigurationRef<Self>,
-//     ) -> Result<Self::PreparedClaims, ClaimsPreparationError>;
-
-//     /// Create a proof by signing the given unsecured document.
-//     #[allow(async_fn_in_trait)]
-//     async fn create_proof<R, S>(
-//         &self,
-//         context: &mut C,
-//         resolver: R,
-//         signer: S,
-//         unsecured_document: &T,
-//         options: InputOptions<Self>,
-//     ) -> Result<Proof<Self>, SignatureError>
-//     where
-//         Self: CryptographicSuiteSigning<R, S>,
-//     {
-//         let proof_configuration = self.configure(options)?;
-//         let proof_configuration_ref = proof_configuration.borrowed();
-//         let prepared_claims = self
-//             .prepare_claims(context, unsecured_document, proof_configuration_ref)
-//             .await?;
-//         let signature = self
-//             .sign_prepared_claims(resolver, signer, &prepared_claims, proof_configuration_ref)
-//             .await?;
-//         Ok(proof_configuration.into_proof(signature))
-//     }
-
-//     /// Verify a proof of the given unsecured document.
-//     #[allow(async_fn_in_trait)]
-//     async fn verify_proof<V>(
-//         &self,
-//         context: &mut C,
-//         verifier: &V,
-//         unsecured_document: &T,
-//         proof: ProofRef<'_, Self>,
-//     ) -> Result<ProofValidity, ProofValidationError>
-//     where
-//         Self: CryptographicSuiteVerification<V>,
-//     {
-//         let prepared_claims = self
-//             .prepare_claims(context, unsecured_document, proof.configuration())
-//             .await?;
-//         self.verify_prepared_claims(verifier, &prepared_claims, proof)
-//             .await
-//     }
-// }
-
 #[derive(Debug, thiserror::Error)]
 pub enum ClaimsPreparationError {
     #[error("proof configuration failed: {0}")]
