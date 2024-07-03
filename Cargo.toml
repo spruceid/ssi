@@ -39,6 +39,7 @@ ssi-caips = { path = "./crates/caips", version = "0.2", default-features = false
 ssi-ucan = { path = "./crates/ucan", version = "0.2", default-features = false }
 ssi-zcap-ld = { path = "./crates/zcap-ld", version = "0.2", default-features = false }
 ssi-ssh = { path = "./crates/ssh", version = "0.2", default-features = false }
+ssi-status = { path = "./crates/status", version = "0.1", default-features = false }
 
 # Verifiable Claims
 ssi-claims-core = { path = "./crates/claims/core", version = "0.1", default-features = false }
@@ -210,6 +211,7 @@ ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 ssi-security.workspace = true
 ssi-claims.workspace = true
+ssi-status.workspace = true
 ssi-verification-methods.workspace = true
 ssi-dids.workspace = true
 ssi-eip712.workspace = true

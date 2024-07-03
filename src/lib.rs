@@ -275,6 +275,9 @@ pub use ssi_security as security;
 #[doc(inline)]
 pub use ssi_claims as claims;
 
+/// Claims status.
+pub use ssi_status as status;
+
 /// Default verification parameters type.
 ///
 /// This type can be used as parameters of the

@@ -5,7 +5,7 @@ use static_iref::iri;
 mod ethereum_adress;
 pub use ethereum_adress::*;
 
-mod multibase;
+pub mod multibase;
 pub use multibase::{Multibase, MultibaseBuf};
 
 // #[tldr("ssi-vc/src/schema/sec.ttl")]
