@@ -664,6 +664,6 @@ mod tests {
 
     #[test]
     fn deserialize_status_size_overflow() {
-        assert!(serde_json::from_str::<StatusSize>("256").is_err())
+        assert!(serde_json::from_str::<StatusSize>("9").is_err())
     }
 }
