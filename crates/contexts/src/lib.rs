@@ -36,6 +36,8 @@ pub const W3ID_ED2020_V1: &str = include_str!("../w3id-ed25519-signature-2020-v1
 pub const W3ID_MULTIKEY_V1: &str = include_str!("../w3id-multikey-v1.jsonld");
 /// <https://w3id.org/security/data-integrity/v1>
 pub const W3ID_DATA_INTEGRITY_V1: &str = include_str!("../w3id-data-integrity-v1.jsonld");
+/// <https://w3id.org/security/data-integrity/v2>
+pub const W3ID_DATA_INTEGRITY_V2: &str = include_str!("../w3id-data-integrity-v2.jsonld");
 /// <https://w3id.org/security/suites/blockchain-2021/v1>
 pub const BLOCKCHAIN2021_V1: &str = include_str!("../w3id-blockchain-2021-v1.jsonld");
 /// <https://w3id.org/citizenship/v1>
