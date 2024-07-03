@@ -34,7 +34,7 @@ pub type JsonCredentialTypes<T = ()> = Types<CredentialType, T>;
 ///
 /// If you care about required context and/or type, use the
 /// [`SpecializedJsonCredential`] type directly.
-pub type JsonCredential<S = json_syntax::Value> = SpecializedJsonCredential<S>;
+pub type JsonCredential<S = json_syntax::Object> = SpecializedJsonCredential<S>;
 
 /// Specialized JSON Credential with custom required context and type.
 ///
@@ -45,7 +45,7 @@ pub type JsonCredential<S = json_syntax::Value> = SpecializedJsonCredential<S>;
     serialize = "S: Serialize",
     deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct SpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
+pub struct SpecializedJsonCredential<S = json_syntax::Object, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,

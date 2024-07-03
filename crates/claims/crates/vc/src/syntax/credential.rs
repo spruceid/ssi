@@ -14,7 +14,7 @@ use crate::{v1, v2, MaybeIdentified};
 ///
 /// If you care about required context and/or type, use the
 /// [`AnySpecializedJsonCredential`] type directly.
-pub type AnyJsonCredential<S = json_syntax::Value> = AnySpecializedJsonCredential<S>;
+pub type AnyJsonCredential<S = json_syntax::Object> = AnySpecializedJsonCredential<S>;
 
 /// Any JSON credential using VCDM v1 or v2 with custom required contexts and
 /// types.
@@ -29,7 +29,7 @@ pub type AnyJsonCredential<S = json_syntax::Value> = AnySpecializedJsonCredentia
         deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
     )
 )]
-pub enum AnySpecializedJsonCredential<S = json_syntax::Value, C = (), T = ()> {
+pub enum AnySpecializedJsonCredential<S = json_syntax::Object, C = (), T = ()> {
     V1(v1::syntax::SpecializedJsonCredential<S, C, T>),
     V2(v2::syntax::SpecializedJsonCredential<S, C, T>),
 }
