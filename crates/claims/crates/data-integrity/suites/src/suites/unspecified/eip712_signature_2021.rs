@@ -12,7 +12,7 @@ use ssi_data_integrity_core::{
     },
     CryptographicSuite, ProofConfigurationRef, StandardCryptographicSuite, TypeRef,
 };
-use ssi_json_ld::{ContextLoaderEnvironment, Expandable, JsonLdNodeObject};
+use ssi_json_ld::{Expandable, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::{AnyLdEnvironment, LdEnvironment, NQuadsStatement};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
@@ -106,7 +106,7 @@ impl TransformationAlgorithm<Eip712Signature2021> for Eip712Transformation {
 impl<T, C> TypedTransformationAlgorithm<Eip712Signature2021, T, C> for Eip712Transformation
 where
     T: Expandable + JsonLdNodeObject,
-    C: ContextLoaderEnvironment,
+    C: JsonLdLoaderProvider,
 {
     async fn transform(
         context: &C,

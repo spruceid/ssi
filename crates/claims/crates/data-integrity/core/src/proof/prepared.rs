@@ -50,7 +50,7 @@ impl<T: CryptographicSuite> DerefMut for PreparedProof<T> {
     }
 }
 
-impl<T, S: CryptographicSuite, V> ssi_claims_core::ValidateProof<T, V> for PreparedProof<S>
+impl<T, S: CryptographicSuite, V> ssi_claims_core::ValidateProof<V, T> for PreparedProof<S>
 where
     S: CryptographicSuiteVerification<V>,
 {
@@ -163,7 +163,7 @@ impl<S: CryptographicSuite> ssi_claims_core::UnprepareProof for PreparedProofs<S
     }
 }
 
-impl<T, S: CryptographicSuiteVerification<V>, V> ssi_claims_core::ValidateProof<T, V>
+impl<T, S: CryptographicSuiteVerification<V>, V> ssi_claims_core::ValidateProof<V, T>
     for PreparedProofs<S>
 {
     async fn validate_proof<'a>(

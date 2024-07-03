@@ -381,7 +381,7 @@ mod tests {
             ProofOptions,
         },
         vc::v1::{JsonCredential, JsonPresentation},
-        VerifiableClaims,
+        VerificationParameters,
     };
     use ssi_dids_core::{did, DIDResolver};
     use ssi_jwk::JWK;
@@ -473,7 +473,8 @@ mod tests {
     }
 
     async fn credential_prove_verify_did_ethr2(eip712: bool) {
-        let didethr = DIDEthr.with_default_options();
+        let didethr = DIDEthr.into_vm_resolver();
+        let verifier = VerificationParameters::from_resolver(&didethr);
         let key: JWK = serde_json::from_value(json!({
             "alg": "ES256K-R",
             "kty": "EC",
@@ -525,14 +526,14 @@ mod tests {
         } else {
             assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFUzI1NkstUiIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..nwNfIHhCQlI-j58zgqwJgX2irGJNP8hqLis-xS16hMwzs3OuvjqzZIHlwvdzDMPopUA_Oq7M7Iql2LNe0B22oQE");
         }
-        assert!(vc.verify(&didethr).await.unwrap().is_ok());
+        assert!(vc.verify(&verifier).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
 
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didethr).await.unwrap().is_err());
+        assert!(vc_bad_issuer.verify(&verifier).await.unwrap().is_err());
 
         // Check that proof JWK must match proof verificationMethod
         let wrong_key = JWK::generate_secp256k1().unwrap();
@@ -551,7 +552,7 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(vc_wrong_key.verify(&didethr).await.unwrap().is_err());
+        assert!(vc_wrong_key.verify(&verifier).await.unwrap().is_err());
 
         // Make it into a VP
         let presentation = JsonPresentation::new(
@@ -573,12 +574,12 @@ mod tests {
             .unwrap();
 
         println!("VP: {}", serde_json::to_string_pretty(&vp).unwrap());
-        assert!(vp.verify(&didethr).await.unwrap().is_ok());
+        assert!(vp.verify(&verifier).await.unwrap().is_ok());
 
         // Mess with proof signature to make verify fail.
         let mut vp_fuzzed = vp.clone();
         vp_fuzzed.proofs.first_mut().unwrap().signature.alter();
-        let vp_fuzzed_result = vp_fuzzed.verify(&didethr).await;
+        let vp_fuzzed_result = vp_fuzzed.verify(&verifier).await;
         assert!(vp_fuzzed_result.is_err() || vp_fuzzed_result.is_ok_and(|v| v.is_err()));
 
         // test that holder is verified
@@ -586,17 +587,21 @@ mod tests {
         vp_bad_holder.holder = Some(uri!("did:pkh:example:bad").to_owned().into());
 
         // It should fail.
-        assert!(vp_bad_holder.verify(&didethr).await.unwrap().is_err());
+        assert!(vp_bad_holder.verify(&verifier).await.unwrap().is_err());
     }
 
     #[tokio::test]
     async fn credential_verify_eip712vm() {
-        let didethr = DIDEthr.with_default_options();
+        let didethr = DIDEthr.into_vm_resolver();
         let vc = ssi_claims::vc::v1::data_integrity::any_credential_from_json_str(include_str!(
             "../tests/vc.jsonld"
         ))
         .unwrap();
         // eprintln!("vc {:?}", vc);
-        assert!(vc.verify(&didethr).await.unwrap().is_ok())
+        assert!(vc
+            .verify(VerificationParameters::from_resolver(didethr))
+            .await
+            .unwrap()
+            .is_ok())
     }
 }

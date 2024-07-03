@@ -5,7 +5,7 @@ use bitvec::prelude::Lsb0;
 use bitvec::vec::BitVec;
 use iref::UriBuf;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::VerifiableClaims;
+use ssi_claims_core::VerificationParameters;
 use ssi_data_integrity::AnyDataIntegrity;
 use ssi_json_ld::REVOCATION_LIST_2020_V1_CONTEXT;
 use ssi_verification_methods::{AnyMethod, VerificationMethodResolver};
@@ -153,7 +153,8 @@ impl CredentialStatus for RevocationList2020Status {
             )));
         }
 
-        let vc_result = revocation_list_credential.verify(resolver).await?;
+        let params = VerificationParameters::from_resolver(resolver);
+        let vc_result = revocation_list_credential.verify(&params).await?;
 
         if let Err(e) = vc_result {
             return Ok(StatusCheck::Invalid(Reason::CredentialVerification(e)));

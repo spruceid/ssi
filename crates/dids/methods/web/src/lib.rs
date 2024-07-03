@@ -139,7 +139,7 @@ mod tests {
     use ssi_claims::{
         data_integrity::{AnySuite, CryptographicSuite, ProofOptions},
         vc::v1::JsonCredential,
-        VerifiableClaims,
+        VerificationParameters,
     };
     use ssi_dids_core::{did, DIDResolver, Document, VerificationMethodDIDResolver};
     use ssi_jwk::JWK;
@@ -243,6 +243,7 @@ mod tests {
     #[tokio::test]
     async fn credential_prove_verify_did_web() {
         let didweb = VerificationMethodDIDResolver::new(DIDWeb);
+        let params = VerificationParameters::from_resolver(&didweb);
 
         let (url, shutdown) = web_server().unwrap();
         PROXY.with(|proxy| {
@@ -280,13 +281,13 @@ mod tests {
             serde_json::to_string_pretty(&vc.proofs).unwrap()
         );
         assert_eq!(vc.proofs.first().unwrap().signature.as_ref(), "eyJhbGciOiJFZERTQSIsImNyaXQiOlsiYjY0Il0sImI2NCI6ZmFsc2V9..BCvVb4jz-yVaTeoP24Wz0cOtiHKXCdPcmFQD_pxgsMU6aCAj1AIu3cqHyoViU93nPmzqMLswOAqZUlMyVnmzDw");
-        assert!(vc.verify(&didweb).await.unwrap().is_ok());
+        assert!(vc.verify(&params).await.unwrap().is_ok());
 
         // test that issuer property is used for verification
         let mut vc_bad_issuer = vc.clone();
         vc_bad_issuer.issuer = uri!("did:pkh:example:bad").to_owned().into();
         // It should fail.
-        assert!(vc_bad_issuer.verify(&didweb).await.unwrap().is_err());
+        assert!(vc_bad_issuer.verify(params).await.unwrap().is_err());
 
         PROXY.with(|proxy| {
             proxy.replace(None);

@@ -1,9 +1,9 @@
 use crate::{verify_bytes, DecodedJWS, DecodedSigningBytes, Error, Header};
 use ssi_claims_core::{
-    ClaimsValidity, DefaultVerificationEnvironment, InvalidProof, ProofValidationError,
-    ProofValidity, Validate, ValidateProof, VerifiableClaims,
+    ClaimsValidity, InvalidProof, ProofValidationError, ProofValidity, ResolverProvider,
+    ValidateClaims, ValidateProof, VerifiableClaims,
 };
-use ssi_jwk::{Algorithm, JWK};
+use ssi_jwk::JWKResolver;
 use std::{
     borrow::{Borrow, Cow},
     ops::Deref,
@@ -25,71 +25,12 @@ impl<'a, E, T: ?Sized + ToOwned + ValidateJWSHeader<E>> ValidateJWSHeader<E> for
     }
 }
 
-impl<E, T: Validate<E, JWSSignature> + ValidateJWSHeader<E>> Validate<E, JWSSignature>
+impl<E, T: ValidateClaims<E, JWSSignature> + ValidateJWSHeader<E>> ValidateClaims<E, JWSSignature>
     for DecodedSigningBytes<T>
 {
-    fn validate(&self, env: &E, proof: &JWSSignature) -> ClaimsValidity {
+    fn validate_claims(&self, env: &E, signature: &JWSSignature) -> ClaimsValidity {
         self.payload.validate_jws_header(env, &self.header)?;
-        self.payload.validate(env, proof)
-    }
-}
-
-/// JWS verifier.
-///
-/// Any type that can fetch a JWK using the `kid` parameter of a JWS JOSE
-/// header.
-pub trait JWSVerifier {
-    /// Fetches a JWK by id.
-    ///
-    /// The key identifier is optional since the key may be known in advance.
-    #[allow(async_fn_in_trait)]
-    async fn fetch_public_jwk(
-        &self,
-        key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError>;
-
-    #[allow(async_fn_in_trait)]
-    async fn verify(
-        &self,
-        signing_bytes: &[u8],
-        signature: &[u8],
-        key_id: Option<&str>,
-        algorithm: Algorithm,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        let key = self.fetch_public_jwk(key_id).await?;
-        match verify_bytes(algorithm, signing_bytes, &key, signature) {
-            Ok(()) => Ok(Ok(())),
-            Err(Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
-            Err(_) => Err(ProofValidationError::InvalidSignature),
-        }
-    }
-}
-
-impl<'a, T: JWSVerifier> JWSVerifier for &'a T {
-    async fn fetch_public_jwk(
-        &self,
-        key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError> {
-        T::fetch_public_jwk(*self, key_id).await
-    }
-
-    async fn verify(
-        &self,
-        signing_bytes: &[u8],
-        signature: &[u8],
-        key_id: Option<&str>,
-        algorithm: Algorithm,
-    ) -> Result<ProofValidity, ProofValidationError> {
-        T::verify(*self, signing_bytes, signature, key_id, algorithm).await
-    }
-}
-
-impl JWSVerifier for JWK {
-    async fn fetch_public_jwk(
-        &self,
-        _key_id: Option<&str>,
-    ) -> Result<Cow<JWK>, ProofValidationError> {
-        Ok(Cow::Borrowed(self))
+        self.payload.validate_claims(env, signature)
     }
 }
 
@@ -151,27 +92,24 @@ impl<T> VerifiableClaims for DecodedJWS<T> {
     }
 }
 
-impl<T: DefaultVerificationEnvironment> DefaultVerificationEnvironment for DecodedJWS<T> {
-    type Environment = ();
-}
-
-impl<T, E, V> ValidateProof<DecodedSigningBytes<T>, E, V> for JWSSignature
+impl<V, T> ValidateProof<V, DecodedSigningBytes<T>> for JWSSignature
 where
-    V: JWSVerifier,
+    V: ResolverProvider,
+    V::Resolver: JWKResolver,
 {
     async fn validate_proof<'a>(
         &'a self,
-        _environment: &'a E,
-        claims: &'a DecodedSigningBytes<T>,
         verifier: &'a V,
+        claims: &'a DecodedSigningBytes<T>,
     ) -> Result<ProofValidity, ProofValidationError> {
-        verifier
-            .verify(
-                &claims.bytes,
-                &self.0,
-                claims.header.key_id.as_deref(),
-                claims.header.algorithm,
-            )
-            .await
+        let key = verifier
+            .resolver()
+            .fetch_public_jwk(claims.header.key_id.as_deref())
+            .await?;
+        match verify_bytes(claims.header.algorithm, &claims.bytes, &key, &self.0) {
+            Ok(()) => Ok(Ok(())),
+            Err(Error::InvalidSignature) => Ok(Err(InvalidProof::Signature)),
+            Err(_) => Err(ProofValidationError::InvalidSignature),
+        }
     }
 }

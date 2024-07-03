@@ -1,6 +1,6 @@
 use super::{Claim, JWTClaims};
 use crate::{CastClaim, ClaimSet, NumericDate, StringOrURI};
-use ssi_claims_core::{ClaimsValidity, DateTimeEnvironment, Validate};
+use ssi_claims_core::{ClaimsValidity, DateTimeProvider, ValidateClaims};
 use ssi_core::OneOrMany;
 use ssi_jws::JWSPayload;
 use std::{borrow::Cow, collections::BTreeMap};
@@ -85,11 +85,11 @@ impl JWSPayload for RegisteredClaims {
     }
 }
 
-impl<E, P> Validate<E, P> for RegisteredClaims
+impl<E, P> ValidateClaims<E, P> for RegisteredClaims
 where
-    E: DateTimeEnvironment,
+    E: DateTimeProvider,
 {
-    fn validate(&self, env: &E, _proof: &P) -> ClaimsValidity {
+    fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
         ClaimSet::validate_registered_claims(self, env)
     }
 }

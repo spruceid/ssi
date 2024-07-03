@@ -8,7 +8,7 @@ use ssi_claims::{
         ProofOptions as SuiteOptions,
     },
     vc::v1::{JsonCredential, JsonPresentation},
-    VerifiableClaims,
+    VerificationParameters,
 };
 use ssi_dids_core::{did, resolution::Options, DIDResolver, VerificationMethodDIDResolver};
 use ssi_jwk::JWK;
@@ -215,6 +215,7 @@ async fn credential_prove_verify_did_tz1() {
     let didtz = VerificationMethodDIDResolver::new(DIDTz::new(Some(
         UriBuf::new(mock_server.uri().into_bytes()).unwrap(),
     )));
+    let params = VerificationParameters::from_resolver(&didtz);
 
     let did = did!("did:tz:delphinet:tz1WvvbEGpBXGeTVbLiR6DYBe1izmgiYuZbq").to_owned();
     let vc = DataIntegrity::new(
@@ -265,7 +266,7 @@ async fn credential_prove_verify_did_tz1() {
     )
     .await
     .unwrap();
-    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_wrong_key.verify(&params).await.unwrap().is_err());
 
     let vp = DataIntegrity::new(
         JsonPresentation::new(
@@ -301,7 +302,7 @@ async fn credential_prove_verify_did_tz1() {
         vp1.proofs.first_mut().unwrap().signature.jws
     ))
     .unwrap();
-    assert!(vp1.verify(&didtz).await.is_err());
+    assert!(vp1.verify(&params).await.is_err());
 
     // test that holder is verified
     let mut _vp2 = vp.clone();
@@ -332,6 +333,7 @@ async fn credential_prove_verify_did_tz2() {
     );
 
     let didtz = VerificationMethodDIDResolver::new(DIDTZ);
+    let params = VerificationParameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc_issue_options = SuiteOptions::new(
@@ -348,12 +350,12 @@ async fn credential_prove_verify_did_tz2() {
         .await
         .unwrap();
     println!("{}", serde_json::to_string_pretty(&vc.proofs).unwrap());
-    assert!(vc.verify(&didtz).await.unwrap().is_ok());
+    assert!(vc.verify(&params).await.unwrap().is_ok());
 
     // Test that issuer property is used for verification.
     let mut vc_bad_issuer = vc.clone();
     vc_bad_issuer.issuer = uri!("did:example:bad").to_owned().into();
-    assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_bad_issuer.verify(&params).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer =
@@ -373,7 +375,7 @@ async fn credential_prove_verify_did_tz2() {
         )
         .await
         .unwrap();
-    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_wrong_key.verify(&params).await.unwrap().is_err());
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
@@ -395,17 +397,17 @@ async fn credential_prove_verify_did_tz2() {
         .await
         .unwrap();
     println!("VP: {}", serde_json::to_string_pretty(&vp.proofs).unwrap());
-    assert!(vp.verify(&didtz).await.unwrap().is_ok());
+    assert!(vp.verify(&params).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
     vp1.proofs.first_mut().unwrap().signature.alter();
-    assert!(vp1.verify(&didtz).await.is_err());
+    assert!(vp1.verify(&params).await.is_err());
 
     // test that holder is verified
     let mut vp2 = vp.clone();
     vp2.holder = Some(did!("did:example:bad").to_owned().into());
-    assert!(vp2.verify(&didtz).await.unwrap().is_err());
+    assert!(vp2.verify(&params).await.unwrap().is_err());
 }
 
 #[tokio::test]
@@ -427,6 +429,7 @@ async fn credential_prove_verify_did_tz3() {
     );
 
     let didtz = VerificationMethodDIDResolver::new(DIDTZ);
+    let params = VerificationParameters::from_resolver(&didtz);
     let signer = SingleSecretSigner::new(key.clone()).into_local();
 
     let vc_issue_options = SuiteOptions::new(
@@ -446,12 +449,12 @@ async fn credential_prove_verify_did_tz3() {
         .await
         .unwrap();
     println!("{}", serde_json::to_string_pretty(&vc.proofs).unwrap());
-    assert!(vc.verify(&didtz).await.unwrap().is_ok());
+    assert!(vc.verify(&params).await.unwrap().is_ok());
 
     // Test that issuer property is used for verification.
     let mut vc_bad_issuer = vc.clone();
     vc_bad_issuer.issuer = uri!("did:example:bad").to_owned().into();
-    assert!(vc_bad_issuer.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_bad_issuer.verify(&params).await.unwrap().is_err());
 
     // Check that proof JWK must match proof verificationMethod
     let wrong_signer = SingleSecretSigner::new(JWK::generate_p256_from(&mut rng)).into_local();
@@ -470,7 +473,7 @@ async fn credential_prove_verify_did_tz3() {
         )
         .await
         .unwrap();
-    assert!(vc_wrong_key.verify(&didtz).await.unwrap().is_err());
+    assert!(vc_wrong_key.verify(&params).await.unwrap().is_err());
 
     let presentation = JsonPresentation::new(
         Some(uri!("http://example.org/presentations/3731").to_owned()),
@@ -494,15 +497,15 @@ async fn credential_prove_verify_did_tz3() {
         .await
         .unwrap();
     println!("VP: {}", serde_json::to_string_pretty(&vp.proofs).unwrap());
-    assert!(vp.verify(&didtz).await.unwrap().is_ok());
+    assert!(vp.verify(&params).await.unwrap().is_ok());
 
     // mess with the VP proof to make verify fail
     let mut vp1 = vp.clone();
     vp1.proofs.first_mut().unwrap().signature.alter();
-    assert!(vp1.verify(&didtz).await.is_err());
+    assert!(vp1.verify(&params).await.is_err());
 
     // test that holder is verified
     let mut vp2 = vp.clone();
     vp2.holder = Some(did!("did:example:bad").to_owned().into());
-    assert!(vp2.verify(&didtz).await.unwrap().is_err());
+    assert!(vp2.verify(params).await.unwrap().is_err());
 }

@@ -7,12 +7,15 @@ use ssi_multicodec::MultiEncoded;
 use std::result::Result;
 use std::{convert::TryFrom, str::FromStr};
 use zeroize::Zeroize;
+
 pub mod error;
 pub use error::Error;
 
 pub mod algorithm;
-
 pub use algorithm::Algorithm;
+
+mod resolver;
+pub use resolver::*;
 
 #[cfg(feature = "ripemd-160")]
 pub mod ripemd160;

@@ -10,6 +10,7 @@ documentation = "https://docs.rs/ssi-token-status-list/"
 
 [dependencies]
 ssi-claims-core.workspace = true
+ssi-jwk.workspace = true
 ssi-jwt.workspace = true
 ssi-jws.workspace = true
 ssi-vc.workspace = true
@@ -30,8 +31,7 @@ parking_lot = "0.12.1"
 flate2 = "1.0.28"
 
 [dev-dependencies]
-ssi-jws = { workspace = true, features = ["secp256r1"] }
-ssi-jwk.workspace = true
+ssi-jwk = { workspace = true, features = ["secp256r1"] }
 ssi-dids.workspace = true
 ssi-data-integrity = { workspace = true, features = ["w3c"] }
 tokio = { version = "1.0", features = ["macros", "rt"] }

@@ -2,7 +2,7 @@ use std::{borrow::Cow, hash::Hash};
 
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::{ClaimsValidity, Validate};
+use ssi_claims_core::{ClaimsValidity, ValidateClaims};
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject, Vocabulary};
 
@@ -34,11 +34,11 @@ impl<C1, C2> JsonLdNodeObject for AnyJsonPresentation<C1, C2> {
     }
 }
 
-impl<C1, C2, E, P> Validate<E, P> for AnyJsonPresentation<C1, C2> {
-    fn validate(&self, env: &E, proof: &P) -> ClaimsValidity {
+impl<C1, C2, E, P> ValidateClaims<E, P> for AnyJsonPresentation<C1, C2> {
+    fn validate_claims(&self, env: &E, proof: &P) -> ClaimsValidity {
         match self {
-            Self::V1(p) => Validate::<E, P>::validate(p, env, proof),
-            Self::V2(p) => Validate::<E, P>::validate(p, env, proof),
+            Self::V1(p) => p.validate_claims(env, proof),
+            Self::V2(p) => p.validate_claims(env, proof),
         }
     }
 }

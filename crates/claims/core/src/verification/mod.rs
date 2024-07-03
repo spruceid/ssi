@@ -20,9 +20,13 @@
 //!   - Proof validation: the claims verified against the proof using the
 //!     [`ValidateProof`] trait.
 mod claims;
+
+use chrono::{DateTime, Utc};
 pub use claims::*;
 mod proof;
 pub use proof::*;
+mod parameters;
+pub use parameters::*;
 
 /// Verifiable Claims.
 ///
@@ -34,37 +38,38 @@ pub trait VerifiableClaims {
     /// Proof type.
     type Proof;
 
+    /// The claims.
     fn claims(&self) -> &Self::Claims;
 
+    /// The proof.
     fn proof(&self) -> &Self::Proof;
 
-    /// Validates the claims and verify them against the proof.
+    /// Validates the claims and proof.
+    ///
+    /// The `params` argument provides all the verification parameters required
+    /// to validate the claims and proof.
+    ///
+    /// # What verification parameters should I use?
+    ///
+    /// It really depends on the claims type `Self::Claims` and proof type
+    /// `Self::Proof`, but the [`VerificationParameters`] type is a good
+    /// starting point that should work most of the time.
+    ///
+    /// # Passing the parameters by reference
+    ///
+    /// If the validation traits are implemented for `P`, they will be
+    /// implemented for `&P` as well. This means the parameters can be passed
+    /// by move *or* by reference.
     #[allow(async_fn_in_trait)]
-    async fn verify<V>(&self, verifier: &V) -> Result<Verification, ProofValidationError>
+    async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
     where
-        Self: DefaultVerificationEnvironment,
-        Self::Claims: Validate<Self::Environment, Self::Proof>,
-        Self::Proof: ValidateProof<Self::Claims, Self::Environment, V>,
+        Self::Claims: ValidateClaims<P, Self::Proof>,
+        Self::Proof: ValidateProof<P, Self::Claims>,
     {
-        self.verify_with(verifier, Self::Environment::default())
-            .await
-    }
-
-    /// Validates the claims and verify them against the proof.
-    #[allow(async_fn_in_trait)]
-    async fn verify_with<V, E>(
-        &self,
-        verifier: &V,
-        env: E,
-    ) -> Result<Verification, ProofValidationError>
-    where
-        Self::Claims: Validate<E, Self::Proof>,
-        Self::Proof: ValidateProof<Self::Claims, E, V>,
-    {
-        match self.claims().validate(&env, self.proof()) {
+        match self.claims().validate_claims(&params, self.proof()) {
             Ok(_) => self
                 .proof()
-                .validate_proof(&env, self.claims(), verifier)
+                .validate_proof(&params, self.claims())
                 .await
                 .map(|r| r.map_err(Invalid::Proof)),
             Err(e) => {
@@ -97,4 +102,35 @@ pub enum Invalid {
 
     #[error("invalid proof: {0}")]
     Proof(#[from] InvalidProof),
+}
+
+/// Type that provides a public key resolver.
+pub trait ResolverProvider {
+    /// Public key resolver.
+    type Resolver;
+
+    /// Returns a reference to the environment's public key resolver.
+    fn resolver(&self) -> &Self::Resolver;
+}
+
+impl<'a, E: ResolverProvider> ResolverProvider for &'a E {
+    type Resolver = E::Resolver;
+
+    fn resolver(&self) -> &Self::Resolver {
+        E::resolver(*self)
+    }
+}
+
+/// Type that provides date and time.
+///
+/// Used to check the validity period of given claims.
+pub trait DateTimeProvider {
+    /// Returns the current date and time.
+    fn date_time(&self) -> DateTime<Utc>;
+}
+
+impl<'a, E: DateTimeProvider> DateTimeProvider for &'a E {
+    fn date_time(&self) -> DateTime<Utc> {
+        E::date_time(*self)
+    }
 }

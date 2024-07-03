@@ -34,7 +34,7 @@ fn data_integrity_sign_is_send() {
 
     let key = JWK::generate_p256(); // requires the `p256` feature.
     let did = DIDJWK::generate_url(&key.to_public());
-    let vm_resolver = DIDJWK.with_default_options();
+    let vm_resolver = DIDJWK.into_vm_resolver();
     let signer = SingleSecretSigner::new(key.clone()).into_local();
     let verification_method = did.into_iri().into();
 

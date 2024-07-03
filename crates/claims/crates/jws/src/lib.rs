@@ -79,7 +79,10 @@ pub mod error;
 pub use base64::DecodeError as Base64DecodeError;
 pub use error::Error;
 use serde::{Deserialize, Serialize};
-use ssi_jwk::{Algorithm, Base64urlUInt, Params as JWKParams, JWK};
+use ssi_claims_core::{
+    ProofValidationError, ResolverProvider, ValidateClaims, VerifiableClaims, Verification,
+};
+use ssi_jwk::{Algorithm, Base64urlUInt, JWKResolver, Params as JWKParams, JWK};
 use std::{borrow::Cow, collections::BTreeMap};
 
 pub type VerificationWarnings = Vec<String>;
@@ -186,6 +189,39 @@ impl<T> DecodedJWS<T> {
             ),
             self.signing_bytes.bytes,
         )
+    }
+
+    /// Verify the JWS signature.
+    ///
+    /// This will check the signature and the validity of the decoded payload.
+    ///
+    /// The `params` argument provides all the verification parameters required
+    /// to validate the claims and proof.
+    ///
+    /// # What verification parameters should I use?
+    ///
+    /// It really depends on the claims type, but `P` must at least provide
+    /// a `JWKResolver` through the `ResolverProvider` trait.
+    /// Notable implementors are:
+    /// - [`VerificationParameters`](ssi_claims_core::VerificationParameters):
+    /// A good default providing many other common verification parameters that
+    /// are not necessary here.
+    /// - [`JWK`](ssi_jwk::JWK): allows you to put a JWK as `params`, which
+    /// will resolve into itself. Can be useful if you don't need key resolution
+    /// because you know in advance what key was used to sign the JWS.
+    ///
+    /// # Passing the parameters by reference
+    ///
+    /// If the validation traits are implemented for `P`, they will be
+    /// implemented for `&P` as well. This means the parameters can be passed
+    /// by move *or* by reference.
+    pub async fn verify<P>(&self, params: P) -> Result<Verification, ProofValidationError>
+    where
+        T: ValidateJWSHeader<P> + ValidateClaims<P, JWSSignature>,
+        P: ResolverProvider,
+        P::Resolver: JWKResolver,
+    {
+        VerifiableClaims::verify(self, params).await
     }
 }
 

@@ -3,8 +3,7 @@ use std::{borrow::Cow, marker::PhantomData};
 use crate::{document::Document, resolution, DIDResolver, DID, DIDURL};
 use iref::Iri;
 use ssi_claims_core::ProofValidationError;
-use ssi_jwk::JWK;
-use ssi_jws::JWSVerifier;
+use ssi_jwk::{JWKResolver, JWK};
 use ssi_verification_methods_core::{
     ControllerError, ControllerProvider, GenericVerificationMethod, InvalidVerificationMethod,
     MaybeJwkVerificationMethod, ProofPurposes, ReferenceOrOwnedRef, VerificationMethod,
@@ -15,6 +14,12 @@ pub struct VerificationMethodDIDResolver<T, M> {
     resolver: T,
     options: resolution::Options,
     method: PhantomData<M>,
+}
+
+impl<T: Default, M> Default for VerificationMethodDIDResolver<T, M> {
+    fn default() -> Self {
+        Self::new(T::default())
+    }
 }
 
 impl<T, M> VerificationMethodDIDResolver<T, M> {
@@ -151,7 +156,7 @@ where
     }
 }
 
-impl<T: DIDResolver, M> JWSVerifier for VerificationMethodDIDResolver<T, M>
+impl<T: DIDResolver, M> JWKResolver for VerificationMethodDIDResolver<T, M>
 where
     M: MaybeJwkVerificationMethod
         + TryFrom<GenericVerificationMethod, Error = InvalidVerificationMethod>,

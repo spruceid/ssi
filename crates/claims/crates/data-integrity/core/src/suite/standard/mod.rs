@@ -1,7 +1,7 @@
 //! Cryptographic suites.
 use std::borrow::Cow;
 
-use ssi_claims_core::{ProofValidationError, ProofValidity, SignatureError};
+use ssi_claims_core::{ProofValidationError, ProofValidity, ResolverProvider, SignatureError};
 use ssi_verification_methods_core::{Signer, VerificationMethodResolver, VerificationMethodSet};
 
 use crate::{CryptographicSuite, ProofConfigurationRef, ProofRef, TypeRef};
@@ -140,22 +140,24 @@ where
     }
 }
 
-impl<S: StandardCryptographicSuite, C, E, V> CryptographicSuiteVerification<C, E, V> for S
+impl<S: StandardCryptographicSuite, C, V> CryptographicSuiteVerification<C, V> for S
 where
-    V: VerificationMethodResolver<Method = S::VerificationMethod>,
-    S::Transformation: TypedTransformationAlgorithm<Self, C, E>,
+    V: ResolverProvider,
+    V::Resolver: VerificationMethodResolver<Method = S::VerificationMethod>,
+    S::Transformation: TypedTransformationAlgorithm<Self, C, V>,
     S::SignatureAlgorithm: VerificationAlgorithm<S>,
 {
     async fn verify_proof(
         &self,
-        context: &E,
         verifier: &V,
         claims: &C,
         proof: ProofRef<'_, Self>,
     ) -> Result<ProofValidity, ProofValidationError> {
         let proof_configuration = proof.configuration();
 
-        let transformed = self.transform(context, claims, proof_configuration).await?;
+        let transformed = self
+            .transform(verifier, claims, proof_configuration)
+            .await?;
 
         let hashed = self.hash(transformed, proof_configuration)?;
 
@@ -165,6 +167,7 @@ where
 
         // Resolve the verification method.
         let method = verifier
+            .resolver()
             .resolve_verification_method_with(None, Some(proof.verification_method), options)
             .await?;
 

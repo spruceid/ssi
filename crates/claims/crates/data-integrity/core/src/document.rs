@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
 use rdf_types::VocabularyMut;
 use serde::{Deserialize, Serialize};
-use ssi_claims_core::Validate;
+use ssi_claims_core::ValidateClaims;
 use ssi_core::OneOrMany;
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, Loader};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject, Vocabulary};
@@ -72,8 +72,8 @@ impl JsonLdNodeObject for DataIntegrityDocument {
     }
 }
 
-impl<E, P> Validate<E, P> for DataIntegrityDocument {
-    fn validate(&self, _env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
+impl<E, P> ValidateClaims<E, P> for DataIntegrityDocument {
+    fn validate_claims(&self, _env: &E, _proof: &P) -> ssi_claims_core::ClaimsValidity {
         Ok(())
     }
 }

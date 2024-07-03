@@ -15,7 +15,7 @@ use ssi_data_integrity_core::{
     CryptographicSuite, ProofConfigurationRef, ProofRef, SerializeCryptographicSuite,
     StandardCryptographicSuite, TypeRef,
 };
-use ssi_eip712::{Eip712TypesEnvironment, TypesProvider, Value};
+use ssi_eip712::{Eip712TypesLoaderProvider, TypesLoader, Value};
 use ssi_jwk::algorithm::{AlgorithmError, AnyESKeccakK};
 use ssi_verification_methods::{
     ecdsa_secp_256k1_recovery_method_2020, ecdsa_secp_256k1_verification_key_2019,
@@ -269,7 +269,7 @@ where
     S: SerializeCryptographicSuite,
     S::ProofOptions: AnyEip712Options,
     T: Serialize,
-    C: Eip712TypesEnvironment,
+    C: Eip712TypesLoaderProvider,
 {
     async fn transform(
         context: &C,

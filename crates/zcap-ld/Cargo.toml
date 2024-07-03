@@ -24,6 +24,7 @@ ssi-rdf.workspace = true
 ssi-json-ld.workspace = true
 ssi-claims.workspace = true
 ssi-verification-methods.workspace = true
+ssi-eip712.workspace = true
 
 [dev-dependencies]
 async-std = { version = "1.9", features = ["attributes"] }

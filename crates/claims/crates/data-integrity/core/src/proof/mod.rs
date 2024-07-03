@@ -218,18 +218,17 @@ impl<S: DebugCryptographicSuite> fmt::Debug for Proof<S> {
     }
 }
 
-impl<S: CryptographicSuite, T, E, V> ssi_claims_core::ValidateProof<T, E, V> for Proof<S>
+impl<S: CryptographicSuite, T, V> ssi_claims_core::ValidateProof<V, T> for Proof<S>
 where
-    S: CryptographicSuiteVerification<T, E, V>,
+    S: CryptographicSuiteVerification<T, V>,
 {
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a E,
-        claims: &'a T,
         verifier: &'a V,
+        claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError> {
         self.suite()
-            .verify_proof(environment, verifier, claims, self.borrowed())
+            .verify_proof(verifier, claims, self.borrowed())
             .await
     }
 }
@@ -325,17 +324,16 @@ impl<S: CryptographicSuite> From<Vec<Proof<S>>> for Proofs<S> {
     }
 }
 
-impl<S: CryptographicSuite, T, E, V> ssi_claims_core::ValidateProof<T, E, V> for Proofs<S>
+impl<S: CryptographicSuite, T, V> ssi_claims_core::ValidateProof<V, T> for Proofs<S>
 where
-    S: CryptographicSuiteVerification<T, E, V>,
+    S: CryptographicSuiteVerification<T, V>,
 {
     async fn validate_proof<'a>(
         &'a self,
-        environment: &'a E,
-        claims: &'a T,
         verifier: &'a V,
+        claims: &'a T,
     ) -> Result<ProofValidity, ProofValidationError> {
-        self.0.validate_proof(environment, claims, verifier).await
+        self.0.validate_proof(verifier, claims).await
     }
 }
 

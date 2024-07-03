@@ -128,8 +128,8 @@ macro_rules! crypto_suites {
         #[allow(unused_variables)]
         impl<T, C, R, S> ssi_data_integrity_core::suite::CryptographicSuiteSigning<T, C, R, S> for AnySuite
         where
-            C: ssi_json_ld::ContextLoaderEnvironment
-                + ssi_eip712::Eip712TypesEnvironment,
+            C: ssi_json_ld::JsonLdLoaderProvider
+                + ssi_eip712::Eip712TypesLoaderProvider,
             T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
             //
             R: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
@@ -169,18 +169,15 @@ macro_rules! crypto_suites {
         }
 
         #[allow(unused_variables)]
-        impl<T, C, F> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, C, F> for AnySuite
+        impl<T, V> ssi_data_integrity_core::suite::CryptographicSuiteVerification<T, V> for AnySuite
         where
-            C: ssi_json_ld::ContextLoaderEnvironment
-                + ssi_eip712::Eip712TypesEnvironment,
             T: serde::Serialize + ssi_json_ld::Expandable + ssi_json_ld::JsonLdNodeObject,
-            //
-            F: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
+            V: ssi_claims_core::ResolverProvider + ssi_json_ld::JsonLdLoaderProvider + ssi_eip712::Eip712TypesLoaderProvider,
+            V::Resolver: ssi_verification_methods::VerificationMethodResolver<Method = ssi_verification_methods::AnyMethod>,
         {
             async fn verify_proof(
                 &self,
-                environment: &C,
-                verifier: &F,
+                verifier: &V,
                 claims: &T,
                 proof: ssi_data_integrity_core::ProofRef<'_, Self>,
             ) -> Result<ssi_claims_core::ProofValidity, ssi_claims_core::ProofValidationError> {
@@ -188,11 +185,14 @@ macro_rules! crypto_suites {
                     $(
                         $(#[cfg($($t)*)])?
                         Self::$name => {
-                            let verifier = crate::AnyResolver::<_, <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuite>::VerificationMethod>::new(verifier);
+                            let verifier = AnyVerifier {
+                                resolver: crate::AnyResolver::<_, <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuite>::VerificationMethod>::new(verifier.resolver()),
+                                json_ld_loader: verifier.loader(),
+                                eip712_loader: verifier.eip712_types()
+                            };
 
-                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteVerification<_, _, _>>::verify_proof(
+                            <ssi_data_integrity_suites::$name as ssi_data_integrity_core::suite::CryptographicSuiteVerification<_, _>>::verify_proof(
                                 &ssi_data_integrity_suites::$name,
-                                environment,
                                 &verifier,
                                 claims,
                                 Self::project_proof(proof)
