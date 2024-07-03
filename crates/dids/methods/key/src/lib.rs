@@ -847,7 +847,7 @@ mod tests {
     #[async_std::test]
     #[cfg(feature = "secp384r1")]
     async fn fetch_jwk_secp384r1() {
-        let jwk = JWK::generate_p384().unwrap();
+        let jwk = JWK::generate_p384();
         fetch_jwk(jwk).await;
     }
 }

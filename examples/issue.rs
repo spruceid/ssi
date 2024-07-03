@@ -27,7 +27,7 @@ async fn issue(proof_format: &str) {
         "issuer": "did:example:foo",
         "issuanceDate": ssi::xsd_types::DateTime::now(),
         "credentialSubject": {
-            "id": uuid::Uuid::new_v4().to_urn().to_string()
+            "id": uuid::Uuid::new_v4().urn().to_string()
         }
     }))
     .unwrap();
