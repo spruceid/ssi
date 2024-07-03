@@ -170,7 +170,9 @@ where
 
         let proof_configuration = proof.configuration();
 
-        let transformed = self.transform(verifier, claims, proof_configuration).await?;
+        let transformed = self
+            .transform(verifier, claims, proof_configuration)
+            .await?;
 
         let hashed = self.hash(transformed, proof_configuration, &method)?;
 

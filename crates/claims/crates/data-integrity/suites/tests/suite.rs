@@ -3,7 +3,7 @@ use std::{borrow::Cow, path::Path};
 use hashbrown::HashMap;
 use iref::UriBuf;
 use serde::{de::DeserializeOwned, Deserialize};
-use ssi_claims_core::{SignatureError, VerifiableClaims};
+use ssi_claims_core::SignatureError;
 use ssi_data_integrity_core::{CryptographicSuite, DataIntegrityDocument, ProofOptions};
 use ssi_multicodec::MultiEncodedBuf;
 use ssi_security::{Multibase, MultibaseBuf};
@@ -157,6 +157,7 @@ impl MessageSigner<ssi_data_integrity_suites::ecdsa_rdfc_2019::ES256OrES384> for
                     Err(MessageSignatureError::InvalidSecretKey)
                 }
             }
+            #[allow(unreachable_patterns)]
             a => Err(MessageSignatureError::UnsupportedAlgorithm(a.to_string())),
         }
     }
@@ -207,6 +208,7 @@ impl PrivateKey {
 #[cfg(all(feature = "w3c", feature = "secp256r1"))]
 #[async_std::test]
 async fn test_ecdsa_rdfc_2019() {
+    use ssi_claims_core::VerificationParameters;
     use ssi_data_integrity_suites::EcdsaRdfc2019;
     let input = load_unsecured_vc("tests/ecdsa_rdfc_2019/input.jsonld");
     let expected_output = load_json("tests/ecdsa_rdfc_2019/output.jsonld");
@@ -234,5 +236,6 @@ async fn test_ecdsa_rdfc_2019() {
 
     assert_eq!(output, expected_output);
 
-    assert!(vc.verify(&keys).await.unwrap().is_ok());
+    let params = VerificationParameters::from_resolver(&keys);
+    assert!(vc.verify(params).await.unwrap().is_ok());
 }
