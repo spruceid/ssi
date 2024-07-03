@@ -1,7 +1,5 @@
 use std::ops::Deref;
 
-pub use unsigned_varint::decode::Error;
-
 mod codec;
 pub use codec::*;
 
