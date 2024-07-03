@@ -239,3 +239,19 @@ impl StatusMapEntry for StatusListReference {
         &self.uri
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::token_status_list::json::JsonStatusList;
+
+    #[test]
+    fn deserialize_json_status_list() {
+        assert!(serde_json::from_str::<JsonStatusList>(
+            r#"{
+                "bits": 1,
+                "lst": "eNrbuRgAAhcBXQ"
+            }"#
+        )
+        .is_ok())
+    }
+}

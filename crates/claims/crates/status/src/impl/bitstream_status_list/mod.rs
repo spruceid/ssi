@@ -641,4 +641,29 @@ mod tests {
         // Too many bits.
         assert_eq!(bitstring.set(14, 2), Err(Overflow::Value(2)));
     }
+
+    #[test]
+    fn deserialize_status_size_1() {
+        assert!(serde_json::from_str::<StatusSize>("1").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_2() {
+        assert!(serde_json::from_str::<StatusSize>("2").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_3() {
+        assert!(serde_json::from_str::<StatusSize>("3").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_negative() {
+        assert!(serde_json::from_str::<StatusSize>("-1").is_err())
+    }
+
+    #[test]
+    fn deserialize_status_size_overflow() {
+        assert!(serde_json::from_str::<StatusSize>("9").is_err())
+    }
 }

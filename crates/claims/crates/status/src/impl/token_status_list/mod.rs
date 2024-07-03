@@ -221,24 +221,9 @@ impl<'de> serde::Deserialize<'de> for StatusSize {
     where
         D: serde::Deserializer<'de>,
     {
-        struct Visitor;
-
-        impl<'de> serde::de::Visitor<'de> for Visitor {
-            type Value = StatusSize;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                write!(formatter, "number of bits per Referenced Token")
-            }
-
-            fn visit_u8<E>(self, v: u8) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                v.try_into().map_err(serde::de::Error::custom)
-            }
-        }
-
-        deserializer.deserialize_u8(Visitor)
+        u8::deserialize(deserializer)?
+            .try_into()
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -779,5 +764,40 @@ mod tests {
 
         // Too many bits.
         assert_eq!(bitstring.set(14, 2), Err(Overflow::Value(2)));
+    }
+
+    #[test]
+    fn deserialize_status_size_1() {
+        assert!(serde_json::from_str::<StatusSize>("1").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_2() {
+        assert!(serde_json::from_str::<StatusSize>("2").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_4() {
+        assert!(serde_json::from_str::<StatusSize>("4").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_8() {
+        assert!(serde_json::from_str::<StatusSize>("8").is_ok())
+    }
+
+    #[test]
+    fn deserialize_status_size_non_power_of_two() {
+        assert!(serde_json::from_str::<StatusSize>("3").is_err())
+    }
+
+    #[test]
+    fn deserialize_status_size_negative() {
+        assert!(serde_json::from_str::<StatusSize>("-1").is_err())
+    }
+
+    #[test]
+    fn deserialize_status_size_overflow() {
+        assert!(serde_json::from_str::<StatusSize>("9").is_err())
     }
 }
