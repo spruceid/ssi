@@ -35,6 +35,8 @@ pub const W3ID_ED2020_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/suites/
 pub const W3ID_MULTIKEY_V1_CONTEXT: &Iri = iri!("https://w3id.org/security/multikey/v1");
 pub const W3ID_DATA_INTEGRITY_V1_CONTEXT: &Iri =
     iri!("https://w3id.org/security/data-integrity/v1");
+pub const W3ID_DATA_INTEGRITY_V2_CONTEXT: &Iri =
+    iri!("https://w3id.org/security/data-integrity/v2");
 pub const BLOCKCHAIN2021_V1_CONTEXT: &Iri =
     iri!("https://w3id.org/security/suites/blockchain-2021/v1");
 pub const CITIZENSHIP_V1_CONTEXT: &Iri = iri!("https://w3id.org/citizenship/v1");
@@ -148,6 +150,10 @@ lazy_static::lazy_static! {
     pub static ref W3ID_DATA_INTEGRITY_V1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
         W3ID_DATA_INTEGRITY_V1_CONTEXT,
         ssi_contexts::W3ID_DATA_INTEGRITY_V1
+    );
+    pub static ref W3ID_DATA_INTEGRITY_V2_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
+        W3ID_DATA_INTEGRITY_V2_CONTEXT,
+        ssi_contexts::W3ID_DATA_INTEGRITY_V2
     );
     pub static ref BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT: RemoteDocument = load_static_context(
         BLOCKCHAIN2021_V1_CONTEXT,
@@ -267,6 +273,7 @@ impl Loader for StaticLoader {
                 W3ID_ED2020_V1_CONTEXT => Ok(W3ID_ED2020_V1_CONTEXT_DOCUMENT.clone()),
                 W3ID_MULTIKEY_V1_CONTEXT => Ok(W3ID_MULTIKEY_V1_CONTEXT_DOCUMENT.clone()),
                 W3ID_DATA_INTEGRITY_V1_CONTEXT => Ok(W3ID_DATA_INTEGRITY_V1_CONTEXT_DOCUMENT.clone()),
+                W3ID_DATA_INTEGRITY_V2_CONTEXT => Ok(W3ID_DATA_INTEGRITY_V2_CONTEXT_DOCUMENT.clone()),
                 BLOCKCHAIN2021_V1_CONTEXT => Ok(BLOCKCHAIN2021_V1_CONTEXT_DOCUMENT.clone()),
                 CITIZENSHIP_V1_CONTEXT => Ok(CITIZENSHIP_V1_CONTEXT_DOCUMENT.clone()),
                 VACCINATION_V1_CONTEXT => Ok(VACCINATION_V1_CONTEXT_DOCUMENT.clone()),
