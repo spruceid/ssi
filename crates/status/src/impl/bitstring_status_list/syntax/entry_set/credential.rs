@@ -20,7 +20,7 @@ use ssi_vc::v2::{syntax::JsonCredentialTypes, Context};
 use ssi_verification_methods::{ssi_core::OneOrMany, AnyMethod, VerificationMethodResolver};
 
 use crate::{
-    bitstream_status_list::FromBytesError, FromBytes, FromBytesOptions, StatusMapEntrySet,
+    bitstring_status_list::FromBytesError, FromBytes, FromBytesOptions, StatusMapEntrySet,
 };
 
 use super::BitstringStatusListEntry;

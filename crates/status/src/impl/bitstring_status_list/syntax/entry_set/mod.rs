@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 mod credential;
 pub use credential::*;
 
-use crate::{bitstream_status_list::StatusPurpose, StatusMapEntry};
+use crate::{bitstring_status_list::StatusPurpose, StatusMapEntry};
 
 pub const BITSTRING_STATUS_LIST_ENTRY_TYPE: &str = "BitstringStatusListEntry";
 

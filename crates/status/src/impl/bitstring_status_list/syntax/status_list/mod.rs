@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 mod credential;
 pub use credential::*;
 
-use crate::bitstream_status_list::{
+use crate::bitstring_status_list::{
     EncodedList, StatusList, StatusMessage, StatusPurpose, StatusSize, TimeToLive,
 };
 
