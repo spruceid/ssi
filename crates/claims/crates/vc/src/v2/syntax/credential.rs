@@ -2,8 +2,9 @@ use std::{borrow::Cow, collections::BTreeMap, hash::Hash};
 
 use super::{Context, InternationalString, RelatedResource};
 use crate::syntax::{
-    not_null, value_or_array, IdOr, IdentifiedObject, IdentifiedTypedObject,
-    MaybeIdentifiedTypedObject, NonEmptyObject, RequiredContextList, RequiredTypeSet, TypedObject,
+    non_empty_value_or_array, not_null, value_or_array, IdOr, IdentifiedObject,
+    IdentifiedTypedObject, MaybeIdentifiedTypedObject, NonEmptyObject, NonEmptyVec,
+    RequiredContextList, RequiredTypeSet, TypedObject,
 };
 use iref::{Uri, UriBuf};
 use rdf_types::VocabularyMut;
@@ -30,7 +31,7 @@ pub type JsonCredential<S = NonEmptyObject> = SpecializedJsonCredential<S>;
     serialize = "S: Serialize",
     deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
 ))]
-pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
+pub struct SpecializedJsonCredential<S: std::clone::Clone = NonEmptyObject, C = (), T = ()> {
     /// JSON-LD context.
     #[serde(rename = "@context")]
     pub context: Context<C>,
@@ -49,12 +50,8 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
 
     /// Credential subjects.
     #[serde(rename = "credentialSubject")]
-    #[serde(
-        with = "value_or_array",
-        default,
-        skip_serializing_if = "Vec::is_empty"
-    )]
-    pub credential_subjects: Vec<S>,
+    #[serde(with = "non_empty_value_or_array")]
+    pub credential_subjects: NonEmptyVec<S>,
 
     /// Issuer.
     pub issuer: IdOr<IdentifiedObject>,
@@ -115,12 +112,14 @@ pub struct SpecializedJsonCredential<S = NonEmptyObject, C = (), T = ()> {
     pub extra_properties: BTreeMap<String, json_syntax::Value>,
 }
 
-impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C: RequiredContextList, T: RequiredTypeSet>
+    SpecializedJsonCredential<S, C, T>
+{
     /// Creates a new credential.
     pub fn new(
         id: Option<UriBuf>,
         issuer: IdOr<IdentifiedObject>,
-        credential_subjects: Vec<S>,
+        credential_subjects: NonEmptyVec<S>,
     ) -> Self {
         Self {
             context: Context::default(),
@@ -140,13 +139,13 @@ impl<S, C: RequiredContextList, T: RequiredTypeSet> SpecializedJsonCredential<S,
     }
 }
 
-impl<S, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> JsonLdObject for SpecializedJsonCredential<S, C, T> {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         Some(Cow::Borrowed(self.context.as_ref()))
     }
 }
 
-impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
     fn json_ld_type(&self) -> JsonLdTypes {
         self.types.to_json_ld_types()
     }
@@ -155,19 +154,20 @@ impl<S, C, T> JsonLdNodeObject for SpecializedJsonCredential<S, C, T> {
 impl<S, C, T, E, P> ValidateClaims<E, P> for SpecializedJsonCredential<S, C, T>
 where
     E: DateTimeProvider,
+    S: std::clone::Clone,
 {
     fn validate_claims(&self, env: &E, _proof: &P) -> ClaimsValidity {
         crate::v2::Credential::validate_credential(self, env)
     }
 }
 
-impl<S, C, T> crate::MaybeIdentified for SpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> crate::MaybeIdentified for SpecializedJsonCredential<S, C, T> {
     fn id(&self) -> Option<&Uri> {
         self.id.as_deref()
     }
 }
 
-impl<S, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
     type Subject = S;
     type Description = InternationalString;
     type Issuer = IdOr<IdentifiedObject>;
@@ -221,7 +221,7 @@ impl<S, C, T> crate::v2::Credential for SpecializedJsonCredential<S, C, T> {
 
 impl<S, C, T> ssi_json_ld::Expandable for SpecializedJsonCredential<S, C, T>
 where
-    S: Serialize,
+    S: Serialize + std::clone::Clone,
 {
     type Error = JsonLdError;
 

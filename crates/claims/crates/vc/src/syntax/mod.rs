@@ -3,6 +3,7 @@ mod credential;
 mod non_empty_object;
 mod presentation;
 mod types;
+mod non_empty_vec;
 
 use std::collections::BTreeMap;
 
@@ -10,6 +11,7 @@ pub use context::*;
 pub use credential::*;
 use iref::{Uri, UriBuf};
 pub use non_empty_object::*;
+pub use non_empty_vec::*;
 pub use presentation::*;
 use serde::{Deserialize, Serialize};
 pub use types::*;
@@ -127,6 +129,39 @@ pub(crate) mod value_or_array {
         match SingleOrArray::deserialize(deserializer)? {
             SingleOrArray::Array(v) => Ok(v),
             SingleOrArray::Single(t) => Ok(vec![t]),
+        }
+    }
+}
+
+pub(crate) mod non_empty_value_or_array {
+    use serde::{de, Deserialize, Serialize};
+
+    use super::NonEmptyVec;
+
+    pub fn serialize<T: Serialize, S>(value: &[T], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match value.split_first() {
+            Some((first, [])) => first.serialize(serializer),
+            _ => value.serialize(serializer),
+        }
+    }
+
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum SingleOrArray<T> {
+        Array(Vec<T>),
+        Single(T),
+    }
+
+    pub fn deserialize<'de, T: Deserialize<'de> + std::clone::Clone, D>(deserializer: D) -> Result<NonEmptyVec<T>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        match SingleOrArray::deserialize(deserializer)? {
+            SingleOrArray::Array(v) => v.try_into().map_err(de::Error::custom),
+            SingleOrArray::Single(t) => Ok(vec![t].try_into().unwrap()),
         }
     }
 }

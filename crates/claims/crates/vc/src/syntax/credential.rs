@@ -29,12 +29,12 @@ pub type AnyJsonCredential<S = json_syntax::Object> = AnySpecializedJsonCredenti
         deserialize = "S: Deserialize<'de>, C: RequiredContextList, T: RequiredTypeSet"
     )
 )]
-pub enum AnySpecializedJsonCredential<S = json_syntax::Object, C = (), T = ()> {
+pub enum AnySpecializedJsonCredential<S: std::clone::Clone = json_syntax::Object, C = (), T = ()> {
     V1(v1::syntax::SpecializedJsonCredential<S, C, T>),
     V2(v2::syntax::SpecializedJsonCredential<S, C, T>),
 }
 
-impl<S, C, T> JsonLdObject for AnySpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> JsonLdObject for AnySpecializedJsonCredential<S, C, T> {
     fn json_ld_context(&self) -> Option<Cow<ssi_json_ld::syntax::Context>> {
         match self {
             Self::V1(c) => c.json_ld_context(),
@@ -43,7 +43,7 @@ impl<S, C, T> JsonLdObject for AnySpecializedJsonCredential<S, C, T> {
     }
 }
 
-impl<S, C, T> JsonLdNodeObject for AnySpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> JsonLdNodeObject for AnySpecializedJsonCredential<S, C, T> {
     fn json_ld_type(&self) -> JsonLdTypes {
         match self {
             Self::V1(c) => c.json_ld_type(),
@@ -55,6 +55,7 @@ impl<S, C, T> JsonLdNodeObject for AnySpecializedJsonCredential<S, C, T> {
 impl<S, C, T, E, P> ValidateClaims<E, P> for AnySpecializedJsonCredential<S, C, T>
 where
     E: DateTimeProvider,
+    S: std::clone::Clone,
 {
     fn validate_claims(&self, env: &E, proof: &P) -> ClaimsValidity {
         match self {
@@ -64,7 +65,7 @@ where
     }
 }
 
-impl<S, C, T> MaybeIdentified for AnySpecializedJsonCredential<S, C, T> {
+impl<S: std::clone::Clone, C, T> MaybeIdentified for AnySpecializedJsonCredential<S, C, T> {
     fn id(&self) -> Option<&Uri> {
         match self {
             Self::V1(c) => c.id(),
@@ -75,7 +76,7 @@ impl<S, C, T> MaybeIdentified for AnySpecializedJsonCredential<S, C, T> {
 
 impl<S, C, T> ssi_json_ld::Expandable for AnySpecializedJsonCredential<S, C, T>
 where
-    S: Serialize,
+    S: Serialize + std::clone::Clone,
 {
     type Error = JsonLdError;
 
