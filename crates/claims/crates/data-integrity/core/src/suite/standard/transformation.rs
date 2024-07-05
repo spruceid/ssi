@@ -72,7 +72,7 @@ pub trait TypedTransformationAlgorithm<S: CryptographicSuite, T, C>:
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<S>,
-        transformation_options: Option<TransformationOptions<S>>,
+        transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError>;
 }
 
@@ -82,14 +82,14 @@ impl<S: CryptographicSuite> TransformationAlgorithm<S> for JsonObjectTransformat
     type Output = json_syntax::Object;
 }
 
-impl<S: CryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, C>
+impl<S: StandardCryptographicSuite, T: Serialize, C> TypedTransformationAlgorithm<S, T, C>
     for JsonObjectTransformation
 {
     async fn transform(
         _context: &C,
         data: &T,
         _options: ProofConfigurationRef<'_, S>,
-        _transformation_options: Option<TransformationOptions<S>>,
+        _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
         json_syntax::to_value(data)
             .map_err(TransformationError::JsonSerialization)?

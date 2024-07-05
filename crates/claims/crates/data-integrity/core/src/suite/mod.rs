@@ -58,12 +58,20 @@ pub trait CryptographicSuite: Clone {
     fn type_(&self) -> TypeRef;
 
     /// Generates a proof configuration from input options.
-    fn configure(
+    fn configure_signature(
         &self,
         proof_options: InputProofOptions<Self>,
         signature_options: InputSignatureOptions<Self>,
     ) -> Result<(ProofConfiguration<Self>, TransformationOptions<Self>), ConfigurationError> {
-        Self::Configuration::configure(self, proof_options, signature_options)
+        Self::Configuration::configure_signature(self, proof_options, signature_options)
+    }
+
+    /// Generates a proof configuration from input options.
+    fn configure_verification(
+        &self,
+        verification_options: &InputVerificationOptions<Self>,
+    ) -> Result<TransformationOptions<Self>, ConfigurationError> {
+        Self::Configuration::configure_verification(self, verification_options)
     }
 
     /// Generates a verifiable document secured with this cryptographic suite.
@@ -81,7 +89,7 @@ pub trait CryptographicSuite: Clone {
         Self: CryptographicSuiteSigning<T, C, R, S>,
     {
         let (proof_configuration, transformation_options) =
-            self.configure(proof_options, signature_options)?;
+            self.configure_signature(proof_options, signature_options)?;
         let proof_configuration_ref = proof_configuration.borrowed();
         let signature = self
             .generate_signature(

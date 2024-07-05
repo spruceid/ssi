@@ -83,7 +83,7 @@ mod tests {
 
     use crate::{
         bbs_2023::{
-            hashing::BaseHashData, transformation::TransformedBase, Bbs2023InputOptions,
+            hashing::BaseHashData, transformation::TransformedBase, Bbs2023SignatureOptions,
             FeatureOption, HashData, HmacKey,
         },
         Bbs2023,
@@ -185,7 +185,7 @@ _:b5 <https://windsurf.grotto-networking.com/selective#year> \"2023\"^^<http://w
             signer,
             HashData::Base(BaseHashData {
                 transformed_document: TransformedBase {
-                    options: Bbs2023InputOptions {
+                    options: Bbs2023SignatureOptions {
                         mandatory_pointers: MANDATORY_POINTERS.clone(),
                         feature_option: FeatureOption::Baseline,
                         commitment_with_proof: None,

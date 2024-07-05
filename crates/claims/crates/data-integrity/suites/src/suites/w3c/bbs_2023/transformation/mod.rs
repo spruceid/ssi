@@ -1,4 +1,4 @@
-use super::{Bbs2023InputOptions, HmacKey};
+use super::{Bbs2023SignatureOptions, HmacKey};
 use crate::Bbs2023;
 use hmac::Hmac;
 use k256::sha2::Sha256;
@@ -32,7 +32,7 @@ where
         context: &C,
         unsecured_document: &T,
         proof_configuration: ProofConfigurationRef<'_, Bbs2023>,
-        transformation_options: Option<Bbs2023InputOptions>,
+        transformation_options: Bbs2023TransformationOptions,
     ) -> Result<Self::Output, TransformationError> {
         let canonical_configuration = proof_configuration
             .expand(context, unsecured_document)
@@ -41,15 +41,17 @@ where
             .nquads_lines();
 
         match transformation_options {
-            Some(transform_options) => base::base_proof_transformation(
-                context.loader(),
-                unsecured_document,
-                canonical_configuration,
-                transform_options,
-            )
-            .await
-            .map(Transformed::Base),
-            None => derived::create_verify_data1(
+            Bbs2023TransformationOptions::BaseSignature(transform_options) => {
+                base::base_proof_transformation(
+                    context.loader(),
+                    unsecured_document,
+                    canonical_configuration,
+                    transform_options,
+                )
+                .await
+                .map(Transformed::Base)
+            }
+            Bbs2023TransformationOptions::DerivedVerification => derived::create_verify_data1(
                 context.loader(),
                 unsecured_document,
                 canonical_configuration,
@@ -104,7 +106,7 @@ impl Transformed {
 /// See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-transformation-bbs-2023>
 #[derive(Clone)]
 pub struct TransformedBase {
-    pub options: Bbs2023InputOptions,
+    pub options: Bbs2023SignatureOptions,
     pub mandatory: Vec<LexicalQuad>,
     pub non_mandatory: Vec<LexicalQuad>,
     pub hmac_key: HmacKey,
@@ -116,4 +118,10 @@ pub struct TransformedDerived {
     pub canonical_configuration: Vec<String>,
     pub quads: Vec<LexicalQuad>,
     pub canonical_id_map: NormalizingSubstitution,
+}
+
+#[derive(Clone)]
+pub enum Bbs2023TransformationOptions {
+    BaseSignature(Bbs2023SignatureOptions),
+    DerivedVerification,
 }

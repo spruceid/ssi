@@ -275,7 +275,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
-        _transformation_options: Option<TransformationOptions<S>>,
+        _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, ssi_data_integrity_core::suite::standard::TransformationError> {
         let types = match proof_configuration.options.types() {
             Some(TypesOrURI::Object(types)) => Some(types.clone()),

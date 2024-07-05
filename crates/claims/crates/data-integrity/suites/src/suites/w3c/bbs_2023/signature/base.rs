@@ -97,7 +97,7 @@ where
     Ok(Bbs2023Signature::encode_base(
         &signature,
         bbs_header,
-        &public_key,
+        public_key,
         hmac_key,
         mandatory_pointers,
         description,

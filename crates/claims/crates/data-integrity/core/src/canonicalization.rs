@@ -39,7 +39,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, S>,
-        _transformation_options: Option<TransformationOptions<S>>,
+        _transformation_options: TransformationOptions<S>,
     ) -> Result<Self::Output, TransformationError> {
         let mut ld = LdEnvironment::default();
 

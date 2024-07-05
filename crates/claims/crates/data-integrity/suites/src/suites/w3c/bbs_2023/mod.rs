@@ -10,7 +10,7 @@ use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_verification_methods::Multikey;
 
 pub(crate) mod transformation;
-pub use transformation::{Bbs2023Transformation, Transformed};
+pub use transformation::{Bbs2023Transformation, Bbs2023TransformationOptions, Transformed};
 
 mod hashing;
 pub use hashing::{Bbs2023Hashing, HashData};
@@ -60,7 +60,7 @@ impl TryFrom<Type> for Bbs2023 {
 }
 
 #[derive(Clone)]
-pub struct Bbs2023InputOptions {
+pub struct Bbs2023SignatureOptions {
     pub mandatory_pointers: Vec<JsonPointerBuf>,
 
     pub feature_option: FeatureOption,
@@ -91,20 +91,33 @@ impl ConfigurationAlgorithm<Bbs2023> for Bbs2023Configuration {
     type InputVerificationMethod = Multikey;
 
     /// Input suite-specific proof options.
-    type InputProofOptions = ();
+    type InputSuiteOptions = ();
 
     /// Input signature options.
-    type InputSignatureOptions = Bbs2023InputOptions;
+    type InputSignatureOptions = Bbs2023SignatureOptions;
+
+    type InputVerificationOptions = ();
 
     /// Document transformation options.
-    type TransformationOptions = Bbs2023InputOptions;
+    type TransformationOptions = Bbs2023TransformationOptions;
 
-    fn configure(
+    fn configure_signature(
         type_: &Bbs2023,
         options: InputProofOptions<Bbs2023>,
-        signature_options: Bbs2023InputOptions,
-    ) -> Result<(ProofConfiguration<Bbs2023>, Bbs2023InputOptions), ConfigurationError> {
+        signature_options: Bbs2023SignatureOptions,
+    ) -> Result<(ProofConfiguration<Bbs2023>, Bbs2023TransformationOptions), ConfigurationError>
+    {
         let proof_configuration = options.into_configuration(*type_)?;
-        Ok((proof_configuration, signature_options))
+        Ok((
+            proof_configuration,
+            Bbs2023TransformationOptions::BaseSignature(signature_options),
+        ))
+    }
+
+    fn configure_verification(
+        _suite: &Bbs2023,
+        _verification_options: &ssi_data_integrity_core::suite::InputVerificationOptions<Bbs2023>,
+    ) -> Result<Self::TransformationOptions, ConfigurationError> {
+        Ok(Bbs2023TransformationOptions::DerivedVerification)
     }
 }

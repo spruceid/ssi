@@ -8,7 +8,7 @@ use ssi_di_sd_primitives::group::canonicalize_and_group;
 use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdNodeObject};
 use ssi_rdf::LexicalInterpretation;
 
-use crate::bbs_2023::{Bbs2023InputOptions, HmacKey};
+use crate::bbs_2023::{Bbs2023SignatureOptions, HmacKey};
 
 use super::{create_shuffled_id_label_map_function, TransformedBase};
 
@@ -16,7 +16,7 @@ pub async fn base_proof_transformation<T>(
     loader: &impl ssi_json_ld::Loader,
     unsecured_document: &T,
     canonical_configuration: Vec<String>,
-    transform_options: Bbs2023InputOptions,
+    transform_options: Bbs2023SignatureOptions,
 ) -> Result<TransformedBase, TransformationError>
 where
     T: JsonLdNodeObject + Expandable,
@@ -84,7 +84,10 @@ mod tests {
     use ssi_verification_methods::{ProofPurpose, ReferenceOrOwned};
 
     use crate::{
-        bbs_2023::{Bbs2023InputOptions, Bbs2023Transformation, FeatureOption, HmacKey},
+        bbs_2023::{
+            Bbs2023SignatureOptions, Bbs2023Transformation, Bbs2023TransformationOptions,
+            FeatureOption, HmacKey,
+        },
         Bbs2023,
     };
 
@@ -165,7 +168,7 @@ mod tests {
             &context,
             &*UNSIGNED_BASE_DOCUMENT,
             proof_configuration.borrowed(),
-            Some(Bbs2023InputOptions {
+            Bbs2023TransformationOptions::BaseSignature(Bbs2023SignatureOptions {
                 mandatory_pointers: MANDATORY_POINTERS.clone(),
                 feature_option: FeatureOption::Baseline,
                 commitment_with_proof: None,

@@ -232,7 +232,7 @@ where
 
     let bbs_proof = match (&feature_option, &decoded_base_proof.description) {
         (DerivedFeatureOption::Baseline, Bbs2023SignatureDescription::Baseline) => proof_gen(
-            &pk,
+            pk,
             &decoded_base_proof.signature_bytes,
             &decoded_base_proof.bbs_header,
             presentation_header,

@@ -182,6 +182,7 @@ macro_rules! crypto_suites {
                 verifier: &V,
                 claims: &T,
                 proof: ssi_data_integrity_core::ProofRef<'_, Self>,
+                transformation_options: ()
             ) -> Result<ssi_claims_core::ProofValidity, ssi_claims_core::ProofValidationError> {
                 match self {
                     $(
@@ -197,7 +198,8 @@ macro_rules! crypto_suites {
                                 &ssi_data_integrity_suites::$name,
                                 &verifier,
                                 claims,
-                                Self::project_proof(proof)
+                                Self::project_proof(proof),
+                                transformation_options
                             ).await
                         },
                     )*
@@ -398,11 +400,12 @@ macro_rules! crypto_suites {
         #[allow(unused_variables)]
         impl ssi_data_integrity_core::suite::ConfigurationAlgorithm<AnySuite> for AnyConfigurationAlgorithm {
             type InputVerificationMethod = ssi_verification_methods::AnyMethod;
-            type InputProofOptions = crate::AnyInputSuiteOptions;
+            type InputSuiteOptions = crate::AnyInputSuiteOptions;
             type InputSignatureOptions = ();
+            type InputVerificationOptions = ();
             type TransformationOptions = ();
 
-            fn configure(
+            fn configure_signature(
                 suite: &AnySuite,
                 options: ssi_data_integrity_core::suite::InputProofOptions<AnySuite>,
                 signature_options: ()
@@ -415,7 +418,7 @@ macro_rules! crypto_suites {
                                 options
                             )?;
 
-                            let (proof_configuration, transformation_options) = <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure(
+                            let (proof_configuration, transformation_options) = <ssi_data_integrity_suites::$name as ssi_data_integrity_core::CryptographicSuite>::configure_signature(
                                 &ssi_data_integrity_suites::$name,
                                 options,
                                 signature_options
@@ -436,6 +439,13 @@ macro_rules! crypto_suites {
                         ()
                     ))
                 }
+            }
+
+            fn configure_verification(
+                _suite: &AnySuite,
+                _verification_options: &()
+            ) -> Result<(), ssi_data_integrity_core::suite::ConfigurationError> {
+                Ok(())
             }
         }
 

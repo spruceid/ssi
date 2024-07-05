@@ -44,7 +44,7 @@ impl VerificationAlgorithm<Bbs2023> for Bbs2023SignatureAlgorithm {
 
                 match data.feature_option {
                     DerivedFeatureOption::Baseline => proof_verify(
-                        &public_key,
+                        public_key,
                         &data.base_signature,
                         &bbs_header,
                         data.presentation_header.as_deref(),

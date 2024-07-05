@@ -1,4 +1,4 @@
-use super::CryptographicSuite;
+use super::{CryptographicSuite, TransformationOptions};
 use crate::ProofRef;
 use ssi_claims_core::{ProofValidationError, ProofValidity};
 
@@ -9,5 +9,6 @@ pub trait CryptographicSuiteVerification<T, V>: CryptographicSuite {
         verifier: &V,
         claims: &T,
         proof: ProofRef<'_, Self>,
+        transformation_options: TransformationOptions<Self>,
     ) -> Result<ProofValidity, ProofValidationError>;
 }

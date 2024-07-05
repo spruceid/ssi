@@ -104,6 +104,19 @@ pub enum Invalid {
     Proof(#[from] InvalidProof),
 }
 
+/// Arbitrary resource provider.
+pub trait ResourceProvider<T> {
+    /// Returns a reference to the resource of type `T`.
+    fn get_resource(&self) -> &T;
+}
+
+/// Anything can return the unit resource.
+impl<T> ResourceProvider<()> for T {
+    fn get_resource(&self) -> &() {
+        &()
+    }
+}
+
 /// Type that provides a public key resolver.
 pub trait ResolverProvider {
     /// Public key resolver.

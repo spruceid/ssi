@@ -112,7 +112,7 @@ where
         context: &C,
         data: &T,
         proof_configuration: ProofConfigurationRef<'_, Eip712Signature2021>,
-        _transformation_options: Option<()>,
+        _transformation_options: (),
     ) -> Result<ssi_eip712::TypedData, TransformationError> {
         let mut ld = LdEnvironment::default();
 

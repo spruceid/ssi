@@ -85,7 +85,7 @@ impl MultiSigningMethod<BBSplusSecretKey, Bbs> for Multikey {
             Bbs::Baseline { header } => Signature::<BBSplus<Bls12381Sha256>>::sign(
                 Some(messages),
                 secret,
-                &pk,
+                pk,
                 Some(&header),
             )
             .map_err(MessageSignatureError::signature_failed)?
@@ -99,7 +99,7 @@ impl MultiSigningMethod<BBSplusSecretKey, Bbs> for Multikey {
                 let signer_blind = signer_blind.map(|b| BlindFactor::from_bytes(&b).unwrap());
                 BlindSignature::<BBSplus<Bls12381Sha256>>::blind_sign(
                     secret,
-                    &pk,
+                    pk,
                     commitment_with_proof.as_deref(),
                     Some(&header),
                     Some(messages),
