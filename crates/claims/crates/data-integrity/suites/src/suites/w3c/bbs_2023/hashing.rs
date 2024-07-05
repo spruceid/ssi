@@ -5,6 +5,7 @@ use ssi_data_integrity_core::{
     ProofConfigurationRef,
 };
 use ssi_rdf::{urdna2015::NormalizingSubstitution, IntoNQuads};
+use ssi_verification_methods::Multikey;
 
 use crate::Bbs2023;
 
@@ -21,6 +22,7 @@ impl HashingAlgorithm<Bbs2023> for Bbs2023Hashing {
     fn hash(
         input: TransformedData<Bbs2023>,
         _proof_configuration: ProofConfigurationRef<Bbs2023>,
+        _verification_method: &Multikey,
     ) -> Result<Self::Output, HashingError> {
         match input {
             Transformed::Base(t) => {

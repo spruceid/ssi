@@ -2,8 +2,6 @@
 //!
 //! See: <https://www.w3.org/TR/vc-di-ecdsa/#ecdsa-rdfc-2019>
 use core::fmt;
-
-use k256::sha2::{Sha256, Sha384};
 use ssi_data_integrity_core::{
     canonicalization::{
         CanonicalClaimsAndConfiguration, CanonicalizeClaimsAndConfiguration,
@@ -14,9 +12,9 @@ use ssi_data_integrity_core::{
         standard::{HashingAlgorithm, HashingError},
         NoConfiguration,
     },
-    ProofConfigurationRef, StandardCryptographicSuite, TypeRef,
+    CryptosuiteStr, ProofConfigurationRef, StandardCryptographicSuite, TypeRef,
 };
-use ssi_verification_methods::Multikey;
+use ssi_verification_methods::{multikey::DecodedMultikey, Multikey};
 use static_iref::iri;
 
 /// The `ecdsa-rdfc-2019` cryptosuite.
@@ -45,7 +43,7 @@ impl StandardCryptographicSuite for EcdsaRdfc2019 {
     type ProofOptions = ();
 
     fn type_(&self) -> TypeRef {
-        TypeRef::DataIntegrityProof("ecdsa-rdfc-2019")
+        TypeRef::DataIntegrityProof(CryptosuiteStr::new("ecdsa-rdfc-2019").unwrap())
     }
 }
 
@@ -59,19 +57,29 @@ impl HashingAlgorithm<EcdsaRdfc2019> for EcdsaRdfc2019HashingAlgorithm {
         proof_configuration: ProofConfigurationRef<EcdsaRdfc2019>,
         verification_method: &Multikey,
     ) -> Result<Self::Output, HashingError> {
-        match verification_method.public_key.codec() {
-            ssi_multicodec::P256_PUB => HashCanonicalClaimsAndConfiguration::<Sha256>::hash(
-                input,
-                proof_configuration,
-                verification_method,
-            )
-            .map(EcdsaRdfc2019Hash::Sha256),
-            ssi_multicodec::P384_PUB => HashCanonicalClaimsAndConfiguration::<Sha384>::hash(
-                input,
-                proof_configuration,
-                verification_method,
-            )
-            .map(EcdsaRdfc2019Hash::Sha384),
+        match verification_method
+            .public_key
+            .decode()
+            .map_err(|_| HashingError::InvalidKey)?
+        {
+            #[cfg(feature = "secp256r1")]
+            DecodedMultikey::P256(_) => {
+                HashCanonicalClaimsAndConfiguration::<k256::sha2::Sha256>::hash(
+                    input,
+                    proof_configuration,
+                    verification_method,
+                )
+                .map(EcdsaRdfc2019Hash::Sha256)
+            }
+            #[cfg(feature = "secp384r1")]
+            DecodedMultikey::P384(_) => {
+                HashCanonicalClaimsAndConfiguration::<k256::sha2::Sha384>::hash(
+                    input,
+                    proof_configuration,
+                    verification_method,
+                )
+                .map(EcdsaRdfc2019Hash::Sha384)
+            }
             _ => Err(HashingError::InvalidKey),
         }
     }
@@ -117,9 +125,15 @@ impl<O> AlgorithmSelection<Multikey, O> for ES256OrES384 {
         verification_method: &Multikey,
         _options: &O,
     ) -> Result<Self, AlgorithmSelectionError> {
-        match verification_method.public_key.codec() {
-            ssi_multicodec::P256_PUB => Ok(Self::ES256),
-            ssi_multicodec::P384_PUB => Ok(Self::ES384),
+        match verification_method
+            .public_key
+            .decode()
+            .map_err(|_| AlgorithmSelectionError::InvalidKey)?
+        {
+            #[cfg(feature = "secp256r1")]
+            DecodedMultikey::P256(_) => Ok(Self::ES256),
+            #[cfg(feature = "secp384r1")]
+            DecodedMultikey::P384(_) => Ok(Self::ES384),
             _ => Err(AlgorithmSelectionError::InvalidKey),
         }
     }

@@ -9,7 +9,7 @@ use ssi_data_integrity_core::{
     ProofConfigurationRef,
 };
 use ssi_di_sd_primitives::canonicalize::create_hmac_id_label_map_function;
-use ssi_json_ld::{ContextLoaderEnvironment, Expandable, ExpandedDocument, JsonLdNodeObject};
+use ssi_json_ld::{Expandable, ExpandedDocument, JsonLdLoaderProvider, JsonLdNodeObject};
 use ssi_rdf::{urdna2015::NormalizingSubstitution, LexicalInterpretation};
 use std::collections::HashMap;
 
@@ -24,7 +24,7 @@ impl TransformationAlgorithm<Bbs2023> for Bbs2023Transformation {
 
 impl<T, C> TypedTransformationAlgorithm<Bbs2023, T, C> for Bbs2023Transformation
 where
-    C: ContextLoaderEnvironment,
+    C: JsonLdLoaderProvider,
     T: Serialize + JsonLdNodeObject + Expandable,
     T::Expanded<LexicalInterpretation, ()>: Into<ExpandedDocument>,
 {

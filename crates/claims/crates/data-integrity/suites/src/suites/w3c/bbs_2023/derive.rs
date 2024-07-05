@@ -226,7 +226,7 @@ where
         .map(|quad| format!("{quad} .\n").into_bytes())
         .collect();
 
-    let DecodedMultikey::Bls12_381(pk) = verification_method.decode()? else {
+    let DecodedMultikey::Bls12_381(pk) = verification_method.public_key.decode()? else {
         return Err(DeriveError::InvalidPublicKey);
     };
 

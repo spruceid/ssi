@@ -5,7 +5,7 @@ pub use codec::*;
 
 include!(concat!(env!("OUT_DIR"), "/table.rs"));
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
     Varint(#[from] unsigned_varint::decode::Error),

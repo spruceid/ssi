@@ -1,5 +1,11 @@
 use iref::{Iri, IriBuf, UriBuf};
 use multibase::Base;
+use rdf_types::{
+    dataset::PatternMatchingDataset,
+    interpretation::{ReverseIriInterpretation, ReverseLiteralInterpretation},
+    vocabulary::{IriVocabularyMut, LiteralVocabulary},
+    Interpretation, Vocabulary,
+};
 use serde::{Deserialize, Serialize};
 use ssi_claims_core::{InvalidProof, ProofValidationError, ProofValidity, SignatureError};
 use ssi_jwk::JWK;
@@ -10,7 +16,7 @@ use ssi_verification_methods_core::{
     VerifyBytes,
 };
 use static_iref::iri;
-use std::{borrow::Cow, hash::Hash};
+use std::{borrow::Cow, hash::Hash, str::FromStr, sync::OnceLock};
 
 use crate::{
     ExpectedType, GenericVerificationMethod, InvalidVerificationMethod, TypedVerificationMethod,
@@ -53,10 +59,10 @@ pub struct Multikey {
     /// [MULTIBASE]: <https://github.com/multiformats/multibase>
     #[serde(rename = "publicKeyMultibase")]
     #[ld("sec:publicKeyMultibase")]
-    pub public_key: MultibaseBuf,
+    pub public_key: PublicKey,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum InvalidPublicKey {
     #[error(transparent)]
     Multibase(#[from] multibase::Error),
@@ -88,12 +94,7 @@ impl Multikey {
     pub const IRI: &'static Iri = iri!("https://w3id.org/security#Multikey");
 
     pub fn public_key_jwk(&self) -> Option<JWK> {
-        self.decode().ok()?.to_jwk()
-    }
-
-    pub fn decode(&self) -> Result<DecodedMultikey, InvalidPublicKey> {
-        let pk_multi_encoded = MultiEncodedBuf::new(self.public_key.decode()?.1)?;
-        pk_multi_encoded.decode().map_err(Into::into)
+        self.public_key.decode().ok()?.to_jwk()
     }
 
     #[cfg(feature = "ed25519")]
@@ -113,7 +114,7 @@ impl Multikey {
         Self {
             id,
             controller,
-            public_key: MultibaseBuf::encode(Base::Base58Btc, MultiEncodedBuf::encode(public_key)),
+            public_key: PublicKey::new(public_key),
         }
     }
 }
@@ -169,29 +170,6 @@ impl<A: Into<ssi_jwk::Algorithm>> VerifyBytes<A> for Multikey {
             ssi_jws::verify_bytes(algorithm.into(), signing_bytes, &key, signature)
                 .map_err(|_| InvalidProof::Signature),
         )
-    }
-}
-
-#[cfg(feature = "ed25519")]
-impl VerifyBytes<ssi_jwk::algorithm::EdDSA> for Multikey {
-    fn verify_bytes(
-        &self,
-        _algorithm: ssi_jwk::algorithm::EdDSA,
-        signing_bytes: &[u8],
-        signature: &[u8],
-    ) -> Result<ProofValidity, ProofValidationError> {
-        #[allow(unreachable_patterns)]
-        match self.decode()? {
-            DecodedMultikey::Ed25519(public_key) => {
-                use ed25519_dalek::Verifier;
-                let signature = ed25519_dalek::Signature::try_from(signature)
-                    .map_err(|_| ProofValidationError::InvalidSignature)?;
-                Ok(public_key
-                    .verify(signing_bytes, &signature)
-                    .map_err(|_| InvalidProof::Signature))
-            }
-            _ => Err(ProofValidationError::InvalidKey),
-        }
     }
 }
 
@@ -268,6 +246,143 @@ impl TryFrom<GenericVerificationMethod> for Multikey {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct PublicKey {
+    pub encoded: MultibaseBuf,
+
+    #[serde(skip)]
+    decoded: OnceLock<Result<DecodedMultikey, InvalidPublicKey>>,
+}
+
+impl PublicKey {
+    pub fn new(public_key: &impl MultiCodec) -> Self {
+        Self::from_multibase(MultibaseBuf::encode(
+            Base::Base58Btc,
+            MultiEncodedBuf::encode(public_key),
+        ))
+    }
+
+    pub fn from_multibase(encoded: MultibaseBuf) -> Self {
+        Self {
+            encoded,
+            decoded: OnceLock::new(),
+        }
+    }
+
+    pub fn decode(&self) -> Result<&DecodedMultikey, InvalidPublicKey> {
+        self.decoded
+            .get_or_init(|| {
+                let pk_multi_encoded = MultiEncodedBuf::new(self.encoded.decode()?.1)?;
+                pk_multi_encoded.decode().map_err(Into::into)
+            })
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+}
+
+impl From<MultibaseBuf> for PublicKey {
+    fn from(value: MultibaseBuf) -> Self {
+        Self::from_multibase(value)
+    }
+}
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.encoded == other.encoded
+    }
+}
+
+impl Eq for PublicKey {}
+
+impl PartialOrd for PublicKey {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for PublicKey {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.encoded.cmp(&other.encoded)
+    }
+}
+
+impl Hash for PublicKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.encoded.hash(state)
+    }
+}
+
+impl FromStr for PublicKey {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        MultibaseBuf::from_str(s).map(Self::from_multibase)
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataResource<I, V> for PublicKey
+where
+    V: IriVocabularyMut,
+{
+    fn interpretation(
+        &self,
+        vocabulary: &mut V,
+        interpretation: &mut I,
+    ) -> linked_data::ResourceInterpretation<I, V> {
+        self.encoded.interpretation(vocabulary, interpretation)
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataPredicateObjects<I, V> for PublicKey
+where
+    V: IriVocabularyMut,
+{
+    fn visit_objects<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::PredicateObjectsVisitor<I, V>,
+    {
+        self.encoded.visit_objects(visitor)
+    }
+}
+
+impl<V: Vocabulary, I: Interpretation> linked_data::LinkedDataSubject<I, V> for PublicKey {
+    fn visit_subject<S>(&self, visitor: S) -> Result<S::Ok, S::Error>
+    where
+        S: linked_data::SubjectVisitor<I, V>,
+    {
+        self.encoded.visit_subject(visitor)
+    }
+}
+
+impl<V: Vocabulary, I> linked_data::LinkedDataDeserializeSubject<I, V> for PublicKey
+where
+    V: LiteralVocabulary,
+    I: ReverseIriInterpretation<Iri = V::Iri> + ReverseLiteralInterpretation<Literal = V::Literal>,
+{
+    fn deserialize_subject_in<D>(
+        vocabulary: &V,
+        interpretation: &I,
+        dataset: &D,
+        graph: Option<&I::Resource>,
+        resource: &<I as Interpretation>::Resource,
+        context: linked_data::Context<I>,
+    ) -> Result<Self, linked_data::FromLinkedDataError>
+    where
+        D: PatternMatchingDataset<Resource = I::Resource>,
+    {
+        Ok(Self::from_multibase(MultibaseBuf::deserialize_subject_in(
+            vocabulary,
+            interpretation,
+            dataset,
+            graph,
+            resource,
+            context,
+        )?))
+    }
+}
+
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum DecodedMultikey {
     #[cfg(feature = "ed25519")]

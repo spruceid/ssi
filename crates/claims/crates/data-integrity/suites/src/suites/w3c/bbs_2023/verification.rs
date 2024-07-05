@@ -25,7 +25,7 @@ impl VerificationAlgorithm<Bbs2023> for Bbs2023SignatureAlgorithm {
                 // Verify Derived Proof algorithm.
                 // See: <https://www.w3.org/TR/vc-di-bbs/#verify-derived-proof-bbs-2023>
 
-                let DecodedMultikey::Bls12_381(public_key) = method.decode()? else {
+                let DecodedMultikey::Bls12_381(public_key) = method.public_key.decode()? else {
                     return Err(ProofValidationError::InvalidKey);
                 };
 
@@ -120,7 +120,7 @@ fn create_verify_data3<'a>(
 
 #[cfg(test)]
 mod tests {
-    use ssi_claims_core::VerifiableClaims;
+    use ssi_claims_core::VerificationParameters;
     use ssi_data_integrity_core::DataIntegrity;
     use ssi_verification_methods::Multikey;
     use static_iref::uri;
@@ -144,6 +144,7 @@ mod tests {
         let mut methods = HashMap::new();
         methods.insert(VERIFICATION_METHOD_IRI.to_owned(), verification_method);
 
-        assert!(document.verify(&methods).await.unwrap().is_ok())
+        let params = VerificationParameters::from_resolver(methods);
+        assert!(document.verify(params).await.unwrap().is_ok())
     }
 }

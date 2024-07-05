@@ -85,10 +85,7 @@ impl VerificationMethodResolver for MultikeyRing {
                     Ok(Cow::Owned(ssi_verification_methods::Multikey {
                         id: id.to_owned(),
                         controller: UriBuf::new(controller.to_owned().into_bytes()).unwrap(),
-                        public_key: ssi_verification_methods::multikey::PublicKey::decode(
-                            public_key,
-                        )
-                        .unwrap(),
+                        public_key: public_key.into(),
                     }))
                 }
                 None => Err(VerificationMethodResolutionError::UnknownKey),

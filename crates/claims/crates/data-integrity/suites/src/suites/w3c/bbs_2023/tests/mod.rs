@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 use rdf_types::{BlankIdBuf, VocabularyMut};
 use serde::{Deserialize, Serialize};
 use ssi_bbs::{BBSplusPublicKey, BBSplusSecretKey};
-use ssi_claims_core::{ClaimsValidity, Validate};
+use ssi_claims_core::{ClaimsValidity, ValidateClaims};
 use ssi_di_sd_primitives::JsonPointerBuf;
 use ssi_json_ld::{JsonLdError, JsonLdNodeObject, JsonLdObject, JsonLdTypes};
 use ssi_rdf::{Interpretation, LdEnvironment, LinkedDataResource, LinkedDataSubject};
@@ -43,8 +43,8 @@ impl JsonLdNodeObject for JsonCredential {
     }
 }
 
-impl<E, P> Validate<E, P> for JsonCredential {
-    fn validate(&self, _env: &E, _proof: &P) -> ClaimsValidity {
+impl<E, P> ValidateClaims<E, P> for JsonCredential {
+    fn validate_claims(&self, _env: &E, _proof: &P) -> ClaimsValidity {
         Ok(())
     }
 }

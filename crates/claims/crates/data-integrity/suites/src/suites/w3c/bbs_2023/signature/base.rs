@@ -22,7 +22,7 @@ where
     T::MessageSigner: MultiMessageSigner<Bbs>,
 {
     // See: <https://www.w3.org/TR/vc-di-bbs/#base-proof-serialization-bbs-2023>
-    let DecodedMultikey::Bls12_381(public_key) = verification_method.decode()? else {
+    let DecodedMultikey::Bls12_381(public_key) = verification_method.public_key.decode()? else {
         return Err(SignatureError::InvalidPublicKey);
     };
     let feature_option = hash_data.transformed_document.options.feature_option;
@@ -44,7 +44,7 @@ where
 
     let message_signer = signer
         .for_method(Cow::Borrowed(verification_method))
-        .await
+        .await?
         .ok_or(SignatureError::MissingSigner)?;
 
     let (algorithm, description) = match feature_option {
